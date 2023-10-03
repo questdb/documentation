@@ -1,0 +1,59 @@
+name: "Preview deploy"
+
+on:
+  pull_request:
+    types: ["opened", "edited", "synchronize"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.event.label.name == 'run-ci' }}
+    name: "build on Netlify"
+    runs-on: ubuntu-latest
+
+    env:
+      ALGOLIA_API_KEY: ${{ vars.ALGOLIA_API_KEY }}
+      ALGOLIA_APP_ID: ${{ vars.ALGOLIA_APP_ID }}
+      GOOGLE_ANALYTICS_ID: ${{ vars.GOOGLE_ANALYTICS_ID }}
+
+    steps:
+      - name: Checkout main website repo
+        uses: actions/checkout@v4
+        with:
+          repository: questdb/questdb.io
+          token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Checkout local docs
+        uses: actions/checkout@v3
+        with:
+          path: docs/.
+
+      - name: Move sidebars.js
+        run: |
+          mv docs/sidebars.js .
+
+      - uses: jsmrcaga/action-netlify-deploy@v2.0.0
+        with:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      # Comment PR if preview was successful and NETLIFY_PREVIEW_URL is set
+      - name: "Update PR"
+        if: ${{ env.NETLIFY_PREVIEW_URL }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            :rocket: **Build success!** 
+
+            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
+
+            Commit SHA: ${{ github.event.pull_request.head.sha }} 
+
+            > :package: Build generates a preview & updates link on each commit.
+
+          comment_tag: execution

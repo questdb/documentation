@@ -1,0 +1,37 @@
+import Button from "@theme/Button"
+
+<p>
+  <a href={props.href}>{props.label}</a>
+</p>
+
+:::note
+
+This package differs from others by not embedding Java.
+
+You should use it only if there is no package specific to your platform.  
+In practice, this often means ARM Linux.
+
+:::
+
+#### Java 11
+
+You need to have Java 11 installed locally. To check your installed version:
+
+```shell
+java -version
+```
+
+If you do not have Java installed, install one of the following supported
+packages for your operating system:
+
+- AdoptOpenJDK
+- Amazon Corretto
+- OpenJDK
+- Oracle Java
+
+Other Java distributions might work but are not tested.
+
+#### `JAVA_HOME` environment variable
+
+The environment variable `JAVA_HOME` needs to point to your Java 11 installation
+folder.

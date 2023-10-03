@@ -1,0 +1,114 @@
+{
+  "line.tcp.enabled": {
+    "default": "true",
+    "description": "Enable or disable line protocol over TCP."
+  },
+  "line.tcp.net.bind.to": {
+    "default": "0.0.0.0:9009",
+    "description": "IP address of the network interface to bind listener to and port. By default, TCP receiver listens on all network interfaces."
+  },
+  "line.tcp.net.connection.limit": {
+    "default": "256",
+    "description": "The maximum number permitted for simultaneous connections to the server. This value is intended to control server memory consumption."
+  },
+  "line.tcp.net.connection.timeout": {
+    "default": "300000",
+    "description": "Connection idle timeout in milliseconds. Connections are closed by the server when this timeout lapses."
+  },
+  "line.tcp.net.connection.hint": {
+    "default": "false",
+    "description": "Windows specific flag to overcome OS limitations on TCP backlog size"
+  },
+  "line.tcp.net.connection.rcvbuf": {
+    "default": "-1",
+    "description": "Maximum buffer receive size on each TCP socket. If value is -1, the socket receive buffer remains unchanged from OS default."
+  },
+  "line.tcp.net.connection.queue.timeout": {
+    "default": "5000",
+    "description": "Amount of time in milliseconds a connection can wait in the listen backlog queue before its refused. Connections will be aggressively removed from the backlog until the active connection limit is breached."
+  },
+  "line.tcp.auth.db.path": {
+    "default": "",
+    "description": "Path which points to the authentication db file."
+  },
+  "line.tcp.connection.pool.capacity": {
+    "default": "64",
+    "description": "The maximum amount of pooled connections this interface may have."
+  },
+  "line.tcp.timestamp": {
+    "default": "n",
+    "description": "Input timestamp resolution. Possible values are `n`, `u`, `ms`, `s` and `h`."
+  },
+  "line.tcp.msg.buffer.size": {
+    "default": "32768",
+    "description": "Size of the buffer read from queue. Maximum size of write request, regardless of the number of measurements."
+  },
+  "line.tcp.maintenance.job.interval": {
+    "default": "1000",
+    "description": "Maximum amount of time (in milliseconds) between maintenance jobs committing any uncommitted data on inactive tables."
+  },
+  "line.tcp.min.idle.ms.before.writer.release": {
+    "default": "500",
+    "description": "Minimum amount of idle time (in milliseconds) before a table writer is released."
+  },
+  "line.tcp.commit.interval.fraction": {
+    "default": "0.5",
+    "description": "Commit lag fraction. Used to calculate commit interval for the table according to the following formula: `commit_interval = commit_lag ∗ fraction`. The calculated commit interval defines how long uncommitted data will need to remain uncommitted."
+  },
+  "line.tcp.commit.interval.default": {
+    "default": "1000",
+    "description": "Default commit interval in milliseconds."
+  },
+  "line.tcp.max.measurement.size": {
+    "default": "32768",
+    "description": "Maximum size of any measurement."
+  },
+  "line.tcp.writer.queue.size": {
+    "default": "128",
+    "description": "Size of the queue between network I/O and writer jobs. Each queue entry represents a measurement."
+  },
+  "line.tcp.writer.worker.count": {
+    "default": "",
+    "description": "Number of dedicated I/O worker threads assigned to write data to tables. When `0`, the writer jobs will use the shared pool."
+  },
+  "line.tcp.writer.worker.affinity": {
+    "default": "",
+    "description": "Comma-separated list of thread numbers which should be pinned for line protocol ingestion over TCP. CPU core indexes are 0-based."
+  },
+  "line.tcp.writer.worker.sleep.threshold": {
+    "default": "1000",
+    "description": "Amount of subsequent loop iterations with no work done before the worker goes to sleep."
+  },
+  "line.tcp.writer.worker.yield.threshold": {
+    "default": "10",
+    "description": "Amount of subsequent loop iterations with no work done before the worker thread yields."
+  },
+  "line.tcp.writer.queue.capacity": {
+    "default": "128",
+    "description": "Size of the queue between the IO jobs and the writer jobs, each queue entry represents a measurement."
+  },
+  "line.tcp.writer.halt.on.error": {
+    "default": "false",
+    "description": "Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  },
+  "line.tcp.io.worker.count": {
+    "default": "",
+    "description": "Number of dedicated I/O worker threads assigned to parse TCP input. When `0`, the writer jobs will use the shared pool."
+  },
+  "line.tcp.io.worker.affinity": {
+    "default": "",
+    "description": "Comma-separated list of thread numbers which should be pinned for line protocol ingestion over TCP. CPU core indexes are 0-based."
+  },
+  "line.tcp.io.worker.sleep.threshold": {
+    "default": "1000",
+    "description": "Amount of subsequent loop iterations with no work done before the worker goes to sleep."
+  },
+  "line.tcp.io.worker.yield.threshold": {
+    "default": "10",
+    "description": "Amount of subsequent loop iterations with no work done before the worker thread yields."
+  },
+  "line.tcp.disconnect.on.error": {
+    "default": "true",
+    "description": "Disconnect TCP socket that sends malformed messages."
+  }
+}

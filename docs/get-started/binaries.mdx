@@ -1,0 +1,150 @@
+---
+title: Get started with QuestDB from the binaries
+sidebar_label: Binaries
+description:
+  How to install and launch QuestDB from the binaries which are available on the
+  Get QuestDB page.
+---
+
+import CodeBlock from "@theme/CodeBlock"
+import Button from "@theme/Button"
+import { getAssets } from "../../src/utils/get-assets"
+import { TabsPlatforms } from "../../src/modules/TabsPlatforms"
+import NoJrePrerequisite from "./_no-jre-prerequisites.partial.mdx"
+import RunWindows from "./_run-windows.partial.mdx"
+import UpgradeLinux from "./_upgrade-linux.partial.mdx"
+import UpgradeWindows from "./_upgrade-windows.partial.mdx"
+
+export const platforms = [
+  { label: "Linux", value: "linux" },
+  { label: "Windows", value: "windows" },
+  { label: "FreeBSD", value: "bsd" },
+  { label: "Any (no JVM)", value: "noJre" },
+]
+
+This page describes how to download and run QuestDB via binaries.
+
+- Linux or FreeBSD versions include `questdb.sh` script,
+- Windows version has `questdb.exe` executable,
+- For macOS, check out [Homebrew](/docs/get-started/homebrew/).
+
+## Download the binaries
+
+Use the following links to download a tarball for your operating system:
+
+<!-- prettier-ignore-start -->
+
+<TabsPlatforms
+  platforms={platforms}
+  render={({ href, platform }) =>
+    platform === "noJre" ? (
+      <NoJrePrerequisite href={href} label={href.split("/").reverse()[0]} />
+    ) : (
+      <Button href={href} uppercase={false} variant="plain">
+        {href.split("/").reverse()[0]}
+      </Button>
+    )
+  }
+/>
+
+<!-- prettier-ignore-end -->
+
+## Extract the tarballs
+
+<!-- prettier-ignore-start -->
+
+<TabsPlatforms
+  platforms={platforms}
+  render={({ href }) => (
+    <CodeBlock className="language-shell">
+      {`tar -xvf ${href.split("/").reverse()[0]}`}
+    </CodeBlock>
+  )}
+/>
+
+<!-- prettier-ignore-end -->
+
+## Run QuestDB
+
+This section lists commands to run QuestDB for different OSes. They can be used
+to run No JVM binaries.
+
+<!-- prettier-ignore-start -->
+
+<TabsPlatforms
+  platforms={[
+    { label: "Linux", value: "linux" },
+    { label: "Windows", value: "windows" },
+    { label: "FreeBSD", value: "bsd" },
+  ]}
+  render={({ platform }) => {
+    if (platform === "linux" || platform === "bsd") {
+      return (
+        <CodeBlock className="language-shell">./questdb.sh start</CodeBlock>
+      );
+    }
+    if (platform === "windows") {
+      return (<RunWindows/>); 
+    }
+  }}
+/>
+
+<!-- prettier-ignore-end -->
+
+The file structure is as the following:
+
+```bash
+
+/questdb
+├── conf
+├── db
+├── log
+└── public
+```
+
+For information about the file structure, see
+[root directory](/docs/concept/root-directory-structure/).
+
+## Upgrade QuestDB version
+
+This section lists commands to upgrade QuestDB for different OSes. They can be
+used to run No JVM binaries.
+
+:::note
+
+Check the [release notes](https://github.com/questdb/questdb/releases) and
+ensure that necessary [backup](/docs/operations/backup/) is completed.
+
+:::
+
+Steps to upgrade the QuestDB version:
+
+- Stop the instance
+- Overwrite the `bin` and `lib` folders with the new files
+- Restart the instance
+
+<!-- prettier-ignore-start -->
+
+<TabsPlatforms
+  platforms={[
+    { label: "Linux", value: "linux" },
+    { label: "Windows", value: "windows" },
+    { label: "FreeBSD", value: "bsd" },
+  ]}
+  render={({ platform }) => {
+    if (platform === "linux" || platform === "bsd") {
+      return (<UpgradeLinux/>);
+    }
+    if (platform === "windows") {
+      return (<UpgradeWindows/>);
+    }
+  }}
+/>
+
+<!-- prettier-ignore-end -->
+
+## Next steps
+
+Once you extracted the tarball, you are ready to use QuestDB. Navigate to our
+[command-line options](/docs/reference/command-line-options/) page to learn more
+about its usage.

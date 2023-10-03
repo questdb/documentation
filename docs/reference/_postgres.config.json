@@ -1,0 +1,146 @@
+{
+  "pg.enabled": {
+    "default": "true",
+    "description": "Configuration for enabling or disabling the Postres interface."
+  },
+  "pg.net.bind.to": {
+    "default": "0.0.0.0:8812",
+    "description": "IP address and port of Postgres wire protocol server. 0 means that the server will bind to all network interfaces. You can specify IP address of any individual network interface on your system."
+  },
+  "pg.net.connection.limit": {
+    "default": "64",
+    "description": "The maximum number permitted for simultaneous Postgres connections to the server. This value is intended to control server memory consumption."
+  },
+  "pg.net.connection.timeout": {
+    "default": "300000",
+    "description": "Connection idle timeout in milliseconds. Connections are closed by the server when this timeout lapses."
+  },
+  "pg.net.connection.rcvbuf": {
+    "default": "-1",
+    "description": "Maximum send buffer size on each TCP socket. If value is -1 socket send buffer remains unchanged from OS default."
+  },
+  "pg.net.connection.sndbuf": {
+    "default": "-1",
+    "description": "Maximum receive buffer size on each TCP socket. If value is -1, the socket receive buffer remains unchanged from OS default."
+  },
+  "pg.net.connection.hint": {
+    "default": "false",
+    "description": "Windows specific flag to overcome OS limitations on TCP backlog size"
+  },
+  "pg.net.connection.queue.timeout": {
+    "default": "300000",
+    "description": "Amount of time in milliseconds a connection can wait in the listen backlog queue before it is refused. Connections will be aggressively removed from the backlog until the active connection limit is breached."
+  },
+  "pg.security.readonly": {
+    "default": "false",
+    "description": "Forces PGWire read only mode when `true`, disabling commands which modify the data or data structure, e.g. INSERT, UPDATE, or CREATE TABLE."
+  },
+  "pg.character.store.capacity": {
+    "default": "4096",
+    "description": "Size of the CharacterStore."
+  },
+  "pg.character.store.pool.capacity": {
+    "default": "64",
+    "description": "Size of the CharacterStore pool capacity."
+  },
+  "pg.connection.pool.capacity": {
+    "default": "64",
+    "description": "The maximum amount of pooled connections this interface may have."
+  },
+  "pg.password": {
+    "default": "quest",
+    "description": "Postgres database password."
+  },
+  "pg.user": {
+    "default": "admin",
+    "description": "Postgres database username."
+  },
+  "pg.readonly.user.enabled": {
+    "default": "false",
+    "description": "Enable or disable Postgres database read-only user account. When enabled, this additional user can be used to open read-only connections to the database."
+  },
+  "pg.readonly.password": {
+    "default": "quest",
+    "description": "Postgres database read-only user password."
+  },
+  "pg.readonly.user": {
+    "default": "user",
+    "description": "Postgres database read-only user username."
+  },
+  "pg.select.cache.enabled": {
+    "default": "true",
+    "description": "Enable or disable the SELECT query cache. Cache capacity is `number_of_blocks * number_of_rows`."
+  },
+  "pg.select.cache.block.count": {
+    "default": "16",
+    "description": "Number of blocks to cache SELECT query execution plan against text to speed up execution."
+  },
+  "pg.select.cache.row.count": {
+    "default": "16",
+    "description": "Number of rows to cache for SELECT query execution plan against text to speed up execution."
+  },
+  "pg.insert.cache.enabled": {
+    "default": "true",
+    "description": "Enable or disable the INSERT query cache. Cache capacity is `number_of_blocks * number_of_rows`."
+  },
+  "pg.insert.cache.block.count": {
+    "default": "8",
+    "description": "Number of blocks to cache INSERT query execution plan against text to speed up execution."
+  },
+  "pg.insert.cache.row.count": {
+    "default": "8",
+    "description": "Number of rows to cache for INSERT query execution plan against text to speed up execution."
+  },
+  "pg.update.cache.enabled": {
+    "default": "true",
+    "description": "Enable or disable the UPDATE query cache. Cache capacity is `number_of_blocks * number_of_rows`."
+  },
+  "pg.update.cache.block.count": {
+    "default": "8",
+    "description": "Number of blocks to cache UPDATE query execution plan against text to speed up execution."
+  },
+  "pg.update.cache.row.count": {
+    "default": "8",
+    "description": "Number of rows to cache for UPDATE query execution plan against text to speed up execution."
+  },
+  "pg.max.blob.size.on.query": {
+    "default": "512k",
+    "description": "For binary values, clients will receive an error when requesting blob sizes above this value."
+  },
+  "pg.recv.buffer.size": {
+    "default": "1M",
+    "description": "Size of the buffer for receiving data."
+  },
+  "pg.send.buffer.size": {
+    "default": "1M",
+    "description": "Size of the buffer for sending data."
+  },
+  "pg.date.locale": {
+    "default": "en",
+    "description": "The locale to handle date types."
+  },
+  "pg.timestamp.locale": {
+    "default": "en",
+    "description": "The locale to handle timestamp types."
+  },
+  "pg.worker.count": {
+    "default": "0",
+    "description": "Number of dedicated worker threads assigned to handle PGWire queries. When `0`, the jobs will use the shared pool."
+  },
+  "pg.worker.affinity": {
+    "default": "",
+    "description": "Comma-separated list of thread numbers which should be pinned for Postgres ingestion. Example `pg.worker.affinity=1,2,3`."
+  },
+  "pg.halt.on.error": {
+    "default": "false",
+    "description": "Whether ingestion should stop upon internal error."
+  },
+  "pg.daemon.pool": {
+    "default": "true",
+    "description": "Defines whether to run all PGWire worker threads in daemon mode (`true`) or not (`false`)."
+  },
+  "pg.binary.param.count.capacity": {
+    "default": "2",
+    "description": "Size of the initial capacity for the pool used for binary bind variables."
+  }
+}
