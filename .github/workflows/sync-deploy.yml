@@ -23,7 +23,7 @@ jobs:
           path: "dst"
           ref: "master"
           repository: "questdb/questdb.io"
-          token: ${{ secrets.DEPLOY_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
           persist-credentials: true
 
