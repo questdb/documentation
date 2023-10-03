@@ -33,10 +33,10 @@ jobs:
           cp -rvT src/docs/* dst/docs/.
           cp -v src/sidebars.js dst/sidebars.js
 
-      - name: Check For New Files
+      - name: Check for new or changed files
         id: newFiles
         shell: bash
-        working-directory: dest
+        working-directory: dst
         run: |
           git add -A
           if [ $(git status --porcelain | wc -l) -gt 0 ]; then
@@ -45,7 +45,7 @@ jobs:
             echo "::set-output name=hasNewFiles::false"
           fi
 
-      - name: Push New Files
+      - name: Synchronize docs with main website
         if: ${{ steps.newFiles.outputs.hasNewFiles == 'true' }}
         shell: bash
         working-directory: dst
