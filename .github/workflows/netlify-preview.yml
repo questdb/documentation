@@ -46,7 +46,7 @@ jobs:
 
       - name: Move sidebars.js
         run: |
-          mv tmp/docs/sidebars.js .
+          mv tmp/sidebars.js .
 
       - name: Read sidebars.js
         run: |
