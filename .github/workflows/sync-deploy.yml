@@ -1,9 +1,9 @@
-name: "Prod deploy"
+name: "Sync to questdb.io for prod deploy"
 
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -11,17 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: "src"
           ref: "main"
           persist-credentials: false
 
       - name: Checkout2
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: "dst"
-          ref: "main"
+          ref: "master"
           repository: "questdb/questdb.io"
           token: ${{ secrets.DEPLOY_TOKEN }}
           fetch-depth: 0
@@ -36,7 +36,7 @@ jobs:
       - name: Check For New Files
         id: newFiles
         shell: bash
-        working-directory: dest
+        working-directory: dst
         run: |
           git add -A
           if [ $(git status --porcelain | wc -l) -gt 0 ]; then
