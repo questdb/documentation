@@ -2,7 +2,7 @@ name: "Preview deploy"
 
 on:
   pull_request:
-    types: ["opened", "edited", "synchronize", "labeled"]
+    types: ["opened", "edited", "synchronize"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -10,7 +10,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event.label.name == 'run-ci' }}
     name: "build on Netlify"
     runs-on: ubuntu-latest
 
