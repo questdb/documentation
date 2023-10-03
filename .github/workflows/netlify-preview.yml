@@ -19,7 +19,7 @@ jobs:
         with:
           repository: questdb/questdb.io
           token: ${{ secrets.GH_PAT }}
-          fetch-depth: 0
+          fetch-depth: 1
           ref: "master"
           persist-credentials: true
 
@@ -28,18 +28,6 @@ jobs:
         with:
           path: tmp
 
-      - name: List contents
-        run: |
-          ls -la
-
-      - name: List contents
-        run: |
-          ls -la tmp/
-
-      - name: List contents
-        run: |
-          ls -la tmp/docs/
-
       - name: Move docs
         run: |
           cp -rvT tmp/docs docs/.
@@ -47,10 +35,6 @@ jobs:
       - name: Move sidebars.js
         run: |
           mv tmp/sidebars.js .
-
-      - name: Read sidebars.js
-        run: |
-          cat sidebars.js
 
       - uses: jsmrcaga/action-netlify-deploy@v2.0.0
         with:
