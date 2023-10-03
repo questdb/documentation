@@ -28,6 +28,10 @@ jobs:
         with:
           path: tmp
 
+      - name: Purge docs
+        run: |
+          rm -rf docs/*
+
       - name: Move docs
         run: |
           cp -rvT tmp/docs docs/.
