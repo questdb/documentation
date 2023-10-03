@@ -14,17 +14,12 @@ jobs:
     name: "build on Netlify"
     runs-on: ubuntu-latest
 
-    env:
-      ALGOLIA_API_KEY: ${{ vars.ALGOLIA_API_KEY }}
-      ALGOLIA_APP_ID: ${{ vars.ALGOLIA_APP_ID }}
-      GOOGLE_ANALYTICS_ID: ${{ vars.GOOGLE_ANALYTICS_ID }}
-
     steps:
       - name: Checkout main website repo
         uses: actions/checkout@v4
         with:
           repository: questdb/questdb.io
-          token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
+          token: ${{ secrets.DEPLOY_TOKEN }} # `GH_PAT` is a secret that contains your PAT
           fetch-depth: 0
           persist-credentials: true
 
