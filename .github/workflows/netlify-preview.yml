@@ -26,11 +26,12 @@ jobs:
       - name: Checkout local docs
         uses: actions/checkout@v4
         with:
-          path: docs/.
+          path: tmp
 
-      - name: Move sidebars.js
+      - name: Move docs & sidebars.js
         run: |
-          mv docs/sidebars.js .
+          cp -rvT tmp/docs/* docs/.
+          mv tmp/docs/sidebars.js .
 
       - name: List contents
         run: |
