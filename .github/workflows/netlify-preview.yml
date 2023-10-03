@@ -28,14 +28,25 @@ jobs:
         with:
           path: tmp
 
-      - name: Move docs & sidebars.js
+      - name: List contents
         run: |
-          cp -rvT tmp/docs/* docs/.
-          mv tmp/docs/sidebars.js .
+          ls -la tmp/
 
       - name: List contents
         run: |
-          ls -la docs/
+          ls -la tmp/
+
+      - name: List contents
+        run: |
+          ls -la tmp/docs/
+
+      - name: Move docs
+        run: |
+          cp -rvT tmp/docs/* docs/.
+
+      - name: Move sidebars.js
+        run: |
+          mv tmp/docs/sidebars.js .
 
       - name: Read sidebars.js
         run: |
@@ -52,11 +63,11 @@ jobs:
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
-            :rocket: **Build success!** 
+            :rocket: **Build success!**
 
             Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
 
-            Commit SHA: ${{ github.event.pull_request.head.sha }} 
+            Commit SHA: ${{ github.event.pull_request.head.sha }}
 
             > :package: Build generates a preview & updates link on each commit.
 
