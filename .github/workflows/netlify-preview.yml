@@ -42,7 +42,7 @@ jobs:
 
       - name: Move docs
         run: |
-          cp -rvT tmp/docs/* docs/.
+          cp -rvT tmp/docs docs/.
 
       - name: Move sidebars.js
         run: |

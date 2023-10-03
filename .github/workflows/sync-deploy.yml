@@ -30,7 +30,7 @@ jobs:
       - name: Copy common files to new repo
         shell: bash
         run: |
-          cp -rvT src/docs/* dst/docs/.
+          cp -rvT src/docs dst/docs/.
           cp -v src/sidebars.js dst/sidebars.js
 
       - name: Check for new or changed files
