@@ -30,7 +30,7 @@ jobs:
 
       - name: List contents
         run: |
-          ls -la tmp/
+          ls -la
 
       - name: List contents
         run: |
