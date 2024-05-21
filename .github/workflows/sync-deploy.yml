@@ -1,4 +1,4 @@
-name: "Sync to questdb.io for prod deploy"
+name: "Prod deploy"
 
 on:
   push:
@@ -6,51 +6,13 @@ on:
       - main
 
 jobs:
-  deploy:
-    name: "Deploy"
+  trigger:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: "Trigger prod deploy from main app"
+        uses: peter-evans/repository-dispatch@v1
         with:
-          path: "src"
-          ref: "main"
-          persist-credentials: false
-
-      - name: Checkout2
-        uses: actions/checkout@v4
-        with:
-          path: "dst"
-          ref: "master"
-          repository: "questdb/questdb.io"
-          token: ${{ secrets.DEPLOY_TOKEN }}
-          fetch-depth: 0
-          persist-credentials: true
-
-      - name: Copy common files to new repo
-        shell: bash
-        run: |
-          cp -rvT src/docs/* dst/docs/.
-          cp -v src/sidebars.js dst/sidebars.js
-
-      - name: Check for new or changed files
-        id: newFiles
-        shell: bash
-        working-directory: dst
-        run: |
-          git add -A
-          if [ $(git status --porcelain | wc -l) -gt 0 ]; then
-            echo "::set-output name=hasNewFiles::true"
-          else
-            echo "::set-output name=hasNewFiles::false"
-          fi
-
-      - name: Synchronize docs with main website
-        if: ${{ steps.newFiles.outputs.hasNewFiles == 'true' }}
-        shell: bash
-        working-directory: dst
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "deploy: Updated docs from ref: ${GITHUB_REF}"
-          git push
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: questdb/questdb.io
+          event-type: docs-updated
