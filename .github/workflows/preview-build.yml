@@ -20,12 +20,16 @@ jobs:
         with:
           repository: questdb/questdb.io
           token: ${{ secrets.GH_PAT }}
-          path: questdb
+          path: questdb.io
 
       - name: Replace documentation in questdb.io with updated documentation from PR
         run: |
-          rm -rf questdb/docs
+          rm -rf questdb.io/docs
           cp -R documentation/. questdb.io/docs/.
+
+      - name: Debug
+        run: |
+          ls -la
 
       - name: Deploy to Netlify
         uses: jsmrcaga/action-netlify-deploy@v2.0.0
