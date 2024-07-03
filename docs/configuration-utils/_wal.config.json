@@ -1,0 +1,34 @@
+{
+  "wal.apply.worker.count": {
+    "default": "equal to the CPU core count",
+    "description": "Number of dedicated worker threads assigned to handle WAL table data."
+  },
+  "wal.apply.worker.affinity": {
+    "default": "equal to the CPU core count",
+    "description": "Comma separated list of CPU core indexes."
+  },
+  "wal.apply.worker.haltOnError": {
+    "default": "false",
+    "description": "Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  },
+  "cairo.wal.purge.interval": {
+    "default": "30000",
+    "description": "Period in ms of how often WAL-applied files are cleaned up from the disk"
+  },
+  "cairo.wal.segment.rollover.row.count": {
+    "default": "200000",
+    "description": "Row count of how many rows are written to the same WAL segment before starting a new segment. Triggers in conjunction with `cairo.wal.segment.rollover.size` (whichever is first)."
+  },
+  "cairo.wal.commit.squash.row.limit": {
+    "default": "500000",
+    "description": "Maximum row count that can be squashed together from multiple transactions before applying to the table. A very low value can delay data visibility."
+  },
+  "cairo.wal.squash.uncommitted.rows.multiplier": {
+    "default": "20.0",
+    "description": "Multiplier to cairo.max.uncommitted.rows to calculate the limit of rows that can be kept invisible when writing to WAL table under heavy load, when multiple transactions are to be applied. It is used to reduce the number Out-Of-Order (O3) commits when O3 commits are unavoidable by squashing multiple commits together. Setting it very low can increase O3 commit frequency and decrease the throughput. Setting it too high may cause excessive memory usage and increase the latency."
+  },
+  "cairo.wal.max.lag.txn.count": {
+    "default": "20",
+    "description": "Maximum number of transactions that can be kept invisible when writing to WAL table. Once the number is reached, full commit occurs. If not set, defaults to the rounded value of cairo.wal.squash.uncommitted.rows.multiplier."
+  }
+}

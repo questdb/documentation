@@ -1,0 +1,15 @@
+```ruby
+require 'pg'
+begin
+    conn =PG.connect( host: "127.0.0.1", port: 8812, dbname: 'qdb',
+                      user: 'admin', password: 'quest' )
+    rows = conn.exec 'SELECT x FROM long_sequence(5);'
+    rows.each do |row|
+        puts row
+    end
+rescue PG::Error => e
+     puts e.message
+ensure
+    conn.close if conn
+end
+```

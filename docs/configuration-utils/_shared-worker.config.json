@@ -1,0 +1,14 @@
+{
+  "shared.worker.count": {
+    "default": "",
+    "description": "Number of worker threads shared across the application. Increasing this number will increase parallelism in the application at the expense of CPU resources."
+  },
+  "shared.worker.affinity": {
+    "default": "",
+    "description": "Comma-delimited list of CPU ids, one per thread specified in `shared.worker.count`. By default, threads have no CPU affinity."
+  },
+  "shared.worker.haltOnError": {
+    "default": "false",
+    "description": "Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  }
+}

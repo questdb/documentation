@@ -1,0 +1,42 @@
+The following example shows how to use parameterized queries and prepared
+statements using the [rust-postgres](https://docs.rs/postgres/0.19.0/postgres/)
+client.
+
+```rust
+use postgres::{Client, NoTls, Error};
+use chrono::{Utc};
+use std::time::SystemTime;
+
+fn main() -> Result<(), Error> {
+    let mut client = Client::connect("postgresql://admin:quest@localhost:8812/qdb", NoTls)?;
+
+    // Basic query
+    client.batch_execute(
+      "CREATE TABLE IF NOT EXISTS trades ( \
+          ts TIMESTAMP, date DATE, name STRING, value INT \
+      ) timestamp(ts);")?;
+
+    // Parameterized query
+    let name: &str = "rust example";
+    let val: i32 = 123;
+    let utc = Utc::now();
+    let sys_time = SystemTime::now();
+    client.execute(
+        "INSERT INTO trades VALUES($1,$2,$3,$4)",
+        &[&utc.naive_local(), &sys_time, &name, &val],
+    )?;
+
+    // Prepared statement
+    let mut txn = client.transaction()?;
+    let statement = txn.prepare("INSERT INTO trades VALUES ($1,$2,$3,$4)")?;
+    for value in 0..10 {
+        let utc = Utc::now();
+        let sys_time = SystemTime::now();
+        txn.execute(&statement, &[&utc.naive_local(), &sys_time, &name, &value])?;
+    }
+    txn.commit()?;
+
+    println!("import finished");
+    Ok(())
+}
+```

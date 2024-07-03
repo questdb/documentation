@@ -1,0 +1,21 @@
+```python
+import sys
+import requests
+import json
+
+host = 'http://localhost:9000'
+
+def run_query(sql_query):
+    query_params = {'query': sql_query, 'fmt' : 'json'}
+    try:
+        response = requests.get(host + '/exec', params=query_params)
+        json_response = json.loads(response.text)
+        print(json_response)
+    except requests.exceptions.RequestException as e:
+        print(f'Error: {e}', file=sys.stderr)
+
+# create table
+run_query("CREATE TABLE IF NOT EXISTS trades (name STRING, value INT)")
+# insert row
+run_query("INSERT INTO trades VALUES('abc', 123456)")
+```

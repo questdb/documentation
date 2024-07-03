@@ -1,0 +1,28 @@
+```java
+package com.myco;
+
+import java.sql.*;
+import java.util.Properties;
+
+public class App {
+    public static void main(String[] args) throws SQLException {
+        Properties properties = new Properties();
+        properties.setProperty("user", "admin");
+        properties.setProperty("password", "quest");
+        properties.setProperty("sslmode", "disable");
+
+        final Connection connection = DriverManager.getConnection(
+            "jdbc:postgresql://localhost:8812/qdb", properties);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(
+                "SELECT x FROM long_sequence(5);")) {
+            try (ResultSet rs = preparedStatement.executeQuery()) {
+                while (rs.next()) {
+                    System.out.println(rs.getLong(1));
+                }
+            }
+        }
+        connection.close();
+    }
+}
+
+```

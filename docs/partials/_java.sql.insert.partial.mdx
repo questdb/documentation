@@ -1,0 +1,38 @@
+```java
+package com.myco;
+
+import java.sql.*;
+import java.util.Properties;
+
+class App {
+  public static void main(String[] args) throws SQLException {
+    Properties properties = new Properties();
+    properties.setProperty("user", "admin");
+    properties.setProperty("password", "quest");
+    properties.setProperty("sslmode", "disable");
+
+    final Connection connection = DriverManager.getConnection(
+      "jdbc:postgresql://localhost:8812/qdb", properties);
+    connection.setAutoCommit(false);
+
+    final PreparedStatement statement = connection.prepareStatement(
+      "CREATE TABLE IF NOT EXISTS trades (" +
+      "    ts TIMESTAMP, date DATE, name STRING, value INT" +
+      ") timestamp(ts);");
+    statement.execute();
+
+    try (PreparedStatement preparedStatement = connection.prepareStatement(
+        "INSERT INTO TRADES  VALUES (?, ?, ?, ?)")) {
+      preparedStatement.setTimestamp(
+        1,
+        new Timestamp(io.questdb.std.Os.currentTimeMicros()));
+      preparedStatement.setDate(2, new Date(System.currentTimeMillis()));
+      preparedStatement.setString(3, "abc");
+      preparedStatement.setInt(4, 123);
+      preparedStatement.execute();
+    }
+    System.out.println("Done");
+    connection.close();
+  }
+}
+```

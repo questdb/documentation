@@ -1,0 +1,54 @@
+{
+  "replication.role": {
+    "default": "none",
+    "description": "Defaults to `none` for stand-alone instances. To enable replication set to one of: `primary`, `replica`."
+  },
+  "replication.object.store": {
+    "default": "",
+    "description": "A configuration string that allows connecting to an object store. The format is **scheme::key1=value;key2=value2;…**. The various keys and values are detailed in a later section. Ignored if replication is disabled. No default given variability."
+  },
+  "cairo.wal.segment.rollover.size": {
+    "default": "2097152",
+    "description": "The size of the WAL segment before it is rolled over. Default is `2MiB`. However, defaults to `0` unless `replication.role=primary` is set."
+  },
+  "cairo.writer.command.queue.capacity": {
+    "default": "32",
+    "description": "Maximum writer ALTER TABLE and replication command capacity. Shared between all the tables."
+  },
+  "replication.primary.throttle.window.duration": {
+    "default": "10000",
+    "description": "The millisecond duration of the sliding window used to process replication batches. Default is `10000` ms."
+  },
+  "replication.requests.max.concurrent": {
+    "default": "0",
+    "description": "A limit to the number of concurrent object store requests. The default is `0` for unlimited."
+  },
+  "replication.requests.retry.attempts": {
+    "default": "3",
+    "description": "Maximum number of times to retry a failed object store request before logging an error and reattempting later after a delay. Default is `3`."
+  },
+  "replication.requests.retry.interval": {
+    "default": "200",
+    "description": "How long to wait before retrying a failed operation. Default is `200` ms."
+  },
+  "replication.primary.compression.threads": {
+    "default": "calculated",
+    "description": "Max number of threads used to perform file compression operations before uploading to the object store. The default value is calculated as half the number of CPU cores."
+  },
+  "replication.primary.compression.level": {
+    "default": "1",
+    "description": "Zstd compression level. Defaults to `1`. Valid values are from 1 to 22."
+  },
+  "replication.replica.poll.interval": {
+    "default": "1000",
+    "description": "Millisecond polling rate of a replica instance to check for the availability of new changes."
+  },
+  "native.async.io.threads": {
+    "default": "cpuCount",
+    "description": "The number of async (network) io threads used for replication (and in the future cold storage). The default should be appropriate for most use cases."
+  },
+  "native.max.blocking.threads": {
+    "default": "cpuCount * 4",
+    "description": "Maximum number of threads for parallel blocking disk IO read/write operations for replication (and other). These threads are ephemeral: They are spawned per need and shut down after a short duration if no longer in use. These are not cpu-bound threads, hence the relative large number. The default should be appropriate for most use cases."
+  }
+}

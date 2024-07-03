@@ -1,0 +1,63 @@
+This example uses the [`pg` package](https://www.npmjs.com/package/pg) which
+allows for quickly building queries using Postgres wire protocol. Details on the
+use of this package can be found on the
+[node-postgres documentation](https://node-postgres.com/).
+
+This example uses naive `Date.now() * 1000` inserts for Timestamp types in
+microsecond resolution. For accurate microsecond timestamps, the
+[process.hrtime.bigint()](https://nodejs.org/api/process.html#processhrtimebigint)
+call can be used.
+
+```javascript
+"use strict"
+
+const { Client } = require("pg")
+
+const start = async () => {
+  const client = new Client({
+    database: "qdb",
+    host: "127.0.0.1",
+    password: "quest",
+    port: 8812,
+    user: "admin",
+  })
+  await client.connect()
+
+  const createTable = await client.query(
+    "CREATE TABLE IF NOT EXISTS trades (" +
+      "    ts TIMESTAMP, date DATE, name STRING, value INT" +
+      ") timestamp(ts);",
+  )
+  console.log(createTable)
+
+  let now = new Date().toISOString()
+  const insertData = await client.query(
+    "INSERT INTO trades VALUES($1, $2, $3, $4);",
+    [now, now, "node pg example", 123],
+  )
+  await client.query("COMMIT")
+
+  console.log(insertData)
+
+  for (let rows = 0; rows < 10; rows++) {
+    // Providing a 'name' field allows for prepared statements / bind variables
+    now = new Date().toISOString()
+    const query = {
+      name: "insert-values",
+      text: "INSERT INTO trades VALUES($1, $2, $3, $4);",
+      values: [now, now, "node pg prep statement", rows],
+    }
+    await client.query(query)
+  }
+  await client.query("COMMIT")
+
+  const readAll = await client.query("SELECT * FROM trades")
+  console.log(readAll.rows)
+
+  await client.end()
+}
+
+start()
+  .then(() => console.log("Done"))
+  .catch(console.error)
+```

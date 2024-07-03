@@ -1,0 +1,24 @@
+```ruby
+require 'socket'
+HOST = 'localhost'
+PORT = 9009
+# Returns the current time in nanoseconds
+def time_in_nsec
+    now = Time.now
+    return now.to_i * (10 ** 9) + now.nsec
+end
+begin
+    s = TCPSocket.new HOST, PORT
+    # Single record insert
+    s.puts "trades,name=client_timestamp value=12.4 #{time_in_nsec}\n"
+    # Omitting the timestamp allows the server to assign one
+    s.puts "trades,name=client_timestamp value=12.4\n"
+    # Streams of readings must be newline-delimited
+    s.puts "trades,name=client_timestamp value=12.4\n" +
+            "trades,name=client_timestamp value=11.4\n"
+rescue SocketError => ex
+    puts ex.inspect
+ensure
+    s.close() if s
+end
+```

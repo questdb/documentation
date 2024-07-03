@@ -1,0 +1,17 @@
+```python
+import sys
+import requests
+
+host = 'http://localhost:9000'
+
+sql_query = "select * from long_sequence(10)"
+
+try:
+    response = requests.get(
+        host + '/exec',
+        params={'query': sql_query}).json()
+    for row in response['dataset']:
+        print(row[0])
+except requests.exceptions.RequestException as e:
+    print(f'Error: {e}', file=sys.stderr)
+```

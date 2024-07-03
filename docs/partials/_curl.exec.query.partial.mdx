@@ -1,0 +1,17 @@
+```shell
+curl -G \
+  --data-urlencode "query=SELECT x FROM long_sequence(5);" \
+  http://localhost:9000/exec
+```
+
+The JSON response contains the original query, a `"columns"` key with the schema
+of the results, a `"count"` number of rows and a `"dataset"` with the results.
+
+```json
+{
+  "query": "SELECT x FROM long_sequence(5);",
+  "columns": [{ "name": "x", "type": "LONG" }],
+  "dataset": [[1], [2], [3], [4], [5]],
+  "count": 5
+}
+```

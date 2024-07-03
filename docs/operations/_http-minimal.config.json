@@ -1,0 +1,34 @@
+{
+  "http.min.enabled": {
+    "default": "true",
+    "description": "Enable or disable Minimal HTTP server."
+  },
+  "http.min.bind.to": {
+    "default": "0.0.0.0:9003",
+    "description": "IPv4 address and port of the server. `0` means it will bind to all network interfaces, otherwise the IP address must be one of the existing network adapters."
+  },
+  "http.min.net.connection.limit": {
+    "default": "4",
+    "description": "Active connection limit."
+  },
+  "http.min.net.connection.timeout": {
+    "default": "300000",
+    "description": "Idle connection timeout in milliseconds."
+  },
+  "http.min.net.connection.hint": {
+    "default": "false",
+    "description": "Windows specific flag to overcome OS limitations on TCP backlog size."
+  },
+  "http.min.worker.count": {
+    "default": "",
+    "description": "By default, minimal HTTP server uses shared thread pool for CPU core count 16 and below. It will use dedicated thread for core count above 16. When `0`, the server will use the shared pool. Do not set pool size to more than `1`."
+  },
+  "http.min.worker.affinity": {
+    "default": "",
+    "description": "Core number to pin thread to."
+  },
+  "http.min.worker.haltOnError": {
+    "default": "false",
+    "description": "Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  }
+}

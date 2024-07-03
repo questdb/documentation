@@ -1,0 +1,210 @@
+{
+  "http.enabled": {
+    "default": "true",
+    "description": "Enable or disable HTTP server."
+  },
+  "http.bind.to": {
+    "default": "0.0.0.0:9000",
+    "description": "IP address and port of HTTP server. A value of `0` means that the HTTP server will bind to all network interfaces. You can specify IP address of any individual network interface on your system."
+  },
+  "http.net.connection.limit": {
+    "default": "64",
+    "description": "The maximum number permitted for simultaneous TCP connection to the HTTP server. The rationale of the value is to control server memory consumption."
+  },
+  "http.net.connection.timeout": {
+    "default": "300000",
+    "description": "TCP connection idle timeout in milliseconds. Connection is closed by HTTP server when this timeout lapses."
+  },
+  "http.net.connection.sndbuf": {
+    "default": "2M",
+    "description": "Maximum send buffer size on each TCP socket. If this value is `-1`, the socket send buffer size remains unchanged from the OS defaults."
+  },
+  "http.net.connection.rcvbuf": {
+    "default": "2M",
+    "description": "Maximum receive buffer size on each TCP socket. If this value is `-1`, the socket receive buffer size remains unchanged from the OS defaults."
+  },
+  "http.net.connection.hint": {
+    "default": "false",
+    "description": "Windows specific flag to overcome OS limitations on TCP backlog size"
+  },
+  "http.net.connection.queue.timeout": {
+    "default": "5000",
+    "description": "Amount of time in milliseconds a connection can wait in the listen backlog queue before it is refused. Connections will be aggressively removed from the backlog until the active connection limit is breached."
+  },
+  "http.net.bind.to": {
+    "default": "0.0.0.0:9000",
+    "description": "IP address and port of HTTP server."
+  },
+  "http.connection.pool.initial.capacity": {
+    "default": "4",
+    "description": "Initial size of pool of reusable objects that hold connection state. The pool should be configured to maximum realistic load so that it does not resize at runtime."
+  },
+  "http.connection.string.pool.capacity": {
+    "default": "128",
+    "description": "Initial size of the string pool shared by the HTTP header and multipart content parsers."
+  },
+  "http.multipart.header.buffer.size": {
+    "default": "512",
+    "description": "Buffer size in bytes used by the HTTP multipart content parser."
+  },
+  "http.multipart.idle.spin.count": {
+    "default": "10000",
+    "description": "How long the code accumulates incoming data chunks for column and delimiter analysis."
+  },
+  "http.receive.buffer.size": {
+    "default": "1M",
+    "description": "Size of receive buffer."
+  },
+  "http.request.header.buffer.size": {
+    "default": "64K",
+    "description": "Size of internal buffer allocated for HTTP request headers. The value is rounded up to the nearest power of 2. When HTTP requests contain headers that exceed the buffer size server will disconnect the client with HTTP error in server log."
+  },
+  "http.response.header.buffer.size": {
+    "default": "32K",
+    "description": "Size of the internal response buffer. The value will be rounded up to the nearest power of 2. The buffer size should be large enough to accommodate max size of server response headers."
+  },
+  "http.worker.count": {
+    "default": "0",
+    "description": "Number of threads in private worker pool. When `0`, HTTP server will be using shared worker pool of the server. Values above `0` switch on private pool."
+  },
+  "http.worker.affinity": {
+    "default": "",
+    "description": "Comma separated list of CPU core indexes. The number of items in this list must be equal to the worker count."
+  },
+  "http.worker.haltOnError": {
+    "default": "false",
+    "description": "**Changing the default value is strongly discouraged**. Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  },
+  "http.send.buffer.size": {
+    "default": "2M",
+    "description": "Size of the internal send buffer. Larger buffer sizes result in fewer I/O interruptions the server is making at the expense of memory usage per connection. There is a limit of send buffer size after which increasing it stops being useful in terms of performance. 2MB seems to be optimal value."
+  },
+  "http.static.index.file.name": {
+    "default": "index.html",
+    "description": "Name of index file for the Web Console."
+  },
+  "http.frozen.clock": {
+    "default": "false",
+    "description": "Sets the clock to always return zero. This configuration parameter is used for internal testing."
+  },
+  "http.allow.deflate.before.send": {
+    "default": "false",
+    "description": "Flag that indicates if Gzip compression of outgoing data is allowed."
+  },
+  "http.keep-alive.timeout": {
+    "default": "5",
+    "description": "Used together with `http.keep-alive.max` to set the value of HTTP `Keep-Alive` response header. This instructs browser to keep TCP connection open. Has to be `0` when `http.version` is set to `HTTP/1.0`."
+  },
+  "http.keep-alive.max": {
+    "default": "10000",
+    "description": "See `http.keep-alive.timeout`. Has to be `0` when `http.version` is set to `HTTP/1.0`."
+  },
+  "http.static.public.directory": {
+    "default": "public",
+    "description": "The name of directory for public web site."
+  },
+  "http.text.date.adapter.pool.capacity": {
+    "default": "16",
+    "description": "Size of date adapter pool. This should be set to the anticipated maximum number of `DATE` fields a text input can have. The pool is assigned to connection state and is reused alongside of connection state object."
+  },
+  "http.text.json.cache.limit": {
+    "default": "16384",
+    "description": "JSON parser cache limit. Cache is used to compose JSON elements that have been broken up by TCP protocol. This value limits the maximum length of individual tag or tag value."
+  },
+  "http.text.json.cache.size": {
+    "default": "8192",
+    "description": "Initial size of JSON parser cache. The value must not exceed `http.text.json.cache.limit` and should be set to avoid cache resizes at runtime."
+  },
+  "http.text.max.required.delimiter.stddev": {
+    "default": "0.1222d",
+    "description": "The maximum standard deviation value for the algorithm that calculates text file delimiter. Usually when text parser cannot recognise the delimiter it will log the calculated and maximum standard deviation for the delimiter candidate."
+  },
+  "http.text.max.required.line.length.stddev": {
+    "default": "0.8",
+    "description": "Maximum standard deviation value for the algorithm that classifies input as text or binary. For the values above configured stddev input will be considered binary."
+  },
+  "http.text.metadata.string.pool.capacity": {
+    "default": "128",
+    "description": "The initial size of pool for objects that wrap individual elements of metadata JSON, such as column names, date pattern strings and locale values."
+  },
+  "http.text.roll.buffer.limit": {
+    "default": "4M",
+    "description": "The limit of text roll buffer. See `http.text.roll.buffer.size` for description."
+  },
+  "http.text.roll.buffer.size": {
+    "default": "1024",
+    "description": "Roll buffer is a structure in the text parser that holds a copy of a line that has been broken up by TCP. The size should be set to the maximum length of text line in text input."
+  },
+  "http.text.analysis.max.lines": {
+    "default": "1000",
+    "description": "Number of lines to read on CSV import for heuristics which determine column names & types. Lower line numbers may detect CSV schemas quicker, but possibly with less accuracy. 1000 lines is the maximum for this value."
+  },
+  "http.text.lexer.string.pool.capacity": {
+    "default": "64",
+    "description": "The initial capacity of string fool, which wraps `STRING` column types in text input. The value should correspond to the maximum anticipated number of STRING columns in text input."
+  },
+  "http.text.timestamp.adapter.pool.capacity": {
+    "default": "64",
+    "description": "Size of timestamp adapter pool. This should be set to the anticipated maximum number of `TIMESTAMP` fields a text input can have. The pool is assigned to connection state and is reused alongside of connection state object."
+  },
+  "http.text.utf8.sink.size": {
+    "default": "4096",
+    "description": "Initial size of UTF-8 adapter sink. The value should correspond the maximum individual field value length in text input."
+  },
+  "http.json.query.connection.check.frequency": {
+    "default": "1000000",
+    "description": "**Changing the default value is strongly discouraged**. The value to throttle check if client socket has been disconnected."
+  },
+  "http.json.query.float.scale": {
+    "default": "4",
+    "description": "The scale value of string representation of `FLOAT` values."
+  },
+  "http.json.query.double.scale": {
+    "default": "12",
+    "description": "The scale value of string representation of `DOUBLE` values."
+  },
+  "http.query.cache.enabled": {
+    "default": "true",
+    "description": "Enable or disable the query cache. Cache capacity is `number_of_blocks * number_of_rows`."
+  },
+  "http.query.cache.block.count": {
+    "default": "4",
+    "description": "Number of blocks for the query cache."
+  },
+  "http.query.cache.row.count": {
+    "default": "16",
+    "description": "Number of rows for the query cache."
+  },
+  "http.security.readonly": {
+    "default": "false",
+    "description": "Forces HTTP read only mode when `true`, disabling commands which modify the data or data structure, e.g. INSERT, UPDATE, or CREATE TABLE."
+  },
+  "http.security.max.response.rows": {
+    "default": "2^63-1",
+    "description": "Limit the number of response rows over HTTP."
+  },
+  "http.security.interrupt.on.closed.connection": {
+    "default": "true",
+    "description": "Switch to enable termination of SQL processing if the HTTP connection is closed. The mechanism affects performance so the connection is only checked after `circuit.breaker.throttle` calls are made to the check method. The mechanism also reads from the input stream and discards it since some HTTP clients send this as a keep alive in between requests, `circuit.breaker.buffer.size` denotes the size of the buffer for this."
+  },
+  "http.pessimistic.health.check.enabled": {
+    "default": "false",
+    "description": "When enabled, the health check returns HTTP 500 for any unhandled errors since the server started."
+  },
+  "circuit.breaker.throttle": {
+    "default": "2000000",
+    "description": "Number of internal iterations such as loops over data before checking if the HTTP connection is still open"
+  },
+  "circuit.breaker.buffer.size": {
+    "default": "32",
+    "description": "Size of buffer to read from HTTP connection. If this buffer returns zero and the HTTP client is no longer sending data, SQL processing will be terminated."
+  },
+  "http.server.keep.alive": {
+    "default": "true",
+    "description": "If set to `false`, the server will disconnect the client after completion of each request."
+  },
+  "http.version": {
+    "default": "HTTP/1.1",
+    "description": "Protocol version, other supported value is `HTTP/1.0`."
+  }
+}

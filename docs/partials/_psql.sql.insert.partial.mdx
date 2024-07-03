@@ -1,0 +1,26 @@
+Create the table:
+
+```shell
+psql -h localhost -p 8812 -U admin -d qdb \
+    -c "CREATE TABLE IF NOT EXISTS t1 (name STRING, value INT);"
+```
+
+Insert row:
+
+```shell
+psql -h localhost -p 8812 -U admin -d qdb -c "INSERT INTO t1 VALUES('a', 42)"
+```
+
+Query back:
+
+```shell
+psql -h localhost -p 8812 -U admin -d qdb -c "SELECT * FROM t1"
+```
+
+Note that you can also run `psql` from Docker without installing the client
+locally:
+
+```shell
+docker run -it --rm --network=host -e PGPASSWORD=quest \
+    postgres psql ....
+```

@@ -1,0 +1,66 @@
+This first example shows uploading the `data.csv` file with automatic schema
+detection.
+
+```python
+import sys
+import requests
+
+csv = {'data': ('my_table', open('./data.csv', 'r'))}
+host = 'http://localhost:9000'
+
+try:
+    response = requests.post(host + '/imp', files=csv)
+    print(response.text)
+except requests.exceptions.RequestException as e:
+    print(f'Error: {e}', file=sys.stderr)
+```
+
+The second example creates a CSV buffer from Python objects and uploads them
+with a custom schema. Note UTF-8 encoding.
+
+The `fmt=json` parameter allows us to obtain a parsable response, rather than a
+tabular response designed for human consumption.
+
+```python
+import io
+import csv
+import requests
+import pprint
+import json
+
+
+def to_csv_str(table):
+    output = io.StringIO()
+    csv.writer(output, dialect='excel').writerows(table)
+    return output.getvalue().encode('utf-8')
+
+
+def main():
+    table_name = 'example_table2'
+    table = [
+        ['col1', 'col2', 'col3'],
+        ['a',    10.5,   True],
+        ['b',    100,    False],
+        ['c',    None,   True]]
+
+    table_csv = to_csv_str(table)
+    print(table_csv)
+    schema = json.dumps([
+        {'name': 'col1', 'type': 'SYMBOL'},
+        {'name': 'col2', 'type': 'DOUBLE'},
+        {'name': 'col3', 'type': 'BOOLEAN'}])
+    response = requests.post(
+        'http://localhost:9000/imp',
+        params={'fmt': 'json'},
+        files={
+            'schema': schema,
+            'data': (table_name, table_csv)}).json()
+
+    # You can parse the `status` field and `error` fields
+    # of individual columns. See Reference/API/REST docs for details.
+    pprint.pprint(response)
+
+
+if __name__ == '__main__':
+    main()
+```

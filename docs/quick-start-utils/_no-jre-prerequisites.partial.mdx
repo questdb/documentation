@@ -1,0 +1,30 @@
+import Button from "@theme/Button"
+
+Download the binary:
+
+<p>
+  <a href={props.href}>{props.label}</a>
+</p>
+
+This package does not embed Java.
+
+Use this if there is no package for your platform, such as ARM Linux.
+
+Requires local Java 17.
+
+To check your installed version:
+
+```shell
+java -version
+```
+
+If you do not have Java, install one of the following:
+
+- AdoptOpenJDK
+- Amazon Corretto
+- OpenJDK
+- Oracle Java
+
+Other Java distributions might work but are not tested.
+
+For environment variable, point `JAVA_HOME` to your Java 17 installation folder.

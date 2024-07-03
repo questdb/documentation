@@ -1,0 +1,58 @@
+{
+  "acl.oidc.enabled": {
+    "default": false,
+    "description": "Enables/disables OIDC authentication. When enabled, few other configuration options must also be set."
+  },
+  "acl.oidc.host": {
+    "default": "",
+    "description": "OIDC provider hostname, required when OIDC is enabled."
+  },
+  "acl.oidc.port": {
+    "default": 443,
+    "description": "OIDC provider port number, required when OIDC is enabled."
+  },
+  "acl.oidc.tls.enabled": {
+    "default": true,
+    "description": "Whether the OIDC provider requires a secure connection or not. It is highly unlikely, but if the User Info Endpoint does not require a secure connection, this option can be set to `false`."
+  },
+  "acl.oidc.tls.validation.enabled": {
+    "default": true,
+    "description": "Enables/disables TLS certificate validation. If you are working with self-signed certificates that you would like QuestDB to trust, disable this option. Validation is strongly recommended in production environments. QuestDB will check that the certificate is valid, and that it is issued for the server to which it connects."
+  },
+  "acl.oidc.tls.keystore.path": {
+    "default": "",
+    "description": "Path to a keystore file that contains trusted Certificate Authorities. Will be used when validating the certificate of the OIDC provider. Not required if your OIDC provider's certificate is signed by a public CA."
+  },
+  "acl.oidc.tls.keystore.password": {
+    "default": "",
+    "description": "Keystore password, required if there is a keystore file and it is password protected."
+  },
+  "acl.oidc.http.timeout": {
+    "default": 30000,
+    "description": "OIDC provider HTTP request timeout in milliseconds."
+  },
+  "acl.oidc.client.id": {
+    "default": "",
+    "description": "Client name assigned to QuestDB in the OIDC server, required when OIDC is enabled."
+  },
+  "acl.oidc.authorization.endpoint": {
+    "default": "/as/authorization.oauth2",
+    "description": "OIDC Authorization Endpoint, the default value should work for the Ping Identity Platform."
+  },
+  "acl.oidc.token.endpoint": {
+    "default": "/as/token.oauth2",
+    "description": "OIDC Token Endpoint, the default value should work for the Ping Identity Platform."
+  },
+  "acl.oidc.userinfo.endpoint": {
+    "default": "/idp/userinfo.openid",
+    "description": "OIDC User Info Endpoint, the default value should work for the Ping Identity Platform."
+  },
+  "acl.oidc.groups.claim": {
+    "default": "groups",
+    "description": "The name of the custom claim inside the user info response object, which contains the group memberships of the user."
+  },
+  "acl.oidc.cache.ttl": {
+    "default": 30000,
+    "description": "User info cache entry TTL (time to live) in milliseconds, default value is 30 seconds. For improved performance QuestDB caches user info responses for each valid access token, this settings drives how often the access token should be validated and the user info updated."
+  }
+}
