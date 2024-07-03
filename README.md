@@ -1,3 +1,2 @@
 # documentation
-
-The questDB docs test4.
+The soon to be future location of QuestDB's raw doc files.
