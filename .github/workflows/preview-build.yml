@@ -28,8 +28,9 @@ jobs:
 
       - name: Replace documentation in questdb.io with updated documentation from PR
         run: |
-          rm -rf questdb.io/docs
-          cp -R documentation/. questdb.io/.
+          rm -rf questdb.io/docs/*
+          cp -R documentation/* questdb.io/docs/
+          cd questdb.io
 
       - name: Deploy to Netlify
         uses: jsmrcaga/action-netlify-deploy@v2.0.0
