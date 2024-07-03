@@ -1,17 +1,18 @@
-name: "PR preview"
+name: Preview deploy trigger
 
 on:
   pull_request:
-    types: [opened, edited, synchronize]
+    types: ["opened", "edited", "synchronize"]
 
 jobs:
-  trigger:
+  trigger-questdb-io:
+    name: "Trigger questdb.io workflow"
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Trigger PR preview from main app"
-        uses: peter-evans/repository-dispatch@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: questdb/questdb.io
-          event-type: docs-updated
+      - name: Trigger questdb.io Netlify Build
+        run: |
+          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/questdb/questdb.io/dispatches \
+          -d '{"event_type":"trigger-preview","client_payload":{"pull_request_url":"${{ github.event.pull_request.url }}","pull_request_number":"${{ github.event.pull_request.number }}","pull_request_branch":"${{ github.head_ref }}"}}'
