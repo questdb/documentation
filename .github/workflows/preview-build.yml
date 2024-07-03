@@ -10,11 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout documentation PR branch
-        uses: actions/checkout@v3
-        with:
-          path: documentation
-
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
         with:
@@ -22,22 +17,23 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           path: questdb.io
 
+      - name: Checkout documentation PR branch
+        uses: actions/checkout@v3
+        with:
+          path: docs
+
       - name: Debug
         run: |
           ls -la
-
-      - name: Replace documentation in questdb.io with updated documentation from PR
-        run: |
-          rm -rf questdb.io/docs/*
-          cp -R documentation/* questdb.io/docs/
-          cd questdb.io
+          cd docs
+          ls -la
 
       - name: Deploy to Netlify
         uses: jsmrcaga/action-netlify-deploy@v2.0.0
         with:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          build_directory: questdb.io/build
+          build_directory: build
 
       - name: "Update PR"
         if: ${{ env.NETLIFY_PREVIEW_URL }}
