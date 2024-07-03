@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout documentation PR branch
         uses: actions/checkout@v3
+        with:
+          path: documentation
 
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
