@@ -15,7 +15,6 @@ jobs:
         with:
           repository: questdb/questdb.io
           token: ${{ secrets.GH_PAT }}
-          path: questdb.io
 
       - name: Checkout documentation PR branch
         uses: actions/checkout@v3
@@ -24,8 +23,6 @@ jobs:
 
       - name: Debug
         run: |
-          ls -la
-          cd docs
           ls -la
 
       - name: Deploy to Netlify
