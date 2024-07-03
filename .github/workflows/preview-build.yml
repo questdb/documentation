@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Trigger questdb.io Netlify Build
         run: |
-          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          curl -X POST -H "Authorization: token ${{ secrets.GH_PAT }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/questdb/questdb.io/dispatches \
           -d '{"event_type":"trigger-preview","client_payload":{"pull_request_url":"${{ github.event.pull_request.url }}","pull_request_number":"${{ github.event.pull_request.number }}","pull_request_branch":"${{ github.head_ref }}"}}'
