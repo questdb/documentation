@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Checkout documentation PR branch
         uses: actions/checkout@v3
-        with:
-          path: documentation
 
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
@@ -22,14 +20,14 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           path: questdb.io
 
-      - name: Replace documentation in questdb.io with updated documentation from PR
-        run: |
-          rm -rf questdb.io/docs
-          cp -R documentation/. questdb.io/docs/.
-
       - name: Debug
         run: |
           ls -la
+
+      - name: Replace documentation in questdb.io with updated documentation from PR
+        run: |
+          rm -rf questdb.io/docs
+          cp -R documentation/. questdb.io/.
 
       - name: Deploy to Netlify
         uses: jsmrcaga/action-netlify-deploy@v2.0.0
