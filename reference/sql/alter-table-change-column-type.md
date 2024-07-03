@@ -51,53 +51,53 @@ QuestDB supports a wide range of conversions. However, certain type conversions 
 Numeric types support a wide range of conversions, but many of them can result in the data / precision loss.
 
 | From \ To | boolean | byte | short | int | float | long | double | date | timestamp |
-|-----------|---------|------|-------|-----|-------|------|--------|------|-----------|
-| boolean   |         |  X   |   X   |  X  |   X   |   X  |    X   |   X  |     X     |
-| byte      |    L    |      |   X   |  X  |   X   |   X  |    X   |   X  |     X     |
-| short     |    L    |   L  |       |  X  |   X   |   X  |    X   |   X  |     X     |
-| int       |    L    |   L  |   L   |     |   L   |   X  |    X   |   X  |     X     |
-| float     |    L    |   L  |   L   |  L  |       |   L  |    X   |   L  |     L     |
-| long      |    L    |   L  |   L   |  L  |   L   |      |    L   |   X  |     X     |
-| double    |    L    |   L  |   L   |  L  |   X   |   L  |        |   L  |     L     |
+| --------- | ------- | ---- | ----- | --- | ----- | ---- | ------ | ---- | --------- |
+| boolean   |         | X    | X     | X   | X     | X    | X      | X    | X         |
+| byte      | L       |      | X     | X   | X     | X    | X      | X    | X         |
+| short     | L       | L    |       | X   | X     | X    | X      | X    | X         |
+| int       | L       | L    | L     |     | L     | X    | X      | X    | X         |
+| float     | L       | L    | L     | L   |       | L    | X      | L    | L         |
+| long      | L       | L    | L     | L   | L     |      | L      | X    | X         |
+| double    | L       | L    | L     | L   | X     | L    |        | L    | L         |
 
 Conversions between `TIMESTAMP` and `DATE` types and numeric types are fully supported. Timestamp values are represented in microseconds since the EPOCH, while Date values are represented in milliseconds since the EPOCH. The EPOCH is defined as `1970-01-01T00:00:00.000000Z`.
 
 Additionally, when converting from `BOOLEAN` values to numerics, `false` is represented as `0`, and `true` is represented as `1`. On the way back `0` and `NULL` are converted to `false` and all other values converted to `true`.
 
 | From \ To | boolean | byte | short | int | float | long | double | date | timestamp |
-|-----------|---------|------|-------|-----|-------|------|--------|------|-----------|
-| date      |    L    |   L  |   L   |  L  |   L   |   X  |    X   |      |     X     |
-| timestamp |    L    |   L  |   L   |  L  |   L   |   X  |    X   |   L  |           |
+| --------- | ------- | ---- | ----- | --- | ----- | ---- | ------ | ---- | --------- |
+| date      | L       | L    | L     | L   | L     | X    | X      |      | X         |
+| timestamp | L       | L    | L     | L   | L     | X    | X      | L    |           |
 
 Conversions to `SYMBOL`, `STRING` and `VARCHAR` are supported from most of the data types.
 
-| From \ To  | symbol | string |varchar|
-|------------|--------|--------|-------|
-| boolean    |    X   |    X   |   X   |
-| byte       |    X   |    X   |   X   |
-| short      |    X   |    X   |   X   |
-| int        |    X   |    X   |   X   |
-| float      |    X   |    X   |   X   |
-| long       |    X   |    X   |   X   |
-| date       |    X   |    X   |   X   |
-| timestamp  |    X   |    X   |   X   |
-| double     |    X   |    X   |   X   |
-| ipv4       |    X   |    X   |   X   |
-| char       |    X   |    X   |   X   |
-| uuid       |    X   |    X   |   X   |
-| symbol     |        |    X   |   X   |
-| string     |    X   |        |   X   |
-| varchar    |    X   |    X   |       |
+| From \ To | symbol | string | varchar |
+| --------- | ------ | ------ | ------- |
+| boolean   | X      | X      | X       |
+| byte      | X      | X      | X       |
+| short     | X      | X      | X       |
+| int       | X      | X      | X       |
+| float     | X      | X      | X       |
+| long      | X      | X      | X       |
+| date      | X      | X      | X       |
+| timestamp | X      | X      | X       |
+| double    | X      | X      | X       |
+| ipv4      | X      | X      | X       |
+| char      | X      | X      | X       |
+| uuid      | X      | X      | X       |
+| symbol    |        | X      | X       |
+| string    | X      |        | X       |
+| varchar   | X      | X      |         |
 
 However conversion from `SYMBOL`, `STRING` and `VARCHAR` to other types can result in `NULL` values for inconvertable string values.
 
-| From \ To | boolean | byte | short | char | int  | float | long | date | timestamp | double | uuid |
-|-----------|---------|------|-------|------|------|-------|------|------|-----------|--------|------|
-| string    |    L    |   L  |  L    |   L  |   L  |   L   |  L   |  L   |     L     |   L    |  L   |
-| varchar   |    L    |   L  |  L    |   L  |   L  |   L   |  L   |  L   |     L     |   L    |  L   |
-| symbol    |    L    |   L  |  L    |   L  |   L  |   L   |  L   |  L   |     L     |   L    |  L   |
+| From \ To | boolean | byte | short | char | int | float | long | date | timestamp | double | uuid |
+| --------- | ------- | ---- | ----- | ---- | --- | ----- | ---- | ---- | --------- | ------ | ---- |
+| string    | L       | L    | L     | L    | L   | L     | L    | L    | L         | L      | L    |
+| varchar   | L       | L    | L     | L    | L   | L     | L    | L    | L         | L      | L    |
+| symbol    | L       | L    | L     | L    | L   | L     | L    | L    | L         | L      | L    |
 
-When column type change results into range overflow or precision loss, the same rules as explicit [CAST](/docs/reference/sql/cast.md) apply.
+When column type change results into range overflow or precision loss, the same rules as explicit [CAST](/docs/reference/sql/cast/) apply.
 
 ## Unsupported Conversions
 
