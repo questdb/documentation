@@ -45,16 +45,17 @@ We'll start with one representing financial market data. Then in the insert
 section, we'll create another pair of tables representing temperature sensors
 and their readings.
 
-Let's start by creating the `ticker_price` table:
+Let's start by creating the `trades` table:
 
 ```questdb-sql
-CREATE TABLE ticker_price (
-    ts TIMESTAMP,
-    ticker SYMBOL,
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
     side SYMBOL,
-    price DOUBLE
+    price DOUBLE,
+    amount DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY WAL
-DEDUP UPSERT KEYS(ts, ticker);
+DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
 This is a basic yet robust table. It applies [SYMBOL](/docs/concept/symbol/)s
@@ -78,19 +79,20 @@ We'll proceed forward to INSERT.
 
 #### Financial market data
 
-Let's populate our `ticker_price` table with procedurally-generated data:
+Let's populate our `trades` table with procedurally-generated data:
 
 ```questdb-sql title="Insert as SELECT"
-INSERT INTO ticker_price
+INSERT INTO trades
     SELECT
-        timestamp_sequence('2023-01-01T00:00:00', 60000L * x) ts, -- Generate a timestamp every minute starting from Jan 1, 2023
-        rnd_str('AAPL', 'GOOGL', 'MSFT', 'AMZN', 'FB') ticker, -- Random ticker symbols
-        rnd_str('BUY', 'SELL') side, -- Random side (BUY or SELL)
-        rnd_double() * 100 + 10 price -- Random price between 10.0 and 110.0
+        timestamp_sequence('2024-01-01T00:00:00', 60000L * x) timestamp, -- Generate a timestamp every minute starting from Jan 1, 2024
+        rnd_str('ETH-USD', 'BTC-USD', 'SOL-USD', 'LTC-USD', 'UNI-USD') symbol, -- Random ticker symbols
+        rnd_str('buy', 'sell') side, -- Random side (BUY or SELL)
+        rnd_double() * 1000 + 100 price, -- Random price between 100.0 and 1100.0,
+        rnd_double() * 2000 + 0.1 amount -- Random price between 0.1 and 2000.1
     FROM long_sequence(10000) x;
 ```
 
-Our `ticker_price` table now contains 10,000 randomly-generated trades. The
+Our `trades` table now contains 10,000 randomly-generated trades. The
 comments indicate how we've structured our random data. We picked a few
 companies, BUY vs. SELL, and created a timestamp every minute. We've dictated
 the overall number of rows generated via `long_sequence(10000)`. We can bump
@@ -103,18 +105,18 @@ keep our basic examples basic.
 Now let's look at the table and its data:
 
 ```questdb-sql
-'ticker_price';
+'trades';
 ```
 
 It will look similar to this, albeit with alternative randomized values.
 
-| ts                          | ticker | side | price           |
-| --------------------------- | ------ | ---- | --------------- |
-| 2023-01-01T00:00:00.000000Z | AAPL   | SELL | 91.166295916161 |
-| 2023-01-01T00:00:00.060000Z | AMZN   | SELL | 68.260944075324 |
-| 2023-01-01T00:00:00.180000Z | FB     | SELL | 99.29323755252  |
-| 2023-01-01T00:00:00.360000Z | MSFT   | BUY  | 57.891314056011 |
-| 2023-01-01T00:00:00.600000Z | AAPL   | SELL | 10.249165832651 |
+| timestamp                   | symbol  | side | price            | amount           |
+| --------------------------- | ------- | ---- | ---------------- | ---------------- |
+| 2024-01-01T00:00:00.000000Z | BTC-USD | sell | 483.904143675277 | 139.449481016294 |
+| 2024-01-01T00:00:00.060000Z | ETH-USD | sell | 920.296245196274 | 920.296245196274 |
+| 2024-01-01T00:00:00.180000Z | UNI-USD | sell | 643.277468441839 | 643.277468441839 |
+| 2024-01-01T00:00:00.360000Z | LTC-USD | buy  | 218.0920768859   | 729.81119178972  |
+| 2024-01-01T00:00:00.600000Z | BTC-USD | sell | 157.596416931116 | 691.081778396176 |
 
 That's some fake market data. What about, say, sensor data?
 
@@ -304,5 +306,5 @@ as QuestDB cannot recover data that is deleted in this way:
 ```questdb-sql
 DROP TABLE readings;
 DROP TABLE sensors;
-DROP TABLE ticker_price;
+DROP TABLE trades;
 ```
