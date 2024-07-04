@@ -14,4 +14,4 @@ jobs:
         env:
           NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
         run: |
-          curl -X POST -d '{}' "${NETLIFY_BUILD_HOOK_URL}?trigger_branch=main&trigger_title=Triggered+by+documentation+merge+to+main&clear_cache=true"
+          curl -X POST -d '{}' "${NETLIFY_BUILD_HOOK_URL}?trigger_branch=master&trigger_title=Triggered+by+documentation+merge+to+main&clear_cache=true"
