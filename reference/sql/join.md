@@ -484,6 +484,44 @@ order, the join result is non-deterministic.
 
 :::
 
+### Backwards ASOF JOIN
+
+For the simple non-keyed case (i.e no ON clause), ASOF JOINs can be run in reverse, allowing for more performant access to recent data.
+
+DDL:
+
+```questdb-sql
+CREATE TABLE t1 (ts TIMESTAMP, i INT, s SYMBOL) timestamp(ts) partition by day bypass wal
+INSERT INTO t1 values ('2022-10-05T08:15:00.000000Z', 0, 'a'), ('2022-10-05T08:17:00.000000Z', 1, 'b'), ('2022-10-05T08:21:00.000000Z', 2, 'c'), ('2022-10-10T01:01:00.000000Z', 3, 'd');
+CREATE TABLE t2 (ts TIMESTAMP, i INT, s SYMBOL) timestamp(ts) partition by day bypass wal
+INSERT INTO t2 values ('2022-10-05T08:18:00.000000Z', 4, 'e'), ('2022-10-05T08:19:00.000000Z', 5, 'f'), ('2023-10-05T09:00:00.000000Z', 6, 'g'), ('2023-10-06T01:00:00.000000Z', 7, 'h');
+```
+
+Now sort each table in reverse order, and ASOF JOIN:
+
+```questdb-sql
+(SELECT * FROM t2 ORDER BY ts DESC)
+ASOF JOIN
+(SELECT * FROM t1 ORDER BY ts DESC)
+```
+
+| ts                          | i   | s   | ts1                         | i1  | s1  |
+| --------------------------- | --- | --- | --------------------------- | --- | --- |
+| 2023-10-06T01:00:00.000000Z | 7   | h   | 2022-10-10T01:01:00.000000Z | 3   | d   |
+| 2023-10-05T09:00:00.000000Z | 6   | g   | 2022-10-10T01:01:00.000000Z | 3   | d   |
+| 2022-10-05T08:19:00.000000Z | 5   | f   | 2022-10-05T08:17:00.000000Z | 1   | b   |
+| 2022-10-05T08:18:00.000000Z | 4   | e   | 2022-10-05T08:17:00.000000Z | 1   | b   |
+
+The above syntax is an alternative to:
+
+```questdb-sql
+SELECT * FROM t2
+ASOF JOIN t1
+ORDER BY ts DESC
+```
+
+which when combined with a LIMIT, will be slower than a backwards ASOF JOIN, as it will scan the full table.
+
 ## LT JOIN
 
 Similar to `ASOF JOIN`, `LT JOIN` joins two different time-series measured. For
