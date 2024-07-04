@@ -19,7 +19,7 @@ jobs:
       - name: Checkout documentation PR branch
         uses: actions/checkout@v3
         with:
-          path: docs
+          path: documentation
 
       - name: Debug
         run: |
