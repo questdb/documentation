@@ -32,11 +32,11 @@ omit most of the statement and pass the table name.
 The two examples below are equivalent
 
 ```questdb-sql title="QuestDB dialect"
-ratings;
+trades;
 ```
 
 ```questdb-sql title="Traditional SQL equivalent"
-SELECT * FROM ratings;
+SELECT * FROM trades;
 ```
 
 ### Specific columns
@@ -47,28 +47,14 @@ interested in.
 Example:
 
 ```questdb-sql
-SELECT movieId, rating FROM ratings;
+SELECT timestamp, symbol, side FROM trades;
 ```
-
-### Arithmetic expressions
-
-`SELECT` is capable of evaluating multiple expressions and functions. You can
-mix comma separated lists of expressions with the column names you are
-selecting.
-
-```questdb-sql
-SELECT movieId, (100 - rating)*2, rating > 3.5 good
-FROM ratings;
-```
-
-The result of `rating > 3.5` is a boolean. The column will be named good and
-take values true or false.
 
 ### Aliases
 
 Using aliases allow you to give expressions or column names of your choice. You
 can assign an alias to a column or an expression by writing the alias name you
-want after that expression
+want after that expression.
 
 :::note
 
@@ -77,14 +63,29 @@ Alias names and column names must be unique.
 :::
 
 ```questdb-sql
-SELECT movieId alias1, rating alias2
-FROM ratings
+SELECT timestamp, symbol,
+    price AS rate,
+    amount quantity
+FROM trades;
 ```
 
-## Aggregation
+Notice how you can use or omit the `AS` keyword.
 
-Supported aggregation functions are listed on the
-[aggregation reference](/docs/reference/function/aggregation/).
+### Arithmetic expressions
+
+`SELECT` is capable of evaluating multiple expressions and functions. You can
+mix comma separated lists of expressions with the column names you are
+selecting.
+
+```questdb-sql
+SELECT timestamp, symbol,
+    price * 0.25 AS price25pct,
+    amount > 10 AS over10
+FROM trades
+```
+
+The result of `amount > 10` is a boolean. The column will be named "over10" and
+take values true or false.
 
 ## Boolean expressions
 
@@ -98,8 +99,8 @@ OR returns true if at least one of the operands is true.
 
 ```questdb-sql
 SELECT
-    (true AND false) AS and_col,
-    (true OR false) AS or_col;
+    (true AND false) AS this_will_return_false,
+    (true OR false) AS this_will_return_true;
 ```
 
 ### NOT
@@ -108,55 +109,68 @@ NOT inverts the truth value of the operand.
 
 ```questdb-sql
 SELECT
-    NOT (true AND false) AS not_col;
+    NOT (true AND false) AS this_will_return_true;
 ```
 
 ### XOR
 
-^ is the bitwise XOR operator. When applied to the integers cast from booleans,
-it returns 1 (true) if the bits are different, and 0 (false) if they are the
-same. The result is then cast back to boolean for readability:
+^ is the bitwise XOR operator. It applies only to the Long data type.
+Depending on what you need, you might prefer to cast the input and
+output to boolean values.
 
 ```questdb-sql
 SELECT
-    (true::int ^ false::int)::boolean AS xor_col1,
-    (true::int ^ true::int)::boolean AS xor_col2;
+    (1 ^ 1) AS will_return_0,
+    (1 ^ 20) AS will_return_21,
+    (true::int ^ false::long)::boolean AS will_return_true,
+    (true::int ^ true::long)::boolean AS will_return_false;
 ```
+
+## Aggregation
+
+Supported aggregation functions are listed on the
+[aggregation reference](/docs/reference/function/aggregation/).
 
 ### Aggregation by group
 
-QuestDB evaluates aggregation functions without need for traditional `GROUP BY`.
-Use a mix of column names and aggregation functions in a `SELECT` clause. You
-can have any number of discrete value columns and any number of aggregation
-functions.
+QuestDB evaluates aggregation functions without need for traditional `GROUP BY`
+whenever there is a mix of column names and aggregation functions
+in a `SELECT` clause. You can have any number of discrete value columns and
+any number of aggregation functions. The three statements below are equivalent.
 
 ```questdb-sql title="QuestDB dialect"
-SELECT movieId, avg(rating), count()
-FROM ratings;
+SELECT symbol, avg(price), count()
+FROM trades;
 ```
 
 ```questdb-sql title="Traditional SQL equivalent"
-SELECT movieId, avg(rating), count()
-FROM ratings
-GROUP BY movieId;
+SELECT symbol, avg(price), count()
+FROM trades
+GROUP BY Symbol;
+```
+
+```questdb-sql title="Traditional SQL equivalent with positional argument"
+SELECT symbol, avg(price), count()
+FROM trades
+GROUP BY 1;
 ```
 
 ### Aggregation arithmetic
 
 Aggregation functions can be used in arithmetic expressions. The following
-computes `mid` of rating values for every movie.
+computes `mid` of prices for every symbol.
 
 ```questdb-sql
-SELECT movieId, (min(rating) + max(rating))/2 mid, count() count
-FROM ratings;
+SELECT symbol, (min(price) + max(price))/2 mid, count() count
+FROM trades;
 ```
 
 :::tip
 
 Whenever possible, it is recommended to perform arithmetic `outside` of
 aggregation functions as this can have a dramatic impact on performance. For
-example, `min(value/2)` is going to execute considerably more slowly than
-`min(value)/2`, although both return the same result.
+example, `min(price/2)` is going to execute considerably more slowly than
+`min(price)/2`, although both return the same result.
 
 :::
 
