@@ -5,7 +5,7 @@ Documentation files consumed by the [QuestDB website](https://questdb.io).
 ## Contributing
 
 We are always happy to have contributions to the project whether it is
-documentation, bug reports, blog posts, or feedback.
+documentation, bug reports, or feedback.
 
 To start, have a look through the [GitHub issues](https://github.com/questdb/documentation/issues)
 
@@ -27,6 +27,10 @@ bug report, update request, or tutorial proposal using the respective template.
 No need to lint manually.
 
 Webpack will take care of that for you!
+
+## Community
+
+Want to chat with the team? [Visit the community forum](https://community.questdb.io)!
 
 ## Legal Notice
 
