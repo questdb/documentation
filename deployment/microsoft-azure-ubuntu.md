@@ -121,3 +121,25 @@ at its IP on port 9000: `https://$YOUR_INSTANCE_IP:9000`
   src="/img/guides/microsoft-azure-ubuntu/web-console.webp"
   width={650}
 />
+
+## Azure Managed Disks
+
+Azure offers a number of managed disk types. For QuestDB deployments, we recommend [Premium SSD](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#premium-ssds) or [Premium SSD v2](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#premium-ssd-v2). Which should you choose?
+
+In general, Premium SSD v2 provides better price to performance, and is similar to [AWS EBS gp3](https://aws.amazon.com/ebs/general-purpose/) volumes. It is easy to scale up and allocate more IOPS without increasing the overall storage size.
+
+However, only LRS resilience is supported for this volume, so judicious use of snapshots and backups are recomended.
+
+To support high-availibility with this volume, [QuestDB Enterprise](/enterprise/) provides replication over [Azure Blob Storage](https://azure.microsoft.com/en-gb/products/storage/blobs).
+
+Premium SSD supports ZRS resiliency. However, it will usually be more expensive to provision, and require upping total storage size in step with IOPS. We would not recommend provisioning a disk with less than 500 MB/s of throughput for general production workloads, which would require overprovisioning storage to 8 TB or higher. Therefore, Premium SSD v2 is a superior choice for most use cases.
+
+For development workloads, [Standard SSD](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#standard-ssds) may be used, but will not provide representative performance.
+
+## Filesystems
+
+Not all filesystems have first-class support in QuestDB. This means we do not routinely run tests against them. This includes `blobfuse2`, which is not currently supported by QuestDB.
+
+For fresh deployments, we recommend `ZFS`, since its built-in compression will reduce spending on storage space.
+
+Please refer to the main documentation on [supported filesystems](/docs/deployment/capacity-planning/#supported-filesystems) for more information.
