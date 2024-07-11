@@ -31,14 +31,14 @@ Once created, ZFS provides system-level compression.
 
 ZFS offers a number of compression choices when constructing the volume.
 
-*lz4* offers a good balance of compression ratio versus increased CPU usage, and slowed performance. For general usage, we would recommend using *lz4*.
+[LZ4](https://github.com/lz4/lz4) offers a good balance of compression ratio versus increased CPU usage, and slowed performance. For general usage, we recommend using LZ4.
 
-*zstd* is another strong option. This will provide higher compression ratios, but take longer to decompress. We would recommend this when storage size is an absolute priority, or for embedded-style deployments (i.e Raspberry PI, home IoT setups).
+[zstd](https://github.com/facebook/zstd) is another strong option. This will provide higher compression ratios, but take longer to decompress. We recommend this when storage size is an absolute priority, or for embedded-style deployments (i.e. Raspberry Pi, home IoT setups).
 
 As always, it is best to benchmark your choice to ensure that the performance matches your use case.
 
 :::note 
 
-We run CI tests using *ZFS* with *lz4* compression. If you encounter issues with other compression algorithms, please let us know.
+We regularly run tests using *ZFS* with *LZ4* compression. If you encounter issues with other compression algorithms, please let us know.
 
 :::
