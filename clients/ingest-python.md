@@ -90,8 +90,6 @@ export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;
 
 ## Basic insert
 
-Consider something such as a temperature sensor.
-
 Basic insertion (no-auth):
 
 ```python
@@ -100,33 +98,20 @@ from questdb.ingress import Sender, TimestampNanos
 conf = f'http::addr=localhost:9000;'
 with Sender.from_conf(conf) as sender:
     sender.row(
-        'sensors',
-        symbols={'id': 'toronto1'},
-        columns={'temperature': 20.0, 'humidity': 0.5},
+        'trades',
+        symbols={'symbol': 'ETH-USD', 'side': 'sell'},
+        columns={'price': 2615.54, 'amount': 0.00044},
+        at=TimestampNanos.now())
+    sender.row(
+        'trades',
+        symbols={'symbol': 'BTC-USD', 'side': 'sell'},
+        columns={'price': 39269.98, 'amount': 0.001},
         at=TimestampNanos.now())
     sender.flush()
 ```
 
-The same temperature senesor, but via a Pandas dataframe:
-
-```python
-import pandas as pd
-from questdb.ingress import Sender
-
-df = pd.DataFrame({
-    'id': pd.Categorical(['toronto1', 'paris3']),
-    'temperature': [20.0, 21.0],
-    'humidity': [0.5, 0.6],
-    'timestamp': pd.to_datetime(['2021-01-01', '2021-01-02'])})
-
-conf = f'http::addr=localhost:9000;'
-with Sender.from_conf(conf) as sender:
-    sender.dataframe(df, table_name='sensors', at='timestamp')
-```
-
-What about market data?
-
-A "full" example, with timestamps and auto-flushing:
+In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps,
+auto-flushing, and error reporting.
 
 ```python
 from questdb.ingress import Sender, IngressError, TimestampNanos
@@ -141,20 +126,20 @@ def example():
             # Record with provided designated timestamp (using the 'at' param)
             # Notice the designated timestamp is expected in Nanoseconds,
             # but timestamps in other columns are expected in Microseconds.
-            # The API provides convenient functions
+            # You can use the TimestampNanos or TimestampMicros classes,
+            # or you can just pass a datetime object
             sender.row(
                 'trades',
                 symbols={
-                    'pair': 'USDGBP',
-                    'type': 'buy'},
+                    'symbol': 'ETH-USD',
+                    'side': 'sell'},
                 columns={
-                    'traded_price': 0.83,
-                    'limit_price': 0.84,
-                    'qty': 100,
-                    'traded_ts': datetime.datetime(
-                        2022, 8, 6, 7, 35, 23, 189062,
-                        tzinfo=datetime.timezone.utc)},
-                at=TimestampNanos.now())
+                    'price': 2615.54,
+                    'amount': 0.00044,
+                   },
+                at=datetime.datetime(
+                        2022, 3, 8, 18, 53, 57, 609765,
+                        tzinfo=datetime.timezone.utc))
 
             # You can call `sender.row` multiple times inside the same `with`
             # block. The client will buffer the rows and send them in batches.
@@ -178,13 +163,43 @@ if __name__ == '__main__':
     example()
 ```
 
-The above generates rows of InfluxDB Line Protocol (ILP) flavoured data:
+The same `trades` insert, but via a Pandas dataframe:
 
 ```python
-trades,pair=USDGBP,type=sell traded_price=0.82,limit_price=0.81,qty=150,traded_ts=1659784523190000000\n
-trades,pair=EURUSD,type=buy traded_price=1.18,limit_price=1.19,qty=200,traded_ts=1659784523191000000\n
-trades,pair=USDJPY,type=sell traded_price=110.5,limit_price=110.4,qty=80,traded_ts=1659784523192000000\n
+import pandas as pd
+from questdb.ingress import Sender
+
+df = pd.DataFrame({
+    'symbol': pd.Categorical(['ETH-USD', 'BTC-USD']),
+    'side': pd.Categorical(['sell', 'sell']),
+    'price': [2615.54, 39269.98],
+    'amount': [0.00044, 0.001],
+    'timestamp': pd.to_datetime(['2022-03-08T18:03:57.609765Z', '2022-03-08T18:03:57.710419Z'])})
+
+conf = f'http::addr=localhost:9000;'
+with Sender.from_conf(conf) as sender:
+    sender.dataframe(df, table_name='trades', at=TimestampNanos.now())
 ```
+
+Note that you can also add a column of your dataframe with your timestamps and
+reference that column in the `at` parameter:
+
+```python
+import pandas as pd
+from questdb.ingress import Sender
+
+df = pd.DataFrame({
+    'symbol': pd.Categorical(['ETH-USD', 'BTC-USD']),
+    'side': pd.Categorical(['sell', 'sell']),
+    'price': [2615.54, 39269.98],
+    'amount': [0.00044, 0.001],
+    'timestamp': pd.to_datetime(['2022-03-08T18:03:57.609765Z', '2022-03-08T18:03:57.710419Z'])})
+
+conf = f'http::addr=localhost:9000;'
+with Sender.from_conf(conf) as sender:
+    sender.dataframe(df, table_name='trades', at='timestamp')
+```
+
 
 ## Limitations
 
@@ -202,21 +217,27 @@ The client does not provide full transactionality in all cases:
 
 The underlying ILP protocol sends timestamps to QuestDB without a name.
 
-Therefore, if you provide it one, say `my_ts`, you will find that the timestamp
-column is named `timestamp`.
+If your table has been created beforehand, the designated timestamp will be correctly
+assigned based on the information provided using `at`. But if your table does not
+exist, it will be automatically created and the timestamp column will be named
+`timestamp`. This will happen even when using the Pandas dataframe API and passing
+a named column, say `my_ts`. You will find that the timestamp column is created
+as `timestamp`.
 
-To address this, issue a CREATE TABLE statement to create the table in advance:
+To address this, issue a `CREATE TABLE` statement to create the table in advance:
 
 ```questdb-sql title="Creating a timestamp named my_ts"
-CREATE TABLE temperatures (
-    ts timestamp,
-    sensorID symbol,
-    sensorLocation symbol,
-    reading double
-) timestamp(my_ts);
+CREATE TABLE IF NOT EXISTS 'trades' (
+  symbol SYMBOL capacity 256 CACHE,
+  side SYMBOL capacity 256 CACHE,
+  price DOUBLE,
+  amount DOUBLE,
+  my_ts TIMESTAMP
+) timestamp (my_ts) PARTITION BY DAY WAL;
 ```
 
-Now, when you can send data to the specified column.
+You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
+created, but without raising an error if the table already existed.
 
 ## Health check
 
