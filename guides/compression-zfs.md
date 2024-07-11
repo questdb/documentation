@@ -27,7 +27,7 @@ to customize your ZFS to meet your requirements.
 
 Once created, ZFS provides system-level compression.
 
-## Compression choices
+## Compression choices, LZ4 and zstd
 
 ZFS offers a number of compression choices when constructing the volume.
 
