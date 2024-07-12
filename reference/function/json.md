@@ -18,10 +18,7 @@ is extracted as a VARCHAR.
 ### Usage
 
 This is an example query that extracts fields from a `trade_details` column
-containing JSON documents.
-   * It filters, keeping only trades made on NASDAQ.
-   * Obtains the price and quantity fields.
-   * Extracts the timestamp of the first execution for the trade.
+containing JSON documents:
 
 ```questdb-sql title="Example"
 SELECT
@@ -33,6 +30,11 @@ FROM
 WHERE
     json_extract(trade_details, '$.exchange') == 'NASDAQ'
 ```
+
+The query above:
+   * Filters rows, keeping only trades made on NASDAQ.
+   * Obtains the price and quantity fields.
+   * Extracts the timestamp of the first execution for the trade.
 
 For reference, here is a sample JSON document that query above.
 
@@ -47,7 +49,7 @@ For reference, here is a sample JSON document that query above.
     "start_timestamp": "2023-07-12T09:30:00Z",
     "end_timestamp": "2023-07-12T16:00:00Z",
     "executed_volume": 1000,
-    "executed_value": 145000,
+    "executed_value": 145000
   },
   "execution_time": "2023-07-12T15:59:59Z",
   "exchange": "NASDAQ",
@@ -113,8 +115,11 @@ Extending the previous example, we can add `price` and `quantity` columns to
 the pre-existing `trades` table as so:
 
 ```questdb-sql title="Extracting JSON to a new column"
+-- Add two columns for caching.
 ALTER TABLE trades ADD COLUMN quantity long;
 ALTER TABLE trades ADD COLUMN price double;
+
+-- Populate the columns from the existing JSON document.
 UPDATE trades SET quantity = json_extract(trade_details, '$.quantity')::long;
 UPDATE trades SET price = json_extract(trade_details, '$.price')::double;
 ```
