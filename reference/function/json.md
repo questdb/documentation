@@ -8,7 +8,7 @@ This page describes functions specific to handling JSON data.
 
 ## json_extract
 
-Extract fields from a JSON document from VARCHAR columns.
+Extract fields from a JSON document stored in VARCHAR columns.
 
 `json_extract(doc, json_path)::datatype`
 
@@ -17,10 +17,24 @@ is extracted as a VARCHAR.
 
 ### Usage
 
-If one of your VARCHAR columns contains a JSON document you can use a path to
-extract a field from it.
+This is an example query that extracts fields from a `trade_details` column
+containing JSON documents.
+   * It filters, keeping only trades made on NASDAQ.
+   * Obtains the price and quantity fields.
+   * Extracts the timestamp of the first execution for the trade.
 
-Let us assume the documents in the `trade_details` column resemble the following:
+```questdb-sql title="Example"
+SELECT
+    json_extract(trade_details, '$.quantity')::long quantity,
+    json_extract(trade_details, '$.price')::double price,
+    json_extract(trade_details, '$.executions[0].timestamp')::timestamp first_ex_ts
+FROM
+    trades
+WHERE
+    json_extract(trade_details, '$.exchange') == 'NASDAQ'
+```
+
+For reference, here is a sample JSON document that query above.
 
 ```json
 {
@@ -34,15 +48,9 @@ Let us assume the documents in the `trade_details` column resemble the following
     "end_timestamp": "2023-07-12T16:00:00Z",
     "executed_volume": 1000,
     "executed_value": 145000,
-    "vwap_price": 145.00
   },
-  "order_id": "7890",
-  "account_id": "456789",
-  "trade_date": "2023-07-12",
   "execution_time": "2023-07-12T15:59:59Z",
   "exchange": "NASDAQ",
-  "broker_id": "B123",
-  "trade_status": "completed",
   "strategy": "VWAP",
   "executions": [
     {
@@ -69,34 +77,34 @@ Let us assume the documents in the `trade_details` column resemble the following
 }
 ```
 
-We can use the following query to:
-   * Filter to only keep trades made on NASDAQ.
-   * Obtain the price and quantity fields.
-   * Obtain the timestamp of the first execution.
+### JSON Path Syntax
 
-```questdb-sql title="Example"
-SELECT
-    json_extract(trade_details, '$.quantity')::long quantity,
-    json_extract(trade_details, '$.price')::double price,
-    json_extract(trade_details, '$.executions[0].timestamp')::timestamp first_ex_ts
-FROM
-    trades
-WHERE
-    json_extract(trade_details, '$.exchange') == 'NASDAQ'
-```
+We support a limited JSON Path syntax.
+* `$` denotes the root of the document. Its use is optional and provided for
+  compatibility with the JSON path standard and other databases: All search
+  operations always start from the root.
+* `.field` accesses a JSON object key.
+* `[n]` accesses a JSON array index (where `n` is a number).
+
+The path cannot be constructed dynamically (e.g. via string concatenation).
+
+### Error Handling
+
+Any errors will return NULL data when extracting to any datatype except
+boolean and short, where these will return `false` and `0` respectively.
 
 ### Performance
 
 Extracting fields from JSON documents provides flexibility, but comes at a
 performance cost compared to storing fields directly in columns.
 
-As a ballpark estimate, you should expect the extracting a field from a JSON
+As a ballpark estimate, you should expect extracting a field from a JSON
 document to be around one order of magnitude slower than extracting the same
-data directly from a dedicated database column. As such we suggesting reserving
+data directly from a dedicated database column. As such, we suggest reserving
 use of JSON for when the requirement of handling multiple data fields flexibly
 outweighs the performance benefits.
 
-JSON offers an opportunity, to capture a wide amount of details early
+JSON offers an opportunity to capture a wide range of details early
 in the design process of a solution (while it is yet unclear which fields may
 be most valuable), to then modify the database schema later to extract more
 frequently accessed fields as first-class columns.
