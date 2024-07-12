@@ -165,6 +165,9 @@ func main() {
 	}
 }
 ```
+We recommended to use User-assigned timestamps when ingesting data into QuestDB.
+Using Server-assigned hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ## Configuration options
 
@@ -194,7 +197,7 @@ The Go client does not support full transactionality:
 QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
 
 If your table has been created beforehand, the designated timestamp will be correctly
-assigned based on the information provided using `at`. But if your table does not
+assigned based on the information provided using `At`. But if your table does not
 exist, it will be automatically created and the timestamp column will be named
 `timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
 timestamp column name:

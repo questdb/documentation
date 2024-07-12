@@ -11,9 +11,14 @@ import CodeBlock from "@theme/CodeBlock"
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
-The QuestDB Java client is baked right into the QuestDB binary.
 
-It requires no additional configuration steps.
+:::note
+
+Note: This is the reference for the QuestDB Java Client when QuestDB is used as a server. For embedded QuestDB, please check our [Java Embedded Guide](/docs/reference/api/java-embedded/)
+
+:::
+
+The QuestDB Java client is baked right into the QuestDB binary.
 
 The client provides the following benefits:
 
@@ -93,6 +98,9 @@ for TCP(s) transports. For a complete list of options, refer to the
 This sample configures a client to use HTTP transport with TLS enabled for a
 connection to a QuestDB server. It also instructs the client to authenticate
 using HTTP Basic Authentication.
+
+When using QuestDB Enterprise, authentication can also be done via REST token.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
 <RemoteRepoExample name="ilp-http-auth" lang="java" header={false} />
 
@@ -183,17 +191,18 @@ An explicit flush can be done by calling the `flush()` method.
 
 ```java
  try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;")) {
-    sender.table("weather_sensor")
-            .symbol("id", "toronto1")
-            .doubleColumn("temperature", 23.5)
-            .doubleColumn("humidity", 0.49)
-            .atNow();
-    sender.flush();
-    sender.table("weather_sensor")
-            .symbol("id", "dubai2")
-            .doubleColumn("temperature", 41.2)
-            .doubleColumn("humidity", 0.34)
-            .atNow();
+    sender.table("trades")
+          .symbol("symbol", "ETH-USD")
+          .symbol("side", "sell")
+          .doubleColumn("price", 2615.54)
+          .doubleColumn("amount", 0.00044)
+          .atNow();
+    sender.table("trades")
+          .symbol("symbol", "TC-USD")
+          .symbol("side", "sell")
+          .doubleColumn("price", 39269.98)
+          .doubleColumn("amount", 0.001)
+          .atNow();
     sender.flush();
 }
 ```
@@ -290,11 +299,12 @@ There are two ways to assign a designated timestamp to a row:
 
    ```java
    java.time.Instant timestamp = Instant.now(); // or any other timestamp
-   sender.table("weather_sensor")
-           .symbol("id", "toronto1")
-           .doubleColumn("temperature", 23.5)
-           .doubleColumn("humidity", 0.49)
-           .at(timestamp);
+   sender.table("trades")
+         .symbol("symbol", "ETH-USD")
+         .symbol("side", "sell")
+         .doubleColumn("price", 2615.54)
+         .doubleColumn("amount", 0.00044)
+         .at(timestamp);
    ```
 
    The `Instant` class is part of the `java.time` package and is used to
@@ -308,11 +318,12 @@ There are two ways to assign a designated timestamp to a row:
 2. Server-assigned timestamp: The server automatically assigns a timestamp to
    the row based on the server's wall-clock time. Example:
    ```java
-   sender.table("weather_sensor")
-           .symbol("id", "toronto1")
-           .doubleColumn("temperature", 23.5)
-           .doubleColumn("humidity", 0.49)
-           .atNow();
+   sender.table("trades")
+         .symbol("symbol", "ETH-USD")
+         .symbol("side", "sell")
+         .doubleColumn("price", 2615.54)
+         .doubleColumn("amount", 0.00044)
+         .atNow();
    ```
 
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
@@ -435,6 +446,44 @@ controls the auto-flushing behavior of the TCP transport.
   pattern can be used to ensure that the Sender is closed.
 - The method `flush()` can be called to force sending the internal buffer to a
   server, even when the buffer is not full yet.
+
+## Limitations
+
+### Transactionality
+
+The client does not provide full transactionality in all cases:
+
+- Data for the first table in an HTTP request will be committed even if the
+  second table's commit fails.
+- An implicit commit occurs each time a new column is added to a table. This
+  action cannot be rolled back if the request is aborted or encounters parse
+  errors.
+
+### Timestamp column
+
+QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
+
+If your table has been created beforehand, the designated timestamp will be correctly
+assigned based on the information provided using `at`. But if your table does not
+exist, it will be automatically created and the timestamp column will be named
+`timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
+timestamp column name:
+
+To address this, issue a `CREATE TABLE` statement to create the table in advance:
+
+```questdb-sql title="Creating a timestamp named my_ts"
+CREATE TABLE IF NOT EXISTS 'trades' (
+  symbol SYMBOL capacity 256 CACHE,
+  side SYMBOL capacity 256 CACHE,
+  price DOUBLE,
+  amount DOUBLE,
+  my_ts TIMESTAMP
+) timestamp (my_ts) PARTITION BY DAY WAL;
+```
+
+You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
+created, but without raising an error if the table already existed.
+
 
 ### Health check
 
