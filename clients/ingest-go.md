@@ -155,10 +155,10 @@ func main() {
 	err = client.Flush(ctx)
 	// You can flush manually at any point.
 	// If you don't flush manually, the client will flush automatically
-    // when a row is added and either:
-    //   * The buffer contains 75000 rows (if HTTP) or 600 rows (if TCP)
-    //   * The last flush was more than 1000ms ago.
-    // Auto-flushing can be customized via the `auto_flush_..` params.
+	// when a row is added and either:
+	//   * The buffer contains 75000 rows (if HTTP) or 600 rows (if TCP)
+	//   * The last flush was more than 1000ms ago.
+	// Auto-flushing can be customized via the `auto_flush_..` params.
 
 	if err != nil {
 		panic("Failed to flush data")
