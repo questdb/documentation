@@ -120,8 +120,7 @@ with Sender.from_conf(conf) as sender:
     sender.flush()
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps,
-auto-flushing, and error reporting.
+In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps, custom auto-flushing, basic auth, and error reporting.
 
 ```python
 from questdb.ingress import Sender, IngressError, TimestampNanos
@@ -131,7 +130,7 @@ import datetime
 
 def example():
     try:
-        conf = f'http::addr=localhost:9000;'
+        conf = f'http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;'
         with Sender.from_conf(conf) as sender:
             # Record with provided designated timestamp (using the 'at' param)
             # Notice the designated timestamp is expected in Nanoseconds,
@@ -210,7 +209,7 @@ with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name='trades', at='timestamp')
 ```
 
-## Configuration String
+## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as in:
 
@@ -235,7 +234,7 @@ The client does not provide full transactionality in all cases:
 
 ### Timestamp column
 
-The underlying ILP protocol sends timestamps to QuestDB without a name.
+QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
 
 If your table has been created beforehand, the designated timestamp will be correctly
 assigned based on the information provided using `at`. But if your table does not
