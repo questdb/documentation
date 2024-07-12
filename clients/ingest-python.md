@@ -84,9 +84,19 @@ with Sender.from_conf(conf) as sender:
 
 Passing via the `QDB_CLIENT_CONF` env var:
 
-```python
+```bash
 export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
 ```
+
+```python
+from questdb.ingress import Sender
+
+with Sender.from_env() as sender:
+    ...
+```
+
+When using QuestDB Enterprise, authentication can also be done via REST token.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
 ## Basic insert
 
@@ -199,6 +209,16 @@ conf = f'http::addr=localhost:9000;'
 with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name='trades', at='timestamp')
 ```
+
+## Configuration String
+
+The minimal configuration string needs to have the protocol, host, and port, as in:
+
+```
+http::addr=localhost:9000;
+```
+
+For all the extra options you can use, please check [the client docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#sender-conf)
 
 
 ## Limitations
