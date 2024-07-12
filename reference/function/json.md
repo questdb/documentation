@@ -36,7 +36,7 @@ The query above:
    * Obtains the price and quantity fields.
    * Extracts the timestamp of the first execution for the trade.
 
-For reference, here is a sample JSON document that query above.
+For reference, here is a sample JSON document for the query above.
 
 ```json
 {
@@ -59,16 +59,6 @@ For reference, here is a sample JSON document that query above.
       "timestamp": "2023-07-12T10:00:00Z",
       "price": 144.50,
       "quantity": 200
-    },
-    {
-      "timestamp": "2023-07-12T11:30:00Z",
-      "price": 145.00,
-      "quantity": 300
-    },
-    {
-      "timestamp": "2023-07-12T13:45:00Z",
-      "price": 145.25,
-      "quantity": 250
     },
     {
       "timestamp": "2023-07-12T15:15:00Z",
@@ -105,6 +95,8 @@ document to be around one order of magnitude slower than extracting the same
 data directly from a dedicated database column. As such, we suggest reserving
 use of JSON for when the requirement of handling multiple data fields flexibly
 outweighs the performance benefits.
+
+### Migrating JSON fields to columns
 
 JSON offers an opportunity to capture a wide range of details early
 in the design process of a solution (while it is yet unclear which fields may
