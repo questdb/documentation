@@ -94,7 +94,7 @@ As a ballpark estimate, you should expect extracting a field from a JSON
 document to be around one order of magnitude slower than extracting the same
 data directly from a dedicated database column. As such, we suggest reserving
 use of JSON for when the requirement of handling multiple data fields flexibly
-outweighs the performance benefits.
+outweighs the performance penalty.
 
 ### Migrating JSON fields to columns
 
