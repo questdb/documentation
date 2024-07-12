@@ -78,11 +78,50 @@ Or, set the QDB_CLIENT_CONF environment variable and call
    client, err := questdb.LineSenderFromEnv(context.TODO())
    ```
 
+When using QuestDB Enterprise, authentication can also be done via REST token.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+
 ## Basic Insert
 
-Example: inserting data from a temperature sensor.
+Example: inserting executed trades for cryptocurrencies.
 
-Without authentication:
+Without authentication and using the current timestamp:
+
+```Go
+package main
+
+import (
+	"context"
+	"github.com/questdb/go-questdb-client/v3"
+)
+
+func main() {
+	ctx := context.TODO()
+
+	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;")
+	if err != nil {
+		panic("Failed to create client")
+	}
+
+	err = client.Table("trades").
+		Symbol("symbol", "ETH-USD").
+		Symbol("side", "sell").
+		Float64Column("price", 2615.54).
+		Float64Column("amount", 0.00044).
+		AtNow(ctx)
+
+	if err != nil {
+		panic("Failed to insert data")
+	}
+
+	err = client.Flush(ctx)
+	if err != nil {
+		panic("Failed to flush data")
+	}
+}
+```
+
+In this case, the designated timestamp will be the one at execution time. Let's see now an example with an explicit timestamp, custom auto-flushing, and basic auth.
 
 ```Go
 package main
@@ -96,16 +135,17 @@ import (
 func main() {
 	ctx := context.TODO()
 
-	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;")
+	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;")
 	if err != nil {
 		panic("Failed to create client")
 	}
 
 	timestamp := time.Now()
-	err = client.Table("sensors").
-		Symbol("id", "toronto1").
-		Float64Column("temperature", 20.0).
-		Float64Column("humidity", 0.5).
+	err = client.Table("trades").
+		Symbol("symbol", "ETH-USD").
+		Symbol("side", "sell").
+		Float64Column("price", 2615.54).
+		Float64Column("amount", 0.00044).
 		At(ctx, timestamp)
 
 	if err != nil {
@@ -113,11 +153,29 @@ func main() {
 	}
 
 	err = client.Flush(ctx)
+	// You can flush manually at any point.
+	// If you don't flush manually, the client will flush automatically
+    // when a row is added and either:
+    //   * The buffer contains 75000 rows (if HTTP) or 600 rows (if TCP)
+    //   * The last flush was more than 1000ms ago.
+    // Auto-flushing can be customized via the `auto_flush_..` params.
+
 	if err != nil {
 		panic("Failed to flush data")
 	}
 }
 ```
+
+## Configuration options
+
+The minimal configuration string needs to have the protocol, host, and port, as in:
+
+```
+http::addr=localhost:9000;
+```
+
+For all the extra options you can use, please check [the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
+
 
 ## Limitations
 
@@ -133,18 +191,27 @@ The Go client does not support full transactionality:
 
 ### Timestamp column
 
-QuestDB's underlying InfluxDB Line Protocol (ILP) does not name timestamps,
-leading to an automatic column name of timestamp. To use a custom name,
-pre-create the table with the desired timestamp column name:
+QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
 
-```sql
-CREATE TABLE temperatures (
-    ts timestamp,
-    sensorID symbol,
-    sensorLocation symbol,
-    reading double
-) timestamp(my_ts);
+If your table has been created beforehand, the designated timestamp will be correctly
+assigned based on the information provided using `at`. But if your table does not
+exist, it will be automatically created and the timestamp column will be named
+`timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
+timestamp column name:
+
+```questdb-sql title="Creating a timestamp named my_ts"
+CREATE TABLE IF NOT EXISTS 'trades' (
+  symbol SYMBOL capacity 256 CACHE,
+  side SYMBOL capacity 256 CACHE,
+  price DOUBLE,
+  amount DOUBLE,
+  my_ts TIMESTAMP
+) timestamp (my_ts) PARTITION BY DAY WAL;
 ```
+
+You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
+created, but without raising an error if the table already existed.
+
 
 ## Health check
 
