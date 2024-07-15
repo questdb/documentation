@@ -96,7 +96,9 @@ json_extract('[0.25, 0.5, 1.0]', '$.name')::varchar  -- [0.25, 0.5, 1.0]
 
 -- Extracts the number as a long, returning NULL if the field is not a number
 -- or is out of range. Floating point numbers are truncated.
+-- Numbers can be enclosed in JSON strings.
 json_extract('{"qty": 10000}', '$.qty')::long        -- 10000
+json_extract('{ "qty": '9999999' }', '$.qty')::long  -- 9999999
 json_extract('1.75', '$')::long                      -- 1
 
 -- Extracts the number as a double, returning NULL if the field is not a number
@@ -132,6 +134,39 @@ SELECT
 FROM
     long_sequence(1)
 ```
+
+#### Table of type conversions
+
+The following table summarizes the type conversions.
+* **Horizontal**: the source JSON field type
+* **Vertical**: the target datatype
+
+|               | null  | boolean    | string | number   | array & object |
+|---------------|-------|------------|--------|----------|----------------|
+| **BOOLEAN**   | false | ✓          | false  | false    | false          |
+| **SHORT**     | 0     | 0 or 1     | ✓ (i)  | ✓ (i)    | 0              |
+| **INT**       | NULL  | 0 or 1     | ✓ (i)  | ✓ (i)    | NULL           |
+| **LONG**      | NULL  | 0 or 1     | ✓ (i)  | ✓ (i)    | NULL           |
+| **FLOAT**     | NULL  | 0.0 or 1.0 | ✓ (ii) | ✓ (ii)   | NULL           |
+| **DOUBLE**    | NULL  | 0.0 or 1.0 | ✓ (ii) | ✓ (ii)   | NULL           |
+| **VARCHAR**   | NULL  | ✓ (iii)    | ✓      | ✓ (iii)  | ✓ (iii)        |
+| **DATE**      | NULL  | NULL       | ✓ (iv) | ✓ (iv)   | NULL           |
+| **TIMESTAMP** | NULL  | NULL       | ✓ (v)  | ✓ (vi)   | NULL           |
+| **IPV4**      | NULL  | NULL       | ✓      | ✓        | NULL           |
+
+All other types are supported through the `VARCHAR` type. In other words,
+`json_extract(..)::UUID` is effectively equivalent to
+`json_extract(..)::VARCHAR::UUID`.
+
+* **✓**: Supported conversion.
+* **(i)**: Floating point numbers are truncated. Out of range numbers evaluate to `NULL` or `0` (for `SHORT`).
+* **(ii)**: Out of range numbers evaluate to `NULL`. Non-IEEE754 numbers are rounded to the nearest representable value. The `FLOAT` type can incur further precision loss.
+* **(iii)**: JSON booleans, numbers, arrays and objects are returned as their raw JSON string representation.
+* **(iv)**: Dates are expected in ISO8601 format as strings. If the date is not in this format, the result is `NULL`. Numeric values are parsed as milliseconds since the Unix epoch. Floating point precision is ignored.
+* **(v)**: Timestamps are expected in ISO8601 format as strings. If the timestamp is not in this format, the result is `NULL`.
+* **(vi)**: Numeric values are parsed as microseconds since the Unix epoch. Floating point precision is ignored.
+
+
 
 ### Error handling
 
