@@ -115,7 +115,7 @@ Calling `json_extract` without immediately casting to a datatype will always
 return a `VARCHAR`.
 
 ```questdb-sql title="Extracting a path as VARCHAR"
-json_extract('{"name": "Lisa"}', '$.name') name      -- Lisa
+json_extract('{"name": "Lisa"}', '$.name')           -- Lisa
 ```
 
 As a quirk, for PostgreSQL compatibility, suffix-casting to `::float` in QuestDB
