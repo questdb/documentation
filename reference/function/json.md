@@ -95,9 +95,20 @@ json_extract('[0.25, 0.5, 1.0]', '$.name')::varchar  -- [0.25, 0.5, 1.0]
 json_extract('{"qty": 10000}', '$.qty')::long        -- 10000
 json_extract('1.75', '$')::long                      -- 1
 
+-- Extracts the number as a double, returning NULL if the field is not a number
+-- or out of range.
+json_extract('{"price": 100.25}', '$.price')::double -- 100.25
+json_extract('10000', '$')::double                   -- 10000.0
+json_extract('{"price": null}', '$.price')::double   -- NULL
+
 -- JSON `true` is extracted as the boolean `true`. Everything else is `false`.
 json_extract('[true]', '$[0]')::boolean              -- true
 json_extract('["true"]', '$[0]')::boolean            -- false
+
+-- SHORT numbers can't represent NULL values, so return 0 instead.
+json_extract('{"qty": 10000}', '$.qty')::short       -- 10000
+json_extract('{"qty": null}', '$.qty')::short        -- 0
+json_extract('{"qty": 1000000}', '$.qty')::short     -- 0  (out of range)
 ```
 
 Calling `json_extract` without immediately casting to a datatype will always
