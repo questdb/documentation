@@ -4,7 +4,7 @@ sidebar_label: JSON
 description: JSON functions reference documentation.
 ---
 
-This page describes functions specific to handling JSON data.
+This page describes functions to handle JSON data.
 
 ## json_extract
 
@@ -12,15 +12,14 @@ Extract fields from a JSON document stored in VARCHAR columns.
 
 `json_extract(doc, json_path)::datatype`
 
-Note that if an extraction datatype isn't specified immediately, the field
-is extracted as a VARCHAR.
+Here [`datatype`](#type-conversions) can be any type supported by QuestDB.
 
 ### Usage
 
 This is an example query that extracts fields from a `trade_details` column
 containing JSON documents:
 
-```questdb-sql title="Example"
+```questdb-sql title="json_extract example"
 SELECT
     json_extract(trade_details, '$.quantity')::long quantity,
     json_extract(trade_details, '$.price')::double price,
@@ -36,7 +35,7 @@ The query above:
    * Obtains the price and quantity fields.
    * Extracts the timestamp of the first execution for the trade.
 
-For reference, here is a sample JSON document for the query above.
+For reference, a sample JSON document for the above query:
 
 ```json
 {
@@ -69,21 +68,69 @@ For reference, here is a sample JSON document for the query above.
 }
 ```
 
-### JSON Path Syntax
+### JSON path syntax
 
 We support a limited JSON Path syntax.
 * `$` denotes the root of the document. Its use is optional and provided for
-  compatibility with the JSON path standard and other databases: All search
-  operations always start from the root.
+  compatibility with the JSON path standard and other databases. Note that
+  all search operations always start from the root.
 * `.field` accesses a JSON object key.
 * `[n]` accesses a JSON array index (where `n` is a number).
 
-The path cannot be constructed dynamically (e.g. via string concatenation).
+The path cannot be constructed dynamically, such as via string concatenation.
 
-### Error Handling
+### Type conversions
 
-Any errors will return NULL data when extracting to any datatype except
+You can specify any
+[datatype supported by QuestDB](/docs/reference/sql/datatypes) as the return
+type. Here are some examples:
+
+```questdb-sql title="Extracting JSON to various datatypes"
+-- Extracts the string, or the raw JSON token for non-string JSON types.
+json_extract('{"name": "Lisa"}', '$.name')::varchar  -- Lisa
+json_extract('[0.25, 0.5, 1.0]', '$.name')::varchar  -- [0.25, 0.5, 1.0]
+
+-- Extracts the number as a long, returning NULL if the field is not a number
+-- or out of range. Floating point numbers are truncated.
+json_extract('{"qty": 10000}', '$.qty')::long        -- 10000
+json_extract('1.75', '$')::long                      -- 1
+
+-- JSON `true` is extracted as the boolean `true`. Everything else is `false`.
+json_extract('[true]', '$[0]')::boolean              -- true
+json_extract('["true"]', '$[0]')::boolean            -- false
+```
+
+Calling `json_extract` without immediately casting to a datatype will always
+return a `VARCHAR`.
+
+```questdb-sql title="Extracting a path as VARCHAR"
+json_extract('{"name": "Lisa"}', '$.name') name      -- Lisa
+```
+
+As a quirk, for PostgreSQL compatibility, suffix-casting to `::float` in QuestDB
+produces a `DOUBLE` datatype. If you need a `FLOAT`, use the `cast` function
+instead as so:
+
+```questdb-sql title="Extract a float from a JSON array"
+SELECT
+    cast(json_extract('[0.25, 0.5, 1.0]', '$[0]') as float) a
+FROM
+    long_sequence(1)
+```
+
+### Error handling
+
+Any errors will return `NULL` data when extracting to any datatype except
 boolean and short, where these will return `false` and `0` respectively.
+
+```questdb-sql title="Error examples"
+-- If either the document or the path is NULL, the result is NULL.
+json_extract(NULL, NULL)                             -- NULL
+
+-- If the document is malformed, the result is NULL.
+json_extract('{"name": "Lisa"', '$.name')            -- NULL
+--                           ^___ note the missing closing brace
+```
 
 ### Performance
 
@@ -99,9 +146,9 @@ outweighs the performance penalty.
 ### Migrating JSON fields to columns
 
 JSON offers an opportunity to capture a wide range of details early
-in the design process of a solution (while it is yet unclear which fields may
-be most valuable), to then modify the database schema later to extract more
-frequently accessed fields as first-class columns.
+in a solution's design process. During early stages, it may not be clear which
+fields will provide the most value. Once known, you can then modify the database
+schema to extract these fields into first-class columns.
 
 Extending the previous example, we can add `price` and `quantity` columns to 
 the pre-existing `trades` table as so:
