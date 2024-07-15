@@ -8,7 +8,7 @@ This page describes functions to handle JSON data.
 
 ## json_extract
 
-Extract fields from a JSON document stored in VARCHAR columns.
+Extracts fields from a JSON document stored in VARCHAR columns.
 
 `json_extract(doc, json_path)::datatype`
 
@@ -16,7 +16,7 @@ Here [`datatype`](#type-conversions) can be any type supported by QuestDB.
 
 ### Usage
 
-This is an example query that extracts fields from a `trade_details` column
+This is an example query that extracts fields from a `trade_details` `VARCHAR` column
 containing JSON documents:
 
 ```questdb-sql title="json_extract example"
@@ -30,12 +30,16 @@ WHERE
     json_extract(trade_details, '$.exchange') == 'NASDAQ'
 ```
 
+| quantity | price  | first_ex_ts                 |
+| -------- | ------ | --------------------------- |
+| 1000     | 145.09 | 2023-07-12T10:00:00.000000Z |
+
 The query above:
    * Filters rows, keeping only trades made on NASDAQ.
    * Obtains the price and quantity fields.
    * Extracts the timestamp of the first execution for the trade.
 
-For reference, a sample JSON document for the above query:
+The above query can run against this inserted JSON document:
 
 ```json
 {
@@ -70,7 +74,7 @@ For reference, a sample JSON document for the above query:
 
 ### JSON path syntax
 
-We support a limited JSON Path syntax.
+We support a subset of the [JSONPath](https://datatracker.ietf.org/doc/rfc9535/) syntax.
 * `$` denotes the root of the document. Its use is optional and provided for
   compatibility with the JSON path standard and other databases. Note that
   all search operations always start from the root.
@@ -91,12 +95,12 @@ json_extract('{"name": "Lisa"}', '$.name')::varchar  -- Lisa
 json_extract('[0.25, 0.5, 1.0]', '$.name')::varchar  -- [0.25, 0.5, 1.0]
 
 -- Extracts the number as a long, returning NULL if the field is not a number
--- or out of range. Floating point numbers are truncated.
+-- or is out of range. Floating point numbers are truncated.
 json_extract('{"qty": 10000}', '$.qty')::long        -- 10000
 json_extract('1.75', '$')::long                      -- 1
 
 -- Extracts the number as a double, returning NULL if the field is not a number
--- or out of range.
+-- or is out of range.
 json_extract('{"price": 100.25}', '$.price')::double -- 100.25
 json_extract('10000', '$')::double                   -- 10000.0
 json_extract('{"price": null}', '$.price')::double   -- NULL
@@ -150,9 +154,9 @@ performance cost compared to storing fields directly in columns.
 
 As a ballpark estimate, you should expect extracting a field from a JSON
 document to be around one order of magnitude slower than extracting the same
-data directly from a dedicated database column. As such, we suggest reserving
-use of JSON for when the requirement of handling multiple data fields flexibly
-outweighs the performance penalty.
+data directly from a dedicated database column. As such, we recommend using JSON
+only when the requirement of handling multiple data fields flexibly outweighs
+the performance penalty.
 
 ### Migrating JSON fields to columns
 
@@ -172,4 +176,14 @@ ALTER TABLE trades ADD COLUMN price double;
 -- Populate the columns from the existing JSON document.
 UPDATE trades SET quantity = json_extract(trade_details, '$.quantity')::long;
 UPDATE trades SET price = json_extract(trade_details, '$.price')::double;
+```
+
+Alternatively, you can insert the extracted fields into a separate table:
+
+```questdb-sql title="Extracting JSON fields to a separate table"
+INSERT INTO trades_summary SELECT
+    json_extract(trade_details, '$.quantity')::long as quantity,
+    json_extract(trade_details, '$.price')::double as price,
+    timestamp
+FROM trades;
 ```
