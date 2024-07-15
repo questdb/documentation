@@ -74,7 +74,7 @@ The above query can run against this inserted JSON document:
 
 ### JSON path syntax
 
-We support a subset of the [JSONPath](https://datatracker.ietf.org/doc/rfc9535/) syntax.
+We support a subset of the [JSONPath](https://en.wikipedia.org/wiki/JSONPath) syntax.
 * `$` denotes the root of the document. Its use is optional and provided for
   compatibility with the JSON path standard and other databases. Note that
   all search operations always start from the root.
