@@ -7,6 +7,14 @@
     "default": "0.0.0.0:9000",
     "description": "IP address and port of HTTP server. A value of `0` means that the HTTP server will bind to all network interfaces. You can specify IP address of any individual network interface on your system."
   },
+  "http.user": {
+    "default": "N/A",
+    "description": "Username for HTTP Basic Authentication in QuestDB Open Source. QuestDB Enterprise Edition supports more advanced authentication mechanisms: RBAC"
+  },
+  "http.password": {
+    "default": "N/A",
+    "description": "Password for HTTP Basic Authentication in QuestDB Open Source. QuestDB Enterprise Edition supports more advanced authentication mechanisms: RBAC"
+  },
   "http.net.connection.limit": {
     "default": "64",
     "description": "The maximum number permitted for simultaneous TCP connection to the HTTP server. The rationale of the value is to control server memory consumption."
