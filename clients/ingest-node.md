@@ -169,65 +169,11 @@ http::addr=localhost:9000;
 For all the extra options you can use, please check [the client docs](https://questdb.github.io/nodejs-questdb-client/SenderOptions.html)
 
 
-## Limitations
-
-### Transactionality
-
-This client does not support full transactionality:
-
-- Data for the first table in an HTTP request will be committed even if the
-  second table's commit fails.
-- An implicit commit occurs each time a new column is added to a table. This
-  action cannot be rolled back if the request is aborted or encounters parse
-  errors.
-
-### Timestamp column
-
-QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
-
-If your table has been created beforehand, the designated timestamp will be correctly
-assigned based on the information provided using `At`. But if your table does not
-exist, it will be automatically created and the timestamp column will be named
-`timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
-timestamp column name:
-
-```questdb-sql title="Creating a timestamp named my_ts"
-CREATE TABLE IF NOT EXISTS 'trades' (
-  symbol SYMBOL capacity 256 CACHE,
-  side SYMBOL capacity 256 CACHE,
-  price DOUBLE,
-  amount DOUBLE,
-  my_ts TIMESTAMP
-) timestamp (my_ts) PARTITION BY DAY WAL;
-```
-
-You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
-created, but without raising an error if the table already existed.
-
-
-## Health check
-
-To monitor your active connection, there is a `ping` endpoint:
-
-```shell
-curl -I http://localhost:9000/ping
-```
-
-Returns (pong!):
-
-```shell
-HTTP/1.1 204 OK
-Server: questDB/1.0
-Date: Fri, 2 Feb 2024 17:09:38 GMT
-Transfer-Encoding: chunked
-Content-Type: text/plain; charset=utf-8
-X-Influxdb-Version: v2.7.4
-```
-
-Determine whether an instance is active and confirm the version of InfluxDB Line
-Protocol with which you are interacting.
-
 ## Next Steps
+
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+about transactions, error control, delivery guarantees, health check, or table and
+column auto-creation.
 
 Dive deeper into the Node.js client capabilities, including TypeScript and Worker Threads examples, by exploring the
 [GitHub repository](https://github.com/questdb/nodejs-questdb-client).

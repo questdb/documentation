@@ -38,7 +38,7 @@ cargo add questdb-rs
 This is how you'd set up the client to authenticate using the HTTP Basic
 authentication:
 
-```no_run
+```rust
 let mut sender = Sender::from_conf(
     "https::addr=localhost:9000;username=admin;password=quest;"
 )?;
@@ -47,7 +47,7 @@ let mut sender = Sender::from_conf(
 You can also pass the connection configuration via the `QDB_CLIENT_CONF` environment variable:
 
 ```bash
-export QDB_CLIENT_CONF="https::addr=localhost:9000;username=admin;password=quest;"
+export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
 ```
 
 Then you use it like this:
@@ -88,7 +88,7 @@ fn main() -> Result<()> {
 
 These are the main steps it takes:
 
-- Use `Sender::from_conf()` to get the `Sender` object
+- Use `Sender::from_conf()` to get the `sender` object
 - Populate a `Buffer` with one or more rows of data
 - Send the buffer using `sender.flush()`(`Sender::flush`)
 
@@ -155,7 +155,8 @@ won't get access to the data in the buffer until you explicitly call
 `sender.flush(&mut buffer)` or a variant. This may lead to a pitfall where you
 drop a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the rust client does not supports auto-flushing via configuration.
+Unlike other official QuestDB clients, the rust client does not supports auto-flushing
+via configuration.
 
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
@@ -192,16 +193,8 @@ on the reason. When this has happened, the sender transitions into an error
 state, and it is permanently unusable. You must drop it and create a new sender.
 You can inspect the sender's error state by calling `sender.must_close()`.
 
-### When to choose the TCP transport?
-
-The TCP transport mode is raw and simplistic: it doesn't report any errors to
-the caller (the server just disconnects), has no automatic retries, requires
-manual handling of connection failures, and doesn't support transactional
-flushing.
-
-However, TCP has a lower overhead than HTTP and it's worthwhile to try out as an
-alternative in a scenario where you have a constantly high data rate and/or deal
-with a high-latency network connection.
+For more details about the HTTP and TCP transports, please refer to the
+[ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
 
 ## Crate features
@@ -227,70 +220,20 @@ These features are opt-in:
   (this compromises security).
 
 
-## Limitations
+## Transactional flush
 
-### Transactional flush
+As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
+the HTTP transport has some support for transactions.
 
-When using HTTP, you can arrange that each `flush()` call happens within its own
-transaction. For this to work, your buffer must contain data that targets only
-one table. This is because QuestDB doesn't support multi-table transactions.
-
-- Data for the first table in an HTTP request will be committed even if the
-  second table's commit fails.
-- An implicit commit occurs each time a new column is added to a table. This
-  action cannot be rolled back if the request is aborted or encounters parse
-  errors.
-
-In order to ensure in advance that a flush will be transactional, call
+In order to ensure in advance that a flush will not affect more than one table, call
 [`sender.flush_and_keep_with_flags(&mut buffer, true)`](Sender::flush_and_keep_with_flags).
-This call will refuse to flush a buffer if the flush wouldn't be transactional.
-
-### Timestamp column
-
-QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
-
-If your table has been created beforehand, the designated timestamp will be correctly
-assigned based on the information provided using `at`. But if your table does not
-exist, it will be automatically created and the timestamp column will be named
-`timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
-timestamp column name:
-
-
-```questdb-sql title="Creating a timestamp named my_ts"
-CREATE TABLE IF NOT EXISTS 'trades' (
-  symbol SYMBOL capacity 256 CACHE,
-  side SYMBOL capacity 256 CACHE,
-  price DOUBLE,
-  amount DOUBLE,
-  my_ts TIMESTAMP
-) timestamp (my_ts) PARTITION BY DAY WAL;
-```
-
-You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
-created, but without raising an error if the table already existed.
-
-## Health check
-
-The QuestDB server has a "ping" endpoint you can access to see if it's alive,
-and confirm the version of InfluxDB Line Protocol with which you are
-interacting:
-
-```shell
-curl -I http://localhost:9000/ping
-```
-
-Example of the expected response:
-
-```shell
-HTTP/1.1 204 OK
-Server: questDB/1.0
-Date: Fri, 2 Feb 2024 17:09:38 GMT
-Transfer-Encoding: chunked
-Content-Type: text/plain; charset=utf-8
-X-Influxdb-Version: v2.7.4
-```
+This call will refuse to flush a buffer if the flush wouldn't be data-transactional.
 
 ## Next steps
+
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+about transactions, error control, delivery guarantees, health check, or table and
+column auto-creation.
 
 Explore the full capabilities of the Rust client via the
 [Crate API page](https://docs.rs/questdb-rs/latest/questdb/).
