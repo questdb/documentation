@@ -89,10 +89,17 @@ efficiency and value.
 Writing blazing-fast queries syntax and creating real-time
 [Grafana](/docs/third-party-tools/grafana/) is done via familiar SQL:
 
-```sql title="Navigate time with SQL"
-SELECT timestamp, sensorName, tempC
-FROM sensors LATEST ON timestamp
-PARTITION BY sensorName;
+```questdb-sql title='Navigate time with SQL' demo
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    last(price) AS close,
+    min(price),
+    max(price),
+    sum(amount) AS volume
+FROM trades
+WHERE  timestamp > dateadd('d', -1, now())
+SAMPLE BY 15m;
 ```
 
 Intrigued? The best way to see whether QuestDB is right for you is to try it
