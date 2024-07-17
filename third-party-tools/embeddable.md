@@ -9,14 +9,14 @@ Embeddable is a developer toolkit for building fast, interactive customer-facing
 analytics. It works well with a high performance time-series database like
 QuestDB.
 
-In [Embeddable](https://embeddable.com) define
+In [Embeddable](https://embeddable.com/) define
 [Data Models](https://trevorio.notion.site/Data-modeling-35637bbbc01046a1bc47715456bfa1d8)
 and
 [Components](https://trevorio.notion.site/Using-components-761f52ac2d0743b488371088a1024e49)
 in code stored in your own code repository, then use the **SDK** to make these
 available for your team in the powerful Embeddable **no-code builder.** The end
 result is the ability to deliver fast, interactive **customer-facing analytics**
-directly in your product.
+directly into your product.
 
 Built-in **row-level security** means that every user only ever sees **exactly**
 the data they’re allowed to see. And two levels of fully-configurable
@@ -68,24 +68,25 @@ dashboards.
 The `name` is a unique name to identify this **connection**.
 
 - By default your **data models** will look for a **connection** called
-  “default”, but you can supply your models with different
+  “default”, but you can supply models with different
   [**data_source**](https://cube.dev/docs/reference/data-model/cube#data_source)
   names to support connecting different **data models** to different
-  **connections** (simply specify the
+  **connections**. To do so , specify the
   **[data_source](https://cube.dev/docs/reference/data-model/cube#data_source)**
-  name in the model)
+  name in the model.
 
-The `type` tells us which driver to use, in this case QuestDB. For a full list,
-see
+The `type` tells Embeddable which driver to use, in this case `questdb`. You can
+also connect multiple datasources like `postgres`, `bigquery` or `mongodb`. For
+a full list, see
 [the documentaiton](https://cube.dev/docs/product/configuration/data-sources).
 
-The `credentials` is a javascript object containing the necessary credentials
-expected by the driver:
+The `credentials` is a javascript object containing the credentials expected by
+the driver:
 
-- These are securely encrypted and only used to retrieve exactly the data you
-  have described in your data models.
-- We strongly encourage you to create a **read-only** database user for each
-  connection. Embeddable will only ever read from your database, not write.
+- Credentials are securely encrypted and only used to retrieve exactly the data
+  described in the data models.
+- Emeddable strongly encourages you to create a **read-only** database user for
+  each connection. Embeddable will only ever read from your database, not write.
 
 To support connecting to different databases for prod, qa, test, etc, or to
 support different databases for different customers, you can assign each
