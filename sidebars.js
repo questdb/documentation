@@ -269,6 +269,7 @@ module.exports = {
             "reference/function/row-generator",
             "reference/function/spatial",
             "reference/function/text",
+            "reference/function/json",
             "reference/function/timestamp-generator",
             "reference/function/timestamp",
             "reference/function/touch",
