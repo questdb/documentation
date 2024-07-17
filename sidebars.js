@@ -1,23 +1,3 @@
-let guidelines
-
-if (process.env.NODE_ENV === "development") {
-  guidelines = {
-    label: "Guidelines (DEV ONLY)",
-    type: "category",
-    items: [
-      {
-        type: "category",
-        label: "Templates",
-        items: [
-          "__guidelines/template/guide",
-          "__guidelines/template/function",
-          "__guidelines/template/sql",
-        ],
-      },
-    ],
-  }
-}
-
 module.exports = {
   docs: [
     {
@@ -309,9 +289,9 @@ module.exports = {
             "reference/operators/ipv4",
             "reference/operators/date-time",
             "reference/operators/spatial",
-            "reference/operators/text"
+            "reference/operators/text",
           ],
-        }
+        },
       ],
     },
     {
@@ -436,6 +416,7 @@ module.exports = {
           id: "third-party-tools/overview",
         },
         "third-party-tools/cube",
+        "third-party-tools/emeddable",
         "third-party-tools/flink",
         "third-party-tools/grafana",
         {
