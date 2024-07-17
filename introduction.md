@@ -89,7 +89,7 @@ efficiency and value.
 Writing blazing-fast queries syntax and creating real-time
 [Grafana](/docs/third-party-tools/grafana/) is done via familiar SQL:
 
-```sql title='Navigate time with SQL' demo
+```questdb-sql title='Navigate time with SQL' demo
 SELECT
     timestamp, symbol,
     first(price) AS open,
