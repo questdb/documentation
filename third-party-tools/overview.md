@@ -45,7 +45,8 @@ these tools:
   powerful data structures.
 - [MindsDB](/third-party-tools/mindsdb/): Build machine learning models for
   predictive analytics on time-series data.
-- [Embeddable](/third-party-tools/embeddable/)
+- [Embeddable](/third-party-tools/embeddable/): Developer toolkit for building
+  fast, interactive customer-facing analytics.
 
 ## Tooling and Interfaces
 
