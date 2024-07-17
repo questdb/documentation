@@ -6,14 +6,14 @@ description: REST API reference documentation.
 
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
-import GoImpPartial from "../../partials/_go.imp.insert.partial.mdx"
-import CurlImpPartial from "../../partials/_curl.imp.insert.partial.mdx"
-import NodejsImpPartial from "../../partials/_nodejs.imp.insert.partial.mdx"
-import PythonImpPartial from "../../partials/_python.imp.insert.partial.mdx"
-import CurlExecPartial from "../../partials/_curl.exec.insert.partial.mdx"
-import GoExecPartial from "../../partials/_go.exec.insert.partial.mdx"
-import NodejsExecPartial from "../../partials/_nodejs.exec.insert.partial.mdx"
-import PythonExecPartial from "../../partials/_python.exec.insert.partial.mdx"
+import GoImpPartial from "../../partials/\_go.imp.insert.partial.mdx"
+import CurlImpPartial from "../../partials/\_curl.imp.insert.partial.mdx"
+import NodejsImpPartial from "../../partials/\_nodejs.imp.insert.partial.mdx"
+import PythonImpPartial from "../../partials/\_python.imp.insert.partial.mdx"
+import CurlExecPartial from "../../partials/\_curl.exec.insert.partial.mdx"
+import GoExecPartial from "../../partials/\_go.exec.insert.partial.mdx"
+import NodejsExecPartial from "../../partials/\_nodejs.exec.insert.partial.mdx"
+import PythonExecPartial from "../../partials/\_python.exec.insert.partial.mdx"
 
 The QuestDB REST API is based on standard HTTP features and is understood by
 off-the-shelf HTTP clients. It provides a simple way to interact with QuestDB
@@ -48,8 +48,8 @@ For details such as content type, query parameters and more, refer to the
 Let's assume you want to upload the following data via the `/imp` entrypoint:
 
 <Tabs defaultValue="csv" values={[
-  { label: "CSV", value: "csv" },
-  { label: "Table", value: "table" },
+{ label: "CSV", value: "csv" },
+{ label: "Table", value: "table" },
 ]}>
 
 <TabItem value="csv">
@@ -83,10 +83,10 @@ query argument to obtain a response in JSON. You can also specify the schema
 explicitly. See the second example in Python for these features.
 
 <Tabs defaultValue="curl" values={[
-  { label: "cURL", value: "curl" },
-  { label: "Python", value: "python" },
-  { label: "NodeJS", value: "nodejs" },
-  { label: "Go", value: "go" },
+{ label: "cURL", value: "curl" },
+{ label: "Python", value: "python" },
+{ label: "NodeJS", value: "nodejs" },
+{ label: "Go", value: "go" },
 ]}>
 
 <TabItem value="curl">
@@ -117,10 +117,10 @@ parameterized queries that are necessary to avoid SQL injection issues. Prefer
 inserts.
 
 <Tabs defaultValue="curl" values={[
-  { label: "cURL", value: "curl" },
-  { label: "Python", value: "python" },
-  { label: "NodeJS", value: "nodejs" },
-  { label: "Go", value: "go" },
+{ label: "cURL", value: "curl" },
+{ label: "Python", value: "python" },
+{ label: "NodeJS", value: "nodejs" },
+{ label: "Go", value: "go" },
 ]}>
 
 <TabItem value="curl">
@@ -585,8 +585,9 @@ returned in a tabular form to be saved and reused as opposed to JSON.
 
 | Parameter | Required | Description                                                                                                                                                                                                                  |
 | :-------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
 | `query`   | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
+| `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
+| `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
 
 The parameters must be URL encoded.
 
@@ -653,7 +654,7 @@ A HTTP status code of `400` is returned with the following response body:
 :::note
 
 Role-based Access Control (RBAC) is available in
-[QuestDB Enterprise](/enterprise/).
+[QuestDB Enterprise](/enterprise/). See the next paragraph for authentication in QuestDB Open Source.
 
 :::
 
@@ -684,3 +685,23 @@ curl -G --data-urlencode "query=SELECT 1;" \
 
 Refer to the [user management](/docs/operations/rbac/#user-management) page to
 learn more on how to generate a REST API token.
+
+## Authentication in QuestDB open source
+
+QuestDB Open Source supports HTTP basic authentication. To enable it, set the configuration
+options `http.user` and `http.password` in `server.conf`.
+
+The following example shows how to enable HTTP basic authentication in QuestDB open source:
+
+```shell
+http.user=my_user
+http.password=my_password
+```
+
+Then this `curl` command executes a `SELECT 1;` query:
+
+```bash
+curl -G --data-urlencode "query=SELECT 1;" \
+    -u "my_user:my_password" \
+    http://localhost:9000/exec
+```

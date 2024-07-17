@@ -21,7 +21,7 @@ The InfluxDB Line Protocol is for **data ingestion only**.
 For building queries, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
-Each ILP client library also has its own language-specific documentation set.
+Each ILP client library also has its own language-specific documentation set.
 
 This supporting document thus provides an overview to aid in client selection
 and initial configuration:
@@ -157,112 +157,6 @@ Exposing these values may expose your database to bad actors.
   - Defaults to 10 seconds.
   - Not all errors are retriable.
 
-#### TCP Parameters
-
-- **username**: Username for TCP authentication.
-- **token** (SENSITIVE): TCP Authentication `d` parameter.
-  - **token_x** (SENSITIVE): TCP Authentication `x` parameter.
-    - Used in C/C++/Rust/Python clients.
-  - **token_y** (SENSITIVE): TCP Authentication `y` parameter.
-    - Used in C/C++/Rust/Python clients.
-- **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
-  milliseconds.
-  - Default 15 seconds.
-
-##### TCP token authentication setup
-
-Create `d`, `x` & `y` tokens for client usage.
-
-##### Prerequisites
-
-- `jose`: C-language implementation of Javascript Object Signing and Encryption.
-  Generates tokens.
-- `jq`: For pretty JSON output.
-
-<Tabs defaultValue="macos" values={[ { label: "macOS", value: "macos" },
-{ label: "Debian", value: "debian" }, { label: "Ubuntu", value: "ubuntu" }, ]}>
-
-<TabItem value="macos">
-
-```bash
-brew install jose
-brew install jq
-```
-
-</TabItem>
-
-<TabItem value="debian">
-
-```bash
-yum install jose
-yum install jq
-```
-
-</TabItem>
-
-<TabItem value="ubuntu">
-
-```bash
-apt install jose
-apt install jq
-```
-
-</TabItem>
-
-</Tabs>
-
-##### Server configuration
-
-Next, create an authentication file.
-
-Only elliptic curve (P-256) are supported (key type `ec-p-256-sha256`):
-
-```bash
-testUser1 ec-p-256-sha256 fLKYEaoEb9lrn3nkwLDA-M_xnuFOdSt9y0Z7_vWSHLU Dt5tbS1dEDMSYfym3fgMv0B99szno-dFc1rYF9t0aac
-# [key/user id] [key type] {keyX keyY}
-```
-
-Generate an authentication file using the `jose` utility:
-
-```bash
-jose jwk gen -i '{"alg":"ES256", "kid": "testUser1"}' -o /var/lib/questdb/conf/full_auth.json
-
-KID=$(cat /var/lib/questdb/conf/full_auth.json | jq -r '.kid')
-X=$(cat /var/lib/questdb/conf/full_auth.json | jq -r '.x')
-Y=$(cat /var/lib/questdb/conf/full_auth.json | jq -r '.y')
-
-echo "$KID ec-p-256-sha256 $X $Y" | tee /var/lib/questdb/conf/auth.txt
-```
-
-Once created, reference it in the server [configuration](/docs/configuration/):
-
-```ini title='/path/to/server.conf'
-line.tcp.auth.db.path=conf/auth.txt
-```
-
-##### Client keys
-
-For the server configuration above, the corresponding JSON Web Key must be
-stored on the clients' side.
-
-When sending a fully-composed JWK, it will have the following keys:
-
-```json
-{
-  "kty": "EC",
-  "d": "5UjEMuA0Pj5pjK8a-fa24dyIf-Es5mYny3oE_Wmus48",
-  "crv": "P-256",
-  "kid": "testUser1",
-  "x": "fLKYEaoEb9lrn3nkwLDA-M_xnuFOdSt9y0Z7_vWSHLU",
-  "y": "Dt5tbS1dEDMSYfym3fgMv0B99szno-dFc1rYF9t0aac"
-}
-```
-
-The `d`, `x` and `y` parameters generate the public key.
-
-For example, the Python client would be configured as outlined in the
-[Python docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#tcp-auth).
-
 #### Auto-flushing behavior
 
 - **auto_flush**: Enable or disable automatic flushing (`on`/`off`).
@@ -318,6 +212,26 @@ _Optional._
   column names.
   - Defaults to `127`.
   - Related to length limits for filenames on the user's host OS.
+
+#### TCP Parameters
+
+:::note
+
+These parameters are only useful when using ILP over TCP with authentication
+enabled. Most users should use ILP over HTTP. These parameters are listed for
+completeness and for users who have specific requirements.
+
+:::
+
+- **username**: Username for TCP authentication.
+- **token** (SENSITIVE): TCP Authentication `d` parameter.
+  - **token_x** (SENSITIVE): TCP Authentication `x` parameter.
+    - Used in C/C++/Rust/Python clients.
+  - **token_y** (SENSITIVE): TCP Authentication `y` parameter.
+    - Used in C/C++/Rust/Python clients.
+- **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
+  milliseconds.
+  - Default 15 seconds.
 
 ## Transactionality caveat
 
