@@ -66,6 +66,7 @@ The `apiKey` can be found by clicking “**Publish**” on one of your Embeddabl
 dashboards.
 
 The `name` is a unique name to identify this connection.
+
 - By default your data models will look for a connection called “default”, but you can supply your models with different `data_source` names to support connecting different data models to different connections (simply specify the data_source name in the model)
 
 The `type` tells Embeddable which driver to use
@@ -74,16 +75,6 @@ The `type` tells Embeddable which driver to use
 
 The `credentials` is a javascript object containing the necessary credentials expected by the driver
 - These are securely encrypted and only used to retrieve exactly the data you have described in your data models.
-Embeddable strongly encourage you to create a read-only database user for each connection (Embeddable will only ever read from your database, not write).
+- Embeddable strongly encourage you to create a read-only database user for each connection (Embeddable will only ever read from your database, not write).
 
 In order to support connecting to different databases for prod, qa, test, etc (or to support different databases for different customers) you can assign each connection to an environment (see [Environments API](https://www.notion.so/Environments-API-497169036b5148b38f7936aa75e62949?pvs=21)).
-
-- Credentials are securely encrypted and only used to retrieve exactly the data
-  described in the data models.
-- Emeddable strongly encourages you to create a **read-only** database user for
-  each connection. Embeddable will only ever read from your database, not write.
-
-To support connecting to different databases for prod, qa, test, etc, or to
-support different databases for different customers, you can assign each
-**connection** to an **environment**. For more information, see
-[Environments API](https://www.notion.so/Environments-API-497169036b5148b38f7936aa75e62949?pvs=21).
