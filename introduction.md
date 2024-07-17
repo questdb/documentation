@@ -13,7 +13,7 @@ import CodeBlock from "@theme/CodeBlock"
 QuestDB is an Apache 2.0 open source columnar database that specializes in time
 series. It offers category-leading ingestion throughput and fast SQL queries
 with operational simplicity. QuestDB reduces operational costs and overcomes
-ingestion bottlenecks, offering greatly simplify overall ingress infrastructure.
+ingestion bottlenecks, offering greatly simplified overall ingress infrastructure.
 
 This introduction provides a brief overview on:
 
