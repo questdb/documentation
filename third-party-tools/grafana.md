@@ -2,7 +2,7 @@
 title: Grafana
 description:
   Guide for fastest, high performance time-series data visualizations with
-  QuestDB and Grafana
+  QuestDB and Grafana.
 ---
 
 import Screenshot from "@theme/Screenshot"
