@@ -41,7 +41,9 @@ you can do this in different ways. Please check the documentation at the
 
 :::note
 
-This sectionis for the QuestDB C++ client. For the QuestDB C Client, scroll down in this document.
+This section is for the QuestDB C++ client. 
+
+For the QuestDB C Client, see the below seciton.
 
 :::
 
@@ -181,8 +183,8 @@ int main()
 }
 ```
 
-As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
-ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
+As you can see, both events now are using the same timestamp. We recommended using the original event timestamps when
+ingesting data into QuestDB. Using the current timestamp will hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 
@@ -190,8 +192,9 @@ ingesting data into QuestDB. Using the current timestamp hinder the ability to d
 
 :::note
 
-This sectionis for the QuestDB C client. Please skip to the bottom of this page for more
-information affecting both C and C++ clients.
+This sectioni s for the QuestDB C client. 
+
+Skip to the bottom of this page for information relating to both the C and C++ clients.
 
 :::
 <ILPClientsTable language="C" />
@@ -414,7 +417,7 @@ error:
 
 ```
 
-As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
+As you can see, both events use the same timestamp. We recommended using the original event timestamps when
 ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](#/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
 
@@ -443,7 +446,7 @@ won't get access to the data in the buffer until you explicitly call
 This may lead to a pitfall where you drop a buffer that still has some data in it,
 resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the rust client does not supports auto-flushing
+Unlike other official QuestDB clients, the Rust client does not supports auto-flushing
 via configuration.
 
 A common technique is to flush periodically on a timer and/or once the buffer
@@ -456,10 +459,10 @@ QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 
 ### Transactional flush
 
-As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
+As described in the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
 the HTTP transport has some support for transactions.
 
-In order to ensure in advance that a flush will not affect more than one table, call
+To ensure in advance that a flush will not affect more than one table, call
 `buffer.transactional()` or `line_sender_buffer_transactional(buffer)` as we demonstrated on
 the examples in this document.
 

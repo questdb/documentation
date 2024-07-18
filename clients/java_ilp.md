@@ -14,7 +14,9 @@ import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
 :::note
 
-Note: This is the reference for the QuestDB Java Client when QuestDB is used as a server. For embedded QuestDB, please check our [Java Embedded Guide](/docs/reference/api/java-embedded/)
+This is the reference for the QuestDB Java Client when QuestDB is used as a server. 
+
+For embedded QuestDB, please check our [Java Embedded Guide](/docs/reference/api/java-embedded/).
 
 :::
 
@@ -362,8 +364,9 @@ controls the auto-flushing behavior of the TCP transport.
 
 ### TLS encryption
 
-TLS in enabled by selecting the `https` or `tcps` protocol. The following
-options are available:
+To enable TLS, select the `https` or `tcps` protocol. 
+
+The following options are available:
 
 - `tls_roots` : Path to a Java keystore file containing trusted root
   certificates. Defaults to the system default trust store.

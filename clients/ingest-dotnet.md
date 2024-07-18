@@ -159,7 +159,7 @@ class Program
 }
 ```
 
-As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
+As you can see, both events use the same timestamp. We recommended using the original event timestamps when
 ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
@@ -414,8 +414,9 @@ For data transactionality, one can use the transaction feature to enforce a
 batch only for a single table.
 
 :::caution
-As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
-the HTTP transport has some limitations for transactions when adding new columns.
+
+As described in the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the HTTP transport has some limitations for transactions when adding new columns.
+
 :::
 
 Transactions follow this flow:

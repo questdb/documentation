@@ -89,7 +89,7 @@ The HTTP(s) transport is recommended for most use cases. It provides feedback on
 errors, automatically retries failed requests, and is easier to configure. The
 TCP(s) transport is kept for compatibility with older QuestDB versions. It has
 limited error feedback, no automatic retries, and requires manual handling of
-connection failures. However, while HTTP is recommended, TCP has a lower
+connection failures. However, while HTTP is recommended, TCP has slightly lower
 overhead than HTTP and may be useful in high-throughput scenarios in
 high-latency networks.
 
@@ -159,8 +159,6 @@ Exposing these values may expose your database to bad actors.
 
 #### TCP Parameters
 
-_See the [Authentication](/docs/reference/api/ilp/overview/#authentication) section below for configuration._
-
 :::note
 
 These parameters are only useful when using ILP over TCP with authentication
@@ -218,7 +216,7 @@ _See the [Authentication](/docs/reference/api/ilp/overview/#authentication) sect
 
 #### TLS configuration
 
-_QuestDB Enterprise Only._
+_QuestDB Enterprise only._
 
 - **tls_verify**: Toggle verification of TLS certificates. Default is `on`.
 - **tls_roots**: Specify the source of bundled TLS certificates.
@@ -407,9 +405,9 @@ If your table has been created beforehand, the designated timestamp will be corr
 assigned based on the payload sent bt the client. But if your table does not
 exist, it will be automatically created and the timestamp column will be named
 `timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
-timestamp column name:
+timestamp column name.
 
-To address this, issue a `CREATE TABLE` statement to create the table in advance:
+To do so, issue a `CREATE TABLE` statement to create the table in advance:
 
 ```questdb-sql title="Creating a timestamp named my_ts"
 CREATE TABLE IF NOT EXISTS 'trades' (
