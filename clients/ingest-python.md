@@ -95,6 +95,12 @@ with Sender.from_env() as sender:
     ...
 ```
 
+```python
+from questdb.ingress import Sender, Protocol
+
+with Sender(Protocol.Http, 'localhost', 9000, username='admin', password='quest') as sender:
+```
+
 When using QuestDB Enterprise, authentication can also be done via REST token.
 Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
@@ -222,14 +228,26 @@ The minimal configuration string needs to have the protocol, host, and port, as 
 http::addr=localhost:9000;
 ```
 
+In the Python client, you can set the configuration options via the standard config string,
+which is the same across all clients, or using [the built-in API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#sender-programmatic-construction).
+
+
 For all the extra options you can use, please check [the client docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#sender-conf)
 
 
+## Transactional flush
+
+As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
+the HTTP transport has some support for transactions.
+
+The python client exposes [an API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#http-transactions)
+to make working with transactions more convenient
+
 ## Next steps
 
-Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for general details
 about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+column auto-creation. The [Python client docs](https://py-questdb-client.readthedocs.io/en/latest/sender.html) explain how to apply those concepts using the built-in API.
 
 For full docs, checkout
 [ReadTheDocs](https://py-questdb-client.readthedocs.io/en).

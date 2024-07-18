@@ -78,6 +78,24 @@ Or, set the QDB_CLIENT_CONF environment variable and call
    client, err := questdb.LineSenderFromEnv(context.TODO())
    ```
 
+Alternatively, you can use the built-in Go API to specify the connection options.
+
+ ```go
+ package main
+
+import (
+        "context"
+        qdb "github.com/questdb/go-questdb-client/v3"
+)
+
+
+func main() {
+        ctx := context.TODO()
+
+        client, err := qdb.NewLineSender(context.TODO(), qdb.WithHttp(), qdb.WithAddress("localhost:9000"), qdb.WithBasicAuth("admin", "quest"))
+```
+
+
 When using QuestDB Enterprise, authentication can also be done via REST token.
 Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
@@ -176,6 +194,9 @@ The minimal configuration string needs to have the protocol, host, and port, as 
 ```
 http::addr=localhost:9000;
 ```
+
+In the Go client, you can set the configuration options via the standard config string,
+which is the same across all clients, or using [the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderOption).
 
 For all the extra options you can use, please check [the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
 
