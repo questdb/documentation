@@ -1,6 +1,7 @@
 ---
 title: "Cube"
-description: Yaa
+description:
+  Guide for QuestDB and Cube integration.
 ---
 
 Cube is middleware that connects your data sources and your data applications.
@@ -47,6 +48,7 @@ services:
     image: "cubejs/cube:latest"
     ports:
       - "4000:4000"
+    env_file: "cube.env"
     volumes:
       - ".:/cube/conf"
   questdb:
@@ -58,19 +60,25 @@ services:
       - "8812:8812"
 ```
 
-Within your project directory, create an `.env` file.
+Within your project directory, create an `cube.env` file.
 
 These variables will allow Cube to connect to your QuestDB deployment.
 
 Remember: default passwords are dangerous! We recommend altering them.
 
-```shell title=.env
+```bash title=.env
 CUBEJS_DB_HOST=questdb
 CUBEJS_DB_PORT=8812
 CUBEJS_DB_NAME=qdb
 CUBEJS_DB_USER=admin
 CUBEJS_DB_PASS=quest
 CUBEJS_DB_TYPE=questdb
+```
+
+Create `model` directory to be used by Cube:
+
+```bash
+mkdir model
 ```
 
 Finally, bring it all up with Docker:
