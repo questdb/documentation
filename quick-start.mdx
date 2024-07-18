@@ -5,29 +5,27 @@ description:
   homebrew, our binaries, and more.
 ---
 
-import Screenshot from "@theme/Screenshot"
+import Screenshot from "@theme/Screenshot";
 
-import Button from "@theme/Button"
+import Button from "@theme/Button";
 
-import InterpolateReleaseData from "../src/components/InterpolateReleaseData"
+import InterpolateReleaseData from "../src/components/InterpolateReleaseData";
 
-import NoJrePrerequisite from
-"./quick-start-utils/\_no-jre-prerequisites.partial.mdx"
+import NoJrePrerequisite from "./quick-start-utils/_no-jre-prerequisites.partial.mdx";
 
-import CodeBlock from "@theme/CodeBlock"
+import CodeBlock from "@theme/CodeBlock";
 
-import { TabsPlatforms } from "../src/modules/TabsPlatforms"
+import { TabsPlatforms } from "../src/modules/TabsPlatforms";
 
-import RunWindows from "./quick-start-utils/\_run-windows.partial.mdx"
+import RunWindows from "./quick-start-utils/_run-windows.partial.mdx";
 
-import OptionsNotWindows from
-"./quick-start-utils/\_options-not-windows.partial.mdx"
+import OptionsNotWindows from "./quick-start-utils/_options-not-windows.partial.mdx";
 
-import OptionsWindows from "./quick-start-utils/\_options-windows.partial.mdx"
+import OptionsWindows from "./quick-start-utils/_options-windows.partial.mdx";
 
-import Tabs from "@theme/Tabs"
+import Tabs from "@theme/Tabs";
 
-import TabItem from "@theme/TabItem"
+import TabItem from "@theme/TabItem";
 
 This guide will get your first QuestDB instance running.
 
@@ -55,10 +53,13 @@ platform on the [official documentation](https://docs.docker.com/get-docker/).
 Once Docker is installed, you will need to pull QuestDB's image from
 [Docker Hub](https://hub.docker.com/r/questdb/questdb) and create a container:
 
-<InterpolateReleaseData renderText={(release) => (
-<CodeBlock className="language-shell">
-{`docker run \\   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\   questdb/questdb:${release.name}`}
-</CodeBlock> )} />
+<InterpolateReleaseData
+  renderText={(release) => (
+    <CodeBlock className="language-shell">
+      {`docker run \\   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\   questdb/questdb:${release.name}`}
+    </CodeBlock>
+  )}
+/>
 
 For deeper instructions, see the
 [Docker deployment guide](/docs/deployment/docker/).
@@ -80,9 +81,11 @@ On macOS, the location of the root directory of QuestDB and
 
 ### Binaries
 
-export const platforms = [ { label: "Linux", value: "linux" }, { label:
-"Windows", value: "windows" }, { label: "FreeBSD", value: "bsd" }, { label:
-"Any (no JVM)", value: "noJre" }, ]
+export const platforms = [
+  { label: "Linux", value: "linux" },
+  { label: "Windows", value: "windows" },
+  { label: "Any (no JVM)", value: "noJre" },
+];
 
 Download and run QuestDB via binaries.
 
@@ -149,7 +152,7 @@ Select your platform of choice:
 
 ## Run QuestDB
 
-<Tabs defaultValue="nix" values={[ { label: "Linux/FreeBSD/No JVM", value: "nix"
+<Tabs defaultValue="nix" values={[ { label: "Linux/No JVM", value: "nix"
 }, { label: "macOS (Homebrew)", value: "macos" }, { label: "Windows", value:
 "windows" }, ]}>
 

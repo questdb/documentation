@@ -879,6 +879,54 @@ SELECT
 | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- |
 | 2016-02-10T16:18:22.862145Z | 2016-02-10T16:18:22.862000Z | 2016-02-10T16:18:22.000000Z | 2016-02-10T16:18:00.000000Z | 2016-02-10T16:00:00.000000Z | 2016-02-10T00:00:00.000000Z | 2016-02-01T00:00:00.000000Z | 2016-01-01T00:00:00.000000Z |
 
+#### timestamp_floor with offset
+
+When timestamps are floored by `timestamp_floor(unit, timestamp)`, they are based on a root timestamp of `0`. This means that some floorings with a stride can be confusing, since they are based on a modulo from `1970-01-01`.
+
+For example:
+
+```questdb-sql
+SELECT timestamp_floor('5d', '2018-01-01')
+```
+
+Gives:
+
+| timestamp_floor             |
+| --------------------------- |
+| 2017-12-30T00:00:00.000000Z |
+
+If you wish to calculate bins from an offset other than `1970-01-01`, you can add a third parameter: `timestamp_floor(unit, timestamp, offset)`. The offset acts as a baseline from which
+further values are calculated.
+
+```questdb-sql
+SELECT timestamp_floor('5d', '2018-01-01', '2018-01-01')
+```
+
+Gives:
+
+| timestamp_floor             |
+| --------------------------- |
+| 2018-01-01T00:00:00.000000Z |
+
+You can test this on the QuestDB Demo:
+
+```questdb-sql
+SELECT timestamp_floor('5d', pickup_datetime, '2018') t, count
+FROM trips
+WHERE pickup_datetime in '2018'
+ORDER BY 1;
+```
+
+Gives:
+
+| t                           | count   |
+| --------------------------- | ------- |
+| 2018-01-01T00:00:00.000000Z | 1226531 |
+| 2018-01-06T00:00:00.000000Z | 1468302 |
+| 2018-01-11T00:00:00.000000Z | 1604016 |
+| 2018-01-16T00:00:00.000000Z | 1677303 |
+| ...                         | ...     |
+
 ## timestamp_shuffle
 
 `timestamp_shuffle(timestamp_1, timestamp_2)` - generates a random timestamp
