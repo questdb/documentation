@@ -21,7 +21,7 @@ The InfluxDB Line Protocol is for **data ingestion only**.
 For building queries, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
-Each ILP client library also has its own language-specific documentation set.
+Each ILP client library also has its own language-specific documentation set.
 
 This supporting document thus provides an overview to aid in client selection
 and initial configuration:
@@ -158,6 +158,16 @@ Exposing these values may expose your database to bad actors.
 - **username**: Username for HTTP Basic Authentication.
 
 #### TCP Parameters
+
+_See the [Authentication](/docs/reference/api/ilp/overview/#authentication) section below for configuration._
+
+:::note
+
+These parameters are only useful when using ILP over TCP with authentication
+enabled. Most users should use ILP over HTTP. These parameters are listed for
+completeness and for users who have specific requirements.
+
+:::
 
 _See the [Authentication](/docs/reference/api/ilp/overview/#authentication) section below for configuration._
 
