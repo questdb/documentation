@@ -184,8 +184,8 @@ func main() {
 }
 ```
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
-Using Server-assigned hinder the ability to deduplicate rows which is
-[important for exactly-once processing](/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
+ Using the current timestamp hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ## Configuration options
 

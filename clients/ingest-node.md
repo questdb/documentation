@@ -155,7 +155,7 @@ run().then(console.log).catch(console.error)
 
 As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
 ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
-[important for exactly-once processing](#/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 
 ## Configuration options

@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
 Using Server-assigned hinder the ability to deduplicate rows which is
-[important for exactly-once processing](#/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 
 The same `trades` insert, but via a Pandas dataframe:

@@ -292,7 +292,7 @@ There are two ways to assign a designated timestamp to a row:
 
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
 Using Server-assigned hinder the ability to deduplicate rows which is
-[important for exactly-once processing](#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::note
 

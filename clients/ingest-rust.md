@@ -134,6 +134,8 @@ fn main() -> Result<()> {
 }
 ```
 
+Using the current timestamp hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ## Configuration options
 
@@ -165,6 +167,17 @@ exceeds a certain size. You can check the buffer's size by calling
 The default `flush()` method clears the buffer after sending its data. If you
 want to preserve its contents (for example, to send the same data to multiple
 QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
+
+
+## Transactional flush
+
+As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
+the HTTP transport has some support for transactions.
+
+In order to ensure in advance that a flush will not affect more than one table, call
+[`sender.flush_and_keep_with_flags(&mut buffer, true)`](Sender::flush_and_keep_with_flags).
+This call will refuse to flush a buffer if the flush wouldn't be data-transactional.
+
 
 ## Error handling
 
@@ -218,16 +231,6 @@ These features are opt-in:
   certificates store.
 - `insecure-skip-verify`: Allows skipping server certificate validation in TLS
   (this compromises security).
-
-
-## Transactional flush
-
-As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
-the HTTP transport has some support for transactions.
-
-In order to ensure in advance that a flush will not affect more than one table, call
-[`sender.flush_and_keep_with_flags(&mut buffer, true)`](Sender::flush_and_keep_with_flags).
-This call will refuse to flush a buffer if the flush wouldn't be data-transactional.
 
 ## Next steps
 
