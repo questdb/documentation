@@ -11,6 +11,16 @@ import { ILPClientsTable } from "@theme/ILPClientsTable"
 QuestDB supports the .NET ecosystem with its dedicated .NET client, engineered
 for high-throughput data ingestion, focusing on insert-only operations.
 
+Apart from blazing fast ingestion, our clients provide these key benefits:
+
+- **Automatic table creation**: No need to define your schema upfront.
+- **Concurrent schema changes**: Seamlessly handle multiple data streams with
+  on-the-fly schema modifications
+- **Optimized batching**: Use strong defaults or curate the size of your batches
+- **Health checks and feedback**: Ensure your system's integrity with built-in
+  health monitoring
+- **Automatic write retries**: Reuse connections and retry after interruptions
+
 This quick start guide aims to familiarize you with the fundamental features of
 the .NET client, including how to establish a connection, authenticate, and
 perform basic insert operations.
@@ -23,7 +33,7 @@ perform basic insert operations.
 - QuestDB must be running. If not, see
   [the general quick start guide](/docs/quick-start/).
 
-## Quickstart
+## Client installation
 
 The latest version of the library is
 [2.0.0](https://www.nuget.org/packages/net-questdb-client/)
@@ -35,15 +45,6 @@ The NuGet package can be installed using the dotnet CLI:
 dotnet add package net-questdb-client
 ```
 
-The .NET ILP client streams data to QuestDB using the ILP format.
-
-The format is a text protocol with the following form:
-
-`table,symbol=value column1=value1 column2=value2 nano_timestamp`
-
-The client provides a convenient API to manage the construction and sending of
-ILP rows.
-
 :::note
 
 `Sender` is single-threaded, and uses a single connection to the database.
@@ -53,33 +54,117 @@ tasking.
 
 :::
 
-### Basic usage
+## Authentication
+
+### HTTP
+
+The HTTP protocol supports authentication via
+[Basic Authentication](https://datatracker.ietf.org/doc/html/rfc7617), and
+[Token Authentication](https://datatracker.ietf.org/doc/html/rfc6750).
+
+**Basic Authentication**
+
+Configure Basic Authentication with the `username` and `password` parameters:
 
 ```csharp
-using var sender = Sender.New("http::addr=localhost:9000;");
-await sender.Table("metric_name")
-    .Symbol("Symbol", "value")
-    .Column("number", 10)
-    .Column("double", 12.23)
-    .Column("string", "born to shine")
-    .AtAsync(new DateTime(2021, 11, 25, 0, 46, 26));
+using QuestDB;
+ ...
+using var sender = Sender.New("http::addr=localhost:9000;username=admin;password=quest;");
+ ...
+```
+
+**Token Authentication**
+
+_QuestDB Enterprise Only_
+
+Configure Token Authentication with the `username` and `token` parameters:
+
+```csharp
+using var sender = Sender.New("http::addr=localhost:9000;username=admin;token=<token>");
+```
+
+### TCP
+
+TCP authentication can be configured using JWK tokens:
+
+```csharp
+using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
+```
+
+The connection string can also be built programatically. See [Configuration](#configuration) for details.
+
+## Basic insert
+
+Basic insertion (no-auth):
+
+```csharp
+using System;
+using QuestDB;
+
+using var sender =  Sender.New("http::addr=localhost:9000;");
+await sender.Table("trades")
+    .Symbol("symbol", "ETH-USD")
+    .Symbol("side", "sell")
+    .Column("price", 2615.54)
+    .Column("amount", 0.00044)
+    .AtNowAsync();
+await sender.Table("trades")
+    .Symbol("symbol", "BTC-USD")
+    .Symbol("side", "sell")
+    .Column("price", 39269.98)
+    .Column("amount", 0.001)
+    .AtNowAsync();
 await sender.SendAsync();
 ```
 
-### Multi-line send (sync)
+In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps, custom auto-flushing, basic auth, and error reporting.
 
 ```csharp
-using var sender = Sender.New("http::addr=localhost:9000;auto_flush=off;");
-for(int i = 0; i < 100; i++)
+using QuestDB;
+using System;
+using System.Threading.Tasks;
+
+class Program
 {
-    sender.Table("metric_name")
-        .Column("counter", i)
-        .At(DateTime.UtcNow);
+    static async Task Main(string[] args)
+    {
+        using var sender = Sender.New("http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;");
+
+        var now = DateTime.UtcNow;
+        try
+        {
+            await sender.Table("trades")
+                        .Symbol("symbol", "ETH-USD")
+                        .Symbol("side", "sell")
+                        .Column("price", 2615.54)
+                        .Column("amount", 0.00044)
+                        .AtAsync(now);
+
+            await sender.Table("trades")
+                        .Symbol("symbol", "BTC-USD")
+                        .Symbol("side", "sell")
+                        .Column("price", 39269.98)
+                        .Column("amount", 0.001)
+                        .AtAsync(now);
+
+            await sender.SendAsync();
+
+            Console.WriteLine("Data flushed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+        }
+    }
 }
-sender.Send();
 ```
 
-## Initialisation
+As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
+ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+
+
+## Configuration
 
 Construct new Senders via the `Sender` factory.
 
@@ -87,12 +172,12 @@ It is mandatory to provide the `addr` config, as this defines the transport
 protocol and the server location.
 
 By default, the HTTP protocol uses `9000`, the same as the other HTTP endpoints.
-Optionally, TCP uses `9009'.
+Optionally, TCP uses `9009`.
 
 ### With a configuration string
 
 It is recommended, where possible, to initialise the sender using a
-[configuration string](https://questdb.io/docs/reference/api/ilp/overview/#configuration-strings).
+[configuration string](https://questdb.io/docs/reference/api/ilp/overview/#client-side-configuration).
 
 Configuration strings provide a convenient shorthand for defining client
 properties, and are validated during construction of the `Sender`.
@@ -134,27 +219,6 @@ var options = new ConfigurationBuilder()
     .GetSection("QuestDB")
     .Get<SenderOptions>();
 ```
-
-### Choosing a protocol
-
-The client currently supports streaming ILP data over HTTP and TCP transports.
-
-The sender performs some validation, but it is still possible that errors are
-present and the server will reject the data.
-
-With the TCP protocol, this will lead to a dropped connection and an error
-server-side.
-
-With the HTTP transport, errors will be returned via standard HTTP responses and
-propagated to the user via `IngressError`.
-
-HTTP transport also provides better guarantees around transactionality for
-submitted data.
-
-In general, it is recommended to use the HTTP transport. If the absolute highest
-performance is required, then in some cases, the TCP transport will be faster.
-However, it is important to use deduplication keys judiciously in your table
-schemas, as this will help guard against duplication of data in the error case.
 
 ## Preparing Data
 
@@ -246,25 +310,6 @@ QuestDB's deduplication feature, and should be avoided where possible.
 
 :::
 
-#### Designated timestamp
-
-QuestDB clusters the table around a
-[designated timestamp](/docs/concept/designated-timestamp/).
-
-The timestamp provided in the `At*` calls will be used as the designated
-timestamp.
-
-Choosing the right timestamp is critical for performance!
-
-#### Table creation
-
-If the table corresponding to the ILP submission does not exist, it will be
-automatically created, with a 'best guess' schema. This may not be optimal for
-your use case, but this functionality does provide flexibility in what the
-database will accept.
-
-It is recommended, when possible, to create your tables ahead of time using a
-thought-out schema. This can be done via APIs other than the ILP ingestion.
 
 ## Flushing
 
@@ -365,8 +410,13 @@ Server-side transactions are only for a single table. Therefore, a request
 containing multiple tables will be split into a single transaction per table. If
 a transaction fails for one table, other transactions may still complete.
 
-For true transactionality, one can use the transaction feature to enforce a
+For data transactionality, one can use the transaction feature to enforce a
 batch only for a single table.
+
+:::caution
+As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
+the HTTP transport has some limitations for transactions when adding new columns.
+:::
 
 Transactions follow this flow:
 
@@ -483,6 +533,8 @@ sender.Clear(); // empties the internal buffer
 
 ## Security
 
+_QuestDB Enterprise offers native TLS support_
+
 ### TLS
 
 Enable TLS via the `https` or `tcps` protocol, along with other associated
@@ -497,159 +549,32 @@ For development purposes, the verification of TLS certificates can be disabled:
 using var sender = Sender.New("https::addr=localhost:9000;tls_verify=unsafe_off;");
 ```
 
-### Authentication
-
-The client supports both TLS encryption, and authentication.
-
-The authentication credentials can be set up by following the
-[RBAC](https://questdb.io/docs/operations/rbac/) documentation.
-
-#### HTTP
-
-The HTTP protocol supports authentication via
-[Basic Authentication](https://datatracker.ietf.org/doc/html/rfc7617), and
-[Token Authentication](https://datatracker.ietf.org/doc/html/rfc6750).
-
-**Basic Authentication**
-
-Configure Basic Authentication with the `username` and `password` parameters:
-
-```csharp
-using var sender = Sender.New("http::addr=localhost:9000;username=admin;password=quest;");
-```
-
-**Token Authentication**
-
-Configure Token Authentication with the `username` and `token` parameters:
-
-```csharp
-using var sender = Sender.New("http::addr=localhost:9000;username=admin;token=<token>");
-```
-
-#### TCP
-
-TCP authentication can be configured using JWK tokens:
-
-```csharp
-using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
-```
-
-## Examples
-
-### Basic Usage
-
-```csharp
-using System;
-using QuestDB;
-
-using var sender =  Sender.New("http::addr=localhost:9000;");
-await sender.Table("trades")
-    .Symbol("pair", "USDGBP")
-    .Symbol("type", "buy")
-    .Column("traded_price", 0.83)
-    .Column("limit_price", 0.84)
-    .Column("qty", 100)
-    .Column("traded_ts", new DateTime(2022, 8, 6, 7, 35, 23, 189, DateTimeKind.Utc))
-    .AtAsync(DateTime.UtcNow);
-await sender.Table("trades")
-    .Symbol("pair", "GBPJPY")
-    .Column("traded_price", 135.97)
-    .Column("qty", 400)
-    .AtAsync(DateTime.UtcNow);
-await sender.SendAsync();
-```
-
-### Streaming data
-
-```csharp
-using System.Diagnostics;
-using QuestDB;
-
-var rowsToSend = 1e6;
-
-using var sender = Sender.New("http::addr=localhost:9000;auto_flush=on;auto_flush_rows=75000;auto_flush_interval=off;");
-
-var timer = new Stopwatch();
-timer.Start();
-
-for (var i = 0; i < rowsToSend; i++)
-{
-    await sender.Table("trades")
-        .Symbol("pair", "USDGBP")
-        .Symbol("type", "buy")
-        .Column("traded_price", 0.83)
-        .Column("limit_price", 0.84)
-        .Column("qty", 100)
-        .Column("traded_ts", new DateTime(
-            2022, 8, 6, 7, 35, 23, 189, DateTimeKind.Utc))
-        .AtAsync(DateTime.UtcNow);
-}
-
-// Ensure no pending rows.
-await sender.SendAsync();
-
-timer.Stop();
-
-Console.WriteLine(
-    $"Wrote {rowsToSend} rows in {timer.Elapsed.TotalSeconds} seconds at a rate of {rowsToSend / timer.Elapsed.TotalSeconds} rows/second.");
-```
-
 ### HTTP TLS with Basic Authentication
 
 ```csharp
-using QuestDB;
-
 // Runs against QuestDB Enterprise, demonstrating HTTPS and Basic Authentication support.
 
 using var sender =
     Sender.New("https::addr=localhost:9000;tls_verify=unsafe_off;username=admin;password=quest;");
-await sender.Table("trades")
-    .Symbol("pair", "USDGBP")
-    .Symbol("type", "buy")
-    .Column("traded_price", 0.83)
-    .Column("limit_price", 0.84)
-    .Column("qty", 100)
-    .Column("traded_ts", new DateTime(
-        2022, 8, 6, 7, 35, 23, 189, DateTimeKind.Utc))
-    .AtAsync(DateTime.UtcNow);
-await sender.Table("trades")
-    .Symbol("pair", "GBPJPY")
-    .Column("traded_price", 135.97)
-    .Column("qty", 400)
-    .AtAsync(DateTime.UtcNow);
-await sender.SendAsync();
 ```
 
 ### TCP TLS with JWK Authentication
 
 ```csharp
-using System;
-using QuestDB;
-
 //    Demonstrates TCPS connection against QuestDB Enterprise
 
 using var sender =
     Sender.New(
         "tcps::addr=localhost:9009;tls_verify=unsafe_off;username=admin;token=NgdiOWDoQNUP18WOnb1xkkEG5TzPYMda5SiUOvT1K0U=;");
 // See: https://questdb.io/docs/reference/api/ilp/authenticate
-await sender.Table("trades")
-    .Symbol("pair", "USDGBP")
-    .Symbol("type", "buy")
-    .Column("traded_price", 0.83)
-    .Column("limit_price", 0.84)
-    .Column("qty", 100)
-    .Column("traded_ts", new DateTime(
-        2022, 8, 6, 7, 35, 23, 189, DateTimeKind.Utc))
-    .AtAsync(DateTime.UtcNow);
-await sender.Table("trades")
-    .Symbol("pair", "GBPJPY")
-    .Column("traded_price", 135.97)
-    .Column("qty", 400)
-    .AtAsync(DateTime.UtcNow);
-await sender.SendAsync();
+
 ```
 
 ## Next Steps
+
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+about transactions, error control, delivery guarantees, health check, or table and
+column auto-creation.
 
 Dive deeper into the .NET client capabilities by exploring more examples
 provided in the
