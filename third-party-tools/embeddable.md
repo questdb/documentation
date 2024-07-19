@@ -9,11 +9,11 @@ Embeddable is a developer toolkit for building fast, interactive customer-facing
 analytics. It works well with a high performance time-series database like
 QuestDB.
 
-In [Embeddable](https://embeddable.com/) define
+In [Embeddable](https://embeddable.com/) you define
 [Data Models](https://trevorio.notion.site/Data-modeling-35637bbbc01046a1bc47715456bfa1d8)
 and
 [Components](https://trevorio.notion.site/Using-components-761f52ac2d0743b488371088a1024e49)
-in code stored in your own code repository, then use the **SDK** to make these
+in code, which are stored in your own code repository, then use the **SDK** to make these
 available for your team in the powerful Embeddable **no-code builder.** The end
 result is the ability to deliver fast, interactive **customer-facing analytics**
 directly into your product.
