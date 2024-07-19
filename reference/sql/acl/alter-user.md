@@ -22,7 +22,31 @@ Enterprise.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER USER keyword](/img/docs/diagrams/alterUser.svg)
+```mermaid
+graph LR
+  A[ALTER USER]
+  A --> B[userName]
+  B --> C[ENABLE]
+  B --> D[DISABLE]
+  B --> E[WITH]
+  E --> F[NO PASSWORD]
+  E --> G[PASSWORD]
+  G --> Q[password]
+  B --> H[CREATE TOKEN TYPE]
+  H --> I[JWK]
+  H --> J[REST WITH TTL]
+  J --> K[timeUnit]
+  K --> L[REFRESH]
+  B --> M[DROP TOKEN TYPE]
+  M --> N[JWK]
+  M --> O[REST]
+  O --> P[token]
+
+  classDef operand fill:#fff,stroke:#333,stroke-width:2px;
+
+  class A,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q sqlSyntax;
+  class B,Q,K,P operand;
+```
 
 ## Description
 
