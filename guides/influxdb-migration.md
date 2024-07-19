@@ -29,7 +29,7 @@ While InfluxDB clients are supported, we recommend using the QuestDB clients.
 
 If QuestDB is not up and running, see the [quick start](/docs/quick-start/).
 
-Tables are created during insert.
+Tables are automatically created during insert.
 
 There is no need for an upfront schema!
 
