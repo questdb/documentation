@@ -18,6 +18,8 @@ use of the [FILL](#fill-options) keyword to specify a fill behavior.
 
 ### SAMPLE BY keywords
 
+todo: railroad update
+
 ![Flow chart showing the syntax of the SAMPLE BY keywords](/img/docs/diagrams/sampleBy.svg)
 
 ### FILL keywords
@@ -192,7 +194,7 @@ below.
 
 :::note
 
-Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has been changed. If you do not specify
+Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you do not specify
 an explicit alignment, `SAMPLE BY` expressions will use `ALIGN TO CALENDAR` behaviour.
 
 The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query. 
@@ -475,6 +477,64 @@ SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d ALIGN TO CALENDAR;
 | --------------------------- | ------ |
 | 2021-05-31T00:00:00.000000Z | 1000.5 |
 | 2021-06-01T00:00:00.000000Z | 8007.2 |
+
+## FROM-TO
+
+:::note
+
+This syntax extension was added in QuestDB 8.1.0, and therefore is unavailable for versions prior to this.
+
+:::
+
+When using `SAMPLE BY` with `FILL`, missing rows within the result set can be filled with pre-determined values.
+
+However, this will only fill rows between existing data in the data set, and cannot be used to fill
+rows outside of this range.
+
+For some use cases, having a fixed result set shape is important. For example,
+let's say you have data from January 2024 to July 2024, but you want to plot a graph
+for the whole year. Previously, you would need to generate the rows after July 2024 by yourself,
+through the database or through your application.
+
+This also improves some unintuitive behaviour when using `SAMPLE BY` with just a `WHERE` filter.
+
+The new `FROM-TO` syntax helps to resolve this issue.
+
+### Aligning the result buckets
+
+Consider the following query:
+
+```questdb-sql demo
+SELECT pickup_datetime as t, count
+FROM trips
+WHERE pickup_datetime IN '2018'
+SAMPLE BY 5d
+LIMIT 5
+```
+
+Running this gives the following result:
+
+|t                          |count  |
+|---------------------------|-------|
+|2017-12-30T00:00:00.000000Z|808413 |
+|2018-01-04T00:00:00.000000Z|1264083|
+|2018-01-09T00:00:00.000000Z|1647305|
+|2018-01-14T00:00:00.000000Z|1580716|
+|2018-01-19T00:00:00.000000Z|1542316|
+
+In the query, we specified an interval 'IN'
+
+### Filling the range
+
+
+
+
+### Limitations
+
+- This syntax not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
+- This syntax is for `ALIGN TO CALENDAR only (default alignment).
+- Any specified `OFFSET` will not be considered.
+
 
 ## See also
 
