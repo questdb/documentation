@@ -58,6 +58,68 @@ trades per hour:
 SELECT ts, count() FROM trades SAMPLE BY 1h
 ```
 
+
+## FROM-TO
+
+todo: blog link
+
+:::note
+
+This syntax extension was added in QuestDB 8.1.0, and therefore is unavailable for versions prior to this.
+
+Please see the new blog for more information.
+
+:::
+
+When using `SAMPLE BY` with `FILL`, missing rows within the result set can be filled with pre-determined values.
+
+However, this will only fill rows between existing data in the data set, and cannot be used to fill
+rows outside of this range.
+
+#### Syntax
+
+The resulting shape of the query can be specified using `FROM` and `TO`:
+
+```questdb-sql title='Pre-filling trip data' demo
+SELECT pickup_datetime as t, count
+FROM trips
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+```
+
+Since there are no rows prior to 2009, these rows are filled automatically.
+
+This is distinct from the `WHERE` clause with a simple rule of thumb -
+`WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
+
+Both `FROM` and `TO` can be used in isolation to solely prefill or postfill data.
+
+#### `WHERE` clause optimisation
+
+If the user does not provide a `WHERE` clause, or the `WHERE` clause does not consider the designated timestamp,
+QuestDB will add one for you, matching the `FROM-TO` interval.
+
+This means that the query will run optimally, and avoid touching data not relevant to the result.
+
+Therefore, the prior query will be compiled into something equivalent to this:
+
+```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
+SELECT pickup_datetime as t, count
+FROM trips
+WHERE pickup_datetime >= '2008-12-28' 
+  AND pickup_datetime <  '2009-01-05'
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+```
+
+#### Limitations
+
+Here are the current limits to this feature.
+
+- This syntax is not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
+- This syntax is for `ALIGN TO CALENDAR` only (default alignment).
+- Any specified `OFFSET` will not be considered.
+- This syntax is for non-keyed `SAMPLE BY` i.e only designated timestamp and aggregate columns.
+
+
 ## Fill options
 
 The `FILL` keyword is optional and expects one or more `fillOption` strategies
@@ -416,6 +478,7 @@ The sample then begins from `Europe/London` at `2021-10-31T02:00:00.000000Z`:
 | 2021-10-31T04:00:00.000000Z | 3     |
 | 2021-10-31T05:00:00.000000Z | 2     |
 
+
 ## Examples
 
 Assume the following table `trades`:
@@ -477,63 +540,6 @@ SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d ALIGN TO CALENDAR;
 | --------------------------- | ------ |
 | 2021-05-31T00:00:00.000000Z | 1000.5 |
 | 2021-06-01T00:00:00.000000Z | 8007.2 |
-
-## FROM-TO
-
-:::note
-
-This syntax extension was added in QuestDB 8.1.0, and therefore is unavailable for versions prior to this.
-
-:::
-
-When using `SAMPLE BY` with `FILL`, missing rows within the result set can be filled with pre-determined values.
-
-However, this will only fill rows between existing data in the data set, and cannot be used to fill
-rows outside of this range.
-
-For some use cases, having a fixed result set shape is important. For example,
-let's say you have data from January 2024 to July 2024, but you want to plot a graph
-for the whole year. Previously, you would need to generate the rows after July 2024 by yourself,
-through the database or through your application.
-
-This also improves some unintuitive behaviour when using `SAMPLE BY` with just a `WHERE` filter.
-
-The new `FROM-TO` syntax helps to resolve this issue.
-
-### Aligning the result buckets
-
-Consider the following query:
-
-```questdb-sql demo
-SELECT pickup_datetime as t, count
-FROM trips
-WHERE pickup_datetime IN '2018'
-SAMPLE BY 5d
-LIMIT 5
-```
-
-Running this gives the following result:
-
-|t                          |count  |
-|---------------------------|-------|
-|2017-12-30T00:00:00.000000Z|808413 |
-|2018-01-04T00:00:00.000000Z|1264083|
-|2018-01-09T00:00:00.000000Z|1647305|
-|2018-01-14T00:00:00.000000Z|1580716|
-|2018-01-19T00:00:00.000000Z|1542316|
-
-In the query, we specified an interval 'IN'
-
-### Filling the range
-
-
-
-
-### Limitations
-
-- This syntax not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
-- This syntax is for `ALIGN TO CALENDAR only (default alignment).
-- Any specified `OFFSET` will not be considered.
 
 
 ## See also
