@@ -80,6 +80,10 @@ infrastructure sprawl.
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
 
+```sql title='yo' demo='https://example.com'
+SQL
+```
+
 With a specialized [time-series database](/glossary/time-series-database/), you
 don't need to worry about out-of-order data, duplicates, exactly one semantics,
 frequency of ingestion, or the many other details you will find in real-time

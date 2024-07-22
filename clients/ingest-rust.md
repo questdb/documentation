@@ -180,7 +180,7 @@ transaction. For this to work, your buffer must contain data that targets only
 one table. This is because QuestDB doesn't support multi-table transactions.
 
 In order to ensure in advance that a flush will be transactional, call
-[`sender.flush_and_keep_with_flags(&mut buffer, true)`](Sender::flush_and_keep_with_flags).
+`sender.flush_and_keep_with_flags(&mut buffer, true)`.
 This call will refuse to flush a buffer if the flush wouldn't be transactional.
 
 ### When to choose the TCP transport?
