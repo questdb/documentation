@@ -175,7 +175,7 @@ As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transac
 the HTTP transport has some support for transactions.
 
 In order to ensure in advance that a flush will not affect more than one table, call
-[`sender.flush_and_keep_with_flags(&mut buffer, true)`](Sender::flush_and_keep_with_flags).
+`sender.flush_and_keep_with_flags(&mut buffer, true)`.
 This call will refuse to flush a buffer if the flush wouldn't be data-transactional.
 
 
