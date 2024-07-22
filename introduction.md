@@ -13,7 +13,7 @@ import CodeBlock from "@theme/CodeBlock"
 QuestDB is an Apache 2.0 open source columnar database that specializes in time
 series. It offers category-leading ingestion throughput and fast SQL queries
 with operational simplicity. QuestDB reduces operational costs and overcomes
-ingestion bottlenecks, offering greatly simplify overall ingress infrastructure.
+ingestion bottlenecks, offering greatly simplified overall ingress infrastructure.
 
 This introduction provides a brief overview on:
 
@@ -93,10 +93,17 @@ efficiency and value.
 Writing blazing-fast queries syntax and creating real-time
 [Grafana](/docs/third-party-tools/grafana/) is done via familiar SQL:
 
-```sql title="Navigate time with SQL"
-SELECT timestamp, sensorName, tempC
-FROM sensors LATEST ON timestamp
-PARTITION BY sensorName;
+```questdb-sql title='Navigate time with SQL' demo
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    last(price) AS close,
+    min(price),
+    max(price),
+    sum(amount) AS volume
+FROM trades
+WHERE  timestamp > dateadd('d', -1, now())
+SAMPLE BY 15m;
 ```
 
 Intrigued? The best way to see whether QuestDB is right for you is to try it
