@@ -50,11 +50,10 @@ QuestDB open source supports the following filesystems:
 - NTFS
 - OVERLAYFS (used by Docker)
 - XFS
+- ZFS
 
 Other file systems supporting
 [mmap](https://man7.org/linux/man-pages/man2/mmap.2.html) feature are untested
 but may work with QuestDB.
 
 They should not be used in production.
-
-QuestDB Enterprise is required if you wish to use [ZFS](https://en.wikipedia.org/wiki/ZFS).
