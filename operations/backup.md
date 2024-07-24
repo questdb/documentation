@@ -58,7 +58,7 @@ Locating the Server Root Directory
 
 The default location of the server root directory varies by operating system:
 - MacOS: When using Homebrew, the server root directory is located at /opt/homebrew/var/questdb/.
-- Linux: The default location is ~/questdb.
+- Linux: The default location is ~/.questdb.
 
 If you are unsure of the server root directory's location, you can determine it by
 inspecting the QuestDB logs. Look for a line that reads, `QuestDB configuration files are in /opt/homebrew/var/questdb/conf`. The server root directory is one level up from the conf directory indicated in this log entry.
