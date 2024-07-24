@@ -10,9 +10,8 @@ Creates a backup for one, several, or all database tables.
 
 :::caution
 
-**The BACKUP statement is deprecated since QuestDB version 7.3.3 on all
-operating systems except Windows.** We recommend the
-[SNAPSHOT](/docs/reference/sql/snapshot/) statements instead.
+**The BACKUP statement is deprecated.** This page is kept for reference purposes only. 
+See our [backup guide](/docs/operations/backup/) for the latest information on how to backup and restore QuestDB databases.
 
 :::
 
