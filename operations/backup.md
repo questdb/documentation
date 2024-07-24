@@ -21,7 +21,6 @@ A snapshot:
 QuestDB currently does not support creating snapshots on Windows.
 If you are a Windows user and require backup functionality, please let us know by [commenting on this issue](https://github.com/questdb/questdb/issues/4811).
 
-
 :::
 
 

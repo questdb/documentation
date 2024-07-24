@@ -6,24 +6,18 @@ description: SNAPSHOT SQL keyword reference documentation.
 
 Prepares the database for a full backup or a filesystem (disk) snapshot.
 
-**Snapshot statements are not supported on Windows OS.**
-
 ## Syntax
 
 ![Flow chart showing the syntax of the SNAPSHOT keyword](/img/docs/diagrams/snapshot.svg)
 
+:::caution
+
+QuestDB currently does not support creating snapshots on Windows.
+If you are a Windows user and require backup functionality, please let us know by [commenting on this issue](https://github.com/questdb/questdb/issues/4811).
+
+:::
+
 ## Snapshot process
-
-Snapshot recovery mechanism requires a **snapshot instance ID** to be specified
-using the `cairo.snapshot.instance.id`
-[configuration key](/docs/configuration/):
-
-```shell title="server.conf"
-cairo.snapshot.instance.id=your_id
-```
-
-A snapshot instance ID may be an arbitrary string value, such as string
-representation of a UUID.
 
 Database snapshots may be used in combination with filesystem snapshots or
 together with file copying for a full data backup. Collecting a snapshot
@@ -72,13 +66,13 @@ the database at the new root directory.
 To start the database on a filesystem snapshot, you should make sure to
 configure a different snapshot instance ID.
 
-When the database starts, it checks the current instance ID and the ID stored in
-the `snapshot` directory, if present. On IDs mismatch, the database runs a
+When the database starts, it checks the presence of a file named `_restore` in
+the root directory. If the file is present, the database runs a
 snapshot recovery procedure restoring the metadata files from the snapshot. When
 this happens, you should see something like the following in the server logs:
 
 ```
-2022-03-07T08:24:12.348004Z I i.q.g.DatabaseSnapshotAgent starting snapshot recovery [currentId=`id2`, previousId=`id1`]
+2022-03-07T08:24:12.348004Z I i.q.g.DatabaseSnapshotAgent starting snapshot recovery [trigger=file]
 ...
 2022-03-07T08:24:12.349922Z I i.q.g.DatabaseSnapshotAgent snapshot recovery finished [metaFilesCount=1, txnFilesCount=1, cvFilesCount=1]
 ```
