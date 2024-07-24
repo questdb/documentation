@@ -63,9 +63,6 @@ In case of a full backup, you should also delete the old root directory and copy
 the files from your backup to the same location or, alternatively, you can point
 the database at the new root directory.
 
-To start the database on a filesystem snapshot, you should make sure to
-configure a different snapshot instance ID.
-
 When the database starts, it checks the presence of a file named `_restore` in
 the root directory. If the file is present, the database runs a
 snapshot recovery procedure restoring the metadata files from the snapshot. When
