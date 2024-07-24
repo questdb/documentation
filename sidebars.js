@@ -264,6 +264,7 @@ module.exports = {
             "reference/function/finance",
             "reference/function/meta",
             "reference/function/numeric",
+            "reference/function/parquet",
             "reference/function/pattern-matching",
             "reference/function/random-value-generator",
             "reference/function/row-generator",
@@ -450,4 +451,4 @@ module.exports = {
       ],
     },
   ].filter(Boolean),
-}
+};
