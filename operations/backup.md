@@ -6,36 +6,24 @@ description:
   to prevent data loss.
 ---
 
-The recommended QuestDB backup method is to create a
-[SNAPSHOT](/docs/reference/sql/snapshot/).
+QuestDB provides a snapshot feature that allows users to create backups of their
+databases. This feature is essential for preventing data loss and ensuring that
+data can be restored in the event of a failure.
 
 A snapshot:
 
-- Supports both full backup and incremental snapshots
-- All OSes except Windows
+- Support both full backups and incremental snapshots
+- Are available on all operating systems except Windows
 - Can be created while the database is running
-
-If you see "backup" indicated, assume we are referencing SNAPSHOT and not BACKUP
-unless clearly indicated.
-
-Alternatively, such as for Windows users, there is a more limited - and
-deprecated - [BACKUP](/docs/reference/sql/backup/) operation.
-
-- Supports full database or table backup only
-- Windows OS only, deprecated on other OSes such as Linux
-
----
 
 :::caution
 
-- A backup includes the contents of the database up to the point of executing a
-  backup. Any data inserted while a backup is underway is not stored as part of
-  the backup.
+QuestDB currently does not support creating snapshots on Windows.
+If you are a Windows user and require backup functionality, please let us know by [commenting on this issue](https://github.com/questdb/questdb/issues/4811).
 
-- Users can't use NFS or a similar distributed filesystem directly with QuestDB,
-  but users may copy a backup to such a filesystem after a backup has been made.
 
 :::
+
 
 ---
 ## Overview
@@ -119,3 +107,6 @@ QuestDB supports the following filesystems:
 
 Other file systems supporting are untested and while they may work,
 they are not officially supported. See the [filesystem compatibility](/docs/deployment/capacity-planning/#supported-filesystems) section for more information.
+
+## Further reading
+- [Snapshot API](/docs/reference/sql/snapshot/) - Reference documentation for the SQL commands used to create and manage snapshots.
