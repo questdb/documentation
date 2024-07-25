@@ -10,6 +10,7 @@ Prepares the database for a full backup or a filesystem (disk) snapshot.
 
 ![Flow chart showing the syntax of the SNAPSHOT keyword](/img/docs/diagrams/snapshot.svg)
 
+
 :::caution
 
 QuestDB currently does not support creating snapshots on Windows.
@@ -17,8 +18,9 @@ If you are a Windows user and require backup functionality, please let us know b
 
 :::
 
-## Snapshot process
+**Tip: Are you looking for a detailed guide on how to create backups and restore them? Check out our [Backup and Restore](/docs/operations/backup/) guide!**
 
+## Snapshot process
 Database snapshots may be used in combination with filesystem snapshots or
 together with file copying for a full data backup. Collecting a snapshot
 involves the following steps:
@@ -28,34 +30,11 @@ involves the following steps:
    flush the committed data to disk.
 2. Start a filesystem snapshot or copy the
    [root directory](/docs/concept/root-directory-structure/) to the backup
-   location on the disk. Refer to the [next section](#filesystem-snapshot) to
+   location on the disk. 
    learn how to create a filesystem snapshot on the most common cloud providers.
 3. Run `SNAPSHOT COMPLETE` statement to release the reader locks and delete the
    metadata file copies.
 
-For some cloud vendors, filesystem snapshot creation operation is asynchronous,
-i.e. the point-in-time snapshot is created immediately, as soon as the operation
-starts, but the end snapshot artifact may become available later. In such case,
-the `SNAPSHOT COMPLETE` statement (step 3) may be run without waiting for the
-end artifact, but once the snapshot creation has started.
-
-In case you prefer full backups over filesystem snapshots, you should keep in
-mind that the database will retain older partition and column file files on disk
-until `SNAPSHOT COMPLETE`. This means that you may run out of disk space if your
-disk doesn't have enough free space at the time you call `SNAPSHOT PREPARE`.
-
-## Filesystem snapshot
-
-The most common ways to perform cloud-native filesystem snapshots are described
-in the following resources, which rely on similar steps but have minor
-differences in terminology and services:
-
-- [AWS](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-creating-snapshot.html) -
-  creating EBS snapshots
-- [Azure](https://docs.microsoft.com/en-us/azure/virtual-machines/snapshot-copy-managed-disk?tabs=portal) -
-  creating snapshots of a virtual hard disk
-- [GCP](https://cloud.google.com/compute/docs/disks/create-snapshots) - working
-  with persistent disk snapshots
 
 ## Snapshot recovery
 
@@ -66,11 +45,11 @@ the database at the new root directory.
 When the database starts, it checks the presence of a file named `_restore` in
 the root directory. If the file is present, the database runs a
 snapshot recovery procedure restoring the metadata files from the snapshot. When
-this happens, you should see something like the following in the server logs:
+this happens, you should see the following in the server logs:
 
 ```
 2022-03-07T08:24:12.348004Z I i.q.g.DatabaseSnapshotAgent starting snapshot recovery [trigger=file]
-...
+[...]
 2022-03-07T08:24:12.349922Z I i.q.g.DatabaseSnapshotAgent snapshot recovery finished [metaFilesCount=1, txnFilesCount=1, cvFilesCount=1]
 ```
 
@@ -95,3 +74,6 @@ SNAPSHOT PREPARE;
 -- $ cp -r /root/dir/path /backup/dir/path
 SNAPSHOT COMPLETE;
 ```
+
+## Further reading
+- [Backup and Restore](/docs/operations/backup/) - Detailed guide on how to create backups and restore them.
