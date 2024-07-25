@@ -65,22 +65,22 @@ todo: blog link
 
 :::note
 
-This syntax extension was added in QuestDB 8.1.0, and therefore is unavailable for versions prior to this.
+Versions prior to QuestDB 8.1.0 do not have access to this extension.
 
 Please see the new blog for more information.
 
 :::
 
-When using `SAMPLE BY` with `FILL`, missing rows within the result set can be filled with pre-determined values.
+When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result set with pre-determined values.
 
-However, this will only fill rows between existing data in the data set, and cannot be used to fill
+However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
 rows outside of this range.
 
 To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause.
 
 #### Syntax
 
-The resulting shape of the query is specified using `FROM` and `TO`:
+Specify the shape of the query using `FROM` and `TO`:
 
 ```questdb-sql title='Pre-filling trip data' demo
 SELECT pickup_datetime as t, count
@@ -88,13 +88,12 @@ FROM trips
 SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
 ```
 
-Since there are no rows prior to 2009, these rows are filled automatically.
+Since no rows existed before 2009, QuestDB automatically fills in these rows.
 
 This is distinct from the `WHERE` clause with a simple rule of thumb -
 `WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
 
-Both `FROM` and `TO` can be used in isolation to solely pre-fill or post-fill data. If `FROM` is not provided,
-then the lower bound is the start of the dataset, aligned to calendar, and vice versa when `TO` is omitted.
+Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM` is not provided, then the lower bound is the start of the dataset, aligned to calendar. The opposite is true omitting `TO`.
 
 #### `WHERE` clause optimisation
 
@@ -103,7 +102,7 @@ QuestDB will add one for you, matching the `FROM-TO` interval.
 
 This means that the query will run optimally, and avoid touching data not relevant to the result.
 
-Therefore, the prior query will be compiled into something similar to this:
+Therefore, we compile the prior query into something similar to this:
 
 ```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
 SELECT pickup_datetime as t, count
@@ -119,7 +118,7 @@ Here are the current limits to this feature.
 
 - This syntax is not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
 - This syntax is for `ALIGN TO CALENDAR` only (default alignment).
-- Any specified `OFFSET` will not be considered.
+- Does not consider any specified `OFFSET`.
 - This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and aggregate columns.
 
 
