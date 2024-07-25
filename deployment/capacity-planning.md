@@ -358,7 +358,7 @@ If you are running the server with `systemd`, you will also need to set the `Lim
 
 If you have followed the [setup guide](https://questdb.io/docs/deployment/systemd/), then the file should be called `questdb.service` and located at `~/.config/systemd/user/questdb.service`.
 
-Set this property to at least `1048576`, or higher if you have set higher OS-wide limits. 
+Add this property to the `[Service]` section, setting it to at least `1048576`, or higher if you have set higher OS-wide limits. 
 
 Then restart the service. If you have configured these settings correctly, any warnings in the web console should now be cleared.
 
