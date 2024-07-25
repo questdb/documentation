@@ -18,8 +18,6 @@ use of the [FILL](#fill-options) keyword to specify a fill behavior.
 
 ### SAMPLE BY keywords
 
-todo: railroad update
-
 ![Flow chart showing the syntax of the SAMPLE BY keywords](/img/docs/diagrams/sampleBy.svg)
 
 ### FILL keywords
@@ -58,10 +56,7 @@ trades per hour:
 SELECT ts, count() FROM trades SAMPLE BY 1h
 ```
 
-
 ## FROM-TO
-
-todo: blog link
 
 :::note
 
@@ -107,7 +102,7 @@ Therefore, we compile the prior query into something similar to this:
 ```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
 SELECT pickup_datetime as t, count
 FROM trips
-WHERE pickup_datetime >= '2008-12-28' 
+WHERE pickup_datetime >= '2008-12-28'
   AND pickup_datetime <  '2009-01-05'
 SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
 ```
@@ -120,7 +115,6 @@ Here are the current limits to this feature.
 - This syntax is for `ALIGN TO CALENDAR` only (default alignment).
 - Does not consider any specified `OFFSET`.
 - This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and aggregate columns.
-
 
 ## Fill options
 
@@ -261,7 +255,7 @@ below.
 Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you do not specify
 an explicit alignment, `SAMPLE BY` expressions will use `ALIGN TO CALENDAR` behaviour.
 
-The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query. 
+The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query.
 
 Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar` option to `false` in `server.conf`.
 
@@ -277,7 +271,7 @@ ts TIMESTAMP,
 val INT
 ) TIMESTAMP(ts) PARTITION BY DAY WAL
 
-INSERT INTO sensors (ts, val) VALUES 
+INSERT INTO sensors (ts, val) VALUES
 ('2021-05-31T23:10:00.000000Z', 10),
 ('2021-06-01T01:10:00.000000Z', 80),
 ('2021-06-01T07:20:00.000000Z', 15),
@@ -326,7 +320,6 @@ ALIGN TO CALENDAR
 ```
 
 Gives the following result:
-
 
 | ts                          | count |
 | --------------------------- | ----- |
@@ -480,7 +473,6 @@ The sample then begins from `Europe/London` at `2021-10-31T02:00:00.000000Z`:
 | 2021-10-31T04:00:00.000000Z | 3     |
 | 2021-10-31T05:00:00.000000Z | 2     |
 
-
 ## Examples
 
 Assume the following table `trades`:
@@ -542,7 +534,6 @@ SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d ALIGN TO CALENDAR;
 | --------------------------- | ------ |
 | 2021-05-31T00:00:00.000000Z | 1000.5 |
 | 2021-06-01T00:00:00.000000Z | 8007.2 |
-
 
 ## See also
 
