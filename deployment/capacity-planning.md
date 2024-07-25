@@ -354,7 +354,7 @@ sysctl fs.file-max
 
 #### Extra steps for systemd
 
-If you are running the server with `systemd`, you will also need to set the `LimitNOFILE` property in your service file.
+If you are running the QuestDB using `systemd`, you will also need to set the `LimitNOFILE` property in your service file.
 
 If you have followed the [setup guide](https://questdb.io/docs/deployment/systemd/), then the file should be called `questdb.service` and located at `~/.config/systemd/user/questdb.service`.
 
