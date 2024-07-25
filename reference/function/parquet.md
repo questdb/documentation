@@ -75,3 +75,7 @@ Parquet format support rich set of data types, including structural types. Quest
 - Binary
 
 Parquet columns with unsupported data types are ignored.
+
+Multiple files are not suppored, only a single file.
+
+Nested data and/or arrays are not supported.
