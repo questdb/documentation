@@ -35,7 +35,7 @@ This guide uses the word "snapshot" in 2 different meanings:
 
 - **Database snapshot**: Instructs QuestDB to record the state of the database at a specific point in time. This is done
   via `SNAPSHOT PREPARE` SQL command.
-- **Filesystem and volumne snapshot**: A point-in-time copy of the filesystem that can be used to create a backup. This is done
+- **Filesystem and volume snapshot**: A point-in-time copy of the filesystem that can be used to create a backup. This is done
   using filesystem-specific tools or commands.
 
 Database backup involves creating a database snapshot and then using a filesystem snapshot or file copying to create a
