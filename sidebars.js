@@ -162,7 +162,6 @@ module.exports = {
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
-            "reference/sql/backup",
             "reference/sql/cancel-query",
             "reference/sql/case",
             "reference/sql/cast",
