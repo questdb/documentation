@@ -352,6 +352,16 @@ sysctl -p
 sysctl fs.file-max
 ```
 
+#### Extra steps for systemd
+
+If you are running the server with `systemd`, you will also need to set the `LimitNOFILE` property in your service file.
+
+If you have followed the [setup guide](https://questdb.io/docs/deployment/systemd/), then the file should be called `questdb.service` and located at `~/.config/systemd/user/questdb.service`.
+
+Set this property to at least `1048576`, or higher if you have set higher OS-wide limits. 
+
+Then restart the service. If you have configured these settings correctly, any warnings in the web console should now be cleared.
+
 #### Setting system-wide open file limit on MacOS:
 
 On MacOS, the system-wide limit can be modified by using `launchctl`:
