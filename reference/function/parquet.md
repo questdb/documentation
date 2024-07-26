@@ -36,25 +36,27 @@ With this function, query a Parquet file located at the QuestDB copy root direct
 SELECT
   *
 FROM
-  parquet_read('trades.parquet')
+  read_parquet('trades.parquet')
 WHERE
-  exchange == 'NASDAQ'
+  side = 'buy'
+LIMIT 1;
 ```
 
-| quantity | price  | exchange | timestamp                 |
-| -------- | ------ | -------- | ------------------------- |
-| 1000     | 145.09 | NASDAQ   | 2023-07-12T09:30:00.0000Z |
+| symbol  | side | price   | amount     | timestamp                   |
+|---------|------|---------|:-----------|-----------------------------|
+| BTC-USD | buy  | 62755.6 | 0.00043367 | 2024-07-01T00:46:39.754075Z |
 
 The query above:
 
-- Reads all columns from the file `trades.parquet` located at the server copy root directory.
-- Filters rows, keeping only trades made on NASDAQ.
+- Reads all columns from the file `trades.parquet` located at the server copy root directory, 
+  i.e. `import/trades.parquet` in the QuestDB copy root directory by default.
+- Filters rows, keeping only the first row where the `side` column equals `buy`.
 
 ### Configuration
 
-For security reason, reading is only allowed if copy root directory is configured. To configure the copy root directory:
-
-- `cairo.sql.copy.root` must be defined using one of the following settings:
+For security reason, reading is only allowed from a specified directory. It defaults to the `import` directory
+inside the QuestDB copy root directory. To change the allowed directory, set the `cairo.sql.copy.root` 
+configuration by using one of the following settings:
   - The environment variable `QDB_CAIRO_SQL_COPY_ROOT`.
   - The `cairo.sql.copy.root` key in `server.conf`.
 
