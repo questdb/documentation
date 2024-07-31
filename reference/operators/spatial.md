@@ -12,7 +12,7 @@ calculations. For more information on this type of data, see the
 ### within
 
 `within(geohash, ...)` - evaluates if a comma-separated list of geohashes are
-equal to are within another geohash:
+equal to or within another geohash:
 
 - The `within` operator can only be used in `LATEST ON` queries and all symbol
   columns within the query **must be indexed**.
