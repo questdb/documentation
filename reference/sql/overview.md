@@ -6,20 +6,37 @@ description:
   querying and cleaning up the example data set.
 ---
 
-import Screenshot from "@theme/Screenshot" import Tabs from "@theme/Tabs" import
-TabItem from "@theme/TabItem" import CQueryPartial from
-"../../partials/\_c.sql.query.partial.mdx" import CsharpQueryPartial from
-"../../partials/\_csharp.sql.query.partial.mdx" import GoQueryPartial from
-"../../partials/\_go.sql.query.partial.mdx" import JavaQueryPartial from
-"../../partials/\_java.sql.query.partial.mdx" import NodeQueryPartial from
-"../../partials/\_nodejs.sql.query.partial.mdx" import RubyQueryPartial from
-"../../partials/\_ruby.sql.query.partial.mdx" import PHPQueryPartial from
-"../../partials/\_php.sql.query.partial.mdx" import PythonQueryPartial from
-"../../partials/\_python.sql.query.partial.mdx" import CurlExecQueryPartial from
-"../../partials/\_curl.exec.query.partial.mdx" import GoExecQueryPartial from
-"../../partials/\_go.exec.query.partial.mdx" import NodejsExecQueryPartial from
-"../../partials/\_nodejs.exec.query.partial.mdx" import PythonExecQueryPartial
-from "../../partials/\_python.exec.query.partial.mdx"
+import Screenshot from "@theme/Screenshot"
+
+import Tabs from "@theme/Tabs"
+
+import TabItem from "@theme/TabItem"
+
+import CQueryPartial from "../../partials/\_c.sql.query.partial.mdx"
+
+import CsharpQueryPartial from "../../partials/\_csharp.sql.query.partial.mdx"
+
+import GoQueryPartial from "../../partials/\_go.sql.query.partial.mdx"
+
+import JavaQueryPartial from "../../partials/\_java.sql.query.partial.mdx"
+
+import NodeQueryPartial from "../../partials/\_nodejs.sql.query.partial.mdx"
+
+import RubyQueryPartial from "../../partials/\_ruby.sql.query.partial.mdx"
+
+import PHPQueryPartial from "../../partials/\_php.sql.query.partial.mdx"
+
+import PythonQueryPartial from "../../partials/\_python.sql.query.partial.mdx"
+
+import CurlExecQueryPartial from "../../partials/\_curl.exec.query.partial.mdx"
+
+import GoExecQueryPartial from "../../partials/\_go.exec.query.partial.mdx"
+
+import NodejsExecQueryPartial
+from"../../partials/\_nodejs.exec.query.partial.mdx"
+
+import PythonExecQueryPartial from
+"../../partials/\_python.exec.query.partial.mdx"
 
 Querying - as a base action - is performed in three primary ways:
 
@@ -29,16 +46,15 @@ Querying - as a base action - is performed in three primary ways:
 3. Query via [REST HTTP API](/docs/reference/sql/overview/#rest-http-api)
 4. Query via [Apache Parquet](/docs/reference/sql/overview/#apache-parquet)
 
-QuestDB provides SQL with enhanced time series extensions.
+For efficient and clear querying, QuestDB provides SQL with enhanced time series
+extensions. This makes analyzing, downsampling, processing and reading time
+series data an intuitive and flexible experience.
 
-This makes analyzing, downsampling, processing and reading time series data an
-intuitive and flexible experience.
-
-Queries can be written into many applications using the many rich and diverse
-drivers and clients of the PostgreSQL or REST-ful ecosystems. However, querying
-is also leveraged heavily by third-party tools to provide visualizations, such
-as within [Grafana](/docs/third-party-tools/grafana/), or for connectivity into
-broad data infrastructure and application environments such as with a tool like
+Queries can be written into many applications using existing drivers and clients
+of the PostgreSQL or REST-ful ecosystems. However, querying is also leveraged
+heavily by third-party tools to provide visualizations, such as within
+[Grafana](/docs/third-party-tools/grafana/), or for connectivity into broad data
+infrastructure and application environments such as with a tool like
 [Cube](/docs/third-party-tools/cube/).
 
 > Need to ingest data first? Checkout our
@@ -57,6 +73,25 @@ and simplest way, apply queries via the Web Console.
   src="/img/pages/getQuestdb/console.webp"
   title="Click to zoom"
 />
+
+For an example, click _Demo this query_ in the below snippet. This will run a
+query within our public demo instance and Web Console:
+
+```questdb-sql title='Navigate time with SQL' demo
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    last(price) AS close,
+    min(price),
+    max(price),
+    sum(amount) AS volume
+FROM trades
+WHERE  timestamp > dateadd('d', -1, now())
+SAMPLE BY 15m;
+```
+
+If you see _Demo this query_ on other snippets in this docs, they can be run
+against the demo instance.
 
 ## PostgreSQL
 
@@ -394,8 +429,6 @@ For more information, see the
 ## What's next?
 
 Now... SQL! It's query time.
-
-SQL is fairly intuitive and known to many.
 
 Whether you want to use the Web Console, PostgreSQL or REST HTTP (or both),
 query construction is rich.
