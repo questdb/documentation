@@ -29,6 +29,11 @@ module.exports = {
           collapsed: false,
           items: [
             {
+              id: "configuration-string",
+              type: "doc",
+              label: "Configuration string",
+            },
+            {
               id: "clients/ingest-python",
               type: "doc",
               label: "Python",
@@ -450,4 +455,4 @@ module.exports = {
       ],
     },
   ].filter(Boolean),
-};
+}

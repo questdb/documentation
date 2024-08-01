@@ -78,26 +78,27 @@ Or, set the QDB_CLIENT_CONF environment variable and call
    client, err := questdb.LineSenderFromEnv(context.TODO())
    ```
 
-Alternatively, you can use the built-in Go API to specify the connection options.
+Alternatively, you can use the built-in Go API to specify the connection
+options.
 
- ```go
- package main
+```go
+package main
 
 import (
-        "context"
-        qdb "github.com/questdb/go-questdb-client/v3"
+       "context"
+       qdb "github.com/questdb/go-questdb-client/v3"
 )
 
 
 func main() {
-        ctx := context.TODO()
+       ctx := context.TODO()
 
-        client, err := qdb.NewLineSender(context.TODO(), qdb.WithHttp(), qdb.WithAddress("localhost:9000"), qdb.WithBasicAuth("admin", "quest"))
+       client, err := qdb.NewLineSender(context.TODO(), qdb.WithHttp(), qdb.WithAddress("localhost:9000"), qdb.WithBasicAuth("admin", "quest"))
 ```
 
-
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 ## Basic Insert
 
@@ -139,7 +140,9 @@ func main() {
 }
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's see now an example with an explicit timestamp, custom auto-flushing, and basic auth.
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with an explicit timestamp, custom auto-flushing, and basic
+auth.
 
 ```Go
 package main
@@ -183,29 +186,35 @@ func main() {
 	}
 }
 ```
+
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
- Using the current timestamp hinder the ability to deduplicate rows which is
+Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ## Configuration options
 
-The minimal configuration string needs to have the protocol, host, and port, as in:
+The minimal configuration string needs to have the protocol, host, and port, as
+in:
 
 ```
 http::addr=localhost:9000;
 ```
 
-In the Go client, you can set the configuration options via the standard config string,
-which is the same across all clients, or using [the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderOption).
+In the Go client, you can set the configuration options via the standard config
+string, which is the same across all clients, or using
+[the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderOption).
 
-For all the extra options you can use, please check [the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
+For all the extra options you can use, please check
+[the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
 
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
 
 ## Next Steps
 
 Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
 Explore the full capabilities of the Go client via
 [Go.dev](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3).
