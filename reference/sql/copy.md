@@ -62,7 +62,9 @@ while an import is taking place.
 from. A CSV file must be saved to the root directory before starting the `COPY`
 operation. There are two root directories to be defined:
 
-- `cairo.sql.copy.root` is used for storing regular files to be imported.
+- `cairo.sql.copy.root` is used for storing regular files to be imported. By default,
+  it points to the `root_directory/import` directory. This allows you to drop a CSV
+    file into the `import` directory and start the import operation.
 - `cairo.sql.copy.work.root` is used for storing temporary files like indexes or
   temporary partitions. Unless otherwise specified, it points to the
   `root_directory/tmp` directory.

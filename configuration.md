@@ -140,18 +140,13 @@ applying WAL data to the table storage:
 This section describes configuration settings for using `COPY` to import large
 CSV files.
 
-Mandatory settings to enable `COPY`:
-
-<ConfigTable
-  rows={csvImportConfig}
-  pick={["cairo.sql.copy.root", "cairo.sql.copy.work.root"]}
-/>
-
-Optional settings for `COPY`:
+Settings for `COPY`:
 
 <ConfigTable
   rows={csvImportConfig}
   pick={[
+    "cairo.sql.copy.root", 
+    "cairo.sql.copy.work.root",
     "cairo.iouring.enabled",
     "cairo.sql.copy.buffer.size",
     "cairo.sql.copy.log.retention.days",
