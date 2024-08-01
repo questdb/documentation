@@ -44,7 +44,8 @@ let mut sender = Sender::from_conf(
 )?;
 ```
 
-You can also pass the connection configuration via the `QDB_CLIENT_CONF` environment variable:
+You can also pass the connection configuration via the `QDB_CLIENT_CONF`
+environment variable:
 
 ```bash
 export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
@@ -57,7 +58,8 @@ let mut sender = Sender::from_env()?;
 ```
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 ## Basic insert
 
@@ -94,9 +96,11 @@ These are the main steps it takes:
 
 In this case, the designated timestamp will be the one at execution time.
 
-Let's see now an example with timestamps using Chrono, custom timeout, and basic auth.
+Let's see now an example with timestamps using Chrono, custom timeout, and basic
+auth.
 
-You need to enable the `chrono_timestamp` feature to the QuestDB crate and add the Chrono crate.
+You need to enable the `chrono_timestamp` feature to the QuestDB crate and add
+the Chrono crate.
 
 ```bash
 cargo add questdb-rs --features chrono_timestamp
@@ -150,6 +154,9 @@ general structure is:
 [crate documentation](https://docs.rs/questdb-rs/latest/questdb/ingress) for the
 full details on configuration.
 
+Alternatively, for breakdown of available params, see the
+[Configuration string](/docs/configuration-string/) page.
+
 ## Don't forget to flush
 
 The sender and buffer objects are entirely decoupled. This means that the sender
@@ -157,8 +164,8 @@ won't get access to the data in the buffer until you explicitly call
 `sender.flush(&mut buffer)` or a variant. This may lead to a pitfall where you
 drop a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the rust client does not supports auto-flushing
-via configuration.
+Unlike other official QuestDB clients, the rust client does not supports
+auto-flushing via configuration.
 
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
@@ -168,16 +175,15 @@ The default `flush()` method clears the buffer after sending its data. If you
 want to preserve its contents (for example, to send the same data to multiple
 QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 
-
 ## Transactional flush
 
-As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
-the HTTP transport has some support for transactions.
+As described at the
+[ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
+HTTP transport has some support for transactions.
 
-In order to ensure in advance that a flush will not affect more than one table, call
-`sender.flush_and_keep_with_flags(&mut buffer, true)`.
-This call will refuse to flush a buffer if the flush wouldn't be data-transactional.
-
+In order to ensure in advance that a flush will not affect more than one table,
+call `sender.flush_and_keep_with_flags(&mut buffer, true)`. This call will
+refuse to flush a buffer if the flush wouldn't be data-transactional.
 
 ## Error handling
 
@@ -209,7 +215,6 @@ You can inspect the sender's error state by calling `sender.must_close()`.
 For more details about the HTTP and TCP transports, please refer to the
 [ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
-
 ## Crate features
 
 The QuestDB client crate supports some optional features, mostly related to
@@ -235,8 +240,8 @@ These features are opt-in:
 ## Next steps
 
 Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
 Explore the full capabilities of the Rust client via the
 [Crate API page](https://docs.rs/questdb-rs/latest/questdb/).

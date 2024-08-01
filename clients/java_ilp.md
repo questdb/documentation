@@ -6,17 +6,22 @@ efficiency."
 ---
 
 import Tabs from "@theme/Tabs"
-import TabItem from "@theme/TabItem"
-import CodeBlock from "@theme/CodeBlock"
-import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
-import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
+import TabItem from "@theme/TabItem"
+
+import CodeBlock from "@theme/CodeBlock"
+
+import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
+
+import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
 :::note
 
-This is the reference for the QuestDB Java Client when QuestDB is used as a server. 
+This is the reference for the QuestDB Java Client when QuestDB is used as a
+server.
 
-For embedded QuestDB, please check our [Java Embedded Guide](/docs/reference/api/java-embedded/).
+For embedded QuestDB, please check our
+[Java Embedded Guide](/docs/reference/api/java-embedded/).
 
 :::
 
@@ -36,21 +41,18 @@ The client provides the following benefits:
 
 Add a QuestDB as a dependency in your project's build configuration file.
 
-<Tabs
-  defaultValue="maven"
-  values={[
-    { label: "Maven", value: "maven" },
-    { label: "Gradle", value: "gradle" },
-  ]}
->
-  <TabItem value="maven">
+<Tabs defaultValue="maven" values={[ { label: "Maven", value: "maven" },
+{ label: "Gradle", value: "gradle" }, ]}
+
+>   <TabItem value="maven">
+
     <InterpolateReleaseData
       renderText={(release) => (
         <CodeBlock className="language-xml">
           {`<dependency>
-  <groupId>org.questdb</groupId>
-  <artifactId>questdb</artifactId>
-  <version>${release.name}</version>
+
+<groupId>org.questdb</groupId> <artifactId>questdb</artifactId>
+<version>${release.name}</version>
 </dependency>`}
         </CodeBlock>
       )}
@@ -61,11 +63,7 @@ Add a QuestDB as a dependency in your project's build configuration file.
       renderText={(release) => (
         <CodeBlock className="language-text">
           {`compile group: 'org.questdb', name: 'questdb', version: '${release.name}'`}
-        </CodeBlock>
-      )}
-    />
-  </TabItem>
-</Tabs>
+</CodeBlock> )} /> </TabItem> </Tabs>
 
 The code below creates an instance of a client configured to use HTTP transport
 to connect to a QuestDB server running on localhost on port 9000. It then sends
@@ -102,7 +100,8 @@ connection to a QuestDB server. It also instructs the client to authenticate
 using HTTP Basic Authentication.
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 <RemoteRepoExample name="ilp-http-auth" lang="java" header={false} />
 
@@ -253,7 +252,6 @@ client receives no additional error information from the server. This limitation
 significantly contributes to the preference for HTTP transport over TCP
 transport.
 
-
 ## Designated timestamp considerations
 
 The concept of [designated timestamp](/docs/concept/designated-timestamp/) is
@@ -303,7 +301,6 @@ rows with older timestamps are ingested before rows with newer timestamps.
 
 :::
 
-
 ## Configuration options
 
 Client can be configured either by using a configuration string as shown in the
@@ -312,77 +309,16 @@ examples above, or by using the builder API.
 The builder API is available via the `Sender.builder(Transport transport)`
 method.
 
-When using the configuration string, the following options are available:
-
-### HTTP transport authentication
-
-- `username` : Username for HTTP basic authentication.
-- `password` : Password for HTTP basic authentication.
-- `token` : Bearer token for HTTP authentication.
-
-### TCP transport authentication
-
-- `username`: Username for TCP authentication.
-- `token`: Token for TCP authentication.
-
-### Auto-flushing
-
-- `auto_flush` : Global switch for the auto-flushing behavior. Options are `on`
-  or `off`. Defaults to `on`.
-- `auto_flush_rows` : The number of rows that will trigger a flush. This option
-  is supported for HTTP transport only. Defaults to 75,000.
-- `auto_flush_interval` : The time in milliseconds that will trigger a flush.
-  Defaults to 1000. This option is support for HTTP transport only.
-
-The TCP transport for a client automatically flushes when its buffer is full.
-The TCP transport utilizes a fixed-size buffer, and its maximum size is the same
-as the initial size. Thus, the option `init_buf_size` (see below) effectively
-controls the auto-flushing behavior of the TCP transport.
-
-### Buffer
-
-- `init_buf_size` : The initial size of the buffer in bytes. Default: 65536
-  (64KiB)
-- `max_buf_size` : The maximum size of the buffer in bytes. Default: 104857600
-  (100MiB) This option is support for HTTP transport only. TCP transport uses a
-  fixed-size buffer and its maximum size is the same as the initial size.
-
-### HTTP Transport
-
-- `retry_timeout` : The time in milliseconds to continue retrying after a failed
-  HTTP request. The interval between retries is an exponential backoff starting
-  at 10ms and doubling after each failed attempt up to a maximum of 1 second.
-  Default: 10000 (10 seconds)
-- `request_timeout` : The time in milliseconds to wait for a response from the
-  server. This is in addition to the calculation derived from the
-  `request_min_throughput` parameter. Default: 10000 (10 seconds)
-- `request_min_throughput` : Minimum expected throughput in bytes per second for
-  HTTP requests. If the throughput is lower than this value, the connection will
-  time out. This is used to calculate an additional timeout on top of
-  `request_timeout`. This is useful for large requests. You can set this value
-  to `0` to disable this logic.
-
-### TLS encryption
-
-To enable TLS, select the `https` or `tcps` protocol. 
-
-The following options are available:
-
-- `tls_roots` : Path to a Java keystore file containing trusted root
-  certificates. Defaults to the system default trust store.
-- `tls_roots_password` : Password for the keystore file. It's always required
-  when `tls_roots` is set.
-- `tls_verify` : Whether to verify the server's certificate. This should only be
-  used for testing as a last resort and never used in production as it makes the
-  connection vulnerable to man-in-the-middle attacks. Options are `on` or
-  `unsafe_off`. Defaults to `on`.
-
+For a breakdown of available options, see the
+[Configuration string](/docs/configuration-string/) page.
 
 ## Other considerations
 
-- Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+- Refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+  about transactions, error control, delivery guarantees, health check, or table
+  and column auto-creation.
+- The method `flush()` can be called to force sending the internal buffer to a
+  server, even when the buffer is not full yet.
 - The Sender is not thread-safe. For multiple threads to send data to QuestDB,
   each thread should have its own Sender instance. An object pool can also be
   used to re-use Sender instances.
@@ -390,5 +326,3 @@ column auto-creation.
   implements the `java.lang.AutoCloseable` interface, and therefore the
   [try-with-resource](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html)
   pattern can be used to ensure that the Sender is closed.
-- The method `flush()` can be called to force sending the internal buffer to a
-  server, even when the buffer is not full yet.

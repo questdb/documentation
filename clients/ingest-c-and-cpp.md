@@ -23,7 +23,6 @@ Key features of the QuestDB C & C++ client include:
   health monitoring
 - **Automatic write retries**: Reuse connections and retry after interruptions
 
-
 ### Requirements
 
 - Requires a C/C++ compiler and standard libraries.
@@ -32,16 +31,16 @@ Key features of the QuestDB C & C++ client include:
 
 ### Client Installation
 
-You need to add the client as a dependency to your project. Depending on your environment,
-you can do this in different ways. Please check the documentation at the
+You need to add the client as a dependency to your project. Depending on your
+environment, you can do this in different ways. Please check the documentation
+at the
 [client's repository](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
-
 
 ## C++
 
 :::note
 
-This section is for the QuestDB C++ client. 
+This section is for the QuestDB C++ client.
 
 For the QuestDB C Client, see the below seciton.
 
@@ -51,7 +50,6 @@ For the QuestDB C Client, see the below seciton.
 
 Explore the full capabilities of the C++ client via the
 [C++ README](https://github.com/questdb/c-questdb-client/blob/main/doc/CPP.md).
-
 
 ## Authentication
 
@@ -70,7 +68,8 @@ auto sender = questdb::ingress::line_sender::from_conf(
 
 ```
 
-You can also pass the connection configuration via the `QDB_CLIENT_CONF` environment variable:
+You can also pass the connection configuration via the `QDB_CLIENT_CONF`
+environment variable:
 
 ```bash
 export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
@@ -83,8 +82,8 @@ auto sender = questdb::ingress::line_sender::from_env();
 ```
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
-
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 ### Basic data insertion
 
@@ -123,7 +122,8 @@ These are the main steps it takes:
 
 In this case, the designated timestamp will be the one at execution time.
 
-Let's see now an example with timestamps, custom timeout, basic auth, and error control.
+Let's see now an example with timestamps, custom timeout, basic auth, and error
+control.
 
 ```cpp
 #include <questdb/ingress/line_sender.hpp>
@@ -183,25 +183,24 @@ int main()
 }
 ```
 
-As you can see, both events now are using the same timestamp. We recommended using the original event timestamps when
-ingesting data into QuestDB. Using the current timestamp will hinder the ability to deduplicate rows which is
+As you can see, both events now are using the same timestamp. We recommended
+using the original event timestamps when ingesting data into QuestDB. Using the
+current timestamp will hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
 
 ## C
 
 :::note
 
-This sectioni s for the QuestDB C client. 
+This sectioni s for the QuestDB C client.
 
-Skip to the bottom of this page for information relating to both the C and C++ clients.
+Skip to the bottom of this page for information relating to both the C and C++
+clients.
 
-:::
-<ILPClientsTable language="C" />
+::: <ILPClientsTable language="C" />
 
 Explore the full capabilities of the C client via the
 [C README](https://github.com/questdb/c-questdb-client/blob/main/doc/C.md).
-
 
 ### Connection
 
@@ -225,13 +224,15 @@ if (!sender) {
 }
 ```
 
-You can also pass the connection configuration via the `QDB_CLIENT_CONF` environment variable:
+You can also pass the connection configuration via the `QDB_CLIENT_CONF`
+environment variable:
 
 ```bash
 export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
 ```
 
 Then you use it like this:
+
 ```c
 #include <questdb/ingress/line_sender.h>
 ...
@@ -317,9 +318,8 @@ error:
 
 In this case, the designated timestamp will be the one at execution time.
 
-Let's see now an example with timestamps, custom timeout, basic auth, error control, and transactional
-awareness.
-
+Let's see now an example with timestamps, custom timeout, basic auth, error
+control, and transactional awareness.
 
 ```c
 // line_sender_trades_example.c
@@ -417,10 +417,10 @@ error:
 
 ```
 
-As you can see, both events use the same timestamp. We recommended using the original event timestamps when
-ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
+As you can see, both events use the same timestamp. We recommended using the
+original event timestamps when ingesting data into QuestDB. Using the current
+timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](#/docs/clients/java_ilp/#exactly-once-delivery-vs-at-least-once-delivery).
-
 
 ## Other Considerations for both C and C++
 
@@ -433,21 +433,23 @@ general structure is:
 <transport>::addr=host:port;param1=val1;param2=val2;...
 ```
 
-`transport` can be `http`, `https`, `tcp`, or `tcps`. The C/C++ and Rust clients share
-the same codebase. Please refer to the
-[Rust client's documentation](https://docs.rs/questdb-rs/latest/questdb/ingress) for the
-full details on configuration.
+`transport` can be `http`, `https`, `tcp`, or `tcps`. The C/C++ and Rust clients
+share the same codebase. Please refer to the
+[Rust client's documentation](https://docs.rs/questdb-rs/latest/questdb/ingress)
+for the full details on configuration.
+
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
 
 ### Don't forget to flush
 
 The sender and buffer objects are entirely decoupled. This means that the sender
 won't get access to the data in the buffer until you explicitly call
-`sender.flush` or `line_sender_flush`.
-This may lead to a pitfall where you drop a buffer that still has some data in it,
-resulting in permanent data loss.
+`sender.flush` or `line_sender_flush`. This may lead to a pitfall where you drop
+a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the Rust client does not supports auto-flushing
-via configuration.
+Unlike other official QuestDB clients, the Rust client does not supports
+auto-flushing via configuration.
 
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
@@ -459,20 +461,21 @@ QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 
 ### Transactional flush
 
-As described in the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
-the HTTP transport has some support for transactions.
+As described in the
+[ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
+HTTP transport has some support for transactions.
 
 To ensure in advance that a flush will not affect more than one table, call
-`buffer.transactional()` or `line_sender_buffer_transactional(buffer)` as we demonstrated on
-the examples in this document.
+`buffer.transactional()` or `line_sender_buffer_transactional(buffer)` as we
+demonstrated on the examples in this document.
 
 This call will return false if the flush wouldn't be data-transactional.
 
 ## Next Steps
 
 Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
 With data flowing into QuestDB, now it's time to for analysis.
 
