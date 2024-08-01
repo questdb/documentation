@@ -6,21 +6,20 @@ description:
   querying and cleaning up the example data set.
 ---
 
-import Screenshot from "@theme/Screenshot"
-import Tabs from "@theme/Tabs"
-import TabItem from "@theme/TabItem"
-import CQueryPartial from "../../partials/\_c.sql.query.partial.mdx"
-import CsharpQueryPartial from "../../partials/\_csharp.sql.query.partial.mdx"
-import GoQueryPartial from "../../partials/\_go.sql.query.partial.mdx"
-import JavaQueryPartial from "../../partials/\_java.sql.query.partial.mdx"
-import NodeQueryPartial from "../../partials/\_nodejs.sql.query.partial.mdx"
-import RubyQueryPartial from "../../partials/\_ruby.sql.query.partial.mdx"
-import PHPQueryPartial from "../../partials/\_php.sql.query.partial.mdx"
-import PythonQueryPartial from "../../partials/\_python.sql.query.partial.mdx"
-import CurlExecQueryPartial from "../../partials/\_curl.exec.query.partial.mdx"
-import GoExecQueryPartial from "../../partials/\_go.exec.query.partial.mdx"
-import NodejsExecQueryPartial from "../../partials/\_nodejs.exec.query.partial.mdx"
-import PythonExecQueryPartial from "../../partials/\_python.exec.query.partial.mdx"
+import Screenshot from "@theme/Screenshot" import Tabs from "@theme/Tabs" import
+TabItem from "@theme/TabItem" import CQueryPartial from
+"../../partials/\_c.sql.query.partial.mdx" import CsharpQueryPartial from
+"../../partials/\_csharp.sql.query.partial.mdx" import GoQueryPartial from
+"../../partials/\_go.sql.query.partial.mdx" import JavaQueryPartial from
+"../../partials/\_java.sql.query.partial.mdx" import NodeQueryPartial from
+"../../partials/\_nodejs.sql.query.partial.mdx" import RubyQueryPartial from
+"../../partials/\_ruby.sql.query.partial.mdx" import PHPQueryPartial from
+"../../partials/\_php.sql.query.partial.mdx" import PythonQueryPartial from
+"../../partials/\_python.sql.query.partial.mdx" import CurlExecQueryPartial from
+"../../partials/\_curl.exec.query.partial.mdx" import GoExecQueryPartial from
+"../../partials/\_go.exec.query.partial.mdx" import NodejsExecQueryPartial from
+"../../partials/\_nodejs.exec.query.partial.mdx" import PythonExecQueryPartial
+from "../../partials/\_python.exec.query.partial.mdx"
 
 Querying - as a base action - is performed in three primary ways:
 
@@ -38,7 +37,7 @@ intuitive and flexible experience.
 Queries can be written into many applications using the many rich and diverse
 drivers and clients of the PostgreSQL or REST-ful ecosystems. However, querying
 is also leveraged heavily by third-party tools to provide visualizations, such
-as within [Grafana](docs/third-party-tools/grafana/), or for connectivity into
+as within [Grafana](/docs/third-party-tools/grafana/), or for connectivity into
 broad data infrastructure and application environments such as with a tool like
 [Cube](/docs/third-party-tools/cube/).
 
@@ -65,16 +64,10 @@ Query QuestDB using the PostgreSQL endpoint via the default port `8812`.
 
 Examples in multiple languages are shown below.
 
-<Tabs defaultValue="python" values={[
-{ label: "Python", value: "python" },
-{ label: "Java", value: "java" },
-{ label: "NodeJS", value: "nodejs" },
-{ label: "Go", value: "go" },
-{ label: "C#", value: "csharp" },
-{ label: "C", value: "c" },
-{ label: "Ruby", value: "ruby" },
-{ label: "PHP", value: "php" }
-]}>
+<Tabs defaultValue="python" values={[ { label: "Python", value: "python" },
+{ label: "Java", value: "java" }, { label: "NodeJS", value: "nodejs" }, { label:
+"Go", value: "go" }, { label: "C#", value: "csharp" }, { label: "C", value:
+"c" }, { label: "Ruby", value: "ruby" }, { label: "PHP", value: "php" } ]}>
 
 <TabItem value="python">
   <PythonQueryPartial />
@@ -163,10 +156,8 @@ obtaining the results as CSV.
 
 For obtaining results in JSON, use `/exec` instead, documented next.
 
-<Tabs defaultValue="curl" values={[
-{ label: "cURL", value: "curl" },
-{ label: "Python", value: "python" },
-]}>
+<Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
+"Python", value: "python" }, ]}>
 
 <TabItem value="curl">
 
@@ -218,12 +209,9 @@ This is similar to the `/exp` entry point which returns results as CSV.
 
 ##### Querying Data
 
-<Tabs defaultValue="curl" values={[
-{ label: "cURL", value: "curl" },
-{ label: "Python", value: "python" },
-{ label: "NodeJS", value: "nodejs" },
-{ label: "Go", value: "go" },
-]}>
+<Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
+"Python", value: "python" }, { label: "NodeJS", value: "nodejs" }, { label:
+"Go", value: "go" }, ]}>
 
 <TabItem value="curl">
   <CurlExecQueryPartial />
@@ -246,11 +234,8 @@ This is similar to the `/exp` entry point which returns results as CSV.
 Alternatively, the `/exec` endpoint can be used to create a table and the
 `INSERT` statement can be used to populate it with values:
 
-<Tabs defaultValue="curl" values={[
-{ label: "cURL", value: "curl" },
-{ label: "NodeJS", value: "nodejs" },
-{ label: "Python", value: "python" },
-]}>
+<Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
+"NodeJS", value: "nodejs" }, { label: "Python", value: "python" }, ]}>
 
 <TabItem value="curl">
 
@@ -278,56 +263,56 @@ curl -G \
 The `node-fetch` package can be installed using `npm i node-fetch`.
 
 ```javascript
-const fetch = require("node-fetch");
+const fetch = require("node-fetch")
 
-const HOST = "http://localhost:9000";
+const HOST = "http://localhost:9000"
 
 async function createTable() {
   try {
-    const query = "CREATE TABLE IF NOT EXISTS trades (name VARCHAR, value INT)";
+    const query = "CREATE TABLE IF NOT EXISTS trades (name VARCHAR, value INT)"
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    );
-    const json = await response.json();
+    )
+    const json = await response.json()
 
-    console.log(json);
+    console.log(json)
   } catch (error) {
-    console.log(error);
+    console.log(error)
   }
 }
 
 async function insertData() {
   try {
-    const query = "INSERT INTO trades VALUES('abc', 123456)";
+    const query = "INSERT INTO trades VALUES('abc', 123456)"
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    );
-    const json = await response.json();
+    )
+    const json = await response.json()
 
-    console.log(json);
+    console.log(json)
   } catch (error) {
-    console.log(error);
+    console.log(error)
   }
 }
 
 async function updateData() {
   try {
-    const query = "UPDATE trades SET value = 9876 WHERE name = 'abc'";
+    const query = "UPDATE trades SET value = 9876 WHERE name = 'abc'"
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    );
-    const json = await response.json();
+    )
+    const json = await response.json()
 
-    console.log(json);
+    console.log(json)
   } catch (error) {
-    console.log(error);
+    console.log(error)
   }
 }
 
-createTable().then(insertData).then(updateData);
+createTable().then(insertData).then(updateData)
 ```
 
 </TabItem>
