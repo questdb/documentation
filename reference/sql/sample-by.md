@@ -56,6 +56,66 @@ trades per hour:
 SELECT ts, count() FROM trades SAMPLE BY 1h
 ```
 
+## FROM-TO
+
+:::note
+
+Versions prior to QuestDB 8.1.0 do not have access to this extension.
+
+Please see the new blog for more information.
+
+:::
+
+When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result set with pre-determined values.
+
+However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
+rows outside of this range.
+
+To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause.
+
+#### Syntax
+
+Specify the shape of the query using `FROM` and `TO`:
+
+```questdb-sql title='Pre-filling trip data' demo
+SELECT pickup_datetime as t, count
+FROM trips
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+```
+
+Since no rows existed before 2009, QuestDB automatically fills in these rows.
+
+This is distinct from the `WHERE` clause with a simple rule of thumb -
+`WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
+
+Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM` is not provided, then the lower bound is the start of the dataset, aligned to calendar. The opposite is true omitting `TO`.
+
+#### `WHERE` clause optimisation
+
+If the user does not provide a `WHERE` clause, or the `WHERE` clause does not consider the designated timestamp,
+QuestDB will add one for you, matching the `FROM-TO` interval.
+
+This means that the query will run optimally, and avoid touching data not relevant to the result.
+
+Therefore, we compile the prior query into something similar to this:
+
+```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
+SELECT pickup_datetime as t, count
+FROM trips
+WHERE pickup_datetime >= '2008-12-28'
+  AND pickup_datetime <  '2009-01-05'
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+```
+
+#### Limitations
+
+Here are the current limits to this feature.
+
+- This syntax is not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
+- This syntax is for `ALIGN TO CALENDAR` only (default alignment).
+- Does not consider any specified `OFFSET`.
+- This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and aggregate columns.
+
 ## Fill options
 
 The `FILL` keyword is optional and expects one or more `fillOption` strategies
@@ -192,10 +252,10 @@ below.
 
 :::note
 
-Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has been changed. If you do not specify
+Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you do not specify
 an explicit alignment, `SAMPLE BY` expressions will use `ALIGN TO CALENDAR` behaviour.
 
-The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query. 
+The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query.
 
 Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar` option to `false` in `server.conf`.
 
@@ -211,7 +271,7 @@ ts TIMESTAMP,
 val INT
 ) TIMESTAMP(ts) PARTITION BY DAY WAL
 
-INSERT INTO sensors (ts, val) VALUES 
+INSERT INTO sensors (ts, val) VALUES
 ('2021-05-31T23:10:00.000000Z', 10),
 ('2021-06-01T01:10:00.000000Z', 80),
 ('2021-06-01T07:20:00.000000Z', 15),
@@ -260,7 +320,6 @@ ALIGN TO CALENDAR
 ```
 
 Gives the following result:
-
 
 | ts                          | count |
 | --------------------------- | ----- |

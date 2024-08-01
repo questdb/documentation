@@ -41,10 +41,41 @@ Install the QuestDB Node.js client via npm:
 npm i -s @questdb/nodejs-client
 ```
 
-## Basic Usage
+## Authentication
 
-A simple example to connect to QuestDB, insert some data into a table, and flush
-the data:
+Passing in a configuration string with basic auth:
+
+```javascript
+const { Sender } = require("@questdb/nodejs-client");
+
+const conf = "http::addr=localhost:9000;username=admin;password=quest;"
+const sender = Sender.fromConfig(conf);
+    ...
+```
+
+Passing via the `QDB_CLIENT_CONF` env var:
+
+```bash
+export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
+```
+
+```javascript
+const { Sender } = require("@questdb/nodejs-client");
+
+
+const sender = Sender.fromEnv();
+    ...
+```
+
+When using QuestDB Enterprise, authentication can also be done via REST token.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
+
+## Basic insert
+
+Example: inserting executed trades for cryptocurrencies.
+
+Without authentication and using the current timestamp.
 
 ```javascript
 const { Sender } = require("@questdb/nodejs-client")
@@ -55,42 +86,99 @@ async function run() {
 
   // add rows to the buffer of the sender
   await sender
-    .table("prices")
-    .symbol("instrument", "EURUSD")
-    .floatColumn("bid", 1.0195)
-    .floatColumn("ask", 1.0221)
-    .at(Date.now(), "ms")
-  await sender
-    .table("prices")
-    .symbol("instrument", "GBPUSD")
-    .floatColumn("bid", 1.2076)
-    .floatColumn("ask", 1.2082)
-    .at(Date.now(), "ms")
+    .table("trades")
+    .symbol("symbol", "ETH-USD")
+    .symbol("side", "sell")
+    .floatColumn("price", 2615.54)
+    .floatColumn("amount", 0.00044)
+    .atNow()
 
   // flush the buffer of the sender, sending the data to QuestDB
   // the buffer is cleared after the data is sent, and the sender is ready to accept new data
   await sender.flush()
 
-  // add rows to the buffer again, and send it to the server
-  await sender
-    .table("prices")
-    .symbol("instrument", "EURUSD")
-    .floatColumn("bid", 1.0197)
-    .floatColumn("ask", 1.0224)
-    .at(Date.now(), "ms")
-  await sender.flush()
-
   // close the connection after all rows ingested
+  // unflushed data will be lost
   await sender.close()
 }
 
 run().then(console.log).catch(console.error)
 ```
 
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with an explicit timestamp, custom auto-flushing, and basic
+auth.
+
+```javascript
+const { Sender } = require("@questdb/nodejs-client")
+
+async function run() {
+  // create a sender using HTTP protocol
+  const sender = Sender.fromConfig(
+    "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;",
+  )
+
+  // Calculate the current timestamp. You could also parse a date from your source data.
+  const timestamp = Date.now()
+
+  // add rows to the buffer of the sender
+  await sender
+    .table("trades")
+    .symbol("symbol", "ETH-USD")
+    .symbol("side", "sell")
+    .floatColumn("price", 2615.54)
+    .floatColumn("amount", 0.00044)
+    .at(timestamp, "ms")
+
+  // add rows to the buffer of the sender
+  await sender
+    .table("trades")
+    .symbol("symbol", "BTC-USD")
+    .symbol("side", "sell")
+    .floatColumn("price", 39269.98)
+    .floatColumn("amount", 0.001)
+    .at(timestamp, "ms")
+
+  // flush the buffer of the sender, sending the data to QuestDB
+  // the buffer is cleared after the data is sent, and the sender is ready to accept new data
+  await sender.flush()
+
+  // close the connection after all rows ingested
+  // unflushed data will be lost
+  await sender.close()
+}
+
+run().then(console.log).catch(console.error)
+```
+
+As you can see, both events now are using the same timestamp. We recommended to
+use the original event timestamps when ingesting data into QuestDB. Using the
+current timestamp hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+
+## Configuration options
+
+The minimal configuration string needs to have the protocol, host, and port, as
+in:
+
+```
+http::addr=localhost:9000;
+```
+
+For all the extra options you can use, please check
+[the client docs](https://questdb.github.io/nodejs-questdb-client/SenderOptions.html)
+
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
+
 ## Next Steps
 
-Dive deeper into the Node.js client capabilities by exploring more examples
-provided in the
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
+
+Dive deeper into the Node.js client capabilities, including TypeScript and
+Worker Threads examples, by exploring the
 [GitHub repository](https://github.com/questdb/nodejs-questdb-client).
 
 To learn _The Way_ of QuestDB SQL, see the

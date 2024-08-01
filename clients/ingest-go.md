@@ -71,18 +71,78 @@ Or, set the QDB_CLIENT_CONF environment variable and call
 
 1. Export the configuration string as an environment variable:
    ```bash
-   export QDB_CLIENT_CONF="addr=localhost:9000;username=admin;password=quest;"
+   export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
    ```
 2. Then in your Go code:
    ```Go
    client, err := questdb.LineSenderFromEnv(context.TODO())
    ```
 
+Alternatively, you can use the built-in Go API to specify the connection
+options.
+
+```go
+package main
+
+import (
+       "context"
+       qdb "github.com/questdb/go-questdb-client/v3"
+)
+
+
+func main() {
+       ctx := context.TODO()
+
+       client, err := qdb.NewLineSender(context.TODO(), qdb.WithHttp(), qdb.WithAddress("localhost:9000"), qdb.WithBasicAuth("admin", "quest"))
+```
+
+When using QuestDB Enterprise, authentication can also be done via REST token.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
+
 ## Basic Insert
 
-Example: inserting data from a temperature sensor.
+Example: inserting executed trades for cryptocurrencies.
 
-Without authentication:
+Without authentication and using the current timestamp:
+
+```Go
+package main
+
+import (
+	"context"
+	"github.com/questdb/go-questdb-client/v3"
+)
+
+func main() {
+	ctx := context.TODO()
+
+	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;")
+	if err != nil {
+		panic("Failed to create client")
+	}
+
+	err = client.Table("trades").
+		Symbol("symbol", "ETH-USD").
+		Symbol("side", "sell").
+		Float64Column("price", 2615.54).
+		Float64Column("amount", 0.00044).
+		AtNow(ctx)
+
+	if err != nil {
+		panic("Failed to insert data")
+	}
+
+	err = client.Flush(ctx)
+	if err != nil {
+		panic("Failed to flush data")
+	}
+}
+```
+
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with an explicit timestamp, custom auto-flushing, and basic
+auth.
 
 ```Go
 package main
@@ -96,16 +156,17 @@ import (
 func main() {
 	ctx := context.TODO()
 
-	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;")
+	client, err := questdb.LineSenderFromConf(ctx, "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;")
 	if err != nil {
 		panic("Failed to create client")
 	}
 
 	timestamp := time.Now()
-	err = client.Table("sensors").
-		Symbol("id", "toronto1").
-		Float64Column("temperature", 20.0).
-		Float64Column("humidity", 0.5).
+	err = client.Table("trades").
+		Symbol("symbol", "ETH-USD").
+		Symbol("side", "sell").
+		Float64Column("price", 2615.54).
+		Float64Column("amount", 0.00044).
 		At(ctx, timestamp)
 
 	if err != nil {
@@ -113,62 +174,47 @@ func main() {
 	}
 
 	err = client.Flush(ctx)
+	// You can flush manually at any point.
+	// If you don't flush manually, the client will flush automatically
+	// when a row is added and either:
+	//   * The buffer contains 75000 rows (if HTTP) or 600 rows (if TCP)
+	//   * The last flush was more than 1000ms ago.
+	// Auto-flushing can be customized via the `auto_flush_..` params.
+
 	if err != nil {
 		panic("Failed to flush data")
 	}
 }
 ```
 
-## Limitations
+We recommended to use User-assigned timestamps when ingesting data into QuestDB.
+Using the current timestamp hinder the ability to deduplicate rows which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
-### Transactionality
+## Configuration options
 
-The Go client does not support full transactionality:
+The minimal configuration string needs to have the protocol, host, and port, as
+in:
 
-- Data for the first table in an HTTP request will be committed even if the
-  second table's commit fails.
-- An implicit commit occurs each time a new column is added to a table. This
-  action cannot be rolled back if the request is aborted or encounters parse
-  errors.
-
-### Timestamp column
-
-QuestDB's underlying InfluxDB Line Protocol (ILP) does not name timestamps,
-leading to an automatic column name of timestamp. To use a custom name,
-pre-create the table with the desired timestamp column name:
-
-```sql
-CREATE TABLE temperatures (
-    ts timestamp,
-    sensorID symbol,
-    sensorLocation symbol,
-    reading double
-) timestamp(my_ts);
+```
+http::addr=localhost:9000;
 ```
 
-## Health check
+In the Go client, you can set the configuration options via the standard config
+string, which is the same across all clients, or using
+[the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderOption).
 
-To monitor your active connection, there is a `ping` endpoint:
+For all the extra options you can use, please check
+[the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
 
-```shell
-curl -I http://localhost:9000/ping
-```
-
-Returns (pong!):
-
-```shell
-HTTP/1.1 204 OK
-Server: questDB/1.0
-Date: Fri, 2 Feb 2024 17:09:38 GMT
-Transfer-Encoding: chunked
-Content-Type: text/plain; charset=utf-8
-X-Influxdb-Version: v2.7.4
-```
-
-Determine whether an instance is active and confirm the version of InfluxDB Line
-Protocol with which you are interacting.
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
 
 ## Next Steps
+
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
 Explore the full capabilities of the Go client via
 [Go.dev](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3).

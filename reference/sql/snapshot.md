@@ -4,26 +4,25 @@ sidebar_label: SNAPSHOT
 description: SNAPSHOT SQL keyword reference documentation.
 ---
 
-Prepares the database for a full backup or a filesystem (disk) snapshot.
+Prepare the database for a full backup or a filesystem (disk) snapshot.
 
-**Snapshot statements are not supported on Windows OS.**
+_For a detailed guide backup creation and restoration? Check out our
+[Backup and Restore](/docs/operations/backup/) guide!_
 
 ## Syntax
 
 ![Flow chart showing the syntax of the SNAPSHOT keyword](/img/docs/diagrams/snapshot.svg)
 
+:::caution
+
+QuestDB currently does not support creating snapshots on Windows.
+
+If you are a Windows user and require backup functionality, please
+[comment on this issue](https://github.com/questdb/questdb/issues/4811).
+
+:::
+
 ## Snapshot process
-
-Snapshot recovery mechanism requires a **snapshot instance ID** to be specified
-using the `cairo.snapshot.instance.id`
-[configuration key](/docs/configuration/):
-
-```shell title="server.conf"
-cairo.snapshot.instance.id=your_id
-```
-
-A snapshot instance ID may be an arbitrary string value, such as string
-representation of a UUID.
 
 Database snapshots may be used in combination with filesystem snapshots or
 together with file copying for a full data backup. Collecting a snapshot
@@ -34,34 +33,33 @@ involves the following steps:
    flush the committed data to disk.
 2. Start a filesystem snapshot or copy the
    [root directory](/docs/concept/root-directory-structure/) to the backup
-   location on the disk. Refer to the [next section](#filesystem-snapshot) to
-   learn how to create a filesystem snapshot on the most common cloud providers.
+   location on the disk. learn how to create a filesystem snapshot on the most
+   common cloud providers.
 3. Run `SNAPSHOT COMPLETE` statement to release the reader locks and delete the
    metadata file copies.
 
-For some cloud vendors, filesystem snapshot creation operation is asynchronous,
-i.e. the point-in-time snapshot is created immediately, as soon as the operation
-starts, but the end snapshot artifact may become available later. In such case,
-the `SNAPSHOT COMPLETE` statement (step 3) may be run without waiting for the
-end artifact, but once the snapshot creation has started.
+### SNAPSHOT PREPARE
 
-In case you prefer full backups over filesystem snapshots, you should keep in
-mind that the database will retain older partition and column file files on disk
-until `SNAPSHOT COMPLETE`. This means that you may run out of disk space if your
-disk doesn't have enough free space at the time you call `SNAPSHOT PREPARE`.
+To support precise usage, we'll unpack `SNAPSHOT PREPARE`.
 
-## Filesystem snapshot
+To answer:
 
-The most common ways to perform cloud-native filesystem snapshots are described
-in the following resources, which rely on similar steps but have minor
-differences in terminology and services:
+- What is the effect of `SNAPSHOT PERPARE`?
+- Will QuestDB will write during `SNAPSHOT PREPAPRE` processing?
+- Does QuestDB write to WAL during `SNAPSHOT PREPARE`, for processing at
+  `SNAPSHOT COMPLETE`?
 
-- [AWS](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-creating-snapshot.html) -
-  creating EBS snapshots
-- [Azure](https://docs.microsoft.com/en-us/azure/virtual-machines/snapshot-copy-managed-disk?tabs=portal) -
-  creating snapshots of a virtual hard disk
-- [GCP](https://cloud.google.com/compute/docs/disks/create-snapshots) - working
-  with persistent disk snapshots
+Using `SNAPSHOT PREPARE` triggers an fsync to sync outstanding writes to the
+disk. It will then temporarily disable the cleanup process related to merging
+out-of-order (O3) data. Then, the latest synced transaction will be used as the
+checkpoint. After which, one can proceed with step 2 above, which is to take an
+EBS snapshot of the files. Calling `SNAPSHOT COMPLETE` then resumes the usual
+process, which cleans up old file versions that are no longer needed.
+
+In short: You can still write to the database during `SNAPSHOT PREPARE`.
+However, old files versions are only purged after `SNAPSHOT COMPLETE`. During
+`SNAPSHOT PREPARE` O3 writes are much more expensive on disk space while append
+writes remain inexpensive.
 
 ## Snapshot recovery
 
@@ -69,17 +67,15 @@ In case of a full backup, you should also delete the old root directory and copy
 the files from your backup to the same location or, alternatively, you can point
 the database at the new root directory.
 
-To start the database on a filesystem snapshot, you should make sure to
-configure a different snapshot instance ID.
+When the database starts, it checks for the presence of a file named `_restore`
+in the root directory. If the file is present, the database runs a snapshot
+recovery procedure restoring the metadata files from the snapshot.
 
-When the database starts, it checks the current instance ID and the ID stored in
-the `snapshot` directory, if present. On IDs mismatch, the database runs a
-snapshot recovery procedure restoring the metadata files from the snapshot. When
-this happens, you should see something like the following in the server logs:
+When this happens, you should see the following in the server logs:
 
 ```
-2022-03-07T08:24:12.348004Z I i.q.g.DatabaseSnapshotAgent starting snapshot recovery [currentId=`id2`, previousId=`id1`]
-...
+2022-03-07T08:24:12.348004Z I i.q.g.DatabaseSnapshotAgent starting snapshot recovery [trigger=file]
+[...]
 2022-03-07T08:24:12.349922Z I i.q.g.DatabaseSnapshotAgent snapshot recovery finished [metaFilesCount=1, txnFilesCount=1, cvFilesCount=1]
 ```
 
@@ -104,3 +100,8 @@ SNAPSHOT PREPARE;
 -- $ cp -r /root/dir/path /backup/dir/path
 SNAPSHOT COMPLETE;
 ```
+
+## Further reading
+
+- [Backup and Restore](/docs/operations/backup/) - Detailed guide on how to
+  create backups and restore them.

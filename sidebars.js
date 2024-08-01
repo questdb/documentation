@@ -1,23 +1,3 @@
-let guidelines
-
-if (process.env.NODE_ENV === "development") {
-  guidelines = {
-    label: "Guidelines (DEV ONLY)",
-    type: "category",
-    items: [
-      {
-        type: "category",
-        label: "Templates",
-        items: [
-          "__guidelines/template/guide",
-          "__guidelines/template/function",
-          "__guidelines/template/sql",
-        ],
-      },
-    ],
-  }
-}
-
 module.exports = {
   docs: [
     {
@@ -48,6 +28,11 @@ module.exports = {
           label: "Language Clients",
           collapsed: false,
           items: [
+            {
+              id: "configuration-string",
+              type: "doc",
+              label: "Configuration string",
+            },
             {
               id: "clients/ingest-python",
               type: "doc",
@@ -182,7 +167,6 @@ module.exports = {
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
-            "reference/sql/backup",
             "reference/sql/cancel-query",
             "reference/sql/case",
             "reference/sql/cast",
@@ -284,11 +268,13 @@ module.exports = {
             "reference/function/finance",
             "reference/function/meta",
             "reference/function/numeric",
+            "reference/function/parquet",
             "reference/function/pattern-matching",
             "reference/function/random-value-generator",
             "reference/function/row-generator",
             "reference/function/spatial",
             "reference/function/text",
+            "reference/function/json",
             "reference/function/timestamp-generator",
             "reference/function/timestamp",
             "reference/function/touch",
@@ -301,17 +287,18 @@ module.exports = {
           type: "category",
           label: "Operators",
           items: [
-            "reference/operators/precedence",
+            "reference/operators/bitwise",
+            "reference/operators/comparison",
+            "reference/operators/date-time",
+            "reference/operators/ipv4",
+            "reference/operators/logical",
             "reference/operators/misc",
             "reference/operators/numeric",
-            "reference/operators/bitwise",
-            "reference/operators/logical",
-            "reference/operators/ipv4",
-            "reference/operators/date-time",
+            "reference/operators/precedence",
             "reference/operators/spatial",
-            "reference/operators/text"
+            "reference/operators/text",
           ],
-        }
+        },
       ],
     },
     {
@@ -436,6 +423,7 @@ module.exports = {
           id: "third-party-tools/overview",
         },
         "third-party-tools/cube",
+        "third-party-tools/embeddable",
         "third-party-tools/flink",
         "third-party-tools/grafana",
         {

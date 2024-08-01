@@ -21,15 +21,22 @@ The InfluxDB Line Protocol is for **data ingestion only**.
 For building queries, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
-Each ILP client library also has its own language-specific documentation set.
+Each ILP client library also has its own language-specific documentation set.
 
 This supporting document thus provides an overview to aid in client selection
 and initial configuration:
 
 1. [Client libraries](/docs/reference/api/ilp/overview/#client-libraries)
-2. [Configuration](/docs/reference/api/ilp/overview/#configuration)
-3. [Authentication](/docs/reference/api/ilp/overview/#authentication)
-4. [Transactionality caveat](/docs/reference/api/ilp/overview/#transactionality-caveat)
+2. [Server-Side configuration](/docs/reference/api/ilp/overview/#server-side-configuration)
+3. [Transport selection](/docs/reference/api/ilp/overview/#transport-selection)
+4. [Client-Side configuration](/docs/reference/api/ilp/overview/#client-side-configuration)
+5. [Error handling](/docs/reference/api/ilp/overview/#error-handling)
+6. [Authentication](/docs/reference/api/ilp/overview/#authentication)
+7. [Table and column auto-creation](/docs/reference/api/ilp/overview/#table-and-column-auto-creation)
+8. [Timestamp column name](/docs/reference/api/ilp/overview/#timestamp-column-name)
+9. [HTTP Transaction semantics](/docs/reference/api/ilp/overview/#http-transaction-semantics)
+10. [Exactly-once delivery](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery)
+11. [Health Check](/docs/reference/api/ilp/overview/#health-check)
 
 ## Client libraries
 
@@ -58,7 +65,7 @@ following is set in `server.conf`:
 line.http.enabled=true
 ```
 
-## Configuration
+## Server-Side Configuration
 
 The HTTP receiver configuration can be completely customized using
 [QuestDB configuration keys for ILP](/docs/configuration/#influxdb-line-protocol-ilp).
@@ -69,32 +76,27 @@ port, load balancing, and more.
 For more guidance in how to tune QuestDB, see
 [capacity planning](/docs/deployment/capacity-planning/).
 
-## Authentication
+## Transport selection
 
-:::note
+The ILP protocol in QuestDB supports the following transport options:
 
-Using [QuestDB Enterprise](/enterprise/)?
+- HTTP (default port 9000)
+- TCP (default port 9009)
 
-Skip to [advanced security features](/docs/operations/rbac/) instead, which
-provides holistic security out-of-the-box.
+On QuestDB Enterprise HTTPS and TCPS are also available.
 
-:::
+The HTTP(s) transport is recommended for most use cases. It provides feedback on
+errors, automatically retries failed requests, and is easier to configure. The
+TCP(s) transport is kept for compatibility with older QuestDB versions. It has
+limited error feedback, no automatic retries, and requires manual handling of
+connection failures. However, while HTTP is recommended, TCP has slightly lower
+overhead than HTTP and may be useful in high-throughput scenarios in
+high-latency networks.
 
-InfluxDB Line Protocol supports authentication.
+## Client-Side Configuration
 
-A similar pattern is used across all client libraries.
-
-This document will break down and demonstrate the configuration keys and core
-configuration options.
-
-Once a client has been selected and configured, resume from your language client
-documentation.
-
-### Configuration strings
-
-Configuration strings combine a set of key/value pairs.
-
-Assembling a string connects an ILP client to a QuestDB ILP server.
+Clients connect to a QuestDB using ILP via a configuration string. Configuration
+strings combine a set of key/value pairs.
 
 The standard configuration string pattern is:
 
@@ -107,7 +109,8 @@ schema::key1=value1;key2=value2;key3=value3;
 It is made up of the following parts:
 
 - **Schema**: One of the specified schemas in the
-  [base values](/docs/reference/api/ilp/overview/#base-parameters) section below
+  [core parameters](/docs/reference/api/ilp/overview/#core-parameters) section
+  below
 - **Key=Value**: Each key-value pair sets a specific parameter for the client
 - **Terminating semicolon**: A semicolon must follow the last key-value pair
 
@@ -118,10 +121,8 @@ Below is a list of common parameters that ILP clients will accept.
 These params facilitate connection to QuestDB's ILP server and define
 client-specific behaviors.
 
-Some are shared across all clients, while some are client specific.
-
-See the [Usage section](/docs/reference/api/ilp/overview/#usage) for write
-examples that use these schemas.
+Some are shared across all clients, while some are client specific. Refer to the
+clients documentation for details.
 
 :::warning
 
@@ -135,15 +136,11 @@ Exposing these values may expose your database to bad actors.
 
 - **schema**: Specifies the transport method, with support for: `http`, `https`,
   `tcp` & `tcps`
-- **addr**: The address and port of the QuestDB server.
+- **addr**: The address and port of the QuestDB server, as in `localhost:9000`.
 
 #### HTTP Parameters
 
-- **username**: Username for HTTP authentication.
-- **password** (SENSITIVE): Password for HTTP Basic authentication.
-- **token** (SENSITIVE): Bearer token for HTTP Token authentication.
-  - Open source HTTP users are unable to generate tokens. For TCP token auth,
-    see the below section.
+- **password** (SENSITIVE): Password for HTTP Basic Authentication.
 - **request_min_throughput**: Expected throughput for network send to the
   database server, in bytes.
   - Defaults to 100 KiB/s
@@ -156,18 +153,133 @@ Exposing these values may expose your database to bad actors.
   milliseconds.
   - Defaults to 10 seconds.
   - Not all errors are retriable.
+- **token** (SENSITIVE): Bearer token for HTTP Token authentication.
+  - Open source HTTP users are unable to generate tokens. For TCP token auth,
+    see the below section.
+- **username**: Username for HTTP Basic Authentication.
 
 #### TCP Parameters
 
-- **username**: Username for TCP authentication.
+:::note
+
+These parameters are only useful when using ILP over TCP with authentication
+enabled. Most users should use ILP over HTTP. These parameters are listed for
+completeness and for users who have specific requirements.
+
+:::
+
+_See the [Authentication](/docs/reference/api/ilp/overview/#authentication)
+section below for configuration._
+
+- **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
+  milliseconds.
+  - Default 15 seconds.
 - **token** (SENSITIVE): TCP Authentication `d` parameter.
   - **token_x** (SENSITIVE): TCP Authentication `x` parameter.
     - Used in C/C++/Rust/Python clients.
   - **token_y** (SENSITIVE): TCP Authentication `y` parameter.
     - Used in C/C++/Rust/Python clients.
-- **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
-  milliseconds.
-  - Default 15 seconds.
+- **username**: Username for TCP authentication.
+
+#### Auto-flushing behavior
+
+- **auto_flush**: Enable or disable automatic flushing (`on`/`off`).
+
+  - Default is “on” for clients that support auto-flushing (all except C, C++ &
+    Rust).
+
+- **auto_flush_bytes** Auto-flushing is triggered above this buffer size.
+
+  - Disabled by default.
+
+- **auto_flush_interval**: Auto-flushing is triggered after this time period has
+  elapsed since the last flush, in milliseconds.
+
+  - Defaults to 1 second
+  - This is not a periodic timer - it will only be checked on the next row
+    creation.
+
+- **auto_flush_rows**: Auto-flushing is triggered above this row count.
+
+  - Defaults to `75,000` for HTTP, and `600` for TCP.
+  - If set, this implies “auto_flush=on”.
+
+#### Buffer configuration
+
+- **init_buf_size**: Set the initial (but growable) size of the buffer in bytes.
+  - Defaults to `64 KiB`.
+- **max_buf_size**: Sets the growth limit of the buffer in bytes.
+  - Defaults to `100 MiB`.
+  - Clients will error if this is exceeded.
+- **max_name_len**: The maximum alloable number of UTF-8 bytes in the table or
+  column names.
+  - Defaults to `127`.
+  - Related to length limits for filenames on the user's host OS.
+
+#### TLS configuration
+
+_QuestDB Enterprise only._
+
+- **tls_verify**: Toggle verification of TLS certificates. Default is `on`.
+- **tls_roots**: Specify the source of bundled TLS certificates.
+  - The defaults and possible param values are client-specific.
+    - In Rust and Python this might be “webpki”, “os-certs” or a path to a “pem”
+      file.
+    - In Java this might be a path to a “jks” trust store.
+    - **tls_roots_password** Password to a configured tls_roots if any.
+      - Passwords are sensitive! Manage appropriately.
+- **tls_ca**: Path to single certificate authourity, not supported on all
+  clients.
+  - Java for instance would apply `tls_roots=/path/to/Java/key/store`
+
+#### Network configuration
+
+- **bind_interface**: Optionally, specify the local network interface for
+  outbound connections. Useful if you have multiple interfaces or an accelerated
+  network interface (e.g. Solarflare)
+  - Not to be confused with the QuestDB port in the `addr` param.
+
+## Error handling
+
+The HTTP transport supports automatic retries for failed requests deemed
+recoverable. Recoverable errors include network errors, some server errors, and
+timeouts, while non-recoverable errors encompass invalid data, authentication
+errors, and other client-side errors.
+
+Retrying is particularly beneficial during network issues or when the server is
+temporarily unavailable. The retrying behavior can be configured through the
+`retry_timeout` configuration option or, in some clients, via their API. The
+client continues to retry recoverable errors until they either succeed or the
+specified timeout is reached.
+
+The TCP transport lacks support for error propagation from the server. In such
+cases, the server merely closes the connection upon encountering an error.
+Consequently, the client receives no additional error information from the
+server. This limitation significantly contributes to the preference for HTTP
+transport over TCP transport.
+
+## Authentication
+
+:::note
+
+Using [QuestDB Enterprise](/enterprise/)?
+
+Skip to [advanced security features](/docs/operations/rbac/) instead, which
+provides holistic security out-of-the-box.
+
+:::
+
+InfluxDB Line Protocol supports authentication via HTTP Basic Authentication,
+using [the HTTP Parameters](/docs/reference/api/ilp/overview/#http-parameters),
+or via token when using the TCP transport, using
+[the TCP Parameters](/docs/reference/api/ilp/overview/#tcp-parameters).
+
+A similar pattern is used across all client libraries. If you want to use a TCP
+token, you need to configure your QuestDB server. This document will break down
+and demonstrate the configuration keys and core configuration options.
+
+Once a client has been selected and configured, resume from your language client
+documentation.
 
 ##### TCP token authentication setup
 
@@ -263,63 +375,66 @@ The `d`, `x` and `y` parameters generate the public key.
 For example, the Python client would be configured as outlined in the
 [Python docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#tcp-auth).
 
-#### Auto-flushing behavior
+## Table and column auto-creation
 
-- **auto_flush**: Enable or disable automatic flushing (`on`/`off`).
+When sending data to a table that does not exist, the server will create the
+table automatically. This also applies to columns that do not exist. The server
+will use the first row of data to determine the column types.
 
-  - Default is “on” for clients that support auto-flushing (all except C, C++ &
-    Rust).
+If the table already exists, the server will validate that the columns match the
+existing table. If the columns do not match, the server will return a
+non-recoverable error which, when using the HTTP/HTTPS transport, is propagated
+to the client.
 
-- **auto_flush_rows**: Auto-flushing is triggered above this row count.
+You can avoid table and/or column auto-creation by setting the
+`line.auto.create.new.columns` and `line.auto.create.new.tables`configuration
+parameters to false.
 
-  - Defaults to `75,000` for HTTP, and `600` for TCP.
-  - If set, this implies “auto_flush=on”.
+If you're using QuestDB Enterprise, you must grant further permissions to the
+authenticated user:
 
-- **auto_flush_interval**: Auto-flushing is triggered after this time period has
-  elapsed since the last flush, in milliseconds.
+```sql
+CREATE SERVICE ACCOUNT ingest_user; -- creates a service account to be used by a client
+GRANT ilp, create table TO ingest_user; -- grants permissions to ingest data and create tables
+GRANT add column, insert ON all tables TO ingest_user; -- grants permissions to add columns and insert data to all tables
+--  OR
+GRANT add column, insert ON table1, table2 TO ingest_user; -- grants permissions to add columns and insert data to specific tables
+```
 
-  - Defaults to 1 second
-  - This is not a periodic timer - it will only be checked on the next row
-    creation.
+Read more setup details in the
+[Enterprise quickstart](/docs/guides/enterprise-quick-start/#4-ingest-data-influxdb-line-protocol)
+and the [role-based access control](/docs/operations/rbac/) guides.
 
-- **auto_flush_bytes** Auto-flushing is triggered above this buffer size.
-  - Disabled by default.
+## Timestamp Column Name
 
-#### Network configuration
+QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
 
-_Optional._
+If your table has been created beforehand, the designated timestamp will be
+correctly assigned based on the payload sent bt the client. But if your table
+does not exist, it will be automatically created and the timestamp column will
+be named `timestamp`. To use a custom name, say `my_ts`, pre-create the table
+with the desired timestamp column name.
 
-- **bind_interface**: Specify the local network interface for outbound
-  connections.
-  - Not to be confused with the QuestDB port in the `addr` param.
+To do so, issue a `CREATE TABLE` statement to create the table in advance:
 
-#### TLS configuration
+```questdb-sql title="Creating a timestamp named my_ts"
+CREATE TABLE IF NOT EXISTS 'trades' (
+  symbol SYMBOL capacity 256 CACHE,
+  side SYMBOL capacity 256 CACHE,
+  price DOUBLE,
+  amount DOUBLE,
+  my_ts TIMESTAMP
+) timestamp (my_ts) PARTITION BY DAY WAL;
+```
 
-- **tls_verify**: Toggle verification of TLS certificates. Default is `on`.
-- **tls_roots**: Specify the source of bundled TLS certificates.
-  - The defaults and possible param values are client-specific.
-    - In Rust and Python this might be “webpki”, “os-certs” or a path to a “pem”
-      file.
-    - In Java this might be a path to a “jks” trust store.
-    - **tls_roots_password** Password to a configured tls_roots if any.
-      - Passwords are sensitive! Manage appropriately.
-- **tls_ca**: Path to single certificate authourity, not supported on all
-  clients.
-  - Java for instance would apply `tls_roots=/path/to/Java/key/store`
+You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
+created, but without raising an error if the table already exists.
 
-#### Buffer configuration
+## HTTP transaction semantics
 
-- **init_buf_size**: Set the initial (but growable) size of the buffer in bytes.
-  - Defaults to `64 KiB`.
-- **max_buf_size**: Sets the growth limit of the buffer in bytes.
-  - Defaults to `100 MiB`.
-  - Clients will error if this is exceeded.
-- **max_name_len**: The maximum alloable number of UTF-8 bytes in the table or
-  column names.
-  - Defaults to `127`.
-  - Related to length limits for filenames on the user's host OS.
-
-## Transactionality caveat
+The TCP endpoint does not support transactions. The HTTP ILP endpoint treats
+every requests as an individual transaction, so long as it contains rows for a
+single table.
 
 As of writing, the HTTP endpoint does not provide full transactionality in all
 cases.
@@ -329,8 +444,69 @@ Specifically:
 - If an HTTP request contains data for two tables and the final commit fails for
   the second table, the data for the first table will still be committed. This
   is a deviation from full transactionality, where a failure in any part of the
-  transaction would result in the entire transaction being rolled back.
+  transaction would result in the entire transaction being rolled back. If data
+  transactionality is important for you, the best practice is to make sure you
+  flush data to the server in batches that contain rows for a single table.
 
-- When adding new columns to a table, an implicit commit occurs each time a new
-  column is added. If the request is aborted or has parse errors, this commit
-  cannot be rolled back.
+- Even when you are sending data to a single table, when dynamically adding new
+  columns to a table, an implicit commit occurs each time a new column is added.
+  If the request is aborted or has parse errors, no data will be inserted into
+  the corresponding table, but the new column will be added and will not be
+  rolled back.
+
+- Some clients have built-in support for controlling transactions. These APIs
+  help to comply with the single-table-per-request pre-requisite for HTTP
+  transactions, but they don't control if new columns are being added.
+
+- As of writing, if you want to make sure you have data transactionality and
+  schema/metadata transactionality, you should disable
+  `line.auto.create.new.columns` and `line.auto.create.new.tables` on your
+  configuration. Be aware that if you do this, you will not have dynamic schema
+  capabilities and you will need to create each table and column before you try
+  to ingest data, via [`CREATE TABLE`](/docs/reference/sql/create-table/) and/or
+  [`ALTER TABLE ADD COLUMN`](/docs/reference/sql/alter-table-add-column/) SQL
+  statements.
+
+## Exactly-once delivery vs at-least-once delivery
+
+The retrying behavior of the HTTP transport can lead to some data being sent to
+the server more than once.
+
+**Example**: Client sends a batch to the server, the server receives the batch,
+processes it, but fails to send a response back to the client due to a network
+error. The client will retry sending the batch to the server. This means the
+server will receive the batch again and process it again. This can lead to
+duplicated rows in the server.
+
+The are two ways to mitigate this issue:
+
+- Use [QuestDB deduplication feature](/docs/concept/deduplication/) to remove
+  duplicated rows. QuestDB server can detect and remove duplicated rows
+  automatically, resulting in exactly-once processing. This is recommended when
+  using the HTTP transport with retrying enabled.
+- Disable retrying by setting `retry_timeout` to 0. This will make the client
+  send the batch only once, failed requests will not be retried and the client
+  will receive an error. This effectively turns the client into an at-most-once
+  delivery.
+
+## Health Check
+
+To monitor your active connection, there is a `ping` endpoint:
+
+```shell
+curl -I http://localhost:9000/ping
+```
+
+Returns (pong!):
+
+```shell
+HTTP/1.1 204 OK
+Server: questDB/1.0
+Date: Fri, 2 Feb 2024 17:09:38 GMT
+Transfer-Encoding: chunked
+Content-Type: text/plain; charset=utf-8
+X-Influxdb-Version: v2.7.4
+```
+
+Determine whether an instance is active and confirm the version of InfluxDB Line
+Protocol with which you are interacting.

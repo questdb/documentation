@@ -19,7 +19,7 @@ import TabItem from "@theme/TabItem"
 
 <Tabs defaultValue="nix"
 values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>
@@ -86,7 +86,7 @@ questdb.exe [start|stop|status|install|remove] \
 
 <Tabs defaultValue="nix"
 values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>
@@ -127,7 +127,7 @@ will be the following:
 <!-- prettier-ignore-start -->
 
 <Tabs defaultValue="nix" values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>
@@ -179,7 +179,7 @@ C:\Windows\System32\qdbroot
 <!-- prettier-ignore-start -->
 
 <Tabs defaultValue="nix" values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>
@@ -223,7 +223,7 @@ questdb.exe stop
 <!-- prettier-ignore-start -->
 
 <Tabs defaultValue="nix" values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>

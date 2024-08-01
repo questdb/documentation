@@ -47,10 +47,9 @@ higher throughput. It also provides some key benefits:
 An example of "data-in" - via the line - appears as:
 
 ```shell
-# temperature sensor example
-readings,city=London temperature=23.2 1465839830100400000\n
-readings,city=London temperature=23.6 1465839830100700000\n
-readings,make=Honeywell temperature=23.2,humidity=0.443 1465839830100800000\n
+trades,symbol=ETH-USD,side=sell price=2615.54,amount=0.00044 1646762637609765000\n
+trades,symbol=BTC-USD,side=sell price=39269.98,amount=0.001 1646762637710419000\n
+trades,symbol=ETH-USD,side=buy price=2615.4,amount=0.002 1646762637764098000\n
 ```
 
 Once inside of QuestDB, it's yours to manipulate and query via extended SQL.

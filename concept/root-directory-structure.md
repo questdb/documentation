@@ -23,7 +23,7 @@ By default, QuestDB's root directory will be the following:
 <!-- prettier-ignore-start -->
 
 <Tabs defaultValue="nix" values={[
-  { label: "Linux/FreeBSD", value: "nix" },
+  { label: "Linux", value: "nix" },
   { label: "macOS (Homebrew)", value: "macos" },
   { label: "Windows", value: "windows" },
 ]}>
