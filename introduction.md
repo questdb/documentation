@@ -49,6 +49,11 @@ No obscure domain-specific languages required. Use extended SQL.
 [High data cardinality](/glossary/high-cardinality/) will not lead to
 performance degradation.
 
+#### Hardware efficiency
+
+Strong, cost-saving performance on very mninimal hardware, 
+including sensors and Raspberry Pi.
+
 #### Time series SQL extensions
 
 Fast, SIMD-optimized SQL extensions to cruise through querying and analysis.
@@ -79,10 +84,6 @@ infrastructure sprawl.
   width={650}
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
-
-```sql title='yo' demo='https://example.com'
-SQL
-```
 
 With a specialized [time-series database](/glossary/time-series-database/), you
 don't need to worry about out-of-order data, duplicates, exactly one semantics,

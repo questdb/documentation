@@ -32,8 +32,6 @@ and partition storage size on disk.
 - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
 - `SHOW PERMISSIONS` displays permissions of user, group or service account
   (enterprise-only)
-- `SHOW SERVER_CONF` shows the content of QuestDB's server.conf configuration
-  file. (enterprise-only)
 
 ## Examples
 
@@ -156,17 +154,13 @@ SHOW GROUPS john;
 ### SHOW SERVICE ACCOUNT
 
 ```questdb-sql
-
 SHOW SERVICE ACCOUNT;
-
 ```
 
 or
 
 ```questdb-sql
-
 SHOW SERVICE ACCOUNT ilp_ingestion;
-
 ```
 
 | auth_type  | enabled |
@@ -178,41 +172,28 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 ### SHOW SERVICE ACCOUNTS
 
 ```questdb-sql
-
 SHOW SERVICE ACCOUNTS;
-
 ```
 
-| name |
-
-|-------------|
-
+| name       |
+| ---------- |
 | management |
-
 | svc1_admin |
 
 ```questdb-sql
-
 SHOW SERVICE ACCOUNTS john;
-
 ```
 
-| name |
-
-|-------------|
-
+| name       |
+| ---------- |
 | svc1_admin |
 
 ```questdb-sql
-
 SHOW SERVICE ACCOUNTS admin_group;
-
 ```
 
-| name |
-
-|-------------|
-
+| name       |
+| ---------- |
 | svc1_admin |
 
 ### SHOW PERMISSIONS FOR CURRENT USER
@@ -252,20 +233,14 @@ SHOW PERMISSIONS admin_group;
 #### For a service account
 
 ```questdb-sql
-
 SHOW PERMISSIONS ilp_ingestion;
-
 ```
 
 | permission | table_name | column_name | grant_option | origin |
-
-|------------|------------|-------------|--------------|--------|
-
-| SELECT | | | t | G |
-
-| INSERT | | | f | G |
-
-| UPDATE | | | f | G |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     |            |             | t            | G      |
+| INSERT     |            |             | f            | G      |
+| UPDATE     |            |             | f            | G      |
 
 ### SHOW SERVER_VERSION
 
@@ -278,17 +253,6 @@ SHOW SERVER_VERSION;
 | server_version |
 | -------------- |
 | 12.3 (questdb) |
-
-### SHOW SERVER_CONF
-
-```questdb-sql
-SHOW SERVER_CONF;
-```
-
-| name                     | value |
-| ------------------------ | ----- |
-| config.validation.strict | true  |
-| query.timeout.sec        | 60    |
 
 ## See also
 
