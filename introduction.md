@@ -46,10 +46,6 @@ Developers are most enthusiastic about the following key features:
 If you are running into throughput bottlenecks using an existing storage engine
 or time series database, QuestDB can help.
 
-#### Familiar SQL analytics
-
-No obscure domain-specific languages required. Use extended SQL.
-
 #### High performance deduplication & out-of-order indexing
 
 [High data cardinality](/glossary/high-cardinality/) will not lead to
@@ -60,9 +56,11 @@ performance degradation.
 Strong, cost-saving performance on very mninimal hardware, including sensors and
 Raspberry Pi.
 
-#### Time series SQL extensions
+#### SQL with time series extensions
 
 Fast, SIMD-optimized SQL extensions to cruise through querying and analysis.
+
+No obscure domain-specific languages required.
 
 Greatest hits include:
 
