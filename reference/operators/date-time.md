@@ -129,7 +129,7 @@ results on Jan 1-2 in 2018 and in 2019:
 | ...                         | ...   |
 | 2019-01-02T23:59:59.999999Z | 103.8 |
 
-### `BETWEEN` value1 `AND` value2
+## `BETWEEN` value1 `AND` value2
 
 The `BETWEEN` operator allows you to specify a non-standard range. It includes
 both upper and lower bounds, similar to standard SQL. The order of these bounds
