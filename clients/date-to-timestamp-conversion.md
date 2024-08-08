@@ -28,8 +28,8 @@ from questdb.ingress import Sender
 
 date_str = '2024-08-05'
 
-# Note that since we want the timestamp, we could directly parse into a Datetime object, but for
-# reference purposes we want to first have a Date object, to illustrate how to convert Date to Datetime
+# We could parse the string directly into a datetime object, 
+# but for this example, we will show how to convert it via a date.
 date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
 print(f"Date object: {date_obj}")
 
