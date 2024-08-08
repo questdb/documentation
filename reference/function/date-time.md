@@ -85,7 +85,7 @@ from `Date` to `Timestamp` you can `CAST(date_column AS Timestamp)`.
 ### Programmatically convert from native Date object into QuestDB timestamp
 
 Different programming languages use different types of objects to represent the `Date` type. To learn how to convert
-from the `Date` type into a `Timestamp` object in Python, Go, JAVA, JavaScript, C/C++, Rust, or .Net, please visit
+from the `Date` type into a `Timestamp` object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
 our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion) reference.
 
 ---
