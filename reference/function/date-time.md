@@ -68,7 +68,7 @@ The interpretation of `y` depends on the input digit number:
 ## Timestamp to Date conversion
 
 As described at the [data types section](/docs/reference/sql/datatypes), the only difference between `Timestamp` and `Date`
-in QuestDB type system is the resolution. While `Timestamp` stores resolution as an offset from Unix Epoch in microseconds,
+in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in microseconds,
 `Date` stores the offset in milliseconds.
 
 Since both types are backed by a signed integer, this means the `Date` type has a
