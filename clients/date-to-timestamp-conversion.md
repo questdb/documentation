@@ -346,10 +346,9 @@ Learn more about the [QuestDB Node.js Client](/docs/clients/ingest-node/)
 
 The `Date` class stores only date information, while the `DateTime` class stores both date and time information.
 
-QuestDB does not have an official Ruby client, but you can send a request composing the ILP messages and passing
-an Epoch in nanoseconds for the designated timestamp, or in microseconds for the rest of columns. An alternative
-is using the [InfluxDB Ruby Client](https://github.com/influxdata/influxdb-client-ruby), which is compatible with
-QuestDB ingestion.
+QuestDB does not have an official Ruby client, but you can send a POST request comprising the ILP messages. Within this messages, you can pass an epoch timestamp in nanoseconds as the designated timestamp, and pass epoch timestamps in microseconds for other timestamp columns. 
+
+Alternatively, you can use the [InfluxDB Ruby Client](https://github.com/influxdata/influxdb-client-ruby), which is compatible with QuestDB.
 
 ```ruby
 require 'date'
