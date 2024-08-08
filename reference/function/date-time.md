@@ -80,8 +80,8 @@ For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of func
 Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot set it to any value before the Unix epoch
 (`1970-01-01T00:00:00.000000Z`).
 
-To explicitely convert from `Timestamp` to Date you can use `CAST(ts_column AS Date)`. To convert
-from `Date` to `Timestamp` you can `CAST(date_column AS Timestamp)`.
+To explicitely convert from `TIMESTAMP` to `DATE` you can use `CAST(ts_column AS DATE)`. To convert
+from `DATE` to `TIMESTAMP` you can `CAST(date_column AS TIMESTAMP)`.
 
 ### Programmatically convert from language-specific datetimes into QuestDB timestamps
 
