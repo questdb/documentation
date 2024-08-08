@@ -182,7 +182,7 @@ Learn more about the [QuestDB Java Client](/docs/clients/java-ilp/)
 
 Standard C does not have a native `Date type`, but `struct tm` in `<time.h>` can store both date and time information.
 
-The QuestDB C client needs the timestamp as an `int64_t` in microseconds, so we will need to convert it.
+The QuestDB C client expects timestamp to be an `int64_t` in microseconds, so we will need to convert it.
 
 ```c
 #include <stdio.h>
