@@ -364,7 +364,7 @@ puts "Date: #{date_obj}"
 puts "Timestamp (microseconds): #{timestamp}"
 ```
 
-Learn more about the [Composing ILP Messages](/docs/reference/api/ilp/advanced-settings/)
+Learn more about the [ILP text format](/docs/reference/api/ilp/advanced-settings/).
 
 
 ## Date to Timestamp in PHP
