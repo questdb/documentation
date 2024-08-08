@@ -136,7 +136,7 @@ public class Main {
 }
 ```
 
-Example using a `long` with Epoch in microseconds and `java.time.temporal.ChronoUnit`
+Example using a `long` with epoch microseconds and `java.time.temporal.ChronoUnit`
 
 ```java
 import java.time.LocalDate;
