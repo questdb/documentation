@@ -240,7 +240,7 @@ int main() {
 
     std::cout << "Date: " << std::put_time(&tm, "%Y-%m-%d") << ", Timestamp (microseconds): " << microseconds << std::endl;
 
-    // You can nos pass the microseconds variable to the QuestDB column function, converting to int64_t using the
+    // You can now pass the microseconds variable to the QuestDB column function, converting to int64_t using the
     // timestamp_micros function
     // .column("NotDesignatedTimestampColumnName",questdb::ingress::timestamp_micros(microseconds)
 
