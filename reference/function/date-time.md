@@ -328,7 +328,7 @@ SELECT to_str(ts,'EE'),day_of_week_sunday_first(ts) FROM myTable;
 
 ## days_in_month
 
-`days_in_month(value)` - returns the number of days in a month from a provided
+`days_in_month(value)` - returns the number of days in a month from a given
 timestamp or date.
 
 **Arguments:**
