@@ -77,7 +77,7 @@ range of ±290,000 years.
 
 For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
 
-Be aware that, when using a `Timestamp` as the designated timestamp, it is not allowed to set any value before the Epoch
+Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot set it to any value before the Unix epoch
 (`1970-01-01T00:00:00.000000Z`).
 
 To explicitely convert from `Timestamp` to Date you can use `CAST(ts_column AS Date)`. To convert
