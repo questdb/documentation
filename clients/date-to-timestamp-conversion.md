@@ -323,7 +323,7 @@ Learn more about the [QuestDB .NET Client](/docs/clients/ingest-dotnet/)
 
 The Date type stores both date and time information.
 
-The QuestDB Nodejs client accepts an Epoch in microsecondsm which can be `number` or `bigint`.
+The QuestDB Node.js client accepts an epoch in microseconds, which can be a `number` or `bigint`.
 
 ```javascript
 const { Sender } = require("@questdb/nodejs-client")
