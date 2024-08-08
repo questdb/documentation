@@ -82,7 +82,7 @@ Be aware that, when using a `Timestamp` as the designated timestamp, it is not a
 To explicitely convert from `Timestamp` to Date you can use `CAST(ts_column AS Date)`. To convert
 from `Date` to `Timestamp` you can `CAST(date_column AS Timestamp)`.
 
-### Programmatically convert from native Date object into QuestDB timestamp
+### Programmatically convert from language-specific datetimes into QuestDB timestamps
 
 Different programming languages use different types of objects to represent the `Date` type. To learn how to convert
 from the `Date` type into a `Timestamp` object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
