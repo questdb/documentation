@@ -55,7 +55,7 @@ Learn more about the [QuestDB Python Client](/docs/clients/ingest-python/)
 The `time.Time` type stores both date and time information. It is used for most time-related tasks in Go, such as
 parsing dates, formatting dates, and time arithmetic.
 
-The QuestDB Go client needs the timestamp as an `int64` in microseconds, so we will need to convert it.
+The QuestDB Go client expects the timestamp as an `int64`, in unix microseconds, so we will need to convert it.
 
 ```go
 package main
