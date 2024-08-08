@@ -10,9 +10,9 @@ description: Python, Go, JAVA, JavaScript, C/C++, Rust, .Net, PHP, or Ruby.
 Most languages have a dedicated type for dates or timestamps, with the notable exception of C. In this guide, we show how to  convert from a literal string representing a date into the native `Date` type, and then
 into a `Timestamp` type using Python, Go, Java, C, C++, Rust, C#/.NET, JavaScript/Node.js, Ruby, and PHP.
 
-QuestDB has clients for Python, Go, Java, C, C++, Rust, Rust, C#/dotnet, and JavaScript/Nodejs. Some of the clients
-can directly use the `Timestamp` type when using the client, while others need to convert the timestamp into an
-integer representing the epoch time in microseconds. On each of the snippets, we add the extra conversion if needed.
+QuestDB offers clients for Python, Go, Java, C, C++, Rust, C#/.NET, and JavaScript/Node.js. Some of the clients
+can directly use a `Timestamp` type when using the client, while others need to convert the timestamp into a
+long representing the epoch time in microseconds. We add such required conversions into the snippets.
 
 Please refer to the [ingestion overview](https://questdb.io/docs/ingestion-overview/) to learn more about the details of the client library for your language.
 
