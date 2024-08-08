@@ -7,9 +7,8 @@ description: Python, Go, JAVA, JavaScript, C/C++, Rust, .Net, PHP, or Ruby.
 
 # Date to Timestamp Conversion in Different Programming Languages
 
-Most languages have a dedicated type for a Date or a Timestamp, with the notable exception of the C language. In this
-reference we show how you can convert from a literal string representing a `Date` into the native date type, and then
-into a `Timestamp` type using Python, Go, Java, C, C++, Rust, Rust, C#/dotnet, JavaScript/Nodejs, Ruby, and PHP.
+Most languages have a dedicated type for dates or timestamps, with the notable exception of C. In this guide, we show how to  convert from a literal string representing a date into the native `Date` type, and then
+into a `Timestamp` type using Python, Go, Java, C, C++, Rust, C#/.NET, JavaScript/Node.js, Ruby, and PHP.
 
 QuestDB has clients for Python, Go, Java, C, C++, Rust, Rust, C#/dotnet, and JavaScript/Nodejs. Some of the clients
 can directly use the `Timestamp` type when using the client, while others need to convert the timestamp into an
