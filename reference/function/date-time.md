@@ -71,10 +71,11 @@ As described at the [data types section](/docs/reference/sql/datatypes), the onl
 in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in microseconds,
 `Date` stores the offset in milliseconds.
 
-Since both types are backed by a signed integer, this means the `Date` type has a
-wider range. A `Date` column can store about ±2.9 million years from the Epoch, while a `Timestamp` has an approximate
-range of ±290,000 years from the Epoch. For most practical purposes a `Timestamp` is preferred, as it takes the same
-storage on disk, but provides a larger range of functions.
+Since both types are backed by a signed long, this means the `DATE` type has a
+wider range. A `DATE` column can store about ±2.9 million years from the Unix epoch, whereas a `TIMESTAMP` has an approximate
+range of ±290,000 years. 
+
+For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
 
 Be aware that, when using a `Timestamp` as the designated timestamp, it is not allowed to set any value before the Epoch
 (`1970-01-01T00:00:00.000000Z`).
