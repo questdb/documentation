@@ -33,7 +33,7 @@ date_str = '2024-08-05'
 date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
 print(f"Date object: {date_obj}")
 
-# Convert to datetime object. This object can be passed in the QuestDB Python API 'columns' dictionary
+# Convert to datetime object. This object can be passed as a column value in the QuestDB Python client's row() API.
 datetime_obj = datetime.combine(date_obj, datetime.min.time())
 print(f"DateTime object: {datetime_obj}")
 
