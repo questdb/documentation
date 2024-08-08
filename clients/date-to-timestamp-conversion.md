@@ -369,8 +369,7 @@ Learn more about the [ILP text format](/docs/reference/api/ilp/advanced-settings
 
 ## Date to Timestamp in PHP
 
-The `DateTime` class stores both date and time information. The `DateTimeImmutable` class also stores both date and time
- information.
+Both of the `DateTime` and `DateTimeImmutable` classes store date and time information
 
 QuestDB does not have an official PHP client, but you can send a request composing the ILP messages and passing
 an Epoch in nanoseconds for the designated timestamp, or in microseconds for the rest of columns. An alternative
