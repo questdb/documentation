@@ -319,7 +319,7 @@ class Program
 ```
 Learn more about the [QuestDB .NET Client](/docs/clients/ingest-dotnet/)
 
-## Date to Timestamp in Javascript/nodejs
+## Date to Timestamp in JavasScript/Node.js
 
 The Date type stores both date and time information.
 
