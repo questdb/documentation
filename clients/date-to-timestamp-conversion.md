@@ -43,7 +43,7 @@ print(f"DateTime object: {datetime_obj}")
 # ...
 
 
-# Optionally convert to pandas Timestamp. The QuestDB python exposes a Dataframe API and accepts pd.Timestamp columns
+# Optionally, you can convert to a pandas Timestamp. The QuestDB Python client offers the dataframe() API, which accepts pd.Timestamp columns
 pd_timestamp = pd.Timestamp(datetime_obj)
 print(f"Pandas Timestamp: {pd_timestamp}")
 
