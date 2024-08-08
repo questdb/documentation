@@ -94,7 +94,7 @@ our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion) r
 
 ## date_trunc
 
-`date_trunc(unit, timestamp)` - returns a timestamps truncated to the selected
+`date_trunc(unit, timestamp)` - returns a timestamp truncated to the specified
 precision
 
 **Arguments:**
