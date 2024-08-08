@@ -371,10 +371,9 @@ Learn more about the [ILP text format](/docs/reference/api/ilp/advanced-settings
 
 Both of the `DateTime` and `DateTimeImmutable` classes store date and time information
 
-QuestDB does not have an official PHP client, but you can send a request composing the ILP messages and passing
-an Epoch in nanoseconds for the designated timestamp, or in microseconds for the rest of columns. An alternative
-is using the [InfluxDB PHP Client](https://github.com/influxdata/influxdb-client-php), which is compatible with
-QuestDB ingestion.
+QuestDB does not have an official PHP client, but you can send a POST request comprising the ILP messages. Within this messages, you can pass an epoch timestamp in nanoseconds as the designated timestamp, and pass epoch timestamps in microseconds for other timestamp columns. 
+
+Alternatively, you can use the [InfluxDB PHP Client](https://github.com/influxdata/influxdb-client-php), which is compatible with QuestDB.
 
 ```php
 <?php
