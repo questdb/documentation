@@ -317,7 +317,7 @@ class Program
 }
 
 ```
-Learn more about the [QuestDB .Net Client](/docs/clients/ingest-dotnet/)
+Learn more about the [QuestDB .NET Client](/docs/clients/ingest-dotnet/)
 
 ## Date to Timestamp in Javascript/nodejs
 
