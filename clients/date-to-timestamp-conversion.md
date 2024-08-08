@@ -99,8 +99,7 @@ Learn more about the [QuestDB Go Client](/docs/clients/ingest-go/)
 The `java.time.LocalDate` type stores only date information, while `java.time.LocalDateTime` stores both date and time
 information.
 
-The QuestDB Java Client needs either an `java.time.Instant` or as a `long` number representing the Epoch. When using a `long`,
-you need to provide the units via `java.time.temporal.ChronoUnit`.
+The QuestDB Java Client expects either a `java.time.Instant` object or a `long` value representing an epoch number. When using a `long`, you must provide the time unit using `java.time.temporal.ChronoUnit`.
 
 Example using `Instant`
 
