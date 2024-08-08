@@ -281,7 +281,7 @@ fn main() {
 ```
 Learn more about the [QuestDB Rust Client](/docs/clients/ingest-rust/)
 
-## Date to Timestamp in C#/.Net
+## Date to Timestamp in C#/.NET
 
 The `System.DateTime` type stores both date and time information. There is also `System.DateOnly` for only date information
 in .NET 6 and later.
