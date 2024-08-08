@@ -96,7 +96,7 @@ Learn more about the [QuestDB Go Client](/docs/clients/ingest-go/)
 
 ## Date to Timestamp in Java
 
-The `java.time.LocalDate` type stores only date information, while `java.time.LocalDateTim`e stores both date and time
+The `java.time.LocalDate` type stores only date information, while `java.time.LocalDateTime` stores both date and time
 information.
 
 The QuestDB Java Client needs either an `java.time.Instant` or as a `long` number representing the Epoch. When using a `long`,
