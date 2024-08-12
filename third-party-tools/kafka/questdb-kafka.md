@@ -74,13 +74,13 @@ information on how to configure properties, see the
 
 This example file:
 
-1. Assumes a running InfluxDB Line Protocol default port of `9009`
+1. Assumes a running InfluxDB Line Protocol default port of `9000`
 2. Creates a reader from a Kafka topic: `example-topic`
 3. Creates & writes into a QuestDB table: `example_table`
 
 ```shell title="Create a configuration file"
 name=questdb-sink
-client.conf.string=http::addr=localhost:9009;
+client.conf.string=http::addr=localhost:9000;
 topics=example-topic
 table=example_table
 
@@ -481,7 +481,7 @@ Example:
 ```shell title="Configuration file an explicit table name"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
-client.conf.string=http::addr=localhost:9009;
+client.conf.string=http::addr=localhost:9000;
 topics=example-topic
 table=example_table
 
@@ -496,7 +496,7 @@ Example:
 ```shell title="Configuration file with a templated table name"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
-client.conf.string=http::addr=localhost:9009;
+client.conf.string=http::addr=localhost:9000;
 topics=example-topic
 table=from_kafka_${topic}_${key}_suffix
 
@@ -590,7 +590,7 @@ you want to remove the `address` field, you can use the following configuration:
   "name": "questdb-sink",
   "config": {
     "connector.class": "io.questdb.kafka.QuestDBSinkConnector",
-    "host": "localhost:9009",
+    "host": "localhost:9000",
     "topics": "Orders",
     "table": "orders_table",
     "key.converter": "org.apache.kafka.connect.storage.StringConverter",
