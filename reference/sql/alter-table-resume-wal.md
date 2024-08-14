@@ -66,6 +66,12 @@ ALTER TABLE trades RESUME WAL FROM TXN 5;
 
 ## Diagnosting corrupted WAL transactions
 
+:::note
+
+If you have [data deduplication](/concept/deduplication/) enabled on your tables and you have access to the original events (for instance, they're stored in Apache Kafka, or other replayable source), you may reingest the data after skipping the problematic transactions.
+
+:::
+
 Sometimes a table may get suspended due to full disk or [kernel limits](/docs/deployment/capacity-planning/#os-configuration). In this case, a whole WAL segment may get corrupted. This means that there will be multiple transactions that rely on the corrupted segment and finding the transaction number to resume from may be complicated. When you run RESUME WAL on such suspended table, you may see an error like this one:
 
 ```
