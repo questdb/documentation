@@ -68,14 +68,14 @@ const sender = Sender.fromEnv();
 ```
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 ## Basic insert
 
 Example: inserting executed trades for cryptocurrencies.
 
 Without authentication and using the current timestamp.
-
 
 ```javascript
 const { Sender } = require("@questdb/nodejs-client")
@@ -105,9 +105,9 @@ async function run() {
 run().then(console.log).catch(console.error)
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's see now an example with an explicit
-timestamp, custom auto-flushing, and basic auth.
-
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with an explicit timestamp, custom auto-flushing, and basic
+auth.
 
 ```javascript
 const { Sender } = require("@questdb/nodejs-client")
@@ -115,11 +115,11 @@ const { Sender } = require("@questdb/nodejs-client")
 async function run() {
   // create a sender using HTTP protocol
   const sender = Sender.fromConfig(
-    "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;"
-    )
+    "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;",
+  )
 
   // Calculate the current timestamp. You could also parse a date from your source data.
-    const timestamp = Date.now();
+  const timestamp = Date.now()
 
   // add rows to the buffer of the sender
   await sender
@@ -139,11 +139,9 @@ async function run() {
     .floatColumn("amount", 0.001)
     .at(timestamp, "ms")
 
-
   // flush the buffer of the sender, sending the data to QuestDB
   // the buffer is cleared after the data is sent, and the sender is ready to accept new data
   await sender.flush()
-
 
   // close the connection after all rows ingested
   // unflushed data will be lost
@@ -153,29 +151,34 @@ async function run() {
 run().then(console.log).catch(console.error)
 ```
 
-As you can see, both events now are using the same timestamp. We recommended to use the original event timestamps when
-ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
+As you can see, both events now are using the same timestamp. We recommended to
+use the original event timestamps when ingesting data into QuestDB. Using the
+current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
 
 ## Configuration options
 
-The minimal configuration string needs to have the protocol, host, and port, as in:
+The minimal configuration string needs to have the protocol, host, and port, as
+in:
 
 ```
 http::addr=localhost:9000;
 ```
 
-For all the extra options you can use, please check [the client docs](https://questdb.github.io/nodejs-questdb-client/SenderOptions.html)
+For all the extra options you can use, please check
+[the client docs](https://questdb.github.io/nodejs-questdb-client/SenderOptions.html)
 
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
 
 ## Next Steps
 
 Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
-Dive deeper into the Node.js client capabilities, including TypeScript and Worker Threads examples, by exploring the
+Dive deeper into the Node.js client capabilities, including TypeScript and
+Worker Threads examples, by exploring the
 [GitHub repository](https://github.com/questdb/nodejs-questdb-client).
 
 To learn _The Way_ of QuestDB SQL, see the

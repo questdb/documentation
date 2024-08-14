@@ -41,8 +41,7 @@ import Screenshot from "@theme/Screenshot"
    general-purpose instance with 4GB memory and should be enough to run this
    example.
 
-   {" "}
-   <Screenshot
+   {" "} <Screenshot
      alt="Deploying a QuestDB instance on Google Cloud Platform Compute Engine"
      height={695}
      src="/img/guides/google-cloud-platform/create-vm.webp"
@@ -62,8 +61,7 @@ import Screenshot from "@theme/Screenshot"
 
    Your docker configuration should look like this:
 
-   {" "}
-   <Screenshot
+   {" "} <Screenshot
      alt="Configuring a Docker container to launch in a new QuestDB instance on Google Cloud Platform Compute Engine"
      height={695}
      src="/img/guides/google-cloud-platform/create-vm-docker.webp"
@@ -162,4 +160,59 @@ Alternatively, a request may be sent to the REST API exposed on port 9000:
 curl -G \
   --data-urlencode "query=SELECT * FROM telemetry_config" \
   <external_ip>:9000/exec
+```
+
+## Set up GCP with Pulumi
+
+If you're using [Pulumi](https://www.pulumi.com/gcp/) to manage your
+infrastructure, you can create a QuestDB instance with the following:
+
+```python
+import pulumi
+import pulumi_gcp as gcp
+
+# Create a Google Cloud Network
+firewall = gcp.compute.Firewall(
+    "questdb-firewall",
+    network="default",
+    allows=[
+        gcp.compute.FirewallAllowArgs(
+            protocol="tcp",
+            ports=["9000", "8812"],
+        ),
+    ],
+    target_tags=["questdb"],
+    source_ranges=["0.0.0.0/0"],
+)
+
+# Create a Compute Engine Instance
+instance = gcp.compute.Instance(
+    "questdb-instance",
+    machine_type="e2-medium",
+    zone="us-central1-a",
+    boot_disk={
+        "initialize_params": {
+            "image": "ubuntu-os-cloud/ubuntu-2004-lts",
+        },
+    },
+    network_interfaces=[
+        gcp.compute.InstanceNetworkInterfaceArgs(
+            network="default",
+            access_configs=[{}],  # Ephemeral public IP
+        )
+    ],
+    metadata_startup_script="""#!/bin/bash
+        sudo apt-get update
+        sudo apt-get install -y docker.io
+        sudo docker run -d -p 9000:9000 -p 8812:8812 \
+        --env QDB_HTTP_USER="admin" \
+        --env QDB_HTTP_PASSWORD="quest" \
+        questdb/questdb
+        """,
+    tags=["questdb"],
+)
+
+# Export the instance's name and public IP
+pulumi.export("instanceName", instance.name)
+pulumi.export("instance_ip", instance.network_interfaces[0].access_configs[0].nat_ip)
 ```

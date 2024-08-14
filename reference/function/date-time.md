@@ -65,9 +65,37 @@ The interpretation of `y` depends on the input digit number:
 | `005-03`   | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
 | `0005-03`  | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
 
+## Timestamp to Date conversion
+
+As described at the [data types section](/docs/reference/sql/datatypes), the only difference between `Timestamp` and `Date`
+in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in microseconds,
+`Date` stores the offset in milliseconds.
+
+Since both types are backed by a signed long, this means the `DATE` type has a
+wider range. A `DATE` column can store about ±2.9 million years from the Unix epoch, whereas a `TIMESTAMP` has an approximate
+range of ±290,000 years. 
+
+For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
+
+Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot set it to any value before the Unix epoch
+(`1970-01-01T00:00:00.000000Z`).
+
+To explicitely convert from `TIMESTAMP` to `DATE` you can use `CAST(ts_column AS DATE)`. To convert
+from `DATE` to `TIMESTAMP` you can `CAST(date_column AS TIMESTAMP)`.
+
+### Programmatically convert from language-specific datetimes into QuestDB timestamps
+
+Different programming languages use different types of objects to represent the `Date` type. To learn how to convert
+from the `Date` type into a `Timestamp` object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
+our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion) reference.
+
+---
+
+# Function Reference
+
 ## date_trunc
 
-`date_trunc(unit, timestamp)` - returns a timestamps truncated to the selected
+`date_trunc(unit, timestamp)` - returns a timestamp truncated to the specified
 precision
 
 **Arguments:**
@@ -299,6 +327,33 @@ SELECT to_str(ts,'EE'),day_of_week_sunday_first(ts) FROM myTable;
 | Saturday  | 7                        |
 | Sunday    | 1                        |
 
+## days_in_month
+
+`days_in_month(value)` - returns the number of days in a month from a given
+timestamp or date.
+
+**Arguments:**
+
+- `value` is any `timestamp` or `date`
+
+**Return value:**
+
+Return value type is `int`
+
+**Examples:**
+
+```questdb-sql
+SELECT month(ts), days_in_month(ts) FROM myTable;
+```
+
+| month | days_in_month |
+| :---- | :------------ |
+| 4     | 30            |
+| 5     | 31            |
+| 6     | 30            |
+| 7     | 31            |
+| 8     | 31            |
+
 ## extract
 
 `extract (unit, timestamp)` - returns the selected time unit from the input
@@ -412,33 +467,6 @@ SELECT year(ts), is_leap_year(ts) FROM myTable;
 | 2023 | false        |
 | 2024 | true         |
 | 2025 | false        |
-
-## days_in_month
-
-`days_in_month(value)` - returns the number of days in a month from a provided
-timestamp or date.
-
-**Arguments:**
-
-- `value` is any `timestamp` or `date`
-
-**Return value:**
-
-Return value type is `int`
-
-**Examples:**
-
-```questdb-sql
-SELECT month(ts), days_in_month(ts) FROM myTable;
-```
-
-| month | days_in_month |
-| :---- | :------------ |
-| 4     | 30            |
-| 5     | 31            |
-| 6     | 30            |
-| 7     | 31            |
-| 8     | 31            |
 
 ## micros
 
@@ -708,41 +736,6 @@ SELECT second(ts), count() FROM transactions;
 | 58     | 9876  |
 | 59     | 2567  |
 
-## systimestamp
-
-`systimestamp()` - offset from UTC Epoch in microseconds. Calculates
-`UTC timestamp` using system's real time clock. The value is affected by
-discontinuous jumps in the system time (e.g., if the system administrator
-manually changes the system time).
-
-`systimestamp()` value can change within the query execution timeframe and
-should **NOT** be used in WHERE clause to filter designated timestamp column.
-
-:::tip
-
-Use now() with WHERE clause filter.
-
-:::
-
-**Arguments:**
-
-- `systimestamp()` does not accept arguments.
-
-**Return value:**
-
-Return value type is `timestamp`.
-
-**Examples:**
-
-```questdb-sql title="Insert current system timestamp"
-INSERT INTO readings
-VALUES(systimestamp(), 123.5);
-```
-
-| ts                          | reading |
-| :-------------------------- | :------ |
-| 2020-01-02T19:28:48.727516Z | 123.5   |
-
 ## sysdate
 
 `sysdate()` - returns the timestamp of the host system as a `date` with
@@ -784,6 +777,41 @@ VALUES(sysdate(), 123.5);
 SELECT * FROM readings
 WHERE date_time > sysdate() - 60000000L;
 ```
+
+## systimestamp
+
+`systimestamp()` - offset from UTC Epoch in microseconds. Calculates
+`UTC timestamp` using system's real time clock. The value is affected by
+discontinuous jumps in the system time (e.g., if the system administrator
+manually changes the system time).
+
+`systimestamp()` value can change within the query execution timeframe and
+should **NOT** be used in WHERE clause to filter designated timestamp column.
+
+:::tip
+
+Use now() with WHERE clause filter.
+
+:::
+
+**Arguments:**
+
+- `systimestamp()` does not accept arguments.
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="Insert current system timestamp"
+INSERT INTO readings
+VALUES(systimestamp(), 123.5);
+```
+
+| ts                          | reading |
+| :-------------------------- | :------ |
+| 2020-01-02T19:28:48.727516Z | 123.5   |
 
 ## timestamp_ceil
 

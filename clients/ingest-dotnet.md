@@ -91,7 +91,8 @@ TCP authentication can be configured using JWK tokens:
 using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
 ```
 
-The connection string can also be built programatically. See [Configuration](#configuration) for details.
+The connection string can also be built programatically. See
+[Configuration](#configuration) for details.
 
 ## Basic insert
 
@@ -117,7 +118,9 @@ await sender.Table("trades")
 await sender.SendAsync();
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps, custom auto-flushing, basic auth, and error reporting.
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with timestamps, custom auto-flushing, basic auth, and error
+reporting.
 
 ```csharp
 using QuestDB;
@@ -159,10 +162,10 @@ class Program
 }
 ```
 
-As you can see, both events use the same timestamp. We recommended using the original event timestamps when
-ingesting data into QuestDB. Using the current timestamp hinder the ability to deduplicate rows which is
+As you can see, both events use the same timestamp. We recommended using the
+original event timestamps when ingesting data into QuestDB. Using the current
+timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
 
 ## Configuration
 
@@ -177,7 +180,7 @@ Optionally, TCP uses `9009`.
 ### With a configuration string
 
 It is recommended, where possible, to initialise the sender using a
-[configuration string](https://questdb.io/docs/reference/api/ilp/overview/#client-side-configuration).
+[configuration string](/docs/configuration-string/).
 
 Configuration strings provide a convenient shorthand for defining client
 properties, and are validated during construction of the `Sender`.
@@ -310,7 +313,6 @@ QuestDB's deduplication feature, and should be avoided where possible.
 
 :::
 
-
 ## Flushing
 
 Once the buffer is filled with data ready to be sent, it can be flushed to the
@@ -415,7 +417,9 @@ batch only for a single table.
 
 :::caution
 
-As described in the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the HTTP transport has some limitations for transactions when adding new columns.
+As described in the
+[ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
+HTTP transport has some limitations for transactions when adding new columns.
 
 :::
 
@@ -574,8 +578,8 @@ using var sender =
 ## Next Steps
 
 Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation.
+about transactions, error control, delivery guarantees, health check, or table
+and column auto-creation.
 
 Dive deeper into the .NET client capabilities by exploring more examples
 provided in the

@@ -27,13 +27,13 @@ This supporting document thus provides an overview to aid in client selection
 and initial configuration:
 
 1. [Client libraries](/docs/reference/api/ilp/overview/#client-libraries)
-2. [Server-Side Configuration](/docs/reference/api/ilp/overview/#server-side-configuration)
-3. [Transport Selection](/docs/reference/api/ilp/overview/#transport-selection)
-4. [Client-Side Configuration](/docs/reference/api/ilp/overview/#client-side-configuration)
+2. [Server-Side configuration](/docs/reference/api/ilp/overview/#server-side-configuration)
+3. [Transport selection](/docs/reference/api/ilp/overview/#transport-selection)
+4. [Client-Side configuration](/docs/reference/api/ilp/overview/#client-side-configuration)
 5. [Error handling](/docs/reference/api/ilp/overview/#error-handling)
 6. [Authentication](/docs/reference/api/ilp/overview/#authentication)
-7. [Table and Column Auto-creation](/docs/reference/api/ilp/overview/#table-and-column-auto-creation)
-8. [Timestamp Column Name](/docs/reference/api/ilp/overview/#timestamp-column-name)
+7. [Table and column auto-creation](/docs/reference/api/ilp/overview/#table-and-column-auto-creation)
+8. [Timestamp column name](/docs/reference/api/ilp/overview/#timestamp-column-name)
 9. [HTTP Transaction semantics](/docs/reference/api/ilp/overview/#http-transaction-semantics)
 10. [Exactly-once delivery](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery)
 11. [Health Check](/docs/reference/api/ilp/overview/#health-check)
@@ -93,10 +93,10 @@ connection failures. However, while HTTP is recommended, TCP has slightly lower
 overhead than HTTP and may be useful in high-throughput scenarios in
 high-latency networks.
 
-
 ## Client-Side Configuration
 
-Clients connect to a QuestDB using ILP via a configuration string. Configuration strings combine a set of key/value pairs.
+Clients connect to a QuestDB using ILP via a configuration string. Configuration
+strings combine a set of key/value pairs.
 
 The standard configuration string pattern is:
 
@@ -109,7 +109,8 @@ schema::key1=value1;key2=value2;key3=value3;
 It is made up of the following parts:
 
 - **Schema**: One of the specified schemas in the
-  [core parameters](/docs/reference/api/ilp/overview/#core-parameters) section below
+  [core parameters](/docs/reference/api/ilp/overview/#core-parameters) section
+  below
 - **Key=Value**: Each key-value pair sets a specific parameter for the client
 - **Terminating semicolon**: A semicolon must follow the last key-value pair
 
@@ -120,8 +121,8 @@ Below is a list of common parameters that ILP clients will accept.
 These params facilitate connection to QuestDB's ILP server and define
 client-specific behaviors.
 
-Some are shared across all clients, while some are client specific. Refer to
-the clients documentation for details.
+Some are shared across all clients, while some are client specific. Refer to the
+clients documentation for details.
 
 :::warning
 
@@ -167,7 +168,8 @@ completeness and for users who have specific requirements.
 
 :::
 
-_See the [Authentication](/docs/reference/api/ilp/overview/#authentication) section below for configuration._
+_See the [Authentication](/docs/reference/api/ilp/overview/#authentication)
+section below for configuration._
 
 - **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
   milliseconds.
@@ -179,7 +181,6 @@ _See the [Authentication](/docs/reference/api/ilp/overview/#authentication) sect
     - Used in C/C++/Rust/Python clients.
 - **username**: Username for TCP authentication.
 
-
 #### Auto-flushing behavior
 
 - **auto_flush**: Enable or disable automatic flushing (`on`/`off`).
@@ -188,6 +189,7 @@ _See the [Authentication](/docs/reference/api/ilp/overview/#authentication) sect
     Rust).
 
 - **auto_flush_bytes** Auto-flushing is triggered above this buffer size.
+
   - Disabled by default.
 
 - **auto_flush_interval**: Auto-flushing is triggered after this time period has
@@ -232,8 +234,9 @@ _QuestDB Enterprise only._
 
 #### Network configuration
 
-- **bind_interface**: Optionally, specify the local network interface for outbound
-  connections. Useful if you have multiple interfaces or an accelerated network interface (e.g. Solarflare)
+- **bind_interface**: Optionally, specify the local network interface for
+  outbound connections. Useful if you have multiple interfaces or an accelerated
+  network interface (e.g. Solarflare)
   - Not to be confused with the QuestDB port in the `addr` param.
 
 ## Error handling
@@ -245,15 +248,15 @@ errors, and other client-side errors.
 
 Retrying is particularly beneficial during network issues or when the server is
 temporarily unavailable. The retrying behavior can be configured through the
-`retry_timeout` configuration option or, in some clients, via their API.
-The client continues to retry recoverable errors until they either succeed or the specified timeout is
-reached.
+`retry_timeout` configuration option or, in some clients, via their API. The
+client continues to retry recoverable errors until they either succeed or the
+specified timeout is reached.
 
 The TCP transport lacks support for error propagation from the server. In such
-cases, the server merely closes the connection upon encountering an error. Consequently, the
-client receives no additional error information from the server. This limitation
-significantly contributes to the preference for HTTP transport over TCP
-transport.
+cases, the server merely closes the connection upon encountering an error.
+Consequently, the client receives no additional error information from the
+server. This limitation significantly contributes to the preference for HTTP
+transport over TCP transport.
 
 ## Authentication
 
@@ -266,11 +269,14 @@ provides holistic security out-of-the-box.
 
 :::
 
-InfluxDB Line Protocol supports authentication via HTTP Basic Authentication, using [the HTTP Parameters](/docs/reference/api/ilp/overview/#http-parameters), or via token when using the TCP transport, using [the TCP Parameters](/docs/reference/api/ilp/overview/#tcp-parameters).
+InfluxDB Line Protocol supports authentication via HTTP Basic Authentication,
+using [the HTTP Parameters](/docs/reference/api/ilp/overview/#http-parameters),
+or via token when using the TCP transport, using
+[the TCP Parameters](/docs/reference/api/ilp/overview/#tcp-parameters).
 
-A similar pattern is used across all client libraries. If you want to use a TCP token, you need to
-configure your QuestDB server. This document will break down and demonstrate the configuration keys and core
-configuration options.
+A similar pattern is used across all client libraries. If you want to use a TCP
+token, you need to configure your QuestDB server. This document will break down
+and demonstrate the configuration keys and core configuration options.
 
 Once a client has been selected and configured, resume from your language client
 documentation.
@@ -377,10 +383,12 @@ will use the first row of data to determine the column types.
 
 If the table already exists, the server will validate that the columns match the
 existing table. If the columns do not match, the server will return a
-non-recoverable error which, when using the HTTP/HTTPS transport, is propagated to the client.
+non-recoverable error which, when using the HTTP/HTTPS transport, is propagated
+to the client.
 
-You can avoid table and/or column auto-creation by setting the `line.auto.create.new.columns` and
-  `line.auto.create.new.tables`configuration parameters to false.
+You can avoid table and/or column auto-creation by setting the
+`line.auto.create.new.columns` and `line.auto.create.new.tables`configuration
+parameters to false.
 
 If you're using QuestDB Enterprise, you must grant further permissions to the
 authenticated user:
@@ -401,11 +409,11 @@ and the [role-based access control](/docs/operations/rbac/) guides.
 
 QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
 
-If your table has been created beforehand, the designated timestamp will be correctly
-assigned based on the payload sent bt the client. But if your table does not
-exist, it will be automatically created and the timestamp column will be named
-`timestamp`. To use a custom name, say `my_ts`, pre-create the table with the desired
-timestamp column name.
+If your table has been created beforehand, the designated timestamp will be
+correctly assigned based on the payload sent bt the client. But if your table
+does not exist, it will be automatically created and the timestamp column will
+be named `timestamp`. To use a custom name, say `my_ts`, pre-create the table
+with the desired timestamp column name.
 
 To do so, issue a `CREATE TABLE` statement to create the table in advance:
 
@@ -424,7 +432,9 @@ created, but without raising an error if the table already exists.
 
 ## HTTP transaction semantics
 
-The TCP endpoint does not support transactions. The HTTP ILP endpoint treats every requests as an individual transaction, so long as it contains rows for a single table.
+The TCP endpoint does not support transactions. The HTTP ILP endpoint treats
+every requests as an individual transaction, so long as it contains rows for a
+single table.
 
 As of writing, the HTTP endpoint does not provide full transactionality in all
 cases.
@@ -438,20 +448,24 @@ Specifically:
   transactionality is important for you, the best practice is to make sure you
   flush data to the server in batches that contain rows for a single table.
 
-- Even when you are sending data to a single table, when dynamically adding new columns to
-  a table, an implicit commit occurs each time a new column is added. If the request
-  is aborted or has parse errors, no data will be inserted into the corresponding
-  table, but the new column will be added and will not be rolled back.
+- Even when you are sending data to a single table, when dynamically adding new
+  columns to a table, an implicit commit occurs each time a new column is added.
+  If the request is aborted or has parse errors, no data will be inserted into
+  the corresponding table, but the new column will be added and will not be
+  rolled back.
 
-- Some clients have built-in support for controlling transactions. These APIs help to comply with the single-table-per-request pre-requisite for HTTP transactions, but they don't control if new columns
-  are being added.
+- Some clients have built-in support for controlling transactions. These APIs
+  help to comply with the single-table-per-request pre-requisite for HTTP
+  transactions, but they don't control if new columns are being added.
 
 - As of writing, if you want to make sure you have data transactionality and
-  schema/metadata transactionality, you should disable `line.auto.create.new.columns` and
-  `line.auto.create.new.tables` on your configuration. Be aware that if you do this,
-  you will not have dynamic schema capabilities and you will need to create each table
-  and column before you try to ingest data, via [`CREATE TABLE`](/docs/reference/sql/create-table/) and/or [`ALTER TABLE ADD COLUMN`](/docs/reference/sql/alter-table-add-column/) SQL statements.
-
+  schema/metadata transactionality, you should disable
+  `line.auto.create.new.columns` and `line.auto.create.new.tables` on your
+  configuration. Be aware that if you do this, you will not have dynamic schema
+  capabilities and you will need to create each table and column before you try
+  to ingest data, via [`CREATE TABLE`](/docs/reference/sql/create-table/) and/or
+  [`ALTER TABLE ADD COLUMN`](/docs/reference/sql/alter-table-add-column/) SQL
+  statements.
 
 ## Exactly-once delivery vs at-least-once delivery
 

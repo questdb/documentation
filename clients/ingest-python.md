@@ -102,7 +102,8 @@ with Sender(Protocol.Http, 'localhost', 9000, username='admin', password='quest'
 ```
 
 When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
+Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
+info.
 
 ## Basic insert
 
@@ -126,7 +127,9 @@ with Sender.from_conf(conf) as sender:
     sender.flush()
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's see now an example with timestamps, custom auto-flushing, basic auth, and error reporting.
+In this case, the designated timestamp will be the one at execution time. Let's
+see now an example with timestamps, custom auto-flushing, basic auth, and error
+reporting.
 
 ```python
 from questdb.ingress import Sender, IngressError, TimestampNanos
@@ -179,9 +182,9 @@ if __name__ == '__main__':
 ```
 
 We recommended `User`-assigned timestamps when ingesting data into QuestDB.
-Using `Server`-assigned timestamps hinders the ability to deduplicate rows which is
+Using `Server`-assigned timestamps hinders the ability to deduplicate rows which
+is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
 
 The same `trades` insert, but via a Pandas dataframe:
 
@@ -222,32 +225,40 @@ with Sender.from_conf(conf) as sender:
 
 ## Configuration options
 
-The minimal configuration string needs to have the protocol, host, and port, as in:
+The minimal configuration string needs to have the protocol, host, and port, as
+in:
 
 ```
 http::addr=localhost:9000;
 ```
 
-In the Python client, you can set the configuration options via the standard config string,
-which is the same across all clients, or using [the built-in API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#sender-programmatic-construction).
+In the Python client, you can set the configuration options via the standard
+config string, which is the same across all clients, or using
+[the built-in API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#sender-programmatic-construction).
 
+For all the extra options you can use, please check
+[the client docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#sender-conf)
 
-For all the extra options you can use, please check [the client docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#sender-conf)
-
+Alternatively, for a breakdown of Configuration string options available across
+all clients, see the [Configuration string](/docs/configuration-string/) page.
 
 ## Transactional flush
 
-As described at the [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics),
-the HTTP transport has some support for transactions.
+As described at the
+[ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
+HTTP transport has some support for transactions.
 
-The python client exposes [an API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#http-transactions)
+The python client exposes
+[an API](https://py-questdb-client.readthedocs.io/en/latest/sender.html#http-transactions)
 to make working with transactions more convenient
 
 ## Next steps
 
-Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for general details
-about transactions, error control, delivery guarantees, health check, or table and
-column auto-creation. The [Python client docs](https://py-questdb-client.readthedocs.io/en/latest/sender.html) explain how to apply those concepts using the built-in API.
+Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for general
+details about transactions, error control, delivery guarantees, health check, or
+table and column auto-creation. The
+[Python client docs](https://py-questdb-client.readthedocs.io/en/latest/sender.html)
+explain how to apply those concepts using the built-in API.
 
 For full docs, checkout
 [ReadTheDocs](https://py-questdb-client.readthedocs.io/en).

@@ -62,7 +62,7 @@ This parameter will expose a port to the host. You can specify:
 
 All ports are optional, you can pick only the ones you need. For example, it is
 enough to expose `8812` if you only plan to use
-[InfluxDB line protocol](/docs/reference/api/ilp/overview/).
+[Postgres wire protocol](/docs/reference/api/postgres/).
 
 ### `-v` parameter to mount storage
 

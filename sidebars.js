@@ -29,6 +29,11 @@ module.exports = {
           collapsed: false,
           items: [
             {
+              id: "configuration-string",
+              type: "doc",
+              label: "Configuration string",
+            },
+            {
               id: "clients/ingest-python",
               type: "doc",
               label: "Python",
@@ -62,6 +67,11 @@ module.exports = {
               id: "clients/ingest-dotnet",
               type: "doc",
               label: ".NET",
+            },
+            {
+              id: "clients/date-to-timestamp-conversion",
+              type: "doc",
+              label: "Date to Timestamp Conversion",
             },
           ],
         },
@@ -450,4 +460,4 @@ module.exports = {
       ],
     },
   ].filter(Boolean),
-};
+}
