@@ -1,7 +1,7 @@
 {
   "cairo.sql.copy.root": {
     "default": "import",
-    "description": "Input root directory for CSV imports via `COPY` SQL. This path must not overlap with other directory (e.g. db, conf) of running instance, otherwise import may delete or overwrite existing files. Relative paths are resolved against the server root directory."
+    "description": "Input root directory for CSV imports via `COPY` SQL and for Parquet file reading. This path must not overlap with other directory (e.g. db, conf) of running instance, otherwise import may delete or overwrite existing files. Relative paths are resolved against the server root directory."
   },
   "cairo.sql.copy.work.root": {
     "default": "null",
