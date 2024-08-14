@@ -39,7 +39,7 @@ git clone https://github.com/apache/superset.git
 
 ```bash
 touch ./docker/requirements-local.txt
-echo "questdb-connect==1.0.11" > docker/requirements-local.txt
+echo "questdb-connect==1.0.12" > docker/requirements-local.txt
 ```
 
 4. Run Apache Superset:
@@ -67,7 +67,7 @@ Superset without Docker, you need to install the following requirements :
 Install QuestDB Connect using `pip`:
 
 ```bash
-pip install 'questdb-connect==1.0.11'
+pip install 'questdb-connect==1.0.12'
 ```
 
 ## Connecting QuestDB to Superset
