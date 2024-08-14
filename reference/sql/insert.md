@@ -108,25 +108,31 @@ INSERT INTO confirmed_trades
 SELECT * FROM confirmed_id;
 ```
 
-:::note 
+:::note
 
-Since QuestDB v7.4.0, the default behaviour for `INSERT INTO SELECT` has been changed.
+Since QuestDB v7.4.0, the default behaviour for `INSERT INTO SELECT` has been
+changed.
 
-Previously, the table would be created atomically. For large tables, this requires a significant amount of RAM,
-and can cause errors if the database runs out of memory.
+Previously, the table would be created atomically. For large tables, this
+requires a significant amount of RAM, and can cause errors if the database runs
+out of memory.
 
-By default, this will be performed in batches. If the query fails, partial data may be inserted.
+By default, this will be performed in batches. If the query fails, partial data
+may be inserted.
 
-If this is a problem, it is recommended to use the ATOMIC keyword (`INSERT ATOMIC INTO`). Alternatively,
-enabling deduplication on the table will allow you to perform an idempotent insert to re-insert any missed data.
+If this is a problem, it is recommended to use the ATOMIC keyword
+(`INSERT ATOMIC INTO`). Alternatively, enabling deduplication on the table will
+allow you to perform an idempotent insert to re-insert any missed data.
 
 :::
 
 ### ATOMIC
 
-Inserts can be performed created atomically, which first loads all of the data and then commits in a single transaction.
+Inserts can be performed created atomically, which first loads all of the data
+and then commits in a single transaction.
 
-This requires the data to be available in memory all at once, so for large inserts, this may have performance issues.
+This requires the data to be available in memory all at once, so for large
+inserts, this may have performance issues.
 
 To force this behaviour, one can use the `ATOMIC` keyword:
 
@@ -143,21 +149,27 @@ By default, data will be inserted in batches.
 
 The size of the batches can be configured:
 
-- globally, by setting the `cairo.sql.insert.model.batch.size` configuration option in `server.conf`.
+- globally, by setting the `cairo.sql.insert.model.batch.size` configuration
+  option in `server.conf`.
 - locally, by using the `BATCH` keyword in the `INSERT INTO` statement.
+
+The composition is `INSERT` + `BATCH` + number of rows + `INTO` + `TABLE`,
+followed by the `SELECT` statement.
+
+In our example, we use 4096 as the batch size:
 
 ```questdb-sql title="Insert as select batched"
 INSERT BATCH 4096 INTO confirmed_trades
     SELECT timestamp, instrument, quantity, price, side
     FROM unconfirmed_trades
-    WHERE trade_id = '47219345234';  WHERE false
-);
+    WHERE trade_id = '47219345234';
 ```
 
-One can also specify the out-of-order commit lag for these batched writes, using the o3MaxLag option:
+One can also specify the out-of-order commit lag for these batched writes, using
+the o3MaxLag option:
 
 ```questdb-sql title="Insert as select with batching and O3 lag"
-INSERT BATCH 4096 o3MaxLag 1s INTO confirmed_trades
+INSERT BATCH 4096 o3MaxLag '1s' INTO confirmed_trades
     SELECT timestamp, instrument, quantity, price, side
     FROM unconfirmed_trades
     WHERE trade_id = '47219345234';
