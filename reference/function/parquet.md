@@ -22,21 +22,22 @@ Either:
 
 :::
 
-## parquet_read
+## read_parquet
 
 Reads a parquet file as a table.
 
-`parquet_read(parquet_file_path)`
+`read_parquet(parquet_file_path)`
 
 ### Usage
 
-With this function, query a Parquet file located at the QuestDB copy root directory. Both relative and absolute file paths are supported.
+With this function, query a Parquet file located at the QuestDB copy root directory. Both relative and absolute file
+paths are supported.
 
-```questdb-sql title="parquet_read example"
+```questdb-sql title="read_parquet example"
 SELECT
   *
 FROM
-  parquet_read('trades.parquet')
+  read_parquet('trades.parquet')
 WHERE
   exchange == 'NASDAQ'
 ```
@@ -60,7 +61,8 @@ For security reason, reading is only allowed if copy root directory is configure
 
 ### Limitations
 
-Parquet format support rich set of data types, including structural types. QuestDB only can read data types that match QuestDB data types:
+Parquet format support rich set of data types, including structural types. QuestDB only can read data types that match
+QuestDB data types:
 
 - Varchar
 - Int
