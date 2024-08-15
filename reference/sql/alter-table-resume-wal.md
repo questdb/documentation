@@ -64,7 +64,7 @@ ALTER TABLE trades RESUME WAL FROM TRANSACTION 5;
 ALTER TABLE trades RESUME WAL FROM TXN 5;
 ```
 
-## Diagnosting corrupted WAL transactions
+## Diagnosing corrupted WAL transactions
 
 :::note
 
@@ -72,13 +72,15 @@ If you have [data deduplication](/concept/deduplication/) enabled on your tables
 
 :::
 
-Sometimes a table may get suspended due to full disk or [kernel limits](/docs/deployment/capacity-planning/#os-configuration). In this case, a whole WAL segment may get corrupted. This means that there will be multiple transactions that rely on the corrupted segment and finding the transaction number to resume from may be complicated. When you run RESUME WAL on such suspended table, you may see an error like this one:
+Sometimes a table may get suspended due to full disk or [kernel limits](/docs/deployment/capacity-planning/#os-configuration). In this case, an entire WAL segment may be corrupted. This means that there will be multiple transactions that rely on the corrupted segment, and finding the transaction number to resume from may be difficult.
+
+When you run RESUME WAL on such suspended table, you may see an error like this:
 
 ```
 2024-07-10T01:01:01.131720Z C i.q.c.w.ApplyWal2TableJob job failed, table suspended [table=trades~3, error=could not open read-only [file=/home/my_user/.questdb/db/trades~3/wal45/101/_event], errno=2]
 ```
 
-In such a case, you may try skipping all transactions that rely on the corrupted WAL segment. To do that, first you need to find the last applied transaction number for the `trades` table:
+In such a case, you should try skipping all transactions that rely on the corrupted WAL segment. To do that, first you need to find the last applied transaction number for the `trades` table:
 
 ```questdb-sql
 SELECT writerTxn
@@ -90,7 +92,7 @@ WHERE name = 'trades';
 | --------- |
 | 1223      |
 
-Next, you need to query the problematic transaction number:
+Next, query the problematic transaction number:
 
 ```questdb-sql
 SELECT max(sequencertxn)
@@ -106,10 +108,10 @@ Here, `1223` stands for the last applied transaction number, `45` stands for the
 | ---- |
 | 1242 |
 
-Since the maximum number of the problematic transactions is `1242`, you can now run resume operation for the `1243` transaction:
+Since the last problematic transaction is `1242`, you can resume the table from transaction `1243`:
 
 ```questdb-sql
 ALTER TABLE trades RESUME WAL FROM TXN 1243;
 ```
 
-Notice that in rare cases subsequent transactions may also involve corrupted WAL segments, so you may have to repeat the process.
+Note that in rare cases, subsequent transactions may also have corrupted WAL segments, so you may have to repeat this process.
