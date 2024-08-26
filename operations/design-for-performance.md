@@ -88,7 +88,7 @@ has multiple options passed for performance optimization.
 
 ```questdb-sql
 CREATE TABLE my_table(
-    symb SYMBOL CAPACITY 1048576 NOCACHE INDEX CAPACITY 512,
+    symb SYMBOL CAPACITY 1048576 NOCACHE,
     vch VARCHAR,
     ts TIMESTAMP
 ) timestamp(ts) PARTITION BY DAY;

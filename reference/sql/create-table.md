@@ -72,7 +72,7 @@ Finally, we add additional parameters for our SYMBOL type:
 ```questdb-sql title="Adding parameters for symbol type"
 CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 256 NOCACHE INDEX CAPACITY 1048576,
+  symbol SYMBOL CAPACITY 256 NOCACHE,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
@@ -256,18 +256,6 @@ CREATE TABLE trades(
 PARTITION BY DAY;
 ```
 
-The symbol capacity is not to be confused with **index capacity** described in
-[column indexes](#column-indexes) below.
-
-```questdb-sql
-CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL CAPACITY 50 INDEX capacity 256,
-  price DOUBLE,
-  amount DOUBLE
-  ) TIMESTAMP(timestamp);
-```
-
 #### Symbol caching
 
 `CACHE | NOCACHE` is used to specify whether a symbol should be cached. The
@@ -312,30 +300,8 @@ CREATE TABLE trades(
   ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
-An index capacity may be provided for the index by defining the index storage
-parameter, `valueBlockSize`:
-
-```questdb-sql
-
-CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE
-  ), INDEX (symbol CAPACITY 128) TIMESTAMP(timestamp);
-
--- equivalent to
-
-CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
-  price DOUBLE,
-  amount DOUBLE
-  ) TIMESTAMP(timestamp);
-```
-
-See [Index](/docs/concept/indexes/#how-indexes-work) for more information about
-index capacity.
+See the [Index concept](/docs/concept/indexes/#how-indexes-work) for more
+information about indexes.
 
 ## OWNED BY
 
@@ -349,7 +315,7 @@ go to the user, group, or service account named in that clause.
 CREATE GROUP analysts;
 CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
+  symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp) PARTITION BY DAY
@@ -369,8 +335,8 @@ CREATE TABLE new_trades AS(
 ) TIMESTAMP(timestamp);
 ```
 
-We can use keywords such as `IF NOT EXISTS`, `PARTITION BY`..., as needed for the new
-table. The data type of a column can be changed:
+We can use keywords such as `IF NOT EXISTS`, `PARTITION BY`..., as needed for
+the new table. The data type of a column can be changed:
 
 ```questdb-sql title="Clone an existing wide table and change type of cherry-picked columns"
 CREATE TABLE new_trades AS(
@@ -429,7 +395,7 @@ The size of the batches can be configured:
 - locally, by using the `BATCH` keyword in the `CREATE TABLE` statement.
 
 ```questdb-sql title="Create batched table as select"
-CREATE BATCH 4096  TABLE new_trades AS(
+CREATE BATCH 4096 TABLE new_trades AS(
   SELECT *
   FROM
     trades
@@ -464,8 +430,8 @@ PARTITION BY MONTH;
 ## CREATE TABLE LIKE
 
 The `LIKE` keyword clones the table schema of an existing table without copying
-the data. Table settings and parameters such as designated timestamp, symbol
-column indexes, and index capacity will be cloned, too.
+the data. Table settings and parameters such as designated timestamp and symbol
+column indexes will be cloned, too.
 
 ```questdb-sql title="Create table like"
 CREATE TABLE new_table (LIKE my_table);
@@ -489,7 +455,7 @@ The global setting for the same parameter is `cairo.max.uncommitted.rows`.
 ```questdb-sql title="Setting out-of-order table parameters via SQL"
 CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
+  symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
@@ -523,7 +489,7 @@ The use of the comma (`,`) depends on the existence of the `WITH` clause:
   ```questdb-sql
   CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
+  symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
@@ -538,7 +504,7 @@ The use of the comma (`,`) depends on the existence of the `WITH` clause:
   ```questdb-sql
   CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
+  symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
@@ -553,7 +519,7 @@ The use of quotation marks (`'`) depends on the volume alias:
   ```questdb-sql
   CREATE TABLE trades(
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX CAPACITY 128,
+  symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
