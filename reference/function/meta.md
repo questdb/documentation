@@ -437,3 +437,38 @@ SELECT pg_catalog.version();
 | version                                                             |
 | ------------------------------------------------------------------- |
 | PostgreSQL 12.3, compiled by Visual C++ build 1914, 64-bit, QuestDB |
+
+
+## hydrate_table_metadata('table1', 'table2' ...)
+
+`hydrate_table_metadata' re-reads table metadata from disk to update the static metadata cache.
+
+**Arguments:**
+
+A variable list of strings, corresponding to table names.
+
+Alternatively, a single asterisk, '*', representing all tables.
+
+**Return value:**
+
+Returns `boolean`. `true` if successful, `false` if unsuccessful.
+
+
+**Examples:**
+
+Simply pass table names as arguments to the function.
+
+```
+SELECT hydrate_table_metadata('trades', 'trips')
+```
+
+| hydrate_table_metadata |
+|------------------------|
+| true                   |
+
+
+If you want to re-read metadata for all user tables, simply use an asterisk:
+
+```
+SELECT hydrate_table_metadata('*')
+```
