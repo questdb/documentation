@@ -445,7 +445,7 @@ SELECT pg_catalog.version();
 
 :::warning
 
-This function should only be used when directed by QuestDB support. Mis-use could cause corruption of the metadata 
+This function should only be used when directed by QuestDB support. Misuse could cause corruption of the metadata 
 cache, requiring the database to be restarted.
 
 :::
