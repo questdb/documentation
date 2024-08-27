@@ -443,6 +443,13 @@ SELECT pg_catalog.version();
 
 `hydrate_table_metadata' re-reads table metadata from disk to update the static metadata cache.
 
+:::warning
+
+This function should only be used when directed by QuestDB support. Mis-use could cause corruption of the metadata 
+cache, requiring the database to be restarted.
+
+:::
+
 **Arguments:**
 
 A variable list of strings, corresponding to table names.
