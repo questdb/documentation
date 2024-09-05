@@ -401,27 +401,25 @@ Either:
 
 Parquet files can be read and thus queried by QuestDB.
 
-To do so, first set a directory where the Parquet file lives.
+QuestDB is shipped with a demo Parquet file, `trades.parquet`, which can be
+queried using the `parquet_read` function.
 
-This can be done one of two ways:
 
-1. Set the environment variable `QDB_CAIRO_SQL_COPY_ROOT`
-2. Set the `cairo.sql.copy.root` key in `server.conf`
+Example:
 
-After that, apply the function like so:
-
-`parquet_read(parquet_file_path)`
-
-In context:
-
-```questdb-sql title="parquet_read example"
+```questdb-sql title="read_parquet example"
 SELECT
   *
 FROM
-  parquet_read('trades.parquet')
+  read_parquet('trades.parquet')
 WHERE
-  exchange == 'NASDAQ'
+  side = 'buy';
 ```
+
+The trades.parquet file is located in the `import` subdirectory inside the QuestDB root directory. 
+Drop your own Parquet files to the import directory and query them using the `parquet_read()` function.
+
+You can change the allowed directory by setting the `cairo.sql.copy.root` configuration key.
 
 For more information, see the
 [Parquet documentation](/docs/reference/function/parquet/).
