@@ -184,3 +184,7 @@ scrollable cursors in PostgreSQL.
 For more information and for tips to work around, see the
 [PostgreSQL compatability seciton](/docs/reference/sql/overview/#postgresql-compatibility)
 in our Query & SQL overview.
+
+## My table has corrupted WAL data due to a previous full disk or kernel limits error. What do I do?
+
+You need to skip the problematic transation using the [RESUME WAL](/docs/reference/sql/alter-table-resume-wal/) SQL statement. If there are multiple transactions that rely on the corrupted WAL data, you may need to follow [this instruction](/docs/reference/sql/alter-table-resume-wal/#diagnosing-corrupted-wal-transactions).

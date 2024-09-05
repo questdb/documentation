@@ -40,27 +40,78 @@ to investigate the table status:
 wal_tables();
 ```
 
-| name        | suspended | writerTxn | sequencerTxn |
-| ----------- | --------- | --------- | ------------ |
-| sensor_wal  | false     | 6         | 6            |
-| weather_wal | true      | 3         | 5            |
+| name   | suspended | writerTxn | sequencerTxn |
+| ------ | --------- | --------- | ------------ |
+| trades | true      | 3         | 5            |
 
-The table `weather_wal` is suspended. The last successful commit in the table is
+The table `trades` is suspended. The last successful commit in the table is
 `3`.
 
 The following query restarts transactions from the failed transaction, `4`:
 
 ```questdb-sql
-ALTER TABLE  weather_wal RESUME WAL;
+ALTER TABLE trades RESUME WAL;
 ```
 
 Alternatively, specifying the `sequencerTxn` to skip the failed commit (`4` in
 this case):
 
 ```questdb-sql
-ALTER TABLE  weather_wal RESUME WAL FROM TRANSACTION 5;
+ALTER TABLE trades RESUME WAL FROM TRANSACTION 5;
 
 -- This is equivalent to
 
-ALTER TABLE  weather_wal RESUME WAL FROM TXN 5;
+ALTER TABLE trades RESUME WAL FROM TXN 5;
 ```
+
+## Diagnosing corrupted WAL transactions
+
+:::note
+
+If you have [data deduplication](/concept/deduplication/) enabled on your tables and you have access to the original events (for instance, they're stored in Apache Kafka, or other replayable source), you may reingest the data after skipping the problematic transactions.
+
+:::
+
+Sometimes a table may get suspended due to full disk or [kernel limits](/docs/deployment/capacity-planning/#os-configuration). In this case, an entire WAL segment may be corrupted. This means that there will be multiple transactions that rely on the corrupted segment, and finding the transaction number to resume from may be difficult.
+
+When you run RESUME WAL on such suspended table, you may see an error like this:
+
+```
+2024-07-10T01:01:01.131720Z C i.q.c.w.ApplyWal2TableJob job failed, table suspended [table=trades~3, error=could not open read-only [file=/home/my_user/.questdb/db/trades~3/wal45/101/_event], errno=2]
+```
+
+In such a case, you should try skipping all transactions that rely on the corrupted WAL segment. To do that, first you need to find the last applied transaction number for the `trades` table:
+
+```questdb-sql
+SELECT writerTxn
+FROM wal_tables()
+WHERE name = 'trades';
+```
+
+| writerTxn |
+| --------- |
+| 1223      |
+
+Next, query the problematic transaction number:
+
+```questdb-sql
+SELECT max(sequencertxn)
+FROM wal_transactions('trades')
+WHERE sequencertxn > 1223
+  AND walId = 45
+  AND segmentId = 101;
+```
+
+Here, `1223` stands for the last applied transaction number, `45` stands for the WAL ID that may be seen in the error log above (`trades~3/wal45`), and `101` stands for the WAL segment ID from the log (`trades~3/wal45/101`).
+
+| max  |
+| ---- |
+| 1242 |
+
+Since the last problematic transaction is `1242`, you can resume the table from transaction `1243`:
+
+```questdb-sql
+ALTER TABLE trades RESUME WAL FROM TXN 1243;
+```
+
+Note that in rare cases, subsequent transactions may also have corrupted WAL segments, so you may have to repeat this process.

@@ -54,14 +54,14 @@ For more details on retrieving table and column information, see the
 ![Flow chart showing the syntax of the ALTER TABLE keyword](/img/docs/diagrams/alterTable.svg)
 ![Flow chart showing the syntax of the ALTER TABLE SET PARA with commit lag keywords](/img/docs/diagrams/alterTableSetParamCommitLag.svg)
 
-`commitLag` allows for specifying the expected maximum _lag_ of late-arriving
+`o3MaxLag` allows for specifying the expected maximum _lag_ of late-arriving
 records when ingesting out-of-order data. The purpose of specifying a commit lag
 per table is to reduce the occurrences of resource-intensive commits when
 ingesting out-of-order data. Incoming records will be kept in memory until for
 the duration specified in _lag_, then all records up to the boundary will be
 ordered and committed.
 
-`commitLag` expects a value with a modifier to specify the unit of time for the
+`o3MaxLag` expects a value with a modifier to specify the unit of time for the
 value:
 
 | unit | description  |
@@ -72,8 +72,8 @@ value:
 | h    | hours        |
 | d    | days         |
 
-To specify `commitLag` value to 20 seconds:
+To specify `o3MaxLag` value to 20 seconds:
 
 ```questdb-sql
-ALTER TABLE my_table SET PARAM commitLag = 20s;
+ALTER TABLE my_table SET PARAM o3MaxLag = 20s;
 ```
