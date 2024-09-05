@@ -50,9 +50,9 @@ Add a QuestDB as a dependency in your project's build configuration file.
       renderText={(release) => (
         <CodeBlock className="language-xml">
           {`<dependency>
-
-<groupId>org.questdb</groupId> <artifactId>questdb</artifactId>
-<version>${release.name}</version>
+  <groupId>org.questdb</groupId> 
+  <artifactId>questdb</artifactId>
+  <version>${release.name}</version>
 </dependency>`}
         </CodeBlock>
       )}

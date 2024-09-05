@@ -61,31 +61,6 @@ Table                                       Index
 | 6     | B         | 1     |
 ```
 
-### Index capacity
-
-When a symbol column is indexed, an additional **index capacity** can be defined
-to specify how many row IDs to store in a single storage block on disk:
-
-- Server-wide setting: `cairo.index.value.block.size` with a default of `256`
-- Column-wide setting: The
-  [`index` option](/docs/reference/sql/create-table/#column-indexes) for
-  `CREATE TABLE`
-- Column-wide setting:
-  [ALTER TABLE COLUMN ADD INDEX](/docs/reference/sql/alter-table-alter-column-add-index/)
-
-Fewer blocks used to store row IDs achieves better performance. At the same time
-over-sizing the setting will result in higher than necessary disk space usage.
-
-:::note
-
-- The **index capacity** and
-  [**symbol capacity**](/docs/concept/symbol/#usage-of-symbols) are different
-  settings.
-- The index capacity value should not be changed, unless an user is aware of all
-  the implications.
-
-:::
-
 ## Advantages
 
 Index allows you to greatly reduce the complexity of queries that span a subset
@@ -117,24 +92,9 @@ Consider the following query applied to the above table
 
 ### Table with index
 
-An example of `CREATE TABLE` command creating a table with an index capacity of
-128:
+An example of `CREATE TABLE` command:
 
 ```questdb-sql
 CREATE TABLE my_table(symb SYMBOL, price DOUBLE, ts TIMESTAMP),
   INDEX (symb CAPACITY 128) timestamp(ts);
--- equivalent to
-CREATE TABLE my_table(symb SYMBOL INDEX CAPACITY 128, price DOUBLE, ts TIMESTAMP),
-  timestamp(ts);
 ```
-
-### Index capacity
-
-Consider an example table with 200 unique stock symbols and 1,000,000,000
-records over time. The index will have to store 1,000,000,000 / 200 row IDs for
-each symbol, i.e. 5,000,000 per symbol.
-
-- If the index capacity is set to 1,048,576 in this case, QuestDB will use 5
-  blocks to store the row IDs.
-- If the index capacity is set to 1,024 in this case, the block count will be
-  4,883.
