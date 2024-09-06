@@ -137,12 +137,6 @@ We recommend using a copy tool that can skip copying files based on the modifica
 [rsync](https://linux.die.net/man/1/rsync) is a popular tool for this purpose. Make sure to back up
 the entire server root directory, including the `db`, `snapshot`, and all other directories. For example:
 
-```bash
-rsync --append /var/lib/questdb
-```
-
-
-
 Using file copy usually takes longer to back up files compared to snapshot. You will have to wait until
 the data transfer is fully complete before releasing the `CHECKPOINT`.
 
