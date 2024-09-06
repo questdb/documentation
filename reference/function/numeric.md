@@ -61,7 +61,7 @@ SELECT ceil(15.75) as RoundedUp;
 | --------- |
 | 16        |
 
-## exponent
+## exp
 
 `exp()` returns the exponential value of a specified numeric expression.
 
@@ -106,9 +106,9 @@ SELECT floor(15.75) as RoundedDown;
 | --------- |
 | 15        |
 
-## log
+## ln
 
-`log(value)` return the natural logarithm (**log*e***) of a given number.
+`ln(value)` return the natural logarithm (**log*e***) of a given number.
 
 **Arguments:**
 
@@ -121,12 +121,40 @@ Return value type is `double`.
 **Examples:**
 
 ```questdb-sql
-SELECT log(4.123)
+SELECT ln(4.123)
+```
+
+| ln             |
+| -------------- |
+| 1.416581053724 |
+
+
+## log
+
+`log(value)` return the base 10 logarithm of a given number.
+
+**Arguments:**
+
+- `value` is any numeric value.
+
+**Return value:**
+
+Return value type is `double`.
+
+**Examples:**
+
+```questdb-sql
+SELECT log(100)
 ```
 
 | log          |
 | ------------ |
-| 1.4165810537 |
+|            2 |
+
+:::note
+Some databases use `LOG` to refer to the natural logarithm and `LOG10` for the base 10 logarithm. QuestDB follows PostgreSQL conventions and uses `LOG` for base 10 and `LN` for natural logarithm.
+:::
+
 
 ## power
 
@@ -158,7 +186,7 @@ SELECT power(2, 3);
 uses the "half up" tie-breaking method when the value is exactly halfway between
 the `round_up` and `round_down` values.
 
-`round(value)` is equivalent to `round(value, 0)`. 
+`round(value)` is equivalent to `round(value, 0)`.
 
 **Arguments:**
 
@@ -333,7 +361,7 @@ FROM dbl;
 
 `sign(value)` returns sign of the argument, that is:
 - -1 for negative value
--  0 for zero 
+-  0 for zero
 - +1 for positive value
 
 **Arguments:**
