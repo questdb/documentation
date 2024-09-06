@@ -8,7 +8,7 @@ description:
 
 Backup or restore copies of QuestDB if your original database or data is lost
 fully or partially, or if your database or table is corrupted. The backup &
-restore process is also used to speed up creation of
+restore process also speeds up the creation of
 [replica instances](/docs/operations/replication/) in QuestDB Enterprise.
 
 ## Overview
