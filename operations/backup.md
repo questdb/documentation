@@ -52,7 +52,7 @@ the mode is done via the `CHECKPOINT RELEASE` command. After
 
 ## Data backup checklist
 
-Before backing up QuestDB, consider the following seqeuence of events:
+Before backing up QuestDB, consider the following sequence of events:
 
 ### Pick a good time
 
@@ -118,10 +118,10 @@ volume manager
 
 #### File copy
 
-If filesystem or volume snapshots are not available, use a file copy method to
-back up the QuestDB server root directory. We recommend using a copy tool that
-can skip copying files based on the modification date. One such popular tool to
-accomplish this is [rsync](https://linux.die.net/man/1/rsync).
+If filesystem or volume snapshots are not available, consider using a file copy
+method to back up the QuestDB server root directory. We recommend using a copy
+tool that can skip copying files based on the modification date. One such
+popular tool to accomplish this is [rsync](https://linux.die.net/man/1/rsync).
 
 Leaving this step, you should know:
 
