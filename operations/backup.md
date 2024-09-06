@@ -18,19 +18,19 @@ The backup step involves:
 - switching the database back into the regular mode of operation via SQL
 
 When in the special mode, the database instance remains available for both reads and writes.
-However, the "garbage collection" sub-system for copy-on-write data mutations is paused.
-Having this sub-system paused is not a big deal for database reads, however under
-heavy write load the database will be consuming more space than normal. When
-database exits the special mode, the "garbage collection" sub-system is resumed and
+However, the housekeeping tasks will be paused. While paused is not a big deal for database reads,
+database writes are likely to be consuming more space than normal. When
+database exits the special mode, the housekeeping tasks are resumed and
 the disk space is rapidly reclaimed.
 
-The second step, creating a copy of the database, is performed using tools of your choice:
+In the second step you must create a copy of the database using a tool of your choice.
+These are some suggestions:
 
 - cloud snapshot, e.g. EBS volume snapshot on AWS, Premium SSD Disk snapshot on Azure etc
 - using the existing on-prem backup tools and software
 - using basic command line tools, such as `cp` or `rsync`
 
-The recovery step involves:
+To recover the database, follow these steps:
 - restoring contents of the QuestDB root directory from a copy, made during the backup
 - touching the trigger file in the questdb root directory
 - starting QuestDB using the restored data directory as normal
@@ -63,16 +63,15 @@ The goal of picking a good copy method is to:
 - minimize the amount of time QuestDB spends in the *checkpoint mode*
 - ensure that copy time remains sustainable as the database size grows
 
-// TODO: reword
-Thanks to time partitioning, QuestDB does not have to make all database files
-"dirty". This helps with incremental backups that are based on file modification times. We
-recommend exercising incremental backups where possible.
+Because of time partitioning older data is often unmodified, both at block and
+file level. QuestDB backup lends itself relatively well to all types of differential
+data copying.
 
 If you're using cloud disks, such as EBS on AWS, SSD on Azure etc. we strongly recommend
 using cloud *snapshot( infrastructure. The advantages of this approach is that:
 
 - snapshot minimizes the time QuestDB is in the *checkpoint mode*
-- snapshots are incremental and easy enough to restore from
+- snapshots are differential and easy enough to restore from
 
 When database is on-prem we recommend using the existing file system backup
 tools.
@@ -136,7 +135,13 @@ and before the backup is complete.
 If filesystem or volume snapshots are not available, you can use file copy to back up the QuestDB server root directory.
 We recommend using a copy tool that can skip copying files based on the modification date.
 [rsync](https://linux.die.net/man/1/rsync) is a popular tool for this purpose. Make sure to back up
-the entire server root directory, including the `db`, `snapshot`, and all other directories.
+the entire server root directory, including the `db`, `snapshot`, and all other directories. For example:
+
+```bash
+rsync --append /var/lib/questdb
+```
+
+
 
 Using file copy usually takes longer to back up files compared to snapshot. You will have to wait until
 the data transfer is fully complete before releasing the `CHECKPOINT`.
