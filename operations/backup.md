@@ -21,8 +21,8 @@ To perform the backup, follow these steps:
 
 When in `CHECKPOINT` mode, QuestDB remains available for both reads and writes.
 However, some housekeeping tasks are paused. While still safe, database writes
-are may consume more space than normal. When the database exits `CHECKPOINT`
-mode, it will resume the housekeeping tasks and quickly reclaim the disk space.
+may consume more space than normal. When the database exits `CHECKPOINT` mode,
+it will resume the housekeeping tasks and quickly reclaim the disk space.
 
 In the second step (creating a copy of the root directory), you must create a
 copy of the database using a tool of your choice. These are some suggestions:
@@ -63,21 +63,23 @@ space, the safer it is to enter into checkpoint mode.
 
 ### Choose your data copy method
 
-When choosing the right copy method, consider the following factors:
+When choosing the right copy method, consider the following goals:
 
 - Minimize the time QuestDB spends in checkpoint mode
 - Ensure that the copy time remains sustainable as the database grows
 
-Due to time partitioning, the older data is often unmodified, at both block and
-file levels. QuestDB backup lends itself relatively well to all types of
-differential data copying.
+QuestDB backup lends itself relatively well to all types of differential data
+copying. Due to time partitioning, older data is often unmodified, at both block
+and file levels.
+
+#### Cloud snapshots
 
 If you're using cloud disks, such as EBS on AWS, SSD on Azure, or similar, we
 strongly recommend using their existing cloud _snapshot_ infrastructure. The
 advantages of this approach are that:
 
-- Snapshotting minimizes the time QuestDB spends in checkpoint mode
-- Snapshots are differential and can be restored cleanly
+- Cloud snapshots minimizes the time QuestDB spends in checkpoint mode
+- Cloud snapshots are differential and can be restored cleanly
 
 See the following guides for volume snapshot creation on the following cloud
 platforms:
@@ -89,27 +91,42 @@ platforms:
 - [GCP](https://cloud.google.com/compute/docs/disks/create-snapshots) - working
   with persistent disk snapshots
 
+Cloud snapshot-based systems usually break down the backup in two steps:
+
+1. Take snapshot
+2. Backup the snapshot
+
+We are concerned with the first step, taking the snapshot.
+
+**It is after this stage where operators must exit checkpoint mode.**
+
+Therefore, exit checkpoint mode at the following snapshot stage:
+
+| Cloud Provider                | State               | Exit checkpoint mode                                     |
+| ----------------------------- | ------------------- | -------------------------------------------------------- |
+| **Google Cloud** (GCP)        | RUNNING (UPLOADING) | When RUNNING substate changes from CREATING to UPLOADING |
+| **Amazon Web Services** (AWS) | PENDING             | When status is PENDING                                   |
+| **Microsoft Azure**           | PENDING             | Before the longer running "CREATING" stage               |
+
+#### Filesystem or volume snapshots
+
 When the database is on-prem, we recommend using the existing file system backup
 tools. Volume snapshots can be taken using either the filesystem
 ([ZFS](https://ubuntu.com/tutorials/using-zfs-snapshots-clones#1-overview)) or a
 volume manager
 ([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_logical_volumes/snapshot-of-logical-volumes_configuring-and-managing-logical-volumes#snapshot-of-logical-volumes_configuring-and-managing-logical-volumes)).
 
-Snapshot-based systems usually break down the backup in two steps:
-
-1. Take snapshot
-2. Backup the snapshot
+#### File copy
 
 If filesystem or volume snapshots are not available, use a file copy method to
-back up the QuestDB server root directory.
-
-We recommend using a copy tool that can skip copying files based on the
-modification date. One such popular tool to accomplish this is
-[rsync](https://linux.die.net/man/1/rsync).
+back up the QuestDB server root directory. We recommend using a copy tool that
+can skip copying files based on the modification date. One such popular tool to
+accomplish this is [rsync](https://linux.die.net/man/1/rsync).
 
 Leaving this step, you should know:
 
-- Whether your method is snapshot-based or file copy-based
+- Whether your method is cloud or file-system snapshot-based, or file copy-based
+- When to enter and exit checkpoint mode
 - How to perform your snapshot/backup method
 
 ### Determine backup frequency
