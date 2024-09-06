@@ -70,7 +70,7 @@ However, there are some limitations on the `UPSERT KEYS` list:
 
 - The [Designated Timestamp](/docs/concept/designated-timestamp) column must be
   included in the `UPSERT KEYS` list.
-- Columns of [VARCHAR, STRING and BINARY](/docs/reference/sql/datatypes) types cannot be
+- Columns of [BINARY](/docs/reference/sql/datatypes) types cannot be
   used in the `UPSERT KEYS` list.
 
 ## Example
