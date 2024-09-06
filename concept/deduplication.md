@@ -66,12 +66,9 @@ criteria are set by defining a column list in the `UPSERT KEYS` clause in the
 
 `UPSERT KEYS` can be changed at any time. It can contain one or more columns.
 
-However, there are some limitations on the `UPSERT KEYS` list:
+Please be aware that the [Designated Timestamp](/docs/concept/designated-timestamp) 
+column must always be included in the `UPSERT KEYS` list.
 
-- The [Designated Timestamp](/docs/concept/designated-timestamp) column must be
-  included in the `UPSERT KEYS` list.
-- Columns of [BINARY](/docs/reference/sql/datatypes) types cannot be
-  used in the `UPSERT KEYS` list.
 
 ## Example
 
