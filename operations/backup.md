@@ -6,86 +6,111 @@ description:
   to prevent data loss.
 ---
 
-QuestDB provides a snapshot feature that allows users to create backups of their
-databases. This feature is essential for preventing data loss and ensuring that
-data can be restored in the event of a failure.
-
-A snapshot:
-
-- Support both full backups and incremental snapshots
-- Are available on all operating systems except Windows
-- Can be created while the database is running
-
-:::caution
-QuestDB currently does not support creating snapshots on Windows.
-If you are a Windows user and require backup functionality, please let us know
-by [commenting on this issue](https://github.com/questdb/questdb/issues/4811).
-:::
-
+QuestDB allows creating copies of the database that you can use in case the original
+database or data is lost fully or partially, or database or table is corrupted. Backup is
+also used to speed up creation of replica instances in QuestDB Enterprise.
 
 ## Overview
 
-Snapshot is a feature that instructs QuestDB to record the state of the database
-at a specific point in time. This state includes all data, metadata, and indexes
-required to restore the database to the condition it was in when the snapshot was taken.
+The backup step involves:
+- switching the database into special mode via SQL
+- creating a copy of the QuestDB root directory
+- switching the database back into the regular mode of operation via SQL
 
-### Terminology
+When in the special mode, the database instance remains available for both reads and writes.
+However, the "garbage collection" sub-system for copy-on-write data mutations is paused.
+Having this sub-system paused is not a big deal for database reads, however under
+heavy write load the database will be consuming more space than normal. When
+database exits the special mode, the "garbage collection" sub-system is resumed and
+the disk space is rapidly reclaimed.
 
-This guide uses the word "snapshot" in 2 different meanings:
+The second step, creating a copy of the database, is performed using tools of your choice:
 
-- **Database snapshot**: Instructs QuestDB to record the state of the database at a specific point in time. This is done
-  via `SNAPSHOT PREPARE` SQL command.
-- **Filesystem and volume snapshot**: A point-in-time copy of the filesystem that can be used to create a backup. This is done
-  using filesystem-specific tools or commands.
+- cloud snapshot, e.g. EBS volume snapshot on AWS, Premium SSD Disk snapshot on Azure etc
+- using the existing on-prem backup tools and software
+- using basic command line tools, such as `cp` or `rsync`
 
-Database backup involves creating a database snapshot and then using a filesystem snapshot or file copying to create a
-backup.
+The recovery step involves:
+- restoring contents of the QuestDB root directory from a copy, made during the backup
+- touching the trigger file in the questdb root directory
+- starting QuestDB using the restored data directory as normal
 
-## Creating a database snapshot
+If the special file is present in the root directory, QuestDB will perform the recovery
+procedure during the startup. If recovery procedure is successful the trigger file is
+removed to enable future restarts to skip the recovery step. Should recovery fail, the
+database will exit with an error and the trigger file will remain in place.
 
-QuestDB database files, including snapshots, are stored inside the server root
-directory provided at startup. The root directory contains the following subdirectories:
+## Terminology
 
-- `db`: Contains database files
-- `log`: Contains log files
-- `conf`: Contains configuration files
-- `public`: Contains static files for the web console
-- `snapshot`: Contains snapshot files, if any
+The "special mode" in the database is called `CHECKPOINT`. Entering the special mode is
+done via `CHECKPOINT CREATE`, existing the special mode is done via `CHECKPOINT RELEASE`.
+From now on we will call the state of the database after `CHECKPOINT CREATE` the
+"checkpoint mode"
 
-:::tip
-The default location of the server root directory varies by operating system:
+## Data backup
 
-- MacOS: When using Homebrew, the server root directory is located at /opt/homebrew/var/questdb/.
-- Linux: The default location is ~/.questdb.
+### Pick a good time
 
-If you are unsure of the server root directory's location, you can determine it by
-inspecting the QuestDB logs. Look for a line that
-reads, `QuestDB configuration files are in /opt/homebrew/var/questdb/conf`. The server root directory is one level up
-from the conf directory indicated in this log entry.
-See the [root directory structure](/docs/concept/root-directory-structure/) for more information.
-:::
+We recommend to take database backup at the times when the database write load is at
+its lowest. If the database is under constant write load, with no light at the end
+of the tunnel, a good workaround is to ensure the disk has at least 50% free space.
+The more free space the better.
 
-Typically, the `db` directory is the largest and contains the most critical data.
-As you ingest data, the `db` directory will grow in size. To create a backup,
-you cannot simply copy the `db` directory, as it may be in an inconsistent state.
-Instead, you have to instruct QuestDB to create a database snapshot.
+### Data copy type
 
-To create a database snapshot, execute the following SQL command:
+The goal of picking a good copy method is to:
 
-```sql
-SNAPSHOT PREPARE;
-```
+- minimize the amount of time QuestDB spends in the *checkpoint mode*
+- ensure that copy time remains sustainable as the database size grows
 
-This command creates a snapshot of the database inside the `db` directory and records
-additional metadata in the `snapshot` directory.
+// TODO: reword
+Thanks to time partitioning, QuestDB does not have to make all database files
+"dirty". This helps with incremental backups that are based on file modification times. We
+recommend exercising incremental backups where possible.
 
-When `SNAPSHOT PREPARE` command finishes, you can copy all directories inside
-the server root directory to a backup location.
+If you're using cloud disks, such as EBS on AWS, SSD on Azure etc. we strongly recommend
+using cloud *snapshot( infrastructure. The advantages of this approach is that:
 
-### Data backup
+- snapshot minimizes the time QuestDB is in the *checkpoint mode*
+- snapshots are incremental and easy enough to restore from
 
-After issuing the `SNAPSHOT PREPARE` command, it's your responsibility to back up the database files.
-You can use any backup method that suits your infrastructure, such as filesystem snapshots or file-based backups.
+When database is on-prem we recommend using the existing file system backup
+tools.
+
+### Backup frequency
+
+Backup should be taken at least daily. If you
+are using QuestDB Enterprise, the frequency of backups impacts the
+time it takes to create a new replica instances. The process of creating
+replicas involves choosing a backup and having the replica replay WAL files until
+it caught up. The older the backup the more WAL files replica will have to
+replay.
+
+### The backup steps
+
+- Put the database in the "checkpoint mode"
+- Take snapshot of or copy the data outside the database instance
+- Exit the "checkpoint mode"
+
+
+### Entering checkpoint mode
+
+ ```sql
+ CHECKPOINT CREATE
+ ```
+
+You can have only one checkpoint in flight. Attempting to create second checkpoint will fail.
+
+### Exiting checkpoint mode
+
+ ```sql
+ CHECKPOINT RELEASE
+ ```
+
+### Taking snapshot or copy
+
+After checkpoint is created and before it is released you are allowed to safely access the
+file system using tools external to the database instance.
 
 In Cloud environments, you can use the volume snapshot functionality provided by your cloud provider.
 See guides for creating volume snapshots on the following cloud platforms:
@@ -101,51 +126,79 @@ Even if you are not in a cloud environment volume snapshots can be taken using e
 filesystem ([ZFS](https://ubuntu.com/tutorials/using-zfs-snapshots-clones#1-overview)) or a volume
 manager ([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_logical_volumes/snapshot-of-logical-volumes_configuring-and-managing-logical-volumes#snapshot-of-logical-volumes_configuring-and-managing-logical-volumes)).
 
-If filesystem or volume snapshots are not available, you can use file-based backups to back up the QuestDB server root directory.
-We recommend using a backup tool that supports incremental backups to reduce the amount of data transferred during each
-backup. [rsync](https://linux.die.net/man/1/rsync) is a popular tool for this purpose. Make sure to back up
+Snapshot based systems usually break down the backup in two steps:
+- take snapshot
+- backup the snapshot
+
+With snapshots, you can release the `CHECKPOINT` as soon as snapshot is taken (which takes a minute or two),
+and before the backup is complete.
+
+If filesystem or volume snapshots are not available, you can use file copy to back up the QuestDB server root directory.
+We recommend using a copy tool that can skip copying files based on the modification date.
+[rsync](https://linux.die.net/man/1/rsync) is a popular tool for this purpose. Make sure to back up
 the entire server root directory, including the `db`, `snapshot`, and all other directories.
 
-Once the backup is complete, you must issue the following command to clean up the database snapshot:
+Using file copy usually takes longer to back up files compared to snapshot. You will have to wait until
+the data transfer is fully complete before releasing the `CHECKPOINT`.
+
+It is very important to exit the *checkpoint mode* regardless if data copy succeed or failed.
+
+## Checkpoint status check
+
+In case you lost your database session and/or backup takes time, you can check if the database is
+in the *checkpoint mode*:
 
 ```sql
-SNAPSHOT COMPLETE;
+SELECT * FROM checkpoint_status();
 ```
 
-This command informs QuestDB that the database snapshot is no longer needed,
-allowing it to clean up any temporary files created during the snapshot process.
+## Restoring from a checkpoint
 
-:::note
-For some cloud vendors, volume snapshot creation operation is asynchronous,
-i.e. the point-in-time snapshot is created immediately, as soon as the operation
-starts, but the end snapshot artifact may become available later. In such case,
-the `SNAPSHOT COMPLETE` statement (step 3) may be run without waiting for the
-end artifact, but once the snapshot creation has started.
-:::
+Restoring from checkpoint will restore the entire database. We will assume that you are setting up
+a new database instance using the data from checkpoint rather than blank database.
 
-Failing to issue the `SNAPSHOT COMPLETE` command will result in the snapshot files
-being retained indefinitely, potentially leading to disk space exhaustion.
+Follow these steps:
 
-## Restoring from a snapshot
+- Ensure QuestDB version match
+- Restore QuestDB root directory contents (`/var/lib/questdb/`) from the backup
+- Touch the trigger file
+- Start the database using the restored root directory
 
-To restore a database from a snapshot, follow these steps:
+### Database versions
 
-1. Stop the QuestDB server.
-2. Remove everything inside the server root directory.
-3. Copy the backup directories to the server root directory. If you are using a filesystem snapshot, you restore the
-   snapshot.
-4. Create an empty file named `_restore` in the server root directory. You can use a simple touch command to create this
-   file.
-   This file serves as a signal to QuestDB that it should restore the database from the snapshot.
-5. Start the QuestDB server.
+The data restore is only possible if the original and the backup QuestDB versions have the same
+major version number, for example: `8.1.0` and `8.1.1` are compatible. `8.1.0` and `7.5.1` are incompatible.
 
-Make sure the `_restore` file is present in the server root directory before starting the server,
-otherwise QuestDB will start normally without restoring the database.
+### Restore the root directory
 
-After starting the server, QuestDB will restore the database to the state it was in when the snapshot was taken.
-If a snapshot recovery cannot be completed, for example, if the snapshot files are missing or corrupted,
-QuestDB will log an error message and abort startup. In this case, you should investigate the cause of the error
-and attempt to restore the database again.
+When using cloud tools you can create a new disk from snapshot. The entire disk contents of the original
+database will be available when compute instance starts.
+
+If you are not using cloud tools you have to make sure that root directory is restored from the backup using
+your own tools of choice.
+
+### The trigger file
+
+When you are starting database on the backup for the first time, the database will have to perform
+a restore procedure to ensure data is consistent and can be read and written. This procedure only
+takes place on startup, and it requires a blank file to exist as the indication of user intent.
+
+Touch `_restore` file in the root directory. Assuming root directory is `/var/lib/questdb/` the following
+command will do the trick:
+
+```bash
+touch /var/lib/questdb/_restore
+```
+### Start the database
+
+Start the database using the root directory as your would normally. When `_restore` file is present
+the database will perform the restore procedure. There are two outcomes of this procedure:
+
+- restore is successful: database continues to run normally and is ready to use; the `_restore` file is removed to
+  prevent the same procedure running twice.
+- restore failed: database will exit and `_restore` file will remain in place. The error will be printed to `stderr`. If
+  this error can be resolved, starting the database again will retry the restore procedure.
+
 
 ## Supported filesystems
 
