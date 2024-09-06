@@ -6,9 +6,9 @@ description:
   to prevent data loss.
 ---
 
-QuestDB allows creating copies of the database that you can use in case the original
+QuestDB allows creating archive copies of the database that you can use in case the original
 database or data is lost fully or partially, or database or table is corrupted. Backup is
-also used to speed up creation of replica instances in QuestDB Enterprise.
+also used to speed up creation of [replica instances](/docs/operations/replication/) in QuestDB Enterprise.
 
 ## Overview
 
@@ -60,7 +60,7 @@ is at its lowest. If the database is under constant write load, a good
 workaround is to ensure the disk has at least 50% free space. The more free
 space, the safer it is to enter the checkpoint mode.
 
-### Data copy type
+### Data copy methods
 
 The goal of picking a good copy method is to:
 
@@ -84,7 +84,7 @@ tools.
 ### Backup frequency
 
 Backups should be taken at least daily. If you are using QuestDB Enterprise, the
-frequency of backups impacts the time it takes to create a new replica instance.
+frequency of backups impacts the time it takes to create a new [replica instance](/docs/operations/replication/) .
 The process of creating replicas involves choosing a backup and having the
 replica replay WAL files until it has caught up. The older the backup, the more
 WAL files the replica will have to replay.
@@ -138,11 +138,7 @@ back up the QuestDB server root directory. We recommend using a copy tool that
 can skip copying files based on the modification date.
 [rsync](https://linux.die.net/man/1/rsync) is a popular tool for this purpose.
 Make sure to back up the entire server root directory, including the `db`,
-`snapshot`, and all other directories. For example:
-
-```bash
-rsync --append /var/lib/questdb
-```
+`snapshot`, and all other directories. 
 
 Using file copy usually takes longer to back up files compared to snapshot. You
 will have to wait until the data transfer is fully complete before exiting the
