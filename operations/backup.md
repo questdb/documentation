@@ -53,7 +53,7 @@ Before backing up QuestDB, consider these items:
 We recommend that teams take a database backup when the database write load is
 at its lowest. If the database is under constant write load, a helpful
 workaround is to ensure that the disk has at least 50% free space. The more free
-space, the safer it is to enter into checkpoint mode.
+space, the safer it is to enter the checkpoint mode.
 
 ### Determine backup frequency
 
@@ -63,8 +63,8 @@ If you are using QuestDB Enterprise, the frequency of backups impacts the time
 it takes to create a new [replica instance](/docs/operations/replication/).
 Creating replicas involves choosing a backup and having the replica replay WAL
 files until it has caught up. The older the backup, the more WAL files the
-replica will have to replay, and thus there is a longer-time frame. Therefore, a
-daily time-interval is recommended to keep the process rapid.
+replica will have to replay, and thus there is a longer time-frame. For these
+reasons, we recommend a daily backup schedule to keep the process rapid.
 
 ### Choose your data copy method
 
