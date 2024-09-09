@@ -2,30 +2,31 @@
 title: Backup and restore
 sidebar_label: Backup and restore
 description:
-  Details and resources which describe backup functionality in QuestDB as means
-  to prevent data loss.
+  Instructions and advice on performing backup/restore operations on QuestDB
 ---
 
-Backup or restore copies of QuestDB if your original database or data is lost
-fully or partially, or if your database or table is corrupted. The backup &
-restore process also speeds up the creation of
+You should back up QuestDB to be prepared for the case where your original
+database or data is lost, or if your database or table is corrupted. The backup
+& restore process also speeds up the creation of
 [replica instances](/docs/operations/replication/) in QuestDB Enterprise.
 
 ## Overview
 
-To perform the backup, follow these steps:
+To perform a backup, follow these steps:
 
-1. Use SQL to switch QuestDB into the optimized `CHECKPOINT` mode
+1. Issue SQL: `CHECKPOINT CREATE`, which activates the special `CHECKPOINT` mode
+   of QuestDB
 2. Create a copy of the QuestDB root directory
-3. Use SQL to switch QuestDB back to the regular mode
+3. Issue SQL: `CHECKPOINT RELEASE`, bringing QuestDB back to regular operation
 
-When in `CHECKPOINT` mode, QuestDB remains available for both reads and writes.
-However, some housekeeping tasks are paused. While still safe, database writes
-may consume more space than normal. When the database exits `CHECKPOINT` mode,
-it will resume the housekeeping tasks and quickly reclaim the disk space.
+When in the `CHECKPOINT` mode, QuestDB remains available for both reads and
+writes. However, some housekeeping tasks are paused. While this is safe in
+principle, database writes may consume more space than normal. When the database
+exits `CHECKPOINT` mode, it will resume the housekeeping tasks and quickly
+reclaim the disk space.
 
-In the second step (creating a copy of the root directory), you must create a
-copy of the database using a tool of your choice. These are some suggestions:
+In the second step above, you must create a copy of the database using a tool of
+your choice. These are some suggestions:
 
 - Cloud snapshot, e.g. EBS volume snapshot on AWS, Premium SSD Disk snapshot on
   Azure etc
@@ -34,32 +35,36 @@ copy of the database using a tool of your choice. These are some suggestions:
 
 To recover the database, follow these steps:
 
-- Restore the QuestDB root directory from the backup copy
-- Touch the trigger file in the questdb root directory
-- Start QuestDB as usual
+1. Restore the QuestDB root directory from the backup copy
+2. Create an empty `_restore` trigger file in the QuestDB root directory
+3. Start QuestDB as usual
 
 If the trigger file is present in the root directory, QuestDB performs the
 recovery process on startup. If successful, the process deletes the trigger
 file, so it won't perform recovery in future restarts. Should recovery fail,
 QuestDB will exit with an error, and the trigger file will remain in place.
 
-## Checkpoint mode
-
-During the backup process, QuestDB enters a phase called `CHECKPOINT` mode. The
-mode is entered when the user invokes the `CHECKPOINT CREATE` command. Exiting
-the mode is done via the `CHECKPOINT RELEASE` command. After
-`CHECKPOINT CREATE`, we consider the database to be in "checkpoint mode".
-
 ## Data backup checklist
 
-Before backing up QuestDB, consider the following sequence of events:
+Before backing up QuestDB, consider these items:
 
 ### Pick a good time
 
 We recommend that teams take a database backup when the database write load is
 at its lowest. If the database is under constant write load, a helpful
 workaround is to ensure that the disk has at least 50% free space. The more free
-space, the safer it is to enter into checkpoint mode.
+space, the safer it is to enter the checkpoint mode.
+
+### Determine backup frequency
+
+We recommend daily backups.
+
+If you are using QuestDB Enterprise, the frequency of backups impacts the time
+it takes to create a new [replica instance](/docs/operations/replication/).
+Creating replicas involves choosing a backup and having the replica replay WAL
+files until it has caught up. The older the backup, the more WAL files the
+replica will have to replay, and thus there is a longer time-frame. For these
+reasons, we recommend a daily backup schedule to keep the process rapid.
 
 ### Choose your data copy method
 
@@ -91,16 +96,14 @@ platforms:
 - [GCP](https://cloud.google.com/compute/docs/disks/create-snapshots) - working
   with persistent disk snapshots
 
-Cloud snapshot-based systems usually break down the backup in two steps:
+Cloud snapshot-based systems usually break down their backup process into two steps:
 
-1. Take snapshot
-2. Backup the snapshot
+1. Take a snapshot
+2. Back up the snapshot
 
-We are concerned with the first step, taking the snapshot.
+**Exit the `CHECKPOINT` mode as soon the snapshoting stage is complete.**
 
-**It is after this stage where operators must exit checkpoint mode.**
-
-Therefore, exit checkpoint mode at the following snapshot stage:
+Specifically, exit checkpoint mode at the following snapshot stage:
 
 | Cloud Provider                | State               | Exit checkpoint mode                                     |
 | ----------------------------- | ------------------- | -------------------------------------------------------- |
@@ -129,39 +132,32 @@ Leaving this step, you should know:
 - When to enter and exit checkpoint mode
 - How to perform your snapshot/backup method
 
-### Determine backup frequency
+## Steps in the backup procedure
 
-We recommend daily backups.
-
-If you are using QuestDB Enterprise, the frequency of backups impacts the time
-it takes to create a new [replica instance](/docs/operations/replication/).
-Creating replicas involves choosing a backup and having the replica replay WAL
-files until it has caught up. The older the backup, the more WAL files the
-replica will have to replay, and thus there is a longer-time frame. Therefore, a
-daily time-interval is recommended to keep the process rapid.
+While explaining the steps, we'll assume the database root directory is
+`/var/lib/questdb`.
 
 ### Enter checkpoint mode
 
-To enter checkpoint mode:
+To enter the checkpoint mode:
 
 ```sql
 CHECKPOINT CREATE
 ```
 
-Only one checkpoint can be created.
+You can create only one checkpoint. Attempting to create a second checkpoint
+will fail.
 
-Attempting to create second checkpoint will fail.
+### Check checkpoint status
 
-## Check checkpoint status
-
-During checkpoint mode, if you have lost your database session and/or the backup
-feels long-running, you can check if the database is in the checkpoint mode:
+You can double-check at any time that the database is in the checkpoint mode:
 
 ```sql
 SELECT * FROM checkpoint_status();
 ```
 
-In checkpoint mode, we now create the backup.
+Having confirmed that QuestDB has entered the checkpoint mode, we now create the
+backup.
 
 ### Take a snapshot or begin file copy
 
@@ -194,24 +190,22 @@ This concludes the backup process.
 
 Now, with our additional copy, we're ready to restore QuestDB.
 
-## Restoring from a checkpoint
+## Restore to a saved checkpoint
 
-Restoring from checkpoint will restore the entire database. We will assume that
-you are setting up a new database instance using the data from a checkpoint,
-rather than a blank database.
+Restoring to a checkpoint will restore the entire database.
 
 Follow these steps:
 
-- Ensure QuestDB versions match
+- Ensure your QuestDB version matches the one that did the backup
 - Restore QuestDB root directory contents (`/var/lib/questdb/`) from the backup
-- Touch the trigger file
+- Touch the `_restore` file
 - Start the database using the restored root directory
 
 ### Database versions
 
-Restoring data is only possible if the original and the backup QuestDB versions
-have the same major version number, for example: `8.1.0` and `8.1.1` are
-compatible. `8.1.0` and `7.5.1` are not compatible.
+Restoring data is only possible if the backup and restore QuestDB versions have
+the same major version number, for example: `8.1.0` and `8.1.1` are compatible.
+`8.1.0` and `7.5.1` are not compatible.
 
 ### Restore the root directory
 
@@ -229,8 +223,8 @@ database must perform a restore procedure. This ensures the data is consistent
 and can be read and written. It only takes place on startup, and requires a
 specific blank file to exist as the indication of user intent.
 
-Touch the `_restore` file in the root directory. Assuming root directory is
-`/var/lib/questdb/` the following command will do the trick:
+Touch the `_restore` file in the root directory. The following command will do
+the trick:
 
 ```bash
 touch /var/lib/questdb/_restore
@@ -238,8 +232,8 @@ touch /var/lib/questdb/_restore
 
 ### Start the database
 
-Start the database using the root directory as per usual. When the `_restore`
-file is present, the database will perform the restore procedure. There are two
+Start the database using the root directory as usual. When the `_restore` file
+is present, the database will perform the restore procedure. There are two
 possible outcomes:
 
 - Restore is successful: the database continues to run normally and is ready to
