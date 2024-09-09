@@ -134,6 +134,9 @@ Leaving this step, you should know:
 
 ## Steps in the backup procedure
 
+While explaining the steps, we'll assume the database root directory is
+`/var/lib/questdb`.
+
 ### Enter checkpoint mode
 
 To enter the checkpoint mode:
@@ -220,8 +223,8 @@ database must perform a restore procedure. This ensures the data is consistent
 and can be read and written. It only takes place on startup, and requires a
 specific blank file to exist as the indication of user intent.
 
-Touch the `_restore` file in the root directory. Assuming root directory is
-`/var/lib/questdb/` the following command will do the trick:
+Touch the `_restore` file in the root directory. The following command will do
+the trick:
 
 ```bash
 touch /var/lib/questdb/_restore
