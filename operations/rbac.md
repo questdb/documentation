@@ -731,12 +731,12 @@ GRANT SELECT ON table1(col4) TO user1;
 
 Since QuestDB is a [time-series database](/glossary/time-series-database/), the
 designated timestamp column is treated on a special way. Some functionality,
-such as [SAMPLE BY](/docs/reference/sql/sample-by),
-[LATEST ON](/docs/reference/sql/latest-on) or
-[ASOF JOIN](/docs/reference/sql/join/#asof-join), require a designated
-timestamp. If a user can access only some columns of a table, but not the
-designated timestamp, then these operations would become unavailable to the
-user. It is something of a dependency.
+such as [SAMPLE BY](/docs/reference/sql/sample-by/),
+[LATEST ON](/docs/reference/sql/latest-on/) or
+[ASOF JOIN](/docs/reference/sql/asof-join/), require a designated timestamp. If
+a user can access only some columns of a table, but not the designated
+timestamp, then these operations would become unavailable to the user. It is
+something of a dependency.
 
 As a solution, QuestDB derives permissions for the designated timestamp column
 based on the access granted to other columns of the table. If a user is granted

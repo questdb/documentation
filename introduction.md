@@ -70,8 +70,8 @@ Greatest hits include:
   into concise intervals
 - [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
   multiple series within a table
-- [`ASOF JOIN`](/docs/reference/sql/join/#asof-join) to associate timestamps
-  between a series based on proximity; no extra indices required
+- [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
+  a series based on proximity; no extra indices required
 
 ## Benefits of QuestDB {#benefits}
 

@@ -404,7 +404,6 @@ Parquet files can be read and thus queried by QuestDB.
 QuestDB is shipped with a demo Parquet file, `trades.parquet`, which can be
 queried using the `parquet_read` function.
 
-
 Example:
 
 ```questdb-sql title="read_parquet example"
@@ -416,10 +415,12 @@ WHERE
   side = 'buy';
 ```
 
-The trades.parquet file is located in the `import` subdirectory inside the QuestDB root directory. 
-Drop your own Parquet files to the import directory and query them using the `parquet_read()` function.
+The trades.parquet file is located in the `import` subdirectory inside the
+QuestDB root directory. Drop your own Parquet files to the import directory and
+query them using the `parquet_read()` function.
 
-You can change the allowed directory by setting the `cairo.sql.copy.root` configuration key.
+You can change the allowed directory by setting the `cairo.sql.copy.root`
+configuration key.
 
 For more information, see the
 [Parquet documentation](/docs/reference/function/parquet/).
@@ -450,8 +451,8 @@ And to learn about some of our favourite, most powerful syntax:
   into concise intervals
 - [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
   multiple series within a table
-- [`ASOF JOIN`](/docs/reference/sql/join/#asof-join) to associate timestamps
-  between a series based on proximity; no extra indices required
+- [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
+  a series based on proximity; no extra indices required
 
 Looking for visuals?
 
