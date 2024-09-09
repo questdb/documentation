@@ -247,3 +247,12 @@ SELECT *
 FROM (a timestamp(ts))
 ASOF JOIN (b timestamp (ts));
 ```
+
+## SPLICE JOIN
+
+Want to join all records from both tables?
+
+`SPLICE JOIN` is a full `ASOF JOIN`.
+
+Read the [JOIN reference](/docs/reference/sql/join/#splice-join) for more
+information on SPLICE JOIN.
