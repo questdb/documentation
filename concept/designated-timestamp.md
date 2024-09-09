@@ -47,6 +47,7 @@ Electing a designated timestamp allows you to:
 - Partition tables by time range. For more information, see the
   [partitions reference](/docs/concept/partitions/).
 - Use time series joins such as `ASOF JOIN`. For more information, see the
+  [ASOF JOIN reference](/docs/reference/sql/asof-join/) or the more general
   [JOIN reference](/docs/reference/sql/join/).
 - Optimize queries with [Interval scan](/docs/concept/interval-scan)
 

@@ -124,6 +124,16 @@ module.exports = {
           label: "SQL Syntax",
           items: [
             {
+              id: "reference/sql/acl/add-user",
+              type: "doc",
+              customProps: { tag: "Enterprise" },
+            },
+            {
+              id: "reference/sql/acl/alter-service-account",
+              type: "doc",
+              customProps: { tag: "Enterprise" },
+            },
+            {
               type: "category",
               label: "ALTER COLUMN",
               items: [
@@ -153,20 +163,11 @@ module.exports = {
               ],
             },
             {
-              id: "reference/sql/acl/add-user",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "reference/sql/acl/alter-service-account",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            {
               id: "reference/sql/acl/alter-user",
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            "reference/sql/asof-join",
             {
               id: "reference/sql/acl/assume-service-account",
               type: "doc",
