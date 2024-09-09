@@ -264,8 +264,3 @@ Other file systems are untested and while they may work, we do not officially
 support them. See the
 [filesystem compatibility](/docs/deployment/capacity-planning/#supported-filesystems)
 section for more information.
-
-## Further reading
-
-- [Snapshot API](/docs/reference/sql/snapshot/) - Reference documentation for
-  the SQL commands used to create and manage snapshots.
