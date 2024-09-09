@@ -3,7 +3,7 @@ title: ASOF JOIN keyword
 sidebar_label: ASOF JOIN
 description:
   Learn how to use the powerful time-series ASOF JOIN SQL keyword from our
-  concise and clea reference documentation.
+  concise and clear reference documentation.
 ---
 
 ASOF JOIN is a powerful SQL keyword that allows you to join two time-series
@@ -20,10 +20,10 @@ JOIN context.
 The JOIN operation is broken into three components:
 
 - Select clause
-- Join claus
+- Join clause
 - Where clause
 
-This document will demosntrate the JOIN clause, where the other keywords
+This document will demonstrate the JOIN clause, where the other keywords
 demonstrate their respective clauses.
 
 Visualized, a JOIN operation looks like this:
@@ -107,11 +107,11 @@ An `ASOF JOIN` query can look like the following:
 WITH
 buy AS (  -- select the first 5 buys in June 22
    SELECT timestamp, price FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'buy' LIMIT 5
+   WHERE timestamp = '2024-06-22' AND side = 'buy' LIMIT 5
    ),
 sell AS ( -- select the first 5 sells in June 22
    SELECT timestamp, price FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'sell' LIMIT 5
+   WHERE timestamp = '2024-06-22' AND side = 'sell' LIMIT 5
    )
 SELECT
    buy.timestamp, sell.timestamp, buy.price, sell.price
