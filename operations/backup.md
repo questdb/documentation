@@ -258,3 +258,7 @@ Other file systems are untested and while they may work, we do not officially
 support them. See the
 [filesystem compatibility](/docs/deployment/capacity-planning/#supported-filesystems)
 section for more information.
+
+## Further reading
+
+(`CHECKPOINT` SQL reference documentation) [/docs/reference/sql/checkpoint/]
