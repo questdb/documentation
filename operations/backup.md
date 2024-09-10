@@ -96,7 +96,8 @@ platforms:
 - [GCP](https://cloud.google.com/compute/docs/disks/create-snapshots) - working
   with persistent disk snapshots
 
-Cloud snapshot-based systems usually break down their backup process into two steps:
+Cloud snapshot-based systems usually break down their backup process into two
+steps:
 
 1. Take a snapshot
 2. Back up the snapshot
@@ -261,4 +262,5 @@ section for more information.
 
 ## Further reading
 
-[`CHECKPOINT` SQL reference documentation](/docs/reference/sql/checkpoint/)
+To learn more, see the
+[`CHECKPOINT` SQL reference documentation](/docs/reference/sql/checkpoint/).
