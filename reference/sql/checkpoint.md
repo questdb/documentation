@@ -12,7 +12,7 @@ _For a detailed guide backup creation and restoration? Check out our
 
 ## Syntax
 
-![Flow chart showing the syntax of the CHECKPOINT keyword](/img/docs/diagrams/snapshot.svg)
+![Flow chart showing the syntax of the CHECKPOINT keyword](/img/docs/diagrams/checkpoint.svg)
 
 :::caution
 
@@ -22,11 +22,6 @@ If you are a Windows user and require backup functionality, please
 [comment on this issue](https://github.com/questdb/questdb/issues/4811).
 
 :::
-
-### SYNOPSIS
-
-Enters and exists the database checkpoint mode. In this mode QuestDB instance
-enables the external systems to take snapshot and/or copy the database's data directory.
 
 ### EXAMPLES
 
