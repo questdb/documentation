@@ -261,4 +261,4 @@ section for more information.
 
 ## Further reading
 
-(`CHECKPOINT` SQL reference documentation) [/docs/reference/sql/checkpoint/]
+[`CHECKPOINT` SQL reference documentation](/docs/reference/sql/checkpoint/)
