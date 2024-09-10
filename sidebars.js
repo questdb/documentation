@@ -176,6 +176,7 @@ module.exports = {
             "reference/sql/cancel-query",
             "reference/sql/case",
             "reference/sql/cast",
+            "reference/sql/checkpoint",
             "reference/sql/copy",
             "reference/sql/create-table",
             {
