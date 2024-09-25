@@ -20,7 +20,7 @@ supported.
 
 - Python from 3.9 to 3.11
 - Psycopg2
-- SQLAlchemy `<=` 1.4.47
+- SQLAlchemy 1.4+ or 2.0+
 - A QuestDB instance
 
 ## Installation
@@ -34,7 +34,6 @@ pip install questdb-connect
 ## Example usage
 
 ```python
-import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy import MetaData
@@ -42,19 +41,22 @@ from sqlalchemy import Table
 from pprint import pprint
 
 engine = create_engine("questdb://admin:quest@localhost:8812/qdb")
-with engine.connect() as conn:
-  # SQL statements with no parameters
+
+# SQL statements with no parameters
+with engine.begin() as conn:
   conn.execute(text("CREATE TABLE IF NOT EXISTS some_table (x int, y int)"))
-  result=conn.execute(text("SHOW TABLES"))
-  print(result.all())
+  result = conn.execute(text("SHOW TABLES"))
   # results can be iterated in many ways. Check SQLAlchemy docs for details
+  print(result.all())
 
-  # passing parameters to your statements
+# passing parameters to your statements
+with engine.begin() as conn:
   conn.execute(
-      text("INSERT INTO some_table (x, y) VALUES (:x, :y)"),
-      [{"x": 11, "y": 12}, {"x": 13, "y": 14}],
-      )
+    text("INSERT INTO some_table (x, y) VALUES (:x, :y)"),
+    [{"x": 11, "y": 12}, {"x": 13, "y": 14}],
+  )
 
+with engine.begin() as conn:
   # basic select, no parameters
   result = conn.execute(text("select * from some_table"))
   print(result.all())
@@ -68,7 +70,8 @@ with engine.connect() as conn:
   some_table = Table("some_table", metadata_obj, autoload_with=engine)
   pprint(some_table)
 
-  # cleaning up
+# cleaning up
+with engine.begin() as conn:
   conn.execute(text("DROP TABLE some_table"))
 ```
 
