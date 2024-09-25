@@ -54,6 +54,7 @@ with engine.connect() as conn:
       text("INSERT INTO some_table (x, y) VALUES (:x, :y)"),
       [{"x": 11, "y": 12}, {"x": 13, "y": 14}],
       )
+  conn.commit()
 
   # basic select, no parameters
   result = conn.execute(text("select * from some_table"))
