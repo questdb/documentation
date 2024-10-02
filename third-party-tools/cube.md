@@ -1,7 +1,6 @@
 ---
 title: "Cube"
-description:
-  Guide for QuestDB and Cube integration.
+description: Guide for QuestDB and Cube integration.
 ---
 
 Cube is middleware that connects your data sources and your data applications.
