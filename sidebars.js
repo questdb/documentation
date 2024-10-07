@@ -124,6 +124,16 @@ module.exports = {
           label: "SQL Syntax",
           items: [
             {
+              id: "reference/sql/acl/add-user",
+              type: "doc",
+              customProps: { tag: "Enterprise" },
+            },
+            {
+              id: "reference/sql/acl/alter-service-account",
+              type: "doc",
+              customProps: { tag: "Enterprise" },
+            },
+            {
               type: "category",
               label: "ALTER COLUMN",
               items: [
@@ -153,20 +163,11 @@ module.exports = {
               ],
             },
             {
-              id: "reference/sql/acl/add-user",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "reference/sql/acl/alter-service-account",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            {
               id: "reference/sql/acl/alter-user",
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            "reference/sql/asof-join",
             {
               id: "reference/sql/acl/assume-service-account",
               type: "doc",
@@ -175,6 +176,7 @@ module.exports = {
             "reference/sql/cancel-query",
             "reference/sql/case",
             "reference/sql/cast",
+            "reference/sql/checkpoint",
             "reference/sql/copy",
             "reference/sql/create-table",
             {
@@ -428,6 +430,7 @@ module.exports = {
           id: "third-party-tools/overview",
         },
         "third-party-tools/cube",
+        "third-party-tools/data-bento",
         "third-party-tools/embeddable",
         "third-party-tools/flink",
         "third-party-tools/grafana",
@@ -460,4 +463,4 @@ module.exports = {
       ],
     },
   ].filter(Boolean),
-}
+};

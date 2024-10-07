@@ -22,12 +22,8 @@ Enable storage level data deduplication on inserts and configures `UPSERT KEYS`.
 
 ![Flow chart showing the syntax of the ALTER TABLE DEDUP ENABLE statement](/img/docs/diagrams/enableDedup.svg)
 
-`UPSERT KEYS` list can include one or more columns with the following rules:
-
-- The [designated Timestamp](/docs/concept/designated-timestamp) column must be
+`UPSERT KEYS` list can include one or more columns. The [designated timestamp](/docs/concept/designated-timestamp) column must be
   included in the `UPSERT KEYS` list.
-- Columns of [STRING and BINARY](/docs/reference/sql/datatypes) types cannot be
-  used in the `UPSERT KEYS` list.
 
 Running `ALTER TABLE DEDUP ENABLE` on a table that already has deduplication
 enabled is not an error.
