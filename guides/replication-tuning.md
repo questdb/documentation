@@ -78,7 +78,7 @@ What do these options do?
 
 In QuestDB each table replicates in a cycle independently of other tables. Thus
 each of the database's network client connections writes its data to its own
-segment in the Write-Ahead Log (WAL).
+segment in the [Write-Ahead Log (WAL)](/docs/concept/write-ahead-log/).
 
 Once a WAL segment reaches a certain size, it's closed and a new one is opened.
 The smaller the size, the more often segments roll over. This results in
