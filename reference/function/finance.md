@@ -28,9 +28,21 @@ Let's take the below order book as an example.
 A _buy market order_ with the size of 50 would wipe out the first two price levels of
 the _Ask_ side of the book, and would also trade on the third level.
 
-The full price of the trade: `14 * $14.50 + 16 * $14.60 + (50 - 14 - 16) * $14.80 = $732.6`
 
-The average price of the instrument in this trade: `$732.6 / 50 = $14.652`
+The full price of the trade:
+$$
+14 \cdot \$14.50 + 16 \cdot \$14.60 + (50 - 14 - 16) \cdot \$14.80 = \$732.60
+$$
+
+
+
+The average price of the instrument in this trade: 
+
+$$
+\$732.60 / 50 = \$14.652
+$$
+
+`$732.6 / 50 = $14.652`
 
 This average trade price is the output of the function when executed with the parameters taken from
 the above example:
@@ -150,7 +162,14 @@ and the lowest asking price.
 
 The result is provided in basis points, and the calculation is:
 
-`spread(bid, ask) / mid(bid, ask) * 10000`
+$$
+\frac
+{\text{spread}\left(\text{bid}, \text{ask}\right)}
+{\text{mid}\left(\text{bid}, \text{ask}\right)}
+\cdot
+10\,000
+$$
+
 
 ### Parameters
 
@@ -175,7 +194,13 @@ SELECT spread_bps(1.5760, 1.5763)
 
 `vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
 based on the given price and quantity columns. This is a handy replacement for
-the `sum(price * quantity) / sum(quantity)` expression.
+the expression:
+
+$$
+\frac
+{\text{sum}\left(\text{price} \cdot \text{quantity}\right)}
+{\text{sum}\left(\text{quantity}\right)}
+$$
 
 ### Parameters
 
@@ -205,8 +230,18 @@ for a sized bid/ask pair.
 
 It is calculated with these formulae:
 
-`imbalance = bidSize / (bidSize + askSize)`
-`wmid = askPrice * imbalance + bidPrice * (1 - imbalance)`
+$$
+\text{imbalance} = 
+\frac
+{ \text{bidSize} }
+{ \left(  \text{bidSize} + \text{askSize} \right) }
+$$
+
+$$
+\text{wmid} = \text{askPrice} \cdot \text{imbalance} 
++ \text{bidPrice} 
+\cdot \left( 1 - \text{imbalance} \right)
+$$
 
 ### Parameters
 
