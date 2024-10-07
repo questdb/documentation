@@ -115,6 +115,34 @@ SELECT ts, L2PRICE(100, askSize1, ask1, askSize2, ask2, askSize3, ask3)
 | 2024-05-22T09:40:15.175000Z | 0.565999999999 |
 | 2024-05-22T09:40:15.522000Z | 0.483          |
 
+
+## mid
+
+`mid(bid, ask)` - calculates the midpoint of a bidding price and asking price.
+
+Returns null if either argument is NaN or null.
+
+### Parameters
+
+- `bid` is any numeric bidding price value.
+- `ask` is any numeric asking price value.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT mid(1.5760, 1.5763)
+```
+
+| mid          |
+|:-------------|
+| 1.57615      |
+
+
+
 ## spread_bps
 
 `spread_bps(bid, ask)` - calculates the quoted bid-ask spread, based on the highest bidding price,
