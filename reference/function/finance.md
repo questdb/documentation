@@ -42,8 +42,6 @@ $$
 \$732.60 / 50 = \$14.652
 $$
 
-`$732.6 / 50 = $14.652`
-
 This average trade price is the output of the function when executed with the parameters taken from
 the above example:
 
@@ -193,10 +191,10 @@ SELECT spread_bps(1.5760, 1.5763)
 ## vwap
 
 `vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
-based on the given price and quantity columns. This is a handy replacement for
-the expression:
+based on the given price and quantity columns. This is defined by the following formula:
 
 $$
+\text{vwap} =
 \frac
 {\text{sum}\left(\text{price} \cdot \text{quantity}\right)}
 {\text{sum}\left(\text{quantity}\right)}
