@@ -198,8 +198,6 @@ FROM (SELECT x FROM long_sequence(100));
 | 67   |
 
 
-
-
 ## wmid
 
 `wmid(bidSize, bidPrice, askPrice, askSize)` - calculates the weighted mid-price
