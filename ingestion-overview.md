@@ -20,7 +20,7 @@ platforms, queues, and more.
 **Recommended!**
 
 Our first party clients are **the fastest way to insert data, and they excel
-with high volume, high cardinality data streaming.**
+with high volume, [high cardinality](/glossary/high-cardinality/) data streaming.**
 
 To start quickly, select your language:
 
