@@ -198,3 +198,36 @@ FROM (SELECT x FROM long_sequence(100));
 | 67   |
 
 
+
+
+## wmid
+
+`wmid(bidSize, bidPrice, askPrice, askSize)` - calculates the weighted mid-price
+for a sized bid/ask pair.
+
+It is calculated with these formulae:
+
+`imbalance = bidSize / (bidSize + askSize)`
+`wmid = askPrice * imbalance + bidPrice * (1 - imbalance)`
+
+### Parameters
+
+- `bidSize` is any numeric value representing the size of the bid offer.
+- `bidPrice` is any numeric value representing the bidding price.
+- `askPrice` is any numeric value representing the asking price.
+- `askSize` is any numeric value representing the size of the ask offer.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT wmid(100, 5, 6, 100)
+```
+
+| wmid |
+|:-----|
+| 5.5  |
+
