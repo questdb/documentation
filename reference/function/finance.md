@@ -115,6 +115,34 @@ SELECT ts, L2PRICE(100, askSize1, ask1, askSize2, ask2, askSize3, ask3)
 | 2024-05-22T09:40:15.175000Z | 0.565999999999 |
 | 2024-05-22T09:40:15.522000Z | 0.483          |
 
+## spread_bps
+
+`spread_bps(bid, ask)` - calculates the quoted bid-ask spread, based on the highest bidding price,
+and the lowest asking price.
+
+The result is provided in basis points, and the calculation is:
+
+`spread(bid, ask) / mid(bid, ask) * 10000`
+
+### Parameters
+
+- `bid` is any numeric bidding price value.
+- `ask` is any numeric asking price value.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT spread_bps(1.5760, 1.5763)
+```
+
+| spread_bps     |
+|:---------------|
+| 1.903372140976 |
+
 ## vwap
 
 `vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
@@ -140,3 +168,5 @@ FROM (SELECT x FROM long_sequence(100));
 | vwap |
 | :--- |
 | 67   |
+
+
