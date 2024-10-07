@@ -430,7 +430,7 @@ module.exports = {
           id: "third-party-tools/overview",
         },
         "third-party-tools/cube",
-        "third-party-tools/data-bento",
+        "third-party-tools/databento",
         "third-party-tools/embeddable",
         "third-party-tools/flink",
         "third-party-tools/grafana",
