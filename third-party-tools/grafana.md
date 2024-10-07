@@ -8,7 +8,7 @@ description:
 import Screenshot from "@theme/Screenshot"
 
 [Grafana](https://grafana.com/) is a popular observability and monitoring
-application used to visualize data and enable time-series data analysis.
+application used to visualize data and enable [time-series data analysis](/glossary/time-series-analysis/).
 
 QuestDB is available within Grafana via the
 [official QuestDB plugin](https://grafana.com/grafana/plugins/questdb-questdb-datasource/).

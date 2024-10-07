@@ -302,7 +302,7 @@ For more information, please refer to the
 
 ### SAMPLE BY
 
-Aggregates time-series data into homogeneous time chunks. For example daily
+Aggregates [time-series data](/blog/what-is-time-series-data/) into homogeneous time chunks. For example daily
 average, monthly maximum etc. This function requires a
 [designated timestamp](/docs/concept/designated-timestamp/).
 

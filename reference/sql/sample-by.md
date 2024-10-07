@@ -4,7 +4,7 @@ sidebar_label: SAMPLE BY
 description: SAMPLE BY SQL keyword reference documentation.
 ---
 
-`SAMPLE BY` is used on time-series data to summarize large datasets into
+`SAMPLE BY` is used on [time-series data](/blog/what-is-time-series-data/) to summarize large datasets into
 aggregates of homogeneous time chunks as part of a
 [SELECT statement](/docs/reference/sql/select/).
 
