@@ -30,7 +30,7 @@ meta-function.
 
 ## Examples
 
-Consider we have two open tabs of the QuestDB Web Console.
+Consider we have two open tabs of the QuestDB [Web Console](/docs/web-console/).
 
 If we execute the following command in the first tab:
 

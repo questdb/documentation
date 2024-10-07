@@ -18,7 +18,7 @@ The precision of HyperLogLog can be controlled via the optional `precision`
 parameter, typically between 4 and 16. A higher precision leads to more accurate
 results with increased memory usage. The default is 1.
 
-This function is useful within high cardinality datasets where an exact count is
+This function is useful within [high cardinality](/glossary/high-cardinality/) datasets where an exact count is
 not required. Thus consider it the higher cardinality alternative to
 [`count_dinstinct`](/docs/reference/function/aggregation/#count_distinct).
 
@@ -451,7 +451,7 @@ SELECT first(device_id) FROM sensors;
 ```
 
 | first      |
-|:-----------|
+| :--------- |
 | arduino-01 |
 
 The following query returns the latest symbol value for the `device_id` column:
@@ -461,7 +461,7 @@ SELECT last(device_id) FROM sensors;
 ```
 
 | last       |
-|:-----------|
+| :--------- |
 | arduino-03 |
 
 Without selecting a designated timestamp column, the table may be unordered and
@@ -469,7 +469,7 @@ the query may return different result. Given an unordered table
 `sensors_unordered`:
 
 | device_id  | temperature | ts                          |
-|:-----------|:------------|:----------------------------|
+| :--------- | :---------- | :-------------------------- |
 | arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
 | arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
 | arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |

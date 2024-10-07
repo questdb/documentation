@@ -95,7 +95,7 @@ load configuration files from and paste the following example:
 [[outputs.influxdb_v2]]
 # Use InfluxDB Line Protocol to write metrics to QuestDB
   urls = ["http://localhost:9000"]
-# Disable gzip compression  
+# Disable gzip compression
   content_encoding = "identity"
 
 # -- INPUT PLUGINS -- #
@@ -148,7 +148,7 @@ Telegraf should report the following if configured correctly:
 
 ## Verifying the integration
 
-1. Navigate to the QuestDB Web Console at `http://127.0.0.1:9000/`. The Schema
+1. Navigate to the QuestDB [Web Console](/docs/web-console/) at `http://127.0.0.1:9000/`. The Schema
    Navigator in the top left should display two new tables:
 
 - `cpu` generated from `inputs.cpu`

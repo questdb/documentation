@@ -11,7 +11,7 @@ import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
 
 Prometheus is an open-source systems monitoring and alerting toolkit. Prometheus
-collects and stores metrics as time-series data, i.e. metrics information is
+collects and stores metrics as [time-series data](/blog/what-is-time-series-data/), i.e. metrics information is
 stored with the timestamp at which it was recorded, alongside optional key-value
 pairs called labels.
 
@@ -51,15 +51,15 @@ When running QuestDB via Docker, port `9003` must be exposed and the metrics
 configuration can be enabled via the `QDB_METRICS_ENABLED` environment variable:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell" title={"Docker"}>
-      {`docker run \\
+renderText={(release) => (
+<CodeBlock className="language-shell" title={"Docker"}>
+{`docker run \\
   -e QDB_METRICS_ENABLED=TRUE \\
   -p 8812:8812 -p 9000:9000 -p 9003:9003 -p 9009:9009 \\
   -v "$(pwd):/var/lib/questdb" \\
   questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+</CodeBlock>
+)}
 />
 
 To verify that metrics are being exposed correctly by QuestDB, navigate to

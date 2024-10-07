@@ -1,7 +1,6 @@
 ---
 title: MindsDB
-description:
-  Guide for getting started in Machine Learning with MindsDB and QuestDB
+description: Guide for getting started in Machine Learning with MindsDB and QuestDB
 ---
 
 [MindsDB](https://mindsdb.com/questdb-machine-learning/) provides Machine
@@ -96,7 +95,7 @@ The container has these mount points:
 The container is running `Debian GNU/Linux 11 (bullseye)` and exposes these
 ports:
 
-- 9000: QuestDB Web Console
+- 9000: QuestDB [Web Console](/docs/web-console/)
 - 8812: QuestDB pg-wire
 - 9009: QuestDB InfluxDB Line Protocol ingress line protocol
 - 47334: MindsDB WebConsole
@@ -109,7 +108,7 @@ There are different ways to [insert data to QuestDB](/docs/ingestion-overview/).
 
 #### SQL
 
-We can access QuestDB's web console at
+We can access QuestDB's [Web Console](/docs/web-console/) at
 [http://localhost:9000](http://localhost:9000).
 
 Run the following SQL query to create a simple table:
@@ -271,7 +270,7 @@ The result should be something like this:
 ```
 
 Beyond SELECT statements, for instance when we need to save the results of a
-query into a new table, we need to use QuestDB's web console available at
+query into a new table, we need to use QuestDB's [Web Console](/docs/web-console/) available at
 [http://localhost:9000](http://localhost:9000):
 
 ```questdb-sql

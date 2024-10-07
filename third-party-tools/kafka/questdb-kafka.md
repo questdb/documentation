@@ -469,7 +469,9 @@ correct column types instead of relying on the connector to infer them. See the
 paragraph below.
 
 ### Target table considerations
+
 #### Table name
+
 By default, the target table name in QuestDB is the same as the Kafka topic
 name from which a message originates. When a connector is configured to read
 from multiple topics, it uses a separate table for each topic.
@@ -478,6 +480,7 @@ Set the table configuration option to override this behavior. Once set, the conn
 regardless of the topic from which they originate.
 
 Example:
+
 ```shell title="Configuration file an explicit table name"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
@@ -493,6 +496,7 @@ variables in the table name: `${topic}`, `${key}`. The connector will replace
 these variables with the actual topic name and key value from the Kafka message.
 
 Example:
+
 ```shell title="Configuration file with a templated table name"
 name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
@@ -502,11 +506,13 @@ table=from_kafka_${topic}_${key}_suffix
 
 [...]
 ```
+
 The placeholder `${key}` will be replaced with the actual key value from the
 Kafka message. If the key is not present in the message, the placeholder will be
 replaced with the string `null`.
 
 #### Table schema
+
 When a target table does not exist in QuestDB, it will be created automatically.
 This is the recommended approach for development and testing.
 

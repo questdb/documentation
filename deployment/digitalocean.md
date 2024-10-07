@@ -1,8 +1,7 @@
 ---
 title: Launch QuestDB on DigitalOcean
 sidebar_label: DigitalOcean Droplet
-description:
-  This document describes how to launch DigitalOcean droplet with QuestDB
+description: This document describes how to launch DigitalOcean droplet with QuestDB
 ---
 
 DigitalOcean is a platform with software listings from independent vendors that
@@ -10,7 +9,7 @@ run on cloud resources. This guide describes how to launch QuestDB via the
 DigitalOcean marketplace using the official listing. This document also
 describes usage instructions after you have launched the instance, including
 hints for authentication, the available interfaces, and tips for accessing the
-REST API and web console.
+REST API and [Web Console](/docs/web-console/).
 
 ## Prerequisites
 
@@ -75,7 +74,7 @@ For details on the server properties and using this file, see the
 
 The default ports used by QuestDB interfaces are as follows:
 
-- Web console &amp; REST API is available on port `9000`
+- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`
