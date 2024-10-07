@@ -111,8 +111,6 @@ SELECT floor(15.75) as RoundedDown;
 
 `greatest(args...)` returns the largest entry in a series of numbers. 
 
-`ln(value)` return the natural logarithm (**log*e***) of a given number.
-
 **Arguments:**
 
 - `args...` is a variable-size list of `long` or `double` values.
@@ -130,6 +128,31 @@ SELECT greatest(11, 3, 8, 15)
 | greatest |
 |----------|
 | 15       |
+
+
+
+## least
+
+`least(args...)` returns the smallest entry in a series of numbers.
+
+**Arguments:**
+
+- `args...` is a variable-size list of `long` or `double` values.
+
+**Return value:**
+
+Return value type is `double` or `long`.
+
+**Examples:**
+
+```questdb-sql
+SELECT least(11, 3, 8, 15)
+```
+
+| least |
+|-------|
+| 3     |
+
 
 
 
