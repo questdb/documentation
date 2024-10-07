@@ -93,18 +93,18 @@ postgresql-42.5.1.jar
 First, start QuestDB. If you are using Docker run the following command:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`docker run -p 9000:9000 -p 8812:8812 questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`docker run -p 9000:9000 -p 8812:8812 questdb/questdb:${release.name}`}
+</CodeBlock>
+)}
 />
 
 The port mappings allow us to connect to QuestDB's REST and PostgreSQL Wire
 Protocol endpoints. The former is required for opening the Web Console, and the
 latter is used by Spark to connect to the database.
 
-Open the Web Console in your browser at
+Open the [Web Console](/docs/web-console/) in your browser at
 [http://localhost:9000](http://localhost:9000).
 
 Run the following SQL commands using the console:
@@ -210,7 +210,7 @@ After the execution is completed, we can check the content of the
 SELECT * FROM trades_enriched;
 ```
 
-The enriched data should be displayed in the Web Console.
+The enriched data should be displayed in the [Web Console](/docs/web-console/).
 
 ## See also
 

@@ -358,9 +358,9 @@ If you are running the QuestDB using `systemd`, you will also need to set the `L
 
 If you have followed the [setup guide](https://questdb.io/docs/deployment/systemd/), then the file should be called `questdb.service` and be located at `~/.config/systemd/user/questdb.service`.
 
-Add this property to the `[Service]` section, setting it to at least `1048576`, or higher if you have set higher OS-wide limits. 
+Add this property to the `[Service]` section, setting it to at least `1048576`, or higher if you have set higher OS-wide limits.
 
-Then restart the service. If you have configured these settings correctly, any warnings in the web console should now be cleared.
+Then restart the service. If you have configured these settings correctly, any warnings in the [Web Console](/docs/web-console/) should now be cleared.
 
 #### Setting system-wide open file limit on MacOS:
 

@@ -124,7 +124,7 @@ systemctl --user status questdb.service
 Your QuestDB instance should now be accessible at localhost, with services
 available at the following default ports:
 
-- Web console &amp; REST API is available on port `9000`
+- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`

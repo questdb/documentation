@@ -44,7 +44,7 @@ password:admin
 ## Start QuestDB
 
 The Docker version runs on port `8812` for the database connection and port
-`9000` for the Web Console and REST interface:
+`9000` for the [Web Console](/docs/web-console/) and REST interface:
 
 ```shell
 docker run --add-host=host.docker.internal:host-gateway \
