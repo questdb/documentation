@@ -440,6 +440,83 @@ SELECT hour(ts), count() FROM transactions;
 | 22   | 9876  |
 | 23   | 2567  |
 
+## interval
+
+`interval(start_timestamp, end_timestamp)` - creates a time interval from
+two timestamps.
+
+**Arguments:**
+
+- `start_timestamp` is a timestamp.
+- `end_timestamp` is a timestamp.
+
+**Return value:**
+
+Return value type is `interval`
+
+**Examples:**
+
+```questdb-sql title="Construct an interval"
+SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
+```
+
+| interval                                                 |
+|:---------------------------------------------------------|
+| ('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z') |
+
+
+## interval_start
+
+`interval_start(interval)` - extracts the lower bound of the interval.
+
+**Arguments:**
+
+- `interval` is an `interval`.
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="Extract an interval lower bound"
+SELECT
+  interval_start(
+    interval(now(), dateadd('d', 1, now()) - 1)
+  )
+```
+
+| interval_start              |
+|:----------------------------|
+| 2024-10-08T11:09:47.573000Z |
+
+
+## interval_end
+
+`interval_end(interval)` - extracts the upper bound of the interval.
+
+**Arguments:**
+
+- `interval` is an `interval`.
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="Extract an interval upper bound"
+SELECT
+  interval_end(
+    interval(now(), dateadd('d', 1, now()) - 1)
+  )
+```
+
+| interval_end                |
+|:----------------------------|
+| 2024-10-09T11:09:47.573000Z |
+
+
 ## is_leap_year
 
 `is_leap_year(value)` - returns `true` if the `year` of `value` is a leap year,
