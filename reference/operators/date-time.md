@@ -14,7 +14,6 @@ If an operator's first argument is a table's timestamp, QuestDB may use an
 
 :::
 
-
 ## `BETWEEN` value1 `AND` value2
 
 The `BETWEEN` operator allows you to specify a non-standard range. It includes
@@ -69,7 +68,6 @@ This query returns all records from the 15th minute of 12 PM on May 23, 2018:
 | 2018-05-23T12:15:00.000000Z | 123.4 |
 | ...                         | ...   |
 | 2018-05-23T12:15:59.999999Z | 115.8 |
-
 
 ## `IN` (timeRange)
 
@@ -129,8 +127,8 @@ time range repeatedly, for a set number of times.
 - `modifier` is a signed integer modifying the upper bound applying to the
   `timestamp`:
 
-    - A `positive` value extends the selected period.
-    - A `negative` value reduces the selected period.
+  - A `positive` value extends the selected period.
+  - A `negative` value reduces the selected period.
 
 - `interval` is an unsigned integer indicating the desired interval period for
   the time range.
@@ -186,9 +184,6 @@ results on Jan 1-2 in 2018 and in 2019:
 | ...                         | ...   |
 | 2019-01-02T23:59:59.999999Z | 103.8 |
 
-
-
-
 ## `IN` (interval)
 
 Returns results within a defined range of time, as specified by an `interval` value.
@@ -199,22 +194,23 @@ Returns results within a defined range of time, as specified by an `interval` va
 
 #### Examples
 
-```questdb-sql title="Check if timestamp is in interval success"
-SELECT true as is_in_interval FROM long_sequence(1) 
+```questdb-sql title="Check if timestamp is in interval success" demo
+SELECT true as is_in_interval FROM trades
 WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2018', '2019')
+LIMIT -1
 ```
 
 | is_in_interval |
-|----------------|
+| -------------- |
 | true           |
 
 If we adjust the interval to be not in range, we get no result:
 
 ```questdb-sql title="Check if timestamp is in interval failure"
-SELECT true as is_in_interval FROM long_sequence(1) 
+SELECT true as is_in_interval FROM long_sequence(1)
 WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2015', '2016')
 ```
-| is_in_interval |
-|----------------|
-|                |
 
+| is_in_interval |
+| -------------- |
+|                |

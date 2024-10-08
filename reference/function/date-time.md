@@ -73,7 +73,7 @@ in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution a
 
 Since both types are backed by a signed long, this means the `DATE` type has a
 wider range. A `DATE` column can store about ±2.9 million years from the Unix epoch, whereas a `TIMESTAMP` has an approximate
-range of ±290,000 years. 
+range of ±290,000 years.
 
 For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
 
@@ -248,9 +248,10 @@ Return value type is `int`
 
 **Examples:**
 
-```questdb-sql title="Day of the month"
+```questdb-sql title="Day of the month" demo
 SELECT day(to_timestamp('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
-FROM long_sequence(1);
+FROM trades
+LIMIT -1;
 ```
 
 | day |
@@ -461,9 +462,8 @@ SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
 ```
 
 | interval                                                 |
-|:---------------------------------------------------------|
+| :------------------------------------------------------- |
 | ('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z') |
-
 
 ## interval_start
 
@@ -487,9 +487,8 @@ SELECT
 ```
 
 | interval_start              |
-|:----------------------------|
+| :-------------------------- |
 | 2024-10-08T11:09:47.573000Z |
-
 
 ## interval_end
 
@@ -513,9 +512,8 @@ SELECT
 ```
 
 | interval_end                |
-|:----------------------------|
+| :-------------------------- |
 | 2024-10-09T11:09:47.573000Z |
-
 
 ## is_leap_year
 
@@ -813,12 +811,15 @@ SELECT second(ts), count() FROM transactions;
 | 58     | 9876  |
 | 59     | 2567  |
 
-
 ## today, tomorrow, yesterday
 
-`today()` - returns an interval representing the current day.
-`tomorrow()` - returns an interval representing the next day.
-`yesterday()` - returns an interval representing the previous day.
+- `today()` - returns an interval representing the current day.
+
+- `tomorrow()` - returns an interval representing the next day.
+
+- `yesterday()` - returns an interval representing the previous day.
+
+Interval is in the UTC/GMT+0 timezone.
 
 **Arguments:**
 
@@ -835,16 +836,17 @@ SELECT true as in_today FROM long_sequence(1)
 WHERE now() IN today();
 ```
 
-
 ## today, tomorrow, yesterday with timezone
 
-`today(tz)` - returns an interval representing the current day with timezone adjustment.
-`tomorrow(tz)` - returns an interval representing the next day timezone adjustment.
-`yesterday(tz)` - returns an interval representing the previous day timezone adjustment.
+- `today(timezone)` - returns an interval representing the current day with timezone adjustment.
+
+- `tomorrow(timezone)` - returns an interval representing the next day timezone adjustment.
+
+- `yesterday(timezone)` - returns an interval representing the previous day timezone adjustment.
 
 **Arguments:**
 
-`tz` is a `string` matching a timezone.
+`timezone` is a `string` matching a timezone.
 
 **Return value:**
 
@@ -858,9 +860,8 @@ SELECT today() as today, today('CEST') as adjusted
 ```
 
 | today                                                    | adjusted                                                 |
-|:---------------------------------------------------------|:---------------------------------------------------------|
+| :------------------------------------------------------- | :------------------------------------------------------- |
 | ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
-
 
 This function allows the user to specify their local timezone and receive a UTC interval that corresponds to their 'day'.
 
@@ -1145,9 +1146,9 @@ Return value type is `date`
 
 **Examples:**
 
-```questdb-sql title="string matches format"
+```questdb-sql title="string matches format" demo
 SELECT to_date('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss')
-FROM long_sequence(1);
+FROM trades;
 ```
 
 | to_date                  |
