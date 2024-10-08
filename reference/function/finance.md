@@ -1,7 +1,7 @@
 ---
 title: Finance functions
 sidebar_label: Finance
-description: Market data functions reference documentation.
+description: Market data and financial functions reference documentation.
 ---
 
 This page describes functions specific to the financial services domain.
