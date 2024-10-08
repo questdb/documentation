@@ -18,8 +18,9 @@ The precision of HyperLogLog can be controlled via the optional `precision`
 parameter, typically between 4 and 16. A higher precision leads to more accurate
 results with increased memory usage. The default is 1.
 
-This function is useful within [high cardinality](/glossary/high-cardinality/) datasets where an exact count is
-not required. Thus consider it the higher cardinality alternative to
+This function is useful within [high cardinality](/glossary/high-cardinality/)
+datasets where an exact count is not required. Thus consider it the higher
+cardinality alternative to
 [`count_dinstinct`](/docs/reference/function/aggregation/#count_distinct).
 
 ### Parameters
@@ -422,7 +423,8 @@ SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY paym
 - `last(column_name)` - returns the last value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and `uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
+`uuid`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
 then the first row is always the row with the lowest timestamp (oldest) and the
@@ -499,7 +501,8 @@ SELECT last(device_id) FROM sensors_unordered;
 - `first_not_null(column_name)` - returns the first non-null value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and `uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
+`uuid`.
 
 If a table has a designated timestamp, then the first non-null row is always the
 row with the lowest timestamp (oldest). For a table without a designated
@@ -555,7 +558,8 @@ SELECT first_not_null(device_id) FROM sensors_unordered;
 - `last_not_null(column_name)` - returns the last non-null value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and `uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
+`uuid`.
 
 If a table has a designated timestamp, then the last non-null row is always the
 row with the highest timestamp (most recent). For a table without a designated
@@ -828,6 +832,68 @@ FROM (SELECT x FROM long_sequence(5));
 | string_agg |
 | :--------- |
 | 1,2,3,4,5  |
+
+## string_distinct_agg
+
+`string_distinct_agg(value, delimiter)` - Concatenates distinct non-null string
+values into a single string, using the specified delimiter to separate the
+values.
+
+- `string_distinct_agg` ignores null values and only concatenates non-null
+  distinct values.
+
+- The order of concatenated values is not guaranteed.
+
+### Arguments
+
+- `value`: A varchar or string column containing the values to be aggregated.
+- `delimiter`: A char value used to separate the distinct values in the
+  concatenated string.
+
+### Return value
+
+Return value type is `varchar`.
+
+### Examples
+
+Suppose we want to find all the distinct sky cover types observed in the weather
+tablein our public demo:
+
+```questdb-sql title="string_distinct_agg example" demo
+SELECT string_distinct_agg(skyCover, ',') AS distinct_sky_covers FROM weather;
+```
+
+This query will return a single string containing all the distinct skyCover
+values separated by commas. The skyCover column contains values such as OVC
+(Overcast), BKN (Broken clouds), SCT (Scattered clouds), and CLR (Clear skies).
+Even though the skyCover column may have many rows with repeated values,
+string_distinct_agg aggregates only the unique non-null values. The result is a
+comma-separated list of all distinct sky cover conditions observed.
+
+Result:
+
+| Sky code key | Description |
+| ------------ | ----------- |
+| OVC          | Overcast    |
+| BKN          | Broken      |
+| SCT          | Scattered   |
+| CLR          | Clear       |
+
+You can also group the aggregation by another column.
+
+To find out which sky cover conditions are observed for each wind direction:
+
+```questdb-sql title="string_distinct_agg example with GROUP BY" demo
+SELECT windDir, string_distinct_agg(skyCover, ',') AS distinct_sky_covers
+FROM weather
+GROUP BY windDir;
+```
+
+| windDir | distinct_sky_covers |
+| ------- | ------------------- |
+| 30      | OVC,BKN             |
+| 45      | BKN,SCT             |
+| 60      | OVC,SCT,CLR         |
 
 ## sum
 
