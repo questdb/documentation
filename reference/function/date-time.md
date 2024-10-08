@@ -448,7 +448,7 @@ two timestamps.
 **Arguments:**
 
 - `start_timestamp` is a timestamp.
-- `end_timestamp` is a timestamp.
+- `end_timestamp` is a timestamp not earlier than the `start_timestamp`.
 
 **Return value:**
 
