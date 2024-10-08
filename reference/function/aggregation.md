@@ -852,7 +852,7 @@ values.
 
 ### Return value
 
-Return value type is `varchar`.
+Return value type is `string`.
 
 ### Examples
 
