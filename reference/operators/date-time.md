@@ -14,6 +14,61 @@ If an operator's first argument is a table's timestamp, QuestDB may use an
 
 :::
 
+## `BETWEEN` value1 `AND` value2
+
+The `BETWEEN` operator allows you to specify a non-standard range. It includes
+both upper and lower bounds, similar to standard SQL. The order of these bounds
+is interchangeable, meaning `BETWEEN X AND Y` is equivalent to
+`BETWEEN Y AND X`.
+
+#### Arguments
+
+- `value1` and `value2` can be of `date`, `timestamp`, or `string` type.
+
+#### Examples
+
+```questdb-sql title="Explicit range"
+SELECT * FROM trades
+WHERE timestamp BETWEEN '2022-01-01T00:00:23.000000Z' AND '2023-01-01T00:00:23.500000Z';
+```
+
+This query returns all records within the specified timestamp range:
+
+| ts                          | value |
+| --------------------------- | ----- |
+| 2018-01-01T00:00:23.000000Z | 123.4 |
+| ...                         | ...   |
+| 2018-01-01T00:00:23.500000Z | 131.5 |
+
+The `BETWEEN` operator can also accept non-constant bounds. For instance, the
+following query returns all records older than one year from the current date:
+
+```questdb-sql title="One year before current date" demo
+SELECT * FROM trades
+WHERE timestamp BETWEEN to_str(now(), 'yyyy-MM-dd')
+AND dateadd('y', -1, to_str(now(), 'yyyy-MM-dd'));
+```
+
+The result set for this query would be:
+
+| ts                          | score |
+| --------------------------- | ----- |
+| 2018-01-01T00:00:00.000000Z | 123.4 |
+| ...                         | ...   |
+| 2018-12-31T23:59:59.999999Z | 115.8 |
+
+```questdb-sql title="Results between two specific timestamps"
+SELECT * FROM trades WHERE ts BETWEEN '2022-05-23T12:15:00.000000Z' AND '2023-05-23T12:16:00.000000Z';
+```
+
+This query returns all records from the 15th minute of 12 PM on May 23, 2018:
+
+| ts                          | score |
+| --------------------------- | ----- |
+| 2018-05-23T12:15:00.000000Z | 123.4 |
+| ...                         | ...   |
+| 2018-05-23T12:15:59.999999Z | 115.8 |
+
 ## `IN` (timeRange)
 
 Returns results within a defined range of time.
@@ -72,8 +127,8 @@ time range repeatedly, for a set number of times.
 - `modifier` is a signed integer modifying the upper bound applying to the
   `timestamp`:
 
-    - A `positive` value extends the selected period.
-    - A `negative` value reduces the selected period.
+  - A `positive` value extends the selected period.
+  - A `negative` value reduces the selected period.
 
 - `interval` is an unsigned integer indicating the desired interval period for
   the time range.
@@ -129,57 +184,34 @@ results on Jan 1-2 in 2018 and in 2019:
 | ...                         | ...   |
 | 2019-01-02T23:59:59.999999Z | 103.8 |
 
-## `BETWEEN` value1 `AND` value2
+## `IN` (interval)
 
-The `BETWEEN` operator allows you to specify a non-standard range. It includes
-both upper and lower bounds, similar to standard SQL. The order of these bounds
-is interchangeable, meaning `BETWEEN X AND Y` is equivalent to
-`BETWEEN Y AND X`.
+Returns results within a defined range of time, as specified by an `interval` value.
 
 #### Arguments
 
-- `value1` and `value2` can be of `date`, `timestamp`, or `string` type.
+- `interval` is an `interval` type representing the desired time range.
 
 #### Examples
 
-```questdb-sql title="Explicit range"
-SELECT * FROM scores
-WHERE ts BETWEEN '2018-01-01T00:00:23.000000Z' AND '2018-01-01T00:00:23.500000Z';
+```questdb-sql title="Check if timestamp is in interval success" demo
+SELECT true as is_in_interval FROM trades
+WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2018', '2019')
+LIMIT -1
 ```
 
-This query returns all records within the specified timestamp range:
+| is_in_interval |
+| -------------- |
+| true           |
 
-| ts                          | value |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:23.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-01T00:00:23.500000Z | 131.5 |
+If we adjust the interval to be not in range, we get no result:
 
-The `BETWEEN` operator can also accept non-constant bounds. For instance, the
-following query returns all records older than one year from the current date:
-
-```questdb-sql title="One year before current date"
-SELECT * FROM scores
-WHERE ts BETWEEN to_str(now(), 'yyyy-MM-dd')
-AND dateadd('y', -1, to_str(now(), 'yyyy-MM-dd'));
+```questdb-sql title="Check if timestamp is in interval failure" demo
+SELECT true as is_in_interval FROM trades
+WHERE '2022-05-17T00:00:00Z'::timestamp IN interval('2022', '2023')
+LIMIT -1;
 ```
 
-The result set for this query would be:
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-12-31T23:59:59.999999Z | 115.8 |
-
-```questdb-sql title="Results between two specific timestamps"
-SELECT * FROM scores WHERE ts BETWEEN '2018-05-23T12:15:00.000000Z' AND '2018-05-23T12:16:00.000000Z';
-```
-
-This query returns all records from the 15th minute of 12 PM on May 23, 2018:
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-05-23T12:15:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-05-23T12:15:59.999999Z | 115.8 |
+| is_in_interval |
+| -------------- |
+|                |
