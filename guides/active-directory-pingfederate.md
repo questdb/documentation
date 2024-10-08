@@ -25,7 +25,7 @@ First thing first, let's pick a name for the client!
   width={750}
 />
 
-The QuestDB Web Console is a SPA (Single Page App).
+The QuestDB [Web Console](/docs/web-console/) is a SPA (Single Page App).
 
 As a result, it cannot store safely a client secret.
 
@@ -33,7 +33,7 @@ Instead it can use PKCE (Proof Key for Code Exchange) to secure the flow.
 
 As shown above, leave the client authentication disabled.
 
-We also have to white list the URL of the Web Console as a redirection URL:
+We also have to white list the URL of the [Web Console](/docs/web-console/) as a redirection URL:
 
 <Screenshot
   alt="PingFederate image, redirection URL"
@@ -43,7 +43,7 @@ We also have to white list the URL of the Web Console as a redirection URL:
 />
 
 We can instruct PingFederate to automatically authorize the scopes requested by
-the Web Console.
+the [Web Console](/docs/web-console/).
 
 The user will not be presented the extra window asking for consent after
 authentication:
@@ -55,7 +55,7 @@ authentication:
   width={500}
 />
 
-The Web Console uses the
+The [Web Console](/docs/web-console/) uses the
 [Authorization Code Flow](/docs/operations/openid-connect-oidc-integration/#authentication-and-authorization-flow),
 and refreshes tokens automatically.
 
@@ -96,7 +96,7 @@ QuestDB does not require any special setup regarding the access token.
 We recommend that you do not to use shorter tokens than the default 28
 characters.
 
-As the QuestDB Web Console refreshes the token automatically, there is no need
+As the QuestDB [Web Console](/docs/web-console/) refreshes the token automatically, there is no need
 for long-lived tokens:
 
 <Screenshot
@@ -142,7 +142,7 @@ Next, ensure the `ROLL REFRESH TOKEN VALUES` option is selected:
   jumbo={true}
 />
 
-It is also important to whitelist the Web Console's URL on the CORS list:
+It is also important to whitelist the [Web Console](/docs/web-console/)'s URL on the CORS list:
 
 <Screenshot
   alt="PingFederate, authorization server ui"
@@ -327,7 +327,7 @@ QuestDB requires a mapping, as laid out in the
 [OIDC operations document](/docs/operations/openid-connect-oidc-integration/#mapping-user-permissions).
 
 If a given user has the HTTP permission, they will be able to now login via the
-Web Console.
+[Web Console](/docs/web-console/).
 
 Head to [http://localhost:9000](http://localhost:9000) and login, to test.
 

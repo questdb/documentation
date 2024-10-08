@@ -1,7 +1,6 @@
 ---
 title: Web Console
-description:
-  Learn how to use the QuestDB Web Console. Launch queries, create
+description: Learn how to use the QuestDB Web Console. Launch queries, create
   visualizations and more. Includes pictures and examples.
 ---
 
@@ -9,7 +8,7 @@ import Screenshot from "@theme/Screenshot"
 
 ## Web Console
 
-The Web Console is a client that allows you to interact with QuestDB. It
+The [Web Console](/docs/web-console/) is a client that allows you to interact with QuestDB. It
 provides UI tools to query data and visualize the results in a table or plot.
 
 <Screenshot
@@ -19,7 +18,7 @@ provides UI tools to query data and visualize the results in a table or plot.
 
 ### Accessing the Web Console
 
-The Web Console will be available at `http://[server-address]:9000`. When
+The [Web Console](/docs/web-console/) will be available at `http://[server-address]:9000`. When
 running locally, this will be [http://localhost:9000](http://localhost:9000).
 
 ### Layout

@@ -27,13 +27,13 @@ Once Docker is installed, you will need to pull QuestDB's image from
 This can be done with a single command using:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`docker run \\
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`docker run \\
   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\
   questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+</CodeBlock>
+)}
 />
 
 This command starts a Docker container from `questdb/questdb` image. In
@@ -79,11 +79,11 @@ By default, `questdb/questdb` points to the latest QuestDB version available on
 Docker. However, it is recommended to define the version used.
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`questdb/questdb:${release.name}`}
+</CodeBlock>
+)}
 />
 
 ## Environment variables
@@ -177,16 +177,16 @@ following example demonstrated how to mount the current directory to a QuestDB
 container using the `-v` flag in a Docker `run` command:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell" title={"Mounting a volume"}>
-      {`docker run -p 9000:9000 \\
+renderText={(release) => (
+<CodeBlock className="language-shell" title={"Mounting a volume"}>
+{`docker run -p 9000:9000 \\
   -p 9009:9009 \\
   -p 8812:8812 \\
   -p 9003:9003 \\
   -v "$(pwd):/var/lib/questdb" \\
   questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+</CodeBlock>
+)}
 />
 
 The current directory will then have data persisted to disk for convenient
@@ -211,14 +211,14 @@ http.bind.to=0.0.0.0:4000
 
 Running the container with the `-v` flag allows for mounting the current
 directory to QuestDB's `conf` directory in the container. With the server
-configuration above, HTTP ports for the web console and REST API will be
+configuration above, HTTP ports for the [Web Console](/docs/web-console/) and REST API will be
 available on [localhost:4000](http://localhost:4000):
 
 ```bash
 docker run -v "$(pwd):/var/lib/questdb/conf" -p 4000:4000 questdb/questdb
 ```
 
-:::note 
+:::note
 
 If you wish to use ZFS for your QuestDB deployment, with Docker, then you will need to enable ZFS on the host volume that Docker uses.
 
@@ -261,21 +261,21 @@ docker rm dd363939f261
 3. Download the latest QuestDB image:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`docker pull questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`docker pull questdb/questdb:${release.name}`}
+</CodeBlock>
+)}
 />
 
 4. Start a new container with the new version and the same volume mounted:
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`docker run -p 8812:8812 -p 9000:9000 -v "$(pwd):/var/lib/questdb" questdb/questdb:${release.name}`}
-    </CodeBlock>
-  )}
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`docker run -p 8812:8812 -p 9000:9000 -v "$(pwd):/var/lib/questdb" questdb/questdb:${release.name}`}
+</CodeBlock>
+)}
 />
 
 ### Writing logs to disk

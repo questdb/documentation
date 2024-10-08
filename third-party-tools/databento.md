@@ -3,12 +3,12 @@ title: "Databento"
 description: Guide to ingest and analyze live multi-stream market data from Databento using QuestDB and Grafana.
 ---
 
-[Databento](https://databento.com/) is a market data aggregator that provides a single,
+[Databento](/docs/third-party-tools/databento/) is a market data aggregator that provides a single,
 normalized feed covering multiple venues,
 simplifying the process of ingesting live market data.
 It interfaces well with QuestDB for real-time data analysis and visualization in Grafana.
 
-This guide will show how to ingest live market data from Databento into QuestDB and visualize it using Grafana.
+This guide will show how to ingest live market data from [Databento](/docs/third-party-tools/databento/) into QuestDB and visualize it using Grafana.
 
 For a deeper dive, see our [Databento & QuestDB blog](/blog/ingesting-live-market-data-data-bento/).
 

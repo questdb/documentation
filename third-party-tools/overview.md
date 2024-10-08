@@ -16,7 +16,7 @@ Interact with and visualize your QuestDB data using these powerful visualization
 platforms:
 
 - **[Grafana](/docs/third-party-tools/grafana/):** Create stunning dashboards
-  and interactive graphs for time-series data visualization.
+  and interactive graphs for [time-series data](/blog/what-is-time-series-data/) visualization.
 - [Superset](/docs/third-party-tools/superset/): Build interactive
   visualizations and perform ad-hoc data analysis.
 
@@ -41,10 +41,10 @@ integrations:
 Enhance your data analysis and processing capabilities with QuestDB through
 these tools:
 
-- [Pandas](/docs/third-party-tools/pandas/): Analyze time-series data in Python
+- [Pandas](/docs/third-party-tools/pandas/): Analyze [time-series data](/blog/what-is-time-series-data/) in Python
   with powerful data structures.
 - [MindsDB](/docs/third-party-tools/mindsdb/): Build machine learning models for
-  predictive analytics on time-series data.
+  predictive analytics on[time-series data](/blog/what-is-time-series-data/).
 - [Embeddable](/docs/third-party-tools/embeddable/): Developer toolkit for
   building fast, interactive customer-facing analytics.
 

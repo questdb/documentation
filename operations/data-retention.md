@@ -1,12 +1,11 @@
 ---
 title: Data retention
-description:
-  How to employ a data retention strategy to delete old data and save disk space
+description: How to employ a data retention strategy to delete old data and save disk space
 ---
 
 ## Background
 
-The nature of time-series data is that the relevance of information diminishes
+The nature of [time-series data](/blog/what-is-time-series-data/) is that the relevance of information diminishes
 over time. If stale data is no longer required, users can delete old data from
 QuestDB to either save disk space or adhere to a data retention policy. This is
 achieved in QuestDB by removing data partitions from a table.

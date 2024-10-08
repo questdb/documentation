@@ -21,7 +21,7 @@ we quickly want to summarize it:
   the table
 - The actual data is stored in column files inside these subdirectories
 - Column files store data **ordered by the designated timestamp** and they are
-  **append-only**. This goes naturally with time-series data, just think about
+  **append-only**. This goes naturally with [time-series data](/blog/what-is-time-series-data/), just think about
   market data where the price of different financial instruments are tracked
   during the trading day, for example
 
