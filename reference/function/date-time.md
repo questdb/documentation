@@ -813,6 +813,29 @@ SELECT second(ts), count() FROM transactions;
 | 58     | 9876  |
 | 59     | 2567  |
 
+
+## today, tomorrow, yesterday
+
+`today()` - returns an interval representing the current day.
+`tomorrow()` - returns an interval representing the next day.
+`yesterday()` - returns an interval representing the previous day.
+
+**Arguments:**
+
+No arguments taken.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today"
+SELECT true as in_today FROM long_sequence(1)
+WHERE now() IN today();
+```
+
+
 ## sysdate
 
 `sysdate()` - returns the timestamp of the host system as a `date` with
