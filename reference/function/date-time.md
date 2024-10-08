@@ -836,6 +836,36 @@ WHERE now() IN today();
 ```
 
 
+## today, tomorrow, yesterday with timezone
+
+`today(tz)` - returns an interval representing the current day with timezone adjustment.
+`tomorrow(tz)` - returns an interval representing the next day timezone adjustment.
+`yesterday(tz)` - returns an interval representing the previous day timezone adjustment.
+
+**Arguments:**
+
+`tz` is a `string` matching a timezone.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today"
+
+SELECT today() as today, today('CEST') as adjusted
+```
+
+| today                                                    | adjusted                                                 |
+|:---------------------------------------------------------|:---------------------------------------------------------|
+| ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
+
+
+This function allows the user to specify their local timezone and receive a UTC interval that corresponds to their 'day'.
+
+In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM` `UTC` the day before.
+
 ## sysdate
 
 `sysdate()` - returns the timestamp of the host system as a `date` with
