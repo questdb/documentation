@@ -856,7 +856,7 @@ Return value is of type `interval`.
 
 ```questdb-sql title="Using today"
 
-SELECT today() as today, today('CEST') as adjusted
+SELECT today() as today, today('CEST') as adjusted;
 ```
 
 | today                                                    | adjusted                                                 |
