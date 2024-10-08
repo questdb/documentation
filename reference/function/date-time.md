@@ -482,7 +482,7 @@ Return value type is `timestamp`.
 ```questdb-sql title="Extract an interval lower bound"
 SELECT
   interval_start(
-    interval(now(), dateadd('d', 1, now()) - 1)
+    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
   )
 ```
 
@@ -508,7 +508,7 @@ Return value type is `timestamp`.
 ```questdb-sql title="Extract an interval upper bound"
 SELECT
   interval_end(
-    interval(now(), dateadd('d', 1, now()) - 1)
+    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
   )
 ```
 
