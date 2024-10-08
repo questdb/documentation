@@ -457,7 +457,7 @@ Return value type is `interval`.
 
 **Examples:**
 
-```questdb-sql title="Construct an interval"
+```questdb-sql title="Construct an interval" demo
 SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
 ```
 
@@ -479,7 +479,7 @@ Return value type is `timestamp`.
 
 **Examples:**
 
-```questdb-sql title="Extract an interval lower bound"
+```questdb-sql title="Extract an interval lower bound" demo
 SELECT
   interval_start(
     interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
@@ -504,7 +504,7 @@ Return value type is `timestamp`.
 
 **Examples:**
 
-```questdb-sql title="Extract an interval upper bound"
+```questdb-sql title="Extract an interval upper bound" demo
 SELECT
   interval_end(
     interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
@@ -530,8 +530,10 @@ Return value type is `boolean`
 
 **Examples:**
 
-```questdb-sql
-SELECT year(ts), is_leap_year(ts) FROM myTable;
+```questdb-sql title="Simple example" demo
+SELECT year(timestamp), is_leap_year(timestamp)
+FROM trades
+limit -1;
 ```
 
 | year | is_leap_year |
@@ -649,9 +651,10 @@ Return value type is `int`
 
 **Examples:**
 
-```questdb-sql title="Minute of the hour"
-SELECT minute(to_timestamp('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
-FROM long_sequence(1);
+```questdb-sql title="Minute of the hour" demo
+SELECT minute(to_timestamp('2022-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
+FROM trades
+LIMIT -1;
 ```
 
 | minute |
@@ -854,8 +857,7 @@ Return value is of type `interval`.
 
 **Examples:**
 
-```questdb-sql title="Using today"
-
+```questdb-sql title="Using today" demo
 SELECT today() as today, today('CEST') as adjusted;
 ```
 

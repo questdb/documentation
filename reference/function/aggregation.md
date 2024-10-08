@@ -862,7 +862,8 @@ Suppose we want to find all the distinct sky cover types observed in the weather
 tablein our public demo:
 
 ```questdb-sql title="string_distinct_agg example" demo
-SELECT string_distinct_agg(skyCover, ',') AS distinct_sky_covers FROM weather;
+SELECT string_distinct_agg(skyCover, ',') AS distinct_sky_covers
+FROM weather;
 ```
 
 This query will return a single string containing all the distinct skyCover
