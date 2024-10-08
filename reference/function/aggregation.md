@@ -835,7 +835,7 @@ FROM (SELECT x FROM long_sequence(5));
 
 ## string_distinct_agg
 
-`string_distinct_agg(value, delimiter)` - Concatenates distinct non-null string
+`string_distinct_agg(value, delimiter)` - concatenates distinct non-null string
 values into a single string, using the specified delimiter to separate the
 values.
 
@@ -854,7 +854,7 @@ values.
 
 ### Return value
 
-Return value type is `varchar`.
+Return value type is `string`.
 
 ### Examples
 
