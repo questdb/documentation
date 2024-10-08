@@ -1,8 +1,7 @@
 ---
-title: Redpanda Connect (Benthos) Component
-description:
-    Redpanda Connect, formerly known as Benthos, ships with a QuestDB
-    output component that can be used as a sink for your stream processing data
+title: Redpanda Connect (Benthos)
+description: Redpanda Connect, formerly known as Benthos, ships with a QuestDB
+  output component that can be used as a sink for your stream processing data
 ---
 
 import Screenshot from "@theme/Screenshot"

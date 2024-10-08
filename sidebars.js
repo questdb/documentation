@@ -447,6 +447,7 @@ module.exports = {
         "third-party-tools/prometheus",
         "third-party-tools/qstudio",
         "third-party-tools/redpanda",
+        "third-party-tools/redpanda-connect",
         "third-party-tools/spark",
         "third-party-tools/sqlalchemy",
         "third-party-tools/superset",
