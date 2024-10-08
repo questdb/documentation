@@ -452,7 +452,7 @@ two timestamps.
 
 **Return value:**
 
-Return value type is `interval`
+Return value type is `interval`.
 
 **Examples:**
 
