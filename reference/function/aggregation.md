@@ -872,12 +872,12 @@ comma-separated list of all distinct sky cover conditions observed.
 
 Result:
 
-| Sky code key | Description |
-| ------------ | ----------- |
-| OVC          | Overcast    |
-| BKN          | Broken      |
-| SCT          | Scattered   |
-| CLR          | Clear       |
+| distinct_sky_covers | Description |
+| ------------------- | ----------- |
+| OVC                 | Overcast    |
+| BKN                 | Broken      |
+| SCT                 | Scattered   |
+| CLR                 | Clear       |
 
 You can also group the aggregation by another column.
 
