@@ -842,7 +842,9 @@ values.
 - `string_distinct_agg` ignores null values and only concatenates non-null
   distinct values.
 
-- The order of concatenated values is not guaranteed.
+- Order is guaranteed.
+
+- Does not support `ORDER BY`.
 
 ### Arguments
 
@@ -867,17 +869,14 @@ This query will return a single string containing all the distinct skyCover
 values separated by commas. The skyCover column contains values such as OVC
 (Overcast), BKN (Broken clouds), SCT (Scattered clouds), and CLR (Clear skies).
 Even though the skyCover column may have many rows with repeated values,
-string_distinct_agg aggregates only the unique non-null values. The result is a
+`string_distinct_agg` aggregates only the unique non-null values. The result is a
 comma-separated list of all distinct sky cover conditions observed.
 
 Result:
 
-| distinct_sky_covers | Description |
-| ------------------- | ----------- |
-| OVC                 | Overcast    |
-| BKN                 | Broken      |
-| SCT                 | Scattered   |
-| CLR                 | Clear       |
+| distinct_sky_covers |
+| ------------------- |
+| OVC,BKN,SCT,CLR,OBS |
 
 You can also group the aggregation by another column.
 
