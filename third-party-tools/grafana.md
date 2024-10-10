@@ -8,7 +8,7 @@ description:
 import Screenshot from "@theme/Screenshot"
 
 [Grafana](https://grafana.com/) is a popular observability and monitoring
-application used to visualize data and enable time-series data analysis.
+application used to visualize data and enable [time-series data analysis](/glossary/time-series-analysis/).
 
 QuestDB is available within Grafana via the
 [official QuestDB plugin](https://grafana.com/grafana/plugins/questdb-questdb-datasource/).
@@ -44,7 +44,7 @@ password:admin
 ## Start QuestDB
 
 The Docker version runs on port `8812` for the database connection and port
-`9000` for the Web Console and REST interface:
+`9000` for the [Web Console](/docs/web-console/) and REST interface:
 
 ```shell
 docker run --add-host=host.docker.internal:host-gateway \

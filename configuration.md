@@ -4,17 +4,17 @@ description: Server configuration keys reference documentation.
 ---
 
 import { ConfigTable } from "@theme/ConfigTable"
-import sharedWorkerConfig from "./configuration-utils/_shared-worker.config.json"
-import httpConfig from "./configuration-utils/_http.config.json"
-import cairoConfig from "./configuration-utils/_cairo.config.json"
-import parallelSqlConfig from "./configuration-utils/_parallel-sql.config.json"
-import walConfig from "./configuration-utils/_wal.config.json"
-import csvImportConfig from "./configuration-utils/_csv-import.config.json"
-import postgresConfig from "./configuration-utils/_postgres.config.json"
-import tcpConfig from "./configuration-utils/_tcp.config.json"
-import udpConfig from "./configuration-utils/_udp.config.json"
-import replicationConfig from "./configuration-utils/_replication.config.json"
-import oidcConfig from "./configuration-utils/_oidc.config.json"
+import sharedWorkerConfig from "./configuration-utils/\_shared-worker.config.json"
+import httpConfig from "./configuration-utils/\_http.config.json"
+import cairoConfig from "./configuration-utils/\_cairo.config.json"
+import parallelSqlConfig from "./configuration-utils/\_parallel-sql.config.json"
+import walConfig from "./configuration-utils/\_wal.config.json"
+import csvImportConfig from "./configuration-utils/\_csv-import.config.json"
+import postgresConfig from "./configuration-utils/\_postgres.config.json"
+import tcpConfig from "./configuration-utils/\_tcp.config.json"
+import udpConfig from "./configuration-utils/\_udp.config.json"
+import replicationConfig from "./configuration-utils/\_replication.config.json"
+import oidcConfig from "./configuration-utils/\_oidc.config.json"
 
 This page describes methods for configuring QuestDB server settings.
 
@@ -115,7 +115,7 @@ configuration) every other subsystem.
 
 ### HTTP server
 
-This section describes configuration settings for the Web Console and the REST
+This section describes configuration settings for the [Web Console](/docs/web-console/) and the REST
 API available by default on port `9000`. For details on the use of this
 component, refer to the [web console documentation](/docs/web-console/) page.
 
@@ -143,16 +143,16 @@ CSV files.
 Settings for `COPY`:
 
 <ConfigTable
-  rows={csvImportConfig}
-  pick={[
-    "cairo.sql.copy.root", 
-    "cairo.sql.copy.work.root",
-    "cairo.iouring.enabled",
-    "cairo.sql.copy.buffer.size",
-    "cairo.sql.copy.log.retention.days",
-    "cairo.sql.copy.max.index.chunk.size",
-    "cairo.sql.copy.queue.capacity",
-  ]}
+rows={csvImportConfig}
+pick={[
+"cairo.sql.copy.root",
+"cairo.sql.copy.work.root",
+"cairo.iouring.enabled",
+"cairo.sql.copy.buffer.size",
+"cairo.sql.copy.log.retention.days",
+"cairo.sql.copy.max.index.chunk.size",
+"cairo.sql.copy.queue.capacity",
+]}
 />
 
 #### CSV import configuration for Docker

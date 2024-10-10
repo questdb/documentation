@@ -23,7 +23,7 @@ formulating queries.
 ### Row serialization
 
 Row serialization and deserialization has a cost on both client and server. The
-QuestDB Web Console limits fetching to 10,000 dataset. When fetching a large
+QuestDB [Web Console](/docs/web-console/) limits fetching to 10,000 dataset. When fetching a large
 (10K+) dataset via a single query using other methods, consider using
 pagination, hence multiple queries instead.
 

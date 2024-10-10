@@ -1,7 +1,7 @@
 ---
 title: Finance functions
 sidebar_label: Finance
-description: Finance functions reference documentation.
+description: Market data and financial functions reference documentation.
 ---
 
 This page describes functions specific to the financial services domain.
@@ -18,7 +18,7 @@ side of an order book with `n` price levels. Then, the return value of the funct
 Let's take the below order book as an example.
 
 | Size | Bid   | Ask   | Size |
-|------|-------|-------|------|
+| ---- | ----- | ----- | ---- |
 | 10   | 14.10 | 14.50 | 14   |
 | 17   | 14.00 | 14.60 | 16   |
 | 19   | 13.90 | 14.80 | 23   |
@@ -28,9 +28,17 @@ Let's take the below order book as an example.
 A _buy market order_ with the size of 50 would wipe out the first two price levels of
 the _Ask_ side of the book, and would also trade on the third level.
 
-The full price of the trade: `14 * $14.50 + 16 * $14.60 + (50 - 14 - 16) * $14.80 = $732.6`
+The full price of the trade:
 
-The average price of the instrument in this trade: `$732.6 / 50 = $14.652`
+$$
+14 \cdot \$14.50 + 16 \cdot \$14.60 + (50 - 14 - 16) \cdot \$14.80 = \$732.60
+$$
+
+The average price of the instrument in this trade:
+
+$$
+\$732.60 / 50 = \$14.652
+$$
 
 This average trade price is the output of the function when executed with the parameters taken from
 the above example:
@@ -39,9 +47,9 @@ the above example:
 select l2price(50, 14, 14.50, 16, 14.60, 23, 14.80, 12, 15.10);
 ```
 
-| l2price   |
-|-----------|
-| 14.652    |
+| l2price |
+| ------- |
+| 14.652  |
 
 ### Parameters
 
@@ -85,19 +93,19 @@ SELECT ts, L2PRICE(100, askSize1, ask1, askSize2, ask2, askSize3, ask3) AS buy F
 ```
 
 | ts                          | buy             |
-|-----------------------------|-----------------|
+| --------------------------- | --------------- |
 | 2024-05-22T09:40:15.006000Z | 14.565999999999 |
 | 2024-05-22T09:40:15.175000Z | 14.495          |
 | 2024-05-22T09:40:15.522000Z | 14.493          |
-
 
 Trading price of instrument when selling 100:
 
 ```questdb-sql
 SELECT ts, L2PRICE(100, bidSize1, bid1, bidSize2, bid2, bidSize3, bid3) AS sell FROM order_book;
 ```
+
 | ts                          | sell   |
-|-----------------------------|--------|
+| --------------------------- | ------ |
 | 2024-05-22T09:40:15.006000Z | 14.027 |
 | 2024-05-22T09:40:15.175000Z | 13.929 |
 | 2024-05-22T09:40:15.522000Z | 14.01  |
@@ -110,16 +118,81 @@ SELECT ts, L2PRICE(100, askSize1, ask1, askSize2, ask2, askSize3, ask3)
 ```
 
 | ts                          | spread         |
-|-----------------------------|----------------|
+| --------------------------- | -------------- |
 | 2024-05-22T09:40:15.006000Z | 0.538999999999 |
 | 2024-05-22T09:40:15.175000Z | 0.565999999999 |
 | 2024-05-22T09:40:15.522000Z | 0.483          |
 
+## mid
+
+`mid(bid, ask)` - calculates the midpoint of a bidding price and asking price.
+
+Returns null if either argument is NaN or null.
+
+### Parameters
+
+- `bid` is any numeric bidding price value.
+- `ask` is any numeric asking price value.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT mid(1.5760, 1.5763)
+```
+
+| mid     |
+| :------ |
+| 1.57615 |
+
+## spread_bps
+
+`spread_bps(bid, ask)` - calculates the quoted bid-ask spread, based on the highest bidding price,
+and the lowest asking price.
+
+The result is provided in basis points, and the calculation is:
+
+$$
+\frac
+{\text{spread}\left(\text{bid}, \text{ask}\right)}
+{\text{mid}\left(\text{bid}, \text{ask}\right)}
+\cdot
+10\,000
+$$
+
+### Parameters
+
+- `bid` is any numeric bidding price value.
+- `ask` is any numeric asking price value.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT spread_bps(1.5760, 1.5763)
+```
+
+| spread_bps     |
+| :------------- |
+| 1.903372140976 |
+
 ## vwap
 
 `vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
-based on the given price and quantity columns. This is a handy replacement for
-the `sum(price * quantity) / sum(quantity)` expression.
+based on the given price and quantity columns. This is defined by the following formula:
+
+$$
+\text{vwap} =
+\frac
+{\text{sum}\left(\text{price} \cdot \text{quantity}\right)}
+{\text{sum}\left(\text{quantity}\right)}
+$$
 
 ### Parameters
 
@@ -140,3 +213,44 @@ FROM (SELECT x FROM long_sequence(100));
 | vwap |
 | :--- |
 | 67   |
+
+## wmid
+
+`wmid(bidSize, bidPrice, askPrice, askSize)` - calculates the weighted mid-price
+for a sized bid/ask pair.
+
+It is calculated with these formulae:
+
+$$
+\text{imbalance} =
+\frac
+{ \text{bidSize} }
+{ \left(  \text{bidSize} + \text{askSize} \right) }
+$$
+
+$$
+\text{wmid} = \text{askPrice} \cdot \text{imbalance}
++ \text{bidPrice}
+\cdot \left( 1 - \text{imbalance} \right)
+$$
+
+### Parameters
+
+- `bidSize` is any numeric value representing the size of the bid offer.
+- `bidPrice` is any numeric value representing the bidding price.
+- `askPrice` is any numeric value representing the asking price.
+- `askSize` is any numeric value representing the size of the ask offer.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT wmid(100, 5, 6, 100)
+```
+
+| wmid |
+| :--- |
+| 5.5  |

@@ -15,7 +15,7 @@ software vendors that runs on AWS. This guide describes how to launch QuestDB
 via the AWS Marketplace using the official listing. This document also describes
 usage instructions after you have launched the instance, including hints for
 authentication, the available interfaces, and tips for accessing the REST API
-and web console.
+and [Web Console](/docs/web-console/).
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ For details on the server properties and using this file, see the
 
 The default ports used by QuestDB interfaces are as follows:
 
-- Web console &amp; REST API is available on port `9000`
+- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`
@@ -143,14 +143,14 @@ systemctl stop questdb.service
 - Download and copy over the new binary
 
 <InterpolateReleaseData
-  renderText={(release) => (
-    <CodeBlock className="language-shell">
-      {`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz \\
+renderText={(release) => (
+<CodeBlock className="language-shell">
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz \\
 tar xzvf questdb-${release.name}-no-jre-bin.tar.gz
 cp questdb-${release.name}-no-jre-bin/questdb.jar /usr/local/bin/questdb.jar
 cp questdb-${release.name}-no-jre-bin/questdb.jar /usr/local/bin/questdb-${release.name}.jar`}
-    </CodeBlock>
-  )}
+</CodeBlock>
+)}
 />
 
 - Restart the service again:

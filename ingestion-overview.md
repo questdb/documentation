@@ -20,7 +20,7 @@ platforms, queues, and more.
 **Recommended!**
 
 Our first party clients are **the fastest way to insert data, and they excel
-with high volume, high cardinality data streaming.**
+with high volume, [high cardinality](/glossary/high-cardinality/) data streaming.**
 
 To start quickly, select your language:
 
@@ -74,7 +74,7 @@ Checkout our quick start guides for the following:
 
 For GUI-driven CSV upload which leverages the
 [built-in REST HTTP API](/docs/reference/api/rest/), use the
-[Import tab](/docs/web-console/#import) in the Web Console:
+[Import tab](/docs/web-console/#import) in the [Web Console](/docs/web-console/):
 
 <Screenshot
   alt="Screenshot of the UI for import"
@@ -107,7 +107,7 @@ No data yet? Just starting? No worries. We've got you covered.
 There are several quick scaffolding options:
 
 1. [QuestDB demo instance](https://demo.questdb.io): Hosted, fully loaded and
-   ready to go. Quickly explore the Web Console and SQL syntax.
+   ready to go. Quickly explore the [Web Console](/docs/web-console/) and SQL syntax.
 2. [Create my first data set guide](/docs/guides/create-database/): Create
    tables, use `rnd_` functions and make your own data.
 3. [Sample dataset repos](https://github.com/questdb/sample-datasets): IoT,

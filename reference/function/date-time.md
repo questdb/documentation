@@ -73,7 +73,7 @@ in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution a
 
 Since both types are backed by a signed long, this means the `DATE` type has a
 wider range. A `DATE` column can store about ±2.9 million years from the Unix epoch, whereas a `TIMESTAMP` has an approximate
-range of ±290,000 years. 
+range of ±290,000 years.
 
 For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
 
@@ -248,9 +248,10 @@ Return value type is `int`
 
 **Examples:**
 
-```questdb-sql title="Day of the month"
+```questdb-sql title="Day of the month" demo
 SELECT day(to_timestamp('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
-FROM long_sequence(1);
+FROM trades
+LIMIT -1;
 ```
 
 | day |
@@ -440,6 +441,80 @@ SELECT hour(ts), count() FROM transactions;
 | 22   | 9876  |
 | 23   | 2567  |
 
+## interval
+
+`interval(start_timestamp, end_timestamp)` - creates a time interval from
+two timestamps.
+
+**Arguments:**
+
+- `start_timestamp` is a timestamp.
+- `end_timestamp` is a timestamp not earlier than the `start_timestamp`.
+
+**Return value:**
+
+Return value type is `interval`.
+
+**Examples:**
+
+```questdb-sql title="Construct an interval" demo
+SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
+```
+
+| interval                                                 |
+| :------------------------------------------------------- |
+| ('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z') |
+
+## interval_start
+
+`interval_start(interval)` - extracts the lower bound of the interval.
+
+**Arguments:**
+
+- `interval` is an `interval`.
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="Extract an interval lower bound" demo
+SELECT
+  interval_start(
+    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
+  )
+```
+
+| interval_start              |
+| :-------------------------- |
+| 2024-10-08T11:09:47.573000Z |
+
+## interval_end
+
+`interval_end(interval)` - extracts the upper bound of the interval.
+
+**Arguments:**
+
+- `interval` is an `interval`.
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="Extract an interval upper bound" demo
+SELECT
+  interval_end(
+    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
+  )
+```
+
+| interval_end                |
+| :-------------------------- |
+| 2024-10-09T11:09:47.573000Z |
+
 ## is_leap_year
 
 `is_leap_year(value)` - returns `true` if the `year` of `value` is a leap year,
@@ -455,8 +530,10 @@ Return value type is `boolean`
 
 **Examples:**
 
-```questdb-sql
-SELECT year(ts), is_leap_year(ts) FROM myTable;
+```questdb-sql title="Simple example" demo
+SELECT year(timestamp), is_leap_year(timestamp)
+FROM trades
+limit -1;
 ```
 
 | year | is_leap_year |
@@ -574,9 +651,10 @@ Return value type is `int`
 
 **Examples:**
 
-```questdb-sql title="Minute of the hour"
-SELECT minute(to_timestamp('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
-FROM long_sequence(1);
+```questdb-sql title="Minute of the hour" demo
+SELECT minute(to_timestamp('2022-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss'))
+FROM trades
+LIMIT -1;
 ```
 
 | minute |
@@ -735,6 +813,61 @@ SELECT second(ts), count() FROM transactions;
 | ...    | ...   |
 | 58     | 9876  |
 | 59     | 2567  |
+
+## today, tomorrow, yesterday
+
+- `today()` - returns an interval representing the current day.
+
+- `tomorrow()` - returns an interval representing the next day.
+
+- `yesterday()` - returns an interval representing the previous day.
+
+Interval is in the UTC/GMT+0 timezone.
+
+**Arguments:**
+
+No arguments taken.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today"
+SELECT true as in_today FROM long_sequence(1)
+WHERE now() IN today();
+```
+
+## today, tomorrow, yesterday with timezone
+
+- `today(timezone)` - returns an interval representing the current day with timezone adjustment.
+
+- `tomorrow(timezone)` - returns an interval representing the next day timezone adjustment.
+
+- `yesterday(timezone)` - returns an interval representing the previous day timezone adjustment.
+
+**Arguments:**
+
+`timezone` is a `string` matching a timezone.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today" demo
+SELECT today() as today, today('CEST') as adjusted;
+```
+
+| today                                                    | adjusted                                                 |
+| :------------------------------------------------------- | :------------------------------------------------------- |
+| ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
+
+This function allows the user to specify their local timezone and receive a UTC interval that corresponds to their 'day'.
+
+In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM` `UTC` the day before.
 
 ## sysdate
 
@@ -1015,9 +1148,9 @@ Return value type is `date`
 
 **Examples:**
 
-```questdb-sql title="string matches format"
+```questdb-sql title="string matches format" demo
 SELECT to_date('2020-03-01:15:43:21', 'yyyy-MM-dd:HH:mm:ss')
-FROM long_sequence(1);
+FROM trades;
 ```
 
 | to_date                  |

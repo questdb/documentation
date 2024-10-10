@@ -47,7 +47,7 @@ The following are required prior to following this guide:
 
 ## Installation guide
 
-Changes take place in your `conf/server.conf` file, the QuestDB Web Console,
+Changes take place in your `conf/server.conf` file, the QuestDB [Web Console](/docs/web-console/),
 your app code or third-party tool.
 
 Check the code snippet's title to see where the command is to be invoked.
@@ -89,7 +89,7 @@ tls.private.key.path=/path/to/private_key
 ```
 
 To hot-reload the certificate and private key and update the files on disk,
-login to your QuestDB Web Console. This is accessible by default at
+login to your QuestDB [Web Console](/docs/web-console/). This is accessible by default at
 [localhost:9000](http://localhost:9000). Login using the built-in administrator
 credential.
 
@@ -145,14 +145,14 @@ delegate permissions.
 Create and govern users through **role-based access control** and the curation
 of your **access control list**.
 
-Interactive users may utilize the Web Console and/or the Postgres querying
+Interactive users may utilize the [Web Console](/docs/web-console/) and/or the Postgres querying
 clients. It is common practice to set them up as `readonly`. But how you setup
 these users or groups is up to you.
 
 For ingestion, we'll cover that in the next section. Consider this first wave of
 users your "database consumers".
 
-For permissions, the Web Console requires `HTTP`, and the PostgreSQL interface
+For permissions, the [Web Console](/docs/web-console/) requires `HTTP`, and the PostgreSQL interface
 requires `PGWIRE`:
 
 ```questdb-sql title="Web Console - Creating multiple users with differing permissions."
@@ -272,7 +272,7 @@ Once generated, safely store it.
 
 Connecting a client to ILP is a common path.
 
-However, you may use something like Kafka.
+However, you may use something like [Kafka](/docs/third-party-tools/kafka/overview/).
 
 ## 5. Ingest data, Kafka Connect (optional)
 

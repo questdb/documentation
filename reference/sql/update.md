@@ -15,7 +15,7 @@ Updates data in a database table.
 - the same `columnName` cannot be specified multiple times after the SET keyword
   as it would be ambiguous
 - the designated timestamp column cannot be updated as it would lead to altering
-  history of the time-series data
+  history of the [time-series data](/blog/what-is-time-series-data/)
 - If the target partition is
   [attached by a symbolic link](/docs/reference/sql/alter-table-attach-partition/#symbolic-links),
   the partition is read-only. `UPDATE` operation on a read-only partition will

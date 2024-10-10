@@ -488,11 +488,11 @@ There are three levels of permissions:
 
 #### Database endpoint permissions
 
-| permission | level    | description                                                                            |
-| ---------- | -------- | -------------------------------------------------------------------------------------- |
-| HTTP       | Database | Allows access to the REST API endpoint, this includes connection from the Web Console. |
-| ILP        | Database | Allows access to the InfluxDB Line Protocol (ILP) endpoint.                            |
-| PGWIRE     | Database | Allows access to the Postgres Wire endpoint.                                           |
+| permission | level    | description                                                                                                  |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| HTTP       | Database | Allows access to the REST API endpoint, this includes connection from the [Web Console](/docs/web-console/). |
+| ILP        | Database | Allows access to the InfluxDB Line Protocol (ILP) endpoint.                                                  |
+| PGWIRE     | Database | Allows access to the Postgres Wire endpoint.                                                                 |
 
 #### Special permissions
 
@@ -614,12 +614,12 @@ database.
 The table below shows the permission required for each endpoint and protocol
 combination.
 
-| Endpoint               | Protocol   | Transport Layer | Port (default) |     | Permission |
-| ---------------------- | ---------- | --------------- | -------------- | --- | ---------- |
-| Web Console            | JSON       | HTTP            | 9000           |     | HTTP       |
-| REST API               | JSON, TEXT | HTTP            | 9000           |     | HTTP       |
-| InfluxDB Line Protocol | ILP        | TCP             | 9009           |     | ILP        |
-| Postgres Wire Protocol | PG Wire    | TCP             | 8812           |     | PGWIRE     |
+| Endpoint                          | Protocol   | Transport Layer | Port (default) |     | Permission |
+| --------------------------------- | ---------- | --------------- | -------------- | --- | ---------- |
+| [Web Console](/docs/web-console/) | JSON       | HTTP            | 9000           |     | HTTP       |
+| REST API                          | JSON, TEXT | HTTP            | 9000           |     | HTTP       |
+| InfluxDB Line Protocol            | ILP        | TCP             | 9009           |     | ILP        |
+| Postgres Wire Protocol            | PG Wire    | TCP             | 8812           |     | PGWIRE     |
 
 An example where we create a new user to access the database only via the
 Postgres endpoint:

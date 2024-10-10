@@ -66,7 +66,7 @@ The Web Console is available by default at
 [localhost:9000](http://localhost:9000). The GUI makes it easy to write, return
 and chart queries. There is autocomplete, syntax highlighting, errors, and more.
 If you want to test a query or interact direclty with your data in the cleanest
-and simplest way, apply queries via the Web Console.
+and simplest way, apply queries via the [Web Console](/docs/web-console/).
 
 <Screenshot
   alt="A shot of the Web Console, showing auto complete and a colourful returned table."
@@ -75,7 +75,7 @@ and simplest way, apply queries via the Web Console.
 />
 
 For an example, click _Demo this query_ in the below snippet. This will run a
-query within our public demo instance and Web Console:
+query within our public demo instance and [Web Console](/docs/web-console/):
 
 ```questdb-sql title='Navigate time with SQL' demo
 SELECT
@@ -298,56 +298,56 @@ curl -G \
 The `node-fetch` package can be installed using `npm i node-fetch`.
 
 ```javascript
-const fetch = require("node-fetch")
+const fetch = require("node-fetch");
 
-const HOST = "http://localhost:9000"
+const HOST = "http://localhost:9000";
 
 async function createTable() {
   try {
-    const query = "CREATE TABLE IF NOT EXISTS trades (name VARCHAR, value INT)"
+    const query = "CREATE TABLE IF NOT EXISTS trades (name VARCHAR, value INT)";
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    )
-    const json = await response.json()
+    );
+    const json = await response.json();
 
-    console.log(json)
+    console.log(json);
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }
 
 async function insertData() {
   try {
-    const query = "INSERT INTO trades VALUES('abc', 123456)"
+    const query = "INSERT INTO trades VALUES('abc', 123456)";
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    )
-    const json = await response.json()
+    );
+    const json = await response.json();
 
-    console.log(json)
+    console.log(json);
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }
 
 async function updateData() {
   try {
-    const query = "UPDATE trades SET value = 9876 WHERE name = 'abc'"
+    const query = "UPDATE trades SET value = 9876 WHERE name = 'abc'";
 
     const response = await fetch(
       `${HOST}/exec?query=${encodeURIComponent(query)}`,
-    )
-    const json = await response.json()
+    );
+    const json = await response.json();
 
-    console.log(json)
+    console.log(json);
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 }
 
-createTable().then(insertData).then(updateData)
+createTable().then(insertData).then(updateData);
 ```
 
 </TabItem>
@@ -429,7 +429,7 @@ For more information, see the
 
 Now... SQL! It's query time.
 
-Whether you want to use the Web Console, PostgreSQL or REST HTTP (or both),
+Whether you want to use the [Web Console](/docs/web-console/), PostgreSQL or REST HTTP (or both),
 query construction is rich.
 
 To brush up and learn what's unique in QuestDB, consider the following:

@@ -239,7 +239,7 @@ Log files look like this:
 
 ## `public` directory
 
-Contains the web files for the Web Console:
+Contains the web files for the [Web Console](/docs/web-console/):
 
 ```filestructure
 └── public

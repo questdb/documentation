@@ -3,13 +3,13 @@ title: OpenID Connect (OIDC) Integration
 description: ""
 ---
 
-import Screenshot from "@theme/Screenshot"
+import Screenshot from "@theme/Screenshot";
 
 OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
 QuestDB.
 
 It is a convenient way to integrate QuestDB into your enterprise environment,
-and it provides SSO (Single Sign-On) for the Web Console.
+and it provides SSO (Single Sign-On) for the [Web Console](/docs/web-console/).
 
 Microsoft Active Directory and Azure AD, for example, can be turned into an
 Identity Provider.
@@ -45,10 +45,10 @@ We can break it down into core components.
 QuestDB's interactive UI. Users must authenticate before accessing the database
 via the interface.
 
-The Web Console uses PKCE (Proof Key for Code Exchange) to secure the
+The [Web Console](/docs/web-console/) uses PKCE (Proof Key for Code Exchange) to secure the
 authentication and authorization flow.
 
-In OAuth2/OIDC terms, the Web Console is referred to as the _client_, and it is
+In OAuth2/OIDC terms, the [Web Console](/docs/web-console/) is referred to as the _client_, and it is
 assigned an identifier, the _Client Id._
 
 Each application integrates via OIDC should be given a different Client Id.
@@ -92,20 +92,20 @@ Console, authenticated.
 Then, it allows QuestDB to determine the user's permissions based on user
 information provided by the Identity Providers.
 
-Specifically, the QuestDB Web Console uses the
+Specifically, the QuestDB [Web Console](/docs/web-console/) uses the
 `Authorization Code Flow with PKCE` option.
 
 It consists of ten steps...
 
 ### 1. Secret generation
 
-First the Web Console generates a cryptographically strong random secret, called
+First the [Web Console](/docs/web-console/) generates a cryptographically strong random secret, called
 the _code verifier_.
 
 The secret is hashed using the _SHA256 algorithm_, the result is the _code
 challenge_.
 
-After PKCE initialization the Web Console requests an _authorization code_ from
+After PKCE initialization the [Web Console](/docs/web-console/) requests an _authorization code_ from
 the OIDC Provider.
 
 It calls the Authorization endpoint with a few parameters, including the:
@@ -170,7 +170,7 @@ without presenting the user with an additional screen in the browser.
 
 Consent is granted!
 
-The Authorization Server redirects the user back to the Web Console with the
+The Authorization Server redirects the user back to the [Web Console](/docs/web-console/) with the
 _authorization code_:
 
 ```bash title="Authorization code response example"
@@ -179,7 +179,7 @@ https://questdb.host:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
 
 ### 5. Credential request
 
-Now, the QuestDB Web Console requests the ID and access tokens from the Token
+Now, the QuestDB [Web Console](/docs/web-console/) requests the ID and access tokens from the Token
 endpoint of the OIDC Provider with the authorization code.
 
 It includes the Client ID and the PKCE code verifier together with the
@@ -201,11 +201,11 @@ grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&clie
 
 ### 6. Credentials received
 
-If the PKCE check is passed, the Web Console receives the ID and access tokens.
+If the PKCE check is passed, the [Web Console](/docs/web-console/) receives the ID and access tokens.
 
 There is also a third token in the response too, the refresh token.
 
-The refresh token is used by the Web Console to refresh the access token before
+The refresh token is used by the [Web Console](/docs/web-console/) to refresh the access token before
 it expires.
 
 Without the refresh token mechanism, the user would be forced to re-authenticate
@@ -225,7 +225,7 @@ The validity of the tokens are configurable inside the OIDC Provider.
 
 ### 7. Database access
 
-With the tokens, the Web Console can interact with the database.
+With the tokens, the [Web Console](/docs/web-console/) can interact with the database.
 
 The access token is in the header of every request sent to QuestDB.
 
@@ -358,7 +358,7 @@ the database.
 Although the user is authenticated, they have no permissions at all.
 
 The user has to have at least the `HTTP` permission to be able to successfully
-login via the Web Console.
+login via the [Web Console](/docs/web-console/).
 
 ```json title=""User info response example"
 {
@@ -393,7 +393,7 @@ It should be set accordingly to your organization's policies.
 Other parts of the user information, such as the `sub` and the `name` also used
 by QuestDB.
 
-They could be displayed in the Web Console, or appear in the logs, for example.
+They could be displayed in the [Web Console](/docs/web-console/), or appear in the logs, for example.
 
 ## Configuration options
 
