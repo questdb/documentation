@@ -8,10 +8,10 @@ import Screenshot from "@theme/Screenshot"
 
 ## Integration guide
 
-This guide shows the steps to use the QuestDB Kafka connector to read JSON data
-from Kafka topics and write them as rows into a QuestDB table. For Confluent
-users, please check the instructions in the
-[Confluent Docker images](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples/confluent-docker-images).
+Redpanda Connect is a stream processing tool that can be used to build data pipelines.
+It's a lightweight alternative to [Apache Kafka Connect](/docs/third-party-tools/kafka/questdb-kafka/).
+This guide shows the steps to use the Redpanda Connect to write JSON data
+as rows into a QuestDB table. 
 
 ### Prerequisites
 
@@ -22,7 +22,7 @@ You will need the following:
 
 ### Download Redpanda Connect
 
-The QuestDB output component was added to Redpanda Connect in version X.X.X
+The QuestDB output component was added to Redpanda Connect in version v4.37.0.
 
 To download the latest version of Redpanda Connect, follow the [installation instructions](https://docs.redpanda.com/redpanda-connect/guides/getting_started/#install) in the official documentation.
 
@@ -51,12 +51,16 @@ This configuration will read lines from stdin and publish them to your running Q
 
 ### Run Redpanda Connect and publish messages
 
-Run the following command to send some messages over Influx Line Protocol to QuestDB through Redpanda Connect
+Run the following command to send some messages to QuestDB through Redpanda Connect
 
 ```bash
-echo '{"symbol": "AAPL", "price": 225.83, "timestamp": 1727294094}
-{"symbol": "MSFT", "price": 431.78, "timestamp": 1727294142}` | rpk connect run config.yaml
+echo \
+'{"symbol": "AAPL", "price": 225.83, "timestamp": 1727294094}
+{"symbol": "MSFT", "price": 431.78, "timestamp": 1727294142}' \
+| rpk connect run config.yaml
 ```
+
+The command above sends two JSON messages to Redpanda Connect standard input, which then writes them to QuestDB.
 
 ### Verify the integration
 
@@ -66,3 +70,8 @@ Navigate to the QuestDB Web Console at http://localhost:9000 and run the followi
 SELECT *
 FROM redpanda_connect_demo
 ```
+
+### Next steps
+
+Explore Redpanda Connect's [official documentation](https://docs.redpanda.com/redpanda-connect/about/) to learn more
+about its capabilities and how to use it in your projects.
