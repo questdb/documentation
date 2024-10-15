@@ -27,9 +27,7 @@ OpenID Connect (OIDC) is only available in QuestDB Enterprise.
 See our example using
 [PingFederate with Active Directory](/docs/guides/active-directory-pingfederate/).
 
-## Web Console
-
-### Architecture
+## Architecture
 
 Altogether, the architecture appears as such:
 
@@ -42,7 +40,7 @@ Altogether, the architecture appears as such:
 
 We can break it down into core components.
 
-#### Web Console
+### Web Console
 
 QuestDB's interactive UI. Users must authenticate before accessing the database
 via the interface.
@@ -55,7 +53,7 @@ assigned an identifier, the _Client Id._
 
 Each application integrates via OIDC should be given a different Client Id.
 
-#### OIDC Provider
+### OIDC Provider
 
 Typically consists of a number of modules.
 
@@ -76,14 +74,14 @@ These clients communicate with the OIDC Provider via its endpoints.
 It exposes a number of APIs, including the Authorization, Token and User Info
 endpoints.
 
-#### QuestDB
+### QuestDB
 
 The database, in OAuth2/OIDC terms the _protected resource_ or _resource
 server_.
 
 Only processes requests which contain a valid access token.
 
-### Authentication and Authorization Flow
+## Authentication and Authorization Flow
 
 The OAuth2/OIDC standard defines different ways of obtaining access and ID
 tokens from the OIDC Provider, referred to as the "_flow_".
@@ -99,7 +97,7 @@ Specifically, the QuestDB [Web Console](/docs/web-console/) uses the
 
 It consists of ten steps...
 
-#### 1. Secret generation
+### 1. Secret generation
 
 First the [Web Console](/docs/web-console/) generates a cryptographically strong random secret, called
 the _code verifier_.
@@ -130,7 +128,7 @@ been authenticated already:
 https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
 ```
 
-#### 2. Prove identity
+### 2. Prove identity
 
 Next, the user must prove its identity.
 
@@ -148,7 +146,7 @@ This could be a username with:
   width={450}
 />
 
-#### 3. Scope consent
+### 3. Scope consent
 
 After successful authentication, the user provides consent for the requested
 scopes.
@@ -167,7 +165,7 @@ without presenting the user with an additional screen in the browser.
   width={650}
 />
 
-#### 4. Redirection
+### 4. Redirection
 
 Consent is granted!
 
@@ -178,7 +176,7 @@ _authorization code_:
 https://questdb.host:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
 ```
 
-#### 5. Credential request
+### 5. Credential request
 
 Now, the QuestDB [Web Console](/docs/web-console/) requests the ID and access tokens from the Token
 endpoint of the OIDC Provider with the authorization code.
@@ -200,7 +198,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
 ```
 
-#### 6. Credentials received
+### 6. Credentials received
 
 If the PKCE check is passed, the [Web Console](/docs/web-console/) receives the ID and access tokens.
 
@@ -224,7 +222,7 @@ The validity of the tokens are configurable inside the OIDC Provider.
 }
 ```
 
-#### 7. Database access
+### 7. Database access
 
 With the tokens, the [Web Console](/docs/web-console/) can interact with the database.
 
@@ -243,7 +241,7 @@ https://questdb.host:9999/exec?query=select%20current_user()
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
-#### 8. Find user information
+### 8. Find user information
 
 No user information in the cache, or stale information?
 
@@ -258,7 +256,7 @@ https://oidc.provider:443/idp/userinfo.openid
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
-#### 9. Receive user information
+### 9. Receive user information
 
 If the access token is valid, QuestDB receives the required user information
 from the endpoint, and it will update its cache.
@@ -279,7 +277,7 @@ Cache expiry is configurable in QuestDB.
 }
 ```
 
-#### 10. Permission check
+### 10. Permission check
 
 With the help of the user information QuestDB can carry out [permission checks](#user-permissions).
 
@@ -301,7 +299,7 @@ and then sends the results back.
 }
 ```
 
-## Other interactive clients
+## Interactive clients
 
 Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an OIDC provider. However, the level support will vary between these tools.
 
