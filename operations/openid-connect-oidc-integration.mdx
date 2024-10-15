@@ -306,8 +306,9 @@ and then sends the results back.
 Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an OIDC provider. However, the level support will vary between these tools.
 
 Interactive clients usually fall into one of the following categories:
- - Browser based clients with support for HTTP redirects, this includes the Web Console or any javascript UI
- - Applications or frameworks running in a browser without support for redirects, such as Jupyter notebooks
+
+ - Browser-based clients with support for HTTP redirects; this includes the Web Console or any javascript UI
+ - Applications running in a browser without support for redirects, such as Jupyter notebooks
  - Non-browser based clients, usually some kind of command line interface (CLI) or a standalone application, such
 as Microsoft Access
 
@@ -315,10 +316,10 @@ as Microsoft Access
 
 If the tool is browser based and can handle HTTP redirects, it can implement
 the [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
-or the [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth) flows
+or [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth) flows
 to request an access token.
 The former is preferred as it is more secure.
-The Web Console implements the [Authorization Code Flow with PKCE](https://oauth.net/2/pkce) which is a
+The Web Console implements the [Authorization Code Flow with PKCE](https://oauth.net/2/pkce), which is a
 special version of the Authorization Code flow designed for mobile apps and single page applications.
 
 Regardless of which flow is used by the web or mobile application, the requested access token can be used for
@@ -326,18 +327,18 @@ authentication and authorization when communicating with QuestDB as explained [a
 
 ### Jupyter notebook
 
-JupyterHub can integrate with OAuth2 providers using OAuthenticator as described in
+JupyterHub can integrate with OAuth2 providers using OAuthenticator, as described in
 its [documentation](https://jupyterhub.readthedocs.io/en/stable/explanation/oauth.html).
 The OAuthenticator documentation also contains
 [examples](https://oauthenticator.readthedocs.io/en/latest/tutorials/provider-specific-setup/index.html)
 using different identity providers.
 
-If Jupyter notebooks are used without JupyterHub, our option for OAuth2 integration is to
-work with the [Resource Owner Password Credentials](https://oauth.net/2/grant-types/password) flow.
+If Jupyter notebooks are used without JupyterHub, one option for OAuth2 integration is to
+use the [Resource Owner Password Credentials](https://oauth.net/2/grant-types/password) flow.
 It is likely that to enable this flow in your OAuth2 provider will require additional setup. The
-Resource Owner Password Credentials flow is legacy, and should be used only as the last resort.
+Resource Owner Password Credentials flow is legacy, and should be used as a last resort.
 
-By adding the code below to a cell we can get hold of an access token in our notebook:
+We can use the code below to acquire an access token in our notebook:
 ```python
 from urllib import request, parse
 import json
@@ -358,7 +359,7 @@ with request.urlopen(req) as f:
     access_token = resp["access_token"]
 ```
 
-Then we can use the token for authentication in QuestDB:
+This token can be used to authenticate with QuestDB:
 ```python
 query = parse.urlencode({
     "query": "select current_user()"
@@ -373,10 +374,10 @@ with request.urlopen(req) as f:
 
 #### Externalizing credentials
 
-The above example saves the user's credentials into the notebook.
-There are a number of ways to fix this. We can use environment variables or files, for
-example, to externalize the username and password. One example would be to use the
-`dotenv` library.
+The above example saves the user's credentials into the notebook, potentially exposing them to others.
+One way to improve this is to use environment variables or files to externalize the username and password.
+
+Here is an example using the `dotenv` library.
 
 First we need to create a file named `.env` with the settings:
 ```python
@@ -412,14 +413,12 @@ with request.urlopen(req) as f:
 
 #### Enable ROPC in QuestDB
 
-The Resource Owner Password Credentials flow can be enabled in QuestDB via config:
+The Resource Owner Password Credentials flow can be enabled in QuestDB within `server.conf`:
 ```
 acl.oidc.ropc.flow.enabled = true
 ```
 
-This will make our code simpler, because now we can use Basic authentication.
-We are sending the credentials to QuestDB, and the server validates the details
-with the OAuth2 provider.
+Now we can use Basic Authentication to simplify our code. We send the credentials to QuestDB, and the database will validate the credentials against the OAuth2 provider.
 ```python
 from dotenv import load_dotenv
 import os
@@ -465,8 +464,8 @@ It is important to note that QuestDB never persists the user's credentials.
 
 ### CLI, standalone applications
 
-When it comes to command line interfaces, such as `psql`, or standalone applications like
-Microsoft Access, usually the only option is the Resource Owner Password Credentials flow.
+When using CLI tools, such as `psql`, or standalone applications like
+Microsoft Access, the best option may be the Resource Owner Password Credentials flow.
 
 The user logs in with their SSO credentials, and the server validates the details with
 the OAuth2 provider.
@@ -483,11 +482,10 @@ testldap=>
 
 ## Non-interactive clients
 
-Non-interactive clients are usually jobs, or standalone applications, such as a client ingesting data.
-For practical reasons it makes sense to manage their accounts through the OAuth2 provider too.
+Non-interactive clients are usually jobs, or standalone applications, for example, a client for ingesting data.
+It is practical to manage their credentials via OAuth2 provider too.
 
-These clients can work the same way as we have seen it earlier in the jupyter notebook examples.
-They can request a token themselves, and use it to ingest data into the database:
+As seen in the Jupyter notebook examples, the clients can request a token thmeselves and then use that to authorise data ingestion.
 ```python
 import json
 import os
@@ -541,8 +539,7 @@ with Sender.from_conf(conf) as sender:
 
 ## User permissions
 
-As mentioned earlier, QuestDB requires additional user information to be able to
-construct the user's access list.
+QuestDB requires additional user information to be able to construct the user's access list.
 
 As a reminder, the access list is the list of permissions that determines what
 the user can and cannot do.
