@@ -3,6 +3,10 @@
     "default": false,
     "description": "Enables/disables OIDC authentication. When enabled, few other configuration options must also be set."
   },
+  "acl.oidc.ropc.flow.enabled": {
+    "default": false,
+    "description": "Enables/disables Resource Owner Password Credentials flow."
+  },
   "acl.oidc.host": {
     "default": "",
     "description": "OIDC provider hostname, required when OIDC is enabled."
@@ -34,6 +38,14 @@
   "acl.oidc.client.id": {
     "default": "",
     "description": "Client name assigned to QuestDB in the OIDC server, required when OIDC is enabled."
+  },
+  "acl.oidc.redirect.uri": {
+    "default": "",
+    "description": "The redirect URI tells the OIDC server where to redirect the user after successful authentication. If not set, the Web Console defaults it to the location where it was loaded from (`window.location.href`)."
+  },
+  "acl.oidc.scope": {
+    "default": "openid",
+    "description": "The OIDC server should ask consent for the list of scopes provided in this property. The scope `openid` is mandatory, and always should be included."
   },
   "acl.oidc.authorization.endpoint": {
     "default": "/as/authorization.oauth2",

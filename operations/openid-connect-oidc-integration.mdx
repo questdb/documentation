@@ -27,7 +27,9 @@ OpenID Connect (OIDC) is only available in QuestDB Enterprise.
 See our example using
 [PingFederate with Active Directory](/docs/guides/active-directory-pingfederate/).
 
-## Architecture
+## Web Console
+
+### Architecture
 
 Altogether, the architecture appears as such:
 
@@ -40,7 +42,7 @@ Altogether, the architecture appears as such:
 
 We can break it down into core components.
 
-### Web Console
+#### Web Console
 
 QuestDB's interactive UI. Users must authenticate before accessing the database
 via the interface.
@@ -53,7 +55,7 @@ assigned an identifier, the _Client Id._
 
 Each application integrates via OIDC should be given a different Client Id.
 
-### OIDC Provider
+#### OIDC Provider
 
 Typically consists of a number of modules.
 
@@ -74,14 +76,14 @@ These clients communicate with the OIDC Provider via its endpoints.
 It exposes a number of APIs, including the Authorization, Token and User Info
 endpoints.
 
-### QuestDB
+#### QuestDB
 
 The database, in OAuth2/OIDC terms the _protected resource_ or _resource
 server_.
 
 Only processes requests which contain a valid access token.
 
-## Authentication and Authorization Flow
+### Authentication and Authorization Flow
 
 The OAuth2/OIDC standard defines different ways of obtaining access and ID
 tokens from the OIDC Provider, referred to as the "_flow_".
@@ -97,7 +99,7 @@ Specifically, the QuestDB [Web Console](/docs/web-console/) uses the
 
 It consists of ten steps...
 
-### 1. Secret generation
+#### 1. Secret generation
 
 First the [Web Console](/docs/web-console/) generates a cryptographically strong random secret, called
 the _code verifier_.
@@ -111,9 +113,9 @@ the OIDC Provider.
 It calls the Authorization endpoint with a few parameters, including the:
 
 - Client Id
-- `openid` and `profile` scopes
+- requested scopes (the list of scopes are configurable, default is `openid` only)
 - code challenge
-- method which was used to generate it from the code verifier (SHA256)
+- algorithm used to generate the code challenge from the code verifier (SHA256)
 
 When the Authorization Server receives the request, it checks if the user has
 been authenticated already:
@@ -125,10 +127,10 @@ been authenticated already:
   Identity Provider for authentication.
 
 ```bash title="Authorization code request example"
-https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid+profile&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
+https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
 ```
 
-### 2. Prove identity
+#### 2. Prove identity
 
 Next, the user must prove its identity.
 
@@ -137,7 +139,7 @@ This could be a username with:
 - a password,
 - an OTP
 - facial recognition via a mobile app
-- anything supported by the Identity Provider.
+- or anything else supported by the Identity Provider.
 
 <Screenshot
   alt="Creating profiles"
@@ -146,15 +148,14 @@ This could be a username with:
   width={450}
 />
 
-### 3. Scope consent
+#### 3. Scope consent
 
-After successful authentication, the user provide consent for the requested
-scopes:
+After successful authentication, the user provides consent for the requested
+scopes.
 
-- The scope `openid` is authorization for using OIDC. No ID Token is issued
-  without it.
-
-- The scope `profile` authorizes the client to access user information.
+The list of scopes are configurable, by default the Web Console requests
+only the `openid` scope which is mandatory for OIDC. No ID Token is issued
+without it.
 
 The OIDC provider can be configured to provide the consent automatically,
 without presenting the user with an additional screen in the browser.
@@ -166,7 +167,7 @@ without presenting the user with an additional screen in the browser.
   width={650}
 />
 
-### 4. Redirection
+#### 4. Redirection
 
 Consent is granted!
 
@@ -177,7 +178,7 @@ _authorization code_:
 https://questdb.host:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
 ```
 
-### 5. Credential request
+#### 5. Credential request
 
 Now, the QuestDB [Web Console](/docs/web-console/) requests the ID and access tokens from the Token
 endpoint of the OIDC Provider with the authorization code.
@@ -199,11 +200,11 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
 ```
 
-### 6. Credentials received
+#### 6. Credentials received
 
 If the PKCE check is passed, the [Web Console](/docs/web-console/) receives the ID and access tokens.
 
-There is also a third token in the response too, the refresh token.
+There is a third token in the response too, the refresh token.
 
 The refresh token is used by the [Web Console](/docs/web-console/) to refresh the access token before
 it expires.
@@ -223,7 +224,7 @@ The validity of the tokens are configurable inside the OIDC Provider.
 }
 ```
 
-### 7. Database access
+#### 7. Database access
 
 With the tokens, the [Web Console](/docs/web-console/) can interact with the database.
 
@@ -242,7 +243,7 @@ https://questdb.host:9999/exec?query=select%20current_user()
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
-### 8. Find user information
+#### 8. Find user information
 
 No user information in the cache, or stale information?
 
@@ -257,7 +258,7 @@ https://oidc.provider:443/idp/userinfo.openid
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
-### 9. Receive user information
+#### 9. Receive user information
 
 If the access token is valid, QuestDB receives the required user information
 from the endpoint, and it will update its cache.
@@ -267,19 +268,22 @@ OIDC Provider on every single request.
 
 Cache expiry is configurable in QuestDB.
 
-```json title="User info response example"
+```json title="User info response example with Active Directory groups"
 {
   "sub": "externalUser",
   "name": "External User",
-  "groups": ["externalGroup1", "externalGroup2"]
+  "groups": [
+    "CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev",
+    "CN=TestGroup2,OU=DC Users,DC=ad,DC=quest,DC=dev"
+  ]
 }
 ```
 
-### 10. Permission check
+#### 10. Permission check
 
-With the help of the user information QuestDB can carry out permission checks
+With the help of the user information QuestDB can carry out [permission checks](#user-permissions).
 
-If the permission check is successful, the database will processes the request,
+If the permission check is successful, the database will process the request,
 and then sends the results back.
 
 ```json title="Query response example"
@@ -297,10 +301,250 @@ and then sends the results back.
 }
 ```
 
+## Other interactive clients
+
+Any interactive client, such as a UI, a jupyter notebook or even a command line
+interface can integrate with an OIDC provider. The only question is what kind
+of support is provided by the tool, if any.
+
+Interactive clients usually fall into one of the following categories:
+ - Browser based clients with support for HTTP redirects, this includes the Web Console or any javascript UI
+ - Applications or frameworks running in a browser without support for redirects, such as Jupyter notebooks
+ - Non-browser based clients, usually some kind of command line interface (CLI) or a standalone application, such
+as Microsoft Access
+
+### Browser-based clients
+
+If the tool is browser based and can handle HTTP redirects, it can implement
+the [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+or the [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth) flows
+to request an access token.
+The former is preferred as it is more secure.
+The Web Console implements the [Authorization Code Flow with PKCE](https://oauth.net/2/pkce) which is a
+special version of the Authorization Code flow designed for mobile apps and single page applications.
+
+Regardless of which flow is used by the web or mobile application, the requested access token can be used for
+authentication and authorization when communicating with QuestDB as explained [above](#7-database-access).
+
+### Jupyter notebook
+
+JupyterHub can integrate with OAuth2 providers using OAuthenticator as described in
+its [documentation](https://jupyterhub.readthedocs.io/en/stable/explanation/oauth.html).
+The OAuthenticator documentation also contains
+[examples](https://oauthenticator.readthedocs.io/en/latest/tutorials/provider-specific-setup/index.html)
+using different identity providers.
+
+If Jupyter notebooks are used without JupyterHub, our option for OAuth2 integration is to
+work with the [Resource Owner Password Credentials](https://oauth.net/2/grant-types/password) flow.
+It is likely that to enable this flow in your OAuth2 provider will require additional setup. The
+Resource Owner Password Credentials flow is legacy, and should be used only as the last resort.
+
+By adding the code below to a cell we can get hold of an access token in our notebook:
+```python
+from urllib import request, parse
+import json
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": "testuser",
+    "password": "testpwd",
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+Then we can use the token for authentication in QuestDB:
+```python
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/exec?{query}")
+req.add_header("Authorization", f"Bearer {access_token}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+#### Externalizing credentials
+
+The above example saves the user's credentials into the notebook.
+There are a number of ways to fix this. We can use environment variables or files, for
+example, to externalize the username and password. One example would be to use the
+`dotenv` library.
+
+First we need to create a file named `.env` with the settings:
+```python
+username=testuser
+password=testpwd
+```
+Then load it in our notebook, and use it to request tokens:
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request, parse
+import json
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": user,
+    "password": pwd,
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+#### Enable ROPC in QuestDB
+
+The Resource Owner Password Credentials flow can be enabled in QuestDB via config:
+```
+acl.oidc.ropc.flow.enabled = true
+```
+
+This will make our code simpler, because now we can use Basic authentication.
+We are sending the credentials to QuestDB, and the server validates the details
+with the OAuth2 provider.
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request
+import base64
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/exec?{query}")
+b64credentials = base64.standard_b64encode(f"{user}:{pwd}".encode()).decode()
+req.add_header("Authorization", f"Basic {b64credentials}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+We can also use a postgres client to connect to the database:
+```python
+import psycopg as pg
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conn_str = f"user={user} password={pwd} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute("select current_user()")
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+
+It is important to note that QuestDB never persists the user's credentials.
+
+### CLI, standalone applications
+
+When it comes to command line interfaces, such as `psql`, or standalone applications like
+Microsoft Access, usually the only option is the Resource Owner Password Credentials flow.
+
+The user logs in with their SSO credentials, and the server validates the details with
+the OAuth2 provider.
+
+```shell
+% psql -h localhost -p 8812 -U testuser
+Password for user testuser:
+psql (14.2, server 11.3)
+Type "help" for help.
+
+testldap=> 
+testldap=> 
+```
+
+## Non-interactive clients
+
+Non-interactive clients are usually jobs, or standalone applications, such as a client ingesting data.
+For practical reasons it makes sense to manage their accounts through the OAuth2 provider too.
+
+These clients can work the same way as we have seen it earlier in the jupyter notebook examples.
+They can request a token themselves, and use it to ingest data into the database:
+```python
+import json
+import os
+import requests
+import pandas as pd
+from dotenv import load_dotenv
+from questdb.ingress import Sender
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+token_endpoint = "https://oidc.provider:443/as/token.oauth2"
+response = requests.post(token_endpoint,
+                         data={"grant_type": "password",
+                               "client_id": "testclient",
+                               "username": user,
+                               "password": pwd,
+                               "scope": "openid"},
+                         headers={"Content-Type": "application/x-www-form-urlencoded"})
+
+response_body = response.content.decode("utf-8")
+tokens = json.loads(response_body)
+access_token = tokens["access_token"]
+
+conf = f"http::addr=localhost:9000;token={access_token};"
+with Sender.from_conf(conf) as sender:
+    df = pd.read_csv("data.csv")
+    df["ts"] = pd.to_datetime(df["ts"])
+    sender.dataframe(df, table_name="foo", at="ts")
+```
+
+Alternatively, they can rely on QuestDB to authenticate them via the OAuth2 provider
+when the Resource Owner Password Credentials flow is enabled on the server side.
+```python
+import os
+import pandas as pd
+from dotenv import load_dotenv
+from questdb.ingress import Sender
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conf = f"http::addr=localhost:9000;username={user};password={pwd};"
+with Sender.from_conf(conf) as sender:
+    df = pd.read_csv("data.csv")
+    df["ts"] = pd.to_datetime(df["ts"])
+    sender.dataframe(df, table_name="foo", at="ts")
+```
+
 ## User permissions
 
-As mentioned earlier, QuestDB requires user information to be able to construct
-the user's access list.
+As mentioned earlier, QuestDB requires additional user information to be able to
+construct the user's access list.
 
 As a reminder, the access list is the list of permissions that determines what
 the user can and cannot do.
@@ -314,10 +558,10 @@ Provider.
 Since external users are not managed by QuestDB, permissions cannot be granted
 to them directly.
 
-Instead the database expects a list of groups, called the _groups claim_ to be
+Instead, the database expects a list of groups, called the _groups claim_ to be
 present in the user information.
 
-These external group names are then mapped to QuestDB's own groups.
+These external group names are mapped to QuestDB's own groups.
 
 The access list of the external user consists of the permissions granted to
 those groups:
@@ -334,16 +578,16 @@ those groups:
 The mappings between external and QuestDB groups are managed with the following
 SQL commands:
 
-```questdb-sql title="Create a group which is mapped to an external group"
-CREATE GROUP groupName WITH EXTERNAL ALIAS externalGroupName;
+```questdb-sql title="Create a group which is mapped to an Active Directory group"
+CREATE GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
 ```
 
-```questdb-sql title="Map and external group to an already existing QuestDB group"
-ALTER GROUP groupName WITH EXTERNAL ALIAS externalGroupName;
+```questdb-sql title="Map an Active Directory group to an already existing QuestDB group"
+ALTER GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
 ```
 
-```questdb-sql title="Remove a mapping"
-ALTER GROUP groupName DROP EXTERNAL ALIAS externalGroupName;
+```questdb-sql title="Remove an Active Directory mapping without deleting the QuestDB group"
+ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
 ```
 
 QuestDB works the list of external groups out from the User Info response
@@ -360,11 +604,14 @@ Although the user is authenticated, they have no permissions at all.
 The user has to have at least the `HTTP` permission to be able to successfully
 login via the [Web Console](/docs/web-console/).
 
-```json title=""User info response example"
+```json title="User info response example with Active Directory groups"
 {
   "sub": "externalUser",
   "name": "External User",
-  "groups": ["externalGroup1", "externalGroup2"]
+  "groups": [
+    "CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev",
+    "CN=TestGroup2,OU=DC Users,DC=ad,DC=quest,DC=dev"
+  ]
 }
 ```
 
