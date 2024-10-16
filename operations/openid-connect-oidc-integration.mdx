@@ -3,7 +3,7 @@ title: OpenID Connect (OIDC) Integration
 description: ""
 ---
 
-import Screenshot from "@theme/Screenshot"
+import Screenshot from "@theme/Screenshot";
 
 OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
 QuestDB.
@@ -447,9 +447,9 @@ The Resource Owner Password Credentials flow can be enabled in QuestDB within
 acl.oidc.ropc.flow.enabled = true
 ```
 
-Note that the flow also has to be configured in the OAuth2/OIDC provider.
-See an example using
-[PingFederate with Active Directory](/docs/guides/active-directory-pingfederate/#enable-resource-owner-password-credentials-ropc-flow).
+> Note that the flow also has to be configured in the OAuth2/OIDC provider.
+> See an example using
+> [PingFederate with Active Directory](/docs/guides/active-directory-pingfederate/#enable-resource-owner-password-credentials-ropc-flow).
 
 Now we can use Basic Authentication to simplify our code. We send the
 credentials to QuestDB, and the database will validate the credentials against
