@@ -12,8 +12,10 @@ Trade price calculation.
 
 `l2price(target_quantity, quantity_1, price_1, quantity_2, price_2, ..., quantity_n, price_n)`
 
-Consider `quantity_1`, `price_1`, `quantity_2`, `price_2`, ..., `quantity_n`, `price_n` to be either
-side of an order book with `n` price levels. Then, the return value of the function is the average trade price of a market order executed with the size of `target_quantity` against the book.
+Consider `quantity_1`, `price_1`, `quantity_2`, `price_2`, ..., `quantity_n`,
+`price_n` to be either side of an order book with `n` price levels. Then, the
+return value of the function is the average trade price of a market order
+executed with the size of `target_quantity` against the book.
 
 Let's take the below order book as an example.
 
@@ -25,8 +27,8 @@ Let's take the below order book as an example.
 | 21   | 13.70 | 15.10 | 12   |
 | 18   | 13.40 |       |      |
 
-A _buy market order_ with the size of 50 would wipe out the first two price levels of
-the _Ask_ side of the book, and would also trade on the third level.
+A _buy market order_ with the size of 50 would wipe out the first two price
+levels of the _Ask_ side of the book, and would also trade on the third level.
 
 The full price of the trade:
 
@@ -40,8 +42,8 @@ $$
 \$732.60 / 50 = \$14.652
 $$
 
-This average trade price is the output of the function when executed with the parameters taken from
-the above example:
+This average trade price is the output of the function when executed with the
+parameters taken from the above example:
 
 ```questdb-sql
 select l2price(50, 14, 14.50, 16, 14.60, 23, 14.80, 12, 15.10);
@@ -53,21 +55,23 @@ select l2price(50, 14, 14.50, 16, 14.60, 23, 14.80, 12, 15.10);
 
 ### Parameters
 
-The function takes a `target quantity`, and a variable number of `quantity`/`price` pairs. Each
-represents a price level of the order book.
+The function takes a `target quantity`, and a variable number of
+`quantity`/`price` pairs. Each represents a price level of the order book.
 
-Each parameter is expected to be a double, or convertible to double (float, long, int, short, byte).
+Each parameter is expected to be a double, or convertible to double (float,
+long, int, short, byte).
 
 - `target_quantity`: The size of a hypothetical market order to be filled.
-- `quantity*`: The number of instruments available at the corresponding price levels.
+- `quantity*`: The number of instruments available at the corresponding price
+  levels.
 - `price*`: Price levels of the order book.
 
 ### Return value
 
 The function returns with a `double`, representing the average trade price.
 
-Returns null if the price is not calculable. For example, if the target quantity cannot be filled,
-or there is incomplete data in the set (nulls).
+Returns null if the price is not calculable. For example, if the target quantity
+cannot be filled, or there is incomplete data in the set (nulls).
 
 ### Examples
 
@@ -148,10 +152,160 @@ SELECT mid(1.5760, 1.5763)
 | :------ |
 | 1.57615 |
 
+## regr_slope
+
+`regr_slope(y, x)` - Calculates the slope of the linear regression line for the
+given numeric columns y (dependent variable) and x (independent variable).
+
+- The function requires at least two valid (x, y) pairs to compute the slope.
+  - If fewer than two pairs are available, the function returns null.
+- Supported data types for x and y include `double`, `float`, and `integer`
+  types.
+- The regr_slope function can be used with other statistical aggregation
+  functions like `corr` or `covar_samp`.
+- The order of arguments in regr_slope(y, x) matters.
+  - Ensure that y is the dependent variable and x is the independent variable.
+
+### Calculation
+
+The slope $b_1$ of the regression line $y = b_0 + b_1 x$ is calculated using the
+formula:
+
+$$
+b_1 = \frac{N \sum (xy) - \sum x \sum y}{N \sum (x^2) - (\sum x)^2}
+$$
+
+Where:
+
+- Let $N$ be the number of valid data points.
+- Let $\sum (xy)$ be the sum of the products of $x$ and $y$.
+- Let $\sum x$ and $\sum y$ be the sums of $x$ and $y$ values, respectively.
+- Let $\sum (x^2)$ be the sum of the squares of $x$ values.
+
+### Arguments
+
+- y: A numeric column representing the dependent variable.
+- x: A numeric column representing the independent variable.
+
+### Return value
+
+Return value type is `double`.
+
+The function returns the slope of the regression line, indicating how much y
+changes for a unit change in x.
+
+### Examples
+
+#### Calculate the regression slope between two variables
+
+Suppose you have a table measurements with the following data:
+
+| x   | y   |
+| --- | --- |
+| 1.0 | 2.0 |
+| 2.0 | 3.0 |
+| 3.0 | 5.0 |
+| 4.0 | 4.0 |
+| 5.0 | 6.0 |
+
+You can calculate the slope of the regression line between y and x using:
+
+```questdb-sql
+SELECT regr_slope(y, x) AS slope FROM measurements;
+```
+
+Result:
+
+| slope |
+| ----- |
+| 8.0   |
+
+Or: The slope of 0.8 indicates that for each unit increase in x, y increases by
+0.8 units on average.
+
+#### Calculate the regression slope grouped by a category
+
+Consider a table sales_data:
+
+| category | advertising_spend | sales |
+| -------- | ----------------- | ----- |
+| A        | 1000              | 15000 |
+| A        | 2000              | 22000 |
+| A        | 3000              | 28000 |
+| B        | 1500              | 18000 |
+| B        | 2500              | 26000 |
+| B        | 3500              | 31000 |
+
+Calculate the regression slope of `sales` versus `advertising_spend` for each
+category:
+
+```questdb-sql
+SELECT category, regr_slope(sales, advertising_spend) AS slope FROM sales_data
+GROUP BY category;
+```
+
+Result:
+
+| category | slope |
+| -------- | ----- |
+| A        | 8.5   |
+| B        | 7.0   |
+
+Or:
+
+- In category A, for every additional unit spent on advertising, sales increase
+  by 8.5 units on average.
+- In category B, the increase is 7.0 units per advertising unit spent.
+
+#### Handling null values
+
+If your data contains null values, regr_slope will ignore those rows:
+
+```questdb
+SELECT regr_slope(y, x) AS slope FROM ( SELECT 1 AS x, 2 AS y UNION ALL SELECT
+2, NULL UNION ALL SELECT NULL, 4 UNION ALL SELECT 4, 5 );
+```
+
+Result:
+
+| slope |
+| ----- |
+| 8.0   |
+
+Only the rows where both x and y are not null are considered in the calculation.
+
+#### Calculating beta
+
+Assuming you have a table stock_returns with daily returns for a specific stock
+and the market index:
+
+| date       | stock_return | market_return |
+| ---------- | ------------ | ------------- |
+| 2023-01-01 | 0.5          | 0.4           |
+| 2023-01-02 | -0.2         | -0.1          |
+| 2023-01-03 | 0.3          | 0.2           |
+| ...        | ...          | ...           |
+
+Calculate the stock's beta coefficient:
+
+```questdb-sql
+SELECT regr_slope(stock_return, market_return) AS beta FROM stock_returns;
+```
+
+| beta |
+| ---- |
+| 1.2  |
+
+Or: A beta of 1.2 suggests the stock is 20% more volatile than the market.
+
+Remember: The order of arguments in regr_slope(y, x) matters.
+
+Ensure that y is the dependent variable and x is the independent variable.
+
 ## spread_bps
 
-`spread_bps(bid, ask)` - calculates the quoted bid-ask spread, based on the highest bidding price,
-and the lowest asking price.
+`spread_bps(bid, ask)` - calculates the quoted bid-ask spread, based on the
+highest bidding price, and the lowest asking price.
 
 The result is provided in basis points, and the calculation is:
 
@@ -185,7 +339,8 @@ SELECT spread_bps(1.5760, 1.5763)
 ## vwap
 
 `vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
-based on the given price and quantity columns. This is defined by the following formula:
+based on the given price and quantity columns. This is defined by the following
+formula:
 
 $$
 \text{vwap} =
