@@ -321,7 +321,38 @@ The value is `memberOf`.
   jumbo={true}
 />
 
-## Confirm QuestDB Mappings, login
+## Enable Resource Owner Password Credentials (ROPC) flow
+
+As described in the
+[OIDC operations document](/docs/operations/openid-connect-oidc-integration/#enable-ropc)
+tools - such as `psql` - can be integrated with the OIDC provider using the ROPC flow.
+
+When setting this flow up, enable the Resource Owner Password Credentials flow in the
+client settings:
+
+<Screenshot
+  alt="PingFederate, enable ROPC for the client"
+  src="/img/guides/active-directory/21.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+Next, create a Resource Owner Credentials Grant Mapping to map values obtained from
+the Password Credential Validator (PCV) into the persistent grants.
+
+When setting this up, select the previously created LDAP Data Source and IdP Adapter, which links
+to the existing PCV.
+
+Then select the `username` attribute of the PCV as `USER_KEY`:
+
+<Screenshot
+alt="PingFederate, ROPC grant mappings"
+src="/img/guides/active-directory/22.webp"
+title="Click to zoom"
+jumbo={true}
+/>
+
+## Confirm QuestDB mappings and login
 
 QuestDB requires a mapping, as laid out in the
 [OIDC operations document](/docs/operations/openid-connect-oidc-integration/#mapping-user-permissions).
@@ -329,7 +360,7 @@ QuestDB requires a mapping, as laid out in the
 If a given user has the HTTP permission, they will be able to now login via the
 [Web Console](/docs/web-console/).
 
-Head to [http://localhost:9000](http://localhost:9000) and login, to test.
+To test, head to [http://localhost:9000](http://localhost:9000) and login.
 
 If all has been wired up well, then login will succeed.
 
