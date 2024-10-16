@@ -237,6 +237,81 @@ tables() WHERE partitionBy = 'DAY'
 | --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- |
 | 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false |
 
+## table_storage
+
+`table_storage()` - Returns a table containing information about the storage and
+structure of all user tables in the database.
+
+Provides detailed storage information about all user tables within QuestDB. It
+returns one row per table, including information about partitioning, row counts,
+and disk usage.
+
+- The `table_storage()` function excludes system tables; it only lists
+  user-created tables.
+- The `diskSize` value represents the total size of all files associated with
+  the table on disk, including data, index, and metadata files.
+- The `partitionBy` column indicates the partitioning strategy used for the
+  table. It can be `NONE` if the table is not partitioned.
+
+**Return values:**
+
+The function returns the following columns:
+
+- `tableName` (`string`): The name of the table.
+- `walEnabled` (`boolean`): Indicates whether Write-Ahead Logging (WAL) is
+  enabled for the table.
+- `partitionBy` (`string`): The partitioning type of the table (e.g., NONE, DAY,
+  MONTH, YEAR, etc.).
+- `partitionCount` (`long`): The number of partitions the table has.
+- `rowCount` (`long`): The total number of rows in the table.
+- `diskSize` (`long`): The total disk space used by the table, in bytes.
+
+**Examples:**
+
+Retrieve storage information for all tables.
+
+```questdb-sql title="Checking our demo tables" demo
+SELECT * FROM table_storage();
+```
+
+- The query retrieves storage details for all tables in the database.
+- The `diskSize` column shows the total disk space used by each table in bytes.
+
+| tableName      | walEnabled | partitionBy | partitionCount | rowCount   | diskSize     |
+| -------------- | ---------- | ----------- | -------------- | ---------- | ------------ |
+| trips          | true       | MONTH       | 126            | 1634599313 | 261536158948 |
+| AAPL_orderbook | true       | HOUR        | 16             | 3024878    | 2149403527   |
+| weather        | false      | NONE        | 1              | 137627     | 9972598      |
+| trades         | true       | DAY         | 954            | 1000848308 | 32764798760  |
+| ethblocks_json | true       | DAY         | 3328           | 20688364   | 28311960478  |
+
+<hr />
+
+Filter tables with WAL enabled.
+
+```questdb-sql title="WAL only tables" demo
+SELECT tableName, rowCount, diskSize
+FROM table_storage()
+WHERE walEnabled = true;
+```
+
+| tableName      | rowCount   | diskSize     |
+| -------------- | ---------- | ------------ |
+| trips          | 1634599313 | 261536158948 |
+| AAPL_orderbook | 3024878    | 2149403527   |
+| trades         | 1000850255 | 32764804264  |
+| ethblocks_json | 20688364   | 28311960478  |
+
+<hr />
+
+Show tables partitioned by `HOUR`.
+
+```questdb-sql title="Show tables partitioned by hour" demo
+SELECT tableName, partitionCount, rowCount
+FROM table_storage()
+WHERE partitionBy = 'HOUR';
+```
+
 ## wal_tables
 
 `wal_tables()` returns the WAL status for all
@@ -305,7 +380,7 @@ table_columns('my_table');
 ```
 
 | column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated | upsertKey |
-|--------|-----------|---------|--------------------|--------------|----------------|------------|-----------|
+| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- | --------- |
 | symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      | false     |
 | price  | DOUBLE    | false   | 0                  | false        | 0              | false      | false     |
 | ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       | false     |
@@ -324,7 +399,7 @@ SELECT type, count() FROM table_columns('my_table');
 ```
 
 | type      | count |
-|-----------|-------|
+| --------- | ----- |
 | SYMBOL    | 1     |
 | DOUBLE    | 1     |
 | TIMESTAMP | 1     |
@@ -438,15 +513,15 @@ SELECT pg_catalog.version();
 | ------------------------------------------------------------------- |
 | PostgreSQL 12.3, compiled by Visual C++ build 1914, 64-bit, QuestDB |
 
-
 ## hydrate_table_metadata('table1', 'table2' ...)
 
-`hydrate_table_metadata' re-reads table metadata from disk to update the static metadata cache.
+`hydrate_table_metadata' re-reads table metadata from disk to update the static
+metadata cache.
 
 :::warning
 
-This function should only be used when directed by QuestDB support. Misuse could cause corruption of the metadata 
-cache, requiring the database to be restarted.
+This function should only be used when directed by QuestDB support. Misuse could
+cause corruption of the metadata cache, requiring the database to be restarted.
 
 :::
 
@@ -454,12 +529,11 @@ cache, requiring the database to be restarted.
 
 A variable list of strings, corresponding to table names.
 
-Alternatively, a single asterisk, '*', representing all tables.
+Alternatively, a single asterisk, '\*', representing all tables.
 
 **Return value:**
 
 Returns `boolean`. `true` if successful, `false` if unsuccessful.
-
 
 **Examples:**
 
@@ -470,9 +544,8 @@ SELECT hydrate_table_metadata('trades', 'trips')
 ```
 
 | hydrate_table_metadata |
-|------------------------|
+| ---------------------- |
 | true                   |
-
 
 If you want to re-read metadata for all user tables, simply use an asterisk:
 
