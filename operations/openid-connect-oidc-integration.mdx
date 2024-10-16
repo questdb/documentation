@@ -438,7 +438,7 @@ with request.urlopen(req) as f:
     access_token = resp["access_token"]
 ```
 
-#### Enable ROPC in QuestDB
+#### Enable ROPC
 
 The Resource Owner Password Credentials flow can be enabled in QuestDB within
 `server.conf`:
@@ -446,6 +446,10 @@ The Resource Owner Password Credentials flow can be enabled in QuestDB within
 ```
 acl.oidc.ropc.flow.enabled = true
 ```
+
+Note that the flow also has to be configured in the OAuth2/OIDC provider.
+See an example using
+[PingFederate with Active Directory](/docs/guides/active-directory-pingfederate/#enable-resource-owner-password-credentials-ropc-flow).
 
 Now we can use Basic Authentication to simplify our code. We send the
 credentials to QuestDB, and the database will validate the credentials against

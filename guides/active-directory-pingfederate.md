@@ -321,6 +321,35 @@ The value is `memberOf`.
   jumbo={true}
 />
 
+## Enable Resource Owner Password Credentials (ROPC) flow
+
+As described in the
+[OIDC operations document](/docs/operations/openid-connect-oidc-integration/#enable-ropc)
+some tools, such as `psql` can be integrated with the OIDC provider using the ROPC flow.
+
+When setting this flow up, we need to enable the Resource Owner Password Credentials flow in the
+client settings:
+<Screenshot
+  alt="PingFederate, enable ROPC for the client"
+  src="/img/guides/active-directory/21.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+We also have to create a Resource Owner Credentials Grant Mapping to map values obtained from
+the PCV into the persistent grants.
+
+When setting this up, select the previously created LDAP Data Source and IdP Adapter, which links
+to the PCV already setup.
+Then select the `username` attribute of the PCV as `USER_KEY`.
+
+<Screenshot
+alt="PingFederate, ROPC grant mappings"
+src="/img/guides/active-directory/22.webp"
+title="Click to zoom"
+jumbo={true}
+/>
+
 ## Confirm QuestDB Mappings, login
 
 QuestDB requires a mapping, as laid out in the
