@@ -163,7 +163,7 @@ given numeric columns y (dependent variable) and x (independent variable).
   types.
 - The regr_slope function can be used with other statistical aggregation
   functions like `corr` or `covar_samp`.
-- The order of arguments in regr_slope(y, x) matters.
+- The order of arguments in `regr_slope(y, x)` matters.
   - Ensure that y is the dependent variable and x is the independent variable.
 
 ### Calculation
@@ -259,7 +259,7 @@ Or:
 
 #### Handling null values
 
-If your data contains null values, regr_slope will ignore those rows:
+If your data contains null values, `regr_slope()` will ignore those rows:
 
 ```questdb
 SELECT regr_slope(y, x) AS slope FROM ( SELECT 1 AS x, 2 AS y UNION ALL SELECT
@@ -276,8 +276,8 @@ Only the rows where both x and y are not null are considered in the calculation.
 
 #### Calculating beta
 
-Assuming you have a table stock_returns with daily returns for a specific stock
-and the market index:
+Assuming you have a table `stock_returns` with daily returns for a specific
+stock and the market index:
 
 | date       | stock_return | market_return |
 | ---------- | ------------ | ------------- |
@@ -298,7 +298,7 @@ SELECT regr_slope(stock_return, market_return) AS beta FROM stock_returns;
 
 Or: A beta of 1.2 suggests the stock is 20% more volatile than the market.
 
-Remember: The order of arguments in regr_slope(y, x) matters.
+Remember: The order of arguments in `regr_slope(y, x)` matters.
 
 Ensure that y is the dependent variable and x is the independent variable.
 
