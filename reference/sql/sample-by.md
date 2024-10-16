@@ -4,8 +4,8 @@ sidebar_label: SAMPLE BY
 description: SAMPLE BY SQL keyword reference documentation.
 ---
 
-`SAMPLE BY` is used on [time-series data](/blog/what-is-time-series-data/) to summarize large datasets into
-aggregates of homogeneous time chunks as part of a
+`SAMPLE BY` is used on [time-series data](/blog/what-is-time-series-data/) to
+summarize large datasets into aggregates of homogeneous time chunks as part of a
 [SELECT statement](/docs/reference/sql/select/).
 
 To use `SAMPLE BY`, a table column needs to be specified as a
@@ -46,14 +46,15 @@ Where the unit for sampled groups may be one of the following:
 | `m`  | minute      |
 | `h`  | hour        |
 | `d`  | day         |
+| `w`  | week        |
 | `M`  | month       |
 | `y`  | year        |
 
 For example, given a table `trades`, the following query returns the number of
 trades per hour:
 
-```questdb-sql
-SELECT ts, count() FROM trades SAMPLE BY 1h
+```questdb-sql title="SAMPLE BY 1 week" demo
+SELECT timestamp, count() FROM trades SAMPLE BY 1w
 ```
 
 ## FROM-TO
@@ -66,12 +67,14 @@ Please see the new blog for more information.
 
 :::
 
-When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result set with pre-determined values.
+When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result
+set with pre-determined values.
 
-However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
-rows outside of this range.
+However, this method will only fill rows between existing data in the data set
+and cannot fill rows outside of this range. rows outside of this range.
 
-To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause.
+To fill outside the bounds of the existing data, you can specify a fill range
+using a `FROM-TO` clause.
 
 #### Syntax
 
@@ -85,17 +88,21 @@ SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
 
 Since no rows existed before 2009, QuestDB automatically fills in these rows.
 
-This is distinct from the `WHERE` clause with a simple rule of thumb -
-`WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
+This is distinct from the `WHERE` clause with a simple rule of thumb - `WHERE`
+controls what data flows in, `FROM-TO` controls what data flows out.
 
-Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM` is not provided, then the lower bound is the start of the dataset, aligned to calendar. The opposite is true omitting `TO`.
+Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM`
+is not provided, then the lower bound is the start of the dataset, aligned to
+calendar. The opposite is true omitting `TO`.
 
 #### `WHERE` clause optimisation
 
-If the user does not provide a `WHERE` clause, or the `WHERE` clause does not consider the designated timestamp,
-QuestDB will add one for you, matching the `FROM-TO` interval.
+If the user does not provide a `WHERE` clause, or the `WHERE` clause does not
+consider the designated timestamp, QuestDB will add one for you, matching the
+`FROM-TO` interval.
 
-This means that the query will run optimally, and avoid touching data not relevant to the result.
+This means that the query will run optimally, and avoid touching data not
+relevant to the result.
 
 Therefore, we compile the prior query into something similar to this:
 
@@ -109,12 +116,13 @@ SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
 
 #### Limitations
 
-Here are the current limits to this feature.
+Current limits include:
 
 - This syntax is not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
 - This syntax is for `ALIGN TO CALENDAR` only (default alignment).
 - Does not consider any specified `OFFSET`.
-- This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and aggregate columns.
+- This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and
+  aggregate columns.
 
 ## Fill options
 
@@ -252,12 +260,15 @@ below.
 
 :::note
 
-Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you do not specify
-an explicit alignment, `SAMPLE BY` expressions will use `ALIGN TO CALENDAR` behaviour.
+Since QuestDB v7.4.0, the default behaviour for `ALIGN TO` has changed. If you
+do not specify an explicit alignment, `SAMPLE BY` expressions will use
+`ALIGN TO CALENDAR` behaviour.
 
-The prior default behaviour can be retained by specifying `ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query.
+The prior default behaviour can be retained by specifying
+`ALIGN TO FIRST OBSERVATION` on a `SAMPLE BY` query.
 
-Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar` option to `false` in `server.conf`.
+Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar`
+option to `false` in `server.conf`.
 
 :::
 
@@ -301,7 +312,8 @@ timestamp, and continue in `1d` intervals.
 
 ## ALIGN TO CALENDAR
 
-The default behaviour for SAMPLE BY, this option aligns data to calendar dates, with two optional parameters:
+The default behaviour for SAMPLE BY, this option aligns data to calendar dates,
+with two optional parameters:
 
 - [TIME ZONE](#time-zone)
 - [WITH OFFSET](#with-offset)
@@ -327,10 +339,12 @@ Gives the following result:
 | 2021-06-01T00:00:00.000000Z | 4     |
 | 2021-06-02T00:00:00.000000Z | 2     |
 
-In this case, the timestamps are floored to the nearest UTC day, and grouped. The counts correspond
-to the number of entries occurring within each UTC day.
+In this case, the timestamps are floored to the nearest UTC day, and grouped.
+The counts correspond to the number of entries occurring within each UTC day.
 
-This is particularly useful for summarising data for charting purposes; see the [candlestick chart](https://dashboard.demo.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6) from the example [crypto dashboard](https://questdb.io/dashboards/crypto/)/
+This is particularly useful for summarising data for charting purposes; see the
+[candlestick chart](https://dashboard.demo.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6)
+from the example [crypto dashboard](https://questdb.io/dashboards/crypto/)/
 
 ### TIME ZONE
 
