@@ -75,29 +75,33 @@ Greatest hits include:
 
 ## Benefits of QuestDB {#benefits}
 
-Time series data is seen increasingly in use cases across:
+To avoid ingestion bottlenecks, high performance data ingestion is essential.
 
-- finance
-- internet of things (IoT)
-- e-commerce
-- security
-- blockchain
-- many other emerging technical industries
+But performance is only part of the story.
 
-As more time bound data is generated, high performance data reception is
-essential to avoid ingestion bottlenecks.
+Efficiency measures how well a database performs relative to its available
+resources.
 
-The right data store greatly simplifies code costly infrastructure sprawl and
-spend.
-
-But to be _the right one_, the storage engine must be both high performance and
-efficient:
+QuestDB, on maximal hardware, significantly outperforms peers:
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
   src="/img/benchmark/benchmark_all_q1_2024.webp"
   width={650}
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
+/>
+
+However, on less robust hardware the difference is even more pronounced, as seen
+in the following benchmark.
+
+Even on hardware as light as a Raspberry Pi 5, QuestDB outperforms competitors
+on stronger hardware:
+
+<Screenshot
+  alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
+  src="/img/pages/index/min-hardware-comp-graph.webp"
+  width={550}
+  title="QuestDB on an RPi5 outperforming competitors on optimal hardware"
 />
 
 Beyond performance and efficiency, with a specialized
