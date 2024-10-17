@@ -177,10 +177,10 @@ $$
 
 Where:
 
-- Let $N$ be the number of valid data points.
-- Let $\sum (xy)$ be the sum of the products of $x$ and $y$.
-- Let $\sum x$ and $\sum y$ be the sums of $x$ and $y$ values, respectively.
-- Let $\sum (x^2)$ be the sum of the squares of $x$ values.
+- $N$ is the number of valid data points.
+- $\sum (xy)$ is the sum of the products of $x$ and $y$.
+- $\sum x$ and $\sum y$ is the sums of $x$ and $y$ values, respectively.
+- $\sum (x^2)$ is the sum of the squares of $x$ values.
 
 ### Arguments
 
@@ -218,7 +218,7 @@ Result:
 
 | slope |
 | ----- |
-| 8.0   |
+| 0.8   |
 
 Or: The slope of 0.8 indicates that for each unit increase in x, y increases by
 0.8 units on average.
@@ -270,7 +270,7 @@ Result:
 
 | slope |
 | ----- |
-| 8.0   |
+| 0.8   |
 
 Only the rows where both x and y are not null are considered in the calculation.
 
