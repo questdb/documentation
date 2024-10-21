@@ -42,7 +42,7 @@ Airbyte uses a user-friendly interface for configuration, allowing you to easily
 2. Select the desired source from the list of available connectors.
 3. Fill in the necessary configuration details, such as connection strings, credentials, and any other required fields.
 
-### Adding a Destination
+### Adding a destination
 
 1. Click on the **Destinations** tab.
 2. Select **QuestDB** as your destination.
@@ -52,15 +52,15 @@ Airbyte uses a user-friendly interface for configuration, allowing you to easily
    - **User**: `admin`
    - **Password**: (Leave empty if using default settings)
 
-### Generating Configuration
+### Generating configuration
 
 Airbyte allows you to test your configuration after entering the details. Click on **Test Connection** to ensure that the connection to the source and destination is successful. Once confirmed, you can proceed to create a connection between the source and destination.
 
-## Example Inputs
+## Example inputs
 
 In this section, we will demonstrate how to set up Airbyte to extract data from a PostgreSQL source and send it to QuestDB.
 
-### PostgreSQL Source Configuration
+### PostgreSQL source configuration
 
 1. **Setting Up the Source**:
    To set up the source connector, you will need the following configuration details:
@@ -91,7 +91,7 @@ SELECT * FROM your_table LIMIT 10;
 
 After configuring your PostgreSQL source, the next step is to configure the destination to send the extracted data to QuestDB.
 
-#### QuestDB Destination Configuration
+#### QuestDB destination configuration
 
 1. **Setting Up the Destination**:
    Here's how to configure the destination connector for QuestDB:
@@ -129,7 +129,7 @@ After configuring your PostgreSQL source, the next step is to configure the dest
 ]
 ```
 
-### Running the Connection
+### Running the connection
 
 Once you have both the source and destination configured, you can create a connection between them.
 
@@ -148,11 +148,11 @@ Once you have both the source and destination configured, you can create a conne
 }
 ```
 
-### Monitoring Sync Status
+### Monitoring sync status
 
 Once the sync process is initiated, you can monitor its status directly in the Airbyte dashboard.
 
-#### Example Sync Status Output
+#### Example sync status output
 
 ```json
 {
@@ -164,7 +164,7 @@ Once the sync process is initiated, you can monitor its status directly in the A
 }
 ```
 
-### Debugging Tips
+### Debugging tips
 
 If you encounter issues during the sync process, consider the following debugging steps:
 
@@ -172,10 +172,10 @@ If you encounter issues during the sync process, consider the following debuggin
 - **Review Logs**: Check the Airbyte logs for any error messages. Logs can provide insight into connection failures or data format issues.
 - **Test Queries**: Use the query tools available in your PostgreSQL and QuestDB interfaces to test individual queries and see what data is being extracted or sent.
 
-## Verifying the Integration
+## Verifying the integration
 
 1. **Access the QuestDB Web Console**:  
-   Navigate to the [QuestDB Web Console](https://questdb.io/docs/develop/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
+   Navigate to the [QuestDB Web Console](/docs/develop/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
 
    - `cpu` (generated from `inputs.cpu`)
    - `mem` (generated from `inputs.mem`)
@@ -188,7 +188,7 @@ SELECT * FROM cpu;
 ```
 
 3. **Inspect the Results**:  
-   After running the query, the results should display columns for each metric collected by the Telegraf plugin for monitoring CPU usage, such as:
+   After running the query, the results should display columns for each metric collected by the [Telegraf](/docs/third-party-tools/telegraf/) plugin for monitoring CPU usage, such as:
 
    - `usage_idle`
    - `usage_user`
@@ -227,7 +227,7 @@ SELECT * FROM mem;
 | 2024-10-19T12:05:00Z | 8000       | 2900      | 4100        | 1000        |
 ```
 
-## Best Practices
+## Best practices
 
 To ensure a smooth and efficient integration between Airbyte and QuestDB, consider the following best practices:
 
@@ -301,6 +301,5 @@ This guide outlines the integration of **Airbyte** with **QuestDB**, enabling se
 For further details and resources, refer to the following links:
 
 - [Airbyte Documentation](https://docs.airbyte.com/)
-- [QuestDB Documentation](https://questdb.io/docs/)
-- [QuestDB Web Console Guide](https://questdb.io/docs/develop/web-console/)
+- [QuestDB Web Console Guide](/docs/develop/web-console/)
 - [Airbyte GitHub Repository](https://github.com/airbytehq/airbyte)
