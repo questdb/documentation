@@ -36,7 +36,7 @@ Before you begin, ensure you have the following:
 
 Airbyte uses a user-friendly interface for configuration, allowing you to easily set up your sources and destinations. Once Airbyte is running, navigate to the Airbyte dashboard at `http://localhost:8000`.
 
-### Adding a Source
+### Adding a source
 
 1. Click on the **Sources** tab.
 2. Select the desired source from the list of available connectors.
