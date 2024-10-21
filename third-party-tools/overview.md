@@ -35,7 +35,9 @@ integrations:
   efficiently.
 - [Apache Spark](/docs/third-party-tools/spark/): Handle complex data processing
   tasks at scale.
-
+- [Airbyte](/docs/third-party-tools/airbyte/): Performs streamlined ETL across 
+  diverse data sources.
+  
 ## Analytics and Processing
 
 Enhance your data analysis and processing capabilities with QuestDB through
