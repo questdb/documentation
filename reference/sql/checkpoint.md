@@ -38,7 +38,7 @@ When initiatied, `CHECKPOINT CREATE`:
 - Takes snapshot of table transactions across the whole database (all tables)
 - Creates a new on-disk data structure that captures append offsets and versions
   of files that represent data for the above transactions. Typically this data
-  is stored in the `/var/lib/questdb/db/.checkpoint` directory.
+  is stored in the `/var/lib/questdb/.checkpoint` directory.
   - **Do not alter contents of this directory manually**!
 - `fsync` - synchronously flushes page cache and buffers to disk
 
@@ -75,7 +75,7 @@ This is done deliberately to avoid the restore procedure running accidentally on
 the source database instance. The database will attempt a restore when empty an
 file, typically `/var/lib/questdb/_restore` is present.
 
-The restore procedure will use `/var/lib/questdb/db/.checkpoint` to adjust the
+The restore procedure will use `/var/lib/questdb/.checkpoint` to adjust the
 database files and remove extra data copies. After the restore is successful the
 database is avaialble as normal with no extra intervantion required.
 
