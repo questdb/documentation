@@ -303,7 +303,8 @@ information, and we do not share any of this data with third parties.
 
 ## Logging & Metrics
 
-For more logging information with `log.conf` and for how to enable metrics with
-Prometheus, see [Logging & Metrics](/docs/operations/logging-metrics/).
+The following settings are available in `server.conf`:
 
 <ConfigTable rows={logConfig} />
+
+Further settings are available in log.conf`. For more information, and details of our Prometheus metrics, please visit the [Logging & Metrics](/docs/operations/logging-metrics/) documentation.
