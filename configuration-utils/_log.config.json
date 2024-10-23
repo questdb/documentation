@@ -1,6 +1,6 @@
 {
   "log.level.verbose": {
     "default": "false",
-    "description": "converts short-hand log level indicators (E, C, I) into long-hand (ERROR, CRITICAL, INFO)"
+    "description": "Converts short-hand log level indicators (E, C, I) into long-hand (ERROR, CRITICAL, INFO)"
   }
 }
