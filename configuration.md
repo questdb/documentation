@@ -15,7 +15,7 @@ import tcpConfig from "./configuration-utils/\_tcp.config.json"
 import udpConfig from "./configuration-utils/\_udp.config.json"
 import replicationConfig from "./configuration-utils/\_replication.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
-import logConfig from "./configuration-utils/\_log.config.json
+import logConfig from "./configuration-utils/\_log.config.json"
 
 This page describes methods for configuring QuestDB server settings.
 
