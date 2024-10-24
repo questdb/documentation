@@ -32,10 +32,10 @@ compatible data type.
 
 ## Examples
 
-Change the data type of the column `age` in the table `employees` to `INTEGER`:
+Change the data type of the column `age` in the table `employees` to `INT`:
 
 ```questdb-sql
-ALTER TABLE employees ALTER COLUMN age TYPE INTEGER;
+ALTER TABLE employees ALTER COLUMN age TYPE INT;
 ```
 
 When changing the column type, ensure that the new type is compatible with the
