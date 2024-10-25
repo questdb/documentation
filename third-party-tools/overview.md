@@ -58,6 +58,7 @@ Improve your interactions with QuestDB using these tools and interfaces:
   analyze monitoring metrics.
 - [SQLAlchemy](/docs/third-party-tools/sqlalchemy/): Utilize Python's ORM
   capabilities for database interactions.
+- [Drizzle ORM](/docs/third-party-tools/drizzle-orm):  Utilize JavaScript's and TypeScript's ORM for type-safe and flexible database interactions.
 - [qStudio](/docs/third-party-tools/qstudio/): A free SQL GUI for query
   execution, table browsing, and result charting.
 
