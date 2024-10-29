@@ -11,7 +11,7 @@ description: Guide for using Drizzle ORM with QuestDB
 - Node.js
 - drizzle-orm
 - pg
--  A QuestDB instance
+- A QuestDB instance
 
 ## Installation
 
@@ -26,13 +26,21 @@ npm install drizzle-orm pg
 ```javascript
 const { drizzle } = require("drizzle-orm/node-postgres");
 const { Client } = require("pg");
-const { pgTable, integer } = require("drizzle-orm/pg-core");
+const {
+  pgTable,
+  varchar,
+  doublePrecision,
+  timestamp,
+} = require("drizzle-orm/pg-core");
 const { gt } = require("drizzle-orm");
 
-// Define the table schema using pgTable
-const someTable = pgTable("some_table", {
-  x: integer("x"),
-  y: integer("y"),
+// Define table schema using pgTable
+const tradesTable = pgTable("trades", {
+  symbol: varchar("symbol"),
+  side: varchar("side"),
+  price: doublePrecision("price"),
+  amount: doublePrecision("amount"),
+  timestamp: timestamp("timestamp"),
 });
 
 const client = new Client({
@@ -46,37 +54,50 @@ const client = new Client({
 async function main() {
   await client.connect();
 
-  // Initialize Drizzle
+  // Initialize Drizzle ORM
   const db = drizzle(client);
 
   // Create the table if it doesn't exist
   await client.query(`
-    CREATE TABLE IF NOT EXISTS some_table (
-      x INT NOT NULL,
-      y INT NOT NULL
+    CREATE TABLE IF NOT EXISTS trades (
+      symbol TEXT,
+      side TEXT,
+      price DOUBLE PRECISION,
+      amount DOUBLE PRECISION,
+      timestamp TIMESTAMP 
     );
   `);
 
-  // Insert data
-  await db.insert(someTable).values([
-    { x: 11, y: 12 },
-    { x: 13, y: 14 },
+  // Insert data with a current timestamp
+  const current_timestamp = new Date();
+  await db.insert(tradesTable).values([
+    {
+      symbol: "ETH-USD",
+      side: "sell",
+      price: 2615.54,
+      amount: 0.00044,
+      timestamp: current_timestamp,
+    },
+    {
+      symbol: "BTC-USD",
+      side: "sell",
+      price: 39269.98,
+      amount: 0.001,
+      timestamp: current_timestamp,
+    },
   ]);
 
-  // Basic select without parameters
-  const result1 = await db.select().from(someTable);
-  console.log(result1);
-
-  // Select with parameters
-  const result2 = await db
+  // Query with conditions
+  const result = await db
     .select({
-      x: someTable.x,
-      y: someTable.y,
+      symbol: tradesTable.symbol,
+      price: tradesTable.price,
+      timestamp: tradesTable.timestamp,
     })
-    .from(someTable)
-    .where(gt(someTable.y, 12));
-  console.log(result2);
+    .from(tradesTable)
+    .where(gt(tradesTable.price, 3000));
 
+  console.log(result);
   await client.end();
 }
 
