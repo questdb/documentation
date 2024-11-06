@@ -429,6 +429,7 @@ module.exports = {
           type: "doc",
           id: "third-party-tools/overview",
         },
+        "third-party-tools/airbyte",
         "third-party-tools/cube",
         "third-party-tools/databento",
         "third-party-tools/embeddable",

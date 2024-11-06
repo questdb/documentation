@@ -15,6 +15,7 @@ import tcpConfig from "./configuration-utils/\_tcp.config.json"
 import udpConfig from "./configuration-utils/\_udp.config.json"
 import replicationConfig from "./configuration-utils/\_replication.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
+import logConfig from "./configuration-utils/\_log.config.json"
 
 This page describes methods for configuring QuestDB server settings.
 
@@ -302,5 +303,8 @@ information, and we do not share any of this data with third parties.
 
 ## Logging & Metrics
 
-For logging information with `log.conf` and for how to enable metrics with
-Prometheus, see [Logging & Metrics](/docs/operations/logging-metrics/).
+The following settings are available in `server.conf`:
+
+<ConfigTable rows={logConfig} />
+
+Further settings are available in `log.conf`. For more information, and details of our Prometheus metrics, please visit the [Logging & Metrics](/docs/operations/logging-metrics/) documentation.
