@@ -60,10 +60,10 @@ async function main() {
   // Create the table if it doesn't exist
   await client.query(`
     CREATE TABLE IF NOT EXISTS trades (
-      symbol TEXT,
-      side TEXT,
-      price DOUBLE PRECISION,
-      amount DOUBLE PRECISION,
+      symbol VARCHAR,
+      side VARCHAR,
+      price DOUBLE,
+      amount DOUBLE,
       timestamp TIMESTAMP 
     );
   `);
