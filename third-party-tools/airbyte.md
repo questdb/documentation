@@ -1,5 +1,5 @@
 ---
-title: Integrating Airbyte with QuestDB
+title: "Airbyte"
 description: Learn how to use Airbyte to collect data from various sources and send it to QuestDB for efficient time-series data storage and analysis.
 ---
 
@@ -174,20 +174,20 @@ If you encounter issues during the sync process, consider the following debuggin
 
 ## Verifying the integration
 
-1. **Access the QuestDB Web Console**:  
+1. **Access the QuestDB Web Console**:
    Navigate to the [QuestDB Web Console](/docs/develop/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
 
    - `cpu` (generated from `inputs.cpu`)
    - `mem` (generated from `inputs.mem`)
 
-2. **Run a Query on the `cpu` Table**:  
+2. **Run a Query on the `cpu` Table**:
    To verify that data is being correctly written to the `cpu` table, type the following query in the editor and click **RUN**:
 
 ```sql
 SELECT * FROM cpu;
 ```
 
-3. **Inspect the Results**:  
+3. **Inspect the Results**:
    After running the query, the results should display columns for each metric collected by the [Telegraf](/docs/third-party-tools/telegraf/) plugin for monitoring CPU usage, such as:
 
    - `usage_idle`
@@ -204,19 +204,19 @@ SELECT * FROM cpu;
 | 2024-10-19T12:05:00Z | 58         | 31         | 9            | 2            |
 ```
 
-4. **Run a Query on the `mem` Table**:  
+4. **Run a Query on the `mem` Table**:
    Similarly, you can check the `mem` table by running the following query:
 
 ```sql
 SELECT * FROM mem;
 ```
 
-   This will display memory usage statistics collected by Telegraf, which might include:
+This will display memory usage statistics collected by Telegraf, which might include:
 
-   - `total`
-   - `available`
-   - `used`
-   - `free`
+- `total`
+- `available`
+- `used`
+- `free`
 
 5. **Sample Memory Query Results**:
 
@@ -262,6 +262,7 @@ retries: 3
 ```
 
 4. **Monitor Resource Utilization**
+
    - Keep an eye on CPU and memory usage on both Airbyte and QuestDB.
    - Enable logging in Airbyte to track data sync processes.
 
