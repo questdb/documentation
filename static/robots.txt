@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /search/
+
+Allow: /sitemap.xml
+Disallow: /__unused/
+Sitemap: https://questdb.io/sitemap.xml
+Host: https://questdb.io

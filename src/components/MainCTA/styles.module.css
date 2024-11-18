@@ -1,0 +1,10 @@
+.ctaButton {
+  margin-left: 10px;
+  font-size: var(--font-size-small);
+  padding: 0 2rem;
+}
+
+.getQuestdb {
+  background: var(--palette-pink);
+  color: #ffffff;
+}

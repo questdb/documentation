@@ -1,0 +1,52 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es5",
+    "module": "esnext",
+    "lib": ["esnext", "DOM", "dom", "dom.iterable"],
+    "declaration": true,
+    "declarationMap": true,
+    "downlevelIteration": true,
+
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "./",
+    "paths": {
+      "@theme/Banner": ["src/theme/Banner"],
+      "@theme/Button": ["src/theme/Button"],
+      "@theme/Chevron": ["src/theme/Chevron"],
+      "@theme/CareerEmailUs": ["src/theme/CareerEmailUs"],
+      "@theme/Input": ["src/theme/Input"],
+      "@theme/Screenshot": ["src/theme/Screenshot"],
+      "@theme/useResizeObserver": ["src/theme/useResizeObserver"],
+      "@theme/useWindowWidth": ["src/theme/useWindowWidth"],
+      "@theme/ILPClientsTable": ["src/theme/ILPClientsTable"],
+      "@theme/BlogPostPage": ["src/theme/BlogPostPage"],
+      "@theme/DemoConsoleButton": ["src/theme/DemoConsoleButton"],
+      "@theme/ConfigTable": ["src/theme/ConfigTable"]
+    }
+  },
+  "include": ["src/", "types/", "**/*.ts"]
+}

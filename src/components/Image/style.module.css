@@ -1,0 +1,17 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.img {
+  display: block;
+  height: auto;
+  margin: 2rem auto;
+  box-shadow: var(--image-shadow);
+}
+
+.description {
+  text-align: center;
+  width: 70%;
+}

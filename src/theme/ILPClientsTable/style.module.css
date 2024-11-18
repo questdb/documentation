@@ -1,0 +1,68 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 4rem 0;
+  gap: 2rem;
+}
+
+.client {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 3rem;
+  padding: 2rem 1rem;
+  background-color: var(--theme-card-bg-color);
+  border-radius: var(--theme-card-border-radius);
+}
+
+@media screen and (min-width: 690px) {
+  .client {
+    flex: 0 1 calc(50% - 1rem);
+    gap: 0;
+    justify-content: space-between;
+  }
+}
+
+.logo {
+  flex: 0 0 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.logo img {
+  width: auto;
+  height: 60px;
+  object-fit: cover;
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--palette-white-20);
+  color: var(--palette-white);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.button:hover {
+  text-decoration: none;
+  background-color: var(--theme-button-secondary-hover-background-color);
+  color: var(--theme-button-secondary-text-color);
+}
+
+:global(html[data-theme="light"]) .button {
+  background-color: var(--palette-dark-10);
+  color: var(--theme-button-secondary-text-color);
+}

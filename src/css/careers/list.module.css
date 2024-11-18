@@ -1,0 +1,15 @@
+.list {
+  padding: 0;
+  list-style: none;
+}
+
+.list__item {
+  margin-bottom: 0.5rem;
+  font-size: var(--font-size-large);
+}
+
+.list__item::before {
+  content: ">";
+  margin-right: 1rem;
+  color: var(--palette-pink);
+}

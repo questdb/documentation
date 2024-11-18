@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="908" height="340">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line            {stroke: #636273; shape-rendering: crispEdges}
+            .filled               {fill: #636273; stroke: none;}
+            text.terminal         {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal      {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp           {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal         {fill: none; stroke: #be2f5b;}
+            rect.nonterminal      {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text             {fill: none; stroke: none;}
+            polygon.regexp        {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 61 1 57 1 65"/>
+    <polygon points="17 61 9 57 9 65"/>
+    <rect x="31" y="47" width="66" height="32" rx="10"/>
+    <rect x="29" y="45" width="66" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="39" y="65">GRANT</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#permission" xlink:title="permission">
+    <rect x="137" y="47" width="88" height="32"/>
+    <rect x="135" y="45" width="88" height="32" class="nonterminal"/>
+    <text class="nonterminal" x="145" y="65">permission</text></a><rect x="137" y="3" width="24" height="32" rx="10"/>
+    <rect x="135" y="1" width="24" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="145" y="21">,</text>
+    <rect x="285" y="47" width="40" height="32" rx="10"/>
+    <rect x="283" y="45" width="40" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="293" y="65">ON</text>
+    <rect x="365" y="47" width="44" height="32" rx="10"/>
+    <rect x="363" y="45" width="44" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="373" y="65">ALL</text>
+    <rect x="429" y="47" width="72" height="32" rx="10"/>
+    <rect x="427" y="45" width="72" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="437" y="65">TABLES</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#tableName" xlink:title="tableName">
+    <rect x="385" y="179" width="88" height="32"/>
+    <rect x="383" y="177" width="88" height="32" class="nonterminal"/>
+    <text class="nonterminal" x="393" y="197">tableName</text></a><rect x="513" y="179" width="26" height="32" rx="10"/>
+    <rect x="511" y="177" width="26" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="521" y="197">(</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#columnName" xlink:title="columnName">
+    <rect x="579" y="179" width="102" height="32"/>
+    <rect x="577" y="177" width="102" height="32" class="nonterminal"/>
+    <text class="nonterminal" x="587" y="197">columnName</text></a><rect x="579" y="135" width="24" height="32" rx="10"/>
+    <rect x="577" y="133" width="24" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="587" y="153">,</text>
+    <rect x="721" y="179" width="26" height="32" rx="10"/>
+    <rect x="719" y="177" width="26" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="729" y="197">)</text>
+    <rect x="385" y="91" width="24" height="32" rx="10"/>
+    <rect x="383" y="89" width="24" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="393" y="109">,</text>
+    <rect x="847" y="47" width="38" height="32" rx="10"/>
+    <rect x="845" y="45" width="38" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="855" y="65">TO</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#entityName" xlink:title="entityName">
+    <rect x="227" y="277" width="92" height="32"/>
+    <rect x="225" y="275" width="92" height="32" class="nonterminal"/>
+    <text class="nonterminal" x="235" y="295">entityName</text></a><rect x="359" y="309" width="58" height="32" rx="10"/>
+    <rect x="357" y="307" width="58" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="367" y="327">WITH</text>
+    <rect x="437" y="309" width="66" height="32" rx="10"/>
+    <rect x="435" y="307" width="66" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="445" y="327">GRANT</text>
+    <rect x="523" y="309" width="76" height="32" rx="10"/>
+    <rect x="521" y="307" width="76" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="531" y="327">OPTION</text>
+    <rect x="659" y="309" width="58" height="32" rx="10"/>
+    <rect x="657" y="307" width="58" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="667" y="327">WITH</text>
+    <rect x="737" y="309" width="122" height="32" rx="10"/>
+    <rect x="735" y="307" width="122" height="32" class="terminal" rx="10"/>
+    <text class="terminal" x="745" y="327">VERIFICATION</text>
+    <path class="line" d="m17 61 h2 m0 0 h10 m66 0 h10 m20 0 h10 m88 0 h10 m-128 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m108 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-108 0 h10 m24 0 h10 m0 0 h64 m40 44 h10 m40 0 h10 m20 0 h10 m44 0 h10 m0 0 h10 m72 0 h10 m0 0 h286 m-462 0 h20 m442 0 h20 m-482 0 q10 0 10 10 m462 0 q0 -10 10 -10 m-472 10 v112 m462 0 v-112 m-462 112 q0 10 10 10 m442 0 q10 0 10 -10 m-432 10 h10 m88 0 h10 m20 0 h10 m26 0 h10 m20 0 h10 m102 0 h10 m-142 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m122 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-122 0 h10 m24 0 h10 m0 0 h78 m20 44 h10 m26 0 h10 m-274 0 h20 m254 0 h20 m-294 0 q10 0 10 10 m274 0 q0 -10 10 -10 m-284 10 v14 m274 0 v-14 m-274 14 q0 10 10 10 m254 0 q10 0 10 -10 m-264 10 h10 m0 0 h244 m-402 -34 l20 0 m-1 0 q-9 0 -9 -10 l0 -68 q0 -10 10 -10 m402 88 l20 0 m-20 0 q10 0 10 -10 l0 -68 q0 -10 -10 -10 m-402 0 h10 m24 0 h10 m0 0 h358 m-522 -44 h20 m542 0 h20 m-582 0 q10 0 10 10 m562 0 q0 -10 10 -10 m-572 10 v162 m562 0 v-162 m-562 162 q0 10 10 10 m542 0 q10 0 10 -10 m-552 10 h10 m0 0 h532 m20 -182 h10 m38 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-702 230 l2 0 m2 0 l2 0 m2 0 l2 0 m2 0 h10 m92 0 h10 m20 0 h10 m0 0 h250 m-280 0 h20 m260 0 h20 m-300 0 q10 0 10 10 m280 0 q0 -10 10 -10 m-290 10 v12 m280 0 v-12 m-280 12 q0 10 10 10 m260 0 q10 0 10 -10 m-270 10 h10 m58 0 h10 m0 0 h10 m66 0 h10 m0 0 h10 m76 0 h10 m40 -32 h10 m0 0 h210 m-240 0 h20 m220 0 h20 m-260 0 q10 0 10 10 m240 0 q0 -10 10 -10 m-250 10 v12 m240 0 v-12 m-240 12 q0 10 10 10 m220 0 q10 0 10 -10 m-230 10 h10 m58 0 h10 m0 0 h10 m122 0 h10 m23 -32 h-3"/>
+    <polygon points="897 291 905 287 905 295"/>
+    <polygon points="897 291 889 287 889 295"/>
+</svg>

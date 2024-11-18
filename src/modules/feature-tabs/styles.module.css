@@ -1,0 +1,45 @@
+.root {
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.tab {
+  padding: 0 0.25rem;
+  flex: 1;
+  font-size: calc(var(--font-size-small) - 3px);
+}
+
+@media screen and (min-width: 820px) {
+  .root {
+    flex-direction: row;
+  }
+
+  .tabs {
+    flex-direction: column;
+  }
+
+  .tab {
+    padding: 0 3rem;
+    font-size: var(--font-size-normal);
+  }
+
+  .content {
+    width: 380px;
+  }
+}
+
+.content {
+  font-size: var(--font-size-large);
+}
+
+.cta {
+  align-self: center;
+}

@@ -1,0 +1,159 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--palette-rock);
+  z-index: 2;
+}
+
+.center {
+  max-width: var(--ifm-container-width);
+  width: 100%;
+  padding: 4.5rem 1rem;
+  margin: 0 auto;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 30px 1fr;
+  gap: 2rem;
+  grid-template-areas:
+    "logo logo"
+    "tagline tagline"
+    "links links";
+}
+
+@media screen and (min-width: 1000px) {
+  .content {
+    grid-template-areas:
+      "logo logo"
+      "tagline links";
+  }
+}
+
+.logo {
+  grid-area: logo;
+}
+
+.tagline {
+  grid-area: tagline;
+  display: grid;
+  gap: 3rem;
+}
+
+.taglineText {
+  max-width: 380px;
+  font-size: var(--font-size-large);
+  color: #979aaf;
+  margin: 0;
+}
+
+.githubButton {
+  justify-self: flex-start;
+  align-self: flex-end;
+  background-color: var(--palette-white);
+}
+
+.githubButton:hover {
+  background-color: var(--palette-white);
+}
+
+.links {
+  grid-area: links;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem 1rem;
+}
+
+@media screen and (min-width: 700px) {
+  .links {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.category {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  flex: 1;
+}
+
+.title {
+  font-weight: var(--ifm-font-weight-bold);
+  font-size: var(--font-size-large);
+  color: var(--palette-white);
+}
+
+.link {
+  color: var(--ifm-footer-link-color);
+  font-size: var(--font-size-normal);
+}
+
+.link:hover {
+  color: var(--ifm-footer-link-hover-color);
+}
+
+.subscribe {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.subscribeInputs {
+  grid-template-columns: 5fr minmax(max-content, 1fr);
+  max-width: 500px;
+}
+
+.subscribeInputs input {
+  padding: 0.6rem 1rem;
+  height: auto;
+}
+
+.subscribeText {
+  font-size: 1rem;
+  color: #979aaf;
+  margin: 0;
+}
+
+.subscribeSubmit {
+  height: auto;
+  font-size: 0.9rem;
+  padding: 0.6rem 1rem;
+}
+
+:global(html[data-theme="light"]) .subscribeSubmit {
+  background: #dde0e9;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.border {
+  border-top: 1px solid var(--palette-white-10);
+}
+
+.bottom {
+  max-width: var(--ifm-container-width);
+  margin: 0 auto;
+
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1rem 2rem;
+  color: var(--palette-white);
+}
+
+.rightLinks {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.root a {
+  text-decoration: var(--ifm-footer-link-decoration);
+}

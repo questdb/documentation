@@ -1,0 +1,21 @@
+.root {
+  padding: 0.2rem 1rem;
+  text-transform: none;
+  height: auto;
+  font-weight: normal;
+  font-size: 0.9rem;
+  background-color: rgb(62, 64, 76);
+}
+
+.root:hover {
+  background-color: rgb(95, 97, 111);
+}
+
+:global(html[data-theme="light"]) .root {
+  background-color: #dadada;
+  color: #333;
+}
+
+:global(html[data-theme="light"]) .root:hover {
+  background-color: #c2c2c2;
+}

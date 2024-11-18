@@ -1,0 +1,20 @@
+.list {
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  margin-bottom: 1.25rem;
+  font-size: var(--font-size-big-1);
+  line-height: 1.5;
+  padding-left: 2rem;
+}
+
+.item::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  content: ">";
+  color: var(--palette-pink);
+}

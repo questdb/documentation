@@ -1,0 +1,10 @@
+graph TD
+  db[(QuestDB)]
+  object_store((object<br/>store))
+  spark[Apache Spark]
+  impala[Apache Impala]
+  custom[Other big data tools]
+  db <---> object_store
+  object_store -.-> spark
+  object_store -.-> impala
+  object_store -.-> custom

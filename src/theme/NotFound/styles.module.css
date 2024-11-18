@@ -1,0 +1,34 @@
+.missingLink {
+  font-size: 0.7em;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  padding: 4rem 0;
+}
+
+.search > button {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  background-color: var(--theme-button-tertiary-background-color);
+  color: var(--theme-button-tertiary-color);
+  font-weight: 600;
+}
+
+.search > button:hover {
+  background-color: var(--theme-button-tertiary-hover-background-color);
+}
+
+.search > button:before {
+  content: "Try our search";
+  font-size: 1rem;
+}
+
+.otherContentLinks li {
+  padding: 0.3rem 0;
+  margin: 0;
+}

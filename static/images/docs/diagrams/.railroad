@@ -1,0 +1,340 @@
+# this file contains the grammar used to generate railroad diagrams.
+# they are used to visualize QuestDB syntax in documentation.
+# to learn how to create or edit these diagrams, please see this (private!) document:
+# https://questdb.slab.com/posts/how-to-do-railroad-diagrams-he6wsuc0
+
+alterUser
+  ::= 'ALTER' 'USER' userName ( 'ENABLE' | 'DISABLE' | 'WITH' ('NO' 'PASSWORD' | 'PASSWORD' password )
+    | 'CREATE' 'TOKEN' 'TYPE' ( 'JWK' | 'REST' 'WITH' 'TTL' 'timeUnit' ('REFRESH')? )
+    | 'DROP' 'TOKEN' 'TYPE' ( 'JWK' | 'REST' ('token')? ) )
+
+alterServiceAccount
+  ::= 'ALTER' 'SERVICE' 'ACCOUNT' serviceAccountName ( 'ENABLE' | 'DISABLE' | 'WITH' ('NO' 'PASSWORD' | 'PASSWORD' password )
+    | 'CREATE' 'TOKEN' 'TYPE' ( 'JWK' | 'REST' 'WITH' 'TTL' 'timeUnit' ('REFRESH')? )
+    | 'DROP' 'TOKEN' 'TYPE' ( 'JWK' | 'REST' ('token')? ) )
+
+addUser
+  ::= 'ADD' 'USER' userName TO groupName ( ',' groupName )*
+
+assignServiceAccount
+  ::= 'ASSIGN' 'SERVICE' 'ACCOUNT' serviceAccount 'TO' userOrGroup ( ',' userOrGroup )*
+
+unassignServiceAccount
+    ::= 'UNASSIGN' 'SERVICE' 'ACCOUNT' serviceAccount 'FROM' userOrGroup ( ',' userOrGroup )*
+
+assumeServiceAccount
+  ::= 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount      
+  
+exitServiceAccount
+  ::= 'EXIT' 'SERVICE' 'ACCOUNT' serviceAccount  
+
+cancelQuery
+::= 'CANCEL' 'QUERY' queryId
+
+createTableDef
+::= 'CREATE' 'TABLE' ('IF' 'NOT' 'EXISTS')? tableName
+  (
+  (
+  '(' columnName typeDef (',' columnName typeDef)* ')'
+  ) | (
+  'AS' '(' selectSql ')'  (',' castDef)* (',' indexDef)*
+  )
+  ) (
+  ('timestamp' '(' columnRef ')' ) ('PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?))?
+  )? 
+ ('WITH' tableParameter)?
+ (tableTargetVolumeDef)?
+ ('OWNED' 'BY' ownerName)?
+
+createTableLike
+  ::= 'CREATE' 'TABLE' ( '(' 'LIKE' sourceTableName ')' )? ';'
+
+createUser
+  ::= 'CREATE' 'USER' ('IF' 'NOT' 'EXISTS')? userName ( 'WITH' ( 'NO' 'PASSWORD' | 'PASSWORD' password ) )?
+
+createGroup
+  ::= 'CREATE' 'GROUP' ('IF' 'NOT' 'EXISTS')? groupName
+  
+createServiceAccount
+  ::= 'CREATE' 'SERVICE' 'ACCOUNT' ('IF' 'NOT' 'EXISTS')? accountName ('OWNED' 'BY' ownerName)?
+
+alterTable 
+  ::= 'ALTER' 'TABLE' tableName
+
+dropGroup 
+  ::= 'DROP' 'GROUP' ('IF' 'EXISTS')? groupName
+
+dropServiceAccount
+  ::= 'DROP' 'SERVICE' 'ACCOUNT' ('IF' 'EXISTS')? accountName
+
+dropTable
+  ::= 'DROP' ('TABLE' ('IF' 'EXISTS')? tableName |'ALL' 'TABLES')
+
+dropUser
+  ::= 'DROP' 'USER' ('IF' 'EXISTS')? userName
+
+castDef
+  ::= 'cast' '(' columnRef 'as' typeDef ')'
+
+inlineIndexDef 
+  ::= 'INDEX' (indexCapacityDef)?
+
+typeDef 
+  ::= (
+  'boolean' | 'byte' | 'short' | 'char' | 'int' | 'float' |
+  ('symbol' (('CAPACITY' distinctValueEstimate) ('CACHE' | 'NOCACHE')?)? inlineIndexDef?) |
+  'varchar' | 'string' | 'long' | 'date' | 'timestamp' | 'double' | 'binary' | 'long256' | 'geohash(<size>)'
+  )
+
+indexDef 
+  ::='INDEX' '(' columnRef ('CAPACITY' valueBlockSize)?')'
+
+tableTargetVolumeDef
+
+::= ','? 'IN' 'VOLUME' "'"? secondaryVolumeAlias "'"?
+
+insertInto
+  ::= 'INSERT' ('batch' batchCount)?
+  'INTO' tableName ( ( '(' columnName (',' columnName)*) ')')?
+  ( 'VALUES' ( ( '(' value ( ',' value)* ')' ) (',' '(' value ( ',' value)* ')' )* ) | 'SELECT' queryDef mainQuery )
+  ';'
+
+withAsInsert
+  ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )? 
+  'INSERT' ( 'batch' batchCount )? 'INTO' tableName 'SELECT' queryDef subQueryName ';'
+
+insertCommitLagInto
+  ::= 'INSERT' ('batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ))?
+  'INTO' tableName ( ( '(' columnName (',' columnName)*) ')')?
+  ( 'VALUES' ( ( '(' value ( ',' value)* ')' ) (',' '(' value ( ',' value)* ')' )* ) | 'SELECT' queryDef mainQuery )
+  ';'
+
+withAsInsertCommitLag
+  ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )? 
+  'INSERT' ( 'batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ) )? 'INTO' tableName 'SELECT' queryDef subQueryName ';'
+
+backup
+  ::= 'BACKUP' ( 'TABLE' tableName ( ',' tableName )* | 'DATABASE' ) ';'
+
+checkpoint
+  ::= 'CHECKPOINT' ( 'CREATE' | 'RELEASE' ) ';'
+
+case
+  ::= 'CASE' ('WHEN' condition 'THEN' value)* ( | 'ELSE' value ) 'END'
+
+copy
+  ::= 'COPY' (id 'CANCEL' | tableName 'FROM' fileName (| 'WITH' (| 'HEADER' (true|false) |'TIMESTAMP' columnName | 'DELIMITER' delimiter | 'FORMAT' format | |'PARTITION BY' ('NONE'|'YEAR'|'MONTH'|'DAY'|'HOUR') | 'ON ERROR' ('SKIP_ROW'|'SKIP_COLUMN'|'ABORT')) ))
+
+createTableTimestamp
+  ::= 'CREATE' someCreateTableStatement 'timestamp' '(' columnName ')'
+
+createTableWithCommitParams
+  ::= 'WITH' 'maxUncommittedRows' '=' rowCount ',' 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' )
+createTableWithMaxRowParams
+  ::= 'WITH' 'maxUncommittedRows' '=' rowCount
+
+dynamicTimestamp
+  ::= 'SELECT' someSelectStatement 'timestamp' '(' columnName ')'
+
+sampleBy 
+  ::= someSelectStatement... 'SAMPLE' 'BY' n ( 'T' | 's' | 'm' | 'h' | 'd' | 'M' | )
+
+fromTo
+  ::= someSampleBySelectQuery... ( 'FROM' lowerBound 'TO' upperBound | 'FROM' lowerBound | 'TO' upperBound )
+
+alignToCalTimeZone
+  ::= 'ALIGN' 'TO' ( 'FIRST' 'OBSERVATION' | 'CALENDAR' ( 'TIME' 'ZONE' timezone | 'WITH' 'OFFSET' offset )? )
+
+distinct
+  ::= 'SELECT' 'DISTINCT' ( columnName (',' columnName)* ) 'FROM' tableName
+
+latestBy
+  ::= 'SELECT' ( columnName (',' columnName)* ) 'FROM' tableName 'LATEST' 'ON' '(' columnName ')' 'PARTITION' 'BY' ( columnName (',' columnName)* )
+
+latestByDeprecated
+  ::= 'SELECT' ( columnName (',' columnName)* ) 'FROM' tableName 'LATEST' 'BY' ( columnName (',' columnName)* )
+
+limit
+  ::= 'SELECT' someSelectStatement 'LIMIT' ( numberOfRecords | (lowerBound ',' upperBound) ) ';'
+
+fill
+  ::= someSampleBySelectQuery 'FILL' ( ( 'NONE' | 'NULL' | 'PREV' | 'LINEAR' | 'x' ) ',' )*
+
+orderBy
+  ::= someSelectQuery 'ORDER' 'BY' ( columnName (ASC | DESC) ? (',' columnName (asc | desc) ?)* )
+
+timestampSearch
+  ::= 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
+
+timestampIntervalSearch
+  ::= 'WHERE' timestampColumn 'IN' "'" timestamp ';' multiplier ( s | m | h | d | M | y ) ';' ( occurrence ( s | m | h | d | M | y ) ';' repetition )? "'"
+
+timestampInSearch
+  ::= 'WHERE' timestampColumn 'IN' '(' "'timestamp1'" ';' "'timestamp2'" ')'
+
+exactStringOrSymbolSearch
+  ::= 'WHERE' column '=' "'" string "'"
+
+regexMatch
+  ::= 'WHERE' '~=' '(' column ';' regex ')'
+
+listMatch
+  ::= 'WHERE' 'NOT'? columnName 'in' '(' string (',' string)* ')'
+
+whereNumericValue
+  ::= 'WHERE' column ('=' | '!=' | '>' | '>=' | '<' | '<=') value
+
+whereEqDoubleProximityPrecision
+  ::= 'WHERE' 'eq' '(' column ',' value ',' precision  ')'
+
+complexWhere
+  ::= 'WHERE' ('('? ( 'AND' | 'OR' | 'NOT' )? boolean ')'?)*
+
+booleanWhere
+  ::= 'WHERE' 'NOT'? columnName
+
+timestampExact
+  ::= 'WHERE' column '=' timestamp
+
+timestampPartial
+  ::= 'WHERE' timestampColumn 'IN' ( 'yyyy' | 'yyyy-MM' | 'YYYY-MM-dd' | 'yyyy-MM-ddThh' | 'yyyy-MM-ddThh:mm' | 'yyyy-MM-ddThh:mm:ss' )
+
+timestampExplicitRange
+  ::= 'WHERE' timestamp 'IN' '(' lower_bound ',' upper_bound ')'
+
+unionExceptIntersect
+  ::= query_1 ('UNION' | 'EXCEPT' | 'INTERSECT') 'ALL'? query_2
+
+renameTable
+  ::= 'RENAME' 'TABLE' oldName 'TO' newName
+
+cast
+  ::= 'CAST' '(' expression 'AS' type ')'
+
+influxLineProtocolOverTCP
+  ::= (user_1 | user_2 | '...') 'TCP requests' network_IO_thread 'write_queue' ((worker_1 'write' (table_1|table_2|'...')) | (worker_2 'write' (table_3|table_4|'...')))
+
+influxLineProtocolOverTCPLoadRebalance
+  ::= Launch_Load_Balancing_Job  ('IF' load_ratio '>' 'max.load.ratio' Rebalance_Load)? ( 'IF' (updates_since_last_rebalance '<' 'n.updates.per.load.balance' | time_since_last_rebalance '<' 'maintenance.job.interval') Launch_Load_Balancing_Job ('IF' load_ratio '>' 'max.load.ratio' Rebalance_Load)?  )*
+
+joinOverview
+  ::= selectClause joinStatement ( 'WHERE' whereClause )?
+
+innerLeftJoin
+  ::= ( 'INNER' | 'LEFT' )? 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( ( column operator anotherColumn ) ( 'AND' ( column operator anotherColumn ) )* | '(' column ( ',' column )* ')' ) )?
+
+aAsofLtSpliceJoin
+  ::= ( 'ASOF' | 'LT' | 'SPLICE' ) 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )?
+
+crossJoin
+  ::= 'CROSS' 'JOIN' ( table | '(' sub-query ')' )
+
+grant
+  ::= 'GRANT' permission ( ',' permission )* ( 'ON' ( 'ALL' 'TABLES' | ( tableName ( '(' columnName ( ',' columnName )* ')' )? ( ',' tableName ( '(' columnName ( ',' columnName )* ')' )? )* ) ) )?
+  'TO' entityName ( 'WITH' 'GRANT' 'OPTION' )? ( 'WITH' 'VERIFICATION' )?
+
+revoke 
+  ::= 'REVOKE' permission ( ',' permission )* ( 'ON' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? ( ',' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? )* )?
+  'FROM' entityName
+
+grantAssume
+  ::= 'GRANT' 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount 'TO' entityName ( 'WITH' 'GRANT' 'OPTION' )?
+
+revokeAssume
+  ::= 'REVOKE' 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount 'FROM' entityName
+
+groupBy
+  ::= 'SELECT' ((column ( ',' column )* ) ' ,' ( aggregation ( ',' aggregation )* )) 'FROM' table ('GROUP BY' (column ( ',' column )* ))?
+
+with
+  ::= 'WITH' ( subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )*) mainQuery
+
+addIndex
+ ::= 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
+
+dropIndex
+ ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
+
+(no)cachColumn
+ ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
+
+dropColumn
+ ::= 'DROP' 'COLUMN' columnName (',' columnName)* ':'
+
+addColumn
+ ::= 'ADD' 'COLUMN' columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
+
+alterColumnType
+ ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef 
+
+dropPartition
+ ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+ 
+removeUser 
+  ::= 'REMOVE' 'USER' userName 'FROM' groupName ( ',' groupName )*
+
+reindexTable
+  ::= 'REINDEX' 'TABLE' tableName ('COLUMN' columnName)* ('PARTITION' partitionName)* 'LOCK' 'EXCLUSIVE'
+
+renameColumn
+  ::= 'RENAME' 'COLUMN' columnName 'TO' newColumnName
+
+attachPartition
+ ::= 'ALTER' 'TABLE' tableName 'ATTACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+
+detachPartition
+ ::= 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+   | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
+   | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn 'IN' '(' timestamp (',' timestamp)* ')'
+
+squashPartitions
+ ::= 'SQUASH' 'PARTITIONS' tableName ';'
+
+setParam
+ ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n)
+
+setParamCommitLag
+ ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n | 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' ))
+
+vacuumTable
+ ::= 'VACUUM' 'TABLE' tableName
+
+resumeWal
+  ::= 'RESUME' 'WAL' ( 'FROM' 'TRANSACTION' sequencerTxn | 'FROM' 'TXN' sequencerTxn )?
+
+setType
+  ::= 'SET' 'TYPE' ( 'BYPASS' )? 'WAL'
+
+update
+ ::= UPDATE 'tableName' SET columnName '=' 'expression' ( ',' columnName '=' 'expression' )*
+(FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
+
+show
+ ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName ) | 'USER' userName? | 'USERS' | 'GROUPS' userName? | 'SERVICE' 'ACCOUNT' accountName? | 'SERVICE' 'ACCOUNTS' userName? | 'PERMISSIONS' entityName? | 'SERVER_VERSION' | 'SERVER_CONF' )  
+ 
+ - `SHOW USER` shows user secret (enterprise-only)
+ - `SHOW USERS` shows all users (enterprise-only) 
+ - `SHOW GROUPS` shows all groups the user belongs or all groups in the system (enterprise-only) 
+ - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
+ - `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the user/group (enterprise-only) 
+ - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)  
+ - `SHOW PERMISSIONS` displays permissions of user, group or service account (enterprise-only)
+ - `SHOW SERVER_CONF` shows the content of QuestDB's server.conf configuration file. (enterprise-only)
+ 
+
+truncateTable
+  ::= 'TRUNCATE TABLE' tableName ';'
+
+explain
+  ::= 'EXPLAIN' statement 
+
+windowFunction
+  ::= functionName 'OVER' '(' ( 'PARTITION' 'BY' ( columnName? (',' columnName?)* ))?  ('ORDER' 'BY' ( columnName ('ASC' | 'DESC') ? (',' columnName ('ASC' | 'DESC') ?)* ))?  ( ( 'RANGE' | 'ROWS' )
+  ( ( 'UNBOUNDED' 'PRECEDING' | offset 'PRECEDING' | 'CURRENT' 'ROW' ) | 'BETWEEN' ( 'UNBOUNDED' 'PRECEDING' | offset 'PRECEDING' | 'CURRENT' 'ROW' ) AND ( offset 'PRECEDING' | 'CURRENT' 'ROW' ) )?
+  ( 'EXCLUDE' 'CURRENT' 'ROW' | 'EXCLUDE' 'NO' 'OTHERS' )? )? ')'
+
+disableDedup
+ ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'DISABLE'
+
+enableDedup
+ ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'ENABLE' 'UPSERT' 'KEYS' '(' (column ( ',' column )* ) ')'

@@ -1,0 +1,44 @@
+.root {
+  display: grid;
+  gap: 4rem;
+  grid-template-columns: 1fr;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.header {
+  text-align: center;
+}
+
+.subheader {
+  margin-bottom: 2rem;
+  max-width: 38rem;
+}
+@media only screen and  (max-width: 997px) {
+  .subheader {
+    /* button CTA become invisible on low res displays therefor the margin is not required */
+    margin-bottom: 0;
+  }
+}
+@media screen and (min-width: 300px) and (max-width: 500px) {
+  .header {
+    max-width: 20rem;
+  }
+}
+
+@media screen and (min-width: 800px) and (max-width: 999px) {
+  .subheader {
+    max-width: 35rem;
+  }
+}
+
+@media screen and (min-width: 1000px) {
+  .subheader {
+    max-width: 51rem;
+  }
+}

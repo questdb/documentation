@@ -1,0 +1,54 @@
+.image {
+  height: auto;
+  background-color: var(--theme-screenshot-background-color);
+}
+
+.jumbo {
+  max-width: 900px;
+  margin: 0 auto;
+  display: block;
+  z-index: 2;
+}
+
+@media screen and (max-width: 800px) {
+  .jumbo {
+    max-width: 100%;
+  }
+}
+
+.forceDark {
+  background-color: var(--palette-charade);
+}
+
+.forceLight {
+  background-color: white;
+}
+
+.shadow {
+  box-shadow: var(--image-shadow);
+}
+
+.margin {
+  display: block;
+  margin: 2rem auto;
+}
+
+.title {
+  margin-bottom: 2rem;
+}
+
+.small {
+  max-width: 500px;
+}
+
+.caption {
+  margin-bottom: 2rem;
+  text-align: center;
+  font-style: italic;
+  color: var(--palette-pale-blue);
+}
+
+.zoomed {
+  transform: scale(1.5);
+  z-index: 1;
+}
