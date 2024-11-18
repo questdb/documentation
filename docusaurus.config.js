@@ -272,6 +272,7 @@ const config = {
         sitemap: {
           changefreq: "daily",
           priority: 0.7,
+          filename: '/docs/sitemap.xml'
         },
         theme: {
           customCss: [require.resolve("./src/css/_global.css")],
