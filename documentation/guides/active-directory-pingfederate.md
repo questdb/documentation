@@ -328,14 +328,7 @@ As described in the
 tools - such as `psql` - can be integrated with the OIDC provider using the ROPC flow.
 
 When setting this flow up, enable the Resource Owner Password Credentials flow in the
-client settings:
-
-<Screenshot
-  alt="PingFederate, enable ROPC for the client"
-  src="/images/guides/active-directory/21.webp"
-  title="Click to zoom"
-  jumbo={true}
-/>
+client settings.
 
 Next, create a Resource Owner Credentials Grant Mapping to map values obtained from
 the Password Credential Validator (PCV) into the persistent grants.
@@ -343,14 +336,7 @@ the Password Credential Validator (PCV) into the persistent grants.
 When setting this up, select the previously created LDAP Data Source and IdP Adapter, which links
 to the existing PCV.
 
-Then select the `username` attribute of the PCV as `USER_KEY`:
-
-<Screenshot
-alt="PingFederate, ROPC grant mappings"
-src="/images/guides/active-directory/22.webp"
-title="Click to zoom"
-jumbo={true}
-/>
+Then select the `username` attribute of the PCV as `USER_KEY`.
 
 ## Confirm QuestDB mappings and login
 
