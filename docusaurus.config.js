@@ -257,8 +257,9 @@ const config = {
           include: ["**/*!(.partial).{md,mdx}"],
           exclude: ["/glossary/"],
           path: "documentation",
+          routeBasePath: "/",
           editUrl: ({ docPath }) => {
-            return `https://github.com/questdb/documentation/edit/main/${docPath}`
+            return `https://github.com/questdb/documentation/documentation/edit/main/${docPath}`
           },
           sidebarPath: require.resolve("./documentation/sidebars.js"),
           showLastUpdateAuthor: false,
