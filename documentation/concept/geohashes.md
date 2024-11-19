@@ -41,7 +41,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="An illustration showing three maps with different geohash precision levels applied"
   height={598}
-  src="/images/docs/geohashes/increasing-precision.webp"
+  src="images/docs/geohashes/increasing-precision.webp"
   width={850}
 />
 

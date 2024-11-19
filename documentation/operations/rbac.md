@@ -67,7 +67,7 @@ permissions are shown in grey colour:
 <Screenshot
   alt="Diagram showing users, service accounts and groups in QuestDB"
   title="Users, service accounts and groups"
-  src="/images/docs/acl/users_service_accounts_groups.webp"
+  src="images/docs/acl/users_service_accounts_groups.webp"
   width={745}
 />
 
@@ -92,7 +92,7 @@ The diagram below shows the authentication and authorization flow in QuestDB:
 <Screenshot
   alt="Diagram shows authentication and authorization flow in QuestDB"
   title="Authentication and authorization flow"
-  src="/images/docs/acl/auth_flow.webp"
+  src="images/docs/acl/auth_flow.webp"
   width={745}
 />
 

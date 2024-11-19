@@ -129,7 +129,7 @@ A WAL table uses the following components to manage concurrent commit requests:
   alt="Diagram showing the sequencer allocating txn numbers to events cronologically"
   title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth."
   height={435}
-  src="/images/docs/concepts/wal_sequencer.webp"
+  src="images/docs/concepts/wal_sequencer.webp"
   width={745}
 />
 
@@ -137,7 +137,7 @@ A WAL table uses the following components to manage concurrent commit requests:
   alt="Diagram showing the WAL job application and WAL collect events and commit to QuestDB"
   title="The WAL job application collects the transactions sequencially for the TableWriter to commit to QuestDB."
   height={435}
-  src="/images/docs/concepts/wal_process.webp"
+  src="images/docs/concepts/wal_process.webp"
   width={745}
 />
 

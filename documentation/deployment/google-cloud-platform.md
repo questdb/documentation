@@ -30,7 +30,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="The Create Instance wizard on Google Cloud platform"
   height={598}
-  src="/images/guides/google-cloud-platform/create-instance.webp"
+  src="images/guides/google-cloud-platform/create-instance.webp"
   width={650}
 />
 
@@ -44,7 +44,7 @@ import Screenshot from "@theme/Screenshot"
    {" "} <Screenshot
      alt="Deploying a QuestDB instance on Google Cloud Platform Compute Engine"
      height={695}
-     src="/images/guides/google-cloud-platform/create-vm.webp"
+     src="images/guides/google-cloud-platform/create-vm.webp"
      width={650}
    />
 
@@ -64,7 +64,7 @@ import Screenshot from "@theme/Screenshot"
    {" "} <Screenshot
      alt="Configuring a Docker container to launch in a new QuestDB instance on Google Cloud Platform Compute Engine"
      height={695}
-     src="/images/guides/google-cloud-platform/create-vm-docker.webp"
+     src="images/guides/google-cloud-platform/create-vm-docker.webp"
      width={650}
    />
 
@@ -81,7 +81,7 @@ is required for you to access the database from outside your VPC. To create a
 <Screenshot
   alt="Applying a Network tag to a Compute Engine VM Instance on Google Cloud Platform"
   height={610}
-  src="/images/guides/google-cloud-platform/add-network-tag.webp"
+  src="images/guides/google-cloud-platform/add-network-tag.webp"
   width={650}
 />
 
@@ -115,7 +115,7 @@ other QuestDB instances that we create in the future.
 <Screenshot
   alt="Creating a firewall rule in for VPC networking on Google Cloud Platform"
   height={654}
-  src="/images/guides/google-cloud-platform/firewall-rules.webp"
+  src="images/guides/google-cloud-platform/firewall-rules.webp"
   width={650}
 />
 
@@ -136,7 +136,7 @@ indicator should show the instance as **running**:
 <Screenshot
   alt="A QuestDB instance running on Google Cloud Platform showing a success status indicator"
   height={186}
-  src="/images/guides/google-cloud-platform/instance-available.webp"
+  src="images/guides/google-cloud-platform/instance-available.webp"
   width={650}
 />
 
@@ -150,7 +150,7 @@ The [Web Console](/docs/web-console/) should now be visible:
 <Screenshot
   alt="The QuestDB Web Console running on a VM instance on Google Cloud Platform"
   height={405}
-  src="/images/guides/google-cloud-platform/gcp-portal.webp"
+  src="images/guides/google-cloud-platform/gcp-portal.webp"
   width={650}
 />
 

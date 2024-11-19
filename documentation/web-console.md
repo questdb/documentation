@@ -13,7 +13,7 @@ provides UI tools to query data and visualize the results in a table or plot.
 
 <Screenshot
   alt="Screenshot of the Web Console"
-  src="/images/docs/console/overview.webp"
+  src="images/docs/console/overview.webp"
 />
 
 ### Accessing the Web Console
@@ -27,7 +27,7 @@ running locally, this will be [http://localhost:9000](http://localhost:9000).
   alt="Preview of the different sections in the Web Console"
   height={375}
   small
-  src="/images/docs/console/layout.webp"
+  src="images/docs/console/layout.webp"
   width={800}
 />
 
@@ -83,7 +83,7 @@ The following options are available to toggle the grid layout:
   alt="Preview of the different sections in the Web Console"
   height={375}
   small
-  src="/images/docs/console/column.webp"
+  src="images/docs/console/column.webp"
   width={300}
 />
 
@@ -95,7 +95,7 @@ The following options are available to toggle the grid layout:
     alt="Screenshot of the freeze-column line"
     height={375}
     small
-    src="/images/docs/console/freeze-column.webp"
+    src="images/docs/console/freeze-column.webp"
     width={300}
   />
 
@@ -119,7 +119,7 @@ execution.
   alt="Screenshot of the Web Console showing the location of the notification panel"
   height={535}
   small
-  src="/images/docs/console/query-log.webp"
+  src="images/docs/console/query-log.webp"
   width={650}
 />
 
@@ -135,7 +135,7 @@ menu:
   alt="Screenshot of the Web Console showing the location of the Import tab"
   height={535}
   small
-  src="/images/docs/console/importTab.webp"
+  src="images/docs/console/importTab.webp"
   width={309}
 />
 
@@ -144,7 +144,7 @@ The import UI:
 <Screenshot
   alt="Screenshot of the UI for import"
   height={535}
-  src="/images/docs/console/import-ui.webp"
+  src="images/docs/console/import-ui.webp"
   width={800}
 />
 
@@ -156,7 +156,7 @@ displayed:
 <Screenshot
   alt="Screenshot of the Web Console showing the file ready to be uploaded"
   height={535}
-  src="/images/docs/console/ready-to-upload.webp"
+  src="images/docs/console/ready-to-upload.webp"
   width={800}
 />
 
@@ -225,7 +225,7 @@ the number of rows inserted is displayed alongside the `Details` tab:
 <Screenshot
   alt="Screenshot of the Web Console showing number of row imported and the Details tab"
   height={535}
-  src="/images/docs/console/import-complete.webp"
+  src="images/docs/console/import-complete.webp"
   width={400}
 />
 
@@ -234,7 +234,7 @@ The `Details` panel lists rejected rows and errors in importing each column:
 <Screenshot
   alt="Screenshot of the Web Console showing the import details"
   height={535}
-  src="/images/docs/console/import-details.webp"
+  src="images/docs/console/import-details.webp"
   width={400}
 />
 
@@ -251,7 +251,7 @@ UI:
 <Screenshot
   alt="Screenshot of the create table tab"
   small
-  src="/images/docs/console/create-table-tab.webp"
+  src="images/docs/console/create-table-tab.webp"
   width={300}
 />
 
@@ -262,7 +262,7 @@ column to a new table:
   alt="Screenshot of the create table panel"
   height={375}
   small
-  src="/images/docs/console/create-table.webp"
+  src="images/docs/console/create-table.webp"
   width={400}
 />
 

@@ -79,7 +79,7 @@ For GUI-driven CSV upload which leverages the
 <Screenshot
   alt="Screenshot of the UI for import"
   height={535}
-  src="/images/docs/console/import-ui.webp"
+  src="images/docs/console/import-ui.webp"
   width={800}
 />
 

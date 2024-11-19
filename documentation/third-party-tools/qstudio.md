@@ -45,7 +45,7 @@ export const screenshotTitle =
 <Screenshot
   alt={screenshotTitle}
   title={screenshotTitle}
-  src="/images/guides/qstudio/qstudio-query.webp"
+  src="images/guides/qstudio/qstudio-query.webp"
   width={820}
   height={460}
 />

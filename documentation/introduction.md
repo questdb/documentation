@@ -86,7 +86,7 @@ QuestDB, on maximal hardware, significantly outperforms peers:
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="/images/benchmark/benchmark_all_q1_2024.webp"
+  src="images/benchmark/benchmark_all_q1_2024.webp"
   width={650}
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
@@ -99,7 +99,7 @@ on stronger hardware:
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="/images/min-hardware-comp-graph.webp"
+  src="images/pages/index/min-hardware-comp-graph.webp"
   width={550}
   title="QuestDB on an RPi5 outperforming competitors on optimal hardware"
 />

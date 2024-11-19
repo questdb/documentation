@@ -113,7 +113,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Prometheus targets tab showing a QuestDB instance status"
   height={320}
-  src="/images/guides/prometheus/healthy-targets.webp"
+  src="images/guides/prometheus/healthy-targets.webp"
   width={750}
 />
 
@@ -124,7 +124,7 @@ can be used to graph QuestDB-specific metrics which are all prefixed with
 <Screenshot
   alt="Prometheus graphing tab showing QuestDB instance metrics on a chart"
   height={320}
-  src="/images/guides/prometheus/graphing-metrics.webp"
+  src="images/guides/prometheus/graphing-metrics.webp"
   width={750}
 />
 

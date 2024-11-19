@@ -18,7 +18,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
   height={373}
-  src="/images/docs/concepts/partitionModel.svg"
+  src="images/docs/concepts/partitionModel.svg"
   width={745}
   forceTheme="dark"
 />

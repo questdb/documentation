@@ -138,6 +138,8 @@
   --theme-screenshot-background-color: var(--palette-charade);
 
   --z-index-dialog: 101;
+
+  --ifm-navbar-height: 85px;
 }
 
 html[data-theme="dark"] {
@@ -176,6 +178,7 @@ html[data-theme="light"] {
   --ifm-background-color: white;
   --ifm-font-color-base: #333;
   --ifm-navbar-background-color: white;
+  --ifm-navbar-height: 80px;
   --ifm-dropdown-background-color: var(--palette-white);
   --ifm-navbar-shadow: 0 1px 0 0 var(--palette-dark-10);
   --ifm-toc-border-color: var(--palette-dark-10);
@@ -311,6 +314,11 @@ html[data-theme="dark"] .DocSearch {
   margin-right: auto;
   padding-left: 8rem;
   padding-right: 4rem;
+}
+
+.sidebar_njMd {
+  --ifm-navbar-height: 85px;
+  margin-top: calc(var(--ifm-navbar-height) * -1);
 }
 
 .table-of-contents {
@@ -473,7 +481,7 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: 90px;
+  padding-top: var(--ifm-navbar-height);
 }
 
 /**
@@ -778,4 +786,9 @@ html[data-theme="light"] .table-alternate {
 #enterprise-contact-us .hs-submit .actions {
   display: flex;
   justify-content: center;
+}
+
+.navbar {
+  min-height: var(--ifm-navbar-height);
+  height: auto;
 }

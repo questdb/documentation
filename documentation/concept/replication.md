@@ -60,7 +60,7 @@ The architecture consists of:
 
 <Screenshot
   alt="Primary into object store. Object store into 1-n replicas."
-  src="/images/docs/concepts/replication-basic.webp"
+  src="images/docs/concepts/replication-basic.webp"
 />
 
 ## Supported Object Stores
@@ -77,7 +77,7 @@ We also plan to support other object stores such as Google Cloud Storage:
 
 <Screenshot
   alt="AWS S3, Azure, and NFS first. Then HDFS. Then Google Cloud Storage."
-  src="/images/docs/concepts/replication-support-timeline.webp"
+  src="images/docs/concepts/replication-support-timeline.webp"
 />
 
 <!--
@@ -92,7 +92,7 @@ timeline
 
 <Screenshot
   alt="AWS S3, Azure, and NFS first. Then HDFS. Then Google Cloud Storage."
-  src="/images/docs/concepts/replication-support-timeline.webp"
+  src="images/docs/concepts/replication-support-timeline.webp"
 />
 -->
 
@@ -119,7 +119,7 @@ examples.
 
 <Screenshot
   alt="Two primaries sharing an object store service."
-  src="/images/docs/concepts/replication-streams.webp"
+  src="images/docs/concepts/replication-streams.webp"
 />
 
 <!--

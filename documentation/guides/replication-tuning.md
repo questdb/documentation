@@ -53,7 +53,7 @@ replication.primary.sequencer.part.txn.count=5000
   alt="Network traffic with default settings"
   title="Network traffic with default settings"
   height={360}
-  src="/images/guides/replication-tuning/one_row_sec_defaults.webp"
+  src="images/guides/replication-tuning/one_row_sec_defaults.webp"
   width={1072}
 />
 
@@ -196,6 +196,6 @@ replication.primary.sequencer.part.txn.count=1000
   alt="Network traffic with network efficiency settings"
   title="Network traffic with network efficiency settings"
   height={360}
-  src="/images/guides/replication-tuning/one_row_sec_small.webp"
+  src="images/guides/replication-tuning/one_row_sec_small.webp"
   width={1072}
 />

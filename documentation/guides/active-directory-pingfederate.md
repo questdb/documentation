@@ -20,7 +20,7 @@ First thing first, let's pick a name for the client!
 
 <Screenshot
   alt="PingFederate image, naming the client."
-  src="/images/guides/active-directory/1.webp"
+  src="images/guides/active-directory/1.webp"
   title="Picking a name"
   width={750}
 />
@@ -37,7 +37,7 @@ We also have to white list the URL of the [Web Console](/docs/web-console/) as a
 
 <Screenshot
   alt="PingFederate image, redirection URL"
-  src="/images/guides/active-directory/2.webp"
+  src="images/guides/active-directory/2.webp"
   title="Whitelist the redirection URL"
   width={600}
 />
@@ -50,7 +50,7 @@ authentication:
 
 <Screenshot
   alt="PingFederate, bypass approval"
-  src="/images/guides/active-directory/3.webp"
+  src="images/guides/active-directory/3.webp"
   title="Bypass, please"
   width={500}
 />
@@ -63,7 +63,7 @@ Next, enable the grant types required for this flow:
 
 <Screenshot
   alt="PingFederate, granting types"
-  src="/images/guides/active-directory/4.webp"
+  src="images/guides/active-directory/4.webp"
   title="Granted"
   width={600}
 />
@@ -82,7 +82,7 @@ All token related settings should be configured in the token manager.
 
 <Screenshot
   alt=""
-  src="/images/guides/active-directory/5.webp"
+  src="images/guides/active-directory/5.webp"
   title="PKCE enabled"
   width={500}
 />
@@ -101,7 +101,7 @@ for long-lived tokens:
 
 <Screenshot
   alt="PingFederate, access token management UI"
-  src="/images/guides/active-directory/6.webp"
+  src="images/guides/active-directory/6.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -122,7 +122,7 @@ These settings relate to the authorization code, refresh token and CORS.
 
 <Screenshot
   alt="PingFederate, auth server image"
-  src="/images/guides/active-directory/7.webp"
+  src="images/guides/active-directory/7.webp"
   title="Authorization server"
   width={750}
 />
@@ -137,7 +137,7 @@ Next, ensure the `ROLL REFRESH TOKEN VALUES` option is selected:
 
 <Screenshot
   alt="PingFederate, auth server settings ui"
-  src="/images/guides/active-directory/8.webp"
+  src="images/guides/active-directory/8.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -146,7 +146,7 @@ It is also important to whitelist the [Web Console](/docs/web-console/)'s URL on
 
 <Screenshot
   alt="PingFederate, authorization server ui"
-  src="/images/guides/active-directory/9.webp"
+  src="images/guides/active-directory/9.webp"
   title="Port 9000, or your custom port"
   width={500}
 />
@@ -167,7 +167,7 @@ The data source needs a:
 
 <Screenshot
   alt="PingFederate, data and credential storage"
-  src="/images/guides/active-directory/10.webp"
+  src="images/guides/active-directory/10.webp"
   title="Configuring our data source"
   width={750}
 />
@@ -182,7 +182,7 @@ First, create a Password Credential Validator:
 
 <Screenshot
   alt="PingFederate, create a PCV view "
-  src="/images/guides/active-directory/11.webp"
+  src="images/guides/active-directory/11.webp"
   title="Create the PCV"
   width={750}
 />
@@ -198,7 +198,7 @@ Furthermore, we now declare our previously created data source (`EntraDS`):
 
 <Screenshot
   alt="PingFederate, additional PCV details"
-  src="/images/guides/active-directory/12.webp"
+  src="images/guides/active-directory/12.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -216,7 +216,7 @@ We do this in the Type subsection:
 
 <Screenshot
   alt="PingFederate, IdP adapters"
-  src="/images/guides/active-directory/13.webp"
+  src="images/guides/active-directory/13.webp"
   title="Defining an adapter"
   width={750}
 />
@@ -230,7 +230,7 @@ Optionally alter number of retries:
 
 <Screenshot
   alt="PingFederate, selecting PCV "
-  src="/images/guides/active-directory/14.webp"
+  src="images/guides/active-directory/14.webp"
   title="Select the PCV"
   jumbo={true}
 />
@@ -250,7 +250,7 @@ Under the Attribute Contract subsection, see:
 
 <Screenshot
   alt="PingFederate, Attribute Contract subsection"
-  src="/images/guides/active-directory/15.webp"
+  src="images/guides/active-directory/15.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -261,7 +261,7 @@ Ensure `groups` is among the `openid` attributes:
 
 <Screenshot
   alt="PingFederate, Attribute Scopes"
-  src="/images/guides/active-directory/16.webp"
+  src="images/guides/active-directory/16.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -274,7 +274,7 @@ Note item `test` of type of LDAP:
 
 <Screenshot
   alt="PingFederate, Attribute Sources & User Lookup ui"
-  src="/images/guides/active-directory/17.webp"
+  src="images/guides/active-directory/17.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -283,7 +283,7 @@ We created it via the following choices in Add Attribute Source:
 
 <Screenshot
   alt="PingFederate, Add Attribute Source ui"
-  src="/images/guides/active-directory/18.webp"
+  src="images/guides/active-directory/18.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -299,7 +299,7 @@ The source is `LDAP (test)`, while the value is `usePrincipalName`:
 
 <Screenshot
   alt="PingFederate, Policy Management ui"
-  src="/images/guides/active-directory/19.webp"
+  src="images/guides/active-directory/19.webp"
   title="Click to zoom"
   jumbo={true}
 />
@@ -316,7 +316,7 @@ The value is `memberOf`.
 
 <Screenshot
   alt="PingFederate, associating groups with the source"
-  src="/images/guides/active-directory/20.webp"
+  src="images/guides/active-directory/20.webp"
   title="Click to zoom"
   jumbo={true}
 />

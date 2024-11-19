@@ -163,7 +163,7 @@ import Screenshot from "@theme/Screenshot"
 
 <Screenshot
   alt="Querying CPU metrics using the QuestDB Web Console"
-  src="/images/docs/telegraf/select_from_cpu.webp"
+  src="images/docs/telegraf/select_from_cpu.webp"
   width={745}
   height={375}
 />
@@ -189,7 +189,7 @@ Select the **Chart** tab and set the following values:
 
 <Screenshot
   alt="Graphing CPU metrics using the QuestDB Web Console"
-  src="/images/docs/telegraf/cpu_stats_chart.webp"
+  src="images/docs/telegraf/cpu_stats_chart.webp"
   width={745}
   height={375}
 />

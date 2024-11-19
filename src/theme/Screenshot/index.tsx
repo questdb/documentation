@@ -1,19 +1,20 @@
-import clsx from "clsx"
-import React, { useState } from "react"
-import styles from "./styles.module.css"
+import clsx from 'clsx';
+import React, { useState } from 'react';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import styles from './styles.module.css';
 
 type Props = {
-  alt: string
-  height?: number
-  margin?: boolean
-  shadow?: boolean
-  small?: boolean
-  src: string
-  jumbo: boolean
-  title?: string
-  width?: number
-  forceTheme?: "light" | "dark"
-}
+  alt: string;
+  height?: number;
+  margin?: boolean;
+  shadow?: boolean;
+  small?: boolean;
+  src: string;
+  jumbo: boolean;
+  title?: string;
+  width?: number;
+  forceTheme?: 'light' | 'dark';
+};
 
 const Screenshot: React.FC<Props> = ({
   alt,
@@ -27,21 +28,24 @@ const Screenshot: React.FC<Props> = ({
   width,
   forceTheme,
 }) => {
-  const [zoomed, setZoomed] = useState(false)
+  const [zoomed, setZoomed] = useState(false);
+
+  // Use useBaseUrl to resolve the src
+  const resolvedSrc = useBaseUrl(src);
 
   return (
     <figure
       style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
       }}
     >
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
         <img
@@ -54,11 +58,11 @@ const Screenshot: React.FC<Props> = ({
             [styles.small]: small,
             [styles.jumbo]: jumbo,
             [styles.title]: title != null,
-            [styles.forceDark]: forceTheme === "dark",
-            [styles.forceLight]: forceTheme === "light",
+            [styles.forceDark]: forceTheme === 'dark',
+            [styles.forceLight]: forceTheme === 'light',
           })}
           height={height}
-          src={src}
+          src={resolvedSrc}
           width={width}
           loading="lazy"
         />
@@ -67,7 +71,7 @@ const Screenshot: React.FC<Props> = ({
         )}
       </div>
     </figure>
-  )
-}
+  );
+};
 
-export default Screenshot
+export default Screenshot;

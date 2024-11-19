@@ -79,7 +79,7 @@ TLS/SSL mode:disable
 
 <Screenshot
     alt="Screenshot of a blank panel after being created"
-    src="/images/blog/2023-04-12/blank-panel.webp"
+    src="images/blog/2023-04-12/blank-panel.webp"
     jumbo={true}
   />
 

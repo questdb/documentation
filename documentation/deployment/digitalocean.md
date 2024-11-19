@@ -37,7 +37,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Choosing the RAM and CPU capacity for a QuestDB DigitalOcean Droplet"
   height={591}
-  src="/images/blog/2021-07-09/choosing-droplet.webp"
+  src="images/blog/2021-07-09/choosing-droplet.webp"
   width={770}
 />
 
@@ -51,7 +51,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Finalizing the creation step of a DigitalOcean Droplet running QuestDB"
   height={591}
-  src="/images/blog/2021-07-09/questdb-droplet.webp"
+  src="images/blog/2021-07-09/questdb-droplet.webp"
   width={770}
 />
 

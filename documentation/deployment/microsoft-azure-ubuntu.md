@@ -32,7 +32,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure"
   height={598}
-  src="/images/guides/microsoft-azure-ubuntu/create-vm.webp"
+  src="images/guides/microsoft-azure-ubuntu/create-vm.webp"
   width={650}
 />
 
@@ -44,7 +44,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure, continued"
   height={598}
-  src="/images/guides/microsoft-azure-ubuntu/ssh-setup.webp"
+  src="images/guides/microsoft-azure-ubuntu/ssh-setup.webp"
   width={650}
 />
 
@@ -55,7 +55,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Deployment Complete"
   height={598}
-  src="/images/guides/microsoft-azure-ubuntu/deployment-complete.webp"
+  src="images/guides/microsoft-azure-ubuntu/deployment-complete.webp"
   width={650}
 />
 
@@ -79,7 +79,7 @@ connect to your new QuestDB instance over the several protocols that we support.
 <Screenshot
   alt="Firewall rules for your Azure VM"
   height={598}
-  src="/images/guides/microsoft-azure-ubuntu/firewall-rules.webp"
+  src="images/guides/microsoft-azure-ubuntu/firewall-rules.webp"
   width={650}
 />
 
@@ -118,7 +118,7 @@ at its IP on port 9000: `https://$YOUR_INSTANCE_IP:9000`
 <Screenshot
   alt="Firewall rules for your Azure VM"
   height={598}
-  src="/images/guides/microsoft-azure-ubuntu/web-console.webp"
+  src="images/guides/microsoft-azure-ubuntu/web-console.webp"
   width={650}
 />
 
