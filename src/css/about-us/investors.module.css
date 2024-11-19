@@ -1,0 +1,47 @@
+.investors {
+  display: grid;
+  padding: 2rem 0;
+}
+
+.investors__text {
+  --columns: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 700px) {
+  .investors {
+    grid-template-columns: 1fr 4fr;
+    gap: 9rem;
+  }
+
+  .investors__text {
+    --columns: 2;
+  }
+}
+
+.investor__logos {
+  display: grid;
+  align-self: flex-start;
+}
+
+@media (min-width: 900px) {
+  .investor__logos {
+    float: left;
+  }
+}
+
+.investor__logo {
+  padding-bottom: 2rem;
+}
+
+.investor__name {
+  margin-bottom: 0;
+  font-size: var(--font-size-large);
+  font-weight: var(--ifm-font-weight-bold);
+}
+
+:global(html[data-theme="light"]) .investor__logo {
+  filter: brightness(0) opacity(0.6);
+}

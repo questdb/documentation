@@ -1,0 +1,34 @@
+.cloud {
+  display: flex;
+  margin-top: 2rem;
+  align-items: center;
+}
+
+.cloud > svg {
+  height: auto;
+}
+
+html[data-theme="light"] .cloud > svg {
+  filter: invert(1) opacity(0.5);
+}
+
+.cloud > svg:not(:last-child) {
+  margin-right: 4rem;
+}
+
+@media (max-width: 996px) {
+  .cloud > svg {
+    max-height: 28px;
+    width: auto;
+  }
+
+  .cloud > svg:not(:last-child) {
+    margin-right: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cloud > svg {
+    max-height: 24px;
+  }
+}

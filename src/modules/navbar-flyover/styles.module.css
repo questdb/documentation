@@ -1,0 +1,129 @@
+:global([data-radix-popper-content-wrapper]) {
+  z-index: 200 !important;
+  min-width: 10rem;
+  min-height: 50px;
+}
+
+.arrow {
+  fill: var(--ifm-dropdown-background-color);
+}
+
+.product,
+.learn {
+  padding-block: 1rem;
+
+  background-color: var(--ifm-dropdown-background-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-global-shadow-md);
+
+  animation-name: slideUpAndFade;
+  animation-duration: var(--ifm-transition-fast);
+  animation-timing-function: cubic-bezier(0.24, 0.22, 0.015, 1.56);
+  will-change: transform;
+}
+
+.product > *,
+.learn > * {
+  padding-inline: 2rem;
+}
+
+.sections {
+  padding-block: 0.5rem;
+  display: flex;
+  column-gap: 4rem;
+}
+
+.product .column {
+  display: flex;
+  flex-direction: column;
+}
+
+.product .section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.heading {
+  white-space: nowrap;
+  font-size: 1rem;
+  color: var(--ifm-color-emphasis-600);
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.heading:not(:first-child) {
+  margin-top: 1rem;
+}
+
+.section:has(.heading) {
+  margin-top: 1rem;
+}
+
+.item {
+  white-space: nowrap;
+  padding-block: 0.15rem;
+}
+
+.item:has(a)::before {
+  content: "›";
+  color: var(--ifm-color-primary);
+  margin-right: 0.4rem;
+  font-size: 16pt;
+}
+
+.item a {
+  display: inline-flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.item.highlight a {
+  border: 1px solid var(--palette-pink);
+}
+
+.item small {
+  color: var(--ifm-color-emphasis-600);
+}
+
+.item mark {
+  background-color: var(--ifm-color-primary);
+  color: var(--ifm-dropdown-background-color);
+  padding-inline: 0.15rem;
+  border-radius: 4px;
+}
+
+.multi {
+  list-style: none;
+  margin: unset;
+  padding: unset;
+}
+
+.footer {
+  padding: 0;
+  border-top: 1px solid var(--ifm-hr-border-color);
+
+  margin-bottom: -1rem;
+  padding-block: 1rem;
+}
+
+.ctas {
+  display: flex;
+  gap: 1rem;
+
+  padding-inline: 1.5rem;
+}
+
+.ctas a {
+  font-size: 0.8rem;
+  padding-inline: 15px;
+}
+
+@keyframes slideUpAndFade {
+  0% {
+    transform: translateY(2px) scale(0.8);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}

@@ -1,0 +1,140 @@
+.flex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+@media screen and (min-width: 800px) {
+  .flex {
+    flex-wrap: nowrap;
+  }
+}
+
+.section__title {
+  font-size: var(--font-size-big-3);
+  color: var(--theme-section-title-color);
+}
+
+.section__subtitle {
+  max-width: 479px;
+  line-height: 35px;
+}
+
+.accent {
+  color: var(--palette-pink);
+}
+
+.newsletter {
+  border-top: 1px solid rgba(177, 181, 211, 0.4);
+  padding: 2rem 0;
+  max-width: 600px;
+}
+
+.shirtImage {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 600px;
+}
+
+.list li {
+  position: relative;
+  font-size: 18px;
+  padding-left: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.list li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  content: " ";
+  background-image: url("/images/pages/index/tick.svg?inline");
+  background-repeat: no-repeat;
+}
+
+.link {
+  text-decoration: underline;
+  color: var(--palette-pink);
+}
+
+html[data-theme="light"] .contribution_link img {
+  filter: invert(1) opacity(0.6);
+}
+
+.reward {
+  border: 1px solid rgba(177, 181, 211, 0.2);
+  border-radius: 8px;
+  padding: 27px;
+  text-align: center;
+}
+
+.card {
+  background-color: var(--theme-card-bg-color);
+  border-radius: var(--theme-card-border-radius);
+  padding: 2rem;
+}
+
+.section_image {
+  max-width: 300px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+}
+
+@media (min-width: 400px) {
+  .section_image {
+    max-width: 400px;
+  }
+}
+
+.howToContribute {
+  display: grid;
+  gap: 0rem;
+  padding: 2rem 0;
+}
+
+.howToContribute p {
+  font-size: 1.3rem;
+}
+
+.howToContribute ul {
+  --border: 1px solid rgba(177, 181, 211, 0.2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 400px;
+  border-top: var(--border);
+}
+
+.howToContribute li {
+  display: grid;
+  grid-template-columns: 40px auto max-content;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: var(--border);
+}
+
+.howToContribute a {
+  font-size: var(--font-size-normal);
+  text-decoration: none;
+  color: var(--theme-contribute-text-color);
+}
+
+.joinSlack {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: max-content auto;
+  align-items: center;
+}

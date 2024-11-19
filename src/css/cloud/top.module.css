@@ -1,0 +1,9 @@
+.top__jumbotron {
+  flex: 0 1 570px;
+}
+
+@media (max-width: 996px) {
+  .top__jumbotron {
+    flex: none;
+  }
+}

@@ -1,0 +1,14 @@
+flowchart TB
+    subgraph proc [application process]
+        subgraph glob [global]
+            vm["`vm: **jni::JavaVM**`"]
+        end
+        subgraph t1 [thread 1]
+            env1["`env1: **jni::JNIEnv**`"]
+        end
+        subgraph t2 [thread 2]
+            env2["`env2: **jni::JNIEnv**`"]
+        end
+        vm --> env1
+        vm --> env2
+    end

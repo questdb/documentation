@@ -1,0 +1,10 @@
+graph TD
+  primary[(primary)]
+  object_store((object<br/>store))
+  replica_1[(replica 1)]
+  replica_2[(replica 2)]
+  replica_N[(replica ..N)]
+  primary --> object_store
+  object_store --> replica_1
+  object_store --> replica_2
+  object_store --> replica_N

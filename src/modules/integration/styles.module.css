@@ -1,0 +1,47 @@
+.integrations {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin: 0 auto;
+  padding: 1rem;
+  gap: 3rem 2rem;
+}
+
+@media screen and (min-width: 579px) {
+  .integrations {
+    max-width: 540px;
+  }
+}
+
+@media screen and (min-width: 723px) {
+  .integrations {
+    max-width: 740px;
+  }
+}
+
+.integration {
+  display: flex;
+  width: 80px;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-around;
+  font-size: var(--font-size-normal);
+  color: var(--theme-text-color);
+}
+
+.logo {
+  width: auto;
+  height: 40px;
+}
+
+@media screen and (min-width: 800px) {
+  .logo {
+    height: 50px;
+  }
+}
+
+:global(html[data-theme="light"]) .logo {
+  filter: invert(0.5);
+  will-change: filter;
+}

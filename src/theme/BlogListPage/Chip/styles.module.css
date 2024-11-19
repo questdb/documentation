@@ -1,0 +1,50 @@
+.root {
+  --color: var(--palette-blog-category-color);
+
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 400;
+  border: 1px solid transparent;
+}
+
+.root:hover,
+.root.active {
+  color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  text-decoration: none;
+}
+
+.skinPrimary {
+  color: var(--color);
+  background: var(--theme-card-bg-color);
+}
+
+.skinSecondary {
+  color: var(--color);
+  background: #33333d;
+}
+
+:global(html[data-theme="light"]) .skinSecondary {
+  background: #fff;
+}
+
+.sizeSmall {
+  padding: 0 0.7rem;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.sizeMedium {
+  padding: 0.2rem 0.8rem;
+  font-size: 0.9rem;
+  border-radius: 30px;
+}
+
+.sizeLarge {
+  padding: 0.7rem 2rem;
+  font-size: 1.2rem;
+  border-radius: 25px;
+}

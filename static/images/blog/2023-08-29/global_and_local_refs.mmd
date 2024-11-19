@@ -1,0 +1,29 @@
+flowchart TB
+    subgraph proc [application process]
+        subgraph glob [global]
+            direction LR
+            vm["`vm: **JavaVM**`"]
+            ref1["`ref1: **GlobalRef**`"]
+            ref2["`ref2: **GlobalRef**`"]
+            vm --> ref1
+            vm --> ref2
+        end
+        subgraph t1 [thread 1]
+            direction LR
+            env1["`env1: **JNIEnv**`"]
+            ref3["`ref3: **JObject**`"]
+            ref4["`ref4: **JObject**`"]
+            env1 --> ref3
+            env1 --> ref4
+        end
+        subgraph t2 [thread 2]
+            direction LR
+            env2["`env2: **JNIEnv**`"]
+            ref5["`ref5: **JObject**`"]
+            ref6["`ref6: **JObject**`"]
+            env2 --> ref5
+            env2 --> ref6
+        end
+        vm --> env1
+        vm --> env2
+    end

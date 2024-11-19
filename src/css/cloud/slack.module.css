@@ -1,0 +1,50 @@
+.slack {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 1.5rem;
+  background: var(--theme-card-bg-color);
+  font-size: var(--font-size-normal);
+  border-radius: var(--ifm-global-border-radius);
+}
+
+.slack__text {
+  display: flex;
+  align-items: center;
+  max-width: 75%;
+}
+
+.slack__logo {
+  display: flex;
+  align-items: center;
+  width: 76px;
+  height: 76px;
+  margin-right: 1.5rem;
+}
+
+.slack__cta {
+  margin-left: auto;
+}
+
+@media (max-width: 996px) {
+  .slack {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .slack__text {
+    flex-direction: column;
+    max-width: 100%;
+    margin-bottom: 1rem;
+  }
+
+  .slack__logo {
+    margin-bottom: 2rem;
+    width: 50px;
+    height: 50px;
+  }
+
+  .slack__cta {
+    margin-right: auto;
+  }
+}

@@ -1,0 +1,49 @@
+.root {
+  padding-block: 2rem;
+  gap: 4rem;
+}
+
+.logos {
+  display: flex;
+  justify-content: space-evenly;
+  flex-wrap: wrap;
+  width: 100%;
+  row-gap: 2rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  filter: brightness(0) invert(0.9);
+  padding-inline: 2.25rem;
+}
+
+@media screen and (min-width: 700px) {
+  .logo {
+    width: 33.33%;
+  }
+}
+
+@media screen and (min-width: 900px) {
+  .logo {
+    width: 25%;
+  }
+}
+
+@media screen and (min-width: 1000px) {
+  .logo {
+    width: calc(100% / 6);
+  }
+}
+
+:global(html[data-theme="light"]) .logo {
+  filter: brightness(0) opacity(0.6);
+}
+
+@media (max-width: 767px) {
+  .used_by_container {
+    display: none !important;
+  }
+}

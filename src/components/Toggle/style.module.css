@@ -1,0 +1,44 @@
+.root {
+  --gap: 0.5rem;
+
+  display: flex;
+  gap: var(--gap);
+
+  background-color: var(--theme-card-secondary-bg-color);
+  border: none;
+  border-radius: 6px;
+
+  padding: 0.5rem 1rem;
+  color: var(--palette-pale-blue);
+}
+
+.option {
+  all: unset;
+  display: flex;
+  border-radius: 6px;
+  padding: 0.1rem 0.5rem;
+  position: relative;
+}
+
+.option:not(.disabled) .label {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.label {
+  opacity: 0.4;
+  user-select: none;
+}
+
+.input {
+  position: absolute;
+  height: 0;
+  width: 0;
+  opacity: 0;
+}
+
+.active {
+  background-color: var(--palette-pink);
+  color: var(--palette-white);
+  font-weight: bold;
+}

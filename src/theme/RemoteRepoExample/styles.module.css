@@ -1,0 +1,9 @@
+.markdown pre {
+  /* from ../../internals/prism-dracula.js */
+  background: #262833;
+}
+
+:global(html[data-theme="light"]) .markdown pre {
+  /* from ../../internals/prism-github.js */
+  background: #f6f8fa;
+}

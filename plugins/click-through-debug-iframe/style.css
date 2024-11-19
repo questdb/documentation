@@ -1,0 +1,3 @@
+iframe[style^="position: fixed"] {
+  pointer-events: none;
+}

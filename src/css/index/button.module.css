@@ -1,0 +1,5 @@
+@media only screen and  (max-width: 997px){
+  .primary_cta {
+    display: none;
+  }
+}
