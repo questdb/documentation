@@ -16,6 +16,7 @@ const config = {
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
+  staticDirectories: ['assets', 'images', 'static'],
   projectName: "questdb",
   customFields,
   onBrokenLinks: "warn",
