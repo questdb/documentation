@@ -99,7 +99,7 @@ on stronger hardware:
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="/images/pages/index/min-hardware-comp-graph.webp"
+  src="/images/min-hardware-comp-graph.webp"
   width={550}
   title="QuestDB on an RPi5 outperforming competitors on optimal hardware"
 />
