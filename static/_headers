@@ -11,10 +11,6 @@
 # Cache JavaScript, CSS, SVG, TXT, and WebP files for a year
 /*.js
   Cache-Control: public, max-age=31536000
-/*.css
-  Cache-Control: public, max-age=31536000
-**/*.svg
-  Cache-Control: public, max-age=31536000
 /*.txt
   Cache-Control: public, max-age=31536000
 /*.webp
