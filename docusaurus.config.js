@@ -137,7 +137,7 @@ const config = {
     footer: {
       links: [
         {
-          title: "Poo",
+          title: "Product",
           items: [
             {
               label: "Open Source",
