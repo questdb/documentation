@@ -137,23 +137,23 @@ const config = {
     footer: {
       links: [
         {
-          title: "Product",
+          title: "Poo",
           items: [
             {
               label: "Open Source",
-              to: "/download/",
+              href: "/download/",
             },
             {
               label: "Enterprise",
-              to: "/enterprise/",
+              href: "/enterprise/",
             },
             {
               label: "Use Cases",
-              to: "/use-cases/",
+              href: "/use-cases/",
             },
             {
               label: "Customers",
-              to: "/customers/",
+              href: "/customers/",
             },
             {
               label: "Roadmap",
@@ -161,11 +161,11 @@ const config = {
             },
             {
               label: "QuestDB for Market Data",
-              to: "/market-data/",
+              href: "/market-data/",
             },
             {
               label: "Compare vs. InfluxDB",
-              to: "/blog/2024/02/26/questdb-versus-influxdb/",
+              href: "/blog/2024/02/26/questdb-versus-influxdb/",
             },
           ],
         },
@@ -174,31 +174,31 @@ const config = {
           items: [
             {
               label: "Blog",
-              to: "/blog/",
+              href: "/blog/",
             },
             {
               label: "Tutorials",
-              to: "/blog/tags/tutorial/",
+              href: "/blog/tags/tutorial/",
             },
             {
               label: "Contributors",
-              to: "/contributors/",
+              href: "/contributors/",
             },
             {
               label: "Community Forum",
-              to: customFields.discourseUrl,
+              href: customFields.discourseUrl,
             },
             {
               label: "Community Slack",
-              to: customFields.slackUrl,
+              href: customFields.slackUrl,
             },
             {
               label: "Glossary",
-              to: "/glossary/",
+              href: "/glossary/",
             },
             {
               label: "Time-series database",
-              to: "/glossary/time-series-database/",
+              href: "/glossary/time-series-database/",
             },
           ],
         },
@@ -215,7 +215,7 @@ const config = {
             },
             {
               label: "StackOverflow",
-              to: customFields.stackoverflowUrl,
+              href: customFields.stackoverflowUrl,
             },
             {
               label: "Linkedin",
@@ -223,7 +223,7 @@ const config = {
             },
             {
               label: "YouTube",
-              to: customFields.videosUrl,
+              href: customFields.videosUrl,
             },
             {
               label: "Reddit",
@@ -236,11 +236,11 @@ const config = {
           items: [
             {
               label: "About us",
-              to: "/about-us/",
+              href: "/about-us/",
             },
             {
               label: "Careers",
-              to: "/careers/",
+              href: "/careers/",
             },
           ],
         },

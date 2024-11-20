@@ -13,8 +13,8 @@ type Props = {
 }
 
 const Link = ({ to, href, label, ...props }: Props) => {
-  const linkHref = useBaseUrl(href ?? "", { forcePrependBaseUrl: undefined })
-  const linkTo = useBaseUrl(to ?? "")
+  const linkHref = href ?? ""
+  const linkTo = to ?? ""
 
   return (
     <a
