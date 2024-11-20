@@ -23,8 +23,6 @@ const Link = ({ to, href, label, ...props }: Props) => {
       {...(href != null
         ? {
             href: linkHref,
-            rel: "noopener noreferrer",
-            target: "_blank",
           }
         : { href: linkTo })}
       {...props}
