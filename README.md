@@ -25,7 +25,15 @@ This command starts a local development server and open up a browser window.
 
 Most changes are reflected live without having to restart the server.
 
-## Creating PRs
+## Contributing 
+
+You'll need to sign a quick CLA.
+
+Pretty standard, [check it out](https://cla-assistant.io/questdb/documentation).
+
+This is done on PR creation.
+
+### Creating PRs
 
 First create a new branch.
 
@@ -39,7 +47,7 @@ A QuestDB member must add the `preview` label to your PR to deploy a preview bui
 
 Once it looks good, we'll merge!
 
-## Enhancements, bugs, typos 
+### Enhancements, bugs, typos 
 
 We'd love your help!
 
