@@ -1,0 +1,52 @@
+name: Preview trigger
+
+on:
+  pull_request:
+    types: ["opened", "edited", "synchronize"]
+
+jobs:
+  pr-preview:
+    name: "PR preview"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout questdb.io repository
+        uses: actions/checkout@v3
+        with:
+          repository: questdb/documentation
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Checkout documentation PR branch
+        uses: actions/checkout@v3
+        with:
+          path: documentation
+
+      - name: Debug
+        run: |
+          ls -la
+
+      - name: "Install Netlify CLI if missing"
+        run: which netlify &> /dev/null || npm install netlify-cli -g
+        shell: bash
+
+      - name: Deploy to Netlify
+        uses: jsmrcaga/action-netlify-deploy@v2.0.0
+        with:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          build_directory: build
+
+      - name: "Update PR"
+        if: ${{ env.NETLIFY_PREVIEW_URL }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            :rocket: **Build success!**
+
+            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
+
+            Commit SHA: ${{ github.event.pull_request.head.sha }}
+
+            > :package: Build generates a preview & updates link on each commit.
+
+          comment_tag: execution
