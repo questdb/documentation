@@ -3,15 +3,22 @@ name: Preview trigger
 on:
   pull_request:
     types: ["opened", "edited", "synchronize"]
+  pull_request_target:
+    types: [labeled]
 
 jobs:
   pr-preview:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'preview')
     name: "PR preview"
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -50,5 +57,4 @@ jobs:
             Commit SHA: ${{ github.event.pull_request.head.sha }}
 
             > :package: Build generates a preview & updates link on each commit.
-
-          comment_tag: execution
+          comment_tag: preview
