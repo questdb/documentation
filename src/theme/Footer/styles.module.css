@@ -13,78 +13,6 @@
   margin: 0 auto;
 }
 
-.content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 30px 1fr;
-  gap: 2rem;
-  grid-template-areas:
-    "logo logo"
-    "tagline tagline"
-    "links links";
-}
-
-@media screen and (min-width: 1000px) {
-  .content {
-    grid-template-areas:
-      "logo logo"
-      "tagline links";
-  }
-}
-
-.logo {
-  grid-area: logo;
-}
-
-.tagline {
-  grid-area: tagline;
-  display: grid;
-  gap: 3rem;
-}
-
-.taglineText {
-  max-width: 380px;
-  font-size: var(--font-size-large);
-  color: #979aaf;
-  margin: 0;
-}
-
-.githubButton {
-  justify-self: flex-start;
-  align-self: flex-end;
-  background-color: var(--palette-white);
-}
-
-.githubButton:hover {
-  background-color: var(--palette-white);
-}
-
-.links {
-  grid-area: links;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem 1rem;
-}
-
-@media screen and (min-width: 700px) {
-  .links {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.category {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  flex: 1;
-}
-
-.title {
-  font-weight: var(--ifm-font-weight-bold);
-  font-size: var(--font-size-large);
-  color: var(--palette-white);
-}
-
 .link {
   color: var(--ifm-footer-link-color);
   font-size: var(--font-size-normal);
@@ -92,33 +20,6 @@
 
 .link:hover {
   color: var(--ifm-footer-link-hover-color);
-}
-
-.subscribe {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.subscribeInputs {
-  grid-template-columns: 5fr minmax(max-content, 1fr);
-  max-width: 500px;
-}
-
-.subscribeInputs input {
-  padding: 0.6rem 1rem;
-  height: auto;
-}
-
-.subscribeText {
-  font-size: 1rem;
-  color: #979aaf;
-  margin: 0;
-}
-
-.subscribeSubmit {
-  height: auto;
-  font-size: 0.9rem;
-  padding: 0.6rem 1rem;
 }
 
 :global(html[data-theme="light"]) .subscribeSubmit {
@@ -156,4 +57,29 @@
 
 .root a {
   text-decoration: var(--ifm-footer-link-decoration);
+}
+
+.community {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem 1rem;
+  border-bottom: 1px solid var(--palette-white-10);
+}
+
+.communityText {
+  margin: 0;
+  color: #979aaf;
+  font-size: var(--font-size-normal);
+}
+
+.communityLink {
+  color: var(--palette-white);
+  text-decoration: none;
+  transition: color var(--transition-fastest) var(--transition-bezier);
+}
+
+.communityLink:hover {
+  color: var(--palette-pink);
+  text-decoration: none;
 }
