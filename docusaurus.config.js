@@ -5,6 +5,7 @@ import dotenv from "dotenv"
 const ssrTemplate = require("./src/internals/ssr.template")
 const customFields = require("./src/config/customFields")
 const path = require("path")
+const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
 
 dotenv.config()
 
@@ -12,7 +13,7 @@ const config = {
   title: "QuestDB",
   tagline: "QuestDB is the fastest open source time series database",
   url: `https://${customFields.domain}`,
-  baseUrl: "/docs/",
+  baseUrl: isPreviews ? '/' : '/docs/',
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
