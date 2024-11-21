@@ -408,7 +408,7 @@ to = "/docs/ingestion-overview/#first-party-clients"
 
 [[redirects]]
 from = "/tutorial"
-to = "/blog/tags/tutorial/"
+to = "/blog/?tag=tutorial"
 
 [[redirects]]
 from = "/blog/2022/09/12/importing-3m-rows-with-io-uring"
