@@ -12,14 +12,6 @@ jobs:
     steps:
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
-        with:
-          repository: questdb/documentation
-          token: ${{ secrets.GH_PAT }}
-
-      - name: Checkout documentation PR branch
-        uses: actions/checkout@v3
-        with:
-          path: documentation
 
       - name: Debug
         run: |
