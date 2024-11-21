@@ -13,13 +13,20 @@ jobs:
       - name: Checkout questdb.io repository
         uses: actions/checkout@v3
 
-      - name: Debug
-        run: |
-          ls -la
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
 
-      - name: "Install Netlify CLI if missing"
-        run: which netlify &> /dev/null || npm install netlify-cli -g
-        shell: bash
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build site
+        env:
+          CONTEXT: deploy-preview
+          NETLIFY: true
+        run: yarn build
 
       - name: Deploy to Netlify
         uses: jsmrcaga/action-netlify-deploy@v2.0.0
@@ -27,6 +34,9 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           build_directory: build
+          install_command: "echo Skipping installing the dependencies"
+          build_command: "echo Skipping building the web files"
+          deploy_alias: preview-${{ github.event.pull_request.number }}
 
       - name: "Update PR"
         if: ${{ env.NETLIFY_PREVIEW_URL }}
