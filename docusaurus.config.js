@@ -178,7 +178,7 @@ const config = {
             },
             {
               label: "Tutorials",
-              href: "/blog/tags/tutorial/",
+              href: "/blog/?tag=tutorial",
             },
             {
               label: "Contributors",
