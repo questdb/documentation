@@ -1,18 +1,45 @@
-const nodeFetch = require("node-fetch")
+export type Release = {
+  name: string
+}
 
-module.exports = () => ({
-  name: "fetch-latest-release",
-  async loadContent() {
-    const response = await nodeFetch(
-      `https://github-api.questdb.io/github/latest`,
-    )
+export async function fetchLatestRelease(): Promise<Release | null> {
+  if (typeof fetch === 'undefined') {
+    const nodeFetch = (await import('node-fetch')).default
+    try {
+      const response = await nodeFetch('https://github-api.questdb.io/github/latest', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        console.error(`GitHub API error: ${response.status}`)
+        return null
+      }
+      
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error('Failed to fetch latest release:', error)
+      return null
+    }
+  }
 
+  // Browser environment with native fetch
+  try {
+    const response = await fetch('https://github-api.questdb.io/github/latest', {
+      next: { revalidate: 3600 },
+    })
+    
+    if (!response.ok) {
+      console.error(`GitHub API error: ${response.status}`)
+      return null
+    }
+    
     const data = await response.json()
-
     return data
-  },
-  async contentLoaded({ content, actions }) {
-    const { setGlobalData } = actions
-    setGlobalData({ release: content })
-  },
-})
+  } catch (error) {
+    console.error('Failed to fetch latest release:', error)
+    return null
+  }
+}
