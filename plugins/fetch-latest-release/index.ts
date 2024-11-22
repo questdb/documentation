@@ -1,10 +1,13 @@
+import type { Plugin } from '@docusaurus/types'
+import nodeFetch from 'node-fetch'
+
 export type Release = {
   name: string
+  html_url?: string
 }
 
 export async function fetchLatestRelease(): Promise<Release | null> {
   if (typeof fetch === 'undefined') {
-    const nodeFetch = (await import('node-fetch')).default
     try {
       const response = await nodeFetch('https://github-api.questdb.io/github/latest', {
         headers: {
@@ -41,5 +44,18 @@ export async function fetchLatestRelease(): Promise<Release | null> {
   } catch (error) {
     console.error('Failed to fetch latest release:', error)
     return null
+  }
+}
+
+export default function plugin(): Plugin {
+  return {
+    name: 'fetch-latest-release',
+    async loadContent() {
+      return fetchLatestRelease()
+    },
+    async contentLoaded({ content, actions }) {
+      const { setGlobalData } = actions
+      setGlobalData({ latestRelease: content })
+    },
   }
 }
