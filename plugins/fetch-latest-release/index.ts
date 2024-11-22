@@ -6,7 +6,12 @@ export type Release = {
   html_url?: string
 }
 
-export async function fetchLatestRelease(): Promise<Release | null> {
+const DEFAULT_RELEASE: Release = {
+  name: 'latest',
+  html_url: 'https://github.com/questdb/questdb/releases/latest'
+}
+
+export async function fetchLatestRelease(): Promise<Release> {
   if (typeof fetch === 'undefined') {
     try {
       const response = await nodeFetch('https://github-api.questdb.io/github/latest', {
@@ -17,14 +22,14 @@ export async function fetchLatestRelease(): Promise<Release | null> {
       
       if (!response.ok) {
         console.error(`GitHub API error: ${response.status}`)
-        return null
+        return DEFAULT_RELEASE
       }
       
       const data = await response.json()
       return data
     } catch (error) {
       console.error('Failed to fetch latest release:', error)
-      return null
+      return DEFAULT_RELEASE
     }
   }
 
@@ -36,14 +41,14 @@ export async function fetchLatestRelease(): Promise<Release | null> {
     
     if (!response.ok) {
       console.error(`GitHub API error: ${response.status}`)
-      return null
+      return DEFAULT_RELEASE
     }
     
     const data = await response.json()
     return data
   } catch (error) {
     console.error('Failed to fetch latest release:', error)
-    return null
+    return DEFAULT_RELEASE
   }
 }
 
@@ -55,7 +60,7 @@ export default function plugin(): Plugin {
     },
     async contentLoaded({ content, actions }) {
       const { setGlobalData } = actions
-      setGlobalData({ latestRelease: content })
+      setGlobalData({ release: content })
     },
   }
 }
