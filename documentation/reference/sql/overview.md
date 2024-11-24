@@ -402,7 +402,7 @@ Either:
 Parquet files can be read and thus queried by QuestDB.
 
 QuestDB is shipped with a demo Parquet file, `trades.parquet`, which can be
-queried using the `parquet_read` function.
+queried using the `read_parquet` function.
 
 Example:
 
@@ -417,7 +417,7 @@ WHERE
 
 The trades.parquet file is located in the `import` subdirectory inside the
 QuestDB root directory. Drop your own Parquet files to the import directory and
-query them using the `parquet_read()` function.
+query them using the `read_parquet()` function.
 
 You can change the allowed directory by setting the `cairo.sql.copy.root`
 configuration key.
