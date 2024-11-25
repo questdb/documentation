@@ -4,12 +4,14 @@ sidebar_label: Window
 description: Window SQL functions reference documentation and explanation.
 ---
 
-This page unpacks QuestDB window functions and provides references.
+Window functions perform calculations across sets of table rows that are related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for every row while considering a window of rows defined by the OVER clause.
 
-Window functions exist within many SQL dialects. QuestDB is consistent with
-expected function.
+We'll cover high-level, introductory information about window functions first.
+For some, it may be helpful to launch some [common examples](#common-examples)
+into our live demo. Experimenting with these examples, then referring back to the
+reference, will help put everything in context.
 
-## What is a Window Function?
+## Deep Dive: What is a Window Function?
 
 A window function performs a calculation across a set of rows that are related
 to the current row. This set of related rows is called a "window", defined by an
@@ -74,1082 +76,527 @@ some order, like the three cars who finished before and after a certain car.
 This makes window functions incredibly powerful for complex calculations and
 analyses.
 
-## Building Window Functions
+## Syntax
 
-At the peak of its complexity, a window function can appear as such:
-
-```questdb-sql
+```txt
 functionName OVER (
-    PARTITION BY columnName [, columnName ...]
-    ORDER BY columnName [ASC | DESC] [, columnName [ASC | DESC] ...]
-    RANGE | ROWS (
-        UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW
-        | BETWEEN (UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW)
-        AND (offset PRECEDING | CURRENT ROW)
-    )
-    EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
+    [PARTITION BY columnName [, ...]]
+    [ORDER BY columnName [ASC | DESC] [, ...]]
+    [ROWS | RANGE BETWEEN frame_start AND frame_end]
+    [EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS]
 )
 ```
+Where:
 
-The broad scope of possible choices can be overwhelming. But once the options
-become clear, assembling valuable and performant queries is quick work.
+- `functionName`: The window function to apply (e.g., avg, sum, rank)
+- `OVER`: Specifies the window over which the function operates
+  - `PARTITION BY`: Divides the result set into partitions
+  - `ORDER BY`: Specifies the order of rows within each partition
+  - `ROWS | RANGE BETWEEN`: Defines the window frame relative to the current row
+  - `EXCLUDE`: Optionally excludes certain rows from the frame
 
-We will break down the above into:
+## Supported functions
 
-1. [Base Function](#base-function)
-2. [OVER Clause - PARTITION & ORDER](#over-clause---partition--order)
-3. ["Frame" Clause - RANGE or ROWS](#frame-clause---range-or-rows)
-4. [Exclusion Option](#exclusion-option)
+### Aggregate window functions
 
-### Base Function
+- `avg()` – Calculates the average within a window
+- `sum()` – Calculates the sum within a window
+- `count()` – Counts rows or non-null values
+- `first_value()` – Retrieves the first value in a window
 
-This reference page demonstrates 5 base functions:
+### Window-only functions
 
-1. [avg()](/docs/reference/function/window/#avg)
-2. [first_value()](/docs/reference/function/window/#first_value)
-3. [rank()](/docs/reference/function/window/#rank)
-4. [row_number()](/docs/reference/function/window/#row_number)
-5. Cumulative [sum()](/docs/reference/function/window/#cumulative-sum)
+- `rank()` – Assigns a rank to rows
+- `row_number()` – Assigns sequential numbers to rows
 
-We can assemble our window functions into "blocks" so that it is easier to
-understand. Each block is then explained in its own small section.
+:::note
+Window-only functions:
+- Require an ORDER BY clause
+- Cannot be used outside of window contexts (e.g., in WHERE clauses)
+- Do not support frame clauses
+:::
 
-The base function is the first block.
+## Components of a window function
 
-It contextualizes the "way we look through our window":
+A window function calculates results across a set of rows related to the current row, called a window. This allows for complex calculations like moving averages, running totals, and rankings without collapsing rows.
 
-```questdb-sql
-avg(price) ... (
-      ...
-    )
-    ...
-)
-```
+1. **Function Name**: Specifies the calculation to perform (e.g., `avg(price)`)
+2. **OVER Clause**: Defines the window for the function
+   - `PARTITION BY`: Divides the result set into partitions
+   - `ORDER BY`: Orders rows within partitions
+   - Frame Specification: Defines the subset of rows using ROWS or RANGE
+3. **Exclusion Option**: Excludes specific rows from the frame
 
-Next we define `OVER`. It is the key to assembling valuable and performant
-window functions:
-
-```questdb-sql
-avg(price) OVER (
-      ...
-    )
-    ...
-)
-```
-
-Within `OVER`, we will define `PARTITION BY` and `ORDER BY`, as well as provide
-our "Frame" clause, which details our `RANGE` or `ROWS`. This is the heart and
-shape of our window:
-
-```questdb-sql
-avg(price) OVER (
-    PARTITION BY columnName [, columnName ...]
-    ORDER BY columnName [ASC | DESC] [, columnName [ASC | DESC] ...]
-    RANGE | ROWS (
-        UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW
-        | BETWEEN (UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW)
-        AND (offset PRECEDING | CURRENT ROW)
-    )
-    ...
-)
-```
-
-Finally, our exclusion clauses indicate what to omit. It's a bit like sculpting
-the final details into the window:
-
-```questdb-sql
-avg(price) OVER (
-    PARTITION BY columnName [, columnName ...]
-    ORDER BY columnName [ASC | DESC] [, columnName [ASC | DESC] ...]
-    RANGE | ROWS (
-        UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW
-        | BETWEEN (UNBOUNDED PRECEDING | offset PRECEDING | CURRENT ROW)
-        AND (offset PRECEDING | CURRENT ROW)
-    )
-    EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
-)
-```
-
-### OVER Clause - PARTITION & ORDER
-
-The `OVER` clause defines how data is grouped and processed. When you set the
-function ahead of `OVER`, it's a bit like a "for each" operation. It is framed
-as: "perform this function OVER related rows based on the following terms".
-
-It can be used with `PARTITION BY` and `ORDER BY` to set unique parameters and
-organize the rows. For performance reasons, if `ORDER BY` is set within an
-`OVER` clause, it should match the base query's `ORDER BY`.
-
-### "Frame" Clause - RANGE or ROWS
-
-Window functions use a "frame" to define the subset of data the function
-operates on. Two modes are available for defining this frame: `RANGE` and
-`ROWS`.
-
-#### RANGE Mode
-
-`RANGE` mode defines the window frame based on a range of values in the
-`ORDER BY` column. This is useful when the data has a continuous or time-based
-nature.
-
-For example, to calculate a moving average of prices over time, you might use
-`RANGE` mode with `ORDER BY` timestamp:
-
-```questdb-sql
-SELECT symbol, price, timestamp,
-       avg(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        RANGE BETWEEN '1' HOUR PRECEDING AND CURRENT ROW)
-as moving_avg
-FROM trades
-```
-
-This calculates the average price for each symbol, for the current row and all
-rows with a timestamp within the preceding hour.
-
-#### ROWS Mode
-
-`ROWS` mode defines the window frame based on a specific number of rows. This is
-useful when you want to consider a fixed number of rows, regardless of their
-values.
-
-For example, to calculate a moving average of the last `N` prices, you might use
-`ROWS` mode:
-
-```questdb-sql
-SELECT symbol, price, timestamp,
-       avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) as moving_avg
-FROM trades
-```
-
-This calculates the average price for each symbol, for the current row and the
-three preceding rows.
-
-##### Common Syntax
-
-Both `RANGE` and `ROWS` modes share similar syntax for defining the frame:
-
-- `UNBOUNDED PRECEDING`: The window starts at the first row of the partition
-- `value PRECEDING` or `offset PRECEDING`: The window starts at a specified
-  value or number of rows before the current row
-- `CURRENT ROW`: The window starts or ends at the current row
-- `BETWEEN (UNBOUNDED PRECEDING | value PRECEDING | CURRENT ROW) AND (value PRECEDING | CURRENT ROW)`:
-  The window starts and ends at specified points relative to the current row
-
-The choice between `RANGE` and `ROWS` depends on the nature of your data and the
-specific requirements of your calculation.
-
-#### Default Frame Definition
-
-When the frame clause is not specified, the default frame is
-`RANGE UNBOUNDED PRECEDING`, which includes all rows from the start of the
-partition to the current row.
-
-- If `ORDER BY` is not present, the frame includes the entire partition, as all
-  rows are considered equal.
-
-- If `ORDER BY` is present, the frame includes all rows from the start of the
-  partition to the current row. Note that `UNBOUNDED FOLLOWING` is only allowed
-  when the frame start is `UNBOUNDED PRECEDING`, which means the frame includes
-  the entire partition.
-
-### Exclusion Option
-
-The `OVER` clause can also include an exclusion option, which determines whether
-certain rows are excluded from the frame:
-
-- `EXCLUDE CURRENT ROW`: Excludes the current row in `ROWS` mode and all rows
-  with the same `ORDER BY` value in `RANGE` mode. This is equivalent to setting
-  the frame end to `1 PRECEDING`.
-- `EXCLUDE NO OTHERS`: Includes all rows in the frame. This is the default if no
-  exclusion option is specified.
-
-### Time Units
-
-The time units that can be used in window functions are:
-
-- `day`
-- `hour`
-- `minute`
-- `second`
-- `millisecond`
-- `microsecond`
-
-Plural forms of these time units are also accepted.
-
-## avg
-
-In the context of window functions, `avg(value)` calculates the average of
-`value` over the set of rows defined by the window frame.
-
-**Arguments:**
-
-- `value`: The column of numeric values to calculate the average of.
-
-**Return value:**
-
-- The average of `value` for the rows in the window frame.
-
-**Description**
-
-When used as a window function, `avg()` operates on a "window" of rows defined
-by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER`
-clause.
-
-The `avg()` function respects the frame clause, meaning it only includes rows
-within the specified frame in the calculation. The result is a separate average
-for each row, based on the corresponding window of rows.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Examples:**
-
-Examples below use `trades` table:
-
-```questdb-sql
-CREATE TABLE trades (
-  symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE,
-  timestamp TIMESTAMP
-) TIMESTAMP (timestamp)
-PARTITION BY DAY WAL;
-
-INSERT INTO trades(symbol, price, amount, timestamp)
-VALUES
-('ETH-USD', 2615.54, 0.00044, '2022-03-08 18:03:57'),
-('BTC-USD', 39269.98, 0.001, '2022-03-08 18:03:57'),
-('BTC-USD', 39265.31, 0.000127, '2022-03-08 18:03:58'),
-('BTC-USD', 39265.31, 0.000245, '2022-03-08 18:03:58'),
-('BTC-USD', 39265.31, 0.000073, '2022-03-08 18:03:58'),
-('BTC-USD', 39263.28, 0.00392897, '2022-03-08 18:03:58'),
-('ETH-USD', 2615.35, 0.02245868, '2022-03-08 18:03:58'),
-('ETH-USD', 2615.36, 0.03244613, '2022-03-08 18:03:58'),
-('BTC-USD', 39265.27, 0.00006847, '2022-03-08 18:03:58'),
-('BTC-USD', 39262.42, 0.00046562, '2022-03-08 18:03:58');
-```
-
-#### Moving average price over latest 4 rows
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol
-                 ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)
-FROM trades
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 2615.54    |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 39269.98   |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 39267.645  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 39266.8666 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 39266.4775 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39264.8025 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 2615.445   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 2615.4166  |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39264.7925 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39264.07   |
-
-#### Moving average price over preceding X rows
-
-If frame is specified only on preceding rows, `avg()` returns null until at
-least one non-null value enters the frame.
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol
-                 ROWS BETWEEN UNBOUNDED PRECEDING AND 4 PRECEDING)
-FROM trades
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | null       |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | null       |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | null       |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | null       |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | null       |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39269.98   |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | null       |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | null       |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39267.6450 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39266.8666 |
-
-#### Moving average price over values in the latest second
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol
-                 ORDER BY timestamp
-                 RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW)
-FROM trades
-ORDER BY timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 2615.54    |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 39269.98   |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 39267.645  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 39266.8666 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 39266.4775 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39265.838  |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 2615.35    |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 2615.355   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39265.7433 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39265.2685 |
-
-#### Moving average price over values in the latest second, descending designated timestamp order
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol
-                 ORDER BY timestamp DESC
-                 RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW)
-FROM trades
-ORDER BY timestamp DESC
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39262.42   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39263.845  |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 2615.36    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 2615.355   |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39263.6566 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 39264.07   |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 39264.318  |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 39264.4833 |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 39265.2685 |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 2615.54    |
-
-#### Moving average over default frame
-
-Default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which spans
-whole partition in absence of ORDER BY clause.
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol)
-FROM trades
-ORDER BY timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 2615.4166  |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 39265.2685 |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 39265.2685 |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 39265.2685 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 39265.2685 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39265.2685 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 2615.4166  |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 2615.4166  |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39265.2685 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39265.2685 |
-
-#### Moving average over default ordered frame
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER (PARTITION BY symbol ORDER BY timestamp)
-FROM trades
-ORDER BY timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 2615.54    |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 39269.98   |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 39267.645  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 39266.8666 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 39266.4775 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 39265.838  |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 2615.445   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 2615.4166  |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 39265.7433 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 39265.2685 |
-
-#### Moving average over whole result set
-
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-avg(price) OVER ()
-FROM trades
-ORDER BY timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | avg        |
-| ------- | -------- | ---------- | --------------------------- | ---------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.609765Z | 28270.3130 |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.710419Z | 28270.3130 |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.357448Z | 28270.3130 |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.357448Z | 28270.3130 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.357448Z | 28270.3130 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.357448Z | 28270.3130 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.612275Z | 28270.3130 |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.612275Z | 28270.3130 |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.660121Z | 28270.3130 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.660121Z | 28270.3130 |
-
-## first_value
-
-In the context of window functions, `first_value(value)` calculates the first
-`value` in the set of rows defined by the window frame.
-
-**Arguments:**
-
-- `value`: Any numeric value.
-
-**Return value:**
-
-- The first occurrence of `value` (including null) for the rows in the window
-  frame.
-
-**Description**
-
-`first_value()` operates on a "window" of rows defined by the `OVER` clause. The
-rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame
-specification components of the `OVER` clause.
-
-The `first_value()` function respects the frame clause, meaning it only includes
-rows within the specified frame in the calculation. The result is a separate
-value for each row, based on the corresponding window of rows.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Examples:**
-
-Examples below use `trades` table defined above.
-
-#### First price over latest 4 rows
+### Example
 
 ```questdb-sql
 SELECT
     symbol,
     price,
-    amount,
     timestamp,
-    first_value(price) OVER (
+    avg(price) OVER (
         PARTITION BY symbol
+        ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    )
-FROM
-    trades
+    ) AS moving_avg
+FROM trades;
 ```
 
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39265.31    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39265.31    |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39265.31    |
+This calculates a moving average of price over the current and three preceding rows for each symbol.
 
-#### First price over preceding rows except 4 latest
+## Frame types and behavior
 
-If frame is specified only on preceding rows, `first_value()` returns null until
-at least one non-null value enters the frame.
+Window frames specify which rows are included in the calculation relative to the current row.
+
+```mermaid
+sequenceDiagram
+    participant CurrentRow as Current Row (Time 09:04)
+    participant Row1 as Row at 09:00
+    participant Row2 as Row at 09:02
+    participant Row3 as Row at 09:03
+    participant Row4 as Row at 09:04
+
+    Note over CurrentRow: Calculating at 09:04
+
+    rect rgb(191, 223, 255)
+    Note over Row2,CurrentRow: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    end
+
+    rect rgb(255, 223, 191)
+    Note over Row3,CurrentRow: RANGE BETWEEN INTERVAL '1' MINUTE PRECEDING AND CURRENT ROW
+    end
+```
+
+### ROWS frame
+
+Defines the frame based on a physical number of rows:
+
+```txt
+ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+```
+
+This includes the current row and four preceding rows.
+
+```mermaid
+sequenceDiagram
+    participant R1 as Row 1
+    participant R2 as Row 2
+    participant R3 as Row 3
+    participant R4 as Row 4
+    participant R5 as Row 5
+
+    Note over R1: Frame includes Row1
+    Note over R2: Frame includes Row1, Row2
+    Note over R3: Frame includes Row1, Row2, Row3
+    Note over R4: Frame includes Row2, Row3, Row4
+    Note over R5: Frame includes Row3, Row4, Row5
+```
+
+### RANGE frame
+
+Defines the frame based on logical intervals of values in the ORDER BY column:
+
+```mermaid
+sequenceDiagram
+    participant R1 as Row at 09:00
+    participant R2 as Row at 09:02
+    participant R3 as Row at 09:03
+    participant R4 as Row at 09:04<br/>(Current Row)
+
+    rect rgba(255, 223, 191)
+    Note over R3,R4: RANGE BETWEEN<br/>INTERVAL '1' MINUTE<br/>PRECEDING AND CURRENT ROW
+    end
+```
+
+This diagram shows that when calculating at 09:04, the RANGE frame includes all rows with timestamps from 09:03 to 09:04.
+
+When using RANGE frames with time-based intervals, you can specify the following time units:
+
+- `day(s)`
+- `hour(s)`
+- `minute(s)`
+- `second(s)`
+- `millisecond(s)`
+- `microsecond(s)`
 
 ```questdb-sql
 SELECT
+    timestamp,
     symbol,
     price,
+    AVG(price) OVER (
+        ORDER BY timestamp
+        RANGE BETWEEN INTERVAL '1' HOUR PRECEDING AND CURRENT ROW
+    ) AS hourly_avg
+FROM trades;
+```
+
+This query calculates a moving average of price over the past hour for each row, using the RANGE frame with an interval of one hour.
+
+:::note
+RANGE frames require ORDER BY on a numeric or timestamp column.
+:::
+
+## Frame boundaries
+
+Frame boundaries determine which rows are included in the window calculation:
+
+- `UNBOUNDED PRECEDING`: Starts at the first row of the partition
+- `<value> PRECEDING`: Starts or ends at a specified number of rows or interval before the current row
+- `CURRENT ROW`: Starts or ends at the current row
+
+> **Default Frame**: If unspecified, defaults to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+
+### Restrictions
+
+1. Frame start can only be:
+   - `UNBOUNDED PRECEDING`
+   - `<value> PRECEDING`
+   - `CURRENT ROW`
+
+2. Frame end can only be:
+   - `CURRENT ROW`
+   - `<value> PRECEDING` (unless start is `UNBOUNDED PRECEDING`)
+
+3. RANGE frames must have ORDER BY on a timestamp or numeric column
+
+## Exclusion options
+
+Modifies the window frame by excluding certain rows:
+
+### EXCLUDE NO OTHERS
+- Default behavior
+- Includes all rows in the frame
+
+### EXCLUDE CURRENT ROW
+- Excludes the current row from the frame
+- When frame ends at `CURRENT ROW`, end boundary automatically adjusts to `1 PRECEDING`
+
+## Function reference
+
+### avg()
+
+Calculates the average of a numeric expression over the window frame.
+
+**Syntax:**
+```questdb-sql title="avg() syntax" 
+avg(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column or expression
+
+**Example:**
+```questdb-sql title="avg() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    avg(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS moving_avg
+FROM trades;
+```
+
+### sum()
+
+Calculates the sum of a numeric expression over the window frame.
+
+**Syntax:**
+```questdb-sql title="sum() syntax" 
+sum(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column or expression
+
+**Example:**
+```questdb-sql title="sum() example" demo
+SELECT
+    symbol,
     amount,
     timestamp,
-    first_value(price) OVER (
+    sum(amount) OVER (
         PARTITION BY symbol
-        ROWS BETWEEN UNBOUNDED PRECEDING AND 4 PRECEDING
-    )
-FROM
-    trades
+        ORDER BY timestamp
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS cumulative_amount
+FROM trades;
 ```
 
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | null        |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | null        |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | null        |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | null        |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | null        |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | null        |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | null        |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39269.98    |
+### count()
 
-#### First value of price in the latest second
+Counts rows or non-null values over the window frame.
 
-```questdb-sql
-SELECT symbol, price, amount, timestamp,
-first_value(price) OVER (PARTITION BY symbol
-                         ORDER BY timestamp
-                         RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW)
-FROM trades
-ORDER BY timestamp
+**Syntax:**
+```questdb-sql title="count() syntax" 
+count(*) OVER (window_definition)
+count(value) OVER (window_definition)
 ```
 
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39269.98    |
+**Arguments:**
+- `*`: Counts all rows
+- `value`: Counts non-null values
 
-#### First value of price in the latest second, descending designated timestamp order
+**Example:**
+```questdb-sql title="count() example" demo
+SELECT
+    symbol,
+    count(*) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        RANGE BETWEEN INTERVAL '1' SECOND PRECEDING AND CURRENT ROW
+    ) AS trades_last_second
+FROM trades;
+```
 
-```questdb-sql
+### first_value()
+
+Returns the first value in the window frame.
+
+**Syntax:**
+```questdb-sql title="first_value() syntax" 
+first_value(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Column or expression
+
+**Example:**
+```questdb-sql title="first_value() example" demo
 SELECT
     symbol,
     price,
-    amount,
-    timestamp,
-    first_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp DESC
-        RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
-    )
-FROM
-    trades
-ORDER BY
-    timestamp DESC
-```
-
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.36     |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.36     |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 39262.42    |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39262.42    |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.36     |
-
-#### First value of price in default frame
-
-Default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which
-spans the whole partition in absence of an `ORDER BY` clause.
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    first_value(price) OVER (
-        PARTITION BY symbol
-    )
-FROM
-    trades
-ORDER BY
-    timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-
-#### First value of price in default ordered frame
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
     timestamp,
     first_value(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
-    )
-FROM
-    trades
-ORDER BY
-    timestamp
+    ) AS first_price
+FROM trades;
 ```
 
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 39269.98    |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39269.98    |
+### rank()
 
-#### First value of price in whole result set
+Assigns a rank to each row within the partition, with gaps for ties.
 
-```questdb-sql
+**Syntax:**
+```questdb-sql title="rank() syntax" 
+rank() OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="rank() example" demo
 SELECT
     symbol,
     price,
-    amount,
     timestamp,
-    first_value(price) OVER ()
-FROM
-    trades
-ORDER BY
-    timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | first_value |
-| ------- | -------- | ---------- | --------------------------- | ----------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 2615.54     |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 2615.54     |
-
-## rank
-
-In the context of window functions, `rank()` assigns a unique rank to each row
-within the window frame, with the same rank assigned to rows with the same
-values. Rows with equal values receive the same rank, and a gap appears in the
-sequence for the next distinct value; that is, the `row_number` of the first row
-in its peer group.
-
-**Arguments:**
-
-- `rank()` does not require arguments.
-
-**Return value:**
-
-- The rank of each row within the window frame. Return value type is `long`.
-
-**Description**
-
-When used as a window function, `rank()` operates on a "window" of rows defined
-by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
-
-The `rank()` function assigns a unique rank to each row within its window, with
-the same rank assigned to rows with the same values in the `ORDER BY` clause of
-the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
-each partition, regardless of the frame specification.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Examples:**
-
-For a given table `housing`:
-
-```questdb-sql
-CREATE TABLE housing (
-  id INT,
-  price DOUBLE,
-  rating INT,
-  location VARCHAR,
-  date_sold TIMESTAMP
-);
-
-INSERT INTO housing(id, price, rating, location, date_sold)
-VALUES
-(2, 246.3393, 1, 'alcatraz_ave', '2021-02-01 00:00:00'),
-(10, 69.2601, 5, 'alcatraz_ave', '2021-02-01 04:00:00'),
-(15, 616.2569, 3, 'westbrae', '2021-02-01 08:00:00'),
-(3, 112.7856, 5, 'south_side', '2021-02-01 12:00:00'),
-(17, 993.3345, 1, 'south_side', '2021-02-01 16:00:00'),
-(8, 937.4274, 1, 'berkeley_hills', '2021-02-01 20:00:00'),
-(4, 207.7797, 1, 'alcatraz_ave', '2021-02-02 00:00:00'),
-(17, 352.3193, 3, 'downtown', '2021-02-02 04:00:00'),
-(3, 140.0437, 1, 'westbrae', '2021-02-02 08:00:00'),
-(15, 971.7142, 1, 'westbrae', '2021-02-02 12:00:00');
-```
-
-The following query uses `rank()` to display output based on the rating:
-
-```questdb-sql
-SELECT
-    location,
-    price,
-    date_sold,
-    rating,
     rank() OVER (
-        ORDER BY rating ASC
-    ) AS rank
-FROM
-    housing
-ORDER BY
-    rank
-```
-
-| location       | price    | date_sold                   | rating | rank |
-| -------------- | -------- | --------------------------- | ------ | ---- |
-| westbrae       | 971.7142 | 2021-02-02T12:00:00.000000Z | 1      | 1    |
-| westbrae       | 140.0437 | 2021-02-02T08:00:00.000000Z | 1      | 1    |
-| alcatraz_ave   | 207.7797 | 2021-02-02T00:00:00.000000Z | 1      | 1    |
-| berkeley_hills | 937.4274 | 2021-02-01T20:00:00.000000Z | 1      | 1    |
-| south_side     | 993.3345 | 2021-02-01T16:00:00.000000Z | 1      | 1    |
-| alcatraz_ave   | 246.3393 | 2021-02-01T00:00:00.000000Z | 1      | 1    |
-| downtown       | 352.3193 | 2021-02-02T04:00:00.000000Z | 3      | 7    |
-| westbrae       | 616.2569 | 2021-02-01T08:00:00.000000Z | 3      | 7    |
-| south_side     | 112.7856 | 2021-02-01T12:00:00.000000Z | 5      | 9    |
-| alcatraz_ave   | 69.2601  | 2021-02-01T04:00:00.000000Z | 5      | 9    |
-
-## row_number
-
-In the context of window functions, `row_number()` assigns a unique row number
-to each row within the window frame. For each partition, the row number starts
-with one and increments by one.
-
-**Arguments:**
-
-- `row_number()` does not require arguments.
-
-**Return value:**
-
-- The row number of each row within the window frame. Return value type is
-  `long`.
-
-**Description**
-
-When used as a window function, `row_number()` operates on a "window" of rows
-defined by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
-
-The `row_number()` function assigns a unique row number to each row within its
-window, starting at one for the first row in each partition and incrementing by
-one for each subsequent row. It ignores the frame clause, meaning it considers
-all rows in each partition, regardless of the frame specification.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Examples:**
-
-Given a table `trades`, the queries below use `row_number()` with a `WHERE`
-clause to filter trading records added within one day.
-
-The following query assigns row numbers and orders output based on them:
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    row_number() OVER () AS row_num
-FROM trades
-WHERE timestamp > DATEADD('d', -1, NOW())
-ORDER BY row_num ASC;
--- The ORDER BY clause arranges the output based on the assigned row_num.
-```
-
-| symbol  | price    | amount     | row_num |
-| :------ | :------- | :--------- | :------ |
-| BTC-USD | 20633.47 | 0.17569298 | 1       |
-| ETH-USD | 1560.04  | 1.3289     | 2       |
-| ETH-USD | 1560.04  | 0.3        | 3       |
-| ETH-USD | 1560     | 1.40426786 | 4       |
-| BTC-USD | 20633.48 | 0.00179092 | 5       |
-
-The following query groups the table based on `symbol` and assigns row numbers
-to each group based on `price`:
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    row_number() OVER (PARTITION BY symbol ORDER BY price) AS row_num
-FROM trades
-WHERE timestamp > DATEADD('d', -1, NOW())
-ORDER BY row_num ASC;
--- The ORDER BY clause arranges the output based on the assigned row_num.
-```
-
-| symbol  | price   | amount     | row_num |
-| :------ | :------ | :--------- | :------ |
-| BTC-USD | 1479.41 | 0.10904633 | 1       |
-| ETH-USD | 20000   | 0.1        | 1       |
-| BTC-USD | 1479.45 | 0.02       | 2       |
-| ETH-USD | 20000   | 0.000249   | 2       |
-
-## Cumulative sum
-
-In the context of window functions, `sum(value)` calculates the sum of `value`
-in the set of rows defined by the window frame. Also known as "cumulative sum".
-
-**Arguments:**
-
-- `value`: Any numeric value.
-
-**Return value:**
-
-- The sum of `value` for the rows in the window frame.
-
-**Description**
-
-When used as a window function, `sum()` operates on a "window" of rows defined
-by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER`
-clause.
-
-The `sum()` function respects the frame clause, meaning it only includes rows
-within the specified frame in the calculation. The result is a separate value
-for each row, based on the corresponding window of rows.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Examples:**
-
-Examples below use `trades` table defined above.
-
-#### Moving price sum over latest 4 rows
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    sum(price) OVER (
         PARTITION BY symbol
+        ORDER BY price DESC
+    ) AS price_rank
+FROM trades;
+```
+
+### row_number()
+
+Assigns a unique sequential integer to rows within a partition.
+
+**Syntax:**
+```questdb-sql title="row_number() syntax" 
+row_number() OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="row_number() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    row_number() OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS trade_number
+FROM trades;
+```
+
+## Common window function examples
+
+### Moving average of best bid price
+
+```questdb-sql title="Calculate 4-row moving average of best bid price" demo
+SELECT
+    timestamp,
+    symbol,
+    bid_px_00 as best_bid,
+    avg(bid_px_00) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    )
-FROM
-    trades
+    ) AS bid_moving_avg
+FROM AAPL_orderbook
+WHERE bid_px_00 > 0;
 ```
 
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54   |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98  |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 78535.29  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 117800.6  |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 157065.91 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 157059.21 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 5230.89   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 7846.25   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 157059.17 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 157056.28 |
+This example:
+- Uses the best bid price (`bid_px_00`)
+- Filters out zero/null bids
+- Calculates average over 4 rows (current + 3 preceding)
+- Groups by symbol (though in this case it's all AAPL)
 
-#### Moving price sum over preceding rows except 4 latest
+### Cumulative bid size
 
-If frame is specified only on preceding rows, `sum()` returns null until at
-least one non-null value enters the frame.
+```questdb-sql title="Calculate cumulative size for top 3 bid levels" demo
+SELECT
+    timestamp,
+    bid_px_00,
+    bid_sz_00,
+    sum(bid_sz_00) OVER (
+        ORDER BY timestamp 
+        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+    ) as bid_volume_1min,
+    bid_sz_00 + bid_sz_01 + bid_sz_02 as total_bid_size
+FROM AAPL_orderbook
+WHERE bid_px_00 > 0
+LIMIT 10;
+```
 
-```questdb-sql
+This example:
+- Shows best bid price and size
+- Calculates 1-minute rolling volume at best bid
+- Sums size across top 3 price levels
+- Filters out empty bids
+
+### Order count analysis
+
+```questdb-sql title="Compare order counts across price levels" demo
+SELECT
+    timestamp,
+    bid_px_00,
+    bid_ct_00 as best_bid_orders,
+    sum(bid_ct_00) OVER (
+        ORDER BY timestamp 
+        ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+    ) as rolling_order_count,
+    bid_ct_00 + bid_ct_01 + bid_ct_02 as total_bid_orders
+FROM AAPL_orderbook
+WHERE bid_px_00 > 0
+LIMIT 10;
+```
+
+This example:
+- Shows best bid price and order count
+- Calculates rolling sum of orders at best bid
+- Sums orders across top 3 price levels
+- Uses ROWS frame for precise control
+
+### Moving sum of bid volume
+
+```questdb-sql title="Calculate 1-minute rolling bid volume" demo
+SELECT
+    timestamp,
+    bid_px_00,
+    bid_sz_00,
+    sum(bid_sz_00) OVER (
+        ORDER BY timestamp 
+        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+    ) as bid_volume_1min,
+    bid_sz_00 + bid_sz_01 + bid_sz_02 as total_bid_size
+FROM AAPL_orderbook
+WHERE bid_px_00 > 0
+LIMIT 10;
+```
+
+This example:
+- Shows best bid price and size
+- Calculates rolling 1-minute volume at best bid
+- Also shows total size across top 3 levels
+- Filters out empty bids
+
+### Order frequency analysis
+
+```questdb-sql title="Calculate order updates per minute" demo
+SELECT
+    timestamp,
+    symbol,
+    COUNT(*) OVER (
+        ORDER BY timestamp 
+        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+    ) as updates_per_min,
+    COUNT(CASE WHEN action = 'A' THEN 1 END) OVER (
+        ORDER BY timestamp 
+        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+    ) as new_orders_per_min
+FROM AAPL_orderbook
+LIMIT 10;
+```
+
+This example:
+- Counts all order book updates in last minute
+- Specifically counts new orders (action = 'A')
+- Uses rolling 1-minute window
+- Shows order book activity patterns
+
+## Notes and Restrictions
+
+### ORDER BY Behavior
+- ORDER BY in OVER clause determines the logical order for window functions
+- Independent of the query-level ORDER BY
+- Required for window-only functions
+- Required for RANGE frames
+
+### Frame Specifications
+- ROWS frames:
+  - Based on physical row counts
+  - More efficient for large datasets
+  - Can be used with any ORDER BY column
+
+- RANGE frames:
+  - Based on logical intervals
+  - Require ORDER BY on timestamp or numeric column
+  - Support time-based intervals (e.g., '1h', '5m')
+
+### Exclusion Behavior
+- Using `EXCLUDE CURRENT ROW` with frame end at `CURRENT ROW`:
+  - Automatically adjusts end boundary to `1 PRECEDING`
+  - Ensures consistent results across queries
+
+### Window-Only Function Restrictions
+- Always require ORDER BY clause
+- Cannot be used in:
+  - WHERE clauses
+  - GROUP BY clauses
+  - Window function arguments
+- Do not support frame clauses
+
+### Performance Considerations
+- ROWS frames typically perform better than RANGE frames for large datasets
+- Partitioning can improve performance by processing smaller chunks of data
+- Consider index usage when ordering by timestamp columns
+
+### Common pitfalls
+
+#### Using window functions in WHERE clauses:
+
+```questdb-sql title="Not allowed!"
+-- Incorrect usage
 SELECT
     symbol,
     price,
-    amount,
-    timestamp,
-    sum(price) OVER (
-        PARTITION BY symbol
-        ROWS BETWEEN UNBOUNDED PRECEDING AND 4 PRECEDING
-    )
-FROM
-    trades
-```
-
-| symbol  | price    | amount     | timestamp                   | sum      |
-| ------- | -------- | ---------- | --------------------------- | -------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | null     |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | null     |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | null     |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | null     |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | null     |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 39269.98 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | null     |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | null     |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 78535.29 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 117800.6 |
-
-#### Moving price sum over the latest second
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    sum(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
-    )
-FROM
-    trades
-ORDER BY
     timestamp
+FROM trades
+WHERE
+    avg(price) OVER (ORDER BY timestamp) > 100;
 ```
 
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54   |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98  |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 78535.29  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 117800.6  |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 157065.91 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 196329.19 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 5230.89   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 7846.25   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 235594.46 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 274856.88 |
+#### Missing ORDER BY in OVER clause
 
-#### Moving price sum over the latest second, descending designated timestamp order
-
-```questdb-sql
+```questdb-sql title="Missing ORDER BY"
+-- Potential issue
 SELECT
     symbol,
     price,
-    amount,
-    timestamp,
-    sum(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp DESC
-        RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
-    )
-FROM
-    trades
-ORDER BY
-    timestamp DESC
+    sum(price) OVER () AS cumulative_sum
+FROM trades;
 ```
-
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 39262.42  |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 78527.69  |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 2615.36   |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 5230.71   |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 117790.97 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 157056.28 |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 196321.59 |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 235586.9  |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 274856.88 |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 7846.25   |
-
-#### Moving price sum over default frame
-
-Default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which spans
-whole partition in absence of ORDER BY clause.
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    sum(price) OVER (
-        PARTITION BY symbol
-    )
-FROM
-    trades
-ORDER BY
-    timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 7846.25   |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 274856.88 |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 274856.88 |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 274856.88 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 274856.88 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 274856.88 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 7846.25   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 7846.25   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 274856.88 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 274856.88 |
-
-#### Moving price sum over default ordered frame
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    sum(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    )
-FROM
-    trades
-ORDER BY
-    timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 2615.54   |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 39269.98  |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 78535.29  |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 117800.6  |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 157065.91 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 196329.19 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 5230.89   |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 7846.25   |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 235594.46 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 274856.88 |
-
-#### Moving price sum over whole result set
-
-```questdb-sql
-SELECT
-    symbol,
-    price,
-    amount,
-    timestamp,
-    sum(price) OVER ()
-FROM
-    trades
-ORDER BY
-    timestamp
-```
-
-| symbol  | price    | amount     | timestamp                   | sum       |
-| ------- | -------- | ---------- | --------------------------- | --------- |
-| ETH-USD | 2615.54  | 0.00044    | 2022-03-08T18:03:57.000000Z | 282703.13 |
-| BTC-USD | 39269.98 | 0.001      | 2022-03-08T18:03:57.000000Z | 282703.13 |
-| BTC-USD | 39265.31 | 0.000127   | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| BTC-USD | 39265.31 | 0.000245   | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| BTC-USD | 39265.31 | 0.000073   | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| BTC-USD | 39263.28 | 0.00392897 | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| ETH-USD | 2615.35  | 0.02245868 | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| ETH-USD | 2615.36  | 0.03244613 | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| BTC-USD | 39265.27 | 0.00006847 | 2022-03-08T18:03:58.000000Z | 282703.13 |
-| BTC-USD | 39262.42 | 0.00046562 | 2022-03-08T18:03:58.000000Z | 282703.13 |
