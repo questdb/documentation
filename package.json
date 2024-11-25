@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "scripts": {
-    "start": "cross-env docusaurus start",
+    "start": "cross-env docusaurus start --port 3001",
     "prebuild": "docusaurus clear && node ./scripts/cleanup-guidelines",
     "build": "cross-env NO_UPDATE_NOTIFIER=true USE_SIMPLE_CSS_MINIFIER=true PWA_SW_CUSTOM= docusaurus build",
     "deploy": "docusaurus deploy",
