@@ -1,7 +1,8 @@
+const { WebpackManifestPlugin } = require("webpack-manifest-plugin")
+
 module.exports = () => ({
   name: "manifest",
-  configureWebpack: (config, isServer, { currentBundler }) => {
-    const { WebpackManifestPlugin } = currentBundler.instance.require("webpack-manifest-plugin")
+  configureWebpack: (_, isServer) => {
     return {
       plugins: isServer
         ? []
