@@ -99,15 +99,15 @@ Where:
 
 ### Aggregate window functions
 
-- `avg()` – Calculates the average within a window
-- `sum()` – Calculates the sum within a window
-- `count()` – Counts rows or non-null values
-- `first_value()` – Retrieves the first value in a window
+- [`avg()`](#avg) – Calculates the average within a window
+- [`sum()`](#cumulative-sum) – Calculates the sum within a window
+- [`count()`](#count) – Counts rows or non-null values
+- [`first_value()`](#first_value) – Retrieves the first value in a window
 
 ### Window-only functions
 
-- `rank()` – Assigns a rank to rows
-- `row_number()` – Assigns sequential numbers to rows
+- [`rank()`](#rank) – Assigns a rank to rows
+- [`row_number()`](#row_number) – Assigns sequential numbers to rows
 
 :::note
 Window-only functions:
