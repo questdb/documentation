@@ -6,8 +6,8 @@ description: Window SQL functions reference documentation and explanation.
 
 Window functions perform calculations across sets of table rows that are related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for every row while considering a window of rows defined by the OVER clause.
 
-We'll cover high-level, introductory information about window functions first.
-For some, it may be helpful to launch some [common examples](#common-examples)
+We'll cover high-level, introductory information about window functions then move into composition.
+For some, it may be helpful to start with executing [common examples](#common-examples)
 into our live demo. Experimenting with these examples, then referring back to the
 reference, will help put everything in context.
 
