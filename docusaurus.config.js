@@ -86,13 +86,12 @@ const config = {
     function (context, options) {
       return {
         name: 'development-redirects',
-        configureWebpack(config, isServer, utils) {
+        configureWebpack(config, isServer, { currentBundler }) {
           if (process.env.NODE_ENV === 'development') {
             return {
               devServer: {
                 onBeforeSetupMiddleware: function (devServer) {
                   devServer.app.get('*', function (req, res, next) {
-                    // If path doesn't start with /docs, redirect to Next.js
                     if (!req.path.startsWith('/docs/')) {
                       return res.redirect(`http://localhost:3000${req.path}`)
                     }
