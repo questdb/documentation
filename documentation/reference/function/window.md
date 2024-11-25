@@ -664,15 +664,15 @@ This example:
 - Uses rolling 1-minute window
 - Shows order book activity patterns
 
-## Notes and Restrictions
+## Notes and restrictions
 
-### ORDER BY Behavior
+### ORDER BY behavior
 - ORDER BY in OVER clause determines the logical order for window functions
 - Independent of the query-level ORDER BY
 - Required for window-only functions
 - Required for RANGE frames
 
-### Frame Specifications
+### Frame specifications
 - ROWS frames:
   - Based on physical row counts
   - More efficient for large datasets
@@ -683,12 +683,12 @@ This example:
   - Require ORDER BY on timestamp or numeric column
   - Support time-based intervals (e.g., '1h', '5m')
 
-### Exclusion Behavior
+### Exclusion behavior
 - Using `EXCLUDE CURRENT ROW` with frame end at `CURRENT ROW`:
   - Automatically adjusts end boundary to `1 PRECEDING`
   - Ensures consistent results across queries
 
-### Window-Only Function Restrictions
+### Window-only function restrictions
 - Always require ORDER BY clause
 - Cannot be used in:
   - WHERE clauses
@@ -696,7 +696,7 @@ This example:
   - Window function arguments
 - Do not support frame clauses
 
-### Performance Considerations
+### Performance considerations
 - ROWS frames typically perform better than RANGE frames for large datasets
 - Partitioning can improve performance by processing smaller chunks of data
 - Consider index usage when ordering by timestamp columns
