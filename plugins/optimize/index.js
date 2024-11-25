@@ -1,13 +1,12 @@
 module.exports = () => ({
   name: "optimize",
-  configureWebpack: (_, isServer) => {
+  configureWebpack: (config, isServer, { currentBundler }) => {
     return {
       optimization: {
         runtimeChunk: false,
         splitChunks: isServer
           ? false
           : {
-              // name: true, // Does not exist anymore, see https://webpack.js.org/blog/2020-10-10-webpack-5-release/
               cacheGroups: {
                 common: {
                   name: "common",
