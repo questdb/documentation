@@ -152,6 +152,122 @@ SELECT mid(1.5760, 1.5763)
 | :------ |
 | 1.57615 |
 
+## regr_intercept
+
+`regr_intercept(y, x)` - Calculates the y-intercept of the linear regression line for the given numeric columns y (dependent variable) and x (independent variable).
+
+- The function requires at least two valid (x, y) pairs to compute the intercept.
+  - If fewer than two pairs are available, the function returns null.
+- Supported data types for x and y include `double`, `float`, and `integer` types.
+- The regr_intercept function can be used with other statistical aggregation functions like `regr_slope` or `corr`.
+- The order of arguments in `regr_intercept(y, x)` matters.
+  - Ensure that y is the dependent variable and x is the independent variable.
+
+### Calculation
+
+The y-intercept $b_0$ of the regression line $y = b_0 + b_1 x$ is calculated using the formula:
+
+$$
+b_0 = \bar{y} - b_1 \bar{x}
+$$
+
+Where:
+- $\bar{y}$ is the mean of y values
+- $\bar{x}$ is the mean of x values
+- $b_1$ is the slope calculated by `regr_slope()`
+
+### Arguments
+
+- y: A numeric column representing the dependent variable.
+- x: A numeric column representing the independent variable.
+
+### Return value
+
+Return value type is `double`.
+
+The function returns the y-intercept of the regression line, indicating the predicted value of y when x is 0.
+
+### Examples
+
+#### Calculate the regression intercept between two variables
+
+Using the same measurements table:
+
+| x   | y   |
+| --- | --- |
+| 1.0 | 2.0 |
+| 2.0 | 3.0 |
+| 3.0 | 5.0 |
+| 4.0 | 4.0 |
+| 5.0 | 6.0 |
+
+Calculate the y-intercept:
+
+```questdb-sql
+SELECT regr_intercept(y, x) AS y_intercept FROM measurements;
+```
+
+Result:
+
+| y_intercept |
+| ----------- |
+| 1.4         |
+
+Or: When x is 0, y is predicted to be 1.4 units.
+
+#### Calculate the regression intercept grouped by category
+
+Using the same sales_data table:
+
+| category | advertising_spend | sales |
+| -------- | ---------------- | ----- |
+| A        | 1000             | 15000 |
+| A        | 2000             | 22000 |
+| A        | 3000             | 28000 |
+| B        | 1500             | 18000 |
+| B        | 2500             | 26000 |
+| B        | 3500             | 31000 |
+
+```questdb-sql
+SELECT category, regr_intercept(sales, advertising_spend) AS base_sales
+FROM sales_data
+GROUP BY category;
+```
+
+Result:
+
+| category | base_sales |
+| -------- | ---------- |
+| A        | 9500       |
+| B        | 12000      |
+
+Or:
+
+- In category A, with no advertising spend, the predicted base sales are 9,500 units
+- In category B, with no advertising spend, the predicted base sales are 12,000 units
+
+#### Handling null values
+
+The function ignores rows where either x or y is null:
+
+```questdb-sql
+SELECT regr_intercept(y, x) AS y_intercept
+FROM (
+SELECT 1 AS x, 2 AS y
+UNION ALL SELECT 2, NULL
+UNION ALL SELECT NULL, 4
+UNION ALL SELECT 4, 5
+);
+```
+
+Result:
+
+| y_intercept |
+| ----------- |
+| 1.4         |
+
+Only the rows where both x and y are not null are considered in the calculation.
+
 ## regr_slope
 
 `regr_slope(y, x)` - Calculates the slope of the linear regression line for the
