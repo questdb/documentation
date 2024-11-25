@@ -23,9 +23,6 @@ const config = {
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
   trailingSlash: true,
-  future: {
-    experimental_faster: true,
-  },
   stylesheets: [
     {
       href: "https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css",
