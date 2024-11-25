@@ -245,7 +245,17 @@ Frame boundaries determine which rows are included in the window calculation:
 - `<value> PRECEDING`: Starts or ends at a specified number of rows or interval before the current row
 - `CURRENT ROW`: Starts or ends at the current row
 
-> **Default Frame**: If unspecified, defaults to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+When the frame clause is not specified, the default frame is
+`RANGE UNBOUNDED PRECEDING`, which includes all rows from the start of the
+partition to the current row.
+
+- If `ORDER BY` is not present, the frame includes the entire partition, as all
+  rows are considered equal.
+
+- If `ORDER BY` is present, the frame includes all rows from the start of the
+  partition to the current row. Note that `UNBOUNDED FOLLOWING` is only allowed
+  when the frame start is `UNBOUNDED PRECEDING`, which means the frame includes
+  the entire partition.
 
 ### Restrictions
 
@@ -276,15 +286,36 @@ Modifies the window frame by excluding certain rows:
 
 ### avg()
 
-Calculates the average of a numeric expression over the window frame.
+In the context of window functions, `avg(value)` calculates the average of
+`value` over the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: The column of numeric values to calculate the average of.
+
+**Return value:**
+
+- The average of `value` for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `avg()` operates on a "window" of rows defined
+by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER`
+clause.
+
+The `avg()` function respects the frame clause, meaning it only includes rows
+within the specified frame in the calculation. The result is a separate average
+for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
 
 **Syntax:**
 ```questdb-sql title="avg() syntax" 
 avg(value) OVER (window_definition)
 ```
-
-**Arguments:**
-- `value`: Numeric column or expression
 
 **Example:**
 ```questdb-sql title="avg() example" demo
@@ -300,17 +331,38 @@ SELECT
 FROM trades;
 ```
 
-### sum()
+### Cumulative sum()
 
-Calculates the sum of a numeric expression over the window frame.
+In the context of window functions, `sum(value)` calculates the sum of `value`
+in the set of rows defined by the window frame. Also known as "cumulative sum".
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The sum of `value` for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `sum()` operates on a "window" of rows defined
+by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER`
+clause.
+
+The `sum()` function respects the frame clause, meaning it only includes rows
+within the specified frame in the calculation. The result is a separate value
+for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
 
 **Syntax:**
 ```questdb-sql title="sum() syntax" 
 sum(value) OVER (window_definition)
 ```
-
-**Arguments:**
-- `value`: Numeric column or expression
 
 **Example:**
 ```questdb-sql title="sum() example" demo
@@ -354,15 +406,36 @@ FROM trades;
 
 ### first_value()
 
-Returns the first value in the window frame.
+In the context of window functions, `first_value(value)` calculates the first
+`value` in the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The first occurrence of `value` (including null) for the rows in the window
+  frame.
+
+**Description**
+
+`first_value()` operates on a "window" of rows defined by the `OVER` clause. The
+rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame
+specification components of the `OVER` clause.
+
+The `first_value()` function respects the frame clause, meaning it only includes
+rows within the specified frame in the calculation. The result is a separate
+value for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
 
 **Syntax:**
 ```questdb-sql title="first_value() syntax" 
 first_value(value) OVER (window_definition)
 ```
-
-**Arguments:**
-- `value`: Column or expression
 
 **Example:**
 ```questdb-sql title="first_value() example" demo
@@ -379,7 +452,34 @@ FROM trades;
 
 ### rank()
 
-Assigns a rank to each row within the partition, with gaps for ties.
+In the context of window functions, `rank()` assigns a unique rank to each row
+within the window frame, with the same rank assigned to rows with the same
+values. Rows with equal values receive the same rank, and a gap appears in the
+sequence for the next distinct value; that is, the `row_number` of the first row
+in its peer group.
+
+**Arguments:**
+
+- `rank()` does not require arguments.
+
+**Return value:**
+
+- The rank of each row within the window frame. Return value type is `long`.
+
+**Description**
+
+When used as a window function, `rank()` operates on a "window" of rows defined
+by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
+
+The `rank()` function assigns a unique rank to each row within its window, with
+the same rank assigned to rows with the same values in the `ORDER BY` clause of
+the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
+each partition, regardless of the frame specification.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
 
 **Syntax:**
 ```questdb-sql title="rank() syntax" 
@@ -401,7 +501,33 @@ FROM trades;
 
 ### row_number()
 
-Assigns a unique sequential integer to rows within a partition.
+In the context of window functions, `row_number()` assigns a unique row number
+to each row within the window frame. For each partition, the row number starts
+with one and increments by one.
+
+**Arguments:**
+
+- `row_number()` does not require arguments.
+
+**Return value:**
+
+- The row number of each row within the window frame. Return value type is
+  `long`.
+
+**Description**
+
+When used as a window function, `row_number()` operates on a "window" of rows
+defined by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
+
+The `row_number()` function assigns a unique row number to each row within its
+window, starting at one for the first row in each partition and incrementing by
+one for each subsequent row. It ignores the frame clause, meaning it considers
+all rows in each partition, regardless of the frame specification.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
 
 **Syntax:**
 ```questdb-sql title="row_number() syntax" 
