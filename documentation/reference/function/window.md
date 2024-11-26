@@ -163,7 +163,7 @@ sequenceDiagram
     end
 
     rect rgb(255, 223, 191)
-    Note over Row3,CurrentRow: RANGE BETWEEN INTERVAL '1' MINUTE PRECEDING AND CURRENT ROW
+    Note over Row3,CurrentRow: RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
     end
 ```
 
@@ -204,34 +204,49 @@ sequenceDiagram
     participant R4 as Row at 09:04<br/>(Current Row)
 
     rect rgba(255, 223, 191)
-    Note over R3,R4: RANGE BETWEEN<br/>INTERVAL '1' MINUTE<br/>PRECEDING AND CURRENT ROW
+    Note over R3,R4: RANGE BETWEEN<br/>'1' MINUTE PRECEDING<br/>AND CURRENT ROW
     end
 ```
 
-This diagram shows that when calculating at 09:04, the RANGE frame includes all rows with timestamps from 09:03 to 09:04.
+The time units that can be used in window functions are:
 
-When using RANGE frames with time-based intervals, you can specify the following time units:
+- day
+- hour
+- minute
+- second
+- millisecond
+- microsecond
 
-- `day(s)`
-- `hour(s)`
-- `minute(s)`
-- `second(s)`
-- `millisecond(s)`
-- `microsecond(s)`
+Plural forms of these time units are also accepted.
 
-```questdb-sql
+```questdb-sql title="Multiple time intervals example" demo
 SELECT
     timestamp,
-    symbol,
-    price,
-    AVG(price) OVER (
+    bid_px_00,
+    -- 5-minute average
+    AVG(bid_px_00) OVER (
         ORDER BY timestamp
-        RANGE BETWEEN INTERVAL '1' HOUR PRECEDING AND CURRENT ROW
-    ) AS hourly_avg
-FROM trades;
+        RANGE BETWEEN '5' MINUTE PRECEDING AND CURRENT ROW
+    ) AS avg_5min,
+    -- 100-millisecond count
+    COUNT(*) OVER (
+        ORDER BY timestamp
+        RANGE BETWEEN '100' MILLISECOND PRECEDING AND CURRENT ROW
+    ) AS updates_100ms,
+    -- 2-second sum
+    SUM(bid_sz_00) OVER (
+        ORDER BY timestamp
+        RANGE BETWEEN '2' SECOND PRECEDING AND CURRENT ROW
+    ) AS volume_2sec
+FROM AAPL_orderbook
+WHERE bid_px_00 > 0
+LIMIT 10;
 ```
 
-This query calculates a moving average of price over the past hour for each row, using the RANGE frame with an interval of one hour.
+This query demonstrates different time intervals in action, calculating:
+- 5-minute moving average of best bid price
+- Update frequency in 100ms windows
+- 2-second rolling volume
 
 :::note
 RANGE frames require ORDER BY on a numeric or timestamp column.
@@ -399,7 +414,7 @@ SELECT
     count(*) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
-        RANGE BETWEEN INTERVAL '1' SECOND PRECEDING AND CURRENT ROW
+        RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
     ) AS trades_last_second
 FROM trades;
 ```
