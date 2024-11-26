@@ -143,5 +143,5 @@ This limitation will be lifted in the future.
 [QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
 multiple primaries can write to the same database.
 
-See the [Multi-primary ingestion](/operations/multi-primary-ingestion)
+See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/)
 page for more information.

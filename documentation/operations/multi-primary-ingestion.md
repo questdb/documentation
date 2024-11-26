@@ -102,4 +102,4 @@ When configuring a QuestDB Enterprise cluster with multi-primary ingestion:
 
 QuestDB Enterprise's multi-primary ingestion is built alongside its primary-replica replication capabilities.
 
-See the [Replication](/operations/replication/) page for more information.
+See the [Replication](/docs/operations/replication/) page for more information.
