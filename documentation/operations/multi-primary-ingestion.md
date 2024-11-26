@@ -13,7 +13,7 @@ This document explains multi-primary ingestion, and provides details on the use 
 
 :::note
 
-Multi-primary ingestion is only available in QuestDB Enterprise.
+Multi-primary ingestion is coming soon to QuestDB Enterprise.
 
 :::
 
@@ -22,6 +22,8 @@ Multi-primary ingestion is only available in QuestDB Enterprise.
 ### The role of the sequencer
 
 QuestDB Enterprise provides write consistency across multiple primary nodes via a **sequencer**. The sequencer coordinates transactions by assigning **monotonic transaction numbers** to writes.
+
+Each primary behaves as both a primary and a replica. It will write data into the [object store](/concept/replication/#supported-object-stores) and read data from the [object store](/concept/replication/#supported-object-stores) written by the other primaries to catch up with any changes.
 
 This approach is already used by QuestDB, even on single-instance configuration, for managing writes via **WAL files** and has been extended to support multi-primary setups:
 

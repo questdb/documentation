@@ -6,8 +6,6 @@ description:
   roadmap, down to limitations.
 ---
 
-import Screenshot from "@theme/Screenshot"
-
 QuestDB Enterprise offers primary-replica replication with eventual consistency.
 
 This document will teach you about the architecture, some configuration, a
@@ -58,10 +56,19 @@ The architecture consists of:
   file system
 - Any number of **replica** instances
 
-<Screenshot
-  alt="Primary into object store. Object store into 1-n replicas."
-  src="images/docs/concepts/replication-basic.webp"
-/>
+```mermaid
+graph TD
+    primary[Primary]
+    objectStore[Object Store]
+    replica1[Replica 1]
+    replica2[Replica 2]
+    replicaN[Replica ..N]
+
+    primary --> objectStore
+    objectStore --> replica1
+    objectStore --> replica2
+    objectStore --> replicaN
+```
 
 ## Supported Object Stores
 
@@ -75,26 +82,14 @@ HDFS support is on our roadmap.
 
 We also plan to support other object stores such as Google Cloud Storage:
 
-<Screenshot
-  alt="AWS S3, Azure, and NFS first. Then HDFS. Then Google Cloud Storage."
-  src="images/docs/concepts/replication-support-timeline.webp"
-/>
-
-<!--
-The sequential diagram above was created by https://mermaid.live/, using the Halloween Theme
-Source:
+```mermaid
 timeline
     Currently  : AWS S3
                : Azure Blob Store
                : NFS Filesystem
     Next-up    : HDFS
     Later on   : Google Cloud Storage
-
-<Screenshot
-  alt="AWS S3, Azure, and NFS first. Then HDFS. Then Google Cloud Storage."
-  src="images/docs/concepts/replication-support-timeline.webp"
-/>
--->
+```
 
 Something missing? Want to see it sooner? [Contact us](/enterprise/contact)!
 
@@ -122,21 +117,6 @@ examples.
   src="images/docs/concepts/replication-streams.webp"
 />
 
-<!--
-The diagram above was created by https://mermaid.live/, using the Halloween Theme
-Source:
-graph TD
-  primary[(primary)]
-  object_store((object<br/>store))
-  replica_1[(replica 1)]
-  replica_2[(replica 2)]
-  replica_N[(replica ..N)]
-  primary - -> object_store #Note: dashes should have no spaces in between
-  object_store - -> replica_1
-  object_store - -> replica_2
-  object_store - -> replica_N
-  -->
-
 In addition, the same object store can be re-used for multiple replication
 clusters. To do so, provide a unique `DB_INSTANCE_NAME` value.
 
@@ -155,3 +135,11 @@ up to date manually and are often generally just inserted during the database
 tables setup phase.
 
 This limitation will be lifted in the future.
+
+## Multi-primary ingestion
+
+[QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
+multiple primaries can write to the same database.
+
+See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion)
+page for more information.
