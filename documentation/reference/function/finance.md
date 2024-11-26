@@ -159,7 +159,7 @@ SELECT mid(1.5760, 1.5763)
 - The function requires at least two valid (y, x) pairs to compute the intercept.
   - If fewer than two pairs are available, the function returns null.
 - Supported data types for x and y include `double`, `float`, and `integer` types.
-- The regr_intercept function can be used with other statistical aggregation functions like `regr_slope` or `corr`.
+- The `regr_intercept` function can be used with other statistical aggregation functions like `regr_slope` or `corr`.
 - The order of arguments in `regr_intercept(y, x)` matters.
   - Ensure that y is the dependent variable and x is the independent variable.
 
@@ -174,7 +174,7 @@ $$
 Where:
 - $\bar{y}$ is the mean of y values
 - $\bar{x}$ is the mean of x values
-- $b_1$ is the slope calculated by `regr_slope()`
+- $b_1$ is the slope calculated by `regr_slope(y, x)`
 
 ### Arguments
 
@@ -253,10 +253,10 @@ The function ignores rows where either x or y is null:
 ```questdb-sql
 SELECT regr_intercept(y, x) AS y_intercept
 FROM (
-SELECT 1 AS x, 2 AS y
-UNION ALL SELECT 2, NULL
-UNION ALL SELECT NULL, 4
-UNION ALL SELECT 4, 5
+    SELECT 1 AS x, 2 AS y
+    UNION ALL SELECT 2, NULL
+    UNION ALL SELECT NULL, 4
+    UNION ALL SELECT 4, 5
 );
 ```
 
