@@ -98,4 +98,8 @@ When configuring a QuestDB Enterprise cluster with multi-primary ingestion:
 
 - **Seamless failover:** During failover events, clients are automatically informed of topology changes, ensuring uninterrupted ingestion.
 
+## Replication
 
+QuestDB Enterprise's multi-primary ingestion is built alongside its primary-replica replication capabilities.
+
+See the [Replication](/docs/operations/replication/) page for more information.
