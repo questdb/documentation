@@ -336,5 +336,5 @@ expiration, may prevent successful database restoration.
 [QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
 multiple primaries can write to the same database.
 
-See the [Multi-primary ingestion](/operations/multi-primary-ingestion) page for
+See the [Multi-primary ingestion](/operations/multi-primary-ingestion/) page for
 more information.
