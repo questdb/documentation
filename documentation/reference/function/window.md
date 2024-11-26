@@ -6,10 +6,13 @@ description: Window SQL functions reference documentation and explanation.
 
 Window functions perform calculations across sets of table rows that are related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for every row while considering a window of rows defined by the OVER clause.
 
-We'll cover high-level, introductory information about window functions, and then move on to composition.
-For some, it may be helpful to start with executing [common examples](#common-examples)
-into our live demo. Experimenting with these examples, then referring back to the
-reference, will help put everything in context.
+We'll cover high-level, introductory information about window functions, and then move on to composition. 
+
+We also have some [common examples](#common-examples) to get you started.
+
+:::tip
+Click _Demo this query_ within our query examples to see them in our live demo.
+:::
 
 ## Deep Dive: What is a Window Function?
 
@@ -129,7 +132,7 @@ A window function calculates results across a set of rows related to the current
 
 ### Example
 
-```questdb-sql
+```questdb-sql title="Moving average example" demo
 SELECT
     symbol,
     price,
@@ -290,12 +293,60 @@ partition to the current row.
 Modifies the window frame by excluding certain rows:
 
 ### EXCLUDE NO OTHERS
+
 - Default behavior
 - Includes all rows in the frame
 
+```mermaid
+sequenceDiagram
+    participant R1 as Row 1
+    participant R2 as Row 2
+    participant CR as Current Row
+    participant R4 as Row 4
+
+    rect rgba(255, 223, 191)
+    Note over R1,CR: Frame includes all rows from the frame start up to and including the current row
+    end
+```
+
 ### EXCLUDE CURRENT ROW
+
 - Excludes the current row from the frame
 - When frame ends at `CURRENT ROW`, end boundary automatically adjusts to `1 PRECEDING`
+- This automatic adjustment ensures that the current row is effectively excluded from the calculation, as there cannot be a frame that ends after the current row when the current row is excluded.
+
+```mermaid
+sequenceDiagram
+    participant R1 as Row 1
+    participant R2 as Row 2
+    participant CR as Current Row
+    participant R4 as Row 4
+
+    rect rgba(255, 223, 191)
+    Note over R1,R2: Frame includes all rows <br/> from the frame startup to one row <br/> before the current row<br/>(excluding the current row)
+    end
+    rect rgba(255, 0, 0, 0.1)
+    Note over CR: Current Row is excluded
+    end
+```
+
+#### Example query
+
+To tie it together, consider the following example:
+
+```questdb-sql title="EXCLUSION example" demo
+SELECT
+    timestamp,
+    price,
+    SUM(price) OVER (
+        ORDER BY timestamp
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        EXCLUDE CURRENT ROW
+    ) AS cumulative_sum_excluding_current
+FROM trades;
+```
+
+The query calculates a cumulative sum of the price column for each row in the trades table, excluding the current row from the calculation. By using `EXCLUDE CURRENT ROW`, the window frame adjusts to include all rows from the start up to one row before the current row. This demonstrates how the `EXCLUDE CURRENT ROW` option modifies the window frame to exclude the current row, affecting the result of the window function.
 
 ## Function reference
 
@@ -595,7 +646,7 @@ SELECT
     bid_sz_00,
     sum(bid_sz_00) OVER (
         ORDER BY timestamp 
-        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+        RANGE BETWEEN '5' SECONDS PRECEDING AND CURRENT ROW
     ) as bid_volume_1min,
     bid_sz_00 + bid_sz_01 + bid_sz_02 as total_bid_size
 FROM AAPL_orderbook
