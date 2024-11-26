@@ -318,6 +318,12 @@ module.exports = {
           collapsed: false,
           items: [
             {
+              id: "operations/multi-primary-ingestion",
+              type: "doc",
+              label: "Multi-primary ingestion",
+              customProps: { tag: "Enterprise" },
+            },
+            {
               id: "operations/openid-connect-oidc-integration",
               type: "doc",
               label: "OpenID Connect (OIDC)",
