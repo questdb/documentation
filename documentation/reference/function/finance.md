@@ -156,7 +156,7 @@ SELECT mid(1.5760, 1.5763)
 
 `regr_intercept(y, x)` - Calculates the y-intercept of the linear regression line for the given numeric columns y (dependent variable) and x (independent variable).
 
-- The function requires at least two valid (x, y) pairs to compute the intercept.
+- The function requires at least two valid (y, x) pairs to compute the intercept.
   - If fewer than two pairs are available, the function returns null.
 - Supported data types for x and y include `double`, `float`, and `integer` types.
 - The regr_intercept function can be used with other statistical aggregation functions like `regr_slope` or `corr`.
