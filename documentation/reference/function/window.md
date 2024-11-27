@@ -186,7 +186,7 @@ sequenceDiagram
 
 ### RANGE frame
 
-::: note
+:::note
 
 RANGE functions have a known issue.
 
