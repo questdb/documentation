@@ -398,6 +398,28 @@ Note that deduplication requires designated timestamps extracted either from
 message payload or Kafka message metadata. See the
 [Designated timestamps](#designated-timestamps) section for more information.
 
+
+#### Dead Letter Queue
+
+When messages cannot be processed due to non-recoverable errors, such as invalid data formats or schema mismatches, the
+connector can send these failed messages to a Dead Letter Queue (DLQ). This prevents the entire connector from stopping
+when it encounters problematic messages. To enable this feature, configure the Dead Letter Queue in your Kafka Connect
+worker configuration using the `errors.tolerance`, `errors.deadletterqueue.topic.name`, and
+`errors.deadletterqueue.topic.replication.factor` properties. For example:
+
+```properties
+errors.tolerance=all
+errors.deadletterqueue.topic.name=dlq-questdb
+errors.deadletterqueue.topic.replication.factor=1
+```
+
+When configured, messages that fail to be processed will be sent to the specified DLQ topic along with error details,
+allowing for later inspection and troubleshooting. This is particularly useful in production environments where data
+quality might vary and you need to ensure continuous operation while investigating problematic messages.
+
+See [Confluent article](https://developer.confluent.io/courses/kafka-connect/error-handling-and-dead-letter-queues/) about DLQ.
+
+
 ### Latency considerations
 
 The connector waits for a batch of messages to accumulate before sending them to
