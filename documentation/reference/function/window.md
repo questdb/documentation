@@ -96,23 +96,17 @@ Where:
 
 ## Supported functions
 
-### Aggregate window functions
-
 - [`avg()`](#avg) – Calculates the average within a window
-  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
 
 - [`sum()`](#cumulative-sum) – Calculates the sum within a window
-  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
 
 - [`count()`](#count) – Counts rows or non-null values
-  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
 
 - [`first_value()`](#first_value) – Retrieves the first value in a window
 
 - [`rank()`](#rank) – Assigns a rank to rows
 
 - [`row_number()`](#row_number) – Assigns sequential numbers to rows
-
 
 ## Components of a window function
 
