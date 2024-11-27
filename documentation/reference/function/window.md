@@ -8,7 +8,7 @@ Window functions perform calculations across sets of table rows that are related
 
 We'll cover high-level, introductory information about window functions, and then move on to composition. 
 
-We also have some [common examples](#common-examples) to get you started.
+We also have some [common examples](#common-window-function-examples) to get you started.
 
 :::tip
 Click _Demo this query_ within our query examples to see them in our live demo.
@@ -57,18 +57,14 @@ An analogy before we get to building:
 
 Imagine a group of cars in a race. Each car has a number, a name, and a finish
 time. If you wanted to know the average finish time, you could use an aggregate
-function like `avg` to calculate it. But this would only give you a single
+function like [`avg()`](#avg) to calculate it. But this would only give you a single
 result: the average time. You wouldn't know anything about individual cars'
 times.
 
-Now, let's say you want to know how each car's time compares to the average.
-Enter window functions. A window function allows you to calculate the average
-finish time (the window), but for each car (row) individually.
-
-For example, you could use a window function to calculate the average finish
-time for all cars, but then apply this average to each car to see if they were
-faster or slower than the average. The `OVER` clause in a window function is
-like saying, "for each car, compare their time to the average time of all cars."
+For example, a window function allows you to calculate the average finish time
+for all the cars (the window), but display it on each car (row), so you can
+compare this average to each car's average speed to see if they were faster or
+slower than the global average.
 
 So, in essence, window functions allow you to perform calculations that consider
 more than just the individual row or the entire table, but a 'window' of related
@@ -103,21 +99,20 @@ Where:
 ### Aggregate window functions
 
 - [`avg()`](#avg) – Calculates the average within a window
+  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
+
 - [`sum()`](#cumulative-sum) – Calculates the sum within a window
+  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
+
 - [`count()`](#count) – Counts rows or non-null values
+  - Cannot be used outside of window contexts (e.g., in WHERE clauses)
+
 - [`first_value()`](#first_value) – Retrieves the first value in a window
 
-### Window-only functions
-
 - [`rank()`](#rank) – Assigns a rank to rows
+
 - [`row_number()`](#row_number) – Assigns sequential numbers to rows
 
-:::note
-Window-only functions:
-- Require an ORDER BY clause
-- Cannot be used outside of window contexts (e.g., in WHERE clauses)
-- Do not support frame clauses
-:::
 
 ## Components of a window function
 
@@ -175,7 +170,7 @@ sequenceDiagram
 Defines the frame based on a physical number of rows:
 
 ```txt
-ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
 ```
 
 This includes the current row and four preceding rows.
@@ -196,6 +191,17 @@ sequenceDiagram
 ```
 
 ### RANGE frame
+
+::: note
+
+RANGE functions have a known issue.
+
+When using RANGE, all the rows with the same value will have the same output for
+the function.
+
+Read the [open issue](https://github.com/questdb/questdb/issues/5177) for more information.
+
+:::
 
 Defines the frame based on logical intervals of values in the ORDER BY column:
 
@@ -250,10 +256,6 @@ This query demonstrates different time intervals in action, calculating:
 - 5-minute moving average of best bid price
 - Update frequency in 100ms windows
 - 2-second rolling volume
-
-:::note
-RANGE frames require ORDER BY on a numeric or timestamp column.
-:::
 
 ## Frame boundaries
 
@@ -706,6 +708,39 @@ This example:
 - Also shows total size across top 3 levels
 - Filters out empty bids
 
+### LAG function
+
+A LAG function allows you to access data from a previous row in the same result
+set without requiring a self-join. This is especially useful for comparing
+values in sequential rows or performing calculations like differences,
+trends, or changes over time.
+
+```questdb-sql title="LAG example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_value(price) OVER (
+        PARTITION BY symbol        
+        ORDER BY timestamp
+        ROWS 1 PRECEDING EXCLUDE CURRENT ROW
+    ) AS price_from_1_row_before,
+    first_value(price) OVER (
+        PARTITION BY symbol        
+        ORDER BY timestamp
+        ROWS 2 PRECEDING EXCLUDE CURRENT ROW
+    ) AS price_from_2_rows_before
+FROM trades;
+```
+
+Key Points:
+
+- `LAG(price, 1)` fetches the price from the immediately preceding row for the same symbol.
+- `PARTITION BY symbol` ensures the function operates independently for each stock.
+- `ORDER BY timestamp` processes rows in chronological order.
+- `price - LAG(price, 1)` calculates the price change compared to the previous row.
+- Returns NULL for the first row (no previous data).
+
 ### Order frequency analysis
 
 ```questdb-sql title="Calculate order updates per minute" demo
@@ -725,6 +760,7 @@ LIMIT 10;
 ```
 
 This example:
+
 - Counts all order book updates in last minute
 - Specifically counts new orders (action = 'A')
 - Uses rolling 1-minute window
@@ -733,12 +769,14 @@ This example:
 ## Notes and restrictions
 
 ### ORDER BY behavior
+
 - ORDER BY in OVER clause determines the logical order for window functions
 - Independent of the query-level ORDER BY
 - Required for window-only functions
 - Required for RANGE frames
 
 ### Frame specifications
+
 - ROWS frames:
   - Based on physical row counts
   - More efficient for large datasets
@@ -750,19 +788,13 @@ This example:
   - Support time-based intervals (e.g., '1h', '5m')
 
 ### Exclusion behavior
+
 - Using `EXCLUDE CURRENT ROW` with frame end at `CURRENT ROW`:
   - Automatically adjusts end boundary to `1 PRECEDING`
   - Ensures consistent results across queries
 
-### Window-only function restrictions
-- Always require ORDER BY clause
-- Cannot be used in:
-  - WHERE clauses
-  - GROUP BY clauses
-  - Window function arguments
-- Do not support frame clauses
-
 ### Performance considerations
+
 - ROWS frames typically perform better than RANGE frames for large datasets
 - Partitioning can improve performance by processing smaller chunks of data
 - Consider index usage when ordering by timestamp columns
@@ -782,7 +814,28 @@ WHERE
     avg(price) OVER (ORDER BY timestamp) > 100;
 ```
 
+Instead, build like so:
+
+```questdb-sql title="Correct usage" demo
+with prices_and_avg AS (
+SELECT
+    symbol,
+    price, avg(price) OVER (ORDER BY timestamp) as moving_avg_price,
+    timestamp
+FROM trades
+WHERE timestamp in yesterday()
+)
+select * from prices_and_avg
+WHERE
+   moving_avg_price  > 100;
+```
+
 #### Missing ORDER BY in OVER clause
+
+When no `ORDER BY` is specified, the average will be calculated for the whole
+partition. Given we don't have a PARTITION BY and we are using a global window,
+all the rows will show the same average. This is the average for the whole
+dataset.
 
 ```questdb-sql title="Missing ORDER BY"
 -- Potential issue
@@ -791,4 +844,42 @@ SELECT
     price,
     sum(price) OVER () AS cumulative_sum
 FROM trades;
+WHERE timestamp in yesterday();
+```
+
+To compute the _moving average_, we need to specify an `ORDER BY` clause:
+
+```questdb-sql title="Safer usage" demo
+SELECT
+    symbol,
+    price,
+    sum(price) OVER (ORDER BY TIMESTAMP) AS cumulative_sum
+FROM trades
+WHERE timestamp in yesterday();
+```
+
+We may also have a case where all the rows for the same partition (symbol) will
+have the same average, if we include a `PARTITION BY` clause without an
+`ORDER BY` clause:
+
+```questdb-sql title="Partitioned usage" demo
+-- Potential issue
+SELECT
+    symbol,
+    price,
+    sum(price) OVER (PARTITION BY symbol ) AS cumulative_sum
+FROM trades
+WHERE timestamp in yesterday();
+```
+
+For every row to show the moving average for each symbol, we need to specify both
+an `ORDER BY` and a `PARTITION BY` clause:
+
+```questdb-sql title="Partitioned and ordered usage" demo
+SELECT
+    symbol,
+    price,
+    sum(price) OVER (PARTITION BY symbol ORDER BY TIMESTAMP) AS cumulative_sum
+FROM trades
+WHERE timestamp in yesterday();
 ```
