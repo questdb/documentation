@@ -48,8 +48,8 @@ They are often used in analytics for tasks such as:
 - Calculating running totals or averages
 - Finding the maximum or minimum value in a sequence or partition
 - Ranking items within a specific category or partition
-- Calculating [moving averages](/docs/reference/function/window/#avg) or
-  [cumulative sums](/docs/reference/function/window/#cumulative-sum)
+- Calculating [moving averages](#avg) or
+  [cumulative sums](#cumulative-sum)
 
 Window functions are tough to grok.
 
