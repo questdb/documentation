@@ -11,15 +11,7 @@ This syntax is supported specifically for `SELECT` queries.
 
 ## Syntax
 
-```mermaid
-graph LR;
-    A[DECLARE] --> B[@variable]
-    B --> C[:=]
-    C --> D[expression]
-    D --> F[SELECT]
-    D --> E[,]
-    E --> B
-```
+![Flow chart showing the syntax of the DECLARE keyword](/images/docs/diagrams/declare.svg)
 
 ## Mechanics
 
