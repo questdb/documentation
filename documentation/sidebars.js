@@ -194,6 +194,7 @@ module.exports = {
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            "reference/sql/declare",
             "reference/sql/distinct",
             "reference/sql/drop",
             {
