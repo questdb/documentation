@@ -330,3 +330,11 @@ daily ones due to the computational and IO demands of applying WAL files.
 For systems with high daily data injection, daily snapshots are recommended.
 Infrequent snapshots or long snapshot periods, such as 60 days with 30-day WAL
 expiration, may prevent successful database restoration.
+
+## Multi-primary ingestion
+
+[QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
+multiple primaries can write to the same database.
+
+See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/) page for
+more information.

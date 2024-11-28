@@ -330,6 +330,12 @@ module.exports = {
               customProps: { tag: "Enterprise" },
             },
             {
+              id: "operations/multi-primary-ingestion",
+              type: "doc",
+              label: "Multi-primary ingestion",
+              customProps: { tag: "Enterprise" },
+            },
+            {
               type: "doc",
               id: "operations/rbac",
               customProps: { tag: "Enterprise" },
