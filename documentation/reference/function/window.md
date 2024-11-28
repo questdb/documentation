@@ -167,7 +167,7 @@ Defines the frame based on a physical number of rows:
 ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
 ```
 
-This includes the current row and four preceding rows.
+This includes the current row and two preceding rows.
 
 ```mermaid
 sequenceDiagram
@@ -282,7 +282,7 @@ partition to the current row.
    - `CURRENT ROW`
    - `<value> PRECEDING` (unless start is `UNBOUNDED PRECEDING`)
 
-3. RANGE frames must have ORDER BY on a timestamp or numeric column
+3. RANGE frames must be ordered by a designated timestamp
 
 ## Exclusion options
 
@@ -732,7 +732,7 @@ Key Points:
 - `LAG(price, 1)` fetches the price from the immediately preceding row for the same symbol.
 - `PARTITION BY symbol` ensures the function operates independently for each stock.
 - `ORDER BY timestamp` processes rows in chronological order.
-- `price - LAG(price, 1)` calculates the price change compared to the previous row.
+- `price - LAG(price, 1)` gets the value from the row before and from 2 rows before
 - Returns NULL for the first row (no previous data).
 
 ### Order frequency analysis
@@ -778,7 +778,7 @@ This example:
 
 - RANGE frames:
   - Based on logical intervals
-  - Require ORDER BY on timestamp or numeric column
+  - Require ORDER BY on timestamp
   - Support time-based intervals (e.g., '1h', '5m')
 
 ### Exclusion behavior
