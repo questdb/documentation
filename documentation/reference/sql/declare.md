@@ -68,7 +68,7 @@ SELECT @x + @y
 
 ### Validity of expressions
 
-Most basic expressions are supported, and we will provide examples later. We suggest
+Most basic expressions are supported, and we provide examples later in this document. We suggest
 you use variables to simplify repeated constants within your code, and minimise
 how many places you need to update the constant.
 
@@ -101,7 +101,7 @@ WHERE symbol IN @symbols
 Declarations made in parent queries are available in subqueries. 
 
 If a subquery declares a variable of the same name, then the variable is shadowed
-and take on the new value. However, any queries above this subquery are unaffected - the
+and takes on the new value. However, any queries above this subquery are unaffected - the
 variable bind is not globally mutated.
 
 ```questdb-sql title="variable shadowing" demo
@@ -146,6 +146,25 @@ FROM second
 | 10 | 9 |
 
 
+### Bind variables
+
+`DECLARE` syntax will work with prepared statements over PG Wire, so long as the client library
+does not perform syntax validation that rejects the `DECLARE` syntax.
+
+
+```sql
+DECLARE @x := ?, @y := ? 
+SELECT @x::int + @y::int
+
+-- Then bind the following values: (1, 2)
+```
+
+| column |
+|--------|
+| 3      |
+
+
+
 ## Examples
 
 ### SAMPLE BY
@@ -181,21 +200,3 @@ INSERT INTO trades SELECT * FROM
     SELECT @x as timestamp, @y as symbol
 )
 ```
-
-## Bind Variables
-
-`DECLARE` syntax will work with prepared statements over PG Wire, so long as the client library
-does not perform syntax validation that rejects the `DECLARE` syntax.
-
-
-
-```sql
-DECLARE @x := ?, @y := ? 
-SELECT @x::int + @y::int
-
--- Then bind the following values: (1, 2)
-```
-
-| column |
-|--------|
-| 3      |
