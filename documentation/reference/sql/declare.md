@@ -66,35 +66,6 @@ SELECT @x + @y
 |--------|
 | 7      |
 
-### Validity of expressions
-
-Most basic expressions are supported, and we provide examples later in this document. We suggest
-you use variables to simplify repeated constants within your code, and minimise
-how many places you need to update the constant.
-
-However, not all expressions are supported. The following are explicitly disallowed:
-
-#### Subqueries
-
-```questdb-sql title="subqueries are not allowed" demo
-DECLARE
-    @sub := (SELECT timestamp FROM trades)
-SELECT * FROM @sub
-
--- error: function, literal or constant is expected
-```
-
-#### Bracket lists
-
-```questdb-sql title="bracket lists are not allowed" demo
-DECLARE
-    @symbols := ('BTC-USD', 'ETH-USD')
-SELECT timestamp, price, symbol
-FROM trades
-WHERE symbol IN @symbols
-
--- error: unexpected bind expression - bracket lists not supported
-```
 
 ### Declarations in subqueries
 
@@ -199,4 +170,36 @@ INSERT INTO trades SELECT * FROM
     DECLARE @x := now(), @y := 'ETH-USD' 
     SELECT @x as timestamp, @y as symbol
 )
+```
+
+
+## Limitations
+
+
+Most basic expressions are supported, and we provide examples later in this document. We suggest
+you use variables to simplify repeated constants within your code, and minimise
+how many places you need to update the constant.
+
+However, not all expressions are supported. The following are explicitly disallowed:
+
+#### Subqueries
+
+```questdb-sql title="subqueries are not allowed"
+DECLARE
+    @sub := (SELECT timestamp FROM trades)
+SELECT * FROM @sub
+
+-- error: function, literal or constant is expected
+```
+
+#### Bracket lists
+
+```questdb-sql title="bracket lists are not allowed"
+DECLARE
+    @symbols := ('BTC-USD', 'ETH-USD')
+SELECT timestamp, price, symbol
+FROM trades
+WHERE symbol IN @symbols
+
+-- error: unexpected bind expression - bracket lists not supported
 ```
