@@ -44,7 +44,7 @@ timestamps, the cost of deduplication is negligible.
 
 :::note
 
-The ordering of how rows with duplicate timestamps are written on-disk differs when deduplication is enabled. 
+The on-disk ordering of rows with duplicate timestamps differs when deduplication is enabled. 
 
 - Without deduplication:
     - the insertion order of each row will be preserved for rows with the same timestamp
@@ -56,7 +56,7 @@ For example:
 ```questdb-sql
 DEDUP UPSERT keys(timestamp, symbol, price)
 
--- will sorted like this on-disk:
+-- will be stored on-disk in an order like:
 
 ORDER BY timestamp, symbol, price
 ```
