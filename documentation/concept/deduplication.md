@@ -61,7 +61,7 @@ DEDUP UPSERT keys(timestamp, symbol, price)
 ORDER BY timestamp, symbol, price
 ```
 
-This is the natural order of data returned in plain queries, without any grouping, filtering or ordering.
+This is the natural order of data returned in plain queries, without any grouping, filtering or ordering. The SQL standard does not guarantee the ordering of result sets without explicit `ORDER BY` clauses.
 
 :::
 
