@@ -256,7 +256,7 @@ addIndex
 dropIndex
  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
 
-(no)cachColumn
+noCacheColumn
  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
 
 dropColumn
