@@ -42,6 +42,29 @@ precisely, deduplicating the data based on the device ID can be expensive.
 However, in cases where CPU metrics are sent at random and typically have unique
 timestamps, the cost of deduplication is negligible.
 
+:::note
+
+The on-disk ordering of rows with duplicate timestamps differs when deduplication is enabled. 
+
+- Without deduplication:
+    - the insertion order of each row will be preserved for rows with the same timestamp
+- With deduplication:
+    - the rows will be stored in order sorted by the `DEDUP UPSERT` keys, with the same timestamp
+  
+For example:
+
+```questdb-sql
+DEDUP UPSERT keys(timestamp, symbol, price)
+
+-- will be stored on-disk in an order like:
+
+ORDER BY timestamp, symbol, price
+```
+
+This is the natural order of data returned in plain queries, without any grouping, filtering or ordering. The SQL standard does not guarantee the ordering of result sets without explicit `ORDER BY` clauses.
+
+:::
+
 ## Configuration
 
 Create a WAL-enabled table with deduplication using
