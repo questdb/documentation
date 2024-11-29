@@ -2477,10 +2477,10 @@
   resolved "https://registry.yarnpkg.com/@polka/url/-/url-1.0.0-next.28.tgz#d45e01c4a56f143ee69c54dd6b12eade9e270a73"
   integrity sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==
 
-"@questdb/sql-grammar@1.0.15":
-  version "1.0.15"
-  resolved "https://registry.yarnpkg.com/@questdb/sql-grammar/-/sql-grammar-1.0.15.tgz#a4b7ba0b8a100e29aeb33535b884b6186e17c8f2"
-  integrity sha512-xduurxIv/cQgx3aHMIU1RYwyN1IBArZ2IUiVqAcoGwhVwmdmlDZkcYq5hkXnamvCFDu+Vzsg182xr+B/gpHbkw==
+"@questdb/sql-grammar@1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@questdb/sql-grammar/-/sql-grammar-1.1.0.tgz#75b46a86c21fe792cce8bd28950f5871085d3bdb"
+  integrity sha512-O4tD5PAMC/aV0qzNJ2QbDo6gWO71DqzEnp+EgxYei5PM01x3lAUm7+JhyMlQixoIHvo1i641F8GIjO0ErRTXfw==
 
 "@radix-ui/number@1.1.0":
   version "1.1.0"
