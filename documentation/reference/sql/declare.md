@@ -40,8 +40,6 @@ SELECT 5
 | 5 |
 
 
-T
-
 :::note
 
 It is easy to accidentally omit the `:` when writing variable binding expressions.
