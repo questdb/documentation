@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="779" height="213">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon>
+         <rect x="31" y="3" width="70" height="32" rx="10"></rect>
+         <rect x="29" y="1" width="70" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="39" y="21">WHERE</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#timestampColumn" xlink:title="timestampColumn">
+            <rect x="121" y="3" width="134" height="32"></rect>
+            <rect x="119" y="1" width="134" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="129" y="21">timestampColumn</text></a><rect x="295" y="3" width="30" height="32" rx="10"></rect>
+         <rect x="293" y="1" width="30" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="303" y="21">=</text>
+         <rect x="295" y="47" width="30" height="32" rx="10"></rect>
+         <rect x="293" y="45" width="30" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="303" y="65">&gt;</text>
+         <rect x="295" y="91" width="30" height="32" rx="10"></rect>
+         <rect x="293" y="89" width="30" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="303" y="109">&lt;</text>
+         <rect x="295" y="135" width="40" height="32" rx="10"></rect>
+         <rect x="293" y="133" width="40" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="303" y="153">&gt;=</text>
+         <rect x="295" y="179" width="40" height="32" rx="10"></rect>
+         <rect x="293" y="177" width="40" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="303" y="197">&lt;=</text>
+         <rect x="375" y="3" width="24" height="32" rx="10"></rect>
+         <rect x="373" y="1" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="383" y="21">'</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#timestamp" xlink:title="timestamp">
+            <rect x="419" y="3" width="88" height="32"></rect>
+            <rect x="417" y="1" width="88" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="427" y="21">timestamp</text></a><rect x="527" y="3" width="24" height="32" rx="10"></rect>
+         <rect x="525" y="1" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="535" y="21">'</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#timestampIntervalSearch" xlink:title="timestampIntervalSearch">
+            <rect x="571" y="3" width="180" height="32"></rect>
+            <rect x="569" y="1" width="180" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="579" y="21">timestampIntervalSearch</text></a><path class="line" d="m17 17 h2 m0 0 h10 m70 0 h10 m0 0 h10 m134 0 h10 m20 0 h10 m30 0 h10 m0 0 h10 m-80 0 h20 m60 0 h20 m-100 0 q10 0 10 10 m80 0 q0 -10 10 -10 m-90 10 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m20 -176 h10 m24 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m24 0 h10 m0 0 h10 m180 0 h10 m3 0 h-3"></path>
+         <polygon points="769 17 777 13 777 21"></polygon>
+         <polygon points="769 17 761 13 761 21"></polygon>
+</svg>
