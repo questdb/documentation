@@ -110,5 +110,9 @@
   "line.tcp.disconnect.on.error": {
     "default": "true",
     "description": "Disconnect TCP socket that sends malformed messages."
+  },
+  "line.tcp.acl.enabled": {
+    "default": "true",
+    "description": "Enable or disable Access Control List (ACL) authentication for InfluxDB Line Protocol over TCP. Enterprise only."
   }
 }
