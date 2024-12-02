@@ -71,6 +71,20 @@ SELECT @x + @y
 
 Declarations made in parent queries are available in subqueries. 
 
+```questdb-sql title="variable shadowing" demo
+DECLARE
+    @x := 5
+SELECT y FROM (
+    SELECT @x AS y
+)
+```
+
+| y |
+|---| 
+| 5 |
+
+#### Shadowing
+
 If a subquery declares a variable of the same name, then the variable is shadowed
 and takes on the new value. However, any queries above this subquery are unaffected - the
 variable bind is not globally mutated.
@@ -85,8 +99,8 @@ SELECT @x + y FROM (
 ```
 
 | column |
-| ----- |
-| 15 |
+|--------|
+| 15     |
 
 ### Declarations as subqueries
 
@@ -157,6 +171,26 @@ SELECT @x::int + @y::int
 | 3      |
 
 
+## Limitations
+
+Most basic expressions are supported, and we provide examples later in this document. We suggest
+you use variables to simplify repeated constants within your code, and minimise
+how many places you need to update the constant.
+
+However, not all expressions are supported. The following are explicitly disallowed:
+
+#### Bracket lists
+
+```questdb-sql title="bracket lists are not allowed"
+DECLARE
+    @symbols := ('BTC-USD', 'ETH-USD')
+SELECT timestamp, price, symbol
+FROM trades
+WHERE symbol IN @symbols
+
+-- error: unexpected bind expression - bracket lists not supported
+```
+
 
 ## Examples
 
@@ -192,24 +226,4 @@ INSERT INTO trades SELECT * FROM
     DECLARE @x := now(), @y := 'ETH-USD' 
     SELECT @x as timestamp, @y as symbol
 )
-```
-
-## Limitations
-
-Most basic expressions are supported, and we provide examples later in this document. We suggest
-you use variables to simplify repeated constants within your code, and minimise
-how many places you need to update the constant.
-
-However, not all expressions are supported. The following are explicitly disallowed:
-
-#### Bracket lists
-
-```questdb-sql title="bracket lists are not allowed"
-DECLARE
-    @symbols := ('BTC-USD', 'ETH-USD')
-SELECT timestamp, price, symbol
-FROM trades
-WHERE symbol IN @symbols
-
--- error: unexpected bind expression - bracket lists not supported
 ```
