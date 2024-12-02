@@ -1,16 +1,73 @@
 ---
-title: QuestDB Kafka Connector
-description:
-  QuestDB ships a QuestDB Kafka connector for ingesting messages from Kafka via
-  the InfluxDB Line Protocol.
+title: Ingestion from Kafka Overview
+sidebar_label: Kafka
+description: Apache Kafka and QuestDB Kafka Connector overview and guide. Thorough explanations and examples.
 ---
 
-import Screenshot from "@theme/Screenshot"
+Kafka is a fault-tolerant message broker that excels at streaming. Its ecosystem
+provides tooling which - given the popularity of Kafka - can be used in
+alternative services and tools like Redpanda, similar to how QuestDB supports
+the InfluxDB Line Protocol.
 
-QuestDB ships a
-[QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
-for fast ingestion from Kafka into QuestDB. This is also useful for processing
-[change data capture](/glossary/change-data-capture/) for the dataflow. The
+1. Apply the Kafka Connect based
+   [QuestDB Kafka connector](#questdb-kafka-connect-connector)
+   - **Recommended for most people!**
+2. Write a
+   [custom program](#customized-program)
+   to read data from Apache Kafka and write to QuestDB
+3. Use a
+   [stream processing](#stream-processing)
+   engine
+
+Each strategy has different trade-offs.
+
+The rest of this section discusses each strategy and guides users who are
+already familiar with the Kafka ecosystem.
+
+
+### Customized program
+
+Writing a dedicated program reading from Kafka topics and writing to QuestDB
+tables offers great flexibility. The program can do arbitrary data
+transformations and filtering, including stateful operations.
+
+On the other hand, it's the most complex strategy to implement. You'll have to
+deal with different serialization formats, handle failures, etc. This strategy
+is recommended for very advanced use cases only.
+
+_Not recommended for most people._
+
+### Stream processing
+
+[Stream processing](/glossary/stream-processing/) engines provide a middle
+ground between writing a dedicated program and using one of the connectors.
+Engines such as [Apache Flink](https://flink.apache.org/) provide rich API for
+data transformations, enrichment, and filtering; at the same time, they can help
+you with shared concerns such as fault-tolerance and serialization. However,
+they often have a non-trivial learning curve.
+
+QuestDB offers a [connector for Apache Flink](/docs/third-party-tools/flink/).
+It is the recommended strategy if you are an existing Flink user, and you need
+to do complex transformations while inserting entries from Kafka into QuestDB.
+
+### QuestDB Kafka Connect connector
+
+**Recommended for most people!**
+
+QuestDB develops a first-party
+[QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector). The
+connector is built on top of the
+[Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
+and uses the InfluxDB Line Protocol for communication with QuestDB. Kafka
+Connect handles concerns such as fault tolerance and serialization. It also
+provides facilities for message transformations, filtering and so on. This is also useful 
+for processing [change data capture](/glossary/change-data-capture/) for the dataflow.
+
+The underlying InfluxDB Line Protocol ensures operational simplicity and
+excellent performance. It can comfortably insert over 100,000s of rows per
+second. Leveraging Apache Connect also allows QuestDB to connect with
+Kafka-compatible applications like
+[Redpanda](/docs/third-party-tools/redpanda/). The
 connector is based on the
 [Kafka Connect framework](https://kafka.apache.org/documentation/#connect) and
 acts as a sink for Kafka topics.
@@ -21,14 +78,14 @@ This page has the following main sections:
 - [Connector Configuration manual](#configuration-manual)
 - [FAQ](#faq)
 
-## Integration guide
+#### Integration guide
 
 This guide shows the steps to use the QuestDB Kafka connector to read JSON data
 from Kafka topics and write them as rows into a QuestDB table. For Confluent
 users, please check the instructions in the
 [Confluent Docker images](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples/confluent-docker-images).
 
-### Prerequisites
+#### Prerequisites
 
 You will need the following:
 
@@ -37,7 +94,7 @@ You will need the following:
 - Local
   [JDK installation](https://docs.oracle.com/en/java/javase/18/install/overview-jdk-installation.html#GUID-8677A77F-231A-40F7-98B9-1FD0B48C346A)
 
-### Configure Kafka
+#### Configure Kafka
 
 :::info
 
@@ -64,7 +121,7 @@ cd kafka-questdb-connector
 cp ./*.jar /path/to/kafka_*.*-*.*.*/libs
 ```
 
-### Set Kafka configuration file
+#### Set Kafka configuration file
 
 Create a Kafka Connect configuration file at
 `/path/to/kafka/config/questdb-connector.properties`. You can also define a
@@ -93,7 +150,7 @@ key.converter=org.apache.kafka.connect.storage.StringConverter
 value.converter.schemas.enable=false
 ```
 
-### Start Kafka
+#### Start Kafka
 
 The commands listed in this section must be run from the Kafka home directory
 and in the order shown below.
@@ -116,7 +173,7 @@ bin/kafka-server-start.sh  config/server.properties
 bin/connect-standalone.sh config/connect-standalone.properties config/questdb-connector.properties
 ```
 
-### Publish messages
+#### Publish messages
 
 Messages can be published via the console producer script:
 
@@ -137,7 +194,7 @@ QuestDB instance:
 
 <!-- prettier-ignore-end -->
 
-### Verify the integration
+#### Verify the integration
 
 To verify that the data has been ingested into the `example-topic` table, the
 following request to QuestDB's `/exp` REST API endpoint can be made to export
@@ -162,7 +219,7 @@ If you can see the expected result, then congratulations!
 You have successfully created and executed your first Kafka to QuestDB pipeline.
 🎉
 
-### Additional sample projects
+#### Additional sample projects
 
 You can find additional sample projects on the
 [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples)
@@ -172,12 +229,12 @@ It includes a
 [sample integration](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples/stocks)
 with [Debezium](https://debezium.io/) for CDC from PostgreSQL.
 
-## Configuration manual
+### Configuration manual
 
 This section lists configuration options as well as further information about
 the Kafka Connect connector.
 
-### Configuration Options
+#### Configuration Options
 
 The connector configuration consists of two parts: the client configuration
 string and the connector configuration options. The client configuration string
@@ -209,7 +266,7 @@ the connector configuration options:
 | symbols                            | `string`  | instrument,stock                                            | N/A                | Comma separated list of columns that should be symbol type  |
 | doubles                            | `string`  | volume,price                                                | N/A                | Comma separated list of columns that should be double type  |
 
-### How does the connector work?
+#### How does the connector work?
 
 The connector reads data from Kafka topics and writes it to QuestDB tables via
 InfluxDB Line Protocol. The connector converts each field in the Kafka message
@@ -235,7 +292,7 @@ The connector will create a table with the following columns:
 | --------------------------- | -------------------------- | ------------------- | -------------------------------- | ------------------------------ |
 | John                        | Doe                        | 30                  | Main Street                      | New York                       |
 
-### Client configuration string
+#### Client configuration string
 
 The connector internally uses the QuestDB Java client to communicate with the
 QuestDB server. The `client.conf.string` option allows you to configure the
@@ -287,7 +344,7 @@ with Kafka.
 
 :::
 
-### Supported serialization formats
+#### Supported serialization formats
 
 The connector does not deserialize data independently. It relies on Kafka
 Connect converters. The connector has been tested predominantly with JSON, but
@@ -295,7 +352,7 @@ it should work with any converter, including Avro. Converters can be configured
 using `key.converter` and `value.converter` options, both are included in the
 [Configuration options](#configuration-options) table above.
 
-### Designated timestamps
+#### Designated timestamps
 
 The connector supports
 [designated timestamps](https://questdb.io/docs/concept/designated-timestamp/).
@@ -332,7 +389,7 @@ which supports the following values:
 Note: These 3 strategies are mutually exclusive. Cannot set both
 `timestamp.kafka.native=true` and `timestamp.field.name`.
 
-### Textual timestamps parsing
+#### Textual timestamps parsing
 
 Kafka messages often contain timestamps in a textual format. The connector can
 parse these and use them as timestamps. Configure field names as a string with
@@ -343,7 +400,7 @@ See the
 [QuestDB timestamp](/docs/reference/function/date-time/#date-and-timestamp-format)
 documentation for more details.
 
-#### Example
+##### Example
 
 Consider the following Kafka message:
 
@@ -368,7 +425,7 @@ timestamp set the following properties in your QuestDB connector configuration:
    format. Please note the correct format for microseconds is `SSSUUU` (3 digits
    for milliseconds and 3 digits for microseconds).
 
-### Fault Tolerance
+#### Fault Tolerance
 
 The connector automatically retries failed requests deemed recoverable.
 Recoverable errors include network errors, some server errors, and timeouts,
@@ -387,7 +444,7 @@ Example with a retry timeout of 60 seconds:
 client.conf.string=http::addr=localhost:9000;retry_timeout=60000;
 ```
 
-#### Exactly once delivery
+##### Exactly once delivery
 
 Retrying might result in the same rows delivered multiple times. To ensure
 exactly once delivery, a target table must have
@@ -399,7 +456,7 @@ message payload or Kafka message metadata. See the
 [Designated timestamps](#designated-timestamps) section for more information.
 
 
-#### Dead Letter Queue
+##### Dead Letter Queue
 
 When messages cannot be processed due to non-recoverable errors, such as invalid data formats or schema mismatches, the
 connector can send these failed messages to a Dead Letter Queue (DLQ). This prevents the entire connector from stopping
@@ -420,7 +477,7 @@ quality might vary and you need to ensure continuous operation while investigati
 See [Confluent article](https://developer.confluent.io/courses/kafka-connect/error-handling-and-dead-letter-queues/) about DLQ.
 
 
-### Latency considerations
+#### Latency considerations
 
 The connector waits for a batch of messages to accumulate before sending them to
 the server. The batch size is determined by the `auto_flush_rows` client string
@@ -450,14 +507,14 @@ configuration file by using the `offset.flush.interval.ms` parameter. See the
 [Kafka Connect Reference](https://docs.confluent.io/platform/current/connect/references/allconfigs.html)
 for more information.
 
-### Symbol type
+#### Symbol type
 
 QuestDB supports a special type called
 [symbol](https://questdb.io/docs/concept/symbol/). Use the `symbols`
 configuration option to specify which columns should be created as the `symbol`
 type.
 
-### Numeric type inference for floating point type
+#### Numeric type inference for floating point type
 
 When a configured Kafka Connect deserializer provides a schema, the connector
 uses it to determine column types. If a schema is unavailable, the connector
@@ -490,9 +547,9 @@ Alternatively, you can use SQL to explicitly create the target table with the
 correct column types instead of relying on the connector to infer them. See the
 paragraph below.
 
-### Target table considerations
+#### Target table considerations
 
-#### Table name
+##### Table name
 
 By default, the target table name in QuestDB is the same as the Kafka topic
 name from which a message originates. When a connector is configured to read
@@ -533,7 +590,7 @@ The placeholder `${key}` will be replaced with the actual key value from the
 Kafka message. If the key is not present in the message, the placeholder will be
 replaced with the string `null`.
 
-#### Table schema
+##### Table schema
 
 When a target table does not exist in QuestDB, it will be created automatically.
 This is the recommended approach for development and testing.
@@ -543,7 +600,7 @@ In production, it's recommended to use the SQL
 because it gives you more control over the table schema, allowing per-table
 [partitioning](/glossary/database-partitioning/), creating indexes, etc.
 
-## FAQ
+#### FAQ
 
 <details>
   <summary>Does this connector work with Schema Registry? </summary>
@@ -654,7 +711,7 @@ issues. If you do, please report them to us.
 </p>
 </details>
 
-## See also
+#### See also
 
 - [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium)
 - [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector)
