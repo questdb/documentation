@@ -377,8 +377,14 @@ module.exports = {
       type: "category",
       items: [
         {
+          id: "guides/microsoft-entraid-oidc",
+          label: "Active Directory - Microsoft Entra ID",
+          type: "doc",
+          customProps: { tag: "Enterprise" },
+        },
+        {
           id: "guides/active-directory-pingfederate",
-          label: "Active Directory",
+          label: "Active Directory - PingFederate",
           type: "doc",
           customProps: { tag: "Enterprise" },
         },
