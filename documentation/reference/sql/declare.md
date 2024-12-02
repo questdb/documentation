@@ -28,7 +28,7 @@ Use the variable binding operator `:=` (walrus) to associate expressions to name
 In the above example, a single binding is declared, which states that the variable `@x` should
 be replaced with the constant integer `5`.
 
-The variabls are resolved at parse-time, meaning that variable is no longer present
+The variables are resolved at parse-time, meaning that variable is no longer present
 when the query is compiled. So the above example reduces to this simple query:
 
 ```questdb-sql title="basic DECLARE post-reduction" demo
@@ -88,7 +88,29 @@ SELECT @x + y FROM (
 | ----- |
 | 15 |
 
+### Declarations as subqueries
 
+Declarations themselves can be subqueries. We suggest that this
+is not overused, as removing the subquery definition from its execution
+location may make queries harder to debug.
+
+Nevertheless, it is possible to define a variable as a subquery:
+
+```questdb-sql title="table cursor as a variable" demo
+DECLARE
+    @subquery := (SELECT timestamp FROM trades)
+SELECT * FROM @subquery
+```
+
+You can even use already-declared variables to define your subquery variable:
+
+```questdb-sql title="nesting decls inside decl subqueries" demo
+DECLARE
+    @timestamp := timestamp,
+    @symbol := symbol,
+    @subquery := (SELECT @timestamp, @symbol FROM trades)
+SELECT * FROM @subquery
+```
 
 ### Declarations in CTEs
 
@@ -172,25 +194,13 @@ INSERT INTO trades SELECT * FROM
 )
 ```
 
-
 ## Limitations
-
 
 Most basic expressions are supported, and we provide examples later in this document. We suggest
 you use variables to simplify repeated constants within your code, and minimise
 how many places you need to update the constant.
 
 However, not all expressions are supported. The following are explicitly disallowed:
-
-#### Subqueries
-
-```questdb-sql title="subqueries are not allowed"
-DECLARE
-    @sub := (SELECT timestamp FROM trades)
-SELECT * FROM @sub
-
--- error: function, literal or constant is expected
-```
 
 #### Bracket lists
 
