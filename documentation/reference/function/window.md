@@ -140,6 +140,24 @@ This calculates a moving average of price over the current and three preceding r
 
 Window frames specify which rows are included in the calculation relative to the current row.
 
+```mermaid
+sequenceDiagram
+    participant R1 as Row at 09:00
+    participant R2 as Row at 09:02
+    participant R3 as Row at 09:03
+    participant R4 as Row at 09:04<br/>(Current Row)
+
+    Note over R4: Calculating at 09:04
+
+    rect rgb(191, 223, 255)
+    Note over R2,R4: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    end
+
+    rect rgb(255, 223, 191)
+    Note over R3,R4: RANGE BETWEEN<br/>'1' MINUTE PRECEDING<br/>AND CURRENT ROW
+    end
+```
+
 ### ROWS frame
 
 Defines the frame based on a physical number of rows:
