@@ -64,7 +64,7 @@ and/or queues.
 Checkout our quick start guides for the following:
 
 - [Flink](/docs/third-party-tools/flink)
-- [Kafka](/docs/third-party-tools/kafka/overview)
+- [Kafka](/docs/third-party-tools/kafka)
 - [Redpanda](/docs/third-party-tools/redpanda)
 - [Telegraf](/docs/third-party-tools/telegraf)
 

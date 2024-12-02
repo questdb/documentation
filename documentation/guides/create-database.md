@@ -12,7 +12,7 @@ specific types.
 
 For most applications, you will import your data using methods like the InfluxDB
 Line Protocol, CSV imports, or integration with third-party tools such as
-Telegraf, [Kafka](/docs/third-party-tools/kafka/overview/), or Prometheus. If your interest lies in data ingestion rather
+Telegraf, [Kafka](/docs/third-party-tools/kafka), or Prometheus. If your interest lies in data ingestion rather
 than generation, refer to our [ingestion overview](/docs/ingestion-overview/).
 Alternatively, the [QuestDB demo instance](https://demo.questdb.io) offers a
 practical way to explore data creation and manipulation without setting up your
