@@ -1,16 +1,72 @@
 ---
-title: QuestDB Kafka Connector
-description:
-  QuestDB ships a QuestDB Kafka connector for ingesting messages from Kafka via
-  the InfluxDB Line Protocol.
+title: Ingestion from Kafka Overview
+sidebar_label: Kafka
+description: Apache Kafka and QuestDB Kafka Connector overview and guide. Thorough explanations and examples.
 ---
 
-import Screenshot from "@theme/Screenshot"
+Kafka is a fault-tolerant message broker that excels at streaming. Its ecosystem
+provides tooling which - given the popularity of Kafka - can be used in
+alternative services and tools like Redpanda, similar to how QuestDB supports
+the InfluxDB Line Protocol.
 
-QuestDB ships a
-[QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
-for fast ingestion from Kafka into QuestDB. This is also useful for processing
-[change data capture](/glossary/change-data-capture/) for the dataflow. The
+1. Apply the Kafka Connect based
+   [QuestDB Kafka connector](#questdb-kafka-connect-connector)
+   - **Recommended for most people!**
+2. Write a
+   [custom program](#customized-program)
+   to read data from Apache Kafka and write to QuestDB
+3. Use a
+   [stream processing](#stream-processing)
+   engine
+
+Each strategy has different trade-offs.
+
+The rest of this section discusses each strategy and guides users who are
+already familiar with the Kafka ecosystem.
+
+## Customized program
+
+Writing a dedicated program reading from Kafka topics and writing to QuestDB
+tables offers great flexibility. The program can do arbitrary data
+transformations and filtering, including stateful operations.
+
+On the other hand, it's the most complex strategy to implement. You'll have to
+deal with different serialization formats, handle failures, etc. This strategy
+is recommended for very advanced use cases only.
+
+_Not recommended for most people._
+
+## Stream processing
+
+[Stream processing](/glossary/stream-processing/) engines provide a middle
+ground between writing a dedicated program and using one of the connectors.
+Engines such as [Apache Flink](https://flink.apache.org/) provide rich API for
+data transformations, enrichment, and filtering; at the same time, they can help
+you with shared concerns such as fault-tolerance and serialization. However,
+they often have a non-trivial learning curve.
+
+QuestDB offers a [connector for Apache Flink](/docs/third-party-tools/flink/).
+It is the recommended strategy if you are an existing Flink user, and you need
+to do complex transformations while inserting entries from Kafka into QuestDB.
+
+## QuestDB Kafka Connect connector
+
+**Recommended for most people!**
+
+QuestDB develops a first-party
+[QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector). The
+connector is built on top of the
+[Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
+and uses the InfluxDB Line Protocol for communication with QuestDB. Kafka
+Connect handles concerns such as fault tolerance and serialization. It also
+provides facilities for message transformations, filtering and so on. This is also useful 
+for processing [change data capture](/glossary/change-data-capture/) for the dataflow.
+
+The underlying InfluxDB Line Protocol ensures operational simplicity and
+excellent performance. It can comfortably insert over 100,000s of rows per
+second. Leveraging Apache Connect also allows QuestDB to connect with
+Kafka-compatible applications like
+[Redpanda](/docs/third-party-tools/redpanda/). The
 connector is based on the
 [Kafka Connect framework](https://kafka.apache.org/documentation/#connect) and
 acts as a sink for Kafka topics.
@@ -21,7 +77,7 @@ This page has the following main sections:
 - [Connector Configuration manual](#configuration-manual)
 - [FAQ](#faq)
 
-## Integration guide
+### Integration guide
 
 This guide shows the steps to use the QuestDB Kafka connector to read JSON data
 from Kafka topics and write them as rows into a QuestDB table. For Confluent
@@ -172,7 +228,7 @@ It includes a
 [sample integration](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples/stocks)
 with [Debezium](https://debezium.io/) for CDC from PostgreSQL.
 
-## Configuration manual
+### Configuration manual
 
 This section lists configuration options as well as further information about
 the Kafka Connect connector.
@@ -398,7 +454,6 @@ Note that deduplication requires designated timestamps extracted either from
 message payload or Kafka message metadata. See the
 [Designated timestamps](#designated-timestamps) section for more information.
 
-
 #### Dead Letter Queue
 
 When messages cannot be processed due to non-recoverable errors, such as invalid data formats or schema mismatches, the
@@ -543,7 +598,7 @@ In production, it's recommended to use the SQL
 because it gives you more control over the table schema, allowing per-table
 [partitioning](/glossary/database-partitioning/), creating indexes, etc.
 
-## FAQ
+### FAQ
 
 <details>
   <summary>Does this connector work with Schema Registry? </summary>
@@ -654,7 +709,7 @@ issues. If you do, please report them to us.
 </p>
 </details>
 
-## See also
+### See also
 
 - [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium)
 - [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector)

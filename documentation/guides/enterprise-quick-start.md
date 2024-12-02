@@ -272,7 +272,7 @@ Once generated, safely store it.
 
 Connecting a client to ILP is a common path.
 
-However, you may use something like [Kafka](/docs/third-party-tools/kafka/overview/).
+However, you may use something like [Kafka](/docs/third-party-tools/kafka).
 
 ## 5. Ingest data, Kafka Connect (optional)
 

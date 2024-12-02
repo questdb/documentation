@@ -423,12 +423,16 @@ from = "/docs/reference/sql/timestamp"
 to = "/docs/reference/function/timestamp/"
 
 [[redirects]]
-from = "/docs/third-party-tools/kafka/"
-to = "/docs/third-party-tools/kafka/overview/"
+from = "/docs/third-party-tools/kafka/overview/"
+to = "/docs/third-party-tools/kafka/"
+
+[[redirects]]
+from = "/docs/third-party-tools/kafka/questdb-kafka/"
+to = "/docs/third-party-tools/kafka/#questdb-kafka-connect-connector"
 
 [[redirects]]
 from = "/docs/third-party-tools/kafka/jdbc"
-to = "/docs/third-party-tools/kafka/overview/"
+to = "/docs/third-party-tools/kafka/"
 
 [[redirects]]
 from = "/blog/laoding-pandas-dataframes/"
