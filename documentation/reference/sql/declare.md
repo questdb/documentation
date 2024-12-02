@@ -9,6 +9,14 @@ throughout your query.
 
 This syntax is supported specifically for `SELECT` queries.
 
+:::note 
+
+`DECLARE` was added to QuestDB in version 8.2.2 (TBD provisional).
+
+Versions prior to this do not support this syntax.
+
+:::
+
 ## Syntax
 
 ![Flow chart showing the syntax of the DECLARE keyword](/images/docs/diagrams/declare.svg)
