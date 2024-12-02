@@ -1,7 +1,8 @@
-# this file contains the grammar used to generate railroad diagrams.
-# they are used to visualize QuestDB syntax in documentation.
-# to learn how to create or edit these diagrams, please see this (private!) document:
-# https://questdb.slab.com/posts/how-to-do-railroad-diagrams-he6wsuc0
+# Add new syntax to this file to generate railroad diagrams
+# Run `scripts/railroad.py`.
+# Link using `![Diagram](/images/docs/diagrams/.railroad/diagramName.svg)`
+# Will take file name from first line
+# Then syntax from following lines
 
 alterUser
   ::= 'ALTER' 'USER' userName ( 'ENABLE' | 'DISABLE' | 'WITH' ('NO' 'PASSWORD' | 'PASSWORD' password )
@@ -255,7 +256,7 @@ addIndex
 dropIndex
  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
 
-(no)cachColumn
+noCacheColumn
  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
 
 dropColumn
