@@ -11,6 +11,11 @@ This document sets up SSO authentication for the [QuestDB Web Console](/docs/web
 For a general introduction to OpenID Connect and QuestDB, see the
 [OIDC Operations page](/docs/operations/openid-connect-oidc-integration/).
 
+:::tip
+
+To enlarge the images, click or tap them.
+
+:::
 ## Set up the client application in Entra ID
 
 First thing first, let's pick a name for the client!
