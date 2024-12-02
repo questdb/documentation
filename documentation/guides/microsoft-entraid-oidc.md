@@ -1,11 +1,11 @@
 ---
 title: Microsoft EntraID OIDC guide
-description: ""
+description: "QuestDB Enterprise guide to demonstrate Microsoft EntraID OpenID Connect."
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-This document helps to set up SSO authentication for the Web Console in
+This document sets up SSO authentication for the [QuestDB Web Console](/docs/web-console/) in
 [Microsoft EntraID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id), formerly known as Azure AD.
 
 For a general introduction to OpenID Connect and QuestDB, see the
@@ -25,7 +25,7 @@ under _Identity - App registrations - New registration_.
   width={750}
 />
 
-QuestDB [Web Console](/docs/web-console/) is a SPA (Single Page App).
+The QuestDB [Web Console](/docs/web-console/) is a SPA (Single Page App).
 
 As a result, it cannot store safely a client secret.
 
@@ -69,7 +69,7 @@ the browser, they fall into this category.
 The redirect URIs are also added to the _CORS_ (Cross-Origin Resource Sharing) policy
 of EntraID. CORS is a mechanism to allow a web page, such as the Web Console, to access
 resources from a different domain than the one that served the page. In this context
-this means that we let the Web Console to access Entra ID, while it is origin is the
+this means that we let the Web Console to access Entra ID, while its origin is the
 HTTP endpoint of QuestDB.
 
 <Screenshot
@@ -109,8 +109,8 @@ width={600}
 Our next stop is the _Token configuration_, where the OAuth2/OIDC access and ID
 tokens can be customized.
 
-Users could be authenticated without customized tokens, but authorization
-would prove to be challenging, as the user's security groups are not included
+Note that users can be authenticated without customized tokens, but authorization
+would prove to be challenging. The user's security groups are not included
 in the tokens by default.
 
 QuestDB can be configured to request the user's groups from the UserInfo
@@ -149,7 +149,7 @@ title="API permissions"
 width={600}
 />
 
-By default, the _User.Read_ permission is added to list, but what we
+By default, the _User.Read_ permission is added to the list, but what we
 really need is:
  - openid: to be able to issue ID tokens
  - profile: to access user information
@@ -246,8 +246,7 @@ id `87654321-1234-1234-1234-123456789abc` to a QuestDB group called `extUsers`.
 
 We should grant the necessary QuestDB endpoint permissions first
 to make sure users can access the Web Console, Postgres and ILP
-interfaces as required. More about endpoint
-permissions [here](/docs/operations/rbac/#endpoint-permissions).
+interfaces as required. [Read more about endpoint permissions](/docs/operations/rbac/#endpoint-permissions).
 
 ```questdb-sql title="Grant endpoint permissions"
 GRANT HTTP, PGWIRE TO groupName;
