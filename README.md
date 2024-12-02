@@ -55,6 +55,36 @@ Raise a [GH issue](https://github.com/questdb/documentation/issues/new/choose) o
 
 ## Syntax
 
+### Railroad diagrams
+
+Our SQL syntax diagrams are created using Railroad.
+
+To create a diagram, use the [Railroad online editor](https://www.bottlecaps.de/rr/ui) to see it rendered.
+
+Once you're happy with it, copy the Railroad syntax and add it to:
+
+```
+static/images/docs/diagrams/.railroad
+```
+
+Ensure it fits the full pattern - there are many examples:
+
+```text
+renameTable
+  ::= 'RENAME' 'TABLE' oldName 'TO' newName
+```
+
+Next, run the `scripts/railroad.py` script to generate the SVG image.
+
+During its final output, a markdown image with the appropriate syntax is printed.
+
+Copy this syntax and paste it into the markdown file where you want the diagram to appear.
+
+The script requires:
+
+* Java (to run the `rr.war` file)
+* Python (to execute the `railroad.py` script)
+
 ### Math Expressions
 
 Use LaTeX-style math between `$` for inline or `$$` for block equations:

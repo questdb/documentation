@@ -10,11 +10,11 @@ module.exports = ({ customFields, favicon, organizationName, url }) => `
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@questdb" />
     <meta name="generator" content="Docusaurus v<%= it.version %>" />
-    <link rel="icon" href="/favicon.ico" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/images/icons/apple-180x180.webp" sizes="180x180" />
-    <meta name="msapplication-config" content="/browserconfig.xml" />
-    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+    <link rel="icon" href="/docs/favicon.ico" />
+    <link rel="icon" href="/docs/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/docs/images/icons/apple-180x180.webp" sizes="180x180" />
+    <meta name="msapplication-config" content="/docs/browserconfig.xml" />
+    <link rel="sitemap" type="application/xml" href="/docs/sitemap.xml" />
     <%~ it.headTags %>
     <% it.metaAttributes.forEach((metaAttribute) => { %>
       <%~ metaAttribute %>
