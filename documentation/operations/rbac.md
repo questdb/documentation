@@ -403,70 +403,52 @@ Next, we'll unpack the depths of database, table & column permission levels.
 
 ### List all permissions
 
-Before, during and as a regular health-check, review all permissions.
-
-List of all permissions, with levels they apply to, is returned by
-`all_permissions()` function, e.g.
+Use the `all_permissions()` function to review all permissions of the access control system.
 
 ```questdb-sql
 select * from all_permissions();
 ```
 
-| permission | level                               |
-| ---------- | ----------------------------------- |
-| SELECT     | Database &#124; Table &#124; Column |
-| INSERT     | Database &#124; Table &#124; Column |
-| UPDATE     | Database &#124; Table &#124; Column |
-| ...        | ...                                 |
-
-Not the return of the `level` column.
-
-### Permission levels
-
-There are three levels of permissions:
-
-- database - relate to global actions, e.g. `BACKUP`, but also table-specific
-  action that apply to all tables, e.g. `SELECT`
-- table - relate to table actions, e.g. `SET TABLE PARAM`, and also column
-  actions that apply to all table's columns, e.g. `DROP COLUMN` or `SELECT`
-- column - relate to actions on specific table's column, e.g. `DROP INDEX`
-
 #### Database permissions
 
-| permission         | level                               | description                                                                           |
-| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| ADD COLUMN         | Database &#124; Table               | Allows adding new column to existing table in rest api and pg wire protocol.          |
-| ADD INDEX          | Database &#124; Table &#124; Column | Allows adding an index on symbol column.                                              |
-| ALTER COLUMN CACHE | Database &#124; Table &#124; Column | Allows disabling or enabling caching of symbol column values via ALTER TABLE command. |
-| ATTACH PARTITION   | Database &#124; Table               | Allows attaching partition to existing table.                                         |
-| BACKUP DATABASE    | Database                            | Allows creating database backup via BACKUP DATABASE command.                          |
-| BACKUP TABLE       | Database &#124; Table               | Allows creating table BACKUP TABLE command.                                           |
-| CANCEL ANY COPY    | Database                            | Allows cancelling running COPY command via COPY importId CANCEL command.              |
-| CREATE TABLE       | Database                            | Allows creating tables.                                                               |
-| DEDUP ENABLE       | Database &#124; Table               | Allows enabling deduplication and setting of upsert keys.                             |
-| DEDUP DISABLE      | Database &#124; Table               | Allows disabling deduplication.                                                       |
-| DETACH PARTITION   | Database &#124; Table               | Allows detaching partitions from tables.                                              |
-| DROP COLUMN        | Database &#124; Table &#124; Column | Allows dropping table columns.                                                        |
-| DROP INDEX         | Database &#124; Table &#124; Column | Allows dropping symbol columns indexes via ALTER TABLE command.                       |
-| DROP PARTITION     | Database &#124; Table               | Allows dropping or squashing existing table partitions.                               |
-| DROP TABLE         | Database &#124; Table               | Allows dropping tables.                                                               |
-| INSERT             | Database &#124; Table               | Allows inserting data into table columns.                                             |
-| REINDEX            | Database &#124; Table &#124; Column | Allows reindexing table's columns.                                                    |
-| RENAME COLUMN      | Database &#124; Table &#124; Column | Allows renaming columns.                                                              |
-| RENAME TABLE       | Database &#124; Table               | Allows renaming tables.                                                               |
-| RESUME WAL         | Database &#124; Table               | Allows resuming WAL processing via ALTER TABLE RESUME WAL command.                    |
-| SELECT             | Database &#124; Table &#124; Column | Allows selecting/reading table or column data.                                        |
-| SET TABLE PARAM    | Database &#124; Table               | Allows setting table parameters via ALTER TABLE SET PARAM command.                    |
-| SET TABLE TYPE     | Database &#124; Table               | Allows changing table type via ALTER TABLE SET TYPE command.                          |
-| SNAPSHOT           | Database                            | Allows preparing database snapshot.                                                   |
-| TRUNCATE TABLE     | Database &#124; Table               | Allows truncating tables.                                                             |
-| UPDATE             | Database &#124; Table &#124; Column | Allows updating table columns.                                                        |
-| VACUUM TABLE       | Database &#124; Table               | Allows reclaiming storage via VACUUM TABLE command.                                   |
+| permission         | level                               | description                                                                                                                                                               |
+|--------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ADD COLUMN         | Database &#124; Table               | Allows adding new column to existing table in rest api and pg wire protocol.                                                                                              |
+| ADD INDEX          | Database &#124; Table &#124; Column | Allows adding an index on symbol column.                                                                                                                                  |
+| ALTER COLUMN CACHE | Database &#124; Table &#124; Column | Allows disabling or enabling caching of symbol column values via ALTER TABLE command.                                                                                     |
+| ALTER COLUMN TYPE  | Database &#124; Table &#124; Column | Allows changing the type of columns via ALTER TABLE command.                                                                                                              |
+| ATTACH PARTITION   | Database &#124; Table               | Allows attaching partition to existing table.                                                                                                                             |
+| BACKUP DATABASE    | Database                            | Allows creating database backup via BACKUP DATABASE command.                                                                                                              |
+| BACKUP TABLE       | Database &#124; Table               | Allows creating table BACKUP TABLE command.                                                                                                                               |
+| CANCEL ANY COPY    | Database                            | Allows cancelling running COPY command via COPY importId CANCEL command.                                                                                                  |
+| CREATE TABLE       | Database                            | Allows creating tables.                                                                                                                                                   |
+| DEDUP ENABLE       | Database &#124; Table               | Allows enabling deduplication and setting of upsert keys.                                                                                                                 |
+| DEDUP DISABLE      | Database &#124; Table               | Allows disabling deduplication.                                                                                                                                           |
+| DETACH PARTITION   | Database &#124; Table               | Allows detaching partitions from tables.                                                                                                                                  |
+| DROP COLUMN        | Database &#124; Table &#124; Column | Allows dropping table columns.                                                                                                                                            |
+| DROP INDEX         | Database &#124; Table &#124; Column | Allows dropping symbol columns indexes via ALTER TABLE command.                                                                                                           |
+| DROP PARTITION     | Database &#124; Table               | Allows dropping or squashing existing table partitions.                                                                                                                   |
+| DROP TABLE         | Database &#124; Table               | Allows dropping tables.                                                                                                                                                   |
+| INSERT             | Database &#124; Table               | Allows inserting data into table columns.                                                                                                                                 |
+| REINDEX            | Database &#124; Table &#124; Column | Allows reindexing table's columns.                                                                                                                                        |
+| RENAME COLUMN      | Database &#124; Table &#124; Column | Allows renaming columns.                                                                                                                                                  |
+| RENAME TABLE       | Database &#124; Table               | Allows renaming tables.                                                                                                                                                   |
+| RESUME WAL         | Database &#124; Table               | Allows resuming WAL processing via ALTER TABLE RESUME WAL command.                                                                                                        |
+| SELECT             | Database &#124; Table &#124; Column | Allows selecting/reading table or column data.                                                                                                                            |
+| SET TABLE PARAM    | Database &#124; Table               | Allows setting table parameters via ALTER TABLE SET PARAM command.                                                                                                        |
+| SET TABLE TYPE     | Database &#124; Table               | Allows changing table type via ALTER TABLE SET TYPE command.                                                                                                              |
+| SNAPSHOT           | Database                            | Allows preparing database snapshot.                                                                                                                                       |
+| SQL ENGINE ADMIN   | Database                            | Allows the listing of currently running queries, and cancelling them via CANCEL QUERY command.                                                                            |
+| SYSTEM ADMIN       | Database                            | Allows the execution of various system related functions, such as reload_tls(), dump_memory_usage(), dump_thread_stacks(), flush_query_cache(), hydrate_table_metadata(). |
+| TRUNCATE TABLE     | Database &#124; Table               | Allows truncating tables.                                                                                                                                                 |
+| UPDATE             | Database &#124; Table &#124; Column | Allows updating table columns.                                                                                                                                            |
+| VACUUM TABLE       | Database &#124; Table               | Allows reclaiming storage via VACUUM TABLE command.                                                                                                                       |
 
 #### User management permissions
 
 | permission             | level    | description                                                                                    |
-| ---------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+|------------------------|----------|------------------------------------------------------------------------------------------------|
+| ADD EXTERNAL ALIAS     | Database | Allows creating external group mappings in CREATE GROUP and ALTER GROUP commands.              |
 | ADD PASSWORD           | Database | Allows setting user password in CREATE USER and ALTER USER commands.                           |
 | ADD USER               | Database | Allows adding user to group(s).                                                                |
 | CREATE GROUP           | Database | Allows creating groups.                                                                        |
@@ -482,118 +464,103 @@ There are three levels of permissions:
 | DROP USER              | Database | Allows dropping users.                                                                         |
 | ENABLE USER            | Database | Allows enabling users.                                                                         |
 | LIST USERS             | Database | Allows listing user details in SHOWS GROUPS, SHOW SERVICE ACCOUNTS and SHOW USERS.             |
+| REMOVE EXTERNAL ALIAS  | Database | Allows removing external group mappings via ALTER GROUP command.                               |
 | REMOVE PASSWORD        | Database | Allows setting no password via WITH NO PASSWORD clause in CREATE USER and ALTER USER commands. |
 | REMOVE USER            | Database | Allows removing user from group(s).                                                            |
 | USER DETAILS           | Database | Applies to SHOW USER, SHOW SERVICE ACCOUNTS, SHOW PERMISSIONS, SHOW GROUPS commands.           |
 
 #### Database endpoint permissions
 
-| permission | level    | description                                                                                                  |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| HTTP       | Database | Allows access to the REST API endpoint, this includes connection from the [Web Console](/docs/web-console/). |
-| ILP        | Database | Allows access to the InfluxDB Line Protocol (ILP) endpoint.                                                  |
-| PGWIRE     | Database | Allows access to the Postgres Wire endpoint.                                                                 |
+| permission | level    | description                                                                                                                    |
+|------------|----------|--------------------------------------------------------------------------------------------------------------------------------|
+| HTTP       | Database | Allows access to the REST API endpoint, this includes connection from the [Web Console](/docs/web-console/) and ILP over HTTP. |
+| ILP        | Database | Allows access to the InfluxDB Line Protocol (ILP) endpoint.                                                                    |
+| PGWIRE     | Database | Allows access to the Postgres Wire endpoint.                                                                                   |
 
-#### Special permissions
+#### Permission groups
 
-| permission | level                               | description                                                                               |
-| ---------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| ALL        | Database &#124; Table &#124; Column | All permissions on all levels, it does not include permissions to assume service accounts |
+Currently only the `ALL` permission group supported.
 
-### Database vs. table vs. column permissions
+| permission | level                               | description                                                                                |
+|------------|-------------------------------------|--------------------------------------------------------------------------------------------|
+| ALL        | Database &#124; Table &#124; Column | All permissions on all levels, it does not include permissions to assume service accounts. |
 
-The following will demosntrate the difference in permission levels.
+Note the values in the `level` column.
 
+### Permission levels
+
+Permissions can be granted on database, table or column levels.
+
+The granularity of a permission determines on which levels it can be granted.
+See the table below.
+
+| permission's granularity | grant levels                        |
+|--------------------------|-------------------------------------|
+| Database                 | Database                            |
+| Table                    | Database &#124; Table               |
+| Column                   | Database &#124; Table &#124; Column |
+
+Let's look at some examples!
+
+- `BACKUP DATABASE` is a global action, it does not make sense to grant it to
+  a specific table or column.
+ 
+  The backup captures the state of the entire database as a whole, therefore
+  this permission has **database** granularity, and _can be granted on database
+  level only_.
 ```questdb-sql
-GRANT SELECT, INSERT ON table1 TO group1;
-GRANT CREATE USER TO user1;
-
-SHOW PERMISSIONS user1; --user1 has been added to group1 earlier
-
-permission	table_name	column_name	grant_option	origin
-----------	----------	-----------	------------	------
-CREATE USER	null		null		false			G
-SELECT		table1		null		false			G
-INSERT		table1		null		false			G
+--database level
+GRANT BACKUP DATABASE TO user;
 ```
 
-Users belong to `group1` can insert data into `table1`, and can also query the
-data from the table. `user1` can create users in the database.
-
-Permissions can be revoked from users and groups, which means losing their
-access to the given functionality:
-
+- `ATTACH PARTITION` makes sense only in the context of a table, because a
+  partition is always attached to a table. This permission has **table**
+  granularity, and _can be granted on database or table level_.
+ 
+  When granted to specific tables, the user can attach partitions only to
+  the tables specified.
+ 
+  If granted on database level, the user can attach partitions to any tables
+  of the database.
 ```questdb-sql
-REVOKE INSERT ON table1 FROM group1;
-REVOKE CREATE USER FROM user1;
+--database level
+GRANT ATTACH PARTITION TO user;
 
-SHOW PERMISSIONS user1; --user1 has been added to group1 earlier
-
-permission	table_name	column_name	grant_option	origin
-----------	----------	-----------	------------	------
-SELECT		table1		null		false			G
+--table level
+GRANT ATTACH PARTITION ON table1, table2 TO user;
 ```
 
-In this example, users who belong to `group1` can no longer insert data into
-`table1`. But they can still run queries on the data stored in the table. And
-`user1` can no longer create new users.
-
-As an admin we can grant or revoke access to operations performed on database
-objects. By database objects we mean tables, columns, users, service accounts,
-groups or the database itself as a whole. Hence, permissions can be granted to
-users or groups on different levels.
-
-Let's take `SELECT` as an example, this permission can be granted on three
-different levels:
-
+- `SELECT` works on any level. Data is queried from columns, so this permission
+  has **column** granularity, and _can be granted on database, table or column
+  level_.
+ 
+  When granted on specific columns of a table, the user can query only the columns
+  specified.
+ 
+  When granted on a table or on a list of tables, the user can query any data from
+  the tables specified.
+ 
+  If granted on database level, the user can query any column of any table in the
+  entire database.
 ```questdb-sql
-GRANT SELECT ON ALL TABLES TO user1;
-GRANT SELECT ON table1 TO user1;
-GRANT SELECT ON table1(col1) TO user1;
+--database level
+GRANT SELECT ON ALL TABLES TO user;
+
+--table level
+GRANT SELECT ON table1 TO user;
+
+--column level
+GRANT SELECT ON table1(col1, col4) TO user;
 ```
 
-- When granted on the **database** level (on all tables), the user can run
-  queries involving any data from any table of the database
-
-- When granted on **table** level, the user can query only specific tables on
-  which the permission has been granted to them
-
-- When granted on **column** level, the user can query only specific columns of
-  tables. It could happen that the user can access all data in some tables, but
-  only some columns from other tables.
-
-Depending on related functionality, some permissions do not make sense when
-granted on table or column level. The granularity in which permissions can be
-granted is defined in QuestDB for each permission. See above for the full list.
-
-Table level permissions can be granted only on the **database** or **table**
-level. However, do note that the functionality linked to a table level
-permission does not work on columns. Take `DETACH PARTITION` and
-`ATTACH PARTITION` as an example. Partitions of a table can be detached and
-re-attached only as a whole. It would not make sense to grant these permissions
-only on specific columns of a table.
-
-```questdb-sql
-GRANT ATTACH PARTITION ON ALL TABLES TO user1;
-GRANT ATTACH PARTITION ON table1 TO user1;
-```
-
-Other functionality is performed on the entire database, and is therefore not
-applicable to specific tables or columns of a table. A good example is taking a
-backup of the database, the permission `BACKUP DATABASE` can be granted only on
-**database** level:
-
-```questdb-sql
-GRANT BACKUP DATABASE TO user1;
-```
-
-Notice the slight difference in syntax. When table or column level permissions,
-such as `ATTACH PARTITION` or `SELECT`, were granted on the **database** level,
+Notice the slight variations in syntax when granting permissions on database
+level. When permissions with table or column granularity, such as
+`ATTACH PARTITION` or `SELECT`, were granted on **database** level,
 we used the `ON ALL TABLES` expression to make it obvious that the permission is
 granted for the entire database. In the case of `BACKUP DATABASE` this is not
 needed.
 
-Functionality related to user management is always granted on the **database**
+Functionality related to user management is always granted on **database**
 level. However, users are always able to manage their own passwords and tokens,
 and view the list of permissions granted to them. Users can also view the
 permissions of the groups and service accounts they are associated with.
@@ -606,20 +573,21 @@ Related SQL commands:
 
 ### Endpoint permissions
 
-Endpoint permissions are granted on the **database** level. They are used to
+Endpoint permissions are granted on **database** level. They are used to
 manage how users and service accounts connect to the database. If endpoint
 permissions are not granted, the user or service account cannot access the
-database.
+database at all.
 
 The table below shows the permission required for each endpoint and protocol
 combination.
 
-| Endpoint                          | Protocol   | Transport Layer | Port (default) |     | Permission |
-| --------------------------------- | ---------- | --------------- | -------------- | --- | ---------- |
-| [Web Console](/docs/web-console/) | JSON       | HTTP            | 9000           |     | HTTP       |
-| REST API                          | JSON, TEXT | HTTP            | 9000           |     | HTTP       |
-| InfluxDB Line Protocol            | ILP        | TCP             | 9009           |     | ILP        |
-| Postgres Wire Protocol            | PG Wire    | TCP             | 8812           |     | PGWIRE     |
+| Endpoint               | Protocol   | Transport Layer | Port (default) |     | Permission |
+|------------------------|------------|-----------------|----------------|-----|------------|
+| Web Console            | JSON       | HTTP            | 9000           |     | HTTP       |
+| REST API               | JSON, TEXT | HTTP            | 9000           |     | HTTP       |
+| ILP over HTTP          | ILP        | HTTP            | 9000           |     | HTTP       |
+| InfluxDB Line Protocol | ILP        | TCP             | 9009           |     | ILP        |
+| Postgres Wire Protocol | PG Wire    | TCP             | 8812           |     | PGWIRE     |
 
 An example where we create a new user to access the database only via the
 Postgres endpoint:
