@@ -85,6 +85,13 @@ const theme = {
         color: "rgb(241, 250, 140)",
       },
     },
+    {
+      types: ["variable"],
+      style: {
+        color: color.draculaPurple,
+        fontStyle: "italic",
+      },
+    },
   ],
 }
 
