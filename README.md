@@ -61,7 +61,18 @@ Our SQL syntax diagrams are created using Railroad.
 
 To create a diagram, use the [Railroad online editor](https://www.bottlecaps.de/rr/ui) to see it rendered.
 
-Once you're happy with it, copy the Railroad syntax and add it to the `static/images/docs/diagrams/.railroad` file.
+Once you're happy with it, copy the Railroad syntax and add it to:
+
+```
+static/images/docs/diagrams/.railroad
+```
+
+Ensure it fits the full pattern - there are many examples:
+
+```text
+renameTable
+  ::= 'RENAME' 'TABLE' oldName 'TO' newName
+```
 
 Next, run the `scripts/railroad.py` script to generate the SVG image.
 
