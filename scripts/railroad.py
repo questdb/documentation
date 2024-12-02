@@ -3,7 +3,6 @@ import subprocess
 import re
 from pathlib import Path
 
-# Get absolute paths relative to project root
 PROJECT_ROOT = Path(os.getcwd())
 RR_WAR_PATH = PROJECT_ROOT / "rr.war"
 INPUT_FILE = PROJECT_ROOT / "static/images/docs/diagrams/.railroad"
@@ -56,38 +55,31 @@ def extract_diagrams(file_path):
     with open(file_path, 'r') as f:
         previous_line = ""
         for line in f:
-            line = line.rstrip()  # Keep right whitespace
+            line = line.rstrip()  
             
-            # Skip comments and empty lines
             if not line or line.startswith('#'):
                 previous_line = ""
                 continue
             
-            # Check for new diagram definition
             if '::=' in line:
-                # If we have a previous non-empty line, it's the name
                 if previous_line and not previous_line.startswith('-'):
-                    # Store previous diagram if exists
                     if current_name and current_definition:
                         diagrams[current_name] = '\n'.join(current_definition)
                     
-                    # Start new diagram
                     current_name = previous_line.strip()
                     current_definition = [f"{current_name} {line.strip()}"]
                     print(f"Found diagram: {current_name}")
                 
-            elif current_name and line:  # Continue previous diagram
+            elif current_name and line:  
                 current_definition.append(line)
             
             previous_line = line
                 
-    # Store the last diagram
     if current_name and current_definition:
         diagrams[current_name] = '\n'.join(current_definition)
     
     print(f"\nFound {len(diagrams)} diagrams: {sorted(diagrams.keys())}")
     
-    # Debug: Print first diagram content
     if diagrams:
         first_key = sorted(diagrams.keys())[0]
         print(f"\nFirst diagram '{first_key}' content:")
@@ -97,12 +89,10 @@ def extract_diagrams(file_path):
 
 def generate_svg(name, definition, temp_dir):
     """Generate SVG for a single diagram definition."""
-    # Create temporary grammar file
     temp_grammar = temp_dir / f"{name}.grammar"
     temp_grammar.write_text(definition)
     print(f"Created temporary grammar file: {temp_grammar}")
     
-    # Generate SVG using rr.war
     output_path = OUTPUT_DIR / f"{name}.svg"
     command = [
         "java", "-jar", str(RR_WAR_PATH),
@@ -125,14 +115,11 @@ def inject_custom_style(svg_path):
     with open(svg_path, 'r') as f:
         content = f.read()
     
-    # Find the actual diagram SVG (not the style SVG)
-    # Look for SVG with width and height attributes
     svg_match = re.search(r'<svg[^>]*width="[^"]*"[^>]*height="[^"]*"[^>]*>(.*?)</svg>', content, re.DOTALL)
     if not svg_match:
         print(f"Warning: No diagram SVG found in {svg_path}")
         return
     
-    # Extract width and height
     width_match = re.search(r'width="([^"]*)"', svg_match.group(0))
     height_match = re.search(r'height="([^"]*)"', svg_match.group(0))
     
@@ -172,59 +159,59 @@ def inject_custom_style(svg_path):
         </style>
     </defs>'''
     
-    # Get the inner content (everything after the opening SVG tag)
     inner_content = svg_match.group(1)
     
-    # Clean up the content
     inner_content = re.sub(r'\s+xmlns="[^"]*"', '', inner_content)
     inner_content = re.sub(r'\s+style="[^"]*"', '', inner_content)
     inner_content = inner_content.strip()
     
-    # Combine everything
     final_svg = f"{new_svg}\n    {inner_content}\n</svg>"
     
     with open(svg_path, 'w') as f:
         f.write(final_svg)
 
 def main():
-    # Create temp directory for grammar files
     temp_dir = PROJECT_ROOT / "temp_grammar"
     temp_dir.mkdir(exist_ok=True)
     print(f"Created temp directory: {temp_dir}")
     
+    markdown_syntax_list = [] 
+    
     try:
-        # Extract diagrams from input file
         diagrams = extract_diagrams(INPUT_FILE)
-        
-        # Process each diagram
+
         for name, definition in diagrams.items():
             print(f"\nProcessing diagram: {name}")
             
-            # Skip if SVG already exists
             output_path = OUTPUT_DIR / f"{name}.svg"
             if output_path.exists():
                 print(f"Skipping existing diagram: {name}")
                 continue
                 
             try:
-                # Generate SVG
                 svg_path = generate_svg(name, definition, temp_dir)
                 
-                # Inject custom style
                 inject_custom_style(svg_path)
                 
                 print(f"Successfully generated: {name}.svg")
+                
+                markdown_syntax_list.append(f"![Diagram for {name}](/images/docs/diagrams/{name}.svg)")
+                
             except Exception as e:
                 print(f"Error processing {name}: {str(e)}")
     
     finally:
-        # Cleanup temp directory
         print("\nCleaning up...")
         for file in temp_dir.glob("*.grammar"):
             print(f"Removing temporary file: {file}")
             file.unlink()
         temp_dir.rmdir()
         print("Cleanup complete")
+        
+        if markdown_syntax_list:
+            print("\nCopy the image syntax below and paste it into your markdown file:")
+            for syntax in markdown_syntax_list:
+                print(syntax)
 
 if __name__ == "__main__":
     main()
