@@ -74,6 +74,23 @@ SELECT @x + @y
 |--------|
 | 7      |
 
+### Variables as functions
+
+A variable need not be just a constant, it could be a function call, 
+and variables with function values can be nested:
+
+```questdb-sql title="declaring function variable" demo
+DECLARE
+  @today := today(),
+  @start := interval_start(@today),
+  @end := interval_end(@today)
+SELECT @today = interval(@start, @end)
+```
+
+| column |
+|--------|
+| true   |
+
 
 ### Declarations in subqueries
 
