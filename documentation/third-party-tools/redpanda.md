@@ -1,22 +1,27 @@
 ---
 title: Redpanda
 description:
-  Guide for using Redpanda with QuestDB via the QuestDB Kafka connector
+  Guide for using Redpanda with QuestDB via the QuestDB Kafka connector. Also
+  covers Redpanda Connect, a stream processing tool that can be used to build
+  data pipelines.
 ---
 
 [Redpanda](https://redpanda.com/) is an open-source, Kafka-compatible streaming
 platform that uses C++ and Raft to replace Java and Zookeeper. Since it is Kafka
 compatible, it can be used with the
-[QuestDB Kafka connector](/docs/third-party-tools/kafka/questdb-kafka/),
+[QuestDB Kafka connector](/docs/third-party-tools/kafka/#questdb-kafka-connect-connector),
 providing an alternative data [streaming](/glossary/stream-processing) option.
 
-## Prerequisites
+This guide also covers [Redpanda Connect](#redpanda-connect), a stream processing
+tool that can be used to build data pipelines.
+
+### Prerequisites
 
 - Docker
 - A local JDK installation
 - A running QuestDB instance
 
-## Configure and start Redpanda
+### Configure and start Redpanda
 
 The Redpanda
 [Quick start guide](https://docs.redpanda.com/docs/get-started/quick-start/quick-start-docker/#start-redpanda)
@@ -118,7 +123,7 @@ docker compose up
 It also start the
 [Redpanda web UI](https://docs.redpanda.com/docs/get-started/quick-start/quick-start-docker/#explore-your-topic-in-redpanda-console).
 
-## Download Apache Kafka
+### Download Apache Kafka
 
 Download
 [Apache Kafka](https://downloads.apache.org/kafka/3.7.0/kafka_2.12-3.7.0.tgz)
@@ -127,7 +132,7 @@ and unzip the file.
 This step is required as Redpanda does not have its own Kafka Connect
 equivalent.
 
-## Download the QuestDB Kafka connector
+### Download the QuestDB Kafka connector
 
 Download
 [the QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector/releases/latest),
@@ -158,7 +163,7 @@ cp ./*.jar /path/to/kafka/libs
 There should be already a lot of other JAR files. That's how you can tell you
 are in the right directory.
 
-## Configure properties
+### Configure properties
 
 Go to /path/to/kafka/config - there should be already quite a few \*.property
 files. Create a new file: `questdb-connector.properties` with the following
@@ -189,7 +194,7 @@ with the Redpanda broker URL:
 bootstrap.servers=127.0.0.1:19092
 ```
 
-## Start Kafka Connect
+### Start Kafka Connect
 
 Navigate to the Kafka Connect folder and then run:
 
@@ -199,7 +204,7 @@ Navigate to the Kafka Connect folder and then run:
 
 Now the Kafka Connect is initiated.
 
-## Send a message
+### Send a message
 
 Open the [Redpanda UI topic page](http://127.0.0.1:8080/topics). It should
 display `example-topic`:
@@ -223,7 +228,7 @@ Paste the following message into the message box:
 
 Then, click 'Publish'.
 
-## See result from QuestDB
+### See result from QuestDB
 
 Go to QuestDB web console at [http://localhost:9000](http://localhost:9000). Run
 a `SELECT` query:
@@ -236,7 +241,7 @@ The message is delivered to QuestDB:
 
 ![QuestDB web console result showing the Redpanda message](/images/docs/guide/redpanda/questdb-select.webp)
 
-## Summary and next steps
+### Summary and next steps
 
 The guide demonstrates how to use Redpanda with the QuestDB Kafka connector. The
 connector implicitly creates a table in QuestDB with inferred schema from the
@@ -248,7 +253,7 @@ from the Kafka message metadata.
 
 The connector can be also configured to use a custom timestamp field from the
 Kafka message. See the
-[QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/questdb-kafka#designated-timestamps)
+[QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/#designated-timestamps)
 for details.
 
 A possible improvement could be to explicitly create the target table in QuestDB
@@ -256,10 +261,80 @@ instead of relying on the connector to create it implicitly. This way, you can
 control the schema, [partitioning](/glossary/database-partitioning/) and data
 types of the table. It also enables QuestDB's native
 [deduplication feature](/docs/concept/deduplication). Deduplication is required
-for [Exactly-Once](/docs/third-party-tools/kafka/questdb-kafka#fault-tolerance)
+for [Exactly-Once](/docs/third-party-tools/kafka/#fault-tolerance)
 processing semantics.
 
 ## See also
 
-- [QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/questdb-kafka/#configuration-manual)
+- [QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/#configuration-manual)
 - [How to build a real-time crypto tracker with Redpanda and QuestDB](https://redpanda.com/blog/real-time-crypto-tracker-questdb-redpanda)
+
+## Redpanda Connect
+
+Redpanda Connect is a stream processing tool that can be used to build data pipelines.
+It's a lightweight alternative to [Apache Kafka Connect](/docs/third-party-tools/kafka/#questdb-kafka-connect-connector).
+This guide shows the steps to use the Redpanda Connect to write JSON data
+as rows into a QuestDB table. 
+
+### Prerequisites
+
+You will need the following:
+
+- [Redpanda Connect](https://docs.redpanda.com/redpanda-connect/about/)
+- A running QuestDB instance
+
+### Download Redpanda Connect
+
+The QuestDB output component was added to Redpanda Connect in version v4.37.0.
+
+To download the latest version of Redpanda Connect, follow the [installation instructions](https://docs.redpanda.com/redpanda-connect/guides/getting_started/#install) in the official documentation.
+
+### Configure Redpanda Connect
+
+One of Redpanda Connect's strengths is the ability to configure an entire data pipeline in a single
+yaml file. We will create a simple configuration to demonstrate the QuestDB connector's capabilities
+by using a straightforward input source.
+
+Create this file and name it `config.yaml` in your current directory
+
+```yaml
+input:
+  stdin: {}
+
+output:
+  questdb:
+    address: localhost:9000
+    table: redpanda_connect_demo
+    doubles:
+      - price
+    designated_timestamp_field: timestamp
+```
+
+This configuration will read lines from stdin and publish them to your running QuestDB instance
+
+### Run Redpanda Connect and publish messages
+
+Run the following command to send some messages to QuestDB through Redpanda Connect
+
+```bash
+echo \
+'{"symbol": "AAPL", "price": 225.83, "timestamp": 1727294094}
+{"symbol": "MSFT", "price": 431.78, "timestamp": 1727294142}' \
+| rpk connect run config.yaml
+```
+
+The command above sends two JSON messages to Redpanda Connect standard input, which then writes them to QuestDB.
+
+### Verify the integration
+
+Navigate to the QuestDB Web Console at http://localhost:9000 and run the following query to see your data:
+
+```sql
+SELECT *
+FROM redpanda_connect_demo
+```
+
+### Next steps
+
+Explore Redpanda Connect's [official documentation](https://docs.redpanda.com/redpanda-connect/about/) to learn more
+about its capabilities and how to use it in your projects.
