@@ -153,10 +153,7 @@ const config = {
             // Disable /search page
             searchPagePath: false,
             contextualSearch: false,
-            replaceSearchResultPathname: {
-              from: /^\/docs\//g.source,
-              to: '/',
-            },
+            externalUrlRegex: 'questdb\\.io',
           },
         }
       : {}),
