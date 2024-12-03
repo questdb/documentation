@@ -39,9 +39,12 @@ Note that new service accounts can only access the database if the necessary
 granted.
 
 The user creating the service account automatically receives the
-`ASSUME SERVICE ACCOUNT` permission, unless the `OWNED BY` clause is present, in
-which case the permission is granted to the user or group specified in the
-clause.
+`ASSUME SERVICE ACCOUNT` permission with `GRANT` option, unless the `OWNED BY`
+clause is present, in which case the permission is granted to the user or
+group specified in the clause.
+
+The `OWNED BY` clause cannot be omitted if the service account is created by
+an external user, because permissions cannot be granted to them.
 
 ## Examples
 
