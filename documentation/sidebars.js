@@ -266,6 +266,7 @@ module.exports = {
             "reference/function/conditional",
             "reference/function/date-time",
             "reference/function/finance",
+            "reference/function/hash",
             "reference/function/meta",
             "reference/function/numeric",
             "reference/function/parquet",
