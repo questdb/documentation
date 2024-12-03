@@ -154,7 +154,7 @@ const config = {
             searchPagePath: false,
             contextualSearch: false,
             replaceSearchResultPathname: {
-              from: /\/docs\//,
+              from: '/docs/',
               to: '/',
             },
           },
