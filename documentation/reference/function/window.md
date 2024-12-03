@@ -189,7 +189,7 @@ sequenceDiagram
 RANGE functions have a known issue. When using RANGE, all the rows with the same value will have the same output for the function. Read the [open issue](https://github.com/questdb/questdb/issues/5177) for more information.
 :::
 
-Defines the frame based on logical intervals of values in the ORDER BY column. Unlike ROWS which counts physical rows, RANGE uses the actual values in the ORDER BY column to determine the window.
+Defines the frame based on the actual values in the ORDER BY column, rather than counting rows. Unlike ROWS, which counts a specific number of rows, RANGE considers the values in the ORDER BY column to determine the window.
 
 Important requirements for RANGE:
 - Data must be ordered by the designated timestamp column
@@ -785,7 +785,7 @@ This example:
   - Can be used with any ORDER BY column
 
 - RANGE frames:
-  - Based on logical intervals
+  - Defines the frame based on the actual values in the ORDER BY column, rather than counted row.
   - Require ORDER BY on timestamp
   - Support time-based intervals (e.g., '1h', '5m')
 
