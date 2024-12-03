@@ -8,7 +8,8 @@
     "prebuild": "docusaurus clear && node ./scripts/cleanup-guidelines",
     "build": "cross-env NO_UPDATE_NOTIFIER=true USE_SIMPLE_CSS_MINIFIER=true PWA_SW_CUSTOM= docusaurus build",
     "deploy": "docusaurus deploy",
-    "serve": "docusaurus serve"
+    "serve": "docusaurus serve",
+    "swizzle": "docusaurus swizzle"
   },
   "dependencies": {
     "@docusaurus/faster": "^3.6.3",
