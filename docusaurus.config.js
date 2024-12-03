@@ -153,6 +153,16 @@ const config = {
             // Disable /search page
             searchPagePath: false,
             contextualSearch: false,
+            replaceSearchResultPathname: [
+              {
+                from: '/docs/blog/',
+                to: '/blog/',
+              },
+              {
+                from: '/docs/glossary/',
+                to: '/glossary/',
+              },
+            ],
           },
         }
       : {}),
