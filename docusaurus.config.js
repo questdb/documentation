@@ -152,7 +152,7 @@ const config = {
             indexName: "questdb",
             // Disable /search page
             searchPagePath: false,
-            contextualSearch: true,
+            contextualSearch: false,
             replaceSearchResultPathname: {
               from: /\/docs\/(blog|glossary)\//,
               to: '/$1/',
