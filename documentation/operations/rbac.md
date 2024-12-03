@@ -524,7 +524,7 @@ GRANT BACKUP DATABASE TO user;
   of the database.
 ```questdb-sql
 --database level
-GRANT ATTACH PARTITION TO user;
+GRANT ATTACH PARTITION ON ALL TABLES TO user;
 
 --table level
 GRANT ATTACH PARTITION ON table1, table2 TO user;
@@ -901,14 +901,18 @@ When a column is deleted and then re-created, permissions are re-instated.
 
 ### Owner grants
 
-When a user creates a new table or adds a new column to an existing table, it
-gets owner permissions on the newly created database object.
+When a user creates a new table or adds a new column to an existing table,
+it receives owner permissions on the newly created database object.
+The same stands for creating a new service account.
 
 If the user creates a table, the user automatically gets all table level
 permissions with the `GRANT` option on it.
 
 If the user adds a new column to an existing table, the user automatically gets
 all column level permissions with the `GRANT` option on it.
+
+If the user creates a new service account, the user automatically gets the
+`ASSUME SERVICE ACCOUNT` permission with the `GRANT` option on it.
 
 In QuestDB ownership does not persist. This means that the user gets full
 control over the newly created table or column at the time of creating it, but
