@@ -264,7 +264,7 @@ For a tuning guide see... the
 
 :::note
 
-Identity and Access Management is [Enterprise](/enterprise/) and [Cloud](/cloud/) only.
+Identity and Access Management is available within [QuestDB Enterprise](/enterprise/).
 
 :::
 
