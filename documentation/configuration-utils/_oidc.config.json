@@ -1,26 +1,34 @@
 {
   "acl.oidc.enabled": {
-    "default": false,
+    "default": "false",
     "description": "Enables/disables OIDC authentication. When enabled, few other configuration options must also be set."
   },
+  "acl.oidc.pkce.enabled": {
+    "default": "true",
+    "description": "Enables/disables PKCE for the Authorization Code Flow. This should always be enabled in a production environment, the Web Console is not fully secure without it."
+  },
   "acl.oidc.ropc.flow.enabled": {
-    "default": false,
-    "description": "Enables/disables Resource Owner Password Credentials flow."
+    "default": "false",
+    "description": "Enables/disables Resource Owner Password Credentials flow. When enabled, this flow also has to be configured in the OIDC Provider."
+  },
+  "acl.oidc.configuration.url": {
+    "default": "",
+    "description": "URL where the OpenID Provider's configuration information cna be loaded in json format, should always end with `/.well-known/openid-configuration`."
   },
   "acl.oidc.host": {
     "default": "",
-    "description": "OIDC provider hostname, required when OIDC is enabled."
+    "description": "OIDC provider hostname. Required when OIDC is enabled, unless the OIDC configuration URL is set."
   },
   "acl.oidc.port": {
     "default": 443,
-    "description": "OIDC provider port number, required when OIDC is enabled."
+    "description": "OIDC provider port number."
   },
   "acl.oidc.tls.enabled": {
-    "default": true,
-    "description": "Whether the OIDC provider requires a secure connection or not. It is highly unlikely, but if the User Info Endpoint does not require a secure connection, this option can be set to `false`."
+    "default": "true",
+    "description": "Whether the OIDC provider requires a secure connection or not. It is highly unlikely in a production environment, but if the OpenID Provider endpoints do not require a secure connection, this option can be set to `false`."
   },
   "acl.oidc.tls.validation.enabled": {
-    "default": true,
+    "default": "true",
     "description": "Enables/disables TLS certificate validation. If you are working with self-signed certificates that you would like QuestDB to trust, disable this option. Validation is strongly recommended in production environments. QuestDB will check that the certificate is valid, and that it is issued for the server to which it connects."
   },
   "acl.oidc.tls.keystore.path": {
@@ -39,6 +47,10 @@
     "default": "",
     "description": "Client name assigned to QuestDB in the OIDC server, required when OIDC is enabled."
   },
+  "acl.oidc.audience": {
+    "default": "",
+    "description": "OAuth2 audience as set on the tokens issued by the OIDC Provider, defaults to the client id."
+  },
   "acl.oidc.redirect.uri": {
     "default": "",
     "description": "The redirect URI tells the OIDC server where to redirect the user after successful authentication. If not set, the Web Console defaults it to the location where it was loaded from (`window.location.href`)."
@@ -46,6 +58,10 @@
   "acl.oidc.scope": {
     "default": "openid",
     "description": "The OIDC server should ask consent for the list of scopes provided in this property. The scope `openid` is mandatory, and always should be included."
+  },
+  "acl.oidc.public.keys.endpoint": {
+    "default": "/pf/JWKS",
+    "description": "JSON Web Key Set (JWKS) Endpoint, the default value should work for the Ping Identity Platform. This endpoint provides the list of public keys can be used to decode and validate ID tokens issued by the OIDC Provider."
   },
   "acl.oidc.authorization.endpoint": {
     "default": "/as/authorization.oauth2",
@@ -57,11 +73,19 @@
   },
   "acl.oidc.userinfo.endpoint": {
     "default": "/idp/userinfo.openid",
-    "description": "OIDC User Info Endpoint, the default value should work for the Ping Identity Platform."
+    "description": "OIDC User Info Endpoint, the default value should work for the Ping Identity Platform. Used to retrieve additional user information which contains the user's group memberships."
+  },
+  "acl.oidc.groups.encoded.in.token": {
+    "default": "false",
+    "description": "Should be set to false, if the OIDC Provider is configured to encode the group memberships of the user into the id token. When set to true, QuestDB will look for the groups in the token instead of calling the User Info endpoint."
+  },
+  "acl.oidc.sub.claim": {
+    "default": "sub",
+    "description": "The name of the claim in the user information, which contains the name of the user. Could be a username, the user's full name or email. It will be displayed in the Web Console, and logged for audit purposes."
   },
   "acl.oidc.groups.claim": {
     "default": "groups",
-    "description": "The name of the custom claim inside the user info response object, which contains the group memberships of the user."
+    "description": "The name of the custom claim in the user information, which contains the group memberships of the user."
   },
   "acl.oidc.cache.ttl": {
     "default": 30000,
