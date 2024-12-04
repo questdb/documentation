@@ -19,10 +19,10 @@ const prismIncludeLanguages = (PrismObject) => {
       dataType: new RegExp(`\\b(?:${dataTypes.join("|")})\\b`, "i"),
       variable: [
         {
-          pattern: /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
+          pattern: /@[\w.$]+/,
           greedy: true,
         },
-        /@[\w.$]+/,
+        /@(["'`])(?:\\[\s\S]|(?!\1)[^\\])+\1/,
       ],
       string: {
         pattern: /(^|[^@\\])("|')(?:\\[\s\S]|(?!\2)[^\\]|\2\2)*\2/,
