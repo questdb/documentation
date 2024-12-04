@@ -238,7 +238,7 @@ Now, this private key is then added to the client.
 
 This provides authenticated access to QuestDB for the "ingest" user.
 
-For example, if you are leveraging Java:
+For example, if you are leveraging Java and our recommended InfluxDB Line Protocol over HTTP client:
 
 ```java
 Java client example:
@@ -248,8 +248,8 @@ import java.time.temporal.ChronoUnit;
 
 public class ILPMain {
     public static void main(String[] args) {
-        try (Sender sender = Sender.builder(Sender.Transport.TCP)
-                .address("localhost:9009")
+        try (Sender sender = Sender.builder(Sender.Transport.HTTP)
+                .address("localhost:9000")
                 .enableTls()
                 .enableAuth("ingest")
                 .authToken("kom7j38LG44HcPfO92oZ4558e6KoeTHn6H5rA8vK3PQ")
