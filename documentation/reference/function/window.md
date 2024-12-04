@@ -524,6 +524,84 @@ SELECT
 FROM trades;
 ```
 
+### max()
+
+In the context of window functions, `max(value)` calculates the maximum value within the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The maximum value (excluding null) for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `max()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
+
+The `max()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="max() syntax" 
+max(value) OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="max() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    max(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS highest_price
+FROM trades;
+```
+
+### min()
+
+In the context of window functions, `min(value)` calculates the minimum value within the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The minimum value (excluding null) for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `min()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
+
+The `min()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="min() syntax" 
+min(value) OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="min() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    min(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS lowest_price
+FROM trades;
+```
+
 ### rank()
 
 In the context of window functions, `rank()` assigns a unique rank to each row
@@ -618,84 +696,6 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS trade_number
-FROM trades;
-```
-
-### max()
-
-In the context of window functions, `max(value)` calculates the maximum value within the set of rows defined by the window frame.
-
-**Arguments:**
-
-- `value`: Any numeric value.
-
-**Return value:**
-
-- The maximum value (excluding null) for the rows in the window frame.
-
-**Description**
-
-When used as a window function, `max()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
-
-The `max()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
-
-Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-```questdb-sql title="max() syntax" 
-max(value) OVER (window_definition)
-```
-
-**Example:**
-```questdb-sql title="max() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    max(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    ) AS highest_price
-FROM trades;
-```
-
-### min()
-
-In the context of window functions, `min(value)` calculates the minimum value within the set of rows defined by the window frame.
-
-**Arguments:**
-
-- `value`: Any numeric value.
-
-**Return value:**
-
-- The minimum value (excluding null) for the rows in the window frame.
-
-**Description**
-
-When used as a window function, `min()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
-
-The `min()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
-
-Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-```questdb-sql title="min() syntax" 
-min(value) OVER (window_definition)
-```
-
-**Example:**
-```questdb-sql title="min() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    min(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    ) AS lowest_price
 FROM trades;
 ```
 
