@@ -28,7 +28,7 @@ The `DECLARE` keyword comes before the `SELECT` clause in your query:
 ```questdb-sql title="Basic DECLARE" demo
 DECLARE
     @x := 5
-SELECT @x
+SELECT @x;
 ```
 
 Use the variable binding operator `:=` (walrus) to associate expressions to names.
@@ -40,7 +40,7 @@ The variables are resolved at parse-time, meaning that variable is no longer pre
 when the query is compiled. So the above example reduces to this simple query:
 
 ```questdb-sql title="basic DECLARE post-reduction" demo
-SELECT 5
+SELECT 5;
 ```
 
 | 5 |
@@ -67,7 +67,7 @@ You can declare multiple variables by setting the bind expressions with commas `
 DECLARE 
     @x := 5,
     @y := 2
-SELECT @x + @y
+SELECT @x + @y;
 ```
 
 | column |
@@ -84,7 +84,7 @@ DECLARE
   @today := today(),
   @start := interval_start(@today),
   @end := interval_end(@today)
-SELECT @today = interval(@start, @end)
+SELECT @today = interval(@start, @end);
 ```
 
 | column |
@@ -101,7 +101,7 @@ DECLARE
     @x := 5
 SELECT y FROM (
     SELECT @x AS y
-)
+);
 ```
 
 | y |
@@ -120,7 +120,7 @@ DECLARE
 SELECT @x + y FROM (
     DECLARE @x := 10
     SELECT @x AS y
-)
+);
 ```
 
 | column |
@@ -138,7 +138,7 @@ Nevertheless, it is possible to define a variable as a subquery:
 ```questdb-sql title="table cursor as a variable" demo
 DECLARE
     @subquery := (SELECT timestamp FROM trades)
-SELECT * FROM @subquery
+SELECT * FROM @subquery;
 ```
 
 You can even use already-declared variables to define your subquery variable:
@@ -148,7 +148,7 @@ DECLARE
     @timestamp := timestamp,
     @symbol := symbol,
     @subquery := (SELECT @timestamp, @symbol FROM trades)
-SELECT * FROM @subquery
+SELECT * FROM @subquery;
 ```
 
 ### Declarations in CTEs
@@ -170,7 +170,7 @@ second AS (
     FROM first
 )
 SELECT a, b
-FROM second
+FROM second;
 ```
 
 | a  | b |
@@ -184,9 +184,9 @@ FROM second
 does not perform syntax validation that rejects the `DECLARE` syntax.
 
 
-```sql
+```questdb-sql
 DECLARE @x := ?, @y := ? 
-SELECT @x::int + @y::int
+SELECT @x::int + @y::int;
 
 -- Then bind the following values: (1, 2)
 ```
@@ -211,7 +211,7 @@ DECLARE
     @symbols := ('BTC-USD', 'ETH-USD')
 SELECT timestamp, price, symbol
 FROM trades
-WHERE symbol IN @symbols
+WHERE symbol IN @symbols;
 
 -- error: unexpected bind expression - bracket lists not supported
 ```
@@ -228,12 +228,12 @@ DECLARE
     @symbol := 'ETH-USD'
 SELECT 
    timestamp, symbol, side, sum(amount) as volume 
- FROM trades
- WHERE side = 'sell' 
- AND timestamp IN @window 
- AND symbol = @symbol
- SAMPLE BY @period 
- FILL(NULL);
+FROM trades
+WHERE side = 'sell' 
+AND timestamp IN @window 
+AND symbol = @symbol
+SAMPLE BY @period 
+FILL(NULL);
 ```
 
 | timestamp                   | symbol  | side | volume           |
@@ -250,5 +250,5 @@ INSERT INTO trades SELECT * FROM
 (
     DECLARE @x := now(), @y := 'ETH-USD' 
     SELECT @x as timestamp, @y as symbol
-)
+);
 ```
