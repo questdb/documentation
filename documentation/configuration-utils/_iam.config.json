@@ -1,0 +1,86 @@
+{
+  "acl.enabled": {
+    "default": "true",
+    "description": "Enables/disables Identity and Access Management."
+  },
+  "acl.admin.user.enabled": {
+    "default": "true",
+    "description": "Enables/disables the built-in admin user."
+  },
+  "acl.admin.user": {
+    "default": "admin",
+    "description": "Name of the built-in admin user."
+  },
+  "acl.admin.password": {
+    "default": "quest",
+    "description": "The password of the built-in admin user."
+  },
+  "acl.basic.auth.realm.enabled": {
+    "default": "false",
+    "description": "When enabled the browser's basic auth popup window is used instead of the Web Console's login screen. Only present for backwards compatibility."
+  },
+  "acl.entity.name.max.length": {
+    "default": "255",
+    "description": "Maximum length of user, group and service account names."
+  },
+  "acl.password.hash.iteration.count": {
+    "default": "100000",
+    "description": "QuestDB Enterprise never stores passwords in plain text, it stores password hashes only. This is the number of hash iterations used in password hashing. Higher means safer, almost never should be changed."
+  },
+  "acl.rest.token.refresh.threshold": {
+    "default": "10",
+    "description": "When a REST token is created in REFRESH mode, its TTL is extended on every successful authentication, unless the last successful authentication was within this threshold. This setting removes unnecessary overhead of continuously refreshing REST tokens if they are used often. The value is expressed in seconds."
+  },
+  "tls.enabled": {
+    "default": "false",
+    "description": "Enables/disables TLS encryption globally for all QuestDB interfaces (HTTP endpoints, ILP over TCP)."
+  },
+  "tls.cert.path": {
+    "default": "",
+    "description": "Path to certificate used for TLS encryption globally. The certificate should be DER-encoded and saved in PEM format."
+  },
+  "tls.private.key.path": {
+    "default": "",
+    "description": "Path to private key used for TLS encryption globally."
+  },
+  "http.tls.enabled": {
+    "default": "false",
+    "description": "Enables/disables TLS encryption for the HTTP server only."
+  },
+  "http.tls.cert.path": {
+    "default": "",
+    "description": "Path to certificate used for TLS encryption for the HTTP server only. The certificate should be DER-encoded and saved in PEM format."
+  },
+  "http.tls.private.key.path": {
+    "default": "",
+    "description": "Path to private key used for TLS encryption for the HTTP server only."
+  },
+  "http.min.tls.enabled": {
+    "default": "false",
+    "description": "Enables/disables TLS encryption for the minimal HTTP server only."
+  },
+  "http.min.tls.cert.path": {
+    "default": "",
+    "description": "Path to certificate used for TLS encryption for the minimal HTTP server only. The certificate should be DER-encoded and saved in PEM format."
+  },
+  "http.min.tls.private.key.path": {
+    "default": "",
+    "description": "Path to private key used for TLS encryption for the minimal HTTP server only."
+  },
+  "line.tcp.tls.enabled": {
+    "default": "false",
+    "description": "Enables/disables TLS encryption for ILP over TCP only."
+  },
+  "line.tcp.tls.cert.path": {
+    "default": "",
+    "description": "Path to certificate used for TLS encryption for ILP over TCP only. The certificate should be DER-encoded and saved in PEM format."
+  },
+  "line.tcp.tls.private.key.path": {
+    "default": "",
+    "description": "Path to private key used for TLS encryption for ILP over TCP only."
+  },
+  "line.tcp.acl.enabled": {
+    "default": "true",
+    "description": "Enables/disables authentication for the ILP over TCP endpoint only."
+  }
+}
