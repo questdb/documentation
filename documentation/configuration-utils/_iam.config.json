@@ -29,7 +29,7 @@
   },
   "acl.rest.token.refresh.threshold": {
     "default": "10",
-    "description": "When a REST token is created in REFRESH mode, its TTL is extended on every successful authentication, unless the last successful authentication was within this threshold. This setting removes unnecessary overhead of continuously refreshing REST tokens if they are used often."
+    "description": "When a REST token is created in REFRESH mode, its TTL is extended on every successful authentication, unless the last successful authentication was within this threshold. This setting removes unnecessary overhead of continuously refreshing REST tokens if they are used often. The value is expressed in seconds."
   },
   "tls.enabled": {
     "default": "false",
