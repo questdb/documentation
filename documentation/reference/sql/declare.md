@@ -248,7 +248,21 @@ FILL(NULL);
 ```questdb-sql
 INSERT INTO trades SELECT * FROM 
 (
-    DECLARE @x := now(), @y := 'ETH-USD' 
+    DECLARE 
+        @x := now(), 
+        @y := 'ETH-USD' 
     SELECT @x as timestamp, @y as symbol
 );
 ```
+
+### CREATE TABLE AS SELECT
+
+```questdb-sql
+CREATE TABLE trades AS (
+    DECLARE 
+        @x := now(), 
+        @y := 'ETH-USD' 
+    SELECT @x as timestamp, @y as symbol, 123 as price
+);
+```
+
