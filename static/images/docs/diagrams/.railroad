@@ -311,7 +311,18 @@ update
 (FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
 
 show
-  ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName ) | 'CREATE' 'TABLE' tableName | 'USER' userName? | 'USERS' | 'GROUPS' userName? | 'SERVICE' 'ACCOUNT' accountName? | 'SERVICE' 'ACCOUNTS' userName? | 'PERMISSIONS' entityName? | 'SERVER_VERSION' | 'SERVER_CONF' )
+  ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName )
+  | 'CREATE' 'TABLE' tableName
+  | 'USER' userName?
+  | 'USERS'
+  | 'GROUPS' userName?
+  | 'SERVICE' 'ACCOUNT' accountName?
+  | 'SERVICE' 'ACCOUNTS' userName?
+  | 'PERMISSIONS' entityName?
+  | 'SERVER_VERSION'
+  | 'SERVER_CONF'
+  )
+
 
 truncateTable
   ::= 'TRUNCATE TABLE' tableName ';'
