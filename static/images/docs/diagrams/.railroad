@@ -311,17 +311,7 @@ update
 (FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
 
 show
- ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName ) | 'USER' userName? | 'USERS' | 'GROUPS' userName? | 'SERVICE' 'ACCOUNT' accountName? | 'SERVICE' 'ACCOUNTS' userName? | 'PERMISSIONS' entityName? | 'SERVER_VERSION' | 'SERVER_CONF' )  
- 
- - `SHOW USER` shows user secret (enterprise-only)
- - `SHOW USERS` shows all users (enterprise-only) 
- - `SHOW GROUPS` shows all groups the user belongs or all groups in the system (enterprise-only) 
- - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
- - `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the user/group (enterprise-only) 
- - `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)  
- - `SHOW PERMISSIONS` displays permissions of user, group or service account (enterprise-only)
- - `SHOW SERVER_CONF` shows the content of QuestDB's server.conf configuration file. (enterprise-only)
- 
+  ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName ) | 'CREATE' 'TABLE' tableName | 'USER' userName? | 'USERS' | 'GROUPS' userName? | 'SERVICE' 'ACCOUNT' accountName? | 'SERVICE' 'ACCOUNTS' userName? | 'PERMISSIONS' entityName? | 'SERVER_VERSION' | 'SERVER_CONF' )
 
 truncateTable
   ::= 'TRUNCATE TABLE' tableName ';'
