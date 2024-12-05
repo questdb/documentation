@@ -64,7 +64,7 @@ SHOW COLUMNS FROM my_table;
 
 ### SHOW CREATE TABLE
 
-```questdbl-sql title="retrieving table ddl" demo
+```questdb-sql title="retrieving table ddl" demo
 SHOW CREATE TABLE trades;
 ```
 
