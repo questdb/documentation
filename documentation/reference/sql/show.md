@@ -19,6 +19,7 @@ and partition storage size on disk.
 - `SHOW` returns all the tables.
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
+- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW PARTITIONS` returns the partition information for the selected table.
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
@@ -59,6 +60,51 @@ SHOW COLUMNS FROM my_table;
 | price  | DOUBLE    | false   | 0                  | false        | 0              | false      |
 | ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       |
 | s      | STRING    | false   | 0                  | false        | 0              | false      |
+
+
+### SHOW CREATE TABLE
+
+```questdbl-sql title="retrieving table ddl" demo
+SHOW CREATE TABLE trades;
+```
+
+| ddl                                                                                                                                                                                                                                      |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WAL WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
+
+This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
+
+```questdb-sql
+CREATE TABLE trades ( 
+	symbol SYMBOL CAPACITY 256 CACHE,
+	side SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+```
+
+#### Enterprise variant
+
+QuestDB Enterprise will include an additional `OWNED BY` clause populated with the current user. 
+
+For example,
+
+```questdb-sql
+CREATE TABLE trades ( 
+	symbol SYMBOL CAPACITY 256 CACHE,
+	side SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us
+OWNED BY 'admin';
+```
+
+This clause assigns permissions for the table to that user. If permissions should be assigned to a different user,
+please modify this clause appropriately.
 
 ### SHOW PARTITIONS
 
