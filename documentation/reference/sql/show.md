@@ -87,7 +87,7 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 
 #### Enterprise variant
 
-QuestDB Enterprise will include an additional `OWNED BY` clause populated with the current user.
+[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
 
 For example,
 
@@ -103,7 +103,9 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```
 
-This clause assigns permissions for the table to that user. If permissions should be assigned to a different user,
+This clause assigns permissions for the table to that user. 
+
+If permissions should be assigned to a different user,
 please modify this clause appropriately.
 
 ### SHOW PARTITIONS
