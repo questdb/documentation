@@ -2,6 +2,7 @@ import os
 import subprocess
 import re
 from pathlib import Path
+import argparse
 
 PROJECT_ROOT = Path(os.getcwd())
 RR_WAR_PATH = PROJECT_ROOT / "rr.war"
@@ -53,37 +54,46 @@ def extract_diagrams(file_path):
     
     print(f"Reading from file: {file_path}")
     with open(file_path, 'r') as f:
-        previous_line = ""
         for line in f:
-            line = line.rstrip()  
+            line = line.rstrip()
             
+            # Skip empty lines and comments
             if not line or line.startswith('#'):
-                previous_line = ""
                 continue
             
-            if '::=' in line:
-                if previous_line and not previous_line.startswith('-'):
-                    if current_name and current_definition:
-                        diagrams[current_name] = '\n'.join(current_definition)
-                    
-                    current_name = previous_line.strip()
-                    current_definition = [f"{current_name} {line.strip()}"]
-                    print(f"Found diagram: {current_name}")
+            # If we find a new definition (non-indented line without ::=)
+            if not line.startswith(' ') and '::=' not in line:
+                # Save previous diagram if it exists
+                if current_name and current_definition:
+                    # Format the definition properly
+                    formatted_def = []
+                    for def_line in current_definition:
+                        if '::=' in def_line:
+                            # First line needs the name
+                            formatted_def.append(f"{current_name} {def_line.strip()}")
+                        else:
+                            formatted_def.append(def_line.strip())
+                    diagrams[current_name] = '\n'.join(formatted_def)
                 
-            elif current_name and line:  
-                current_definition.append(line)
+                # Start new diagram
+                current_name = line.strip()
+                current_definition = []
+                continue
             
-            previous_line = line
-                
+            # Add definition lines to current diagram
+            if current_name and line:
+                current_definition.append(line)
+    
+    # Save the last diagram
     if current_name and current_definition:
-        diagrams[current_name] = '\n'.join(current_definition)
-    
-    print(f"\nFound {len(diagrams)} diagrams: {sorted(diagrams.keys())}")
-    
-    if diagrams:
-        first_key = sorted(diagrams.keys())[0]
-        print(f"\nFirst diagram '{first_key}' content:")
-        print(diagrams[first_key])
+        formatted_def = []
+        for def_line in current_definition:
+            if '::=' in def_line:
+                # First line needs the name
+                formatted_def.append(f"{current_name} {def_line.strip()}")
+            else:
+                formatted_def.append(def_line.strip())
+        diagrams[current_name] = '\n'.join(formatted_def)
     
     return diagrams
 
@@ -171,34 +181,48 @@ def inject_custom_style(svg_path):
         f.write(final_svg)
 
 def main():
+    # Add argument parsing
+    parser = argparse.ArgumentParser(description='Generate railroad diagrams')
+    parser.add_argument('diagram_name', nargs='?', help='Optional specific diagram name to generate')
+    args = parser.parse_args()
+
     temp_dir = PROJECT_ROOT / "temp_grammar"
     temp_dir.mkdir(exist_ok=True)
     print(f"Created temp directory: {temp_dir}")
     
     markdown_syntax_list = [] 
-    
+    processed_diagrams = set()  
+    orphaned_diagrams = []     
+
     try:
         diagrams = extract_diagrams(INPUT_FILE)
 
+        if args.diagram_name:
+            if args.diagram_name not in diagrams:
+                print(f"Error: Diagram '{args.diagram_name}' not found in .railroad file")
+                return
+            # Process only the specified diagram
+            diagrams = {args.diagram_name: diagrams[args.diagram_name]}
+
         for name, definition in diagrams.items():
             print(f"\nProcessing diagram: {name}")
+            processed_diagrams.add(name)
             
             output_path = OUTPUT_DIR / f"{name}.svg"
-            if output_path.exists():
-                print(f"Skipping existing diagram: {name}")
-                continue
-                
             try:
                 svg_path = generate_svg(name, definition, temp_dir)
-                
                 inject_custom_style(svg_path)
-                
                 print(f"Successfully generated: {name}.svg")
-                
                 markdown_syntax_list.append(f"![Diagram for {name}](/images/docs/diagrams/{name}.svg)")
-                
             except Exception as e:
                 print(f"Error processing {name}: {str(e)}")
+        
+        # Only check for orphaned diagrams if we're processing all diagrams
+        if not args.diagram_name:
+            for svg_file in OUTPUT_DIR.glob("*.svg"):
+                diagram_name = svg_file.stem
+                if diagram_name not in processed_diagrams:
+                    orphaned_diagrams.append(diagram_name)
     
     finally:
         print("\nCleaning up...")
@@ -212,6 +236,11 @@ def main():
             print("\nCopy the image syntax below and paste it into your markdown file:")
             for syntax in markdown_syntax_list:
                 print(syntax)
+        
+        if orphaned_diagrams:
+            print("\nFound orphaned diagrams (these exist as SVGs but have no matching syntax):")
+            for diagram in sorted(orphaned_diagrams):
+                print(f"- {diagram}")
 
 if __name__ == "__main__":
     main()

@@ -323,7 +323,6 @@ show
   | 'SERVER_CONF'
   )
 
-
 truncateTable
   ::= 'TRUNCATE TABLE' tableName ';'
 
