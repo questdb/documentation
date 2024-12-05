@@ -29,13 +29,17 @@ first failure. It is therefore possible to add some columns and not others.
 
 _Enterprise only._
 
-When a user adds a column to a table, they automatically get permissions for
-that column. However, if the `OWNED BY` clause is used, the permissions instead
-go to the user, group, or service account named in that clause.
+When a user adds a new column to a table, they automatically get all column
+level permissions with the `GRANT` option for that column.
+However, if the `OWNED BY` clause is used, the permissions instead go to the
+user, group, or service account named in that clause.
+
+The `OWNED BY` clause cannot be omitted if the column is added by an external
+user, because permissions cannot be granted to them.
 
 ## Examples
 
-Add a new column called `comment` of type `STRING` type to the table `ratings`
+Add a new column called `comment` of `STRING` type to the table `ratings`
 
 ```questdb-sql title="New column"
 ALTER TABLE ratings ADD COLUMN comment STRING;

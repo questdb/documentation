@@ -14,6 +14,7 @@ import postgresConfig from "./configuration-utils/\_postgres.config.json"
 import tcpConfig from "./configuration-utils/\_tcp.config.json"
 import udpConfig from "./configuration-utils/\_udp.config.json"
 import replicationConfig from "./configuration-utils/\_replication.config.json"
+import iamConfig from "./configuration-utils/\_iam.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
 import logConfig from "./configuration-utils/\_log.config.json"
 
@@ -192,8 +193,8 @@ It is important that the two path are identical
 
 ### Parallel SQL execution
 
-This section describes settings that can affect parallelism level of SQL
-execution and therefore performance.
+This section describes settings that can affect the level of parallelism during
+SQL execution, and therefore can also have an impact on performance.
 
 <ConfigTable rows={parallelSqlConfig} />
 
@@ -207,13 +208,15 @@ PostgresSQL wire protocol.
 ### InfluxDB Line Protocol (ILP)
 
 This section describes ingestion settings for incoming messages using InfluxDB
-line protocol.
+Line Protocol.
 
 | Property                  | Default | Description                                                                                                                                                                |
 | ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | line.default.partition.by | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
 
 #### HTTP specific settings
+
+ILP over HTTP is the preferred way of ingesting data.
 
 | Property               | Default | Description                                                                                                                                       |
 | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -229,9 +232,8 @@ line protocol.
 
 :::note
 
-The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend the
-[InfluxDB Line Protocol TCP receiver](/docs/reference/api/ilp/overview/)
-instead.
+The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend ILP over
+HTTP instead, or less frequently [ILP over TCP](/docs/reference/api/ilp/overview/).
 
 :::
 
@@ -258,6 +260,23 @@ For a tuning guide see... the
 
 <ConfigTable rows={replicationConfig} />
 
+### Identity and Access Management (IAM)
+
+:::note
+
+Identity and Access Management is available within [QuestDB Enterprise](/enterprise/).
+
+:::
+
+Identity and Access Management (IAM) ensures that data can be accessed only
+by authorized users. The below configuration properties relate to various
+authentication and authorization features.
+
+For a full explanation of IAM, see the
+[Identity and Access Management (IAM) documentation](/docs/operations/rbac).
+
+<ConfigTable rows={iamConfig} />
+
 ### OpenID Connect (OIDC)
 
 :::note
@@ -266,10 +285,10 @@ OpenID Connect is [Enterprise](/enterprise/) and [Cloud](/cloud/) only.
 
 :::
 
-Integrate with OpenID Connect (OIDC) to sync QuestDB with an Identity Provider
-(IdP).
+OpenID Connect (OIDC) support is part of QuestDB's Identity and Access Management.
+The database can be integrated with any OAuth2/OIDC Identity Provider (IdP).
 
-For a full explanation of OIDC, see the
+For detailed information about OIDC, see the
 [OpenID Connect (OIDC) integration guide](/docs/operations/openid-connect-oidc-integration).
 
 <ConfigTable rows={oidcConfig} />

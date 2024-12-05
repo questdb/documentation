@@ -153,6 +153,7 @@ const config = {
             // Disable /search page
             searchPagePath: false,
             contextualSearch: false,
+            externalUrlRegex: 'questdb\\.io',
           },
         }
       : {}),
