@@ -74,9 +74,22 @@ renameTable
   ::= 'RENAME' 'TABLE' oldName 'TO' newName
 ```
 
-Next, run the `scripts/railroad.py` script to generate the SVG image.
+Be sure to maintain proper indentation!
 
-During its final output, a markdown image with the appropriate syntax is printed.
+Next, run the `scripts/railroad.py [name]` script to generate the SVG image.
+
+For example:
+
+```shell
+python3 scripts/railroad.py renameTable
+```
+
+During its final output, a markdown image with the appropriate syntax is printed:
+
+```text
+Copy the image syntax below and paste it into your markdown file:
+![Diagram for renameTable](/images/docs/diagrams/renameTable.svg)
+```
 
 Copy this syntax and paste it into the markdown file where you want the diagram to appear.
 

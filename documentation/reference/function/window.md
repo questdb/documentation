@@ -104,6 +104,10 @@ Where:
 
 - [`first_value()`](#first_value) – Retrieves the first value in a window
 
+- [`max()`](#max) – Returns the maximum value within a window
+
+- [`min()`](#min) – Returns the minimum value within a window
+
 - [`rank()`](#rank) – Assigns a rank to rows
 
 - [`row_number()`](#row_number) – Assigns sequential numbers to rows
@@ -142,20 +146,19 @@ Window frames specify which rows are included in the calculation relative to the
 
 ```mermaid
 sequenceDiagram
-    participant CurrentRow as Current Row (Time 09:04)
-    participant Row1 as Row at 09:00
-    participant Row2 as Row at 09:02
-    participant Row3 as Row at 09:03
-    participant Row4 as Row at 09:04
+    participant R1 as Row at 09:00
+    participant R2 as Row at 09:02
+    participant R3 as Row at 09:03
+    participant R4 as Row at 09:04<br/>(Current Row)
 
-    Note over CurrentRow: Calculating at 09:04
+    Note over R4: Calculating at 09:04
 
     rect rgb(191, 223, 255)
-    Note over Row2,CurrentRow: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    Note over R2,R4: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
     end
 
     rect rgb(255, 223, 191)
-    Note over Row3,CurrentRow: RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
+    Note over R3,R4: RANGE BETWEEN<br/>'1' MINUTE PRECEDING<br/>AND CURRENT ROW
     end
 ```
 
@@ -187,17 +190,18 @@ sequenceDiagram
 ### RANGE frame
 
 :::note
-
-RANGE functions have a known issue.
-
-When using RANGE, all the rows with the same value will have the same output for
-the function.
-
-Read the [open issue](https://github.com/questdb/questdb/issues/5177) for more information.
-
+RANGE functions have a known issue. When using RANGE, all the rows with the same value will have the same output for the function. Read the [open issue](https://github.com/questdb/questdb/issues/5177) for more information.
 :::
 
-Defines the frame based on logical intervals of values in the ORDER BY column:
+Defines the frame based on the actual values in the ORDER BY column, rather than counting rows. Unlike ROWS, which counts a specific number of rows, RANGE considers the values in the ORDER BY column to determine the window.
+
+Important requirements for RANGE:
+- Data must be ordered by the designated timestamp column
+- The window is calculated based on the values in that ORDER BY column
+
+For example, with a current row at 09:04 and `RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW`:
+- Only includes rows with timestamps between 09:03 and 09:04 (inclusive)
+- Earlier rows (e.g., 09:00, 09:02) are excluded as they fall outside the 1-minute range
 
 ```mermaid
 sequenceDiagram
@@ -206,12 +210,18 @@ sequenceDiagram
     participant R3 as Row at 09:03
     participant R4 as Row at 09:04<br/>(Current Row)
 
+    Note over R4: Calculating at 09:04
+
+    %% Only include rows within 1 minute of current row (09:03-09:04)
     rect rgba(255, 223, 191)
     Note over R3,R4: RANGE BETWEEN<br/>'1' MINUTE PRECEDING<br/>AND CURRENT ROW
     end
+
+    %% Show excluded rows in grey or with a visual indicator
+    Note over R1,R2: Outside 1-minute range
 ```
 
-The time units that can be used in window functions are:
+The following time units can be used in RANGE window functions:
 
 - day
 - hour
@@ -220,23 +230,23 @@ The time units that can be used in window functions are:
 - millisecond
 - microsecond
 
-Plural forms of these time units are also accepted.
+Plural forms of these time units are also accepted (e.g., 'minutes', 'hours').
 
 ```questdb-sql title="Multiple time intervals example" demo
 SELECT
     timestamp,
     bid_px_00,
-    -- 5-minute average
+    -- 5-minute average: includes rows from (current_timestamp - 5 minutes) to current_timestamp
     AVG(bid_px_00) OVER (
         ORDER BY timestamp
         RANGE BETWEEN '5' MINUTE PRECEDING AND CURRENT ROW
     ) AS avg_5min,
-    -- 100-millisecond count
+    -- 100ms count: includes rows from (current_timestamp - 100ms) to current_timestamp
     COUNT(*) OVER (
         ORDER BY timestamp
         RANGE BETWEEN '100' MILLISECOND PRECEDING AND CURRENT ROW
     ) AS updates_100ms,
-    -- 2-second sum
+    -- 2-second sum: includes rows from (current_timestamp - 2 seconds) to current_timestamp
     SUM(bid_sz_00) OVER (
         ORDER BY timestamp
         RANGE BETWEEN '2' SECOND PRECEDING AND CURRENT ROW
@@ -250,6 +260,8 @@ This query demonstrates different time intervals in action, calculating:
 - 5-minute moving average of best bid price
 - Update frequency in 100ms windows
 - 2-second rolling volume
+
+Note that each window calculation is based on the timestamp values, not the number of rows. This means the number of rows included can vary depending on how many records exist within each time interval.
 
 ## Frame boundaries
 
@@ -509,6 +521,84 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS first_price
+FROM trades;
+```
+
+### max()
+
+In the context of window functions, `max(value)` calculates the maximum value within the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The maximum value (excluding null) for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `max()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
+
+The `max()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="max() syntax" 
+max(value) OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="max() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    max(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS highest_price
+FROM trades;
+```
+
+### min()
+
+In the context of window functions, `min(value)` calculates the minimum value within the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The minimum value (excluding null) for the rows in the window frame.
+
+**Description**
+
+When used as a window function, `min()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
+
+The `min()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
+
+Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="min() syntax" 
+min(value) OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="min() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    min(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS lowest_price
 FROM trades;
 ```
 
@@ -777,7 +867,7 @@ This example:
   - Can be used with any ORDER BY column
 
 - RANGE frames:
-  - Based on logical intervals
+  - Defines the frame based on the actual values in the ORDER BY column, rather than counted row.
   - Require ORDER BY on timestamp
   - Support time-based intervals (e.g., '1h', '5m')
 

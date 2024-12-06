@@ -25,7 +25,7 @@ platforms:
 Ingest, store, and process high-throughput and real-time data streams with these
 integrations:
 
-- **[Apache Kafka](/docs/third-party-tools/kafka/overview/):** A distributed
+- **[Apache Kafka](/docs/third-party-tools/kafka):** A distributed
   event streaming platform for high-throughput data pipelines.
 - [Telegraf](/docs/third-party-tools/telegraf/): Collect and report metrics from
   various sources.
