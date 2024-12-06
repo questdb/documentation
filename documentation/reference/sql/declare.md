@@ -204,7 +204,7 @@ how many places you need to update the constant.
 
 However, not all expressions are supported. The following are explicitly disallowed:
 
-#### Bracket lists
+### Bracket lists
 
 ```questdb-sql title="bracket lists are not allowed"
 DECLARE
@@ -216,6 +216,15 @@ WHERE symbol IN @symbols;
 -- error: unexpected bind expression - bracket lists not supported
 ```
 
+### SQL statement fragments
+
+```questdb-sql title="sql fragments are not allowed"
+DECLARE
+    @x := FROM trades
+SELECT 5 @x;
+
+-- table and column names that are SQL keywords have to be enclosed in double quotes, such as "FROM"```
+```
 
 ## Examples
 
