@@ -1,4 +1,3 @@
-import React from "react"
 import ReactMarkdown from "react-markdown"
 
 type Props = {
@@ -8,7 +7,7 @@ type Props = {
 
 export const ConfigTable = ({ rows, pick }: Props) => {
   return (
-    <table>
+    <table className="config-table">
       <thead>
         <tr>
           <th>Property</th>
