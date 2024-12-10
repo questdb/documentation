@@ -16,13 +16,12 @@ export const ConfigTable = ({ rows, pick }: Props) => {
           <th>Description</th>
         </tr>
       </thead>
-
       <tbody>
         {Object.entries(rows)
           .filter(([key]) => (Array.isArray(pick) ? pick.includes(key) : true))
           .map(([key, { default: defaultValue, description }]) => (
             <tr key={key}>
-              <td>{key}</td>
+              <td className="property-cell">{key}</td>
               <td>{defaultValue}</td>
               <td>
                 <ReactMarkdown>{description}</ReactMarkdown>
