@@ -1,4 +1,3 @@
-import React from "react"
 import ReactMarkdown from "react-markdown"
 
 type Props = {
@@ -8,7 +7,7 @@ type Props = {
 
 export const ConfigTable = ({ rows, pick }: Props) => {
   return (
-    <table>
+    <table className="config-table">
       <thead>
         <tr>
           <th>Property</th>
@@ -16,13 +15,12 @@ export const ConfigTable = ({ rows, pick }: Props) => {
           <th>Description</th>
         </tr>
       </thead>
-
       <tbody>
         {Object.entries(rows)
           .filter(([key]) => (Array.isArray(pick) ? pick.includes(key) : true))
           .map(([key, { default: defaultValue, description }]) => (
             <tr key={key}>
-              <td>{key}</td>
+              <td className="property-cell">{key}</td>
               <td>{defaultValue}</td>
               <td>
                 <ReactMarkdown>{description}</ReactMarkdown>
