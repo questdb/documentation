@@ -14,8 +14,7 @@ import { DocButton } from '../src/components/DocButton'
 
 <HeroPattern />
 
-QuestDB is an Apache 2.0 open source columnar database that specializes in time
-series.
+QuestDB is a top performance database that specializes in time-series.
 
 It offers **category-leading ingestion throughput** and **fast SQL queries**
 with operational simplicity.
@@ -59,7 +58,7 @@ QuestDB Enterprise offers everything from open source, plus additional features
 for running QuestDB at greater scale or significance.
 
 <div className="not-prose">
-  <DocButton href="/enterprise" variant="text" arrow="right">
+  <DocButton href="/enterprise/" variant="text" arrow="right">
     <>Learn more</>
   </DocButton>
 </div>

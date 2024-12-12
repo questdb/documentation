@@ -30,7 +30,7 @@ const resources: Array<Resource> = [
     href: '/docs/reference/sql/overview/',
     name: 'SQL overview',
     description:
-      'Learn about our powerful extended SQL language and how to use it to query QuestDB.',
+      'Learn about our powerful extended SQL and how to use it to query QuestDB.',
     icon: MagnifyingGlassIcon,
     pattern: {
       y: 16,
@@ -164,7 +164,7 @@ function Resource({ resource }: { resource: Resource }) {
             {resource.name}
           </Link>
         </h3>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
           {resource.description}
         </p>
       </div>
