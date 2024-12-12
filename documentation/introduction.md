@@ -21,7 +21,7 @@ with operational simplicity.
 Given its effiency, QuestDB **reduces operational costs**, all while overcoming
 ingestion bottlenecks.
 
-As a result, QuestDB offers amplifies intensive **time-series**, **capital market**, and **heavy industry** use cases.
+As a result, QuestDB amplifies intensive **time-series**, **capital market**, and **heavy industry** use cases.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
@@ -47,7 +47,7 @@ The first step is to get your data into QuestDB.
 
 We've got a range of first-party clients, protols and methods for ingestion. 
 
-Whether you're using first-party or interfacing with a third-party tool or library, we've got you covered.
+Whether you're using first-party clients or interfacing with a third-party tool or library, we've got you covered.
 
 <div className="not-prose">
   <DocButton href="/docs/ingestion-overview/" variant="text" arrow="right">
