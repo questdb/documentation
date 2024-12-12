@@ -25,7 +25,7 @@ As a result, QuestDB amplifies intensive **time-series**, **capital market**, an
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
-    <>Quickstart</>
+    <>Quick start</>
   </DocButton>
 
   <DocButton href="/docs/ingestion-overview/#first-party-clients" variant="outline" style={{ marginRight: '20px' }}>
