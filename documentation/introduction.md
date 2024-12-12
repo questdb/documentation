@@ -11,7 +11,6 @@ import { Resources } from '../src/components/Resources'
 import { HeroPattern } from '../src/components/HeroPattern'
 import { DocButton } from '../src/components/DocButton'
 
-
 <HeroPattern />
 
 QuestDB is a top performance database that specializes in time-series.
@@ -33,8 +32,12 @@ As a result, QuestDB offers amplifies intensive **time-series**, **capital marke
     <>Explore clients</>
   </DocButton>
 
-  <DocButton href="/docs/why-questdb/" variant="outline">
+  <DocButton href="/docs/why-questdb/" variant="outline" style={{ marginRight: '20px' }}>
     <>Why QuestDB?</>
+  </DocButton>
+
+  <DocButton href="https://demo.questdb.io" variant="outline" style={{ marginRight: '20px' }}>
+    <>Try live demo</>
   </DocButton>
 </div>
 
