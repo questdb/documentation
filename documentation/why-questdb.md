@@ -5,6 +5,9 @@ description:
   We'll explain the main features, advances and benefits of QuestDB. Learn how to accelerate your time-series use cases.
 ---
 
+import { Clients } from '../src/components/Clients'
+import Screenshot from "@theme/Screenshot"
+
 This pages provides a brief overview on:
 
 - [Top QuestDB features](#features)
@@ -134,13 +137,7 @@ First, the [quick start](/docs/quick-start/) guide will get you running.
 
 Choose from one of our premium ingest-only language clients:
 
-- [C & C++](/docs/clients/ingest-c-and-cpp)
-- [.NET](/docs/clients/ingest-dotnet)
-- [Go](/docs/clients/ingest-go)
-- [Java](/docs/clients/java_ilp)
-- [Node.js](/docs/clients/ingest-node)
-- [Python](/docs/clients/ingest-python)
-- [Rust](/docs/clients/ingest-rust)
+<Clients />
 
 From there, you can learn more about what's to offer.
 
@@ -156,10 +153,6 @@ From there, you can learn more about what's to offer.
   QuestDB deployment for production workloads.
 
 ## Support
-
-
-
-
 
 We are happy to help with any question you may have.
 
