@@ -9,14 +9,6 @@ paths = [
     "node_modules"
 ]
 
-[build]
-command = "npm run build"
-publish = "build"
-
-[build.environment]
-NODE_VERSION = "18"
-NODE_OPTIONS = "--max_old_space_size=4096"
-
 [[redirects]]
 from = "/docs/reference/sql/backup/"
 to = "/docs/reference/sql/snapshot/"
