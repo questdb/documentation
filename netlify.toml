@@ -1,7 +1,21 @@
 [[plugins]]
 package = "netlify-plugin-cache"
 [plugins.inputs]
-paths = ["node_modules/.cache"]
+paths = [
+    "node_modules/.cache",
+    ".cache",
+    ".docusaurus",
+    "build",
+    "node_modules"
+]
+
+[build]
+command = "npm run build"
+publish = "build"
+
+[build.environment]
+NODE_VERSION = "18"
+NODE_OPTIONS = "--max_old_space_size=4096"
 
 [[redirects]]
 from = "/docs/reference/sql/backup/"
@@ -637,3 +651,18 @@ X-Frame-Options = "SAMEORIGIN"
 X-XSS-Protection = "0"
 X-Content-Type-Options = "nosniff"
 Content-Security-Policy = "frame-src 'self' app.netlify.com *.demo.questdb.io *.questdb.io www.youtube.com www.slideshare.net forms.hsforms.com;"
+
+[[headers]]
+for = "/static/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "*.js"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "*.css"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
