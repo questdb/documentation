@@ -9,14 +9,14 @@ import {
 } from 'framer-motion'
 
 import { GridPattern } from '../GridPattern'
-import { ChatBubbleIcon } from '../../assets/icons/tailwind/ChatBubbleIcon'
-import { EnvelopeIcon } from '../../assets/icons/tailwind/EnvelopeIcon'
-import { UserIcon } from '../../assets/icons/tailwind/UserIcon'
+import { BoltIcon } from '../../assets/icons/tailwind/BoltIcon'
+import { CogIcon } from '../../assets/icons/tailwind/CogIcon'
+import { MagnifyingGlassIcon } from '../../assets/icons/tailwind/MagnifyingGlassIcon'
 import { UsersIcon } from '../../assets/icons/tailwind/UsersIcon'
 
 interface Resource {
   href: string
-  name: string
+  name: string    
   description: string
   icon: React.ComponentType<{ className?: string }>
   pattern: Omit<
@@ -27,11 +27,11 @@ interface Resource {
 
 const resources: Array<Resource> = [
   {
-    href: '/contacts',
-    name: 'Contacts',
+    href: '/docs/reference/sql/overview/',
+    name: 'SQL overview',
     description:
-      'Learn about the contact model and how to create, retrieve, update, delete, and list contacts.',
-    icon: UserIcon,
+      'Learn about our powerful extended SQL language and how to use it to query QuestDB.',
+    icon: MagnifyingGlassIcon,
     pattern: {
       y: 16,
       squares: [
@@ -41,11 +41,11 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/conversations',
-    name: 'Conversations',
+    href: '/docs/ingestion-overview/#first-party-clients',
+    name: 'Language clients',
     description:
-      'Learn about the conversation model and how to create, retrieve, update, delete, and list conversations.',
-    icon: ChatBubbleIcon,
+      'Explore our language clients and how to use them to ingest data into QuestDB.',
+    icon: BoltIcon,
     pattern: {
       y: -6,
       squares: [
@@ -55,11 +55,11 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/messages',
-    name: 'Messages',
+    href: '/docs/configuration/',
+    name: 'Configuration',
     description:
-      'Learn about the message model and how to create, retrieve, update, delete, and list messages.',
-    icon: EnvelopeIcon,
+      'See all of our available configuration options and fine-tune to match your use case.',
+    icon: CogIcon,
     pattern: {
       y: 32,
       squares: [
@@ -69,10 +69,10 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/groups',
-    name: 'Groups',
+    href: '/docs/third-party-tools/overview/',
+    name: 'Third-Party Tools',
     description:
-      'Learn about the group model and how to create, retrieve, update, delete, and list groups.',
+      'Our recommended third-party tools can aid you in analyzing and visualizing your data.',
     icon: UsersIcon,
     pattern: {
       y: 22,
@@ -83,8 +83,8 @@ const resources: Array<Resource> = [
 
 function ResourceIcon({ icon: Icon }: { icon: Resource['icon'] }) {
   return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/5 ring-1 ring-zinc-900/25 backdrop-blur-[2px] transition duration-300 group-hover:bg-white/50 group-hover:ring-zinc-900/25 dark:bg-white/7.5 dark:ring-white/15 dark:group-hover:bg-emerald-300/10 dark:group-hover:ring-emerald-400">
-      <Icon className="h-5 w-5 fill-zinc-700/10 stroke-zinc-700 transition-colors duration-300 group-hover:stroke-zinc-900 dark:fill-white/10 dark:stroke-zinc-400 dark:group-hover:fill-emerald-300/10 dark:group-hover:stroke-emerald-400" />
+    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/5 ring-1 ring-zinc-900/25 backdrop-blur-[2px] transition duration-300 group-hover:ring-zinc-900/25 dark:bg-white/7.5 dark:ring-white/15 dark:group-hover:bg-[var(--ifm-color-primary)]/10 dark:group-hover:ring-[var(--ifm-color-primary)]">
+      <Icon className="h-5 w-5 fill-zinc-700/10 stroke-zinc-700 transition-colors duration-300 group-hover:stroke-zinc-900 dark:fill-white/10 dark:stroke-zinc-400 dark:group-hover:fill-[var(--ifm-color-primary)]/10 dark:group-hover:stroke-[var(--ifm-color-primary)]" />
     </div>
   )
 }
@@ -112,7 +112,7 @@ function ResourcePattern({
         />
       </div>
       <motion.div
-        className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#D7EDEA] to-[#F4FBDF] opacity-0 transition duration-300 group-hover:opacity-100 dark:from-[#202D2E] dark:to-[#303428]"
+        className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[var(--ifm-color-primary-light)] to-[var(--ifm-color-primary-lightest)] opacity-0 transition duration-300 group-hover:opacity-100 dark:from-[var(--palette-rock)] dark:to-[var(--palette-gray)]"
         style={style}
       />
       <motion.div
@@ -149,14 +149,17 @@ function Resource({ resource }: { resource: Resource }) {
     <div
       key={resource.href}
       onMouseMove={onMouseMove}
-      className="group relative flex rounded-2xl bg-zinc-50 transition-shadow hover:shadow-md hover:shadow-zinc-900/5 dark:bg-white/2.5 dark:hover:shadow-black/5"
+      className="group relative flex rounded-2xl bg-[var(--ifm-color-primary-lightest)]/10 transition-shadow hover:shadow-md hover:shadow-zinc-900/5 dark:bg-white/2.5 dark:hover:shadow-black/5"
     >
       <ResourcePattern {...resource.pattern} mouseX={mouseX} mouseY={mouseY} />
-      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-zinc-900/7.5 group-hover:ring-zinc-900/10 dark:ring-white/10 dark:group-hover:ring-white/20" />
+      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-[var(--ifm-color-primary)]/20 group-hover:ring-[var(--ifm-color-primary)] dark:ring-white/10 dark:group-hover:ring-[var(--ifm-color-primary)]" />
       <div className="relative rounded-2xl px-4 pb-4 pt-4">
         <ResourceIcon icon={resource.icon} />
-        <h3 className="mt-4 text-sm font-semibold leading-7 text-zinc-900 dark:text-white">
-          <Link href={resource.href}>
+        <h3 className="mt-4 text-sm font-semibold leading-7 text-[var(--ifm-color-primary-darker)] dark:text-white">
+          <Link 
+            href={resource.href}
+            className="text-[var(--ifm-color-primary-darker)] hover:text-[var(--ifm-color-primary)] dark:text-white dark:hover:text-white no-underline"
+          >
             <span className="absolute inset-0 rounded-2xl" />
             {resource.name}
           </Link>

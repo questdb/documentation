@@ -2,7 +2,8 @@
 title: Introduction
 slug: /
 description:
-  The official QuestDB documentation. Learn how to accelerate your time-series and capital markets use cases.
+  The official QuestDB documentation. Learn how to accelerate your time-series, capital markets, and heavy industry use cases.
+custom_edit_url: null
 ---
 
 import { Guides } from '../src/components/Guides'
@@ -10,10 +11,6 @@ import { Resources } from '../src/components/Resources'
 import { HeroPattern } from '../src/components/HeroPattern'
 import { DocButton } from '../src/components/DocButton'
 
-export const sections = [
-  { title: 'Guides', id: 'guides' },
-  { title: 'Resources', id: 'resources' },
-]
 
 <HeroPattern />
 
@@ -26,18 +23,18 @@ with operational simplicity.
 Given its effiency, QuestDB **reduces operational costs**, all while overcoming
 ingestion bottlenecks.
 
-As a result, QuestDB offers greatly simplified overall ingress infrastructure.
+As a result, QuestDB offers amplifies intensive **time-series**, **capital market**, and **heavy industry** use cases.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
-  <DocButton href="/quickstart" arrow="right" style={{ marginRight: '20px' }}>
+  <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
     <>Quickstart</>
   </DocButton>
 
-  <DocButton href="/sdks" variant="outline" style={{ marginRight: '20px' }}>
+  <DocButton href="/docs/ingestion-overview/#first-party-clients" variant="outline" style={{ marginRight: '20px' }}>
     <>Explore clients</>
   </DocButton>
 
-  <DocButton href="/sdks" variant="outline">
+  <DocButton href="/docs/why-questdb/" variant="outline">
     <>Why QuestDB?</>
   </DocButton>
 </div>

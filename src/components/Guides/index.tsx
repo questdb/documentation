@@ -2,26 +2,26 @@ import { DocButton } from '../DocButton'
 
 const guides = [
   {
-    href: '/authentication',
-    name: 'Authentication',
-    description: 'Learn how to authenticate your API requests.',
+    href: '/docs/deployment/capacity-planning/',
+    name: 'Capacity planning',
+    description: 'Select a storage medium, plan, size and compress your QuestDB deployment.',
   },
   {
-    href: '/pagination',
-    name: 'Pagination',
-    description: 'Understand how to work with paginated responses.',
+    href: '/docs/operations/design-for-performance/',
+    name: 'Design for performance',
+    description: 'Design and tweak your data model to set yourself up for reliable, optimal performance.',
   },
   {
-    href: '/errors',
-    name: 'Errors',
+    href: '/docs/guides/working-with-timestamps-timezones/',
+    name: 'Working with time',
     description:
-      'Read about the different types of errors returned by the API.',
+      `It's about time. Learn how to work with timestamps and timezones in QuestDB.`,
   },
   {
-    href: '/webhooks',
-    name: 'Webhooks',
+    href: '/docs/operations/backup/',
+    name: 'Backup and restore',
     description:
-      'Learn how to programmatically configure webhooks for your app.',
+      'Safety is key! See the methods to backup and restore your QuestDB deployment.',
   },
 ]
 
