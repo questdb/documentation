@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
       - name: Build site
         env:
           CONTEXT: deploy-preview
