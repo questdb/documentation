@@ -8,6 +8,8 @@ description:
 
 import Screenshot from "@theme/Screenshot"
 
+import { Clients } from "../src/components/Clients"
+
 QuestDB makes top performance "data-in" easy.
 
 This guide will prepare you to get the most out of (and into!) QuestDB.
@@ -24,13 +26,7 @@ with high volume, [high cardinality](/glossary/high-cardinality/) data streaming
 
 To start quickly, select your language:
 
-- [C & C++](/docs/clients/ingest-c-and-cpp)
-- [.NET](/docs/clients/ingest-dotnet)
-- [Go](/docs/clients/ingest-go)
-- [Java](/docs/clients/java_ilp)
-- [Node.js](/docs/clients/ingest-node)
-- [Python](/docs/clients/ingest-python)
-- [Rust](/docs/clients/ingest-rust)
+<Clients />
 
 Our clients utitilize the InfluxDB Line Protocol (ILP) which is an insert-only
 protocol that bypasses SQL `INSERT` statements, thus achieving significantly
