@@ -1,14 +1,3 @@
-[[plugins]]
-package = "netlify-plugin-cache"
-[plugins.inputs]
-paths = [
-    "node_modules/.cache",
-    ".cache",
-    ".docusaurus",
-    "build",
-    "node_modules"
-]
-
 [[redirects]]
 from = "/docs/reference/sql/backup/"
 to = "/docs/reference/sql/snapshot/"
@@ -634,7 +623,6 @@ from = "/pricing/"
 to = "/enterprise/"
 status = 301
 force = true
-
 
 [[headers]]
 for = "/*"
