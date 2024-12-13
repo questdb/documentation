@@ -128,10 +128,15 @@ const config = {
             appId: process.env.ALGOLIA_APP_ID,
             apiKey: process.env.ALGOLIA_API_KEY,
             indexName: "questdb",
-            // Disable /search page
             searchPagePath: false,
             contextualSearch: false,
             externalUrlRegex: 'questdb\\.io',
+            transformItems: (items) => {
+              return items.map((item) => ({
+                ...item,
+                isExternal: false,
+              }))
+            },
           },
         }
       : {}),
