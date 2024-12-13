@@ -45,22 +45,22 @@ function Hit({
   hit: InternalDocSearchHit | StoredDocSearchHit;
   children: React.ReactNode;
 }) {
+  // Transform URL once and use it in both places
+  const transformUrl = (url: string) => {
+    return (url.startsWith('/docs/glossary/') || url.startsWith('/docs/blog/'))
+      ? url.replace('/docs/', '/')
+      : url;
+  };
+
+  const finalUrl = transformUrl(hit.url);
+  
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    // 1. Remove domain if present
-    let url = hit.url.replace(/^https?:\/\/[^\/]+/, '');
-    
-    // 2. For glossary/blog URLs, ensure they don't have /docs/ prefix
-    if (url.match(/\/docs\/(glossary|blog)/)) {
-      url = url.replace('/docs/', '/');
-    }
-    
-    window.location.assign(url);
+    window.location.assign(finalUrl);
   };
 
   return (
-    <a href={hit.url} onClick={handleClick}>
+    <a href={finalUrl} onClick={handleClick}>
       {children}
     </a>
   );
