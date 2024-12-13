@@ -1,11 +1,4 @@
 import { DocButton } from '../DocButton'
-import logoCpp from '../../assets/icons/logos/cplusplus.svg'
-import logoDotNet from '../../assets/icons/logos/dotnet.svg'
-import logoGo from '../../assets/icons/logos/go.svg'
-import logoJava from '../../assets/icons/logos/java.svg'
-import logoNode from '../../assets/icons/logos/node.svg'
-import logoPython from '../../assets/icons/logos/python.svg'
-import logoRust from '../../assets/icons/logos/rust.svg'
 
 const clients = [
   {
@@ -13,49 +6,49 @@ const clients = [
     name: 'C & C++',
     description:
       'High-performance client for systems programming and embedded applications.',
-    logo: logoCpp,
+    logo: '/images/logos/cplusplus.svg',
   },
   {
     href: '/docs/clients/ingest-dotnet',
     name: '.NET',
     description:
       'Cross-platform client for building applications with .NET technologies.',
-    logo: logoDotNet,
+    logo: '/images/logos/dotnet.svg',
   },
   {
     href: '/docs/clients/ingest-go',
     name: 'Go',
     description:
       'An open-source programming language supported by Google with built-in concurrency.',
-    logo: logoGo,
+    logo: '/images/logos/go.svg',
   },
   {
     href: '/docs/clients/java_ilp',
     name: 'Java',
     description:
       'Platform-independent client for enterprise applications and Android development.',
-    logo: logoJava,
+    logo: '/images/logos/java.svg',
   },
   {
     href: '/docs/clients/ingest-node',
     name: 'Node.js',
     description:
       'Node.js® is an open-source, cross-platform JavaScript runtime environment.',
-    logo: logoNode,
+    logo: '/images/logos/nodejs-light.svg',
   },
   {
     href: '/docs/clients/ingest-python',
     name: 'Python',
     description:
       'Python is a programming language that lets you work quickly and integrate systems more effectively.',
-    logo: logoPython,
+    logo: '/images/logos/python.svg',
   },
   {
     href: '/docs/clients/ingest-rust',
     name: 'Rust',
     description:
       'Systems programming language focused on safety, speed, and concurrency.',
-    logo: logoRust,
+    logo: '/images/logos/rust.svg',
   },
 ]
 
