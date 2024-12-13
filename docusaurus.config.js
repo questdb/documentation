@@ -120,21 +120,13 @@ const config = {
       theme: require("./src/internals/prism-github"),
       darkTheme: require("./src/internals/prism-dracula"),
     },
-
-    ...(typeof process.env.ALGOLIA_API_KEY === "string" &&
-    typeof process.env.ALGOLIA_APP_ID === "string"
-      ? {
-          algolia: {
-            appId: process.env.ALGOLIA_APP_ID,
-            apiKey: process.env.ALGOLIA_API_KEY,
-            indexName: "questdb",
-            // Disable /search page
-            searchPagePath: false,
-            contextualSearch: false,
-            externalUrlRegex: 'questdb\\.io',
-          },
-        }
-      : {}),
+    algolia: {
+      appId: process.env.ALGOLIA_APP_ID || 'placeholder-app-id',
+      apiKey: process.env.ALGOLIA_API_KEY || 'placeholder-api-key',
+      indexName: "questdb",
+      searchPagePath: false,
+      contextualSearch: false,
+    },
   },
   presets: [
     [
