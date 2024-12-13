@@ -61,7 +61,7 @@ QuestDB Enterprise offers everything from open source, plus additional features
 for running QuestDB at greater scale or significance.
 
 <div className="not-prose">
-  <DocButton href="/enterprise/" variant="text" arrow="right">
+  <DocButton href="/enterprise/" absolute variant="text" arrow="right">
     <>Learn more</>
   </DocButton>
 </div>

@@ -29,6 +29,7 @@ const variantStyles = {
 type ButtonProps = {
   variant?: keyof typeof variantStyles
   arrow?: 'left' | 'right'
+  absolute?: boolean
 } & (
   | React.ComponentPropsWithoutRef<typeof Link>
   | (React.ComponentPropsWithoutRef<'button'> & { href?: undefined })
@@ -39,6 +40,7 @@ export function DocButton({
   className,
   children,
   arrow,
+  absolute,
   ...props
 }: ButtonProps) {
   className = clsx(
@@ -76,6 +78,14 @@ export function DocButton({
       <button {...buttonProps}>
         {inner}
       </button>
+    )
+  }
+
+  if (absolute && props.href?.startsWith('/')) {
+    return (
+      <a className={className} {...props}>
+        {inner}
+      </a>
     )
   }
 
