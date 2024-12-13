@@ -45,11 +45,12 @@ function Hit({
   hit: InternalDocSearchHit | StoredDocSearchHit;
   children: React.ReactNode;
 }) {
-  const history = useHistory();
-  
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    history.push(hit.url);
+    // Remove any domain part from the URL if it exists
+    const url = hit.url.replace(/^https?:\/\/[^\/]+/, '');
+    // Navigate to the URL in the same tab
+    window.location.assign(url);
   };
 
   return (
