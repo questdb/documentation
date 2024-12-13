@@ -79,7 +79,6 @@
     "imagemin-pngquant": "10.0.0",
     "imagemin-svgo": "11.0.1",
     "lint-staged": "15.2.10",
-    "netlify-plugin-cache": "1.0.3",
     "node-fetch": "2",
     "postcss": "8.4.49",
     "prettier": "3.3.3",
