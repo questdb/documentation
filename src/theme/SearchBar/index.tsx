@@ -47,9 +47,24 @@ function Hit({
 }) {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Remove any domain part from the URL if it exists
-    const url = hit.url.replace(/^https?:\/\/[^\/]+/, '');
-    // Navigate to the URL in the same tab
+    
+    // Log the original URL for debugging
+    console.log('Original URL:', hit.url);
+    
+    // 1. Remove domain if present
+    let url = hit.url.replace(/^https?:\/\/[^\/]+/, '');
+    console.log('After domain removal:', url);
+    
+    // 2. Handle double /docs/ if present (in case the URL already has /docs/ and gets another prepended)
+    url = url.replace(/^\/docs\/docs\//, '/docs/');
+    console.log('After fixing double docs:', url);
+    
+    // 3. Handle case where /docs/ is missing from documentation pages
+    if (!url.startsWith('/docs/') && !url.match(/^\/(glossary|blog)/)) {
+      url = `/docs${url}`;
+    }
+    console.log('Final URL:', url);
+    
     window.location.assign(url);
   };
 
