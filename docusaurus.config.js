@@ -17,7 +17,7 @@ const config = {
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
-  staticDirectories: ['assets', 'images', 'static'],
+  staticDirectories: ['static'],
   projectName: "questdb",
   customFields,
   onBrokenLinks: "warn",
@@ -83,28 +83,6 @@ const config = {
         ],
       },
     ],
-    function (context, options) {
-      return {
-        name: 'development-redirects',
-        configureWebpack(config, isServer, utils) {
-          if (process.env.NODE_ENV === 'development') {
-            return {
-              devServer: {
-                onBeforeSetupMiddleware: function (devServer) {
-                  devServer.app.get('*', function (req, res, next) {
-                    // If path doesn't start with /docs, redirect to Next.js
-                    if (!req.path.startsWith('/docs/')) {
-                      return res.redirect(`http://localhost:3000${req.path}`)
-                    }
-                    next()
-                  })
-                }
-              }
-            }
-          }
-        }
-      }
-    }
   ].filter(Boolean),
 
   themeConfig: {
