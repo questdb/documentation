@@ -197,7 +197,9 @@ This sectioni s for the QuestDB C client.
 Skip to the bottom of this page for information relating to both the C and C++
 clients.
 
-::: <ILPClientsTable language="C" />
+::: 
+
+<ILPClientsTable language="C" />
 
 Explore the full capabilities of the C client via the
 [C README](https://github.com/questdb/c-questdb-client/blob/main/doc/C.md).
