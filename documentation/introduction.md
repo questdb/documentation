@@ -43,9 +43,9 @@ As a result, QuestDB amplifies intensive **time-series**, **capital market**, an
 
 ## Ingest your data
 
-The first step is to get your data into QuestDB. 
+Once running, the next step is to get your data into QuestDB. 
 
-We've got a range of first-party clients, protols and methods for ingestion. 
+We've got a range of first-party clients, protocols and methods for ingestion. 
 
 Whether you're using first-party clients or interfacing with a third-party tool or library, we've got you covered.
 
