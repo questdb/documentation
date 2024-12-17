@@ -110,6 +110,7 @@ If you'd like QuestDB to support this feature, please add a 👍 to [this GitHub
 
 - If connection fails, verify your QuestDB instance is running and accessible
 - Ensure PGWire is enabled in your QuestDB configuration
+  - `pg.enabled=true` - see [configuration](/docs/configuration/) for more details
 - Check that the port `8812` is open and not blocked by firewalls
 - For timeout errors, adjust the command timeout in advanced options
 
