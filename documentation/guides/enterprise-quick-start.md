@@ -42,8 +42,8 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
-- An OS that supports the
-  [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page)
+- Use of a [supported file system](/docs/deployment/capacity-planning/#supported-filesystems)
+  - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
 ## Installation guide
 
