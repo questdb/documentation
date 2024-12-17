@@ -1,6 +1,6 @@
 ---
 title: PowerBI
-description: "Guide for using PowerBI with QuestDB. Use the top performing QuestDB database to build your PowerBI dashboards.
+description: "Guide for using PowerBI with QuestDB. Use the top performing QuestDB database to build your PowerBI dashboards."
 ---
 
 This guide demonstrates how to connect QuestDB with Microsoft PowerBI to create
@@ -13,6 +13,11 @@ interactive data visualizations and dashboards.
 - Basic understanding of SQL queries
 
 ## Connection Setup
+
+QuestDB utilizes a fully featured PostgreSQL Wire Protocol (PGWire). As such,
+setup for PowerBI mirrors the standard PostgreSQL connection setup. The benefit
+is the performance profile of QuestDB, and its powerful time-series SQL extensions,
+with the simplicity of the PGWire protocol.
 
 1. Open PowerBI Desktop
 2. Click "Get Data" in the Home tab
@@ -40,26 +45,67 @@ interactive data visualizations and dashboards.
 3. Create visualizations by dragging fields onto the report canvas
 4. Save your report and publish it to PowerBI Service if needed
 
-## Best Practices
+## Using Custom SQL
 
-- Use [WHERE](/docs/reference/sql/where/) clauses to limit data volume
-- Leverage [timestamp](/docs/concept/timestamps/) functions for time-series analysis
-- For large datasets, use incremental refresh in PowerBI
+To leverage QuestDB-specific features like `SAMPLE BY` and `LATEST ON`, you can use custom SQL:
 
-## Example Queries
+1. In the "Get Data" dialog, click "Advanced options"
+2. Enter your SQL query in the "SQL statement" field
+3. Click "OK" to execute
 
-Here's a sample query to get started:
+> Remember, you must include a timestamp column when using functions like `SAMPLE BY`.
+
+Here are some useful query examples:
 
 ```questdb-sql
-SELECT
-  timestamp,
-  symbol,
-AVG(price) as avg_price
-FROM trades
+-- Get 1-hour samples of sensor readings
+SELECT 
+    timestamp,
+    avg(temperature) as avg_temp,
+    avg(humidity) as avg_humidity
+FROM sensors
 WHERE timestamp >= dateadd('d', -7, now())
-GROUP BY timestamp, symbol
-ORDER BY timestamp DESC
+SAMPLE BY 1h;
+
+-- Get latest reading for each sensor
+SELECT * FROM sensors
+LATEST ON timestamp PARTITION BY sensor_id;
+
+-- Combine SAMPLE BY with multiple aggregations
+SELECT 
+    timestamp,
+    symbol,
+    max(price) max_price,
+    min(price) min_price,
+    avg(price) avg_price
+FROM trades
+WHERE timestamp >= dateadd('M', -1, now())
+SAMPLE BY 1d
+ALIGN TO CALENDAR;
 ```
+
+## Best Practices
+
+- Leverage [timestamps](/docs/guides/working-with-timestamps-timezones/ functions for time-series analysis
+- Explore various [aggregation functions](/docs/reference/function/aggregation/) to suit your data needs
+- Consider using powerful [window functions](/docs/reference/function/window/) to perform complex calculations
+- For large datasets, use incremental refresh in PowerBI
+
+## Caveats
+
+### Date Table Limitations
+
+QuestDB currently cannot be used as a source for PowerBI's "Mark as Date Table" feature. This means:
+
+- You cannot mark QuestDB tables as date tables in PowerBI
+- Some time intelligence functions in PowerBI may not be available
+- If you need date table functionality, consider creating it in PowerBI or using another data source
+
+:::tip 
+
+If you'd like QuestDB to support this feature, please add a 👍 to [this GitHub issue](https://github.com/questdb/questdb/issues/5208).
+
+:::
 
 ## Troubleshooting
 
