@@ -10,7 +10,6 @@ interactive data visualizations and dashboards.
 
 - [QuestDB](/docs/quick-start) running locally or remotely
 - [PowerBI Desktop](https://powerbi.microsoft.com/) installed
-- Basic understanding of SQL queries
 
 ## Connection Setup
 
