@@ -102,7 +102,7 @@ SELECT reload_tls();
 TLS is now active.
 
 For more details on TLS see the
-[TLS operations documentation](https://questdb.io/docs/operations/tls/).
+[TLS operations documentation](/docs/operations/tls/).
 
 ## 2. Setup a database administrator
 
@@ -396,7 +396,7 @@ Next, we will enable Enterprise-specific features.
 
 ## 7. Setup replication
 
-[Replication](https://questdb.io/docs/concept/replication/) consists of:
+[Replication](/docs/concept/replication/) consists of:
 
 - a primary database instance
 - an object storage

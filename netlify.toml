@@ -634,7 +634,7 @@ for = "/*"
 X-Frame-Options = "SAMEORIGIN"
 X-XSS-Protection = "0"
 X-Content-Type-Options = "nosniff"
-Content-Security-Policy = "frame-src 'self' app.netlify.com *.demo.questdb.io *.questdb.io www.youtube.com www.slideshare.net forms.hsforms.com;"
+Content-Security-Policy = "frame-src 'self' app.netlify.com *.demo.questdb.com *.questdb.com www.youtube.com www.slideshare.net forms.hsforms.com;"
 
 [[headers]]
 for = "/static/*"

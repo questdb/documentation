@@ -354,7 +354,7 @@ using `key.converter` and `value.converter` options, both are included in the
 ### Designated timestamps
 
 The connector supports
-[designated timestamps](https://questdb.io/docs/concept/designated-timestamp/).
+[designated timestamps](/docs/concept/designated-timestamp/).
 
 There are three distinct strategies for designated timestamp handling:
 
@@ -508,7 +508,7 @@ for more information.
 ### Symbol type
 
 QuestDB supports a special type called
-[symbol](https://questdb.io/docs/concept/symbol/). Use the `symbols`
+[symbol](/docs/concept/symbol/). Use the `symbols`
 configuration option to specify which columns should be created as the `symbol`
 type.
 
@@ -594,7 +594,7 @@ When a target table does not exist in QuestDB, it will be created automatically.
 This is the recommended approach for development and testing.
 
 In production, it's recommended to use the SQL
-[CREATE TABLE](https://questdb.io/docs/reference/sql/create-table/) keyword,
+[CREATE TABLE](/docs/reference/sql/create-table/) keyword,
 because it gives you more control over the table schema, allowing per-table
 [partitioning](/glossary/database-partitioning/), creating indexes, etc.
 
