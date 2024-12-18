@@ -3,6 +3,8 @@ title: PowerBI
 description: "Guide for using PowerBI with QuestDB. Use the top performing QuestDB database to build your PowerBI dashboards."
 ---
 
+import Screenshot from "@theme/Screenshot"
+
 This guide demonstrates how to connect QuestDB with Microsoft PowerBI to create
 interactive data visualizations and dashboards.
 
