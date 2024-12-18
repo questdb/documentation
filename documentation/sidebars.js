@@ -449,6 +449,7 @@ module.exports = {
             "third-party-tools/grafana",
             "third-party-tools/kafka",
             "third-party-tools/redpanda",
+            "third-party-tools/powerbi",
             "third-party-tools/pandas",
             "third-party-tools/prometheus",
             "third-party-tools/qstudio",

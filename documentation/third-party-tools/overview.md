@@ -43,6 +43,7 @@ integrations:
 Enhance your data analysis and processing capabilities with QuestDB through
 these tools:
 
+- [**PowerBI**](/docs/third-party-tools/powerbi/): Create interactive data visualizations and dashboards.
 - [Pandas](/docs/third-party-tools/pandas/): Analyze [time-series data](/blog/what-is-time-series-data/) in Python
   with powerful data structures.
 - [MindsDB](/docs/third-party-tools/mindsdb/): Build machine learning models for
