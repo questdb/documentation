@@ -67,7 +67,7 @@ open the `questdb.service` file and add the following:
 ```shell
 [Unit]
 Description=QuestDB
-Documentation=https://www.questdb.io/docs/
+Documentation=https://www.questdb.com/docs/
 After=network.target
 
 [Service]

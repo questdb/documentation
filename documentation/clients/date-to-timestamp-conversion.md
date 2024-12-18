@@ -14,7 +14,7 @@ QuestDB offers clients for Python, Go, Java, C, C++, Rust, C#/.NET, and JavaScri
 can directly use a `Timestamp` type when using the client, while others need to convert the timestamp into a
 long representing the epoch time in microseconds. We add such required conversions into the snippets.
 
-Please refer to the [ingestion overview](https://questdb.io/docs/ingestion-overview/) to learn more about the details of the client library for your language.
+Please refer to the [ingestion overview](/docs/ingestion-overview/) to learn more about the details of the client library for your language.
 
 ## Date to Timestamp in Python
 

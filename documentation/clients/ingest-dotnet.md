@@ -571,7 +571,7 @@ using var sender =
 using var sender =
     Sender.New(
         "tcps::addr=localhost:9009;tls_verify=unsafe_off;username=admin;token=NgdiOWDoQNUP18WOnb1xkkEG5TzPYMda5SiUOvT1K0U=;");
-// See: https://questdb.io/docs/reference/api/ilp/authenticate
+// See: /docs/reference/api/ilp/authenticate
 
 ```
 

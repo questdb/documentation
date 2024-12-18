@@ -102,7 +102,7 @@ ssh -i ~/download/questdb_key.pem azureuser@$YOUR_INSTANCE_IP
 ```
 
 Once we've connected to the instance, we will be following the
-[binary installation method](https://questdb.io/download/). Here, we use `wget`
+[binary installation method](/download/). Here, we use `wget`
 to download the latest QuestDB binary, extract it, and run the start script.
 
 ```bash

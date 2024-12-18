@@ -1,5 +1,5 @@
 const githubOrgUrl = "https://github.com/questdb"
-const domain = "questdb.io"
+const domain = "questdb.com"
 
 module.exports = {
   trailingSlash: undefined,
