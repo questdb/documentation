@@ -25,14 +25,14 @@ with the simplicity of the PGWire protocol.
 
 <Screenshot
     alt="Select Get Data"
-    src="images/powerbi/powerbi-1.webp"
+    src="images/docs/powerbi/powerbi-1.webp"
   />
 
 3. Select "Database" → "PostgreSQL"
 
 <Screenshot
     alt="Select PostgreSQL"
-    src="images/powerbi/powerbi-2.webp"
+    src="images/docs/powerbi/powerbi-2.webp"
   />
 
 4. Enter your QuestDB connection details:
