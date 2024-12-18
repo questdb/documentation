@@ -18,9 +18,23 @@ setup for PowerBI mirrors the standard PostgreSQL connection setup. The benefit
 is the performance profile of QuestDB, and its powerful time-series SQL extensions,
 with the simplicity of the PGWire protocol.
 
+
 1. Open PowerBI Desktop
+
 2. Click "Get Data" in the Home tab
+
+<Screenshot
+    alt="Select Get Data"
+    src="images/powerbi/powerbi-1.webp"
+  />
+
 3. Select "Database" → "PostgreSQL"
+
+<Screenshot
+    alt="Select PostgreSQL"
+    src="images/powerbi/powerbi-2.webp"
+  />
+
 4. Enter your QuestDB connection details:
    - Server: `localhost` (or your server address)
    - Database: `qdb`
@@ -29,8 +43,7 @@ with the simplicity of the PGWire protocol.
      - Port: `8812` (default QuestDB PGWire port)
      - Command timeout: Adjust based on your query complexity
 
-5. Select either:
-   - Windows authentication (if configured)
+5. Select:
    - Database authentication:
      - User: `admin`
      - Password: `quest`
@@ -85,7 +98,7 @@ ALIGN TO CALENDAR;
 
 ## Best Practices
 
-- Leverage [timestamps](/docs/guides/working-with-timestamps-timezones/ functions for time-series analysis
+- Leverage [timestamps](/docs/guides/working-with-timestamps-timezones/) functions for time-series analysis
 - Explore various [aggregation functions](/docs/reference/function/aggregation/) to suit your data needs
 - Consider using powerful [window functions](/docs/reference/function/window/) to perform complex calculations
 - For large datasets, use incremental refresh in PowerBI
