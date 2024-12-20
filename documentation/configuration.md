@@ -210,9 +210,11 @@ PostgresSQL wire protocol.
 This section describes ingestion settings for incoming messages using InfluxDB
 Line Protocol.
 
-| Property                  | Default | Description                                                                                                                                                                |
-| ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| line.default.partition.by | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
+| Property                      | Default | Description                                                                                                                                                                |
+| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
+| line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
+| line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                   |
 
 #### HTTP specific settings
 
