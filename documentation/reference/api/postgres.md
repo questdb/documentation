@@ -111,7 +111,7 @@ CLIs that our team has tested extensively. Picking an item from it will
 guarantee that your code will work with QuestDB.
 
 We recognize that our community might value some features more than others. This
-is why we encourage you to [open an issue on GitHub]({@githubUrl@}/issues) if
+is why we encourage you to [open an issue on GitHub](https://github.com/questdb/questdb/issues) if
 you think we are missing something important for your workflow.
 
 ### CLIs

@@ -403,7 +403,7 @@ module.exports = {
         {
           label: "Blog tutorials 🔗",
           type: "link",
-          href: "/blog/tags/tutorial",
+          href: "https://questdb.com/blog/?tag=tutorial",
         },
       ],
     },
