@@ -176,7 +176,7 @@ public class Main {
 }
 ```
 
-Learn more about the [QuestDB Java Client](/docs/clients/java-ilp/)
+Learn more about the [QuestDB Java Client](/docs/clients/java_ilp/)
 
 ##  Date to Timestamp in C
 

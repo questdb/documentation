@@ -302,5 +302,5 @@ This guide outlines the integration of **Airbyte** with **QuestDB**, enabling se
 For further details and resources, refer to the following links:
 
 - [Airbyte Documentation](https://docs.airbyte.com/)
-- [QuestDB Web Console Guide](/docs/develop/web-console/)
+- [QuestDB Web Console Guide](/docs/web-console/)
 - [Airbyte GitHub Repository](https://github.com/airbytehq/airbyte)
