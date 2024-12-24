@@ -63,4 +63,4 @@ Improve your interactions with QuestDB using these tools and interfaces:
   execution, table browsing, and result charting.
 
 Is there an integration you'd like to see that's not listed? Let us know by
-opening an issue on [QuestDB Github]({@githubUrl@}/issues/new/choose).
+opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).
