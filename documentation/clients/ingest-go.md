@@ -39,7 +39,7 @@ some common insert patterns.
 To add the QuestDB client to your Go project:
 
 ```toml
-go get github.com/questdb/go-questdb-client/v3
+go get github.com/questdb/go-questdb-client/
 ```
 
 ## Authentication
@@ -51,7 +51,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/"
 )
 
 func main() {
@@ -86,7 +86,7 @@ package main
 
 import (
        "context"
-       qdb "github.com/questdb/go-questdb-client/v3"
+       qdb "github.com/questdb/go-questdb-client/"
 )
 
 
@@ -111,7 +111,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/"
 )
 
 func main() {
@@ -149,7 +149,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/"
 	"time"
 )
 
@@ -202,10 +202,10 @@ http::addr=localhost:9000;
 
 In the Go client, you can set the configuration options via the standard config
 string, which is the same across all clients, or using
-[the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderOption).
+[the built-in API](https://pkg.go.dev/github.com/questdb/go-questdb-client/#LineSenderOption).
 
 For all the extra options you can use, please check
-[the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3#LineSenderFromConf)
+[the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/#LineSenderFromConf)
 
 Alternatively, for a breakdown of Configuration string options available across
 all clients, see the [Configuration string](/docs/configuration-string/) page.
@@ -217,7 +217,7 @@ about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 
 Explore the full capabilities of the Go client via
-[Go.dev](https://pkg.go.dev/github.com/questdb/go-questdb-client/v3).
+[Go.dev](https://pkg.go.dev/github.com/questdb/go-questdb-client/).
 
 With data flowing into QuestDB, now it's time to for analysis.
 
