@@ -20,9 +20,9 @@ While InfluxDB clients are supported, we recommend using the QuestDB clients.
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="images/blog/2021-11-29/timeseries-benchmark-high-cardinality.webp"
-  width={500}
-  title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4"
+  src="images/benchmark/benchmark_all_q1_2024.webp"
+  width={650}
+  title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
 
 ## Overview
