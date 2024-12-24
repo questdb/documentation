@@ -14,7 +14,7 @@ import ILPRubyPartial from "../../../partials/\_ruby.ilp.partial.mdx"
 
 import ILPPHPPartial from "../../../partials/\_php.ilp.partial.mdx"
 
-import { Clients } from "../../../src/components/Clients"
+import { Clients } from "../../../../src/components/Clients"
 
 QuestDB implements the InfluxDB Line Protocol to ingest data.
 
