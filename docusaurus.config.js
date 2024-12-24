@@ -138,7 +138,7 @@ const config = {
           include: ["**/*!(.partial).{md,mdx}"],
           exclude: ["/glossary/"],
           path: "documentation",
-          routeBasePath: "/docs/",
+          routeBasePath: "/",
           editUrl: ({ docPath }) => {
             return `https://github.com/questdb/documentation/documentation/edit/main/${docPath}`
           },
