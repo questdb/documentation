@@ -1,5 +1,5 @@
-// Preserves "external"" localhost links with no 404 penalty
-//
+import Link from '@docusaurus/Link'
+
 const LocalLink = ({ href, children, ...props }) => {
   // Only add noopener/noreferrer for truly external links
   const isExternal = /^(https?:\/\/)/.test(href) && 
@@ -8,10 +8,15 @@ const LocalLink = ({ href, children, ...props }) => {
     
   const rel = isExternal ? "noopener noreferrer nofollow" : ""
 
-  return (
+  // Use regular <a> for external links, Docusaurus Link for internal
+  return isExternal ? (
     <a href={href} rel={rel} {...props}>
       {children}
     </a>
+  ) : (
+    <Link to={href} rel={rel} {...props}>
+      {children}
+    </Link>
   )
 }
 
