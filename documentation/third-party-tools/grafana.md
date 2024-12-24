@@ -127,5 +127,5 @@ SAMPLE BY $__interval;
 ## See also
 
 - [QuestDB + Grafana walkthrough](/blog/time-series-monitoring-dashboard-grafana-questdb/)
-- [QuestDB Grafana blogs](/blog/tags/GRAFANA/)
+- [QuestDB Grafana blogs](/blog/?tag=grafana)
 - [Official QuestDB plugin](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)

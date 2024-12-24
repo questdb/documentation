@@ -175,7 +175,7 @@ If you encounter issues during the sync process, consider the following debuggin
 ## Verifying the integration
 
 1. **Access the QuestDB Web Console**:
-   Navigate to the [QuestDB Web Console](/docs/develop/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
+   Navigate to the [QuestDB Web Console](/docs/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
 
    - `cpu` (generated from `inputs.cpu`)
    - `mem` (generated from `inputs.mem`)
