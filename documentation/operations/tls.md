@@ -18,7 +18,7 @@ QuestDB supports TLS v1.2 and v1.3.
 
 :::note
 
-TLS encryption is only available in [QuestDB Enterprise](/Enterprise/).
+TLS encryption is only available in [QuestDB Enterprise](/enterprise/).
 
 :::
 

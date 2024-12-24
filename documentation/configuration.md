@@ -283,7 +283,7 @@ For a full explanation of IAM, see the
 
 :::note
 
-OpenID Connect is [Enterprise](/enterprise/) and [Cloud](/cloud/) only.
+OpenID Connect is [Enterprise](/enterprise/) only.
 
 :::
 

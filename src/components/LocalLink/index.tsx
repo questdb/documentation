@@ -8,7 +8,8 @@ const LocalLink = ({ href, children, ...props }) => {
   const isMainSiteLink = href.startsWith('/glossary/') || 
     href.startsWith('/blog/') ||
     href.startsWith('/enterprise/') ||
-    href.startsWith('/download/')
+    href.startsWith('/download/') ||
+    href.startsWith('/dashboards/')
   
   // Only add rel attributes for true external links
   const rel = isHttpExternal && 
