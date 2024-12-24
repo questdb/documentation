@@ -30,7 +30,7 @@ description: Learn how to use Airbyte to collect data from various sources and s
 Before you begin, ensure you have the following:
 
 - **QuestDB** must be running and accessible. Check out the [QuestDB quick start guide](/docs/quick-start/).
-- **Airbyte** installed using Docker, or locally via [Homebrew](https://brew.sh/) on macOS. For detailed installation instructions, refer to the [official Airbyte documentation](https://docs.airbyte.com/deploying-airbyte/local-deployment).
+- **Airbyte** installed using Docker, or locally via [Homebrew](https://brew.sh/) on macOS. For detailed installation instructions, refer to the [official Airbyte documentation](https://docs.airbyte.com/).
 
 ## Configuring Airbyte
 

@@ -118,7 +118,7 @@ When the database is on-prem, we recommend using the existing file system backup
 tools. Volume snapshots can be taken using either the filesystem
 ([ZFS](https://ubuntu.com/tutorials/using-zfs-snapshots-clones#1-overview)) or a
 volume manager
-([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_logical_volumes/snapshot-of-logical-volumes_configuring-and-managing-logical-volumes#snapshot-of-logical-volumes_configuring-and-managing-logical-volumes)).
+([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/logical_volume_manager_administration/lvm_overview)).
 
 #### File copy
 
