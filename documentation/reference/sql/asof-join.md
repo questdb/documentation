@@ -61,168 +61,169 @@ Read more about execution order in the
 
 ## ASOF JOIN
 
-`ASOF JOIN` joins two different time-series measured.
+`ASOF JOIN` joins two time-series on their timestamp, using the following
+logic: for each row in the first time-series,
 
-For each row in the first time-series, the `ASOF JOIN` takes from the second
-time-series a timestamp that meets both of the following criteria:
-
-- The timestamp is the closest to the first timestamp.
-- The timestamp is **strictly prior or equal to** the first timestamp.
+1. consider all timestamps in the second time-series **earlier or equal to**
+the first one
+2. choose **the latest** such timestamp
 
 ### Example
 
-Given the following tables:
+Given a table of cryptocurrency trades with both buy and sell orders:
 
-Table `buy` (the left table):
+Table `buy` (filtered for ETH-USD buy orders):
 
 <div className="pink-table">
 
-| timestamp                   | price    |
-| --------------------------- | -------- |
-| 2024-06-22T00:00:00.039906Z | 0.092014 |
-| 2024-06-22T00:00:00.343909Z | 9.805    |
-| 2024-06-22T00:00:00.349387Z | 134.56   |
-| 2024-06-22T00:00:00.349387Z | 134.56   |
-| 2024-06-22T00:00:00.446196Z | 9.805    |
+| timestamp                   | symbol  | price   | amount   |
+| --------------------------- | ------- | ------- | -------- |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.40 | 0.002000 |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.40 | 0.001000 |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.40 | 0.000427 |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.36 | 0.025936 |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.37 | 0.035008 |
 
 </div>
 
-The `sell` table (the right table):
+The `sell` table (filtered for ETH-USD sell orders):
 
 <div className="blue-table">
 
-| timestamp                   | price    |
-| --------------------------- | -------- |
-| 2024-06-22T00:00:00.222534Z | 64120.28 |
-| 2024-06-22T00:00:00.222534Z | 64120.28 |
-| 2024-06-22T00:00:00.222534Z | 64116.74 |
-| 2024-06-22T00:00:00.222534Z | 64116.5  |
-| 2024-06-22T00:00:00.543826Z | 134.56   |
+| timestamp                   | symbol  | price   | amount   |
+| --------------------------- | ------- | ------- | -------- |
+| 2022-03-08T18:03:57.609765Z | ETH-USD | 2615.54 | 0.000440 |
+| 2022-03-08T18:03:57.710419Z | ETH-USD | 2615.54 | 0.000440 |
+| 2022-03-08T18:03:57.764097Z | ETH-USD | 2615.53 | 0.000440 |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.52 | 0.000440 |
+| 2022-03-08T18:03:58.194581Z | ETH-USD | 2615.51 | 0.000440 |
 
 </div>
 
-An `ASOF JOIN` query can look like the following:
+An `ASOF JOIN` query to calculate the price spread between buy and sell orders:
 
-```questdb-sql
+```questdb-sql title="A basic ASOF JOIN example" demo
 WITH
-buy AS (  -- select the first 5 buys in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp = '2024-06-22' AND side = 'buy' LIMIT 5
-   ),
-sell AS ( -- select the first 5 sells in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp = '2024-06-22' AND side = 'sell' LIMIT 5
-   )
+buy AS (
+   SELECT timestamp, symbol, price, amount
+   FROM trades
+   WHERE symbol = 'ETH-USD'
+   AND side = 'buy'
+   AND timestamp IN '2022-03-08T18:03:57;2s'
+   LIMIT 5
+),
+sell AS (
+   SELECT timestamp, symbol, price, amount
+   FROM trades
+   WHERE symbol = 'ETH-USD'
+   AND side = 'sell'
+   AND timestamp IN '2022-03-08T18:03:57;2s'
+   LIMIT 5
+)
 SELECT
-   buy.timestamp, sell.timestamp, buy.price, sell.price
+   buy.timestamp buy_ts,
+   sell.timestamp sell_ts,
+   buy.price buy_price,
+   sell.price sell_price,
+   buy.price - sell.price spread
 FROM buy ASOF JOIN sell;
 ```
 
-This is the JOIN result:
+This query returns:
 
 <div className="table-alternate">
 
-| timestamp                   | timestamp1                  | price    | price1  |
-| --------------------------- | --------------------------- | -------- | ------- |
-| 2024-06-22T00:00:00.039906Z | NULL                        | 0.092014 | NULL    |
-| 2024-06-22T00:00:00.343909Z | 2024-06-22T00:00:00.222534Z | 9.805    | 64116.5 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-22T00:00:00.222534Z | 134.56   | 64116.5 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-22T00:00:00.222534Z | 134.56   | 64116.5 |
-| 2024-06-22T00:00:00.446196Z | 2024-06-22T00:00:00.222534Z | 9.805    | 64116.5 |
+| buy_ts                      | sell_ts                     | buy_price | sell_price | spread  |
+| --------------------------- | --------------------------- | --------- | ---------- | ------- |
+| 2022-03-08T18:03:57.764098Z | 2022-03-08T18:03:57.710419Z | 2615.40   | 2615.54    | -0.14   |
+| 2022-03-08T18:03:57.764098Z | 2022-03-08T18:03:57.710419Z | 2615.40   | 2615.54    | -0.14   |
+| 2022-03-08T18:03:57.764098Z | 2022-03-08T18:03:57.710419Z | 2615.40   | 2615.54    | -0.14   |
+| 2022-03-08T18:03:58.194582Z | 2022-03-08T18:03:58.194581Z | 2615.36   | 2615.51    | -0.15   |
+| 2022-03-08T18:03:58.194582Z | 2022-03-08T18:03:58.194581Z | 2615.37   | 2615.51    | -0.14   |
 
 </div>
 
-The result has all rows from the `buys` table joined with rows from the `sells`
-table. For each timestamp from the `buys` table, the query looks for a timestamp
-that is equal or prior to it from the `sells` table. If no matching timestamp is
-found, NULL is inserted.
+For each buy order, the query finds the most recent sell order that occurred at or before the buy timestamp. The spread shows the difference between buy and sell prices, indicating market conditions at that moment.
 
 ### Using `ON` for matching column value
 
 An additional `ON` clause can be used to join the tables based on the value of a
-selected column.
+selected column. This is particularly useful when dealing with multiple trading pairs.
 
-The query above does not use the optional `ON` clause. If both tables store data
-for multiple symbols, `ON` clause provides a way to find sells for buys with
-matching symbol value.
-
-Table `buy` (the left table):
+Table `buy` (filtered for multiple symbols):
 
 <div className="pink-table">
 
-| timestamp                   | symbol  | price    |
-| --------------------------- | ------- | -------- |
-| 2024-06-22T00:00:00.039906Z | XLM-USD | 0.092014 |
-| 2024-06-22T00:00:00.039906Z | UNI-USD | 9.805    |
-| 2024-06-22T00:00:00.349387Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.349387Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.446196Z | UNI-USD | 9.805    |
+| timestamp                   | symbol  | price    | amount    |
+| --------------------------- | ------- | -------- | --------- |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.40  | 0.002000  |
+| 2022-03-08T18:03:57.764098Z | BTC-USD | 39269.98 | 0.001000  |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.36  | 0.025936  |
+| 2022-03-08T18:03:58.194582Z | BTC-USD | 39265.31 | 0.000127  |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.37  | 0.035008  |
 
 </div>
 
-The `sell` table (the right table):
+The `sell` table (filtered for multiple symbols):
 
 <div className="blue-table">
 
-| timestamp                   | symbol  | price    |
-| --------------------------- | ------- | -------- |
-| 2024-06-21T23:59:59.187884Z | SOL-USD | 134.54   |
-| 2024-06-21T23:59:59.878276Z | UNI-USD | 9.804    |
-| 2024-06-22T00:00:00.222534Z | BTC-USD | 64120.28 |
-| 2024-06-22T00:00:00.543826Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.644399Z | SOL-USD | 134.56   |
+| timestamp                   | symbol  | price    | amount    |
+| --------------------------- | ------- | -------- | --------- |
+| 2022-03-08T18:03:57.609765Z | ETH-USD | 2615.54  | 0.000440  |
+| 2022-03-08T18:03:57.710419Z | BTC-USD | 39269.98 | 0.001000  |
+| 2022-03-08T18:03:57.764097Z | ETH-USD | 2615.53  | 0.000440  |
+| 2022-03-08T18:03:58.194581Z | BTC-USD | 39265.31 | 0.000245  |
+| 2022-03-08T18:03:58.194581Z | ETH-USD | 2615.51  | 0.000440  |
 
 </div>
 
-Notice how both tables have a new column `symbol` that stores the stock name.
+The `ON` clause ensures we match trades of the same symbol:
 
-The `ON` clause allows you to match the value of the `symbol` column in the
-`buys` table with that in the `sells` table:
-
-```questdb-sql
+```questdb-sql title="ASOF JOIN with symbol matching" demo
 WITH
-buy AS (  -- select the first 5 buys in June 22
-   SELECT * FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'buy' LIMIT 5
-   ),
-sell AS ( -- sells in the last second of June 21 and 1 second later
-   SELECT * FROM trades
-   WHERE timestamp IN '2024-06-21T23:59:59;1s' AND side = 'sell'
-   )
+buy AS (
+   SELECT timestamp, symbol, price, amount
+   FROM trades
+   WHERE timestamp IN '2022-03-08T18:03:57;2s'
+   AND side = 'buy'
+   AND (symbol = 'ETH-USD' OR symbol = 'BTC-USD')
+   LIMIT 5
+),
+sell AS (
+   SELECT timestamp, symbol, price, amount
+   FROM trades
+   WHERE timestamp IN '2022-03-08T18:03:57;2s'
+   AND side = 'sell'
+   AND (symbol = 'ETH-USD' OR symbol = 'BTC-USD')
+   LIMIT 5
+)
 SELECT
-   buy.timestamp,  sell.timestamp, buy.symbol,
-   (buy.price - sell.price) spread
-FROM buy ASOF JOIN sell ON (symbol);
-
+   buy.timestamp buy_ts,
+   buy.symbol,
+   buy.price buy_price,
+   sell.price sell_price,
+   buy.price - sell.price spread
+FROM buy
+ASOF JOIN sell
+ON (symbol);
 ```
 
-The above query returns these results:
+This query returns:
 
 <div className="table-alternate">
 
-| timestamp                   | timestamp1                  | symbol  | spread |
-| --------------------------- | --------------------------- | ------- | ------ |
-| 2024-06-22T00:00:00.039906Z | NULL                        | XLM-USD | NULL   |
-| 2024-06-22T00:00:00.343909Z | 2024-06-21T23:59:59.878276Z | UNI-USD | 0.0009 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-21T23:59:59.187884Z | SOL-USD | 0.02   |
-| 2024-06-22T00:00:00.349387Z | 2024-06-21T23:59:59.187884Z | SOL-USD | 0.02   |
-| 2024-06-22T00:00:00.446196Z | 2024-06-21T23:59:59.878276Z | UNI-USD | 0.0009 |
+| buy_ts                      | symbol  | buy_price | sell_price | spread  |
+| --------------------------- | ------- | --------- | ---------- | ------- |
+| 2022-03-08T18:03:57.764098Z | ETH-USD | 2615.40   | 2615.53    | -0.13   |
+| 2022-03-08T18:03:57.764098Z | BTC-USD | 39269.98  | 39269.98   | 0.00    |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.36   | 2615.51    | -0.15   |
+| 2022-03-08T18:03:58.194582Z | BTC-USD | 39265.31  | 39265.31   | 0.00    |
+| 2022-03-08T18:03:58.194582Z | ETH-USD | 2615.37   | 2615.51    | -0.14   |
 
 </div>
 
-This query returns all rows from the `buy` table joined with records from the
-`sell` table that meet both the following criterion:
-
-- The `symbol` column of the two tables has the same value
-- The timestamp of the `sell` record is prior to or equal to the timestamp of
-  the `buy` record.
-
-The XLM-USD record in the `buy` table is not joined with any record in the
-`sell` table because there is no record in the `sell` table with the same stock
-name and a timestamp prior to or equal to the timestamp of the XLM-USD record.
-Note how the `sell` table has three rows with the SOL-USD symbol, but both of
-the SOL-USD in the `buy` table are matching to the first entry, as it is the
-only timestamp which is equal or prior.
+The query matches each buy order with the most recent sell order of the same symbol. This ensures we're comparing prices within the same market, giving us meaningful spread calculations for each trading pair.
 
 ### Timestamp considerations
 
