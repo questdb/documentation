@@ -61,13 +61,12 @@ Read more about execution order in the
 
 ## ASOF JOIN
 
-`ASOF JOIN` joins two different time-series measured.
+`ASOF JOIN` joins two time-series on their timestamp, using the following
+logic: for each row in the first time-series,
 
-For each row in the first time-series, the `ASOF JOIN` takes from the second
-time-series a timestamp that meets both of the following criteria:
-
-- The timestamp is the closest to the first timestamp.
-- The timestamp is **strictly prior or equal to** the first timestamp.
+1. consider all timestamps in the second time-series **earlier or equal to**
+the first one
+2. choose **the latest** such timestamp
 
 ### Example
 
