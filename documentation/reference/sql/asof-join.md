@@ -106,10 +106,10 @@ An `ASOF JOIN` query to calculate the price spread between buy and sell orders:
 ```questdb-sql title="A basic ASOF JOIN example" demo
 WITH
 buy AS (
-   SELECT timestamp, symbol, price, amount 
+   SELECT timestamp, symbol, price, amount
    FROM trades
-   WHERE symbol = 'ETH-USD' 
-   AND side = 'buy' 
+   WHERE symbol = 'ETH-USD'
+   AND side = 'buy'
    AND timestamp IN '2022-03-08T18:03:57;2s'
    LIMIT 5
 ),
@@ -122,7 +122,7 @@ sell AS (
    LIMIT 5
 )
 SELECT
-   buy.timestamp buy_ts, 
+   buy.timestamp buy_ts,
    sell.timestamp sell_ts,
    buy.price buy_price,
    sell.price sell_price,
@@ -184,7 +184,7 @@ The `ON` clause ensures we match trades of the same symbol:
 ```questdb-sql title="ASOF JOIN with symbol matching" demo
 WITH
 buy AS (
-   SELECT timestamp, symbol, price, amount 
+   SELECT timestamp, symbol, price, amount
    FROM trades
    WHERE timestamp IN '2022-03-08T18:03:57;2s'
    AND side = 'buy'
@@ -205,8 +205,8 @@ SELECT
    buy.price buy_price,
    sell.price sell_price,
    buy.price - sell.price spread
-FROM buy 
-ASOF JOIN sell 
+FROM buy
+ASOF JOIN sell
 ON (symbol);
 ```
 
