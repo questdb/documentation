@@ -17,7 +17,7 @@ Please let us know if you run into issues.
 Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.io/)
+2. Join our [public Slack](https://slack.questdb.com/)
 3. Post on our [Discourse community](https://community.questdb.com/)
 
 :::
