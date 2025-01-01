@@ -395,7 +395,7 @@ Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.io/)
-3. Post on our [Discourse community](https://community.questdb.io/)
+3. Post on our [Discourse community](https://community.questdb.com/)
 
 :::
 

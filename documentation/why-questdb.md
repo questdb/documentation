@@ -161,6 +161,6 @@ The team loves a good performance optimization challenge!
 Feel free to reach out using the following channels:
 
 - [Raise an issue on GitHub](https://github.com/questdb/questdb/issues/new/choose)
-- [Join our community forums](https://community.questdb.io/)
+- [Join our community forums](https://community.questdb.com/)
 - [QuestDB on Stack Overflow](https://stackoverflow.com/questions/tagged/questdb)
 - or email us at [hello@questdb.io](mailto:hello@questdb.io)

@@ -6,7 +6,7 @@ description: FAQ for QuestDB troubleshooting.
 The following document contains common hardware and software configuration
 issues met when running QuestDB, as well as solutions to them. If you cannot
 find the answers to your question, please join our
-[community forums](https://community.questdb.io/) and post your questions there.
+[community forums](https://community.questdb.com/) and post your questions there.
 
 ## Where do I find the log and how do I filter the log messages?
 
