@@ -53,7 +53,7 @@ your app code or third-party tool.
 Check the code snippet's title to see where the command is to be invoked.
 
 If you run into any trouble, please [contact us](mailto:support@questdb.io) by
-email or visit the [Community Forum](https://community.questdb.io/).
+email or visit the [Community Forum](https://community.questdb.com/).
 
 ## 0. Secure the built in admin
 

@@ -589,5 +589,5 @@ To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
 Should you encounter any issues or have questions, the
-[Community Forum](https://community.questdb.io/) is a vibrant platform for
+[Community Forum](https://community.questdb.com/) is a vibrant platform for
 discussions.
