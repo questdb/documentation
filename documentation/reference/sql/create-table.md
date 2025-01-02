@@ -53,8 +53,22 @@ CREATE TABLE trades(
 PARTITION BY DAY;
 ```
 
-Next, data deduplication is enabled to discard duplicates for the timestamp and
-ticker columns:
+Now we can add a time-to-live (TTL) period. Once an entire data partition is
+past its TTL, it becomes eligible for automatic removal.
+
+```questdb-sql title="With TTL"
+CREATE TABLE trades(
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+  ) TIMESTAMP(timestamp)
+PARTITION BY DAY
+TTL 1 WEEK;
+```
+
+Next, we enable data deduplication. This will discard exact duplicates on the
+timestamp and ticker columns:
 
 ```questdb-sql title="With deduplication, adding ticker as an upsert key."
 CREATE TABLE trades(
@@ -64,6 +78,7 @@ CREATE TABLE trades(
   amount DOUBLE
   ) TIMESTAMP(timestamp)
 PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -76,7 +91,8 @@ CREATE TABLE trades(
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
-PARTITION BY DAY;
+PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -121,6 +137,23 @@ one of the following:
 
 The partitioning strategy **cannot be changed** after the table has been
 created.
+
+## Time To Live (TTL)
+
+If you're only interested in storing and analyzing recent data with QuestDB, you
+can configure a time-to-live for the table with the `TTL` clause. Follow the
+`TTL` keyword with the desired time period. Units you can use: `HOUR`, `DAY`,
+`WEEK`, `MONTH`, `YEAR`. The latter two units are flexible: they match the same
+date in a future month. The former three are fixed time periods. QuestDB accepts
+both the singular and plural form of these units. It also accepts shorthand
+syntax, like `3H` or `2M`.
+
+Note that QuestDB doesn't respect TTL as data semantics: as long as it's
+physically present in the table, it appears in queries as well. QuestDB only
+removes full partitions, and a partition is eligible for removal once the entire
+time period it's responsible for falls behind the TTL deadline. QuestDB will
+take action and remove stale partitions only during a data commit operation, so
+if you don't add any new data, the stale data lingers on.
 
 ## Deduplication
 
