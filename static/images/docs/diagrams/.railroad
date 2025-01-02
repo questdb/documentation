@@ -41,8 +41,12 @@ createTableDef
   'AS' '(' selectSql ')'  (',' castDef)* (',' indexDef)*
   )
   ) (
-  ('timestamp' '(' columnRef ')' ) ('PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?))?
-  )? 
+    ('timestamp' '(' columnRef ')' )
+    (
+      'PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?)
+      ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
+    )?
+  )?
  ('WITH' tableParameter)?
  (tableTargetVolumeDef)?
  ('OWNED' 'BY' ownerName)?
@@ -305,6 +309,10 @@ resumeWal
 
 setType
   ::= 'SET' 'TYPE' ( 'BYPASS' )? 'WAL'
+
+
+setTtl
+  ::= 'SET' 'TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
 
 update
  ::= UPDATE 'tableName' SET columnName '=' 'expression' ( ',' columnName '=' 'expression' )*
