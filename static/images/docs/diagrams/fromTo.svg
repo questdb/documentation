@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="881" height="113">
+<svg xmlns="http://www.w3.org/2000/svg" width="713" height="113">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -47,10 +47,7 @@
          <text class="terminal" x="285" y="97">TO</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#upperBound" xlink:title="upperBound">
             <rect x="335" y="79" width="96" height="32"></rect>
             <rect x="333" y="77" width="96" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="343" y="97">upperBound</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#alignToCalTimeZone" xlink:title="alignToCalTimeZone">
-            <rect x="705" y="3" width="148" height="32"></rect>
-            <rect x="703" y="1" width="148" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="713" y="21">alignToCalTimeZone</text></a><path class="line" d="m17 17 h2 m0 0 h10 m206 0 h10 m20 0 h10 m60 0 h10 m0 0 h10 m94 0 h10 m20 0 h10 m0 0 h164 m-194 0 h20 m174 0 h20 m-214 0 q10 0 10 10 m194 0 q0 -10 10 -10 m-204 10 v12 m194 0 v-12 m-194 12 q0 10 10 10 m174 0 q10 0 10 -10 m-184 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m-408 -32 h20 m408 0 h20 m-448 0 q10 0 10 10 m428 0 q0 -10 10 -10 m-438 10 v56 m428 0 v-56 m-428 56 q0 10 10 10 m408 0 q10 0 10 -10 m-418 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m0 0 h234 m20 -76 h10 m148 0 h10 m3 0 h-3"></path>
-         <polygon points="871 17 879 13 879 21"></polygon>
-         <polygon points="871 17 863 13 863 21"></polygon>
+            <text class="nonterminal" x="343" y="97">upperBound</text></a><path class="line" d="m17 17 h2 m0 0 h10 m206 0 h10 m20 0 h10 m60 0 h10 m0 0 h10 m94 0 h10 m20 0 h10 m0 0 h164 m-194 0 h20 m174 0 h20 m-214 0 q10 0 10 10 m194 0 q0 -10 10 -10 m-204 10 v12 m194 0 v-12 m-194 12 q0 10 10 10 m174 0 q10 0 10 -10 m-184 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m-408 -32 h20 m408 0 h20 m-448 0 q10 0 10 10 m428 0 q0 -10 10 -10 m-438 10 v56 m428 0 v-56 m-428 56 q0 10 10 10 m408 0 q10 0 10 -10 m-418 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m0 0 h234 m23 -76 h-3"></path>
+         <polygon points="703 17 711 13 711 21"></polygon>
+         <polygon points="703 17 695 13 695 21"></polygon>
 </svg>
