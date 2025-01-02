@@ -76,7 +76,7 @@ described below:
 :::note
 
 QuestDB applies these configuration changes on startup and a running instance
-must be restarted in order for configuration changes to take effect
+must be restarted in order for configuration changes to take effect.
 
 :::
 
@@ -92,6 +92,41 @@ shared.worker.count=5
 ```shell title="Customizing the worker count via environment variable"
 export QDB_SHARED_WORKER_COUNT=5
 ```
+
+## Reloadable settings
+
+Certain configuration settings can be reloaded without having to restart
+the server. To reload a setting, edit its value in the `server.conf` file
+and then run the `reload_config` SQL function:
+
+```questdb-sql title="Reload server configuration"
+SELECT reload_config();
+```
+
+If the value was reloaded successfully, the `reload_config` function returns
+`true` and a message is printed to the server log:
+
+```
+2025-01-02T09:52:40.833848UTC I i.q.DynamicPropServerConfiguration reloaded config option [update, key=http.net.connection.limit, old=100, new=200]
+```
+
+The following settings can be reloaded:
+* `pg.user`
+* `pg.password`
+* `pg.readonly.user.enabled`
+* `pg.readonly.user`
+* `pg.readonly.password`
+* `pg.named.statement.limit`
+* `pg.recv.buffer.size`
+* `pg.send.buffer.size`
+* `pg.net.connection.limit`
+* `http.request.header.buffer.size`
+* `http.multipart.header.buffer.size`
+* `http.recv.buffer.size`
+* `http.send.buffer.size`
+* `http.net.connection.limit`
+* `line.tcp.net.connection.limit`
+* `acl.admin.password` (Enterprise-only)
 
 ## Keys and default values
 
