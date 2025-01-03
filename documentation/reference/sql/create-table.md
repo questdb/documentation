@@ -11,7 +11,7 @@ column definitions are used.
 
 To create a table by manually entering parameters and settings:
 
-![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTable.svg)
+![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTableDef.svg)
 
 :::note
 
@@ -53,8 +53,22 @@ CREATE TABLE trades(
 PARTITION BY DAY;
 ```
 
-Next, data deduplication is enabled to discard duplicates for the timestamp and
-ticker columns:
+Now we can add a time-to-live (TTL) period. Once an entire data partition is
+past its TTL, it becomes eligible for automatic removal.
+
+```questdb-sql title="With TTL"
+CREATE TABLE trades(
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+  ) TIMESTAMP(timestamp)
+PARTITION BY DAY
+TTL 1 WEEK;
+```
+
+Next, we enable data deduplication. This will discard exact duplicates on the
+timestamp and ticker columns:
 
 ```questdb-sql title="With deduplication, adding ticker as an upsert key."
 CREATE TABLE trades(
@@ -64,6 +78,7 @@ CREATE TABLE trades(
   amount DOUBLE
   ) TIMESTAMP(timestamp)
 PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -76,7 +91,8 @@ CREATE TABLE trades(
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
-PARTITION BY DAY;
+PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -121,6 +137,23 @@ one of the following:
 
 The partitioning strategy **cannot be changed** after the table has been
 created.
+
+## Time To Live (TTL)
+
+If you're interested in storing and analyzing only recent data with QuestDB, you
+can configure a time-to-live for the table data with the `TTL` clause. Follow
+the `TTL` keyword with a number and a time unit, one of `HOURS`, `DAYS`,
+`WEEKS`, `MONTHS` or `YEARS`. The last two units are flexible: they match the
+same date in a future month. The first three are fixed time periods. QuestDB
+accepts both the singular and plural form of these units. It also accepts
+shorthand syntax, like `3H` or `2M`.
+
+Keep in mind that the TTL feature is designed only to limit the stored data
+size, and doesn't have strict semantics. It works at the granularity of
+partitions, and a partition is eligible for eviction once the entire time period
+it's responsible for falls behind the TTL deadline. QuestDB will take action and
+remove stale partitions only during a data commit operation, so if you don't add
+any new data, the stale data lingers on.
 
 ## Deduplication
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="533" height="81">
+<svg xmlns="http://www.w3.org/2000/svg" width="421" height="81">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -43,10 +43,8 @@
          <text class="terminal" x="235" y="21">,</text>
          <rect x="369" y="47" width="24" height="32" rx="10"></rect>
          <rect x="367" y="45" width="24" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="377" y="65">:</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#addColumn" xlink:title="addColumn">
-            <rect x="413" y="47" width="92" height="32"></rect>
-            <rect x="411" y="45" width="92" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="421" y="65">addColumn</text></a><path class="line" d="m17 61 h2 m0 0 h10 m58 0 h10 m0 0 h10 m78 0 h10 m20 0 h10 m102 0 h10 m-142 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m122 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-122 0 h10 m24 0 h10 m0 0 h78 m20 44 h10 m24 0 h10 m0 0 h10 m92 0 h10 m3 0 h-3"></path>
-         <polygon points="523 61 531 57 531 65"></polygon>
-         <polygon points="523 61 515 57 515 65"></polygon>
+         <text class="terminal" x="377" y="65">:</text>
+         <path class="line" d="m17 61 h2 m0 0 h10 m58 0 h10 m0 0 h10 m78 0 h10 m20 0 h10 m102 0 h10 m-142 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m122 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-122 0 h10 m24 0 h10 m0 0 h78 m20 44 h10 m24 0 h10 m3 0 h-3"></path>
+         <polygon points="411 61 419 57 419 65"></polygon>
+         <polygon points="411 61 403 57 403 65"></polygon>
 </svg>

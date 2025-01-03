@@ -1,31 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="535" height="115">
+<svg xmlns="http://www.w3.org/2000/svg" width="531" height="113">
     <defs>
-        <style type="text/css">text.nonterminal,text.terminal{font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif;font-size:12px}text.terminal{fill:#fff;font-weight:700}text.nonterminal{fill:#e289a4;font-weight:400}.line{fill:none;stroke:#636273}polygon,rect{fill:none;stroke:none}rect.terminal{fill:none;stroke:#be2f5b}rect.nonterminal{fill:rgba(255,255,255,.1);stroke:none}
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
         </style>
     </defs>
-    <polygon points="9 17 1 13 1 21"/>
-    <polygon points="17 17 9 13 9 21"/>
-    <rect x="31" y="3" width="58" height="32" rx="10"/>
-    <rect x="29" y="1" width="58" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="39" y="21">DROP</text>
-    <rect x="129" y="3" width="62" height="32" rx="10"/>
-    <rect x="127" y="1" width="62" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="137" y="21">TABLE</text>
-    <rect x="231" y="35" width="34" height="32" rx="10"/>
-    <rect x="229" y="33" width="34" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="239" y="53">IF</text>
-    <rect x="285" y="35" width="70" height="32" rx="10"/>
-    <rect x="283" y="33" width="70" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="293" y="53">EXISTS</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#tableName" xlink:title="tableName">
-    <rect x="395" y="3" width="88" height="32"/>
-    <rect x="393" y="1" width="88" height="32" class="nonterminal"/>
-    <text class="nonterminal" x="403" y="21">tableName</text></a><rect x="129" y="79" width="44" height="32" rx="10"/>
-    <rect x="127" y="77" width="44" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="137" y="97">ALL</text>
-    <rect x="193" y="79" width="72" height="32" rx="10"/>
-    <rect x="191" y="77" width="72" height="32" class="terminal" rx="10"/>
-    <text class="terminal" x="201" y="97">TABLES</text>
-    <path class="line" d="m17 17 h2 m0 0 h10 m58 0 h10 m20 0 h10 m62 0 h10 m20 0 h10 m0 0 h134 m-164 0 h20 m144 0 h20 m-184 0 q10 0 10 10 m164 0 q0 -10 10 -10 m-174 10 v12 m164 0 v-12 m-164 12 q0 10 10 10 m144 0 q10 0 10 -10 m-154 10 h10 m34 0 h10 m0 0 h10 m70 0 h10 m20 -32 h10 m88 0 h10 m-394 0 h20 m374 0 h20 m-414 0 q10 0 10 10 m394 0 q0 -10 10 -10 m-404 10 v56 m394 0 v-56 m-394 56 q0 10 10 10 m374 0 q10 0 10 -10 m-384 10 h10 m44 0 h10 m0 0 h10 m72 0 h10 m0 0 h218 m23 -76 h-3"/>
-    <polygon points="521 17 529 13 529 21"/>
-    <polygon points="521 17 513 13 513 21"/>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon>
+         <rect x="31" y="3" width="58" height="32" rx="10"></rect>
+         <rect x="29" y="1" width="58" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="39" y="21">DROP</text>
+         <rect x="129" y="3" width="62" height="32" rx="10"></rect>
+         <rect x="127" y="1" width="62" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="137" y="21">TABLE</text>
+         <rect x="231" y="35" width="34" height="32" rx="10"></rect>
+         <rect x="229" y="33" width="34" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="239" y="53">IF</text>
+         <rect x="285" y="35" width="70" height="32" rx="10"></rect>
+         <rect x="283" y="33" width="70" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="293" y="53">EXISTS</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#tableName" xlink:title="tableName">
+            <rect x="395" y="3" width="88" height="32"></rect>
+            <rect x="393" y="1" width="88" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="403" y="21">tableName</text></a><rect x="129" y="79" width="44" height="32" rx="10"></rect>
+         <rect x="127" y="77" width="44" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="137" y="97">ALL</text>
+         <rect x="193" y="79" width="72" height="32" rx="10"></rect>
+         <rect x="191" y="77" width="72" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="201" y="97">TABLES</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m58 0 h10 m20 0 h10 m62 0 h10 m20 0 h10 m0 0 h134 m-164 0 h20 m144 0 h20 m-184 0 q10 0 10 10 m164 0 q0 -10 10 -10 m-174 10 v12 m164 0 v-12 m-164 12 q0 10 10 10 m144 0 q10 0 10 -10 m-154 10 h10 m34 0 h10 m0 0 h10 m70 0 h10 m20 -32 h10 m88 0 h10 m-394 0 h20 m374 0 h20 m-414 0 q10 0 10 10 m394 0 q0 -10 10 -10 m-404 10 v56 m394 0 v-56 m-394 56 q0 10 10 10 m374 0 q10 0 10 -10 m-384 10 h10 m44 0 h10 m0 0 h10 m72 0 h10 m0 0 h218 m23 -76 h-3"></path>
+         <polygon points="521 17 529 13 529 21"></polygon>
+         <polygon points="521 17 513 13 513 21"></polygon>
 </svg>

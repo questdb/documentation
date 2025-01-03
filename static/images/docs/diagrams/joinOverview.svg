@@ -1,43 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="80">
-         <defs>
-            <style type="text/css">
-                @namespace "http://www.w3.org/2000/svg";
-                .line                 {fill: none; stroke: #636273;}
-                .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
-                .thin-line            {stroke: #636273; shape-rendering: crispEdges}
-                .filled               {fill: #636273; stroke: none;}
-                text.terminal         {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
-                font-size: 12px;
-                fill: #ffffff;
-                font-weight: bold;
-                }
-                text.nonterminal      {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
-                font-size: 12px;
-                fill: #e289a4;
-                font-weight: normal;
-                }
-                text.regexp           {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
-                font-size: 12px;
-                fill: #00141F;
-                font-weight: normal;
-                }
-                rect, circle, polygon {fill: none; stroke: none;}
-                rect.terminal         {fill: none; stroke: #be2f5b;}
-                rect.nonterminal      {fill: rgba(255,255,255,0.1); stroke: none;}
-                rect.text             {fill: none; stroke: none;}
-                polygon.regexp        {fill: #C7ECFF; stroke: #038cbc;}
-  </style>
-         </defs>
-        <polygon points="9 17 1 13 1 21"/>
-         <polygon points="17 17 9 13 9 21"/><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#selectClause" xlink:title="selectClause">
-            <rect x="31" y="3" width="100" height="32"/>
-            <rect x="29" y="1" width="100" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="39" y="21">selectClause</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#joinClause" xlink:title="joinClause">
-            <rect x="151" y="3" width="86" height="32"/>
-            <rect x="149" y="1" width="86" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="159" y="21">joinClause</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#whereClause" xlink:title="whereClause">
-            <rect x="277" y="35" width="102" height="32"/>
-            <rect x="275" y="33" width="102" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="285" y="53">whereClause</text></a><path class="line" d="m17 17 h2 m0 0 h10 m100 0 h10 m0 0 h10 m86 0 h10 m20 0 h10 m0 0 h112 m-142 0 h20 m122 0 h20 m-162 0 q10 0 10 10 m142 0 q0 -10 10 -10 m-152 10 v12 m142 0 v-12 m-142 12 q0 10 10 10 m122 0 q10 0 10 -10 m-132 10 h10 m102 0 h10 m23 -32 h-3"/>
-         <polygon points="417 17 425 13 425 21"/>
-         <polygon points="417 17 409 13 409 21"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="541" height="69">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#selectClause" xlink:title="selectClause">
+            <rect x="31" y="3" width="100" height="32"></rect>
+            <rect x="29" y="1" width="100" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="39" y="21">selectClause</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#joinStatement" xlink:title="joinStatement">
+            <rect x="151" y="3" width="110" height="32"></rect>
+            <rect x="149" y="1" width="110" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="159" y="21">joinStatement</text></a><rect x="301" y="35" width="70" height="32" rx="10"></rect>
+         <rect x="299" y="33" width="70" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="309" y="53">WHERE</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#whereClause" xlink:title="whereClause">
+            <rect x="391" y="35" width="102" height="32"></rect>
+            <rect x="389" y="33" width="102" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="399" y="53">whereClause</text></a><path class="line" d="m17 17 h2 m0 0 h10 m100 0 h10 m0 0 h10 m110 0 h10 m20 0 h10 m0 0 h202 m-232 0 h20 m212 0 h20 m-252 0 q10 0 10 10 m232 0 q0 -10 10 -10 m-242 10 v12 m232 0 v-12 m-232 12 q0 10 10 10 m212 0 q10 0 10 -10 m-222 10 h10 m70 0 h10 m0 0 h10 m102 0 h10 m23 -32 h-3"></path>
+         <polygon points="531 17 539 13 539 21"></polygon>
+         <polygon points="531 17 523 13 523 21"></polygon>
+</svg>
