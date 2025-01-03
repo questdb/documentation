@@ -24,12 +24,12 @@ same date in a future month. The first three are fixed time periods. QuestDB
 accepts both the singular and plural form of these units. It also accepts
 shorthand syntax, like `3H` or `2M`.
 
-Note that QuestDB doesn't respect TTL as data semantics: as long as it's
-physically present in the table, it appears in queries as well. QuestDB only
-removes full partitions, and a partition is eligible for removal once the entire
-time period it's responsible for falls behind the TTL deadline. QuestDB will
-take action and remove stale partitions only during a data commit operation, so
-if you don't add any new data, the stale data lingers on.
+Keep in mind that the TTL feature is designed only to limit the stored data
+size, and doesn't have strict semantics. It works at the granularity of
+partitions, and a partition is eligible for eviction once the entire time period
+it's responsible for falls behind the TTL deadline. QuestDB will take action and
+remove stale partitions only during a data commit operation, so if you don't add
+any new data, the stale data lingers on.
 
 ## Examples
 
