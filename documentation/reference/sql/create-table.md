@@ -11,7 +11,7 @@ column definitions are used.
 
 To create a table by manually entering parameters and settings:
 
-![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTable.svg)
+![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTableDef.svg)
 
 :::note
 
