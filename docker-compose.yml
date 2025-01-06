@@ -1,16 +1,17 @@
 services:
-  website:
+  docs:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - .:/app
       - node_modules:/app/node_modules
     environment:
       - NODE_ENV=development
-    command: yarn dev
-
+      - CONTEXT=development
+      - PORT=3001
+    command: sh -c "yarn start --host 0.0.0.0"
 volumes:
   node_modules:
