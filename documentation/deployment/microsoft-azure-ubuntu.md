@@ -27,8 +27,6 @@ basics.
    the name of your new virtual machine, as well as its desired Region and
    Availability Zone. Your dialog should look something like this:
 
-import Screenshot from "@theme/Screenshot"
-
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure"
   height={598}
@@ -108,13 +106,16 @@ to download the QuestDB binary, extract it, and run the start script. Please vis
 the Ubuntu section at the [binary installation page](/download/) to make sure you are using the latest
 version of the binary package and replace the URL below as appropriate.
 
-
-```bash
-wget https://github.com/questdb/questdb/releases/download/8.2.1/questdb-8.2.1-rt-linux-x86-64.tar.gz
-tar -xvf questdb-8.2.1-rt-linux-x86-64.tar.gz
-cd questdb-8.2.1-rt-linux-x86-64/bin
-./questdb.sh start
-```
+<InterpolateReleaseData
+  renderText={(release) => (
+    <CodeBlock className="language-bash">
+      {`wget https://github.com/questdb/questdb/releases/download/8.2.1/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar -xvf questdb-${release.name}-rt-linux-x86-64.tar.gz
+cd questdb-${release.name}-rt-linux-x86-64/bin
+./questdb.sh start`}
+    </CodeBlock>
+  )}
+/>
 
 Once you've run these commands, you should be able to navigate to your instance
 at its IP on port 9000: `http://$YOUR_INSTANCE_IP:9000`
