@@ -29,9 +29,9 @@ basics.
 
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/create-vm.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 3. Scroll down and select your desired instance type. In this case, we used a
@@ -41,9 +41,9 @@ basics.
 
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure, continued"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/ssh-setup.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 5. We will use Azure defaults for the rest of the VM's settings. Click
@@ -52,9 +52,9 @@ basics.
 
 <Screenshot
   alt="Deployment Complete"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/deployment-complete.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 Once you see this screen, click the **Go to resource** button and move on to the
@@ -78,9 +78,9 @@ connect to your new QuestDB instance over the several protocols that we support.
 
 <Screenshot
   alt="Firewall rules for your Azure VM"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/firewall-rules.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 ## Connect to your instance and install QuestDB
@@ -122,9 +122,9 @@ at its IP on port 9000: `http://$YOUR_INSTANCE_IP:9000`
 
 <Screenshot
   alt="Firewall rules for your Azure VM"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/web-console.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 ## Azure Managed Disks
