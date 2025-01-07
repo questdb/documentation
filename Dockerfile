@@ -1,5 +1,5 @@
-# Use Node.js LTS version
-FROM node:18-slim
+# Use Node.js LTS version with explicit platform
+FROM --platform=linux/amd64 node:18-slim
 
 # Set working directory
 WORKDIR /app
