@@ -263,7 +263,7 @@
     "default": "64",
     "description": "Size of InsertModel pool in SqlParser."
   },
-   "cairo.sql.insert.model.batch.size": {
+  "cairo.sql.insert.model.batch.size": {
     "default": "1000000",
     "description": "Batch size for non-atomic INSERT INTO SELECT statements."
   },
