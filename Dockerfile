@@ -5,13 +5,16 @@ FROM --platform=linux/amd64 node:18-slim
 WORKDIR /app
 
 # Copy package.json and yarn.lock
-COPY package.json yarn.lock ./
+COPY package.json ./
+
+# Generate yarn.lock with updated dependencies
+RUN yarn install --mode=update-lockfile
+
+# Copy the generated yarn.lock back to host
+COPY . .
 
 # Install dependencies
 RUN yarn install
-
-# Copy the rest of the application
-COPY . .
 
 # Expose port 3001 (documentation server port)
 EXPOSE 3001
