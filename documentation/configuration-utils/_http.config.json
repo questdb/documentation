@@ -53,7 +53,8 @@
   },
   "http.multipart.header.buffer.size": {
     "default": "512",
-    "description": "Buffer size in bytes used by the HTTP multipart content parser."
+    "description": "Buffer size in bytes used by the HTTP multipart content parser.",
+    "reloadable": true
   },
   "http.multipart.idle.spin.count": {
     "default": "10000",
@@ -61,11 +62,13 @@
   },
   "http.receive.buffer.size": {
     "default": "1M",
-    "description": "Size of receive buffer."
+    "description": "Size of receive buffer.",
+    "reloadable": true
   },
   "http.request.header.buffer.size": {
     "default": "64K",
-    "description": "Size of internal buffer allocated for HTTP request headers. The value is rounded up to the nearest power of 2. When HTTP requests contain headers that exceed the buffer size server will disconnect the client with HTTP error in server log."
+    "description": "Size of internal buffer allocated for HTTP request headers. The value is rounded up to the nearest power of 2. When HTTP requests contain headers that exceed the buffer size server will disconnect the client with HTTP error in server log.",
+    "reloadable": true
   },
   "http.response.header.buffer.size": {
     "default": "32K",
@@ -85,7 +88,8 @@
   },
   "http.send.buffer.size": {
     "default": "2M",
-    "description": "Size of the internal send buffer. Larger buffer sizes result in fewer I/O interruptions the server is making at the expense of memory usage per connection. There is a limit of send buffer size after which increasing it stops being useful in terms of performance. 2MB seems to be optimal value."
+    "description": "Size of the internal send buffer. Larger buffer sizes result in fewer I/O interruptions the server is making at the expense of memory usage per connection. There is a limit of send buffer size after which increasing it stops being useful in terms of performance. 2MB seems to be optimal value.",
+    "reloadable": true
   },
   "http.static.index.file.name": {
     "default": "index.html",
