@@ -195,6 +195,18 @@ SELECT @x::int + @y::int;
 |--------|
 | 3      |
 
+This can be useful to minimise repeated bind variables. For example, rather than passing the same value to multiple positional arguments, 
+you could instead use a declared variable and send a single bind variable:
+
+
+```questdb-sql
+-- instead of this:
+SELECT ? as name, id FROM users WHERE name = ?;
+
+-- do this:
+DECLARE @name := 'John Smith'
+SELECT @name as name, id FROM users WHERE name = @name;
+```
 
 ## Limitations
 
