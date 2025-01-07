@@ -151,5 +151,5 @@ Please refer to the main documentation on [supported filesystems](/docs/deployme
 
 ## Single Sign On with EntraID
 
-If you are using EntraID to manage users, [QuestDB enterprise](/enterprise) offers the possibility to do Single Sign On and manage your database permissions.
+If you are using EntraID to manage users, [QuestDB enterprise](/enterprise/) offers the possibility to do Single Sign On and manage your database permissions.
 See more information at the [Microsoft EntraID OIDC guide](/docs/guides/microsoft-entraid-oidc).
