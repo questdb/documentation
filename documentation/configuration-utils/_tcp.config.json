@@ -9,7 +9,8 @@
   },
   "line.tcp.net.connection.limit": {
     "default": "256",
-    "description": "The maximum number permitted for simultaneous connections to the server. This value is intended to control server memory consumption."
+    "description": "The maximum number permitted for simultaneous connections to the server. This value is intended to control server memory consumption.",
+    "reloadable": true
   },
   "line.tcp.net.connection.timeout": {
     "default": "300000",
