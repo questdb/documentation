@@ -19,13 +19,13 @@ This feature works as follows:
 4. QuestDB detects a stale partition and evicts it as a part of the commit
    operation.
 
-To be more precise, it doesn't matter what the actually latest timestamp is
+To be more precise, it doesn't matter what is the actually latest timestamp
 stored in a given partition. QuestDB simply considers the entire time period a
 partition is responsible for, so it will evict a partition when the end of that
 period falls behind the time-to-live limit. This is a compromise that favors a
 low overhead of the eviction procedure.
 
-Here's an example that demonstrates these semantics in action:
+Here's an example that demonstrates these semantics in action.
 
 First we create a table partitioned by hour, with TTL set to one hour:
 
