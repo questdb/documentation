@@ -37,7 +37,7 @@ CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
 partition:
 
 ```sql
-insert into tango values ('2025-01-01T08:00:00');
+INSERT INTO tango VALUES ('2025-01-01T08:00:00');
 tango;
 
              ts
@@ -48,7 +48,7 @@ tango;
 2\. Insert the second row one hour later, at 9:00 AM:
 
 ```sql
-insert into tango values ('2025-01-01T09:00:00');
+INSERT INTO tango VALUES ('2025-01-01T09:00:00');
 tango;
 
              ts
@@ -62,7 +62,7 @@ The 8:00 AM row remains.
 3\. Insert one more row at 9:59:59 AM:
 
 ```sql
-insert into tango values ('2025-01-01T09:59:59');
+INSERT INTO tango VALUES ('2025-01-01T09:59:59');
 tango;
 
              ts
@@ -77,7 +77,7 @@ The 8:00 AM data is still there, because the "8 AM" partition ends at 9:00 AM.
 4\. Insert a row at 10:00:
 
 ```sql
-insert into tango values ('2025-01-01T10:00:00');
+INSERT INTO tango VALUES ('2025-01-01T10:00:00');
 tango;
 
              ts
