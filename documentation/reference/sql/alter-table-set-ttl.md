@@ -14,6 +14,8 @@ Sets the time-to-live period on a table.
 
 ![Flow chart showing the syntax of ALTER TABLE with SET TTL keyword](/images/docs/diagrams/setTtl.svg)
 
+:::
+
 ## Description
 
 If you're interested in storing and analyzing only recent data with QuestDB, you
