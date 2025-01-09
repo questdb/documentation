@@ -215,7 +215,9 @@ DECLARE
     @symbol = ?
 SELECT avg(@col), min(@col), max(@col) 
 FROM trades 
-WHERE symbol = @symbol
+WHERE symbol = @symbol;
+
+```
 ## Limitations
 
 Most basic expressions are supported, and we provide examples later in this document. We suggest
