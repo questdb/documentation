@@ -22,12 +22,12 @@ This feature works as follows:
 To be more precise, it doesn't matter what is the actually latest timestamp
 stored in a given partition. QuestDB simply considers the entire time period a
 partition is responsible for, so it will evict a partition when the end of that
-period falls behind the TTL limit. This is a compromise that favors a
-low overhead of the eviction procedure.
+period falls behind the TTL limit. This is a compromise that favors a low
+overhead of the eviction procedure.
 
 Here's an example that demonstrates these semantics in action.
 
-First we create a table partitioned by hour, with TTL set to one hour:
+Assume we created a table partitioned by hour, with TTL set to one hour:
 
 ```sql
 CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
