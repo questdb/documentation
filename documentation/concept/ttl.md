@@ -31,6 +31,8 @@ Assume we created a table partitioned by hour, with TTL set to one hour:
 
 ```sql
 CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1 HOUR;
+-- or
+CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
 ```
 
 1\. Insert the first row at 8:00 AM. This is the very beginning of the "8 AM"
