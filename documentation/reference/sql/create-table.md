@@ -148,6 +148,10 @@ same date in a future month. The first three are fixed time periods. QuestDB
 accepts both the singular and plural form of these units. It also accepts
 shorthand syntax, like `3H` or `2M`.
 
+Refer to the [section on TTL](/docs/concept/ttl) for more details.
+
+:::note
+
 Keep in mind that the TTL feature is designed only to limit the stored data
 size, and doesn't have strict semantics. It works at the granularity of
 partitions, and a partition is eligible for eviction once the entire time period
@@ -155,7 +159,7 @@ it's responsible for falls behind the TTL deadline. QuestDB measures the age of
 the data relative to the most recent timestamp in the table, so the data doesn't
 become stale just through the passage of time.
 
-Refer to the [section on TTL](/docs/concept/ttl) for more details.
+:::
 
 ## Deduplication
 
