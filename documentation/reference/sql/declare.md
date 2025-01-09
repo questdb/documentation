@@ -204,7 +204,7 @@ you could instead use a declared variable and send a single bind variable:
 SELECT ? as name, id FROM users WHERE name = ?;
 
 -- do this:
-DECLARE @name := 'John Smith'
+DECLARE @name := '?'
 SELECT @name as name, id FROM users WHERE name = @name;
 ```
 
