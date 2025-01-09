@@ -14,23 +14,23 @@ This feature works as follows:
    stored in the table.
 2. As you keep inserting time-series data, the age of the oldest data starts
    exceeding its TTL limit.
-3. When all the data in a partition becomes stale, the partition as a whole
-   becomes eligible for eviction.
-4. QuestDB detects a stale partition and evicts it as a part of the commit
+3. When **all** the data in a partition becomes stale, the partition as a whole
+   becomes eligible to be dropped.
+4. QuestDB detects a stale partition and drops it as a part of the commit
    operation.
 
 To be more precise, it doesn't matter what is the actually latest timestamp
 stored in a given partition. QuestDB simply considers the entire time period a
-partition is responsible for, so it will evict a partition when the end of that
+partition is responsible for, so it will drop a partition when the end of that
 period falls behind the TTL limit. This is a compromise that favors a low
-overhead of the eviction procedure.
+overhead of the TTL enforcement procedure.
 
 Here's an example that demonstrates these semantics in action.
 
 Assume we created a table partitioned by hour, with TTL set to one hour:
 
 ```sql
-CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
+CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1 HOUR;
 ```
 
 1\. Insert the first row at 8:00 AM. This is the very beginning of the "8 AM"
@@ -87,4 +87,4 @@ tango;
  2025-01-01 10:00:00.000000
 ```
 
-This made the whole "8 AM" partition stale, and it got evicted.
+This made the whole "8 AM" partition stale, and it got dropped.
