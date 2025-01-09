@@ -204,10 +204,18 @@ you could instead use a declared variable and send a single bind variable:
 SELECT ? as name, id FROM users WHERE name = ?;
 
 -- do this:
-DECLARE @name := '?'
+DECLARE @name := ?
 SELECT @name as name, id FROM users WHERE name = @name;
 ```
+Or for repeating columns:
 
+```questdb-sql
+DECLARE 
+    @col = ?,
+    @symbol = ?
+SELECT avg(@col), min(@col), max(@col) 
+FROM trades 
+WHERE symbol = @symbol
 ## Limitations
 
 Most basic expressions are supported, and we provide examples later in this document. We suggest
@@ -267,7 +275,8 @@ FILL(NULL);
 ### INSERT INTO SELECT
 
 ```questdb-sql
-INSERT INTO trades SELECT * FROM 
+INSERT INTO trades (timestamp, symbol) 
+SELECT * FROM 
 (
     DECLARE 
         @x := now(), 
