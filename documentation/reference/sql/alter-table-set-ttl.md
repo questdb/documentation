@@ -6,15 +6,11 @@ description: ALTER TABLE SET TTL SQL keyword reference documentation.
 
 Sets the time-to-live period on a table.
 
-:::info
-
 ## Syntax
 
 ![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
 
 ![Flow chart showing the syntax of ALTER TABLE with SET TTL keyword](/images/docs/diagrams/setTtl.svg)
-
-:::
 
 ## Description
 
