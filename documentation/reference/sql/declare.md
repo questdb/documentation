@@ -224,9 +224,11 @@ Most basic expressions are supported, and we provide examples later in this docu
 you use variables to simplify repeated constants within your code, and minimise
 how many places you need to update the constant.
 
+### Disallowed expressions
+
 However, not all expressions are supported. The following are explicitly disallowed:
 
-### Bracket lists
+#### Bracket lists
 
 ```questdb-sql title="bracket lists are not allowed"
 DECLARE
@@ -238,7 +240,7 @@ WHERE symbol IN @symbols;
 -- error: unexpected bind expression - bracket lists not supported
 ```
 
-### SQL statement fragments
+#### SQL statement fragments
 
 ```questdb-sql title="sql fragments are not allowed"
 DECLARE
@@ -247,6 +249,22 @@ SELECT 5 @x;
 
 -- table and column names that are SQL keywords have to be enclosed in double quotes, such as "FROM"```
 ```
+
+### Language client support
+
+Some language SQL clients do not allow identifiers to be passed as if it was a normal value. One example is `psycopg`.
+In this case, you should use an alternate API to splice in identifiers, for example:
+
+
+```python title="psycopg"
+cur.execute(
+    sql.SQL("""
+        DECLARE @col := {}
+        SELECT max(@col), min(@col), avg(price) 
+        FROM btc_trades;
+    """).format(sql.Identifier('price')))
+```
+
 
 ## Examples
 
