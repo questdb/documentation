@@ -112,12 +112,10 @@ Specifically, exit checkpoint mode at the following snapshot stage:
 | **Amazon Web Services** (AWS) | PENDING             | When status is PENDING                                   |
 | **Microsoft Azure**           | PENDING             | Before the longer running "CREATING" stage               |
 
-#### Filesystem or volume snapshots
+#### Volume snapshots
 
 When the database is on-prem, we recommend using the existing file system backup
-tools. Volume snapshots can be taken using either the filesystem
-([ZFS](https://ubuntu.com/tutorials/using-zfs-snapshots-clones#1-overview)) or a
-volume manager
+tools. Volume snapshots by, for example, can be taken via LVM:
 ([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/logical_volume_manager_administration/lvm_overview)).
 
 #### File copy
