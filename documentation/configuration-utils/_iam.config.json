@@ -13,7 +13,8 @@
   },
   "acl.admin.password": {
     "default": "quest",
-    "description": "The password of the built-in admin user."
+    "description": "The password of the built-in admin user.",
+    "reloadable": true
   },
   "acl.basic.auth.realm.enabled": {
     "default": "false",
