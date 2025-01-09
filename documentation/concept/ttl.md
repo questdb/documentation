@@ -5,15 +5,15 @@ description: Use the time-to-live feature to limit data size
 ---
 
 If you're interested in storing and analyzing only recent data with QuestDB, you
-can configure a time-to-live for the table data. Both the `CREATE TABLE` and
-`ALTER TABLE` commands support configuring TTL.
+can configure a time-to-live (TTL) for the table data. Both the `CREATE TABLE`
+and `ALTER TABLE` commands support configuring TTL.
 
 This feature works as follows:
 
 1. The age of the data is measured with respect to the most recent timestamp
    stored in the table.
 2. As you keep inserting time-series data, the age of the oldest data starts
-   exceeding its time-to-live limit.
+   exceeding its TTL limit.
 3. When all the data in a partition becomes stale, the partition as a whole
    becomes eligible for eviction.
 4. QuestDB detects a stale partition and evicts it as a part of the commit
@@ -22,7 +22,7 @@ This feature works as follows:
 To be more precise, it doesn't matter what is the actually latest timestamp
 stored in a given partition. QuestDB simply considers the entire time period a
 partition is responsible for, so it will evict a partition when the end of that
-period falls behind the time-to-live limit. This is a compromise that favors a
+period falls behind the TTL limit. This is a compromise that favors a
 low overhead of the eviction procedure.
 
 Here's an example that demonstrates these semantics in action.
