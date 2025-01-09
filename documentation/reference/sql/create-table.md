@@ -140,30 +140,33 @@ created.
 
 ## Time To Live (TTL)
 
-If you're interested in storing and analyzing only recent data with QuestDB, you
-can configure a time-to-live for the table data with the `TTL` clause. Follow
-the `TTL` keyword with a number and a time unit, one of `HOURS`, `DAYS`,
-`WEEKS`, `MONTHS` or `YEARS`. The last two units are flexible: they match the
-same date in a future month. The first three are fixed time periods. QuestDB
-accepts both the singular and plural form of these units. It also accepts
-shorthand syntax, like `3H` or `2M`.
+To store and analyze only recent data, configure a time-to-live (TTL) period on
+a table using the `ALTER TABLE SET TTL` command.
 
-Refer to the [section on TTL](/docs/concept/ttl) for more details.
+Follow the `TTL` keyword with a number and a time unit, one of:
 
-:::note
+- `HOURS`
+- `DAYS`
+- `WEEKS`
+- `MONTHS`
+- `YEARS`
 
-Keep in mind that the TTL feature is designed only to limit the stored data
-size, and doesn't have strict semantics. It works at the granularity of
-partitions, and a partition is eligible for eviction once the entire time period
-it's responsible for falls behind the TTL deadline.
+TTL units fall into two categories:
 
-For this reason, QuestDB only accepts a TTL that is an integer multiple of the
-partiton size.
+1. Fixed time periods:
+   - `HOURS` 
+   - `DAYS` 
+   - `WEEKS` 
+2. Calendar-based periods:
+   - `MONTHS`
+   - `YEARS`
 
-QuestDB measures the age of the data relative to the most recent timestamp in
-the table, so the data doesn't become stale just through the passage of time.
+Fixed-time periods are always exact durations: 24 HOURS is always 24 × 60 × 60 seconds.
 
-:::
+Calendar-based periods may vary in length: 1
+MONTH from January 15th goes to February 15th and could be between 28-31 days.
+
+For more information, see the [Time To Live (TTL)](/docs/sql/alter-table-set-ttl/) reference.
 
 ## Deduplication
 

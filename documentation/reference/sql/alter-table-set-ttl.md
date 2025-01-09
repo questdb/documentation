@@ -4,7 +4,9 @@ sidebar_label: SET TTL
 description: ALTER TABLE SET TTL SQL keyword reference documentation.
 ---
 
-Sets the time-to-live period on a table.
+Sets the time-to-live (TTL) period on a table.
+
+Refer to the [section on TTL](/docs/concept/ttl/) for a conceptual overview.
 
 ## Syntax
 
@@ -14,28 +16,55 @@ Sets the time-to-live period on a table.
 
 ## Description
 
-If you're interested in storing and analyzing only recent data with QuestDB, you
-can configure a time-to-live for the table data using `ALTER TABLE SET TTL`.
-Follow the `TTL` keyword with a number and a time unit, one of `HOURS`, `DAYS`,
-`WEEKS`, `MONTHS` or `YEARS`. The last two units are flexible: they match the
-same date in a future month. The first three are fixed time periods. QuestDB
-accepts both the singular and plural form of these units. It also accepts
-shorthand syntax, like `3H` or `2M`.
+To store and analyze only recent data, configure a time-to-live (TTL) period on
+a table using the `ALTER TABLE SET TTL` command.
 
-Refer to the [section on TTL](/docs/concept/ttl) for more details.
+Follow the `TTL` keyword with a number and a time unit, one of:
+
+- `HOURS`
+- `DAYS`
+- `WEEKS`
+- `MONTHS`
+- `YEARS`
+
+TTL units fall into two categories:
+
+1. Fixed time periods:
+   - `HOURS` 
+   - `DAYS` 
+   - `WEEKS` 
+2. Calendar-based periods:
+   - `MONTHS`
+   - `YEARS`
+
+Fixed-time periods are always exact durations: 24 HOURS is always 24 × 60 × 60 seconds.
+
+Calendar-based periods may vary in length: 1
+MONTH from January 15th goes to February 15th and could be between 28-31 days.
+
+QuestDB accepts both singular and plural forms: 
+
+- `HOUR` or `HOURS`
+- `DAY` or `DAYS`
+- `WEEK` or `WEEKS`
+- `MONTH` or `MONTHS`
+- `YEAR` or `YEARS`
+
+It also
+supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
+
 
 :::note
 
-Keep in mind that the TTL feature is designed only to limit the stored data
-size, and doesn't have strict semantics. It works at the granularity of
-partitions, and a partition is eligible for eviction once the entire time period
-it's responsible for falls behind the TTL deadline.
+The TTL period must be a whole number multiple of the table's partition size. 
 
-For this reason, QuestDB only accepts a TTL that is an integer multiple of the
-partiton size.
+For example:
 
-QuestDB measures the age of the data relative to the most recent timestamp in
-the table, so the data doesn't become stale just through the passage of time.
+- If a table is partitioned by HOUR, the TTL must be a whole number of hours (1 HOUR, 2 HOURS, and so on)
+
+- If a table is partitioned by DAY, the TTL must be a whole number of days (1 DAY, 2 DAYS, and so on)
+
+Refer to the [conceptual section on TTL](/docs/concept/ttl/) for a deeper conceptual explanation.
 
 :::
 
