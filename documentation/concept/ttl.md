@@ -31,7 +31,7 @@ Assume we created a table partitioned by hour, with TTL set to one hour:
 
 ```sql
 CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1 HOUR;
--- or
+-- or:
 CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
 ```
 
@@ -89,4 +89,4 @@ tango;
  2025-01-01 10:00:00.000000
 ```
 
-This made the whole "8 AM" partition stale, and it got dropped.
+Now the whole "8 AM" partition is outside its TTL limit, and it got dropped.
