@@ -54,7 +54,9 @@ It also supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
 
 :::note
 
-The TTL period must be a whole number multiple of the table's partition size.
+QuestDB drops data that exceeded its TTL only a whole partition at a time. For
+this reason, the TTL period must be a whole number multiple of the table's
+partition size.
 
 For example:
 
