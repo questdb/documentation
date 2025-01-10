@@ -11,7 +11,7 @@ column definitions are used.
 
 To create a table by manually entering parameters and settings:
 
-![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTable.svg)
+![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTableDef.svg)
 
 :::note
 
@@ -53,8 +53,22 @@ CREATE TABLE trades(
 PARTITION BY DAY;
 ```
 
-Next, data deduplication is enabled to discard duplicates for the timestamp and
-ticker columns:
+Now we can add a time-to-live (TTL) period. Once an entire data partition is
+past its TTL, it becomes eligible for automatic removal.
+
+```questdb-sql title="With TTL"
+CREATE TABLE trades(
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+  ) TIMESTAMP(timestamp)
+PARTITION BY DAY
+TTL 1 WEEK;
+```
+
+Next, we enable data deduplication. This will discard exact duplicates on the
+timestamp and ticker columns:
 
 ```questdb-sql title="With deduplication, adding ticker as an upsert key."
 CREATE TABLE trades(
@@ -64,6 +78,7 @@ CREATE TABLE trades(
   amount DOUBLE
   ) TIMESTAMP(timestamp)
 PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -76,7 +91,8 @@ CREATE TABLE trades(
   price DOUBLE,
   amount DOUBLE
   ) TIMESTAMP(timestamp)
-PARTITION BY DAY;
+PARTITION BY DAY
+TTL 1 WEEK
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
@@ -121,6 +137,63 @@ one of the following:
 
 The partitioning strategy **cannot be changed** after the table has been
 created.
+
+## Time To Live (TTL)
+
+To store and analyze only recent data, configure a time-to-live (TTL) period on
+a table using the `TTL` clause, placing it right after `PARTITION BY <unit>`.
+You can't set TTL on a non-partitioned table.
+
+Follow the `TTL` keyword with a number and a time unit, one of:
+
+- `HOURS`
+- `DAYS`
+- `WEEKS`
+- `MONTHS`
+- `YEARS`
+
+TTL units fall into two categories:
+
+1. Fixed time periods:
+   - `HOURS`
+   - `DAYS`
+   - `WEEKS`
+2. Calendar-based periods:
+   - `MONTHS`
+   - `YEARS`
+
+Fixed-time periods are always exact durations: `1 WEEK` is always 7 days.
+
+Calendar-based periods may vary in length: `1 MONTH` from January 15th goes to
+February 15th and could be between 28 and 31 days.
+
+QuestDB accepts both singular and plural forms:
+
+- `HOUR` or `HOURS`
+- `DAY` or `DAYS`
+- `WEEK` or `WEEKS`
+- `MONTH` or `MONTHS`
+- `YEAR` or `YEARS`
+
+It also supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
+
+:::note
+
+QuestDB drops data that exceeded its TTL only a whole partition at a time. For
+this reason, the TTL period must be a whole number multiple of the table's
+partition size.
+
+For example:
+
+- If a table is partitioned by `DAY`, the TTL must be a whole number of days
+  (`24 HOURS`, `2 DAYS` and `3 MONTHS` are all accepted)
+- If a table is partitioned by `MONTH`, the TTL must be in months or years.
+  QuestDB won't accept the `HOUR`, `DAY`, or `WEEK` units
+
+Refer to the [section on TTL in Concepts](/docs/concept/ttl/) for detailed
+information on the behavior of this feature.
+
+:::
 
 ## Deduplication
 

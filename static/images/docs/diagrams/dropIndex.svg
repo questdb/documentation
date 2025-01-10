@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="947" height="37">
+<svg xmlns="http://www.w3.org/2000/svg" width="775" height="37">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -51,13 +51,8 @@
          <text class="terminal" x="613" y="21">DROP</text>
          <rect x="683" y="3" width="64" height="32" rx="10"></rect>
          <rect x="681" y="1" width="64" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="691" y="21">INDEX</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#no" xlink:title="no">
-            <rect x="767" y="3" width="36" height="32"></rect>
-            <rect x="765" y="1" width="36" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="775" y="21">no</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cachColumn" xlink:title="cachColumn">
-            <rect x="823" y="3" width="96" height="32"></rect>
-            <rect x="821" y="1" width="96" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="831" y="21">cachColumn</text></a><path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m0 0 h10 m58 0 h10 m0 0 h10 m64 0 h10 m0 0 h10 m36 0 h10 m0 0 h10 m96 0 h10 m3 0 h-3"></path>
-         <polygon points="937 17 945 13 945 21"></polygon>
-         <polygon points="937 17 929 13 929 21"></polygon>
+         <text class="terminal" x="691" y="21">INDEX</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m0 0 h10 m58 0 h10 m0 0 h10 m64 0 h10 m3 0 h-3"></path>
+         <polygon points="765 17 773 13 773 21"></polygon>
+         <polygon points="765 17 757 13 757 21"></polygon>
 </svg>

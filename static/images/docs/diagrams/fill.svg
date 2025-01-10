@@ -1,1 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="961" height="289"><defs><style type="text/css">@namespace &quot;http://www.w3.org/2000/svg&quot;;text.terminal{font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif;font-size:12px;fill:#fff;font-weight:700}polygon,rect{fill:none;stroke:none}rect.terminal{fill:none;stroke:#be2f5b}</style></defs><polygon points="9 33 1 29 1 37"/><polygon points="17 33 9 29 9 37"/><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#someSampleBySelectQuery" xlink:title="someSampleBySelectQuery"><rect x="31" y="19" width="192" height="32"/><rect x="29" y="17" width="192" height="32" class="nonterminal" fill="rgba(255,255,255,.1)" stroke="none"/><text class="nonterminal" x="39" y="37" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif" font-size="12" fill="#e289a4" font-weight="400">someSampleBySelectQuery</text></a><rect x="243" y="19" width="50" height="32" rx="10"/><rect x="241" y="17" width="50" height="32" class="terminal" rx="10"/><text class="terminal" x="251" y="37">FILL</text><rect x="373" y="19" width="58" height="32" rx="10"/><rect x="371" y="17" width="58" height="32" class="terminal" rx="10"/><text class="terminal" x="381" y="37">NONE</text><rect x="373" y="63" width="56" height="32" rx="10"/><rect x="371" y="61" width="56" height="32" class="terminal" rx="10"/><text class="terminal" x="381" y="81">NULL</text><rect x="373" y="107" width="56" height="32" rx="10"/><rect x="371" y="105" width="56" height="32" class="terminal" rx="10"/><text class="terminal" x="381" y="125">PREV</text><rect x="373" y="151" width="72" height="32" rx="10"/><rect x="371" y="149" width="72" height="32" class="terminal" rx="10"/><text class="terminal" x="381" y="169">LINEAR</text><rect x="373" y="195" width="28" height="32" rx="10"/><rect x="371" y="193" width="28" height="32" class="terminal" rx="10"/><text class="terminal" x="381" y="213">x</text><rect x="485" y="19" width="24" height="32" rx="10"/><rect x="483" y="17" width="24" height="32" class="terminal" rx="10"/><text class="terminal" x="493" y="37">,</text><path xmlns:svg="http://www.w3.org/2000/svg" d="M17 33h2m0 0h10m192 0h10m0 0h10m50 0h10m60 0h10m58 0h10m0 0h14m-112 0h20m92 0h20m-132 0q10 0 10 10m112 0q0-10 10-10M351 43v24m112 0V43M351 67q0 10 10 10m92 0q10 0 10-10M361 77h10m56 0h10m0 0h16M351 67v20m112 0V67M351 87v24m112 0V87m-112 24q0 10 10 10m92 0q10 0 10-10m-102 10h10m56 0h10m0 0h16m-102-10v20m112 0v-20m-112 20v24m112 0v-24m-112 24q0 10 10 10m92 0q10 0 10-10m-102 10h10m72 0h10m-102-10v20m112 0v-20m-112 20v24m112 0v-24m-112 24q0 10 10 10m92 0q10 0 10-10m-102 10h10m28 0h10m0 0h44m20-176h10m24 0h10m-196 0h20m-1 0q-9 0-9-10V11q0-10 10-10m176 32h20m-20 0q10 0 10-10V11q0-10-10-10M341 1h10m0 0h166M301 33h20m216 0h20m-256 0q10 0 10 10m236 0q0-10 10-10M311 43v190m236 0V43M311 233q0 10 10 10m216 0q10 0 10-10m-226 10h10m0 0h206m23-210h-3" fill="none" stroke="#636273"/><polygon points="567 33 575 29 575 37"/><polygon points="567 33 559 29 559 37"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="577" height="245">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 33 1 29 1 37"></polygon>
+         <polygon points="17 33 9 29 9 37"></polygon><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#someSampleBySelectQuery" xlink:title="someSampleBySelectQuery">
+            <rect x="31" y="19" width="192" height="32"></rect>
+            <rect x="29" y="17" width="192" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="39" y="37">someSampleBySelectQuery</text></a><rect x="243" y="19" width="50" height="32" rx="10"></rect>
+         <rect x="241" y="17" width="50" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="251" y="37">FILL</text>
+         <rect x="373" y="19" width="58" height="32" rx="10"></rect>
+         <rect x="371" y="17" width="58" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="381" y="37">NONE</text>
+         <rect x="373" y="63" width="56" height="32" rx="10"></rect>
+         <rect x="371" y="61" width="56" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="381" y="81">NULL</text>
+         <rect x="373" y="107" width="56" height="32" rx="10"></rect>
+         <rect x="371" y="105" width="56" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="381" y="125">PREV</text>
+         <rect x="373" y="151" width="72" height="32" rx="10"></rect>
+         <rect x="371" y="149" width="72" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="381" y="169">LINEAR</text>
+         <rect x="373" y="195" width="28" height="32" rx="10"></rect>
+         <rect x="371" y="193" width="28" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="381" y="213">x</text>
+         <rect x="485" y="19" width="24" height="32" rx="10"></rect>
+         <rect x="483" y="17" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="493" y="37">,</text>
+         <path class="line" d="m17 33 h2 m0 0 h10 m192 0 h10 m0 0 h10 m50 0 h10 m60 0 h10 m58 0 h10 m0 0 h14 m-112 0 h20 m92 0 h20 m-132 0 q10 0 10 10 m112 0 q0 -10 10 -10 m-122 10 v24 m112 0 v-24 m-112 24 q0 10 10 10 m92 0 q10 0 10 -10 m-102 10 h10 m56 0 h10 m0 0 h16 m-102 -10 v20 m112 0 v-20 m-112 20 v24 m112 0 v-24 m-112 24 q0 10 10 10 m92 0 q10 0 10 -10 m-102 10 h10 m56 0 h10 m0 0 h16 m-102 -10 v20 m112 0 v-20 m-112 20 v24 m112 0 v-24 m-112 24 q0 10 10 10 m92 0 q10 0 10 -10 m-102 10 h10 m72 0 h10 m-102 -10 v20 m112 0 v-20 m-112 20 v24 m112 0 v-24 m-112 24 q0 10 10 10 m92 0 q10 0 10 -10 m-102 10 h10 m28 0 h10 m0 0 h44 m20 -176 h10 m24 0 h10 m-196 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -12 q0 -10 10 -10 m176 32 l20 0 m-20 0 q10 0 10 -10 l0 -12 q0 -10 -10 -10 m-176 0 h10 m0 0 h166 m-216 32 h20 m216 0 h20 m-256 0 q10 0 10 10 m236 0 q0 -10 10 -10 m-246 10 v190 m236 0 v-190 m-236 190 q0 10 10 10 m216 0 q10 0 10 -10 m-226 10 h10 m0 0 h206 m23 -210 h-3"></path>
+         <polygon points="567 33 575 29 575 37"></polygon>
+         <polygon points="567 33 559 29 559 37"></polygon>
+</svg>
