@@ -30,19 +30,20 @@ Follow the `TTL` keyword with a number and a time unit, one of:
 TTL units fall into two categories:
 
 1. Fixed time periods:
-   - `HOURS` 
-   - `DAYS` 
-   - `WEEKS` 
+   - `HOURS`
+   - `DAYS`
+   - `WEEKS`
 2. Calendar-based periods:
    - `MONTHS`
    - `YEARS`
 
-Fixed-time periods are always exact durations: 24 HOURS is always 24 × 60 × 60 seconds.
+Fixed-time periods are always exact durations: `24 HOURS` is always 24 × 60 × 60
+seconds.
 
-Calendar-based periods may vary in length: 1
-MONTH from January 15th goes to February 15th and could be between 28-31 days.
+Calendar-based periods may vary in length: `1 MONTH` from January 15th goes to
+February 15th and could be between 28 and 31 days.
 
-QuestDB accepts both singular and plural forms: 
+QuestDB accepts both singular and plural forms:
 
 - `HOUR` or `HOURS`
 - `DAY` or `DAYS`
@@ -50,21 +51,22 @@ QuestDB accepts both singular and plural forms:
 - `MONTH` or `MONTHS`
 - `YEAR` or `YEARS`
 
-It also
-supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
-
+It also supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
 
 :::note
 
-The TTL period must be a whole number multiple of the table's partition size. 
+The TTL period must be a whole number multiple of the table's partition size.
 
 For example:
 
-- If a table is partitioned by HOUR, the TTL must be a whole number of hours (1 HOUR, 2 HOURS, and so on)
+- If a table is partitioned by `DAY`, the TTL must be a whole number of days
+  (`1 DAY`, `2 DAYS`, and so on). QuestDB will also accept `24 HOURS`,
+  `48 HOURS`, as well as `2 MONTHS`
+- If a table is partitioned by `MONTH`, the TTL must be in months or years.
+  QuestDB won't accept the `HOUR`, `DAY`, or `WEEK` units
 
-- If a table is partitioned by DAY, the TTL must be a whole number of days (1 DAY, 2 DAYS, and so on)
-
-Refer to the [conceptual section on TTL](/docs/concept/ttl/) for a deeper conceptual explanation.
+Refer to the [section on TTL in Concepts](/docs/concept/ttl/) for detailed
+information on the behavior of this feature.
 
 :::
 
