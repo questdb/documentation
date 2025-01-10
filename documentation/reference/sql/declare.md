@@ -4,18 +4,9 @@ sidebar_label: DECLARE
 description: DECLARE SQL keyword reference documentation.
 ---
 
-`DECLARE` is used to specify a series of variables bindings to be used
-throughout your query. 
+`DECLARE` specifies a series of variable bindings used throughout your query. 
 
-This syntax is supported specifically for `SELECT` queries.
-
-:::note 
-
-`DECLARE` was added to QuestDB in version 8.2.2 (TBD provisional).
-
-Versions prior to this do not support this syntax.
-
-:::
+This syntax is supported within `SELECT` queries.
 
 ## Syntax
 
@@ -33,11 +24,23 @@ SELECT @x;
 
 Use the variable binding operator `:=` (walrus) to associate expressions to names.
 
-In the above example, a single binding is declared, which states that the variable `@x` should
-be replaced with the constant integer `5`.
+:::tip
 
-The variables are resolved at parse-time, meaning that variable is no longer present
-when the query is compiled. So the above example reduces to this simple query:
+It is easy to accidentally omit the `:` when writing variable binding expressions.
+
+Don't confuse the `:=` operator with a simple equality `=`!
+
+You should see an error message like this:
+> expected variable assignment operator `:=`
+
+:::
+
+The above example declares a single binding, which states that the variable `@x` is replaced with the constant integer `5`.
+
+The variables are resolved at parse-time, meaning that the variable is no longer present
+when the query is compiled. 
+
+So the above example reduces to this simple query:
 
 ```questdb-sql title="basic DECLARE post-reduction" demo
 SELECT 5;
@@ -48,20 +51,9 @@ SELECT 5;
 | 5 |
 
 
-:::note
-
-It is easy to accidentally omit the `:` when writing variable binding expressions.
-
-Don't confuse the `:=` operator with a simple equality `=`!
-
-You should see an error message like this:
-> expected variable assignment operator `:=`
->
-:::
-
 ### Multiple bindings
 
-You can declare multiple variables by setting the bind expressions with commas `,`:
+To declare multiple variables, set the bind expressions with commas `,`:
 
 ```questdb-sql title="Multiple variable bindings" demo
 DECLARE 
@@ -76,7 +68,7 @@ SELECT @x + @y;
 
 ### Variables as functions
 
-A variable need not be just a constant, it could be a function call, 
+A variable need not be just a constant. It could also be a function call, 
 and variables with function values can be nested:
 
 ```questdb-sql title="declaring function variable" demo
@@ -111,7 +103,9 @@ SELECT y FROM (
 #### Shadowing
 
 If a subquery declares a variable of the same name, then the variable is shadowed
-and takes on the new value. However, any queries above this subquery are unaffected - the
+and takes on the new value. 
+
+However, any queries above this subquery are unaffected - the
 variable bind is not globally mutated.
 
 ```questdb-sql title="variable shadowing" demo
@@ -129,8 +123,9 @@ SELECT @x + y FROM (
 
 ### Declarations as subqueries
 
-Declarations themselves can be subqueries. We suggest that this
-is not overused, as removing the subquery definition from its execution
+Declarations themselves can be subqueries. 
+
+We suggest that this is not overused, as removing the subquery definition from its execution
 location may make queries harder to debug.
 
 Nevertheless, it is possible to define a variable as a subquery:
@@ -181,8 +176,7 @@ FROM second;
 ### Bind variables
 
 `DECLARE` syntax will work with prepared statements over PG Wire, so long as the client library
-does not perform syntax validation that rejects the `DECLARE` syntax.
-
+does not perform syntax validation that rejects the `DECLARE` syntax:
 
 ```questdb-sql
 DECLARE @x := ?, @y := ? 
@@ -195,7 +189,9 @@ SELECT @x::int + @y::int;
 |--------|
 | 3      |
 
-This can be useful to minimise repeated bind variables. For example, rather than passing the same value to multiple positional arguments, 
+This can be useful to minimise repeated bind variables. 
+
+For example, rather than passing the same value to multiple positional arguments, 
 you could instead use a declared variable and send a single bind variable:
 
 
@@ -220,8 +216,9 @@ WHERE symbol = @symbol;
 ```
 ## Limitations
 
-Most basic expressions are supported, and we provide examples later in this document. We suggest
-you use variables to simplify repeated constants within your code, and minimise
+Most basic expressions are supported, and we provide examples later in this document. 
+
+We suggest you use variables to simplify repeated constants within your code, and minimise
 how many places you need to update the constant.
 
 ### Disallowed expressions
@@ -264,7 +261,6 @@ cur.execute(
         FROM btc_trades;
     """).format(sql.Identifier('price')))
 ```
-
 
 ## Examples
 
