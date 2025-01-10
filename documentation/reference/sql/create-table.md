@@ -184,8 +184,7 @@ The TTL period must be a whole number multiple of the table's partition size.
 For example:
 
 - If a table is partitioned by `DAY`, the TTL must be a whole number of days
-  (`1 DAY`, `2 DAYS`, and so on). QuestDB will also accept `24 HOURS`,
-  `48 HOURS`, as well as `2 MONTHS`
+  (`24 HOURS`, `2 DAYS` and `3 MONTHS` are all accepted)
 - If a table is partitioned by `MONTH`, the TTL must be in months or years.
   QuestDB won't accept the `HOUR`, `DAY`, or `WEEK` units
 
