@@ -18,13 +18,14 @@ This feature works as follows:
 4. QuestDB detects a stale partition and drops it as a part of the commit
    operation
 
-To be more precise, the latest timestamp stored in a given partition does
-not matter. QuestDB considers the entire time period a partition for which it is
-responsible. As a result, it will drop the partition when the end of that period
-falls behind the TTL limit. This is a compromise that favors a low overhead of
-the TTL enforcement procedure.
+To be more precise, the latest timestamp stored in a given partition does not
+matter. Instead, QuestDB considers the entire time period for which a partition
+is responsible. As a result, it will drop the partition only when the end of
+that period falls behind the TTL limit. This is a compromise that favors a low
+overhead of the TTL enforcement procedure.
 
-To demonstrate, assume we create a table partitioned by hour, with TTL set to one hour:
+To demonstrate, assume we have created a table partitioned by hour, with TTL set
+to one hour:
 
 ```sql
 CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1 HOUR;
@@ -82,4 +83,4 @@ INSERT INTO tango VALUES ('2025-01-01T10:00:00');
 | 2025-01-01 09:59:59.000000 |
 | 2025-01-01 10:00:00.000000 |
 
-Now the whole "8 AM" partition is outside its TTL limit. It is then dropped.
+Now the whole "8 AM" partition is outside its TTL limit, and has been dropped.
