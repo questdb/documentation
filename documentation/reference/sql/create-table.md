@@ -161,8 +161,7 @@ TTL units fall into two categories:
    - `MONTHS`
    - `YEARS`
 
-Fixed-time periods are always exact durations: `24 HOURS` is always 24 × 60 × 60
-seconds.
+Fixed-time periods are always exact durations: `1 WEEK` is always 7 days.
 
 Calendar-based periods may vary in length: `1 MONTH` from January 15th goes to
 February 15th and could be between 28 and 31 days.
