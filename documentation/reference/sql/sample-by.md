@@ -20,6 +20,10 @@ use of the [FILL](#fill-options) keyword to specify a fill behavior.
 
 ![Flow chart showing the syntax of the SAMPLE BY keywords](/images/docs/diagrams/sampleBy.svg)
 
+### FROM-TO keywords
+
+![Flow chart showing the syntax of the FROM-TO keywords](/images/docs/diagrams/fromTo.svg)
+
 ### FILL keywords
 
 ![Flow chart showing the syntax of the FILL keyword](/images/docs/diagrams/fill.svg)
