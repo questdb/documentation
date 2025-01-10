@@ -141,7 +141,8 @@ created.
 ## Time To Live (TTL)
 
 To store and analyze only recent data, configure a time-to-live (TTL) period on
-a table using the `ALTER TABLE SET TTL` command.
+a table using the `TTL` clause, placing it right after `PARTITION BY <unit>`.
+You can't set TTL on a non-partitioned table.
 
 Follow the `TTL` keyword with a number and a time unit, one of:
 
