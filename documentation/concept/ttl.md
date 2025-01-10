@@ -71,7 +71,7 @@ INSERT INTO tango VALUES ('2025-01-01T09:59:59');
 
 The 8:00 AM data is still there, because the "8 AM" partition ends at 9:00 AM.
 
-4\. Insert a row at 10:00:
+4\. Insert a row at 10:00 AM:
 
 ```sql
 INSERT INTO tango VALUES ('2025-01-01T10:00:00');
