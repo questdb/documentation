@@ -29,7 +29,7 @@ was created in a different volume than the standard, see
 [CREATE TABLE IN VOLUME](/docs/reference/sql/create-table/#table-target-volume),
 in which case the table is only logically removed and data remains intact in its
 volume. In doubt, make sure you have created
-[backups](/docs/reference/sql/backup/) of your data.
+[backups](/docs/operations/backup/) of your data.
 
 Disk space is reclaimed asynchronously after the table is dropped. Ongoing table
 reads might delay space reclamation.

@@ -10,6 +10,11 @@ module.exports = {
       customProps: { tag: "Popular" },
     },
     {
+      id: "why-questdb",
+      type: "doc",
+      customProps: { tag: "Popular" },
+    },
+    {
       id: "guides/influxdb-migration",
       type: "doc",
       customProps: { tag: "Popular" },
@@ -399,7 +404,7 @@ module.exports = {
         {
           label: "Blog tutorials 🔗",
           type: "link",
-          href: "/blog/tags/tutorial",
+          href: "https://questdb.com/blog/?tag=tutorial",
         },
       ],
     },
@@ -445,6 +450,7 @@ module.exports = {
             "third-party-tools/grafana",
             "third-party-tools/kafka",
             "third-party-tools/redpanda",
+            "third-party-tools/powerbi",
             "third-party-tools/pandas",
             "third-party-tools/prometheus",
             "third-party-tools/qstudio",

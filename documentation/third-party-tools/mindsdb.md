@@ -386,7 +386,7 @@ DESCRIBE MODEL mindsdb.home_rentals_model_ts.features;
 ```
 
 Additional information about the models and how they can be customized can be
-found on the [Lightwood docs](https://lightwood.io/).
+found on the [Lightwood docs](https://mindsdb.github.io/lightwood/).
 
 ### Query MindsDB for predictions
 

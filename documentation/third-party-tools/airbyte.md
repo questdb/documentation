@@ -29,8 +29,8 @@ description: Learn how to use Airbyte to collect data from various sources and s
 
 Before you begin, ensure you have the following:
 
-- **QuestDB** must be running and accessible. Check out the [QuestDB quick start guide](/docs/get-started/docker/).
-- **Airbyte** installed using Docker, or locally via [Homebrew](https://brew.sh/) on macOS. For detailed installation instructions, refer to the [official Airbyte documentation](https://docs.airbyte.com/deploying-airbyte/local-deployment).
+- **QuestDB** must be running and accessible. Check out the [QuestDB quick start guide](/docs/quick-start/).
+- **Airbyte** installed using Docker, or locally via [Homebrew](https://brew.sh/) on macOS. For detailed installation instructions, refer to the [official Airbyte documentation](https://docs.airbyte.com/).
 
 ## Configuring Airbyte
 
@@ -175,7 +175,7 @@ If you encounter issues during the sync process, consider the following debuggin
 ## Verifying the integration
 
 1. **Access the QuestDB Web Console**:
-   Navigate to the [QuestDB Web Console](/docs/develop/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
+   Navigate to the [QuestDB Web Console](/docs/web-console/) at `http://127.0.0.1:9000/`. Once you're on the console, check the Schema Navigator in the top left. You should see two new tables:
 
    - `cpu` (generated from `inputs.cpu`)
    - `mem` (generated from `inputs.mem`)
@@ -302,5 +302,5 @@ This guide outlines the integration of **Airbyte** with **QuestDB**, enabling se
 For further details and resources, refer to the following links:
 
 - [Airbyte Documentation](https://docs.airbyte.com/)
-- [QuestDB Web Console Guide](/docs/develop/web-console/)
+- [QuestDB Web Console Guide](/docs/web-console/)
 - [Airbyte GitHub Repository](https://github.com/airbytehq/airbyte)

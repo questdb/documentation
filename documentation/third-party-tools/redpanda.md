@@ -266,8 +266,7 @@ processing semantics.
 
 ## See also
 
-- [QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/#configuration-manual)
-- [How to build a real-time crypto tracker with Redpanda and QuestDB](https://redpanda.com/blog/real-time-crypto-tracker-questdb-redpanda)
+- [QuestDB Kafka Connector reference manual](/docs/third-party-tools/kafka/)
 
 ## Redpanda Connect
 

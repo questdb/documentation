@@ -76,7 +76,7 @@ described below:
 :::note
 
 QuestDB applies these configuration changes on startup and a running instance
-must be restarted in order for configuration changes to take effect
+must be restarted in order for configuration changes to take effect.
 
 :::
 
@@ -92,6 +92,27 @@ shared.worker.count=5
 ```shell title="Customizing the worker count via environment variable"
 export QDB_SHARED_WORKER_COUNT=5
 ```
+
+## Reloadable settings
+
+Certain configuration settings can be reloaded without having to restart
+the server. To reload a setting, edit its value in the `server.conf` file
+and then run the `reload_config` SQL function:
+
+```questdb-sql title="Reload server configuration"
+SELECT reload_config();
+```
+
+If the value was reloaded successfully, the `reload_config` function returns
+`true` and a message is printed to the server log:
+
+```
+2025-01-02T09:52:40.833848UTC I i.q.DynamicPropServerConfiguration reloaded config option [update, key=http.net.connection.limit, old=100, new=200]
+```
+
+Each key has a `reloadable` property that indicates whether the key can be
+reloaded. If yes, the `reload_config` function can be used to reload the
+configuration.
 
 ## Keys and default values
 
@@ -210,9 +231,11 @@ PostgresSQL wire protocol.
 This section describes ingestion settings for incoming messages using InfluxDB
 Line Protocol.
 
-| Property                  | Default | Description                                                                                                                                                                |
-| ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| line.default.partition.by | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
+| Property                      | Default | Description                                                                                                                                                                |
+| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
+| line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
+| line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                   |
 
 #### HTTP specific settings
 
@@ -281,7 +304,7 @@ For a full explanation of IAM, see the
 
 :::note
 
-OpenID Connect is [Enterprise](/enterprise/) and [Cloud](/cloud/) only.
+OpenID Connect is [Enterprise](/enterprise/) only.
 
 :::
 
@@ -302,9 +325,15 @@ without causing the database to stop its startup sequence: These are usually
 setting deprecation warnings. Configuration errors can optionally cause the
 database to fail its startup.
 
-| Property                 | Default | Description                                                    |
-| ------------------------ | ------- | -------------------------------------------------------------- |
-| config.validation.strict | false   | When enabled, startup fails if there are configuration errors. |
+<ConfigTable
+  rows={{
+    "config.validation.strict": {
+      default: "false",
+      description: "When enabled, startup fails if there are configuration errors.",
+      reloadable: false
+    }
+  }}
+/>
 
 _We recommended enabling strict validation._
 
@@ -314,11 +343,25 @@ QuestDB sends anonymous telemetry data with information about usage which helps
 us improve the product over time. We do not collect any personally-identifying
 information, and we do not share any of this data with third parties.
 
-| Property                 | Default | Description                                                                                                                                   |
-| ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| telemetry.enabled        | true    | Enable or disable anonymous usage metrics collection.                                                                                         |
-| telemetry.hide.tables    | false   | Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view. |
-| telemetry.queue.capacity | 512     | Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking.        |
+<ConfigTable
+  rows={{
+    "telemetry.enabled": {
+      default: "true",
+      description: "Enable or disable anonymous usage metrics collection.",
+      reloadable: false
+    },
+    "telemetry.hide.tables": {
+      default: "false",
+      description: "Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view.",
+      reloadable: false
+    },
+    "telemetry.queue.capacity": {
+      default: "512",
+      description: "Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking.",
+      reloadable: false
+    }
+  }}
+/>
 
 ## Logging & Metrics
 

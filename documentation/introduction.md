@@ -2,16 +2,18 @@
 title: Introduction
 slug: /
 description:
-  QuestDB time series database documentation. QuestDB is a fast columnar time
-  series database that solves ingestion speed bottlenecks
+  The official QuestDB documentation. Learn how to accelerate your time-series, capital markets, and heavy industry use cases.
+custom_edit_url: null
 ---
 
-import Screenshot from "@theme/Screenshot"
+import { Guides } from '../src/components/Guides'
+import { Resources } from '../src/components/Resources'
+import { HeroPattern } from '../src/components/HeroPattern'
+import { DocButton } from '../src/components/DocButton'
 
-import CodeBlock from "@theme/CodeBlock"
+<HeroPattern />
 
-QuestDB is an Apache 2.0 open source columnar database that specializes in time
-series.
+QuestDB is a top performance database that specializes in time-series.
 
 It offers **category-leading ingestion throughput** and **fast SQL queries**
 with operational simplicity.
@@ -19,174 +21,55 @@ with operational simplicity.
 Given its effiency, QuestDB **reduces operational costs**, all while overcoming
 ingestion bottlenecks.
 
-As a result, QuestDB offers greatly simplified overall ingress infrastructure.
+As a result, QuestDB amplifies intensive **time-series**, **capital market**, and **heavy industry** use cases.
 
-This introduction provides a brief overview on:
+<div className="not-prose mb-16 mt-6 flex gap-3">
+  <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
+    <>Quick start</>
+  </DocButton>
 
-- [Top QuestDB features](#features)
-- [Benefits of QuestDB](#benefits)
-- [QuestDB Enterprise](#questdb-enterprise)
-- [Where to next?](#next-up)
-- [Support](#support)
+  <DocButton href="/docs/ingestion-overview/#first-party-clients" variant="outline" style={{ marginRight: '20px' }}>
+    <>Explore clients</>
+  </DocButton>
 
-<hr />
+  <DocButton href="/docs/why-questdb/" variant="outline" style={{ marginRight: '20px' }}>
+    <>Why QuestDB?</>
+  </DocButton>
 
-> **Just want to build? Jump to the [quick start](/docs/quick-start/) guide.**
+  <DocButton href="https://demo.questdb.io" variant="outline" style={{ marginRight: '20px' }}>
+    <>Try live demo</>
+  </DocButton>
+</div>
 
-<hr />
+## Ingest your data
 
-## Top QuestDB features {#features}
+Once running, the next step is to get your data into QuestDB. 
 
-QuestDB is applied within cutting edge use cases around the world.
+We've got a range of first-party clients, protocols and methods for ingestion. 
 
-Developers are most enthusiastic about the following key features:
+Whether you're using first-party clients or interfacing with a third-party tool or library, we've got you covered.
 
-#### Massive ingestion handling & throughput
-
-If you are running into throughput bottlenecks using an existing storage engine
-or time series database, QuestDB can help.
-
-#### High performance deduplication & out-of-order indexing
-
-[High data cardinality](/glossary/high-cardinality/) will not lead to
-performance degradation.
-
-#### Hardware efficiency
-
-Strong, cost-saving performance on very mninimal hardware, including sensors and
-Raspberry Pi.
-
-#### SQL with time series extensions
-
-Fast, SIMD-optimized SQL extensions to cruise through querying and analysis.
-
-No obscure domain-specific languages required.
-
-Greatest hits include:
-
-- [`SAMPLE BY`](/docs/reference/sql/sample-by/) summarizes data into chunks
-  based on a specified time interval, from a year to a microsecond
-- [`WHERE IN`](/docs/reference/sql/where/#time-range) to compress time ranges
-  into concise intervals
-- [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
-  multiple series within a table
-- [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
-  a series based on proximity; no extra indices required
-
-## Benefits of QuestDB {#benefits}
-
-To avoid ingestion bottlenecks, high performance data ingestion is essential.
-
-But performance is only part of the story.
-
-Efficiency measures how well a database performs relative to its available
-resources.
-
-QuestDB, on maximal hardware, significantly outperforms peers:
-
-<Screenshot
-  alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="images/benchmark/benchmark_all_q1_2024.webp"
-  width={650}
-  title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
-/>
-
-However, on less robust hardware the difference is even more pronounced, as seen
-in the following benchmark.
-
-Even on hardware as light as a Raspberry Pi 5, QuestDB outperforms competitors
-on stronger hardware:
-
-<Screenshot
-  alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="images/pages/index/min-hardware-comp-graph.webp"
-  width={550}
-  title="QuestDB on an RPi5 outperforming competitors on optimal hardware"
-/>
-
-Beyond performance and efficiency, with a specialized
-[time-series database](/glossary/time-series-database/), you don't need to worry
-about:
-
-- out-of-order data
-- duplicates
-- exactly one semantics
-- frequency of ingestion
-- many other details you will find in demanding real-world scenarios
-
-QuestDB provides simplified, hyper-fast data ingestion with tremendous
-efficiency and therefore value.
-
-Write blazing-fast queries and create real-time
-[Grafana](/docs/third-party-tools/grafana/) via familiar SQL:
-
-```questdb-sql title='Navigate time with SQL' demo
-SELECT
-    timestamp, symbol,
-    first(price) AS open,
-    last(price) AS close,
-    min(price),
-    max(price),
-    sum(amount) AS volume
-FROM trades
-WHERE  timestamp > dateadd('d', -1, now())
-SAMPLE BY 15m;
-```
-
-Intrigued? The best way to see whether QuestDB is right for you is to try it
-out.
-
-Click _Demo this query_ in the snippet above to visit our demo instance and
-experiment.
-
-To bring your own data and learn more, keep reading!
+<div className="not-prose">
+  <DocButton href="/docs/ingestion-overview/" variant="text" arrow="right">
+    <>Read the ingestion overview</>
+  </DocButton>
+</div>
 
 ## QuestDB Enterprise
 
 QuestDB Enterprise offers everything from open source, plus additional features
 for running QuestDB at greater scale or significance.
 
-For a breakdown of Enterprise features, see the
-[QuestDB Enterprise](/enterprise/) page.
+<div className="not-prose">
+  <DocButton href="/enterprise/" absolute variant="text" arrow="right">
+    <>Learn more</>
+  </DocButton>
+</div>
 
-## Where to next? {#next-up}
+## Guides
 
-You'll be inserting data and generating valuable queries in little time.
+<Guides />
 
-First, the [quick start](/docs/quick-start/) guide will get you running.
+## Resources
 
-Choose from one of our premium ingest-only language clients:
-
-- [C & C++](/docs/clients/ingest-c-and-cpp)
-- [.NET](/docs/clients/ingest-dotnet)
-- [Go](/docs/clients/ingest-go)
-- [Java](/docs/clients/java_ilp)
-- [Node.js](/docs/clients/ingest-node)
-- [Python](/docs/clients/ingest-python)
-- [Rust](/docs/clients/ingest-rust)
-
-From there, you can learn more about what's to offer.
-
-- [Ingestion overview](/docs/ingestion-overview/) want to see all available
-  ingestion options? Checkout the overview.
-- [Query & SQL Overview](/docs/reference/sql/overview/) learn how to query
-  QuestDB
-- [Web Console](/docs/web-console/) for quick SQL queries, charting and CSV
-  upload/export functionality
-- [Grafana guide](/docs/third-party-tools/grafana/) to visualize your data as
-  beautiful and functional charts.
-- [Capacity planning](/docs/deployment/capacity-planning/) to optimize your
-  QuestDB deployment for production workloads.
-
-## Support
-
-We are happy to help with any question you may have.
-
-The team loves a good performance optimization challenge!
-
-Feel free to reach out using the following channels:
-
-- [Raise an issue on GitHub](https://github.com/questdb/questdb/issues/new/choose)
-- [Join our community forums](https://community.questdb.io/)
-- [QuestDB on Stack Overflow](https://stackoverflow.com/questions/tagged/questdb)
-- or email us at [hello@questdb.io](mailto:hello@questdb.io)
+<Resources />

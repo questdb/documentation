@@ -43,6 +43,7 @@ integrations:
 Enhance your data analysis and processing capabilities with QuestDB through
 these tools:
 
+- [**PowerBI**](/docs/third-party-tools/powerbi/): Create interactive data visualizations and dashboards.
 - [Pandas](/docs/third-party-tools/pandas/): Analyze [time-series data](/blog/what-is-time-series-data/) in Python
   with powerful data structures.
 - [MindsDB](/docs/third-party-tools/mindsdb/): Build machine learning models for
@@ -62,4 +63,4 @@ Improve your interactions with QuestDB using these tools and interfaces:
   execution, table browsing, and result charting.
 
 Is there an integration you'd like to see that's not listed? Let us know by
-opening an issue on [QuestDB Github]({@githubUrl@}/issues/new/choose).
+opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).

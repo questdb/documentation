@@ -269,4 +269,4 @@ To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
 Alone? Stuck? Want help? Visit us in our
-[Community Forum](https://community.questdb.io/).
+[Community Forum](https://community.questdb.com/).

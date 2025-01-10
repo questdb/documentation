@@ -23,7 +23,7 @@ If the cluster is already running, enabling replication requires minimal steps:
    [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) files in AWS, Azure,
    or NFS
 2. Enable a **primary** node and upload WAL files to the object storage
-3. Take a data [Snapshot](https://questdb.io/docs/operations/backup/) of the
+3. Take a data [Snapshot](/docs/operations/backup/) of the
    **primary** node
 4. Configure a **replica** node or and restore via snapshot or allow sync via
    WAL files

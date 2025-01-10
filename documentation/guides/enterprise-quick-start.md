@@ -42,8 +42,8 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
-- An OS that supports the
-  [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page)
+- Use of a [supported file system](/docs/deployment/capacity-planning/#supported-filesystems)
+  - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
 ## Installation guide
 
@@ -53,7 +53,7 @@ your app code or third-party tool.
 Check the code snippet's title to see where the command is to be invoked.
 
 If you run into any trouble, please [contact us](mailto:support@questdb.io) by
-email or visit the [Community Forum](https://community.questdb.io/).
+email or visit the [Community Forum](https://community.questdb.com/).
 
 ## 0. Secure the built in admin
 
@@ -102,7 +102,7 @@ SELECT reload_tls();
 TLS is now active.
 
 For more details on TLS see the
-[TLS operations documentation](https://questdb.io/docs/operations/tls/).
+[TLS operations documentation](/docs/operations/tls/).
 
 ## 2. Setup a database administrator
 
@@ -396,7 +396,7 @@ Next, we will enable Enterprise-specific features.
 
 ## 7. Setup replication
 
-[Replication](https://questdb.io/docs/concept/replication/) consists of:
+[Replication](/docs/concept/replication/) consists of:
 
 - a primary database instance
 - an object storage

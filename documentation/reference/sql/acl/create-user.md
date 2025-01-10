@@ -57,7 +57,7 @@ CREATE USER IF NOT EXISTS john WITH NO PASSWORD;
 ```
 
 If you want to update the user's password unconditionally, you can use the
-[ALTER USER](/sql/acl/alter-user/#set-password) command.
+[ALTER USER](/docs/reference/sql/acl/alter-user/#set-password) command.
 
 ## Examples
 

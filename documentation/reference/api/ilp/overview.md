@@ -14,6 +14,8 @@ import ILPRubyPartial from "../../../partials/\_ruby.ilp.partial.mdx"
 
 import ILPPHPPartial from "../../../partials/\_php.ilp.partial.mdx"
 
+import { Clients } from "../../../../src/components/Clients"
+
 QuestDB implements the InfluxDB Line Protocol to ingest data.
 
 The InfluxDB Line Protocol is for **data ingestion only**.
@@ -46,13 +48,7 @@ From there, its documentation will carry you through to implementation.
 
 Client libraries are available for several languages:
 
-- [C & C++](/docs/clients/ingest-c-and-cpp)
-- [.NET](/docs/clients/ingest-dotnet)
-- [Go](/docs/clients/ingest-go)
-- [Java](/docs/clients/java_ilp)
-- [Node.js](/docs/clients/ingest-node)
-- [Python](/docs/clients/ingest-python)
-- [Rust](/docs/clients/ingest-rust)
+<Clients />
 
 If you'd like more context on ILP overall, please continue reading.
 

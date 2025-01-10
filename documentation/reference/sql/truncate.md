@@ -14,7 +14,7 @@ the table itself.
 ## Notes
 
 This command irremediably deletes the data in the target table. In doubt, make
-sure you have created [backups](/docs/reference/sql/backup/) of your data.
+sure you have created [backups](/docs/operations/backup/) of your data.
 
 ## Examples
 
