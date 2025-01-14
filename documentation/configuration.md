@@ -242,6 +242,7 @@ Line Protocol.
 | line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
 | line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
 | line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                   |
+| line.log.message.on.error   | true    | Controls whether malformed ILP messages are printed to the server log when errors occur.                                                                                   |
 
 #### HTTP specific settings
 
@@ -375,4 +376,4 @@ The following settings are available in `server.conf`:
 
 <ConfigTable rows={logConfig} />
 
-Further settings are available in `log.conf`. For more information, and details of our Prometheus metrics, please visit the [Logging & Metrics](/docs/operations/logging-metrics/) documentation.
+Further settings are available in `
