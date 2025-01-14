@@ -5,6 +5,6 @@
   },
   "log.timezone": {
     "default": "UTC",
-    "description": "Sets the timezone for log timestamps. Can be a timezone ID (e.g. 'Antarctica/McMurdo'), 'SystemDefault' to use system timezone, or the default UTC with 'Z' suffix"
+    "description": "Sets the timezone for log timestamps. Can be a timezone ID such as 'Antarctica/McMurdo', 'SystemDefault' to use system timezone, or the default UTC with 'Z' suffix"
   }
 }
