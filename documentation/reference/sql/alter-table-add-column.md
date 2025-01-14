@@ -45,6 +45,12 @@ Add a new column called `comment` of `STRING` type to the table `ratings`
 ALTER TABLE ratings ADD COLUMN comment STRING;
 ```
 
+Add a column only if it doesn't already exist:
+
+```questdb-sql title="Add column if not exists"
+ALTER TABLE ratings ADD COLUMN IF NOT EXISTS score DOUBLE;
+```
+
 When adding a column of `Symbol` type, optional keywords may be passed which are
 unique to this type. These keywords are described in the
 [Symbol type](/docs/reference/sql/create-table/#symbol) section of the
