@@ -695,18 +695,6 @@ for more details.
 <details>
   <summary>I need to run Kafka Connect on Java 8, but the connector says it requires
 Java 17. What should I do? </summary>
-<p>
-
-The Kafka Connect-specific part of the connectors works with Java 8. The
-requirement for Java 17 is coming from QuestDB client itself. The zip archive
-contains 2 JARs: `questdb-kafka-connector-VERSION.jar` and
-`questdb-VERSION.jar`. You can replace the latter with
-`questdb-VERSION-jdk8.jar` from the
-[Maven central](https://mvnrepository.com/artifact/org.questdb/questdb/6.5.4-jdk8).
-Please note that this setup is not officially supported, and you may encounter
-issues. If you do, please report them to us.
-
-</p>
 </details>
 
 ### See also
