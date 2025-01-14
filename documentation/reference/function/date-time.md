@@ -138,6 +138,14 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 
 `dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`, optionally respecting timezone DST transitions.
 
+:::tip
+
+When a timezone is specified, the function handles daylight savings time transitions correctly. This is particularly important when adding periods that could cross DST boundaries (like weeks, months, or years).
+
+Without the timezone parameter, the function performs simple UTC arithmetic which may lead to incorrect results when crossing DST boundaries. For timezone-aware calculations, use the timezone parameter.
+
+:::
+
 **Arguments:**
 
 - `period` is a `char`. Period to be added. Available periods are:
@@ -160,12 +168,6 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 **Return value:**
 
 Return value type is `timestamp`
-
-**Notes:**
-
-When a timezone is specified, the function handles daylight savings time transitions correctly. This is particularly important when adding periods that could cross DST boundaries (like weeks, months, or years).
-
-Without the timezone parameter, the function performs simple UTC arithmetic which may lead to incorrect results when crossing DST boundaries. For timezone-aware calculations, use the timezone parameter.
 
 **Examples:**
 
