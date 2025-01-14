@@ -17,8 +17,16 @@ To work properly, all of the following must be true:
 
 - Each query statement should return the same number of column.
 - Each column to be combined should have data types that are either the same, or
-  supported by `implicit cast`. See [CAST](/docs/reference/sql/cast/) for more
+  supported by `implicit cast`. For example, IPv4 columns can be combined with VARCHAR/STRING
+  columns as they will be automatically cast. See [CAST](/docs/reference/sql/cast/) for more
   information.
+  - Example:
+    ```questdb-sql
+    select '1'::varchar as col from long_sequence(1)
+    union all
+    select '127.0.0.1'::ipv4 from long_sequence(1);
+    ```
+
 - Columns in each query statement should be in the same order.
 
 ## Syntax
@@ -261,3 +269,4 @@ SELECT alias_2 FROM table_2;
 ```
 
 The output shows `alias_1`.
+

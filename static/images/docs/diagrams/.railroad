@@ -62,6 +62,9 @@ createServiceAccount
 alterTable 
   ::= 'ALTER' 'TABLE' tableName
 
+alterTableAddColumn
+  ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
+
 dropGroup 
   ::= 'DROP' 'GROUP' ('IF' 'EXISTS')? groupName
 

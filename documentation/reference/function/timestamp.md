@@ -47,6 +47,33 @@ assigned.
 
 ![Flow chart showing the syntax of the timestamp function](/images/docs/diagrams/dynamicTimestamp.svg)
 
+## Optimization with WHERE clauses
+
+When filtering on a designated timestamp column in WHERE clauses, QuestDB automatically optimizes the query by applying time-based partition filtering. This optimization also works with subqueries that return timestamp values. 
+
+For example:
+
+```questdb-sql title="Timestamp optimization with WHERE clause" demo
+SELECT * 
+FROM trades 
+WHERE ts > (SELECT min(ts) FROM trades) 
+  AND ts < (SELECT max(ts) FROM trades);
+```
+
+In this case, if `ts` is the designated timestamp column, QuestDB will optimize the query by:
+
+1. Evaluating the subqueries to determine the time range
+2. Using this range to filter partitions before scanning the data
+3. Applying the final timestamp comparison on the remaining records
+
+This optimization applies to timestamp comparisons using:
+
+- Greater than (`>`)
+- Less than (`<`)
+- Equals (`=`)
+- Greater than or equal to (`>=`)
+- Less than or equal to (`<=`)
+
 ## Examples
 
 ### During a CREATE operation

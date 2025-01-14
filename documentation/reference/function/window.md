@@ -524,6 +524,49 @@ SELECT
 FROM trades;
 ```
 
+### first_not_null_value()
+
+In the context of window functions, `first_not_null_value(value)` returns the first non-null value in the set of rows defined by the window frame.
+
+**Arguments:**
+
+- `value`: Any numeric value.
+
+**Return value:**
+
+- The first non-null occurrence of `value` for the rows in the window frame. Returns `NaN` if no non-null values are found.
+
+**Description**
+
+When used as a window function, `first_not_null_value()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
+
+The `first_not_null_value()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
+
+Unlike `first_value()`, this function skips null values and returns the first non-null value it encounters in the window frame. This is particularly useful when dealing with sparse data or when you want to ignore null values in your analysis.
+
+Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+
+```questdb-sql title="first_not_null_value() syntax" 
+first_not_null_value(value) OVER (window_definition)
+```
+
+**Example:**
+
+```questdb-sql title="first_not_null_value() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_not_null_value(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS first_valid_price
+FROM trades;
+```
+
 ### max()
 
 In the context of window functions, `max(value)` calculates the maximum value within the set of rows defined by the window frame.

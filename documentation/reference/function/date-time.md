@@ -136,7 +136,15 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 
 ## dateadd
 
-`dateadd(period, n, startDate)` - adds `n` `period` to `startDate`.
+`dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`, optionally respecting timezone DST transitions.
+
+:::tip
+
+When a timezone is specified, the function handles daylight savings time transitions correctly. This is particularly important when adding periods that could cross DST boundaries (like weeks, months, or years).
+
+Without the timezone parameter, the function performs simple UTC arithmetic which may lead to incorrect results when crossing DST boundaries. For timezone-aware calculations, use the timezone parameter.
+
+:::
 
 **Arguments:**
 
@@ -155,6 +163,7 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 - `n` is an `int` indicating the number of periods to add.
 - `startDate` is a timestamp or date indicating the timestamp to add the period
   to.
+- `timezone` (optional) is a string specifying the timezone to use for DST-aware calculations - for example, 'Europe/London'.
 
 **Return value:**
 
@@ -179,6 +188,20 @@ FROM long_sequence(1);
 | systimestamp                | dateadd                     |
 | :-------------------------- | :-------------------------- |
 | 2020-04-17T00:30:51.380499Z | 2020-04-19T00:30:51.380499Z |
+
+```questdb-sql title="Adding weeks with timezone"
+SELECT 
+    '2024-10-21T10:00:00Z',
+    dateadd('w', 1, '2024-10-21T10:00:00Z', 'Europe/Bratislava') as with_tz,
+    dateadd('w', 1, '2024-10-21T10:00:00Z') as without_tz
+FROM long_sequence(1);
+```
+
+| timestamp                | with_tz                    | without_tz                 |
+| :----------------------- | :------------------------- | :------------------------- |
+| 2024-10-21T10:00:00.000Z | 2024-10-28T10:00:00.000Z  | 2024-10-28T09:00:00.000Z  |
+
+Note how the timezone-aware calculation correctly handles the DST transition in Europe/Bratislava.
 
 ```questdb-sql title="Adding months"
 SELECT systimestamp(), dateadd('M', 2, systimestamp())
