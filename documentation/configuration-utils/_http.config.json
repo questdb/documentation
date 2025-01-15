@@ -218,5 +218,49 @@
   "http.version": {
     "default": "HTTP/1.1",
     "description": "Protocol version, other supported value is `HTTP/1.0`."
+  },
+  "http.context.web.console": {
+    "default": "/",
+    "description": "Context path for the Web Console. If other REST services remain on the default context paths they will move to the same context path as the Web Console. InfluxDB Line Protocol (ILP) HTTP services are not affected and remain on their default paths. When default context paths are changed, moving the Web Console will not affect the configured paths. QuestDB creates copies of services on the Web Console paths so that both the Web Console and custom services remain operational."
+  },
+  "http.context.import": {
+    "default": "/imp",
+    "description": "Context path of the file import service."
+  },
+  "http.context.table.status": {
+    "default": "/chk",
+    "description": "Context path for the table statusservice used by the Import UI in the Web Console."
+  },
+  "http.context.export": {
+    "default": "/exp",
+    "description": "Context path for the SQL result CSV export service."
+  },
+  "http.context.settings": {
+    "default": "/settings",
+    "description": "Context path for the service which provides server-side settings to the Web Console."
+  },
+  "http.context.execute": {
+    "default": "/exec",
+    "description": "Context path for the SQL execution service."
+  },
+  "http.context.warnings": {
+    "default": "/warnings",
+    "description": "Context path for the Web Console specific service."
+  },
+  "http.context.ilp": {
+    "default": "/write,/api/v2/write",
+    "description": "Context paths for the Influx Line Protocol (ILP) HTTP services. These are not used by the Web Console."
+  },
+  "http.context.ilp.ping": {
+    "default": "/ping",
+    "description": "Context path for the Influx Line Protocol (ILP) ping endpoint."
+  },
+  "http.redirect.count": {
+    "default": "1",
+    "description": "Number of HTTP redirects. All redirects are 301 - Moved Permanently."
+  },
+  "http.redirect.1": {
+    "default": "/ -> /index.html",
+    "description": "Example redirect configuration. Format is 'source -> destination'."
   }
 }
