@@ -113,7 +113,7 @@ SELECT reload_tls();
 
 The function returns `true` if the reload is successful; otherwise, it returns
 `false`. In case of unsuccessful reload, you should check error messages in the
-[server logs](/docs/troubleshooting/log/) for more details.
+[server logs](/docs/operations/logging-metrics/) for more details.
 
 When Role-based Access Control (RBAC) is enabled, the `reload_tls()` SQL
 function is only available to the admin user, i.e. to the built-in user account
