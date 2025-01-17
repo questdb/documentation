@@ -425,6 +425,7 @@ module.exports = {
         },
         "concept/sql-extensions",
         "concept/jit-compiler",
+        "concept/query-tracing",
         "concept/partitions",
         "concept/ttl",
         "concept/symbol",
