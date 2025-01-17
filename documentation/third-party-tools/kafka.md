@@ -324,7 +324,7 @@ http::addr=localhost:9000;
 Configuration string with HTTPS and custom retry timeout:
 
 ```
-http::addr=localhost:9000;retry_timeout=60000;
+https::addr=localhost:9000;retry_timeout=60000;
 ```
 
 See the [Java Client configuration guide](/docs/clients/java_ilp) for all

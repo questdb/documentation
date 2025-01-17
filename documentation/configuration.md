@@ -114,6 +114,12 @@ Each key has a `reloadable` property that indicates whether the key can be
 reloaded. If yes, the `reload_config` function can be used to reload the
 configuration.
 
+All reloadable properties can be also queried from the server:
+
+```questdb-sql title="Query reloadable properties"
+(SHOW PARAMETERS) WHERE reloadable = true;
+```
+
 ## Keys and default values
 
 This section lists the configuration keys available to QuestDB by topic or
