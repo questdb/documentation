@@ -104,6 +104,12 @@ Where:
 
 - [`first_value()`](#first_value) – Retrieves the first value in a window
 
+- [`last_value()`](#last_value) – Retrieves the last value in a window
+
+- [`lead()`](#lead) – Accesses data from subsequent rows
+
+- [`lag()`](#lag) – Accesses data from previous rows
+
 - [`max()`](#max) – Returns the maximum value within a window
 
 - [`min()`](#min) – Returns the minimum value within a window
@@ -742,6 +748,162 @@ SELECT
 FROM trades;
 ```
 
+### lead()
+
+In the context of window functions, `lead()` accesses data from subsequent rows in the result set without using a self-join. For each row, `lead()` returns the value from a row at a specified offset following the current row within the partition.
+
+The `lead()` function provides access to a row at a given physical offset that follows the current row, returning NULL if the offset goes beyond the bounds of the window or partition (unless a default is specified).
+
+- When `offset` is 0, returns the current row value
+- `IGNORE NULLS` makes the function act as if `NULL` value rows don't exist
+- `RESPECT NULLS` (default) includes `NULL` values in offset counting
+- Does not support `ROWS/RANGE` frame clauses (silently ignored if present)
+- When `ORDER BY` is not provided, uses table scan order
+
+**Arguments:**
+
+- `value`: The column or expression to get the value from
+- `offset` (optional): The number of rows forward from the current row. Default is 1
+- `default` (optional): The value to return when the offset goes beyond the partition bounds. Default is `NULL`
+- `[IGNORE | RESPECT] NULLS` (optional): Determines whether `NULL` values should be ignored. Default is `RESPECT NULLS`
+
+**Return value:**
+
+- The value from the row at the specified offset after the current row
+
+**Syntax:**
+```questdb-sql title="lead() syntax"
+lead(value [, offset [, default]]) [(IGNORE|RESPECT) NULLS] 
+OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
+```
+
+**Example:**
+```questdb-sql title="lead() example" demo
+SELECT 
+    timestamp,
+    price,
+    lead(price) OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+    ) AS next_price,
+    lead(price, 2, 0.0) OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+    ) AS price_after_next
+FROM trades;
+```
+
+This example:
+- Gets the next price for each symbol (`next_price`)
+- Gets the price from 2 rows ahead (`price_after_next`)
+- Uses 0.0 as default when looking 2 rows ahead reaches the partition end
+
+### lag()
+
+In the context of window functions, `lag()` accesses data from previous rows in the result set without using a self-join. For each row, `lag()` returns the value from a row at a specified offset before the current row within the partition.
+
+The `lag()` function provides access to a row at a given physical offset that precedes the current row, returning NULL if the offset goes beyond the bounds of the window or partition (unless a default is specified).
+
+- When `offset` is 0, returns the current row value
+- `IGNORE NULLS` makes the function act as if NULL value rows don't exist
+- `RESPECT NULLS` (default) includes NULL values in offset counting
+- Does not support ROWS/RANGE frame clauses (silently ignored if present)
+- When ORDER BY is not provided, uses table scan order
+
+**Arguments:**
+
+- `value`: The column or expression to get the value from
+- `offset` (optional): The number of rows backward from the current row. Default is 1
+- `default` (optional): The value to return when the offset goes beyond the partition bounds. Default is NULL
+- `[IGNORE | RESPECT] NULLS` (optional): Determines whether NULL values should be ignored. Default is RESPECT NULLS
+
+**Return value:**
+
+- The value from the row at the specified offset before the current row
+
+**Syntax:**
+```questdb-sql title="lag() syntax"
+lag(value [, offset [, default]]) [(IGNORE|RESPECT) NULLS] 
+OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
+```
+
+**Example:**
+```questdb-sql title="lag() example" demo
+SELECT 
+    timestamp,
+    price,
+    lag(price) OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+    ) AS previous_price,
+    lag(price, 2, 0.0) OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+    ) AS price_two_rows_back
+FROM trades;
+```
+
+This example:
+- Gets the previous price for each symbol (`previous_price`)
+- Gets the price from 2 rows back (`price_two_rows_back`)
+- Uses 0.0 as default when looking 2 rows back reaches the partition start
+
+### last_value()
+
+In the context of window functions, `last_value()` returns the last value in a window frame. The function supports both regular and NULL-aware processing through the `IGNORE NULLS` clause.
+
+The `last_value()` function provides access to the last value within a window frame. The behavior depends on:
+- Window frame definition (`ROWS`/`RANGE`)
+- Presence of `ORDER BY` and `PARTITION BY` clauses
+- `IGNORE/RESPECT NULLS` setting
+
+In addition, note the following:
+
+- When no `ORDER BY` is provided, uses table scan order
+- Supports both `ROWS` and `RANGE` frame specifications
+- When neither `ORDER BY` nor `ROWS`/`RANGE` is specified, the default frame becomes `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
+- When `ORDER BY` is provided but `ROWS`/`RANGE` is not, the default frame becomes `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+
+**Arguments:**
+
+- `value`: The column or expression to get the value from
+- `[IGNORE | RESPECT] NULLS` (optional): Determines whether NULL values should be ignored. Default is `RESPECT NULLS`
+
+**Return value:**
+
+- The last non-NULL value in the window frame when using `IGNORE NULLS`
+- The last value (including NULL) in the window frame when using `RESPECT NULLS`
+
+**Syntax:**
+```questdb-sql title="last_value() syntax"
+last_value(value) [(IGNORE|RESPECT) NULLS] 
+OVER ([PARTITION BY partition_expression] 
+      [ORDER BY sort_expression]
+      [frame_clause])
+```
+
+**Example:**
+```questdb-sql title="last_value() example" demo
+SELECT 
+    timestamp,
+    price,
+    last_value(price) OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS last_price,
+    last_value(price) IGNORE NULLS OVER (
+        PARTITION BY symbol 
+        ORDER BY timestamp
+    ) AS last_non_null_price
+FROM trades;
+```
+
+This example:
+- Gets the last price within a 3-row window for each symbol (`last_price`)
+- Gets the last non-NULL price for each symbol (`last_non_null_price`)
+- Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
+
 ## Common window function examples
 
 ### Moving average of best bid price
@@ -834,39 +996,6 @@ This example:
 - Calculates rolling 1-minute volume at best bid
 - Also shows total size across top 3 levels
 - Filters out empty bids
-
-### LAG function
-
-A LAG function allows you to access data from a previous row in the same result
-set without requiring a self-join. This is especially useful for comparing
-values in sequential rows or performing calculations like differences,
-trends, or changes over time.
-
-```questdb-sql title="LAG example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    first_value(price) OVER (
-        PARTITION BY symbol        
-        ORDER BY timestamp
-        ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) AS price_from_1_row_before,
-    first_value(price) OVER (
-        PARTITION BY symbol        
-        ORDER BY timestamp
-        ROWS 2 PRECEDING EXCLUDE CURRENT ROW
-    ) AS price_from_2_rows_before
-FROM trades;
-```
-
-Key Points:
-
-- `LAG(price, 1)` fetches the price from the immediately preceding row for the same symbol.
-- `PARTITION BY symbol` ensures the function operates independently for each stock.
-- `ORDER BY timestamp` processes rows in chronological order.
-- `price - LAG(price, 1)` gets the value from the row before and from 2 rows before
-- Returns NULL for the first row (no previous data).
 
 ### Order frequency analysis
 
