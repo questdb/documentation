@@ -19,6 +19,14 @@
     "default": "64",
     "description": "The maximum number permitted for simultaneous TCP connection to the HTTP server. The rationale of the value is to control server memory consumption."
   },
+  "http.query.connection.limit": {
+    "default": "12",
+    "description": "Soft limit for simultaneous HTTP query connections. When breached, new connections will be rejected but existing connections won't be closed immediately as long as http.net.connection.limit is not exceeded."
+  },
+  "http.ilp.connection.limit": {
+    "default": "4",
+    "description": "Soft limit for simultaneous ILP connections. When breached, new connections will be rejected but existing connections won't be closed immediately as long as http.net.connection.limit is not exceeded."
+  },
   "http.net.connection.timeout": {
     "default": "300000",
     "description": "TCP connection idle timeout in milliseconds. Connection is closed by HTTP server when this timeout lapses."
