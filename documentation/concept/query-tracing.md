@@ -7,8 +7,9 @@ description:
 ---
 
 Query tracing is a feature that helps you diagnose performance issues with
-queries by recording each query's execution time in a system table. You can
-then analyze this data using the full power of QuestDB's SQL statements.
+queries by recording each query's execution time in a system table called
+`_query_trace`. You can then analyze the data in this table using the full power
+of QuestDB's SQL statements.
 
 Query tracing is disabled by default. You can enable it using the following
 configuration property:
@@ -24,11 +25,10 @@ just run the following query to reload the configuration:
 select reload_config();
 ```
 
-You can reach the contents of the query tracing table using the `query_trace()`
-function:
+This is an example of what the `_query_trace` table may contain:
 
 ```sql
-query_trace();
+_query_trace;
 ```
 
 |             ts              |        query_text         | execution_micros |
@@ -37,11 +37,12 @@ query_trace();
 | 2025-01-15T08:53:03.815732Z | tables()                  |             1523 |
 | 2025-01-15T08:53:22.971239Z | 'sys.query_trace'         |             5384 |
 
-For example, to get the text of all queries that took more than 100 ms, run:
+As a simple performance debugging example, to get the text of all queries that
+took more than 100 ms, run:
 
 ```sql
 select query_text from query_trace() where execution_micros > 100_000;
 ```
 
-The `query_trace()` table will drop data older than 24 hours to limit how much
-storage query tracing uses.
+The `_query_trace` table will drop data older than 24 hours in order to limit
+how much storage query tracing uses.
