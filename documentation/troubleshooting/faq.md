@@ -14,7 +14,7 @@ Log files are stored in the `log` folder under the
 [root_directory](/docs/concept/root-directory-structure/). The log has the
 following levels to assist filtering:
 
-Check the [log](/docs/troubleshooting/log/) page for the available log levels.
+Check the [log](/docs/operations/logging-metrics/) page for the available log levels.
 
 ## How do I delete a row?
 

@@ -481,7 +481,6 @@ module.exports = {
       type: "category",
       items: [
         "troubleshooting/faq",
-        "troubleshooting/log",
         "troubleshooting/os-error-codes",
       ],
     },
