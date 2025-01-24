@@ -37,15 +37,17 @@ and partition storage size on disk.
 
 ### SHOW TABLES
 
-```questdb-sql
+```questdb-sql title="show tables" demo
 SHOW TABLES;
 ```
 
-| table    |
-| -------- |
-| weather  |
-| my_table |
-| ...      |
+| table_name      |
+| --------------- |
+| ethblocks_json  |
+| trades          |
+| weather         |
+| AAPL_orderbook  |
+| trips           |
 
 ### SHOW COLUMNS
 
