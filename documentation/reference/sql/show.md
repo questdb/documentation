@@ -41,7 +41,7 @@ and partition storage size on disk.
 SHOW TABLES;
 ```
 
-| table    |
+| table_name    |
 | -------- |
 | weather  |
 | my_table |
@@ -63,7 +63,7 @@ SHOW COLUMNS FROM my_table;
 ### SHOW PARTITIONS
 
 ```questdb-sql
-SHOW PARTITIONS FROM my_table;
+SHOW PARTITIONS FROM my_;
 ```
 
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
@@ -202,7 +202,7 @@ SHOW SERVICE ACCOUNTS admin_group;
 SHOW PERMISSIONS;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
+| permission | _name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 | SELECT     |            |             | t            | G      |
 
@@ -212,7 +212,7 @@ SHOW PERMISSIONS;
 SHOW PERMISSIONS admin;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
+| permission | _name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 | SELECT     |            |             | t            | G      |
 | INSERT     | orders     |             | f            | G      |
@@ -226,7 +226,7 @@ SHOW PERMISSIONS admin;
 SHOW PERMISSIONS admin_group;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
+| permission | _name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 | INSERT     | orders     |             | f            | G      |
 
@@ -236,7 +236,7 @@ SHOW PERMISSIONS admin_group;
 SHOW PERMISSIONS ilp_ingestion;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
+| permission | _name | column_name | grant_option | origin |
 | ---------- | ---------- | ----------- | ------------ | ------ |
 | SELECT     |            |             | t            | G      |
 | INSERT     |            |             | f            | G      |
@@ -256,9 +256,9 @@ SHOW SERVER_VERSION;
 
 ## See also
 
-The following functions allow querying tables with filters and using the results
+The following functions allow querying s with filters and using the results
 as part of a function:
 
-- [table_columns()](/docs/reference/function/meta/#table_columns)
-- [tables()](/docs/reference/function/meta/#all_tables)
+- [_columns()](/docs/reference/function/meta/#_columns)
+- [s()](/docs/reference/function/meta/#all_s)
 - [table_partitions()](/docs/reference/function/meta/#table_partitions)
