@@ -398,6 +398,7 @@ module.exports = {
         "guides/import-csv",
         "guides/modifying-data",
         "guides/replication-tuning",
+        "guides/replication-disaster-recovery",
         "guides/working-with-timestamps-timezones",
         "web-console",
         {
@@ -479,6 +480,7 @@ module.exports = {
       items: [
         "troubleshooting/faq",
         "troubleshooting/os-error-codes",
+        "error-codes",
       ],
     },
   ].filter(Boolean),
