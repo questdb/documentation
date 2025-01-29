@@ -212,7 +212,6 @@ DECLARE
 SELECT avg(@col), min(@col), max(@col) 
 FROM trades 
 WHERE symbol = @symbol;
-
 ```
 ## Limitations
 
