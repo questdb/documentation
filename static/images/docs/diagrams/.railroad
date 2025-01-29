@@ -33,7 +33,11 @@ cancelQuery
 ::= 'CANCEL' 'QUERY' queryId
 
 createTableDef
-::= 'CREATE' 'TABLE' ('IF' 'NOT' 'EXISTS')? tableName
+::= 'CREATE' (
+        ('ATOMIC')?
+        |
+        ('BATCH' number ('o3MaxLag' numberWithUnit)?) )
+    'TABLE' ('IF' 'NOT' 'EXISTS')? tableName
   (
   (
   '(' columnName typeDef (',' columnName typeDef)* ')'
@@ -65,6 +69,10 @@ createServiceAccount
 
 alterTable
   ::= 'ALTER' 'TABLE' tableName
+
+declare
+::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
+
 
 alterTableAddColumn
   ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
@@ -102,14 +110,14 @@ tableTargetVolumeDef
 ::= ','? 'IN' 'VOLUME' "'"? secondaryVolumeAlias "'"?
 
 insertInto
-  ::= 'INSERT' ('batch' batchCount)?
+  ::= 'INSERT' (('ATOMIC')? | ('BATCH' number ('o3MaxLag' numberWithUnit)?) )
   'INTO' tableName ( ( '(' columnName (',' columnName)*) ')')?
   ( 'VALUES' ( ( '(' value ( ',' value)* ')' ) (',' '(' value ( ',' value)* ')' )* ) | 'SELECT' queryDef mainQuery )
   ';'
 
 withAsInsert
   ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )?
-  'INSERT' ( 'batch' batchCount )? 'INTO' tableName 'SELECT' queryDef subQueryName ';'
+  'INSERT' (('ATOMIC')? | ('BATCH' number ('o3MaxLag' numberWithUnit)?) ) 'INTO' tableName 'SELECT' queryDef subQueryName ';'
 
 insertCommitLagInto
   ::= 'INSERT' ('batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ))?
