@@ -16,7 +16,8 @@ using the complementary SQL keyword
 ## Example
 
 To detach one or more partitions, let's assume table `x` with 3 partitions,
-`2019-02-01`, `2019-02-02`, and `2019-02-03`:
+`2019-02-01`, `2019-02-02`, and `2019-02-03`, and designated timestamp column
+named `timestamp`:
 
 1. Detach two partitions using the SQL `ALTER TABLE DETACH PARTITION` command:
 
@@ -25,7 +26,7 @@ To detach one or more partitions, let's assume table `x` with 3 partitions,
 
    -- It is also possible to use WHERE clause to define the partition list:
 
-   ALTER TABLE sensors DETACH PARTITION WHERE < '2019-02-03T00';
+   ALTER TABLE sensors DETACH PARTITION WHERE timestamp < '2019-02-03T00';
    ```
 
 2. Users can move the partition, for example, to an S3 bucket:
