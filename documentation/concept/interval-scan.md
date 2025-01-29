@@ -49,7 +49,7 @@ returned from a sub-query is not guaranteed to be in timestamp order.
 ## EXPLAIN Interval Scan
 
 You can determine whether an **Interval Scan** is used to execute a query using
-the [EXPLAIN](https://questdb.io/docs/reference/sql/explain/) command.
+the [EXPLAIN](/docs/reference/sql/explain/) command.
 
 For example, consider the `trades` table with a `timestamp` designated
 timestamp. The following query:

@@ -36,8 +36,8 @@ perform basic insert operations.
 ## Client installation
 
 The latest version of the library is
-[2.0.0](https://www.nuget.org/packages/net-questdb-client/)
-([changelog](https://github.com/questdb/net-questdb-client/releases/tag/v2.0.0))
+[2.1.0](https://www.nuget.org/packages/net-questdb-client/)
+([changelog](https://github.com/questdb/net-questdb-client/releases/tag/2.1.0))
 
 The NuGet package can be installed using the dotnet CLI:
 
@@ -571,7 +571,7 @@ using var sender =
 using var sender =
     Sender.New(
         "tcps::addr=localhost:9009;tls_verify=unsafe_off;username=admin;token=NgdiOWDoQNUP18WOnb1xkkEG5TzPYMda5SiUOvT1K0U=;");
-// See: https://questdb.io/docs/reference/api/ilp/authenticate
+// See: /docs/reference/api/ilp/authenticate
 
 ```
 
@@ -583,11 +583,11 @@ and column auto-creation.
 
 Dive deeper into the .NET client capabilities by exploring more examples
 provided in the
-[GitHub repository](https://github.com/questdb/dotnet-questdb-client).
+[GitHub repository](https://github.com/questdb/net-questdb-client).
 
 To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
 
 Should you encounter any issues or have questions, the
-[Community Forum](https://community.questdb.io/) is a vibrant platform for
+[Community Forum](https://community.questdb.com/) is a vibrant platform for
 discussions.

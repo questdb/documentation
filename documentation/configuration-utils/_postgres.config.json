@@ -9,7 +9,8 @@
   },
   "pg.net.connection.limit": {
     "default": "64",
-    "description": "The maximum number permitted for simultaneous Postgres connections to the server. This value is intended to control server memory consumption."
+    "description": "The maximum number permitted for simultaneous Postgres connections to the server. This value is intended to control server memory consumption.",
+    "reloadable": true
   },
   "pg.net.connection.timeout": {
     "default": "300000",
@@ -49,23 +50,28 @@
   },
   "pg.password": {
     "default": "quest",
-    "description": "Postgres database password."
+    "description": "Postgres database password.",
+    "reloadable": true
   },
   "pg.user": {
     "default": "admin",
-    "description": "Postgres database username."
+    "description": "Postgres database username.",
+    "reloadable": true
   },
   "pg.readonly.user.enabled": {
     "default": "false",
-    "description": "Enable or disable Postgres database read-only user account. When enabled, this additional user can be used to open read-only connections to the database."
+    "description": "Enable or disable Postgres database read-only user account. When enabled, this additional user can be used to open read-only connections to the database.",
+    "reloadable": true
   },
   "pg.readonly.password": {
     "default": "quest",
-    "description": "Postgres database read-only user password."
+    "description": "Postgres database read-only user password.",
+    "reloadable": true
   },
   "pg.readonly.user": {
     "default": "user",
-    "description": "Postgres database read-only user username."
+    "description": "Postgres database read-only user username.",
+    "reloadable": true
   },
   "pg.select.cache.enabled": {
     "default": "true",
@@ -109,11 +115,13 @@
   },
   "pg.recv.buffer.size": {
     "default": "1M",
-    "description": "Size of the buffer for receiving data."
+    "description": "Size of the buffer for receiving data.",
+    "reloadable": true
   },
   "pg.send.buffer.size": {
     "default": "1M",
-    "description": "Size of the buffer for sending data."
+    "description": "Size of the buffer for sending data.",
+    "reloadable": true
   },
   "pg.date.locale": {
     "default": "en",
@@ -142,5 +150,10 @@
   "pg.binary.param.count.capacity": {
     "default": "2",
     "description": "Size of the initial capacity for the pool used for binary bind variables."
+  },
+  "pg.named.statement.limit": {
+    "default": "64",
+    "description": "Size of the named statement pool.",
+    "reloadable": true
   }
 }

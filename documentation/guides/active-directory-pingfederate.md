@@ -6,7 +6,7 @@ description: ""
 import Screenshot from "@theme/Screenshot"
 
 This document helps set up SSO authentication for the Web Console in
-[PingFederate](https://docs.pingidentity.com/r/en-us/pingfederate-110/pf_intro_to_pingfed).
+[PingFederate](https://www.pingidentity.com/en/platform/capabilities/authentication-authority/pingfederate.html).
 
 It is assumed that the Azure Active Directory serves as the Identity Provider
 (IdP).

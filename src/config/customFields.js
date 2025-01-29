@@ -1,5 +1,5 @@
 const githubOrgUrl = "https://github.com/questdb"
-const domain = "questdb.io"
+const domain = "questdb.com"
 
 module.exports = {
   trailingSlash: undefined,
@@ -18,7 +18,7 @@ module.exports = {
   websiteGithubUrl: `${githubOrgUrl}/questdb.io`,
   linkedInUrl: "https://www.linkedin.com/company/questdb/",
   oneLiner: "QuestDB: the database for time series",
-  slackUrl: `https://slack.${domain}`,
+  slackUrl: `https://slack.questdb.com/`,
   discourseUrl: `https://community.${domain}`,
   stackoverflowUrl: "https://stackoverflow.com/questions/tagged/questdb",
   twitterUrl: "https://x.com/questdb",

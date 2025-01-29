@@ -20,7 +20,7 @@ together. For a deeper tutorial, see
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
-- [QuestDB](/get-questdb)
+- [QuestDB](/download/)
 - [Cube](https://github.com/cube-js/cube)
 
 ## Start Cube & QuestDB

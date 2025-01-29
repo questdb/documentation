@@ -106,7 +106,7 @@ explore data through customizable dashboards and reports. This guide provides
 instructions for installing Apache Superset via Docker and QuestDB Connect, and
 connecting QuestDB to Apache Superset.
 
-If you have any questions or need help, please join our [community Slack](https://slack.questdb.io/) or 
+If you have any questions or need help, please join our [community Slack](https://slack.questdb.com/) or 
 open a [GitHub issue](https://github.com/questdb/questdb-connect/issues/new).
 
 

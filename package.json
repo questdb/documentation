@@ -1,6 +1,6 @@
 {
-  "name": "questdb.io",
-  "version": "0.0.1",
+  "name": "documentation",
+  "version": "2.0.0",
   "private": true,
   "license": "Apache-2.0",
   "scripts": {
@@ -12,8 +12,9 @@
     "swizzle": "docusaurus swizzle"
   },
   "dependencies": {
-    "@docusaurus/faster": "^3.6.3",
-    "@docusaurus/theme-mermaid": "^3.6.3",
+    "@docusaurus/faster": "^3.7.0",
+    "@docusaurus/theme-mermaid": "^3.7.0",
+    "@docusaurus/theme-search-algolia": "^3.7.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "2.2.0",
     "@mdx-js/react": "3.1.0",
@@ -24,11 +25,12 @@
     "clsx": "2.1.1",
     "date-fns": "4.1.0",
     "dotenv": "^16.4.5",
+    "framer-motion": "^10.18.0",
     "gray-matter": "4.0.3",
     "prism-react-renderer": "2.4.0",
-    "react": "18.3.1",
+    "react": "^19.0.0",
     "react-calendly": "4.3.1",
-    "react-dom": "18.3.1",
+    "react-dom": "^19.0.0",
     "react-markdown": "9.0.1",
     "react-remark": "2.1.0",
     "react-tippy": "1.4.0",
@@ -40,12 +42,12 @@
     "unist-util-visit": "5.0.0"
   },
   "devDependencies": {
-    "@docusaurus/core": "^3.6.3",
-    "@docusaurus/module-type-aliases": "^3.6.3",
-    "@docusaurus/plugin-pwa": "^3.6.3",
-    "@docusaurus/preset-classic": "^3.6.3",
-    "@docusaurus/tsconfig": "^3.6.3",
-    "@docusaurus/types": "^3.6.3",
+    "@docusaurus/core": "^3.7.0",
+    "@docusaurus/module-type-aliases": "^3.7.0",
+    "@docusaurus/plugin-pwa": "^3.7.0",
+    "@docusaurus/preset-classic": "^3.7.0",
+    "@docusaurus/tsconfig": "^3.7.0",
+    "@docusaurus/types": "^3.7.0",
     "@types/react": "18.3.12",
     "@types/react-helmet": "6.1.11",
     "@types/react-router-config": "5.0.11",
@@ -78,7 +80,6 @@
     "imagemin-pngquant": "10.0.0",
     "imagemin-svgo": "11.0.1",
     "lint-staged": "15.2.10",
-    "netlify-plugin-cache": "1.0.3",
     "node-fetch": "2",
     "postcss": "8.4.49",
     "prettier": "3.3.3",
@@ -86,7 +87,8 @@
     "tailwindcss": "3.4.15",
     "typescript": "~5.6.3",
     "webpack": "5.96.1",
-    "webpack-manifest-plugin": "5.0.0"
+    "webpack-manifest-plugin": "5.0.0",
+    "zustand": "4.5.0"
   },
   "browserslist": {
     "production": [

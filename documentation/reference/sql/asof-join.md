@@ -61,168 +61,271 @@ Read more about execution order in the
 
 ## ASOF JOIN
 
-`ASOF JOIN` joins two different time-series measured.
+`ASOF JOIN` joins two time-series on their timestamp, using the following
+logic: for each row in the first time-series,
 
-For each row in the first time-series, the `ASOF JOIN` takes from the second
-time-series a timestamp that meets both of the following criteria:
-
-- The timestamp is the closest to the first timestamp.
-- The timestamp is **strictly prior or equal to** the first timestamp.
+1. consider all timestamps in the second time-series **earlier or equal to**
+the first one
+2. choose **the latest** such timestamp
 
 ### Example
 
-Given the following tables:
+Let's use an example with two tables:
 
-Table `buy` (the left table):
+- `trades`: trade events on a single stock
+- `order_book`: level-1 order book snapshots for that stock
 
-<div className="pink-table">
-
-| timestamp                   | price    |
-| --------------------------- | -------- |
-| 2024-06-22T00:00:00.039906Z | 0.092014 |
-| 2024-06-22T00:00:00.343909Z | 9.805    |
-| 2024-06-22T00:00:00.349387Z | 134.56   |
-| 2024-06-22T00:00:00.349387Z | 134.56   |
-| 2024-06-22T00:00:00.446196Z | 9.805    |
-
-</div>
-
-The `sell` table (the right table):
+`trades` data:
 
 <div className="blue-table">
 
-| timestamp                   | price    |
-| --------------------------- | -------- |
-| 2024-06-22T00:00:00.222534Z | 64120.28 |
-| 2024-06-22T00:00:00.222534Z | 64120.28 |
-| 2024-06-22T00:00:00.222534Z | 64116.74 |
-| 2024-06-22T00:00:00.222534Z | 64116.5  |
-| 2024-06-22T00:00:00.543826Z | 134.56   |
+|    timestamp    |  price | size |
+| --------------- | ------ | ---- |
+| 08:00:00.007140 | 175.97 |  400 |
+| 08:00:00.609618 | 178.55 |  400 |
+| 08:00:00.672131 | 176.09 |  400 |
+| 08:00:00.672147 | 176.03 |  400 |
+| 08:00:01.146931 | 175.45 |  400 |
+| 08:00:01.495188 | 177.90 |  400 |
+| 08:00:01.991977 | 175.35 |  400 |
+| 08:00:01.991991 | 175.36 |  400 |
+| 08:00:02.039451 | 175.36 |  400 |
+| 08:00:02.836413 | 175.55 |  400 |
+| 08:00:03.447858 | 176.79 |  400 |
+| 08:00:04.782191 | 181.00 |   15 |
+| 08:00:05.408871 | 175.77 |  400 |
+| 08:00:06.007145 | 176.52 |  400 |
+| 08:00:06.740159 | 184.00 |    1 |
+| 08:00:07.593841 | 175.75 |  400 |
+| 08:00:10.310291 | 176.38 |   29 |
+| 08:00:10.550535 | 175.86 |  400 |
+| 08:00:10.761790 | 175.94 |  400 |
+| 08:00:12.046660 | 176.15 |  400 |
+| 08:00:12.897624 | 176.62 |  400 |
+| 08:00:13.838193 | 176.51 |   25 |
+| 08:00:15.125509 | 176.17 |  400 |
+| 08:00:16.727077 | 176.48 |  400 |
+| 08:00:18.813886 | 176.68 |  400 |
+| 08:00:22.180535 | 176.05 |  400 |
+| 08:00:25.125634 | 176.16 |  400 |
+| 08:00:26.117889 | 176.33 |    1 |
+| 08:00:26.184839 | 176.52 |  400 |
+| 08:00:26.185102 | 176.41 |   25 |
 
 </div>
 
-An `ASOF JOIN` query can look like the following:
+`order_book` data:
 
-```questdb-sql
-WITH
-buy AS (  -- select the first 5 buys in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp = '2024-06-22' AND side = 'buy' LIMIT 5
-   ),
-sell AS ( -- select the first 5 sells in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp = '2024-06-22' AND side = 'sell' LIMIT 5
-   )
-SELECT
-   buy.timestamp, sell.timestamp, buy.price, sell.price
-FROM buy ASOF JOIN sell;
+<div className="pink-table">
+
+| timestamp | bid_price | bid_size | ask_price | ask_size |
+| --------- | --------- | -------- | --------- | -------- |
+| 08:00:00  |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:01  |    176.33 |     4744 |    176.6  |     8404 |
+| 08:00:02  |    176.07 |      136 |    176.76 |     4946 |
+| 08:00:03  |    176.07 |       84 |    176.75 |     2182 |
+| 08:00:04  |    176.07 |      112 |    176.59 |     2734 |
+| 08:00:05  |    176.38 |      212 |    176.5  |     6966 |
+| 08:00:06  |    176.33 |      176 |    176.52 |     8174 |
+| 08:00:07  |    176.33 |      276 |    176.67 |     7345 |
+| 08:00:08  |    176.33 |       48 |    176.67 |     1600 |
+| 08:00:09  |    176.35 |       66 |    176.67 |     2400 |
+| 08:00:10  |    176.36 |      695 |    176.38 |    20698 |
+| 08:00:11  |    176.35 |       98 |    176.59 |     2800 |
+| 08:00:12  |    176.48 |      104 |    176.59 |     4040 |
+| 08:00:13  |    176.48 |      165 |    176.38 |     6035 |
+| 08:00:14  |    176.35 |       56 |    176.38 |      720 |
+| 08:00:15  |    176.35 |      119 |    176.38 |     1530 |
+| 08:00:16  |    176.35 |      133 |    176.38 |     3710 |
+| 08:00:18  |    176.35 |       84 |    176.38 |     1880 |
+| 08:00:19  |    176.35 |       14 |    176.38 |      180 |
+| 08:00:20  |    176.35 |       14 |    176.38 |      180 |
+| 08:00:21  |    176.35 |      112 |    176.38 |     1440 |
+| 08:00:22  |    176.35 |      133 |    176.38 |     1710 |
+| 08:00:25  |    176.35 |      122 |    176.38 |     3929 |
+| 08:00:26  |    176.35 |      300 |    176.37 |     6952 |
+| 08:00:28  |    176.07 |       28 |    176.37 |      496 |
+
+</div>
+
+We want to join each trade event to the relevant order book snapshot. All
+we have to write is
+
+```questdb-sql title="A basic ASOF JOIN example" demo
+trades ASOF JOIN order_book
 ```
 
-This is the JOIN result:
+and we get this result:
 
 <div className="table-alternate">
 
-| timestamp                   | timestamp1                  | price    | price1  |
-| --------------------------- | --------------------------- | -------- | ------- |
-| 2024-06-22T00:00:00.039906Z | NULL                        | 0.092014 | NULL    |
-| 2024-06-22T00:00:00.343909Z | 2024-06-22T00:00:00.222534Z | 9.805    | 64116.5 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-22T00:00:00.222534Z | 134.56   | 64116.5 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-22T00:00:00.222534Z | 134.56   | 64116.5 |
-| 2024-06-22T00:00:00.446196Z | 2024-06-22T00:00:00.222534Z | 9.805    | 64116.5 |
+|     timestamp   |  price | size | timestamp1 | bid_price | bid_size | ask_price | ask_size |
+| --------------- | ------ | ---- | ---------- | --------- | -------- | --------- | -------- |
+| 08:00:00.007140 | 175.97 |  400 |   08:00:00 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:00.609618 | 178.55 |  400 |   08:00:00 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:00.672131 | 176.09 |  400 |   08:00:00 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:00.672147 | 176.03 |  400 |   08:00:00 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:01.146931 | 175.45 |  400 |   08:00:01 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:01.495188 | 177.90 |  400 |   08:00:01 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:01.991977 | 175.35 |  400 |   08:00:01 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:01.991991 | 175.36 |  400 |   08:00:01 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:02.039451 | 175.36 |  400 |   08:00:02 |    176.07 |      136 |    176.76 |     4946 |
+| 08:00:02.836413 | 175.55 |  400 |   08:00:02 |    176.07 |      136 |    176.76 |     4946 |
+| 08:00:03.447858 | 176.79 |  400 |   08:00:03 |    176.07 |       84 |    176.75 |     2182 |
+| 08:00:04.782191 | 181.00 |   15 |   08:00:04 |    176.07 |      112 |    176.59 |     2734 |
+| 08:00:05.408871 | 175.77 |  400 |   08:00:05 |    176.38 |      212 |    176.50 |     6966 |
+| 08:00:06.007145 | 176.52 |  400 |   08:00:06 |    176.33 |      176 |    176.52 |     8174 |
+| 08:00:06.740159 | 184.00 |    1 |   08:00:06 |    176.33 |      176 |    176.52 |     8174 |
+| 08:00:07.593841 | 175.75 |  400 |   08:00:07 |    176.33 |      276 |    176.67 |     7345 |
+| 08:00:10.310291 | 176.38 |   29 |   08:00:10 |    176.36 |      695 |    176.38 |    20698 |
+| 08:00:10.550535 | 175.86 |  400 |   08:00:10 |    176.36 |      695 |    176.38 |    20698 |
+| 08:00:10.761790 | 175.94 |  400 |   08:00:10 |    176.36 |      695 |    176.38 |    20698 |
+| 08:00:12.046660 | 176.15 |  400 |   08:00:12 |    176.48 |      104 |    176.59 |     4040 |
+| 08:00:12.897624 | 176.62 |  400 |   08:00:12 |    176.48 |      104 |    176.59 |     4040 |
+| 08:00:13.838193 | 176.51 |   25 |   08:00:13 |    176.48 |      165 |    176.38 |     6035 |
+| 08:00:15.125509 | 176.17 |  400 |   08:00:15 |    176.35 |      119 |    176.38 |     1530 |
+| 08:00:16.727077 | 176.48 |  400 |   08:00:16 |    176.35 |      133 |    176.38 |     3710 |
+| 08:00:18.813886 | 176.68 |  400 |   08:00:18 |    176.35 |       84 |    176.38 |     1880 |
+| 08:00:22.180535 | 176.05 |  400 |   08:00:22 |    176.35 |      133 |    176.38 |     1710 |
+| 08:00:25.125634 | 176.16 |  400 |   08:00:25 |    176.35 |      122 |    176.38 |     3929 |
+| 08:00:26.117889 | 176.33 |    1 |   08:00:26 |    176.35 |      300 |    176.37 |     6952 |
+| 08:00:26.184839 | 176.52 |  400 |   08:00:26 |    176.35 |      300 |    176.37 |     6952 |
+| 08:00:26.185102 | 176.41 |   25 |   08:00:26 |    176.35 |      300 |    176.37 |     6952 |
 
 </div>
-
-The result has all rows from the `buys` table joined with rows from the `sells`
-table. For each timestamp from the `buys` table, the query looks for a timestamp
-that is equal or prior to it from the `sells` table. If no matching timestamp is
-found, NULL is inserted.
 
 ### Using `ON` for matching column value
 
-An additional `ON` clause can be used to join the tables based on the value of a
-selected column.
+The tables in the above example are just about one stock; in reality the same
+table covers many stocks, and you want the results not to get mixed between
+them. This is what the `ON` clause is for -- you can point out the key (ticker)
+column and get results separate for each key.
 
-The query above does not use the optional `ON` clause. If both tables store data
-for multiple symbols, `ON` clause provides a way to find sells for buys with
-matching symbol value.
-
-Table `buy` (the left table):
+Here's the trades table expanded to include two stocks, and a new `symbol` column:
 
 <div className="pink-table">
 
-| timestamp                   | symbol  | price    |
-| --------------------------- | ------- | -------- |
-| 2024-06-22T00:00:00.039906Z | XLM-USD | 0.092014 |
-| 2024-06-22T00:00:00.039906Z | UNI-USD | 9.805    |
-| 2024-06-22T00:00:00.349387Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.349387Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.446196Z | UNI-USD | 9.805    |
+|    timestamp    | symbol |  price | size |
+| --------------- | ------ | ------ | ---- |
+| 08:00:00.007168 |   AAPL | 176.91 |  400 |
+| 08:00:00.834205 |   AAPL | 175.93 |  400 |
+| 08:00:00.988111 |   AAPL | 176.47 |  100 |
+| 08:00:01.199577 |   AAPL | 175.46 |  400 |
+| 08:00:01.495172 |   AAPL | 177.95 |  400 |
+| 08:00:01.538683 |   GOOG | 175.82 |  400 |
+| 08:00:01.555565 |   AAPL | 176.33 |   25 |
+| 08:00:02.006636 |   GOOG |  150.0 |   10 |
+| 08:00:02.039451 |   AAPL | 175.36 |  400 |
+| 08:00:02.460454 |   GOOG | 175.45 |  400 |
+| 08:00:03.012909 |   GOOG |  175.5 |    1 |
+| 08:00:03.494927 |   GOOG |  185.0 |    5 |
+| 08:00:03.524212 |   AAPL | 175.48 |  400 |
+| 08:00:04.648333 |   AAPL | 175.66 |  400 |
+| 08:00:04.943421 |   GOOG | 175.48 |  400 |
+| 08:00:05.884890 |   AAPL | 176.54 |   28 |
+| 08:00:05.961856 |   GOOG | 175.66 |  400 |
+| 08:00:06.589806 |   GOOG | 175.65 |  400 |
+| 08:00:06.740159 |   AAPL |  184.0 |    1 |
+| 08:00:07.342978 |   GOOG | 176.55 |  400 |
+| 08:00:07.345877 |   AAPL | 176.73 |  400 |
+| 08:00:10.419065 |   AAPL | 176.41 |  400 |
+| 08:00:11.636237 |   AAPL | 176.69 |  400 |
+| 08:00:11.683078 |   GOOG | 176.67 |  400 |
+| 08:00:13.650868 |   AAPL | 176.52 |  124 |
+| 08:00:13.650880 |   AAPL | 176.59 |  124 |
+| 08:00:14.055762 |   AAPL | 176.66 |  400 |
+| 08:00:14.083022 |   GOOG | 176.81 |  400 |
+| 08:00:15.088091 |   GOOG | 176.52 |  400 |
+| 08:00:15.125494 |   AAPL | 176.12 |  400 |
+| 08:00:15.147691 |   GOOG | 176.54 |  400 |
 
 </div>
 
-The `sell` table (the right table):
+Order book, similarly extended with the `symbol` column:
 
 <div className="blue-table">
 
-| timestamp                   | symbol  | price    |
-| --------------------------- | ------- | -------- |
-| 2024-06-21T23:59:59.187884Z | SOL-USD | 134.54   |
-| 2024-06-21T23:59:59.878276Z | UNI-USD | 9.804    |
-| 2024-06-22T00:00:00.222534Z | BTC-USD | 64120.28 |
-| 2024-06-22T00:00:00.543826Z | SOL-USD | 134.56   |
-| 2024-06-22T00:00:00.644399Z | SOL-USD | 134.56   |
+| timestamp | symbol | bid_price | bid_size | ask_price | ask_size |
+| --------- | ------ | --------- | -------- | --------- | -------- |
+|  08:00:00 |   AAPL |    176.47 |     5542 |    176.82 |    13054 |
+|  08:00:01 |   GOOG |    130.32 |     7516 |    130.9  |    25652 |
+|  08:00:01 |   AAPL |    176.33 |     4744 |    176.6  |     8404 |
+|  08:00:02 |   GOOG |    130.59 |     9046 |    130.68 |     9264 |
+|  08:00:02 |   AAPL |    176.07 |      136 |    176.76 |     4946 |
+|  08:00:03 |   GOOG |    130.34 |     4086 |    130.82 |    12676 |
+|  08:00:03 |   AAPL |    176.07 |       84 |    176.75 |     2182 |
+|  08:00:04 |   GOOG |    130.29 |      350 |    130.79 |     8780 |
+|  08:00:04 |   AAPL |    176.07 |      112 |    176.59 |     2734 |
+|  08:00:05 |   GOOG |    130.29 |      182 |    130.68 |     6060 |
+|  08:00:05 |   AAPL |    176.38 |      212 |    176.5  |     6966 |
+|  08:00:06 |   GOOG |    130.48 |      394 |    130.65 |     6828 |
+|  08:00:06 |   AAPL |    176.33 |      176 |    176.52 |     8174 |
+|  08:00:07 |   GOOG |    130.52 |      366 |    130.61 |    21260 |
+|  08:00:07 |   AAPL |    176.33 |      276 |    176.67 |     7345 |
+|  08:00:08 |   GOOG |    130.48 |      480 |    130.76 |    13032 |
+|  08:00:08 |   AAPL |    176.33 |       48 |    176.67 |     1600 |
+|  08:00:09 |   GOOG |    130.48 |      216 |    130.74 |     6458 |
+|  08:00:09 |   AAPL |    176.35 |       66 |    176.67 |     2400 |
+|  08:00:10 |   GOOG |    130.48 |       72 |    130.74 |     2400 |
+|  08:00:10 |   AAPL |    176.36 |      695 |    176.38 |    20698 |
+|  08:00:11 |   GOOG |    130.51 |     1236 |    130.52 |    26596 |
+|  08:00:11 |   AAPL |    176.35 |       98 |    176.59 |     2800 |
+|  08:00:12 |   GOOG |    130.5 |       378 |    130.68 |    22000 |
+|  08:00:12 |   AAPL |    176.48 |      104 |    176.59 |     4040 |
+|  08:00:13 |   GOOG |    130.6 |       174 |    130.68 |     5200 |
+|  08:00:13 |   AAPL |    176.48 |      165 |    176.38 |     6035 |
+|  08:00:14 |   GOOG |    130.6 |       138 |    130.62 |     8616 |
+|  08:00:14 |   AAPL |    176.35 |       56 |    176.38 |      720 |
+|  08:00:15 |   GOOG |    130.6 |       394 |    130.52 |     9374 |
 
 </div>
 
-Notice how both tables have a new column `symbol` that stores the stock name.
+And here's the ASOF JOIN query with the `ON` clause added:
 
-The `ON` clause allows you to match the value of the `symbol` column in the
-`buys` table with that in the `sells` table:
-
-```questdb-sql
-WITH
-buy AS (  -- select the first 5 buys in June 22
-   SELECT * FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'buy' LIMIT 5
-   ),
-sell AS ( -- sells in the last second of June 21 and 1 second later
-   SELECT * FROM trades
-   WHERE timestamp IN '2024-06-21T23:59:59;1s' AND side = 'sell'
-   )
-SELECT
-   buy.timestamp,  sell.timestamp, buy.symbol,
-   (buy.price - sell.price) spread
-FROM buy ASOF JOIN sell ON (symbol);
-
+```questdb-sql title="ASOF JOIN with symbol matching" demo
+SELECT t.timestamp, t.symbol, price, size, bid_price, bid_size, ask_price, ask_size
+FROM trades t ASOF JOIN order_book ON (symbol);
 ```
 
-The above query returns these results:
+Result:
 
 <div className="table-alternate">
 
-| timestamp                   | timestamp1                  | symbol  | spread |
-| --------------------------- | --------------------------- | ------- | ------ |
-| 2024-06-22T00:00:00.039906Z | NULL                        | XLM-USD | NULL   |
-| 2024-06-22T00:00:00.343909Z | 2024-06-21T23:59:59.878276Z | UNI-USD | 0.0009 |
-| 2024-06-22T00:00:00.349387Z | 2024-06-21T23:59:59.187884Z | SOL-USD | 0.02   |
-| 2024-06-22T00:00:00.349387Z | 2024-06-21T23:59:59.187884Z | SOL-USD | 0.02   |
-| 2024-06-22T00:00:00.446196Z | 2024-06-21T23:59:59.878276Z | UNI-USD | 0.0009 |
+|    timestamp    | symbol |  price | size | bid_price | bid_size | ask_price | ask_size |
+| --------------- | ------ | ------ | ---- | --------- | -------- | --------- | -------- |
+| 08:00:00.007168 |   AAPL | 176.91 |  400 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:00.834205 |   AAPL | 175.93 |  400 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:00.988111 |   AAPL | 176.47 |  100 |    176.47 |     5542 |    176.82 |    13054 |
+| 08:00:01.199577 |   AAPL | 175.46 |  400 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:01.495172 |   AAPL | 177.95 |  400 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:01.538683 |   GOOG | 175.82 |  400 |    130.32 |     7516 |    130.90 |    25652 |
+| 08:00:01.555565 |   AAPL | 176.33 |   25 |    176.33 |     4744 |    176.60 |     8404 |
+| 08:00:02.006636 |   GOOG | 150.00 |   10 |    130.59 |     9046 |    130.68 |     9264 |
+| 08:00:02.039451 |   AAPL | 175.36 |  400 |    176.07 |      136 |    176.76 |     4946 |
+| 08:00:02.460454 |   GOOG | 175.45 |  400 |    130.59 |     9046 |    130.68 |     9264 |
+| 08:00:03.012909 |   GOOG | 175.50 |    1 |    130.34 |     4086 |    130.82 |    12676 |
+| 08:00:03.494927 |   GOOG | 185.00 |    5 |    130.34 |     4086 |    130.82 |    12676 |
+| 08:00:03.524212 |   AAPL | 175.48 |  400 |    176.07 |       84 |    176.75 |     2182 |
+| 08:00:04.648333 |   AAPL | 175.66 |  400 |    176.07 |      112 |    176.59 |     2734 |
+| 08:00:04.943421 |   GOOG | 175.48 |  400 |    130.29 |      350 |    130.79 |     8780 |
+| 08:00:05.884890 |   AAPL | 176.54 |   28 |    176.38 |      212 |    176.50 |     6966 |
+| 08:00:05.961856 |   GOOG | 175.66 |  400 |    130.29 |      182 |    130.68 |     6060 |
+| 08:00:06.589806 |   GOOG | 175.65 |  400 |    130.48 |      394 |    130.65 |     6828 |
+| 08:00:06.740159 |   AAPL | 184.00 |    1 |    176.33 |      176 |    176.52 |     8174 |
+| 08:00:07.342978 |   GOOG | 176.55 |  400 |    130.52 |      366 |    130.61 |    21260 |
+| 08:00:07.345877 |   AAPL | 176.73 |  400 |    176.33 |      276 |    176.67 |     7345 |
+| 08:00:10.419065 |   AAPL | 176.41 |  400 |    176.36 |      695 |    176.38 |    20698 |
+| 08:00:11.636237 |   AAPL | 176.69 |  400 |    176.35 |       98 |    176.59 |     2800 |
+| 08:00:11.683078 |   GOOG | 176.67 |  400 |    130.51 |     1236 |    130.52 |    26596 |
+| 08:00:13.650868 |   AAPL | 176.52 |  124 |    176.48 |      165 |    176.38 |     6035 |
+| 08:00:13.650880 |   AAPL | 176.59 |  124 |    176.48 |      165 |    176.38 |     6035 |
+| 08:00:14.055762 |   AAPL | 176.66 |  400 |    176.35 |       56 |    176.38 |      720 |
+| 08:00:14.083022 |   GOOG | 176.81 |  400 |    130.60 |      138 |    130.62 |     8616 |
+| 08:00:15.088091 |   GOOG | 176.52 |  400 |    130.60 |      394 |    130.52 |     9374 |
+| 08:00:15.125494 |   AAPL | 176.12 |  400 |    176.35 |       56 |    176.38 |      720 |
+| 08:00:15.147691 |   GOOG | 176.54 |  400 |    130.60 |      394 |    130.52 |     9374 |
 
 </div>
-
-This query returns all rows from the `buy` table joined with records from the
-`sell` table that meet both the following criterion:
-
-- The `symbol` column of the two tables has the same value
-- The timestamp of the `sell` record is prior to or equal to the timestamp of
-  the `buy` record.
-
-The XLM-USD record in the `buy` table is not joined with any record in the
-`sell` table because there is no record in the `sell` table with the same stock
-name and a timestamp prior to or equal to the timestamp of the XLM-USD record.
-Note how the `sell` table has three rows with the SOL-USD symbol, but both of
-the SOL-USD in the `buy` table are matching to the first entry, as it is the
-only timestamp which is equal or prior.
 
 ### Timestamp considerations
 

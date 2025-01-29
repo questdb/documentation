@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="779" height="213">
+<svg xmlns="http://www.w3.org/2000/svg" width="579" height="213">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -57,10 +57,8 @@
             <rect x="417" y="1" width="88" height="32" class="nonterminal"></rect>
             <text class="nonterminal" x="427" y="21">timestamp</text></a><rect x="527" y="3" width="24" height="32" rx="10"></rect>
          <rect x="525" y="1" width="24" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="535" y="21">'</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#timestampIntervalSearch" xlink:title="timestampIntervalSearch">
-            <rect x="571" y="3" width="180" height="32"></rect>
-            <rect x="569" y="1" width="180" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="579" y="21">timestampIntervalSearch</text></a><path class="line" d="m17 17 h2 m0 0 h10 m70 0 h10 m0 0 h10 m134 0 h10 m20 0 h10 m30 0 h10 m0 0 h10 m-80 0 h20 m60 0 h20 m-100 0 q10 0 10 10 m80 0 q0 -10 10 -10 m-90 10 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m20 -176 h10 m24 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m24 0 h10 m0 0 h10 m180 0 h10 m3 0 h-3"></path>
-         <polygon points="769 17 777 13 777 21"></polygon>
-         <polygon points="769 17 761 13 761 21"></polygon>
+         <text class="terminal" x="535" y="21">'</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m70 0 h10 m0 0 h10 m134 0 h10 m20 0 h10 m30 0 h10 m0 0 h10 m-80 0 h20 m60 0 h20 m-100 0 q10 0 10 10 m80 0 q0 -10 10 -10 m-90 10 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m30 0 h10 m0 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m-70 -10 v20 m80 0 v-20 m-80 20 v24 m80 0 v-24 m-80 24 q0 10 10 10 m60 0 q10 0 10 -10 m-70 10 h10 m40 0 h10 m20 -176 h10 m24 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m24 0 h10 m3 0 h-3"></path>
+         <polygon points="569 17 577 13 577 21"></polygon>
+         <polygon points="569 17 561 13 561 21"></polygon>
 </svg>

@@ -27,7 +27,7 @@ SELECT
 FROM
     trades
 WHERE
-    json_extract(trade_details, '$.exchange') == 'NASDAQ'
+    json_extract(trade_details, '$.exchange') = 'NASDAQ'
 ```
 
 | quantity | price  | first_ex_ts                 |

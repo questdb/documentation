@@ -51,8 +51,8 @@ const clients: Client[] = [
   {
     label: "Golang",
     logoSrc: "/images/logos/go.svg",
-    docsUrl: "https://pkg.go.dev/github.com/questdb/go-questdb-client/v3",
-    sourceUrl: "https://github.com/questdb/go-questdb-client/v3",
+    docsUrl: "https://pkg.go.dev/github.com/questdb/go-questdb-client/",
+    sourceUrl: "https://github.com/questdb/go-questdb-client/",
   },
   {
     label: "Rust",

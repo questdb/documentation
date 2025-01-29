@@ -27,13 +27,11 @@ basics.
    the name of your new virtual machine, as well as its desired Region and
    Availability Zone. Your dialog should look something like this:
 
-import Screenshot from "@theme/Screenshot"
-
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/create-vm.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 3. Scroll down and select your desired instance type. In this case, we used a
@@ -43,9 +41,9 @@ import Screenshot from "@theme/Screenshot"
 
 <Screenshot
   alt="The Create Instance dialog on Microsoft Azure, continued"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/ssh-setup.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 5. We will use Azure defaults for the rest of the VM's settings. Click
@@ -54,9 +52,9 @@ import Screenshot from "@theme/Screenshot"
 
 <Screenshot
   alt="Deployment Complete"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/deployment-complete.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 Once you see this screen, click the **Go to resource** button and move on to the
@@ -70,17 +68,19 @@ connect to your new QuestDB instance over the several protocols that we support.
 1. In the **Settings** sidebar, click the **Networking** button. This will lead
    you to a page with all firewall rules for your instance. To open up the
    required ports, click the **Add inbound port rule** on the right-hand side.
-2. Change the **Destination port ranges** to the `8812,9000,9009`, set the
+2. Change the **Destination port ranges** to the `8812,9000,9003`, set the
    **Protocol** to `TCP`, change the name to `questdb`, and click the **Add**
    button. This will add the appropriate ingress rules to your instance's
    firewall. It may take a few seconds, and possibly a page refresh, but you
-   should see your new firewall rule in the list.
+   should see your new firewall rule in the list. Port 8812 is used for the
+   postgresql protocol, port 9000 is used for the web interface, the REST API,
+   and ILP ingestion over HTTP. Port 9003 is used for metrics and health check.
 
 <Screenshot
   alt="Firewall rules for your Azure VM"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/firewall-rules.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 ## Connect to your instance and install QuestDB
@@ -101,25 +101,30 @@ chmod 400 ~/download/questdb_key.pem
 ssh -i ~/download/questdb_key.pem azureuser@$YOUR_INSTANCE_IP
 ```
 
-Once we've connected to the instance, we will be following the
-[binary installation method](https://questdb.io/download/). Here, we use `wget`
-to download the latest QuestDB binary, extract it, and run the start script.
+Once we've connected to the instance, we will use `wget`
+to download the QuestDB binary, extract it, and run the start script. Please visit
+the Ubuntu section at the [binary installation page](/download/) to make sure you are using the latest
+version of the binary package and replace the URL below as appropriate.
 
-```bash
-wget https://github.com/questdb/questdb/releases/download/7.3.3/questdb-7.3.3-rt-linux-amd64.tar.gz
-tar -xvf questdb-7.3.3-rt-linux-amd64.tar.gz
-cd questdb-7.3.3-rt-linux-amd64/bin
-./questdb.sh start
-```
+<InterpolateReleaseData
+  renderText={(release) => (
+    <CodeBlock className="language-bash">
+      {`wget https://github.com/questdb/questdb/releases/download/8.2.1/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar -xvf questdb-${release.name}-rt-linux-x86-64.tar.gz
+cd questdb-${release.name}-rt-linux-x86-64/bin
+./questdb.sh start`}
+    </CodeBlock>
+  )}
+/>
 
 Once you've run these commands, you should be able to navigate to your instance
-at its IP on port 9000: `https://$YOUR_INSTANCE_IP:9000`
+at its IP on port 9000: `http://$YOUR_INSTANCE_IP:9000`
 
 <Screenshot
   alt="Firewall rules for your Azure VM"
-  height={598}
   src="images/guides/microsoft-azure-ubuntu/web-console.webp"
-  width={650}
+  width={450}
+  title="Click to zoom"
 />
 
 ## Azure Managed Disks
@@ -143,3 +148,8 @@ Not all filesystems have first-class support in QuestDB. This means we do not ro
 For fresh deployments, we recommend `ZFS`, since its built-in compression will reduce spending on storage space.
 
 Please refer to the main documentation on [supported filesystems](/docs/deployment/capacity-planning/#supported-filesystems) for more information.
+
+## Single Sign On with EntraID
+
+If you are using EntraID to manage users, [QuestDB enterprise](/enterprise/) offers the possibility to do Single Sign On and manage your database permissions.
+See more information at the [Microsoft EntraID OIDC guide](/docs/guides/microsoft-entraid-oidc).

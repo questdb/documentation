@@ -96,7 +96,7 @@ our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion) r
 ## date_trunc
 
 `date_trunc(unit, timestamp)` - returns a timestamp truncated to the specified
-precision
+precision.
 
 **Arguments:**
 
@@ -113,9 +113,8 @@ precision
   - `hour`
   - `minute`
   - `second`
-  - `milliseconds`
-  - `microseconds`
-  <!--https://github.com/questdb/questdb/pull/3158-->
+  - `millisecond`
+  - `microsecond`
 
 - `timestamp` is any timestamp value.
 
@@ -137,7 +136,15 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 
 ## dateadd
 
-`dateadd(period, n, startDate)` - adds `n` `period` to `startDate`.
+`dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`, optionally respecting timezone DST transitions.
+
+:::tip
+
+When a timezone is specified, the function handles daylight savings time transitions correctly. This is particularly important when adding periods that could cross DST boundaries (like weeks, months, or years).
+
+Without the timezone parameter, the function performs simple UTC arithmetic which may lead to incorrect results when crossing DST boundaries. For timezone-aware calculations, use the timezone parameter.
+
+:::
 
 **Arguments:**
 
@@ -156,6 +163,7 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 - `n` is an `int` indicating the number of periods to add.
 - `startDate` is a timestamp or date indicating the timestamp to add the period
   to.
+- `timezone` (optional) is a string specifying the timezone to use for DST-aware calculations - for example, 'Europe/London'.
 
 **Return value:**
 
@@ -180,6 +188,20 @@ FROM long_sequence(1);
 | systimestamp                | dateadd                     |
 | :-------------------------- | :-------------------------- |
 | 2020-04-17T00:30:51.380499Z | 2020-04-19T00:30:51.380499Z |
+
+```questdb-sql title="Adding weeks with timezone"
+SELECT 
+    '2024-10-21T10:00:00Z',
+    dateadd('w', 1, '2024-10-21T10:00:00Z', 'Europe/Bratislava') as with_tz,
+    dateadd('w', 1, '2024-10-21T10:00:00Z') as without_tz
+FROM long_sequence(1);
+```
+
+| timestamp                | with_tz                    | without_tz                 |
+| :----------------------- | :------------------------- | :------------------------- |
+| 2024-10-21T10:00:00.000Z | 2024-10-28T10:00:00.000Z  | 2024-10-28T09:00:00.000Z  |
+
+Note how the timezone-aware calculation correctly handles the DST transition in Europe/Bratislava.
 
 ```questdb-sql title="Adding months"
 SELECT systimestamp(), dateadd('M', 2, systimestamp())
@@ -273,7 +295,7 @@ SELECT day(ts), count() FROM transactions;
 ## day_of_week
 
 `day_of_week(value)` - returns the day number in a week from `1` (Monday) to `7`
-(Sunday)
+(Sunday).
 
 **Arguments:**
 
@@ -302,7 +324,7 @@ SELECT to_str(ts,'EE'),day_of_week(ts) FROM myTable;
 ## day_of_week_sunday_first
 
 `day_of_week_sunday_first(value)` - returns the day number in a week from `1`
-(Sunday) to `7` (Saturday)
+(Sunday) to `7` (Saturday).
 
 **Arguments:**
 
@@ -357,7 +379,7 @@ SELECT month(ts), days_in_month(ts) FROM myTable;
 
 ## extract
 
-`extract (unit, timestamp)` - returns the selected time unit from the input
+`extract(unit, timestamp)` - returns the selected time unit from the input
 timestamp.
 
 **Arguments:**
@@ -404,11 +426,10 @@ extract(second from '2023-03-11T22:00:30.555555Z') second;
 | millennium | year | month | quarter | hour | second |
 | ---------- | ---- | ----- | ------- | ---- | ------ |
 | 3          | 2023 | 3     | 10      | 22   | 30     |
-|            |      |       |         |      |        |
 
 ## hour
 
-`hour(value)` - returns the `hour` of day for a given timestamp from `0` to `23`
+`hour(value)` - returns the `hour` of day for a given timestamp from `0` to `23`.
 
 **Arguments:**
 
@@ -548,7 +569,7 @@ limit -1;
 ## micros
 
 `micros(value)` - returns the `micros` of the millisecond for a given date or
-timestamp from `0` to `999`
+timestamp from `0` to `999`.
 
 **Arguments:**
 
@@ -593,7 +614,7 @@ SELECT micros(ts), count() FROM transactions;
 ## millis
 
 `millis(value)` - returns the `millis` of the second for a given date or
-timestamp from `0` to `999`
+timestamp from `0` to `999`.
 
 **Arguments:**
 
@@ -639,7 +660,7 @@ SELECT millis(ts), count() FROM transactions;
 ## minute
 
 `minute(value)` - returns the `minute` of the hour for a given timestamp from
-`0` to `59`
+`0` to `59`.
 
 **Arguments:**
 
@@ -675,7 +696,7 @@ SELECT minute(ts), count() FROM transactions;
 
 ## month
 
-`month(value)` - returns the `month` of year for a given date from `1` to `12`
+`month(value)` - returns the `month` of year for a given date from `1` to `12`.
 
 **Arguments:**
 
@@ -781,7 +802,7 @@ SELECT pg_postmaster_start_time();
 ## second
 
 `second(value)` - returns the `second` of the minute for a given date or
-timestamp from `0` to `59`
+timestamp from `0` to `59`.
 
 **Arguments:**
 
@@ -1178,7 +1199,7 @@ values(to_date('2019-12-12T12:15', 'yyyy-MM-ddTHH:mm'), 123.5);
 ## to_str
 
 `to_str(value, format)` - converts timestamp value to a string in the specified
-format
+format.
 
 Will convert a timestamp value to a string using the format definition passed as
 an argument. When elements in the `format` definition are unrecognized, they
@@ -1388,7 +1409,7 @@ SELECT to_utc('2021-06-08T13:45:45.000000Z', 'PST')
 ## week_of_year
 
 `week_of_year(value)` - returns the number representing the week number in the
-year
+year.
 
 **Arguments:**
 

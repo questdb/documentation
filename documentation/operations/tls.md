@@ -9,7 +9,7 @@ Transport Layer Security (TLS) encryption is available on all supported network
 interfaces and protocols:
 
 - [InfluxDB Line Protocol over TCP](/docs/reference/api/ilp/overview/)
-- [PGWire](https://questdb.io/docs/reference/api/postgres/)
+- [PGWire](/docs/reference/api/postgres/)
 - [HTTP](/docs/reference/api/rest/) (REST API)
 
 It's possible to configure encryption on all interfaces at once or individually.
@@ -18,7 +18,7 @@ QuestDB supports TLS v1.2 and v1.3.
 
 :::note
 
-TLS encryption is only available in [QuestDB Enterprise](/Enterprise/).
+TLS encryption is only available in [QuestDB Enterprise](/enterprise/).
 
 :::
 
@@ -113,7 +113,7 @@ SELECT reload_tls();
 
 The function returns `true` if the reload is successful; otherwise, it returns
 `false`. In case of unsuccessful reload, you should check error messages in the
-[server logs](/docs/troubleshooting/log/) for more details.
+[server logs](/docs/operations/logging-metrics/) for more details.
 
 When Role-based Access Control (RBAC) is enabled, the `reload_tls()` SQL
 function is only available to the admin user, i.e. to the built-in user account

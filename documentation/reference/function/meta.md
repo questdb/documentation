@@ -12,7 +12,7 @@ learning useful information about your instance, including:
 - [Attached, detached, or attachable](/docs/reference/sql/alter-table-attach-partition/)
   partitions
 - Partition storage size on disk
-- Running sql commands
+- Running SQL commands
 
 ## build
 
@@ -478,7 +478,7 @@ SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
 | 80.3 MB     |
 
 ```questdb-sql title="Get active partition of a table"
-SELECT * FROM table_partitions('my_table') WHERE active = true
+SELECT * FROM table_partitions('my_table') WHERE active = true;
 ```
 
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
@@ -501,7 +501,6 @@ Returns `string`.
 **Examples:**
 
 ```questdb-sql
-
 SELECT version();
 
 --The above equals to:
@@ -540,7 +539,7 @@ Returns `boolean`. `true` if successful, `false` if unsuccessful.
 Simply pass table names as arguments to the function.
 
 ```
-SELECT hydrate_table_metadata('trades', 'trips')
+SELECT hydrate_table_metadata('trades', 'trips');
 ```
 
 | hydrate_table_metadata |
@@ -550,5 +549,46 @@ SELECT hydrate_table_metadata('trades', 'trips')
 If you want to re-read metadata for all user tables, simply use an asterisk:
 
 ```
-SELECT hydrate_table_metadata('*')
+SELECT hydrate_table_metadata('*');
+```
+
+## flush_query_cache()
+
+`flush_query_cache' invalidates cached query execution plans.
+
+**Arguments:**
+
+- `flush_query_cache()` does not require arguments.
+
+**Return value:**
+
+Returns `boolean`. `true` if successful, `false` if unsuccessful.
+
+**Examples:**
+
+```questdb-sql title="Flush cached query execution plans"
+SELECT flush_query_cache();
+```
+
+## reload_config()
+
+`reload_config' reloads server configuration file's contents (`server.conf`)
+without server restart. The list of reloadable settings can be found
+[here](/docs/configuration/#reloadable-settings).
+
+**Arguments:**
+
+- `reload_config()` does not require arguments.
+
+**Return value:**
+
+Returns `boolean`. `true` if any configuration properties were reloaded, `false`
+if none were reloaded.
+
+**Examples:**
+
+Edit `server.conf` and run `reload_config`:
+
+```questdb-sql title="Reload server configuration"
+SELECT reload_config();
 ```

@@ -924,31 +924,31 @@ someone re-granting it to them.
 Managing or verifying what users have access to is possible with the following
 SQL commands:
 
-- [ADD USER](/docs/reference/sql/acl/add-user) - add user to one or more groups
-- [ALTER USER](/docs/reference/sql/acl/alter-user) - modifies user settings
-- [ALTER SERVICE ACCOUNT](/docs/reference/sql/acl/alter-service-account) -
+- [ADD USER](/docs/reference/sql/acl/add-user/) - add user to one or more groups
+- [ALTER USER](/docs/reference/sql/acl/alter-user/) - modifies user settings
+- [ALTER SERVICE ACCOUNT](/docs/reference/sql/acl/alter-service-account/) -
   modifies service account settings
-- [ASSUME SERVICE ACCOUNT](/docs/reference/sql/acl/assume-service-account) -
+- [ASSUME SERVICE ACCOUNT](/docs/reference/sql/acl/assume-service-account/) -
   switches current user to a service account
 - [CREATE GROUP](/docs/reference/sql/acl/create-group) - creates user group
-- [CREATE SERVICE ACCOUNT](/docs/reference/sql/acl/create-service-account) -
+- [CREATE SERVICE ACCOUNT](/docs/reference/sql/acl/create-service-account/) -
   creates service account
-- [CREATE USER](/docs/reference/sql/acl/create-user) - creates user
-- [DROP GROUP](/docs/reference/sql/acl/drop-group) - drops user group
-- [DROP SERVICE ACCOUNT](/docs/reference/sql/acl/drop-service-account) - drops
+- [CREATE USER](/docs/reference/sql/acl/create-user/) - creates user
+- [DROP GROUP](/docs/reference/sql/acl/drop-group/) - drops user group
+- [DROP SERVICE ACCOUNT](/docs/reference/sql/acl/drop-service-account/) - drops
   an existing service account
-- [DROP USER](/docs/reference/sql/acl/drop-user) - drops an existing user
-- [EXIT SERVICE ACCOUNT](/docs/reference/sql/acl/exit-service-account) -
+- [DROP USER](/docs/reference/sql/acl/drop-user/) - drops an existing user
+- [EXIT SERVICE ACCOUNT](/docs/reference/sql/acl/exit-service-account/) -
   switches current user back from service account
-- [GRANT](/docs/reference/sql/acl/grant) - grants permission to user, service
+- [GRANT](/docs/reference/sql/acl/grant/) - grants permission to user, service
   account or group
 - [GRANT ASSUME SERVICE ACCOUNT](/docs/reference/sql/acl/grant-assume-service-account) -
   grants a service account to a user or a group
-- [REMOVE USER](/docs/reference/sql/acl/remove-user) - removes user from one or
+- [REMOVE USER](/docs/reference/sql/acl/remove-user/) - removes user from one or
   more groups
-- [REVOKE](/docs/reference/sql/acl/revoke) - revokes permission from user,
+- [REVOKE](/docs/reference/sql/acl/revoke/) - revokes permission from user,
   service account or group
-- [REVOKE ASSUME SERVICE ACCOUNT](/docs/reference/sql/acl/revoke-assume-service-account) -
+- [REVOKE ASSUME SERVICE ACCOUNT](/docs/reference/sql/acl/revoke-assume-service-account/) -
   revokes a service account from a user or a group
 - [SHOW USER](/docs/reference/sql/show/#show-user) - shows enabled
   authentication methods of a user
