@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="657" height="37">
+<svg xmlns="http://www.w3.org/2000/svg" width="485" height="37">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -44,10 +44,7 @@
          <text class="terminal" x="387" y="21">=</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#n" xlink:title="n">
             <rect x="429" y="3" width="28" height="32"></rect>
             <rect x="427" y="1" width="28" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="437" y="21">n</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#setParamCommitLag" xlink:title="setParamCommitLag">
-            <rect x="477" y="3" width="152" height="32"></rect>
-            <rect x="475" y="1" width="152" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="485" y="21">setParamCommitLag</text></a><path class="line" d="m17 17 h2 m0 0 h10 m44 0 h10 m0 0 h10 m68 0 h10 m0 0 h10 m176 0 h10 m0 0 h10 m30 0 h10 m0 0 h10 m28 0 h10 m0 0 h10 m152 0 h10 m3 0 h-3"></path>
-         <polygon points="647 17 655 13 655 21"></polygon>
-         <polygon points="647 17 639 13 639 21"></polygon>
+            <text class="nonterminal" x="437" y="21">n</text></a><path class="line" d="m17 17 h2 m0 0 h10 m44 0 h10 m0 0 h10 m68 0 h10 m0 0 h10 m176 0 h10 m0 0 h10 m30 0 h10 m0 0 h10 m28 0 h10 m3 0 h-3"></path>
+         <polygon points="475 17 483 13 483 21"></polygon>
+         <polygon points="475 17 467 13 467 21"></polygon>
 </svg>
