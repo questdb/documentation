@@ -57,7 +57,9 @@ For example, given a table `trades`, the following query returns the number of
 trades per hour:
 
 ```questdb-sql
-SELECT ts, count() FROM trades SAMPLE BY 1h
+SELECT ts, count()
+FROM trades
+SAMPLE BY 1h;
 ```
 
 ## FROM-TO
@@ -75,7 +77,8 @@ When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result 
 However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
 rows outside of this range.
 
-To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause.
+To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause. The boundary
+timestamps are expected in UTC.
 
 #### Syntax
 
@@ -84,7 +87,7 @@ Specify the shape of the query using `FROM` and `TO`:
 ```questdb-sql title='Pre-filling trip data' demo
 SELECT pickup_datetime as t, count
 FROM trips
-SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
 ```
 
 Since no rows existed before 2009, QuestDB automatically fills in these rows.
@@ -108,7 +111,7 @@ SELECT pickup_datetime as t, count
 FROM trips
 WHERE pickup_datetime >= '2008-12-28'
   AND pickup_datetime <  '2009-01-05'
-SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL)
+SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
 ```
 
 #### Limitations
@@ -133,11 +136,12 @@ restrictions apply:
 - The `FILL` keyword must precede alignment described in the
   [sample calculation section](#sample-calculation), i.e.:
 
-  ```questdb-sql
-  SELECT ts, max(price) max FROM prices
-  SAMPLE BY 1h FILL(LINEAR)
-  ALIGN TO ...
-  ```
+```questdb-sql
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h FILL(LINEAR)
+ALIGN TO ...
+```
 
 | fillOption | Description                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -161,7 +165,9 @@ The following query returns the maximum price per hour. As there are missing
 values, an aggregate cannot be calculated:
 
 ```questdb-sql
-SELECT ts, max(price) max FROM prices SAMPLE BY 1h;
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h;
 ```
 
 A row is missing for the `2021-01-01T03:00:00.000000Z` sample:
@@ -177,7 +183,9 @@ A `FILL` strategy can be employed which fills with the previous value using
 `PREV`:
 
 ```questdb-sql
-SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(PREV);
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h FILL(PREV);
 ```
 
 | ts                              | max      |
@@ -191,7 +199,9 @@ SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(PREV);
 Linear interpolation is done using the `LINEAR` fill option:
 
 ```questdb-sql
-SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(LINEAR);
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h FILL(LINEAR);
 ```
 
 | ts                              | max               |
@@ -205,7 +215,9 @@ SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(LINEAR);
 A constant value can be used as a `fillOption`:
 
 ```questdb-sql
-SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(100.5);
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h FILL(100.5);
 ```
 
 | ts                              | max       |
@@ -219,7 +231,9 @@ SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(100.5);
 Finally, `NULL` may be used as a `fillOption`:
 
 ```questdb-sql
-SELECT ts, max(price) max FROM prices SAMPLE BY 1h FILL(NULL);
+SELECT ts, max(price) max
+FROM prices
+SAMPLE BY 1h FILL(NULL);
 ```
 
 | ts                              | max      |
@@ -271,26 +285,27 @@ Consider a table `sensors` with the following data spanning three calendar days:
 
 ```questdb-sql
 CREATE TABLE sensors (
-ts TIMESTAMP,
-val INT
-) TIMESTAMP(ts) PARTITION BY DAY WAL
+  ts TIMESTAMP,
+  val INT
+) TIMESTAMP(ts) PARTITION BY DAY WAL;
 
 INSERT INTO sensors (ts, val) VALUES
-('2021-05-31T23:10:00.000000Z', 10),
-('2021-06-01T01:10:00.000000Z', 80),
-('2021-06-01T07:20:00.000000Z', 15),
-('2021-06-01T13:20:00.000000Z', 10),
-('2021-06-01T19:20:00.000000Z', 40),
-('2021-06-02T01:10:00.000000Z', 90),
-('2021-06-02T07:20:00.000000Z', 30)
+  ('2021-05-31T23:10:00.000000Z', 10),
+  ('2021-06-01T01:10:00.000000Z', 80),
+  ('2021-06-01T07:20:00.000000Z', 15),
+  ('2021-06-01T13:20:00.000000Z', 10),
+  ('2021-06-01T19:20:00.000000Z', 40),
+  ('2021-06-02T01:10:00.000000Z', 90),
+  ('2021-06-02T07:20:00.000000Z', 30);
 ```
 
 The following query can be used to sample the table by day.
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1d
-ALIGN TO FIRST OBSERVATION
+ALIGN TO FIRST OBSERVATION;
 ```
 
 This query will return two rows:
@@ -311,16 +326,18 @@ The default behaviour for SAMPLE BY, this option aligns data to calendar dates, 
 - [WITH OFFSET](#with-offset)
 
 ```questdb-sql
-SELECT ts, count() from sensors
-SAMPLE BY 1d
+SELECT ts, count()
+FROM sensors
+SAMPLE BY 1d;
 ```
 
 or:
 
 ```questdb-sql
-SELECT ts, count() from sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1d
-ALIGN TO CALENDAR
+ALIGN TO CALENDAR;
 ```
 
 Gives the following result:
@@ -334,7 +351,7 @@ Gives the following result:
 In this case, the timestamps are floored to the nearest UTC day, and grouped. The counts correspond
 to the number of entries occurring within each UTC day.
 
-This is particularly useful for summarising data for charting purposes; see the [candlestick chart](https://dashboard.demo.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6) from the example [crypto dashboard](https://questdb.com/dashboards/crypto/)/
+This is particularly useful for summarising data for charting purposes; see the [candlestick chart](https://dashboard.demo.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6) from the example [crypto dashboard](https://questdb.com/dashboards/crypto/).
 
 ### TIME ZONE
 
@@ -344,35 +361,35 @@ guide for
 [working with timestamps and time zones](/docs/guides/working-with-timestamps-timezones/).
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1d
-ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin'
+ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin';
 ```
 
-In this case, the 24 hour samples begin at `2021-05-31T01:00:00.000000Z`:
+In this case, the 24 hour samples begin at `2021-05-31T22:00:00.000000Z`:
 
 | ts                          | count |
 | --------------------------- | ----- |
-| 2021-05-31T01:00:00.000000Z | 1     |
-| 2021-06-01T01:00:00.000000Z | 4     |
-| 2021-06-02T01:00:00.000000Z | 2     |
+| 2021-05-31T22:00:00.000000Z | 5     |
+| 2021-06-01T22:00:00.000000Z | 2     |
 
 Additionally, an offset may be applied when aligning sample calculation to
 calendar
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1d
-ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin' WITH OFFSET '00:45'
+ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin' WITH OFFSET '00:45';
 ```
 
-In this case, the 24 hour samples begin at `2021-05-31T01:45:00.000000Z`:
+In this case, the 24 hour samples begin at `2021-05-31T22:45:00.000000Z`:
 
 | ts                          | count |
 | --------------------------- | ----- |
-| 2021-05-31T01:45:00.000000Z | 2     |
-| 2021-06-01T01:45:00.000000Z | 4     |
-| 2021-06-02T01:45:00.000000Z | 1     |
+| 2021-05-31T22:45:00.000000Z | 5     |
+| 2021-06-01T22:45:00.000000Z | 1     |
 
 #### Local timezone output
 
@@ -383,9 +400,12 @@ be used.
 
 ```questdb-sql
 SELECT to_timezone(ts, 'PST') ts, count
-FROM (SELECT ts, count()
-      FROM sensors SAMPLE BY 2h
-      ALIGN TO CALENDAR TIME ZONE 'PST')
+FROM (
+  SELECT ts, count()
+  FROM sensors
+  SAMPLE BY 2h
+  ALIGN TO CALENDAR TIME ZONE 'PST'
+);
 ```
 
 #### Time zone transitions
@@ -400,7 +420,7 @@ total number of hours due to daylight savings time. Considering the 31st October
 When a `SAMPLE BY` operation crosses time zone transitions in cases such as
 this, the first sampled group which spans a transition will include aggregates
 by full calendar range. Consider a table `sensors` with one data point per hour
-spanning three calendar hours:
+spanning five calendar hours:
 
 | ts                          | val |
 | --------------------------- | --- |
@@ -414,9 +434,10 @@ The following query will sample by hour with the `Europe/London` time zone and
 align to calendar ranges:
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1h
-ALIGN TO CALENDAR TIME ZONE 'Europe/London'
+ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
 
 The record count for the hour which encounters a time zone transition will
@@ -431,7 +452,7 @@ contain two records for both hours at the time zone transition:
 
 Similarly, given one data point per hour on this table, running `SAMPLE BY 1d`
 will have a count of `25` for this day when aligned to calendar time zone
-'Europe/London'.
+`Europe/London`.
 
 ### WITH OFFSET
 
@@ -445,9 +466,10 @@ Aligning sampling calculation can be provided an arbitrary offset in the format
 The query uses the default offset '00:00' if the parameter is not set.
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1d
-ALIGN TO CALENDAR WITH OFFSET '02:00'
+ALIGN TO CALENDAR WITH OFFSET '02:00';
 ```
 
 In this case, the 24 hour samples begin at `2021-05-31T02:00:00.000000Z`:
@@ -463,9 +485,10 @@ In this case, the 24 hour samples begin at `2021-05-31T02:00:00.000000Z`:
 The `TIME ZONE` and `WITH OFFSET` options can be combined.
 
 ```questdb-sql
-SELECT ts, count() FROM sensors
+SELECT ts, count()
+FROM sensors
 SAMPLE BY 1h
-ALIGN TO CALENDAR TIME ZONE 'Europe/London' WITH OFFSET '02:00'
+ALIGN TO CALENDAR TIME ZONE 'Europe/London' WITH OFFSET '02:00';
 ```
 
 The sample then begins from `Europe/London` at `2021-10-31T02:00:00.000000Z`:
@@ -493,7 +516,9 @@ Assume the following table `trades`:
 This query will return the number of trades per hour:
 
 ```questdb-sql title="Hourly interval"
-SELECT ts, count() FROM trades SAMPLE BY 1h;
+SELECT ts, count()
+FROM trades
+SAMPLE BY 1h;
 ```
 
 | ts                          | count |
@@ -506,7 +531,9 @@ SELECT ts, count() FROM trades SAMPLE BY 1h;
 The following will return the trade volume in 30 minute intervals
 
 ```questdb-sql title="30 minute interval"
-SELECT ts, sum(quantity*price) FROM trades SAMPLE BY 30m;
+SELECT ts, sum(quantity*price)
+FROM trades
+SAMPLE BY 30m;
 ```
 
 | ts                          | sum    |
@@ -521,7 +548,9 @@ The following will return the average trade notional (where notional is = q \*
 p) by day:
 
 ```questdb-sql title="Daily interval"
-SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d;
+SELECT ts, avg(quantity*price)
+FROM trades
+SAMPLE BY 1d;
 ```
 
 | ts                          | avg               |
@@ -531,7 +560,10 @@ SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d;
 To make this sample align to calendar dates:
 
 ```questdb-sql title="Calendar alignment"
-SELECT ts, avg(quantity*price) FROM trades SAMPLE BY 1d ALIGN TO CALENDAR;
+SELECT ts, avg(quantity*price)
+FROM trades
+SAMPLE BY 1d
+ALIGN TO CALENDAR;
 ```
 
 | ts                          | avg    |

@@ -114,6 +114,12 @@ Each key has a `reloadable` property that indicates whether the key can be
 reloaded. If yes, the `reload_config` function can be used to reload the
 configuration.
 
+All reloadable properties can be also queried from the server:
+
+```questdb-sql title="Query reloadable properties"
+(SHOW PARAMETERS) WHERE reloadable = true;
+```
+
 ## Keys and default values
 
 This section lists the configuration keys available to QuestDB by topic or
@@ -236,6 +242,7 @@ Line Protocol.
 | line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
 | line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
 | line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                   |
+| line.log.message.on.error   | true    | Controls whether malformed ILP messages are printed to the server log when errors occur.                                                                                   |
 
 #### HTTP specific settings
 

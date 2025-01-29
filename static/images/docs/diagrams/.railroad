@@ -24,10 +24,10 @@ unassignServiceAccount
     ::= 'UNASSIGN' 'SERVICE' 'ACCOUNT' serviceAccount 'FROM' userOrGroup ( ',' userOrGroup )*
 
 assumeServiceAccount
-  ::= 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount      
-  
+  ::= 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount
+
 exitServiceAccount
-  ::= 'EXIT' 'SERVICE' 'ACCOUNT' serviceAccount  
+  ::= 'EXIT' 'SERVICE' 'ACCOUNT' serviceAccount
 
 cancelQuery
 ::= 'CANCEL' 'QUERY' queryId
@@ -45,8 +45,12 @@ createTableDef
   'AS' '(' selectSql ')'  (',' castDef)* (',' indexDef)*
   )
   ) (
-  ('timestamp' '(' columnRef ')' ) ('PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?))?
-  )? 
+    ('timestamp' '(' columnRef ')' )
+    (
+      'PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?)
+      ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
+    )?
+  )?
  ('WITH' tableParameter)?
  (tableTargetVolumeDef)?
  ('OWNED' 'BY' ownerName)?
@@ -59,16 +63,19 @@ createUser
 
 createGroup
   ::= 'CREATE' 'GROUP' ('IF' 'NOT' 'EXISTS')? groupName
-  
+
 createServiceAccount
   ::= 'CREATE' 'SERVICE' 'ACCOUNT' ('IF' 'NOT' 'EXISTS')? accountName ('OWNED' 'BY' ownerName)?
 
-alterTable 
+alterTable
   ::= 'ALTER' 'TABLE' tableName
 
 declare
 ::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
 
+
+alterTableAddColumn
+  ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
 
 dropGroup 
   ::= 'DROP' 'GROUP' ('IF' 'EXISTS')? groupName
@@ -85,17 +92,17 @@ dropUser
 castDef
   ::= 'cast' '(' columnRef 'as' typeDef ')'
 
-inlineIndexDef 
+inlineIndexDef
   ::= 'INDEX' (indexCapacityDef)?
 
-typeDef 
+typeDef
   ::= (
   'boolean' | 'byte' | 'short' | 'char' | 'int' | 'float' |
   ('symbol' (('CAPACITY' distinctValueEstimate) ('CACHE' | 'NOCACHE')?)? inlineIndexDef?) |
   'varchar' | 'string' | 'long' | 'date' | 'timestamp' | 'double' | 'binary' | 'long256' | 'geohash(<size>)'
   )
 
-indexDef 
+indexDef
   ::='INDEX' '(' columnRef ('CAPACITY' valueBlockSize)?')'
 
 tableTargetVolumeDef
@@ -119,7 +126,7 @@ insertCommitLagInto
   ';'
 
 withAsInsertCommitLag
-  ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )? 
+  ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )?
   'INSERT' ( 'batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ) )? 'INTO' tableName 'SELECT' queryDef subQueryName ';'
 
 backup
@@ -145,7 +152,7 @@ createTableWithMaxRowParams
 dynamicTimestamp
   ::= 'SELECT' someSelectStatement 'timestamp' '(' columnName ')'
 
-sampleBy 
+sampleBy
   ::= someSelectStatement... 'SAMPLE' 'BY' n ( 'T' | 's' | 'm' | 'h' | 'd' | 'M' | )
 
 fromTo
@@ -242,7 +249,7 @@ grant
   ::= 'GRANT' permission ( ',' permission )* ( 'ON' ( 'ALL' 'TABLES' | ( tableName ( '(' columnName ( ',' columnName )* ')' )? ( ',' tableName ( '(' columnName ( ',' columnName )* ')' )? )* ) ) )?
   'TO' entityName ( 'WITH' 'GRANT' 'OPTION' )? ( 'WITH' 'VERIFICATION' )?
 
-revoke 
+revoke
   ::= 'REVOKE' permission ( ',' permission )* ( 'ON' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? ( ',' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? )* )?
   'FROM' entityName
 
@@ -274,12 +281,12 @@ addColumn
  ::= 'ADD' 'COLUMN' columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
 
 alterColumnType
- ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef 
+ ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
 
 dropPartition
  ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
- 
-removeUser 
+
+removeUser
   ::= 'REMOVE' 'USER' userName 'FROM' groupName ( ',' groupName )*
 
 reindexTable
@@ -314,6 +321,10 @@ resumeWal
 setType
   ::= 'SET' 'TYPE' ( 'BYPASS' )? 'WAL'
 
+
+setTtl
+  ::= 'SET' 'TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
+
 update
  ::= UPDATE 'tableName' SET columnName '=' 'expression' ( ',' columnName '=' 'expression' )*
 (FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
@@ -335,7 +346,7 @@ truncateTable
   ::= 'TRUNCATE TABLE' tableName ';'
 
 explain
-  ::= 'EXPLAIN' statement 
+  ::= 'EXPLAIN' statement
 
 windowFunction
   ::= functionName 'OVER' '(' ( 'PARTITION' 'BY' ( columnName? (',' columnName?)* ))?  ('ORDER' 'BY' ( columnName ('ASC' | 'DESC') ? (',' columnName ('ASC' | 'DESC') ?)* ))?  ( ( 'RANGE' | 'ROWS' )

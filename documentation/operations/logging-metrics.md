@@ -1,19 +1,86 @@
 ---
-title: Logging & Metrics
-description:
-  Create various logs and customize a log.conf within QuestDB. Apply the
-  /metrics endpoint to interact with Prometheus.
+title: Logging and metrics
+description: Configure and understand QuestDB logging and metrics, including log levels, configuration options, and Prometheus integration.
 ---
 
 import { ConfigTable } from "@theme/ConfigTable"
 import httpMinimalConfig from "./_http-minimal.config.json"
 
-This page outlines logging, as configured in QuestDB's `log.conf` and metrics,
-accessible via Prometheus. Together, create robust outbound pipelines reporting
-what is happening with QuestDB.
+This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus. 
 
 - [Logging](/docs/operations/logging-metrics/#logging)
 - [Metrics](/docs/operations/logging-metrics/#metrics)
+
+## Log location
+
+QuestDB creates the following file structure in its
+[root_directory](/docs/concept/root-directory-structure/):
+
+```filestructure
+questdb
+├── conf
+├── db
+├── log
+├── public
+└── snapshot (optional)
+```
+
+Log files are stored in the `log` folder:
+
+```filestructure
+├── log
+│   ├── stdout-2020-04-15T11-59-59.txt
+│   └── stdout-2020-04-12T13-31-22.txt
+```
+
+## Understanding log levels
+
+QuestDB provides the following types of log information:
+
+| Type     | Marker | Details                                                                                                                                                                                                           | Default  |
+| -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Advisory | A      | Startup information such as hosts, listening ports, etc. Rarely used after startup                                                                                                                                | Enabled  |
+| Critical | C      | Internal database errors. Serious issues. Things that should not happen in general operation.                                                                                                                     | Enabled  |
+| Error    | E      | An error, usually (but not always) caused by a user action such as inserting a `symbol` into a `timestamp` column. For context on how this error happened, check for Info-level messages logged before the error. | Enabled  |
+| Info     | I      | Logs for activities. Info-level messages often provide context for an error if one is logged later.                                                                                                               | Enabled  |
+| Debug    | D      | Finer details on what is happening. Useful to debug issues.                                                                                                                                                       | Disabled |
+
+For more information, see the
+[QuestDB source code](https://github.com/questdb/questdb/blob/master/core/src/main/java/io/questdb/log/LogLevel.java).
+
+
+### Example log messages
+
+Advisory:
+```
+2023-02-24T14:59:45.076113Z A server-main Config:
+2023-02-24T14:59:45.076130Z A server-main  - http.enabled : true
+2023-02-24T14:59:45.076144Z A server-main  - tcp.enabled  : true
+2023-02-24T14:59:45.076159Z A server-main  - pg.enabled   : true
+```
+
+Critical:
+```
+2022-08-08T11:15:13.040767Z C i.q.c.p.WriterPool could not open [table=`sys.text_import_log`, thread=1, ex=could not open read-write [file=/opt/homebrew/var/questdb/db/sys.text_import_log/_todo_], errno=13]
+```
+
+Error:
+```
+2023-02-24T14:59:45.059012Z I i.q.c.t.t.InputFormatConfiguration loading input format config [resource=/text_loader.json]
+2023-03-20T08:38:17.076744Z E i.q.c.l.u.AbstractLineProtoUdpReceiver could not set receive buffer size [fd=140, size=8388608, errno=55]
+```
+
+Info:
+```
+2020-04-15T16:42:32.879970Z I i.q.c.TableReader new transaction [txn=2, transientRowCount=1, fixedRowCount=1, maxTimestamp=1585755801000000, attempts=0]
+2020-04-15T16:42:32.880051Z I i.q.g.FunctionParser call to_timestamp('2020-05-01:15:43:21','yyyy-MM-dd:HH:mm:ss') -> to_timestamp(Ss)
+```
+
+Debug:
+```
+2023-03-31T11:47:05.723715Z D i.q.g.FunctionParser call cast(investmentMill,INT) -> cast(Li)
+2023-03-31T11:47:05.723729Z D i.q.g.FunctionParser call rnd_symbol(4,4,4,2) -> rnd_symbol(iiii)
+```
 
 ## Logging
 
