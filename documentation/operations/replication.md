@@ -352,7 +352,7 @@ for read in the replica. A temporary network partition is not necessarily a prob
 ingested into the primary, but the object-store is not available. In this case, the replicas will contain stale data,
 and then catch-up when the primary reconnects and successfully uploads to the object store.
 
-Permanent network partitions are not recoverable, and the [replica promotion](#replica-promotion) flow should be followed.
+Permanent network partitions are not recoverable, and the [emergency primary migration](#emergency-primary-migration) flow should be followed.
 
 ### Instance crashes
 
@@ -362,7 +362,7 @@ This will lead to a table suspension on restart. To recover in this case, you ca
 and reload any missing data.
 
 In the event that the corruption is severe, or confidence in the underlying instance is removed, you should follow the
-[replica promotion](#replica-promotion) flow.
+[emergency primary migration](#emergency-primary-migration) flow.
 
 ### Disk or block storage failure
 
@@ -374,20 +374,34 @@ Disk failures can present in several forms, which may initially be hard to detec
 2. Disk not available/unmounted
     - This could be a configuration issue between your server and storage
     - Alternatively, this could indicate a complete drive failure.
-3. Data corruption reported by database (i.e you see suspended tables)
+3. Data corruption reported by database (i.e. you see suspended tables)
     - This is usually caused by writes to disk partially or completely failing
     - This can also be caused by running out of disk space
 
 As with an instance crash, the consequences can be far-reaching and not immediately clear in all cases.
 
-To migrate to a new disk, follow the [replica promotion](#replica-promotion) flow. When you create a new replica, you
+To migrate to a new disk, follow the [emergency primary migration](#emergency-primary-migration) flow. When you create a new replica, you
 can populate it with the latest snapshot you have taken, and then recover the rest using replicated WALs in the object
 store.
 
 
 ### Flows
 
-#### Replica promotion
+
+#### Scheduled primary migration
+
+This flow should be used when you want to change your primary to another instance, but the primary has not failed.
+The database can be started in a mode which prevents further ingestion, but allows replication. This means that you an
+ensure that all outstanding data has been replicated before you start ingesting on a new primary instance.
+
+- Ensure primary instance is still capable of replicating data  to the object store.
+- Stop primary instance.
+- Restart primary instance with `replication.role=primary_catchup_uploads`
+- Wait for the instance to complete its uploads and exit with `code 0`.
+- Then follow the [emergency primary migration](#emergency-primary-migration) flow.
+
+
+#### Emergency primary migration
 
 This flow should be used when you wish to discard a failed primary instance and move to a new one.
 
@@ -399,17 +413,13 @@ This flow should be used when you wish to discard a failed primary instance and 
 - Start the replica instance, which is now the new primary.
 - Create a new replica instance to replace the promoted replica.
 
-#### Safe primary migration
+:::warning
 
-This flow should be used when you want to change your primary to another instance, but the primary has not failed.
-The database can be started in a mode which prevents further ingestion, but allows replication. This means that you an
-ensure that all outstanding data has been replicated before you start ingesting on a new primary instance.
+Any data committed to the primary, but not yet replicated, will be lost. If the primary is not
+completely failed, you can follow the [scheduled primary migration](#scheduled-primary-migration) flow
+to ensure that all remaining data has been replicated before switching primary.
 
-- Ensure primary instance is still capable of replicating data  to the object store.
-- Stop primary instance.
-- Restart primary instance with `replication.role=primary_catchup_uploads`
-- Wait for the instance to complete its uploads and exit with `code 0`.
-- Then follow the [replica promotion](#replica-promotion) flow.
+:::
 
 
 ## Multi-primary ingestion
