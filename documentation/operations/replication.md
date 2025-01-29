@@ -396,7 +396,7 @@ ensure that all outstanding data has been replicated before you start ingesting 
 
 - Ensure primary instance is still capable of replicating data  to the object store.
 - Stop primary instance.
-- Restart primary instance with `replication.role=primary_catchup_uploads`
+- Restart primary instance with `replication.role=primary-catchup-uploads`
 - Wait for the instance to complete its uploads and exit with `code 0`.
 - Then follow the [emergency primary migration](#emergency-primary-migration) flow.
 
