@@ -352,7 +352,7 @@ for read in the replica. A temporary network partition is not necessarily a prob
 ingested into the primary, but the object-store is not available. In this case, the replicas will contain stale data,
 and then catch-up when the primary reconnects and successfully uploads to the object store.
 
-Permanent network partitions are not recoverable, and the [replica promotion](#Replica-promotion) flow should be followed.
+Permanent network partitions are not recoverable, and the [replica promotion](#replica-promotion) flow should be followed.
 
 ### Instance crashes
 
@@ -362,7 +362,7 @@ This will lead to a table suspension on restart. To recover in this case, you ca
 and reload any missing data.
 
 In the event that the corruption is severe, or confidence in the underlying instance is removed, you should follow the
-[replica promotion](#Replica-promotion) flow.
+[replica promotion](#replica-promotion) flow.
 
 ### Disk or block storage failure
 
@@ -380,7 +380,7 @@ Disk failures can present in several forms, which may initially be hard to detec
 
 As with an instance crash, the consequences can be far-reaching and not immediately clear in all cases.
 
-To migrate to a new disk, follow the [replica promotion](#Replica-promotion) flow. When you create a new replica, you
+To migrate to a new disk, follow the [replica promotion](#replica-promotion) flow. When you create a new replica, you
 can populate it with the latest snapshot you have taken, and then recover the rest using replicated WALs in the object
 store.
 
@@ -409,7 +409,7 @@ ensure that all outstanding data has been replicated before you start ingesting 
 - Stop primary instance.
 - Restart primary instance with `replication.role=primary_catchup_uploads`
 - Wait for the instance to complete its uploads and exit with `code 0`.
-- Then follow the [replica promotion](#Replica-promotion) flow.
+- Then follow the [replica promotion](#replica-promotion) flow.
 
 
 ## Multi-primary ingestion
