@@ -331,6 +331,87 @@ For systems with high daily data injection, daily snapshots are recommended.
 Infrequent snapshots or long snapshot periods, such as 60 days with 30-day WAL
 expiration, may prevent successful database restoration.
 
+## Disaster Recovery
+
+Deployed software can fail in a number of ways, some recoverable, and some unrecoverable.
+
+In general, we can group them into a small matrix:
+
+|         | recoverable     | unrecoverable                       |
+|---------|-----------------|-------------------------------------|
+| primary | restart primary | promote replica, create new replica |
+| replica | restart replica | destroy and recreate replica        |
+
+To successfully recover from serious failures, it is critical that you follow best practices and regularly [back up](../operations#backup)
+your data.
+
+### Network partitions
+
+Temporary network partitions introduce delays between when data is written to the primary, and when it becomes available
+for read in the replica. A temporary network partition is not necessarily a problem - for example, perhaps data can be
+ingested into the primary, but the object-store is not available. In this case, the replicas will contain stale data,
+and then catch-up when the primary reconnects and successfully uploads to the object store.
+
+Permanent network partitions are not recoverable, and the [replica promotion](#Replica-promotion) flow should be followed.
+
+### Instance crashes
+
+An instance crash may be recoverable or unrecoverable, depending on the specific cause of the crash.
+If the instance crashes during ingestion, then it is possible for transactions to be corrupted.
+This will lead to a table suspension on restart. To recover in this case, you can skip the transaction,
+and reload any missing data.
+
+In the event that the corruption is severe, or confidence in the underlying instance is removed, you should follow the
+[replica promotion](#Replica-promotion) flow.
+
+### Disk or block storage failure
+
+Disk failures can present in several forms, which may initially be hard to detect. Here are some possible symptoms:
+
+1. High latency for reads and writes.
+    - This could be a failing disk, which will need replacing
+    - Alternatively, it could be caused by under-provisioned IOPS, and need upgrading.
+2. Disk not available/unmounted
+    - This could be a configuration issue between your server and storage
+    - Alternatively, this could indicate a complete drive failure.
+3. Data corruption reported by database (i.e you see suspended tables)
+    - This is usually caused by writes to disk partially or completely failing
+    - This can also be caused by running out of disk space
+
+As with an instance crash, the consequences can be far-reaching and not immediately clear in all cases.
+
+To migrate to a new disk, follow the [replica promotion](#Replica-promotion) flow. When you create a new replica, you
+can populate it with the latest snapshot you have taken, and then recover the rest using replicated WALs in the object
+store.
+
+
+### Flows
+
+#### Replica promotion
+
+This flow should be used when you wish to discard a failed primary instance and move to a new one.
+
+- Stop primary instance, and ensure it **cannot** restart.
+- Stop the replica instance.
+- Set `replication.role=primary` on the replica.
+- Create a `_recovery_timestamp` file in your data directory (by default, `db`)
+    - This file should contain either a `TIMESTAMP` value, or `latest`.
+- Start the replica instance, which is now the new primary.
+- Create a new replica instance to replace the promoted replica.
+
+#### Safe primary migration
+
+This flow should be used when you want to change your primary to another instance, but the primary has not failed.
+The database can be started in a mode which prevents further ingestion, but allows replication. This means that you an
+ensure that all outstanding data has been replicated before you start ingesting on a new primary instance.
+
+- Ensure primary instance is still capable of replicating data  to the object store.
+- Stop primary instance.
+- Restart primary instance with `replication.role=primary_catchup_uploads`
+- Wait for the instance to complete its uploads and exit with `code 0`.
+- Then follow the [replica promotion](#Replica-promotion) flow.
+
+
 ## Multi-primary ingestion
 
 [QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
