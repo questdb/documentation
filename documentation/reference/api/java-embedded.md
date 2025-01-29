@@ -37,22 +37,6 @@ import TabItem from "@theme/TabItem"
   }}
 />
 
-<InterpolateReleaseData
-  renderText={(release) => {
-    return (
-      <CodeBlock className="language-xml" title={"JDK8"}>
-        {`
-<dependency>
-  <groupId>org.questdb</groupId>
-  <artifactId>questdb</artifactId>
-  <version>${release.name}-jdk8</version>
-</dependency>
-      `}
-      </CodeBlock>
-    )
-  }}
-/>
-
 </TabItem>
 
 <TabItem value="gradle">
@@ -62,16 +46,6 @@ import TabItem from "@theme/TabItem"
     return (
       <CodeBlock className="language-shell" title={"JDK11"}>
         implementation 'org.questdb:questdb:{release.name}'
-      </CodeBlock>
-    )
-  }}
-/>
-
-<InterpolateReleaseData
-  renderText={(release) => {
-    return (
-      <CodeBlock className="language-shell" title={"JDK8"}>
-        implementation 'org.questdb:questdb:{release.name}-jdk8'
       </CodeBlock>
     )
   }}
