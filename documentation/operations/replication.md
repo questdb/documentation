@@ -388,7 +388,7 @@ store.
 ### Flows
 
 
-#### Scheduled primary migration
+#### Planned primary migration
 
 This flow should be used when you want to change your primary to another instance, but the primary has not failed.
 The database can be started in a mode which prevents further ingestion, but allows replication. This means that you an
@@ -416,7 +416,7 @@ This flow should be used when you wish to discard a failed primary instance and 
 :::warning
 
 Any data committed to the primary, but not yet replicated, will be lost. If the primary is not
-completely failed, you can follow the [scheduled primary migration](#scheduled-primary-migration) flow
+completely failed, you can follow the [planned primary migration](#planned-primary-migration) flow
 to ensure that all remaining data has been replicated before switching primary.
 
 :::
