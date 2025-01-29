@@ -398,7 +398,6 @@ module.exports = {
         "guides/import-csv",
         "guides/modifying-data",
         "guides/replication-tuning",
-        "guides/replication-disaster-recovery",
         "guides/working-with-timestamps-timezones",
         "web-console",
         {
