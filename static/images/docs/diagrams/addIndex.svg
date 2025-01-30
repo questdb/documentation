@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="597" height="37">
+<svg xmlns="http://www.w3.org/2000/svg" width="493" height="37">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -43,10 +43,8 @@
          <text class="terminal" x="341" y="21">ADD</text>
          <rect x="401" y="3" width="64" height="32" rx="10"></rect>
          <rect x="399" y="1" width="64" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="409" y="21">INDEX</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#dropIndex" xlink:title="dropIndex">
-            <rect x="485" y="3" width="84" height="32"></rect>
-            <rect x="483" y="1" width="84" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="493" y="21">dropIndex</text></a><path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m0 0 h10 m48 0 h10 m0 0 h10 m64 0 h10 m0 0 h10 m84 0 h10 m3 0 h-3"></path>
-         <polygon points="587 17 595 13 595 21"></polygon>
-         <polygon points="587 17 579 13 579 21"></polygon>
+         <text class="terminal" x="409" y="21">INDEX</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m0 0 h10 m48 0 h10 m0 0 h10 m64 0 h10 m3 0 h-3"></path>
+         <polygon points="483 17 491 13 491 21"></polygon>
+         <polygon points="483 17 475 13 475 21"></polygon>
 </svg>

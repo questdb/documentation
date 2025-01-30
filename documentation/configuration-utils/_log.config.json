@@ -2,5 +2,9 @@
   "log.level.verbose": {
     "default": "false",
     "description": "Converts short-hand log level indicators (E, C, I) into long-hand (ERROR, CRITICAL, INFO)"
+  },
+  "log.timezone": {
+    "default": "UTC",
+    "description": "Sets the timezone for log timestamps. Can be a timezone ID such as 'Antarctica/McMurdo', 'SystemDefault' to use system timezone, or the default UTC with 'Z' suffix"
   }
 }

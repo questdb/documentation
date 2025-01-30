@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="875" height="81">
+<svg xmlns="http://www.w3.org/2000/svg" width="759" height="81">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -51,10 +51,8 @@
          <text class="terminal" x="633" y="21">NOCACHE</text>
          <rect x="625" y="47" width="66" height="32" rx="10"></rect>
          <rect x="623" y="45" width="66" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="633" y="65">CACHE</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#dropColumn" xlink:title="dropColumn">
-            <rect x="751" y="3" width="96" height="32"></rect>
-            <rect x="749" y="1" width="96" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="759" y="21">dropColumn</text></a><path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m20 0 h10 m86 0 h10 m-126 0 h20 m106 0 h20 m-146 0 q10 0 10 10 m126 0 q0 -10 10 -10 m-136 10 v24 m126 0 v-24 m-126 24 q0 10 10 10 m106 0 q10 0 10 -10 m-116 10 h10 m66 0 h10 m0 0 h20 m20 -44 h10 m96 0 h10 m3 0 h-3"></path>
-         <polygon points="865 17 873 13 873 21"></polygon>
-         <polygon points="865 17 857 13 857 21"></polygon>
+         <text class="terminal" x="633" y="65">CACHE</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m20 0 h10 m86 0 h10 m-126 0 h20 m106 0 h20 m-146 0 q10 0 10 10 m126 0 q0 -10 10 -10 m-136 10 v24 m126 0 v-24 m-126 24 q0 10 10 10 m106 0 q10 0 10 -10 m-116 10 h10 m66 0 h10 m0 0 h20 m23 -44 h-3"></path>
+         <polygon points="749 17 757 13 757 21"></polygon>
+         <polygon points="749 17 741 13 741 21"></polygon>
 </svg>
