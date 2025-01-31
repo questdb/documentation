@@ -342,7 +342,7 @@ In general, we can group them into a small matrix:
 | primary | restart primary | promote replica, create new replica |
 | replica | restart replica | destroy and recreate replica        |
 
-To successfully recover from serious failures, it is critical that you follow best practices and regularly [back up](../operations#backup)
+To successfully recover from serious failures, it is critical that you follow best practices and regularly back up
 your data.
 
 ### Network partitions
