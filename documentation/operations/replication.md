@@ -408,6 +408,8 @@ This flow should be used when you wish to discard a failed primary instance and 
 - Stop primary instance, and ensure it **cannot** restart.
 - Stop the replica instance.
 - Set `replication.role=primary` on the replica.
+- Ensure other primary-related settings are configured appropriately
+    - for example, snapshotting policies
 - Create a `_recovery_timestamp` file in your data directory (by default, `db`)
     - This file should contain either a `TIMESTAMP` value, or `latest`.
 - Start the replica instance, which is now the new primary.
@@ -415,7 +417,7 @@ This flow should be used when you wish to discard a failed primary instance and 
 
 :::warning
 
-Any data committed to the primary, but not yet replicated, will be lost. If the primary is not
+Any data committed to the primary, but not yet replicated, will be lost. If the primary has not
 completely failed, you can follow the [planned primary migration](#planned-primary-migration) flow
 to ensure that all remaining data has been replicated before switching primary.
 
