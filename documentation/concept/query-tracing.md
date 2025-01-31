@@ -22,7 +22,7 @@ You don't need to restart the database server for this property to take effect;
 just run the following query to reload the configuration:
 
 ```sql
-select reload_config();
+SELECT reload_config();
 ```
 
 This is an example of what the `_query_trace` table may contain:
@@ -41,7 +41,11 @@ As a simple performance debugging example, to get the text of all queries that
 took more than 100 ms, run:
 
 ```sql
-select query_text from query_trace() where execution_micros > 100_000;
+SELECT 
+    query_text 
+FROM query_trace() 
+WHERE execution_micros > 100_000
+ORDER BY execution_micros DESC;
 ```
 
 The `_query_trace` table will drop data older than 24 hours in order to limit
