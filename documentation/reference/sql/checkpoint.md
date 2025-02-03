@@ -40,7 +40,8 @@ When initiatied, `CHECKPOINT CREATE`:
   of files that represent data for the above transactions. Typically this data
   is stored in the `/var/lib/questdb/.checkpoint` directory.
   - **Do not alter contents of this directory manually**!
-- `fsync` - synchronously flushes page cache and buffers to disk
+- Calls [`sync()`](https://man7.org/linux/man-pages/man2/sync.2.html) to
+  synchronously flush filesystem caches to disk
 
 ### What happens after a checkpoint has been created?
 

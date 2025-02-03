@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="501" height="69">
+<svg xmlns="http://www.w3.org/2000/svg" width="359" height="69">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -38,10 +38,7 @@
          <text class="terminal" x="149" y="53">NOT</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#columnName" xlink:title="columnName">
             <rect x="229" y="3" width="102" height="32"></rect>
             <rect x="227" y="1" width="102" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="237" y="21">columnName</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#timestampExact" xlink:title="timestampExact">
-            <rect x="351" y="3" width="122" height="32"></rect>
-            <rect x="349" y="1" width="122" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="359" y="21">timestampExact</text></a><path class="line" d="m17 17 h2 m0 0 h10 m70 0 h10 m20 0 h10 m0 0 h58 m-88 0 h20 m68 0 h20 m-108 0 q10 0 10 10 m88 0 q0 -10 10 -10 m-98 10 v12 m88 0 v-12 m-88 12 q0 10 10 10 m68 0 q10 0 10 -10 m-78 10 h10 m48 0 h10 m20 -32 h10 m102 0 h10 m0 0 h10 m122 0 h10 m3 0 h-3"></path>
-         <polygon points="491 17 499 13 499 21"></polygon>
-         <polygon points="491 17 483 13 483 21"></polygon>
+            <text class="nonterminal" x="237" y="21">columnName</text></a><path class="line" d="m17 17 h2 m0 0 h10 m70 0 h10 m20 0 h10 m0 0 h58 m-88 0 h20 m68 0 h20 m-108 0 q10 0 10 10 m88 0 q0 -10 10 -10 m-98 10 v12 m88 0 v-12 m-88 12 q0 10 10 10 m68 0 q10 0 10 -10 m-78 10 h10 m48 0 h10 m20 -32 h10 m102 0 h10 m3 0 h-3"></path>
+         <polygon points="349 17 357 13 357 21"></polygon>
+         <polygon points="349 17 341 13 341 21"></polygon>
 </svg>

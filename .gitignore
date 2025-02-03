@@ -35,3 +35,5 @@ yarn-error.log*
 .log
 src/css/infima.css
 .ignore
+
+.yarn/sdks
