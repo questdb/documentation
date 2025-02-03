@@ -423,6 +423,14 @@ to ensure that all remaining data has been replicated before switching primary.
 
 :::
 
+### When will migration fail?
+
+Two primaries started within the same `replication.primary.keepalive.interval=10s` may still break. 
+
+It is important not to migrate the primary without stopping the first primary, if it is still within this interval.
+
+This config can be set in the range of 1 to 300 seconds.
+
 
 ## Multi-primary ingestion
 
