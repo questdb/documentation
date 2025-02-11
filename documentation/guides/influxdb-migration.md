@@ -230,6 +230,15 @@ this with a small configuration change:
   drop_original = true
 ```
 
+## Migrating from InfluxDB with Telegraf
+
+Looking for instructions on how to migrate from InfluxDB with Telegraf? 
+
+Check out this [community post](https://community.questdb.com/t/datamigration-from-influxdb-to-questdb-with-telegraf/182).
+
+It will help you read from InfluxDB and write into QuestDB.
+
+
 ## Dig deeper
 
 Now that you know the basics of InfluxDB Line Protocol, you may want to dig
