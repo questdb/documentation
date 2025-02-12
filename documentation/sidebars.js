@@ -459,6 +459,7 @@ module.exports = {
             "third-party-tools/qstudio",
             "third-party-tools/superset",
             "third-party-tools/flink",
+            "third-party-tools/airflow"
           ],
         },
         {
