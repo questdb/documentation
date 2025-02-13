@@ -81,14 +81,6 @@ cleanup_task = PostgresOperator(
 1. Open the Airflow UI at [http://localhost:8080](http://localhost:8080).
 2. Enable and trigger the `questdb_cleanup` DAG manually.
 
-## Pros & Cons
-
-✅ Scalable and widely used in production environments
-✅ Built-in scheduling and monitoring
-✅ Extensive operator library
-
-❌ More complex setup compared to REST API based automation
-❌ Requires managing dependencies and services
 
 ## Next Steps
 

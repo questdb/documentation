@@ -73,15 +73,6 @@ def daily_questdb_cleanup_schedule():
     return {}
 ```
 
-## Pros & Cons
-
-✅ UI for monitoring and debugging
-✅ Supports retries and error handling
-✅ Scalable workflow automation
-
-❌ More complex setup compared to REST API based automation
-❌ Requires Python environment
-
 ## Next Steps
 
 For further details and resources, refer to the following links:
