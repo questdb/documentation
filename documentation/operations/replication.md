@@ -410,8 +410,7 @@ This flow should be used when you wish to discard a failed primary instance and 
 - Set `replication.role=primary` on the replica.
 - Ensure other primary-related settings are configured appropriately
     - for example, snapshotting policies
-- Create a `_recovery_timestamp` file in your data directory (by default, `db`)
-    - This file should contain either a `TIMESTAMP` value, or `latest`.
+- Create an empty `_migrate_primary` file in your database installation directory (i.e. the parent of `conf` and `db`).
 - Start the replica instance, which is now the new primary.
 - Create a new replica instance to replace the promoted replica.
 
