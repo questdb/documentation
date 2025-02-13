@@ -486,6 +486,7 @@ module.exports = {
       items: [
         "troubleshooting/faq",
         "troubleshooting/os-error-codes",
+        "troubleshooting/error-codes",
       ],
     },
   ].filter(Boolean),
