@@ -12,7 +12,7 @@ queries by recording each query's execution time in a system table called
 of QuestDB's SQL statements.
 
 Query tracing is disabled by default. You can enable it using the following
-configuration property:
+configuration property in `server.conf`:
 
 ```text
 query.tracing.enabled=true
@@ -22,13 +22,13 @@ You don't need to restart the database server for this property to take effect;
 just run the following query to reload the configuration:
 
 ```sql
-select reload_config();
+SELECT reload_config();
 ```
 
 This is an example of what the `_query_trace` table may contain:
 
 ```sql
-_query_trace;
+SELECT * from _query_trace;
 ```
 
 |             ts              |        query_text         | execution_micros |
@@ -41,7 +41,11 @@ As a simple performance debugging example, to get the text of all queries that
 took more than 100 ms, run:
 
 ```sql
-select query_text from query_trace() where execution_micros > 100_000;
+SELECT 
+    query_text
+FROM _query_trace 
+WHERE execution_micros > 100_000
+ORDER BY execution_micros DESC;
 ```
 
 The `_query_trace` table will drop data older than 24 hours in order to limit
