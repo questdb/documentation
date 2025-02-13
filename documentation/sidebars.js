@@ -371,7 +371,7 @@ module.exports = {
         "operations/design-for-performance",
         "operations/logging-metrics",
         "operations/updating-data",
-        "operations/automating-questdb-tasks",
+        "operations/task-automation",
       ],
     },
     {

@@ -3,11 +3,9 @@ title: "Dagster"
 description: Learn how to use Dagster to automate QuestDB workflows.
 ---
 
-# Automating QuestDB with Dagster
-
-## Introduction
-
 Dagster is a modern data orchestrator that enables structured and scalable workflow automation. With Dagster, you can automate tasks such as executing SQL queries on QuestDB and managing data pipelines with built-in monitoring and logging.
+
+Alternatively, checkout our [Automating QuestDB Tasks](/docs/operations/task-automation/) guide for a scripted approach.
 
 ## Prerequisites
 

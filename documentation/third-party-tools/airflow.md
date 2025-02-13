@@ -3,12 +3,9 @@ title: "Apache Airflow"
 description: Learn how to use Apache Airflow to automate QuestDB workflows.
 ---
 
-# Automating QuestDB with Apache Airflow
-
-## Introduction
-
 Apache Airflow is a powerful workflow automation tool that allows you to schedule and monitor tasks through directed acyclic graphs (DAGs). Airflow provides built-in operators for executing SQL queries, making it easy to automate QuestDB tasks.
 
+Alternatively, checkout our [Automating QuestDB Tasks](/docs/operations/task-automation/) guide for a scripted approach.
 
 ## Prerequisites
 

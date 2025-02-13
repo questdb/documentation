@@ -1,33 +1,29 @@
 ---
 title: Automating QuestDB Tasks
-sidebar_label: Automating QuestDB Tasks
+sidebar_label: Task automation
 description:
-  This document describes how to automate QuestDB tasks using the REST HTTP API.
+  Learn how to automate QuestDB tasks using the REST HTTP API, or one of our recommended workflow orchestrators.
 ---
 
-# Automating QuestDB with the REST API and Bash Scripts
-
-## Introduction
-
-QuestDB provides a simple [HTTP API](../reference/api/rest.md) that allows you to interact with the database using SQL queries.
+QuestDB provides a simple [HTTP API](/docs/reference/api/rest/) that allows you to interact with the database using SQL queries.
 This API can be leveraged for automation using Bash scripts and scheduled execution via cron jobs. This is a lightweight
 approach that requires minimal dependencies.
 
 For a more robust approach, you might want to explore the integration with workflow orchestrators such as
-[Apache Airflow](../third-party-tools/airflow.md) or [Dagster](../third-party-tools/dagster.md).
+[Apache Airflow](/docs/third-party-tools/airflow/) or [Dagster](/docs/third-party-tools/dagster/).
 
 
 ## Prerequisites
 
-- QuestDB running locally or on a server.
-- `curl` installed (pre-installed on most Linux/macOS systems).
-- Basic knowledge of Bash scripting.
+- QuestDB running locally or on a server
+- `curl` installed (pre-installed on most Linux/macOS systems)
+- Basic knowledge of Bash or similar scripting language
 
 ## Example: Running a Scheduled Query
 
 The following example demonstrates how to execute a query using the HTTP API:
 
-```bash
+```bash title="drop-partitions.sh"
 #!/bin/bash
 
 # QuestDB API URL
@@ -60,11 +56,11 @@ To execute this script daily at midnight, add the following line to your crontab
 
 ## Next Steps
 
-For more advanced automation, consider using a workflow orchestrator like [**Dagster**](../third-party-tools/dagster.md) or
-[**Apache Airflow**](../third-party-tools/airflow.md).
+For more advanced automation, consider using a workflow orchestrator like [**Dagster**](/docs/third-party-tools/dagster/) or
+[**Apache Airflow**](/docs/third-party-tools/airflow/).
 
-- **QuestDB REST API Documentation**: [https://questdb.io/docs/reference/api/rest](../reference/api/rest.md)
+- **QuestDB REST API Documentation**: [https://questdb.io/docs/reference/api/rest](../reference/api/rest/)
 - **Full Example Repository**: [https://github.com/questdb/data-orchestration-and-scheduling-samples](https://github.com/questdb/data-orchestration-and-scheduling-samples)
-- **Apache Airflow**: [Automating QuestDB Workflows Using Apache Airflow](../third-party-tools/airflow.md)
-- **Dagster**: [Automating QuestDB Workflows Using Dagster](../third-party-tools/dagster.md)
+- **Apache Airflow**: [Automating QuestDB Workflows Using Apache Airflow](/docs/third-party-tools/airflow/)
+- **Dagster**: [Automating QuestDB Workflows Using Dagster](/docs/third-party-tools/dagster/)
 
