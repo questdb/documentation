@@ -37,7 +37,16 @@ integrations:
   tasks at scale.
 - [Airbyte](/docs/third-party-tools/airbyte/): Performs streamlined ETL across 
   diverse data sources.
-  
+
+## Workflow Orchestrators
+
+Automate your data pipelines with these workflow orchestrators:
+
+- [Apache Airflow](/docs/third-party-tools/airflow/): A workflow automation tool for
+  scheduling and monitoring tasks through directed acyclic graphs (DAGs).
+- [Dagster](/docs/third-party-tools/dagster/): A modern workflow orchestrator for
+  data pipelines.
+
 ## Analytics and Processing
 
 Enhance your data analysis and processing capabilities with QuestDB through
