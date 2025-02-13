@@ -59,8 +59,5 @@ To execute this script daily at midnight, add the following line to your crontab
 For more advanced automation, consider using a workflow orchestrator like [**Dagster**](/docs/third-party-tools/dagster/) or
 [**Apache Airflow**](/docs/third-party-tools/airflow/).
 
-- **QuestDB REST API Documentation**: [https://questdb.io/docs/reference/api/rest](../reference/api/rest/)
 - **Full Example Repository**: [https://github.com/questdb/data-orchestration-and-scheduling-samples](https://github.com/questdb/data-orchestration-and-scheduling-samples)
-- **Apache Airflow**: [Automating QuestDB Workflows Using Apache Airflow](/docs/third-party-tools/airflow/)
-- **Dagster**: [Automating QuestDB Workflows Using Dagster](/docs/third-party-tools/dagster/)
 
