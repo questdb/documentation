@@ -25,6 +25,11 @@ While InfluxDB clients are supported, we recommend using the QuestDB clients.
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
 
+> The InfluxData team has recently announced InfluxDB 3.0 Core Alpha, which is a
+> new open source version of InfluxDB. We benchmark and discuss the caveats in our
+> [InfluxDB 3.0 Core Alpha benchmark blog](/blog/influxdb3-core-alpha-benchmarks-and-caveats/).
+
+
 ## Overview
 
 If QuestDB is not up and running, see the [quick start](/docs/quick-start/).
