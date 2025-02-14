@@ -75,17 +75,19 @@ Please see the new blog for more information.
 When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result set with pre-determined values.
 
 However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
-rows outside of this range.
 
 To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause. The boundary
 timestamps are expected in UTC.
+
+Note that `FROM-TO` clause can be used only on non-keyed SAMPLE BY queries, i.e. queries that have no grouping columns
+other than the timestamp.
 
 #### Syntax
 
 Specify the shape of the query using `FROM` and `TO`:
 
 ```questdb-sql title='Pre-filling trip data' demo
-SELECT pickup_datetime as t, count
+SELECT pickup_datetime as t, count()
 FROM trips
 SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
 ```
@@ -107,7 +109,7 @@ This means that the query will run optimally, and avoid touching data not releva
 Therefore, we compile the prior query into something similar to this:
 
 ```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
-SELECT pickup_datetime as t, count
+SELECT pickup_datetime as t, count()
 FROM trips
 WHERE pickup_datetime >= '2008-12-28'
   AND pickup_datetime <  '2009-01-05'
