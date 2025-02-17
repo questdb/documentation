@@ -485,6 +485,39 @@ SELECT * FROM table_partitions('my_table') WHERE active = true;
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
 | 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
 
+## mat_views
+
+`mat_views()` returns the list of all materialized views in the database.
+
+**Arguments:**
+
+- `mat_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `name` - materialized view name
+- `baseTableName` - base table name
+- `lastRefreshTimestamp` - last time when the view was incrementally refreshed
+- `viewSql` - query used to populate view data
+- `viewTableDirName` - view directory name
+- `invalid` - invalid status flag
+- `invalidationReason` - message explaining why the view was marked as invalid
+- `baseTableTxn` - the last committed transaction in the base table
+- `appliedBaseTableTxn` - the last base table transaction used to refresh the
+  materialized view
+
+**Examples:**
+
+```questdb-sql title="List all materialized views"
+mat_views();
+```
+
+| name      | baseTableName | lastRefreshTimestamp        | viewSql                                                                          | viewTableDirName | invalid | invalidationReason | baseTableTxn | appliedBaseTableTxn |
+| --------- | ------------- | --------------------------- | -------------------------------------------------------------------------------- | ---------------- | ------- | ------------------ | ------------ | ------------------- |
+| trades_1h | trades        | 2024-10-24T17:22:09.842574Z | SELECT timestamp, symbol, side, avg(price) AS avg_price FROM trades SAMPLE BY 1h | trades_1h~10     | false   |                    | 42           | 42                  |
+
 ## version/pg_catalog.version
 
 `version()` or `pg_catalog.version()` returns the supported version of the

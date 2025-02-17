@@ -45,7 +45,7 @@ createTableDef
   'AS' '(' selectSql ')'  (',' castDef)* (',' indexDef)*
   )
   ) (
-    ('timestamp' '(' columnRef ')' )
+    ('TIMESTAMP' '(' columnRef ')' )
     (
       'PARTITION' 'BY' ('NONE' ('BYPASS' 'WAL')? | ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')('WAL' | 'BYPASS' 'WAL')?)
       ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
@@ -358,3 +358,20 @@ disableDedup
 
 enableDedup
  ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'ENABLE' 'UPSERT' 'KEYS' '(' (column ( ',' column )* ) ')'
+
+createMatViewDef
+::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
+  ('WITH BASE' baseTableName)?
+  ('REFRESH' 'INCREMENTAL')?
+  'AS'
+  (
+    query
+  ) (
+    ('TIMESTAMP' '(' columnRef ')' )
+    (
+      'PARTITION' 'BY' ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')
+      ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
+    )?
+  )?
+ (viewTargetVolumeDef)?
+ ('OWNED' 'BY' ownerName)?
