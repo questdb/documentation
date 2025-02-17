@@ -71,7 +71,7 @@ alterTable
   ::= 'ALTER' 'TABLE' tableName
 
 declare
-::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
+  ::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
 
 
 alterTableAddColumn
@@ -106,8 +106,7 @@ indexDef
   ::='INDEX' '(' columnRef ('CAPACITY' valueBlockSize)?')'
 
 tableTargetVolumeDef
-
-::= ','? 'IN' 'VOLUME' "'"? secondaryVolumeAlias "'"?
+  ::= ','? 'IN' 'VOLUME' "'"? secondaryVolumeAlias "'"?
 
 insertInto
   ::= 'INSERT' (('ATOMIC')? | ('BATCH' number ('o3MaxLag' numberWithUnit)?) )
@@ -266,25 +265,25 @@ with
   ::= 'WITH' ( subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )*) mainQuery
 
 addIndex
- ::= 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
+  ::= 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
 
 dropIndex
- ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
 
 noCacheColumn
- ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
 
 dropColumn
- ::= 'DROP' 'COLUMN' columnName (',' columnName)* ':'
+  ::= 'DROP' 'COLUMN' columnName (',' columnName)* ':'
 
 addColumn
- ::= 'ADD' 'COLUMN' columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
+  ::= 'ADD' 'COLUMN' columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
 
 alterColumnType
- ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
 
 dropPartition
- ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+  ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
 
 removeUser
   ::= 'REMOVE' 'USER' userName 'FROM' groupName ( ',' groupName )*
@@ -296,24 +295,24 @@ renameColumn
   ::= 'RENAME' 'COLUMN' columnName 'TO' newColumnName
 
 attachPartition
- ::= 'ALTER' 'TABLE' tableName 'ATTACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+  ::= 'ALTER' 'TABLE' tableName 'ATTACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
 
 detachPartition
- ::= 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
+  ::= 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
    | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
    | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn 'IN' '(' timestamp (',' timestamp)* ')'
 
 squashPartitions
- ::= 'SQUASH' 'PARTITIONS' tableName ';'
+  ::= 'SQUASH' 'PARTITIONS' tableName ';'
 
 setParam
- ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n)
+  ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n)
 
 setParamCommitLag
- ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n | 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' ))
+  ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n | 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' ))
 
 vacuumTable
- ::= 'VACUUM' 'TABLE' tableName
+  ::= 'VACUUM' 'TABLE' tableName
 
 resumeWal
   ::= 'RESUME' 'WAL' ( 'FROM' 'TRANSACTION' sequencerTxn | 'FROM' 'TXN' sequencerTxn )?
@@ -321,13 +320,12 @@ resumeWal
 setType
   ::= 'SET' 'TYPE' ( 'BYPASS' )? 'WAL'
 
-
 setTtl
   ::= 'SET' 'TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
 
 update
- ::= UPDATE 'tableName' SET columnName '=' 'expression' ( ',' columnName '=' 'expression' )*
-(FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
+  ::= UPDATE 'tableName' SET columnName '=' 'expression' ( ',' columnName '=' 'expression' )*
+  (FROM 'joinTable1' (JOIN 'joinTable2' ON 'joinCondition2')? )? (WHERE 'filter')?
 
 show
   ::= 'SHOW' ( ('TABLES'|('COLUMNS'|'PARTITIONS') 'FROM' tableName )
@@ -354,13 +352,13 @@ windowFunction
   ( 'EXCLUDE' 'CURRENT' 'ROW' | 'EXCLUDE' 'NO' 'OTHERS' )? )? ')'
 
 disableDedup
- ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'DISABLE'
+  ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'DISABLE'
 
 enableDedup
- ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'ENABLE' 'UPSERT' 'KEYS' '(' (column ( ',' column )* ) ')'
+  ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'ENABLE' 'UPSERT' 'KEYS' '(' (column ( ',' column )* ) ')'
 
 createMatViewDef
-::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
+  ::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
   ('WITH BASE' baseTableName)?
   ('REFRESH' 'INCREMENTAL')?
   'AS'
@@ -375,3 +373,12 @@ createMatViewDef
   )?
  (viewTargetVolumeDef)?
  ('OWNED' 'BY' ownerName)?
+
+alterMatView
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
+
+refreshMatView
+  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName
+
+dropMatView
+  ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName  
