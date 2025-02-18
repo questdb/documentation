@@ -10,13 +10,6 @@ import MinimumHardware from "../../src/components/DRY/_questdb_production_hardwa
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
 
-AWS Marketplace is a digital catalog with software listings from independent
-software vendors that runs on AWS. This guide describes how to launch QuestDB
-via the AWS Marketplace using the official listing. This document also describes
-usage instructions after you have launched the instance, including hints for
-authentication, the available interfaces, and tips for accessing the REST API
-and [Web Console](/docs/web-console/).
-
 
 ## Hardware recommendations
 
@@ -49,21 +42,21 @@ QuestDB supports `S3` as its replication object-store in the Enterprise edition.
 This requires very little provisioning - simply create a bucket or virtual subdirectory and follow
 the [Enterprise Quick Start](../guides/enterprise-quick-start.md) steps to configure replication.
 
-#### Example minimum specification
+### Minimum specification
 
 - **Instance**: `m6i.xlarge (4 vCPUs, 16 GiB RAM)`
 - **Storage**
-    - **OS disk**: `gp3 (30 GIB)` volume with minimum IOPS/throughput.
-    - **Data disk**: `gp3 (100 GiB)` volume with minimum IOPS/throughput. 
+    - **OS disk**: `gp3 (30 GIB)` volume provisioned with `3000 IOPS/125 MBps`.
+    - **Data disk**: `gp3 (100 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `ext4`
 
-#### Recommended minimum specification
+### Better specification
 
 - **Instance**: `r6i.2xlarge (8 vCPUs, 64 GiB RAM)`
 - **Storage**
-    - **OS disk**: `gp3`, `30 GIB` volume with 5000 IOPS/300 MBps throughput.
-    - **Data disk**: `gp3` `300 GiB` volume with 5000 IOPS/300 MBps throughput.
+    - **OS disk**: `gp3`, `30 GIB` volume provisioned with `5000 IOPS/300 MBps`.
+    - **Data disk**: `gp3` `300 GiB` volume provisioned with `5000 IOPS/300 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `zfs` with `lz4` compression.
 
@@ -76,6 +69,13 @@ You can also keep it simple - just [download](https://questdb.com/download/) the
 QuestDB is a single self-contained binary and easy to deploy.
 
 ## Launching QuestDB on the AWS Marketplace
+
+[AWS Marketplace](https://aws.amazon.com/marketplace) is a digital catalog with software listings from independent
+software vendors that runs on AWS. This guide describes how to launch QuestDB
+via the AWS Marketplace using the official listing. This document also describes
+usage instructions after you have launched the instance, including hints for
+authentication, the available interfaces, and tips for accessing the REST API
+and [Web Console](/docs/web-console/).
 
 The QuestDB listing can be found in the AWS Marketplace under the databases
 category. To launch a QuestDB instance:
