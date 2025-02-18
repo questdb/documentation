@@ -53,7 +53,7 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
     avg(price) AS avg_price
   FROM trades
   SAMPLE BY 1h
-) PARTITION BY DAY;
+) PARTITION BY WEEK;
 ```
 
 We've created a materialized view that will be automatically refreshed each time
@@ -88,7 +88,7 @@ AS (
   FROM trades t
   LT JOIN ext_trades e ON (symbol)
   SAMPLE BY 1d
-) PARTITION BY DAY;
+) PARTITION BY WEEK;
 ```
 
 ## Partitioning
