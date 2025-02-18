@@ -48,7 +48,7 @@ For open-source users, you may want to:
 
 :::warning
 
-QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](../deployment/capacity-planning.md)
+QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](../operations/capacity-planning.md)
 
 :::
 

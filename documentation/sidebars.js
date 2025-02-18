@@ -313,30 +313,14 @@ module.exports = {
       label: "Deployment",
       type: "category",
       items: [
-        "deployment/capacity-planning",
-        {
-          id: "configuration",
-          type: "doc",
-        },
-        {
-          label: "Deployment Options",
-          type: "category",
-          items: [
-            "deployment/docker",
-            "deployment/kubernetes",
-            "deployment/systemd",
-            {
-              label: "Cloud-specific",
-              type: "category",
-              items: [
-                  "deployment/aws",
-                  "deployment/azure",
-                  "deployment/gcp",
-                  "deployment/digital-ocean"
-              ]
-            }
-          ],
-        },
+        "deployment/standalone",
+        "deployment/docker",
+        "deployment/kubernetes",
+        "deployment/systemd",
+        "deployment/aws",
+        "deployment/azure",
+        "deployment/gcp",
+        "deployment/digital-ocean",
       ],
     },
     {
@@ -377,6 +361,7 @@ module.exports = {
             },
           ],
         },
+        "operations/capacity-planning",
         "operations/backup",
         "operations/command-line-options",
         {
@@ -477,7 +462,7 @@ module.exports = {
             "third-party-tools/superset",
             "third-party-tools/flink",
             "third-party-tools/airflow",
-            "third-party-tools/dagster"
+            "third-party-tools/dagster",
           ],
         },
         {
@@ -499,10 +484,7 @@ module.exports = {
     {
       label: "Troubleshooting",
       type: "category",
-      items: [
-        "troubleshooting/faq",
-        "troubleshooting/os-error-codes",
-      ],
+      items: ["troubleshooting/faq", "troubleshooting/os-error-codes"],
     },
   ].filter(Boolean),
-};
+}
