@@ -7,9 +7,6 @@ description:
 
 import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
 import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
-import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
-import CodeBlock from "@theme/CodeBlock"
-
 
 ## Hardware recommendations
 
@@ -25,14 +22,14 @@ on `Cobalt` chips.
 **Do** use instances with the letter `s`. This indicates that it is compatible with `Premium SSD` storage,
 preferred for QuestDB.
 
-Either `AMD` CPUs (`a` letter) or `Intel` (no letter) are appropriate for `x86_64` deployments.
+Either `AMD EPYC` CPUs (`a` letter) or `Intel Xeon` (no letter) are appropriate for `x86_64` deployments.
 
 We recommend starting with `D-series` instances, and then later upgrading to `E-series` if necessary i.e. for more RAM.
 
 You should deploy using an  `x86_64` Linux distribution, such as Ubuntu.
 
-For storage, we recommend using [Premium SSD v2](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#premium-ssd-v2) disks, and provisioning this at `5000 IOPS/300 MBps` until you have
-tested your workload.
+For storage, we recommend using [Premium SSD v2](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#premium-ssd-v2) disks, 
+and provisioning them at `5000 IOPS/300 MBps` until you have tested your workload.
 
 :::note
 
@@ -91,7 +88,7 @@ This offers `2300 IOPS/150 MBps` which should be enough for basic workloads.
 
 - **Instance**: `E8as v5`or `E8s v5` `(8 vCPUs, 64 GiB RAM)`
 - **Storage**
-    - **OS disk**: `Premium SSD v2 (30 GIB)` volume provisioned with `5000 IOPS/300 MBps`.
+    - **OS disk**: `Premium SSD v2 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
     - **Data disk**: `Premium SSD v2 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `zfs`

@@ -17,8 +17,8 @@ import CodeBlock from "@theme/CodeBlock"
 
 ### Elastic Compute Cloud (EC2) with Elastic Block Storage (EBS)
 
-We recommend starting with `M6i` instances, with an upgrade to
-`R6i` instances if extra RAM is needed.
+We recommend starting with `M6` instances, with an upgrade to
+`R6` instances if extra RAM is needed. You can use either `i` (Intel) or `a` (AMD) instsance. 
 
 These should be deployed with an `x86_64` Linux distribution, such as Ubuntu.
 
@@ -44,19 +44,19 @@ the [Enterprise Quick Start](../guides/enterprise-quick-start.md) steps to confi
 
 ### Minimum specification
 
-- **Instance**: `m6i.xlarge (4 vCPUs, 16 GiB RAM)`
+- **Instance**: `m6i.xlarge` or `m6a.xlarge` `(4 vCPUs, 16 GiB RAM)`
 - **Storage**
-    - **OS disk**: `gp3 (30 GIB)` volume provisioned with `3000 IOPS/125 MBps`.
+    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
     - **Data disk**: `gp3 (100 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `ext4`
 
 ### Better specification
 
-- **Instance**: `r6i.2xlarge (8 vCPUs, 64 GiB RAM)`
+- **Instance**: `r6i.2xlarge` or `r6a.xlarge` `(8 vCPUs, 64 GiB RAM)`
 - **Storage**
-    - **OS disk**: `gp3`, `30 GIB` volume provisioned with `5000 IOPS/300 MBps`.
-    - **Data disk**: `gp3` `300 GiB` volume provisioned with `5000 IOPS/300 MBps`.
+    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
+    - **Data disk**: `gp3 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `zfs` with `lz4` compression.
 
