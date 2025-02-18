@@ -17,6 +17,7 @@ import replicationConfig from "./configuration-utils/\_replication.config.json"
 import iamConfig from "./configuration-utils/\_iam.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
 import logConfig from "./configuration-utils/\_log.config.json"
+import matViewConfig from "./configuration-utils/\_mat-view.config.json"
 
 This page describes methods for configuring QuestDB server settings.
 
@@ -369,6 +370,12 @@ information, and we do not share any of this data with third parties.
     }
   }}
 />
+
+## Materialized views
+
+The following settings are available in `server.conf`:
+
+<ConfigTable rows={matViewConfig} />
 
 ## Logging & Metrics
 

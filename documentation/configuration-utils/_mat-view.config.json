@@ -1,0 +1,22 @@
+{
+  "cairo.mat.view.enabled": {
+    "default": "true",
+    "description": "Enables SQL support and refresh job for materialized views."
+  },
+  "cairo.mat.view.parallel.sql.enabled": {
+    "default": "true",
+    "description": "When disabled, SQL executed by materialized view refresh job always runs single-threaded."
+  },
+  "mat.view.refresh.worker.count": {
+    "default": "0",
+    "description": "Number of dedicated worker threads assigned to refresh materialized views. When `0`, the jobs will use the shared pool."
+  },
+  "mat.view.refresh.worker.affinity": {
+    "default": "equal to the CPU core count",
+    "description": "Comma separated list of CPU core indexes."
+  },
+  "mat.view.refresh.worker.haltOnError": {
+    "default": "false",
+    "description": "Flag that indicates if the worker thread must stop when an unexpected error occurs."
+  }
+}
