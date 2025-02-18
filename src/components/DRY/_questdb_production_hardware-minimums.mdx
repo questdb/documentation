@@ -1,0 +1,22 @@
+
+#### CPU/RAM
+
+A production instance for QuestDB should be provisioned with at least `4 vCPUs` and `8 GiB` of memory. If possible,
+a 1:4 `vCPU/RAM` ratio should be used. Some use cases may benefit from a `1:8` ratio, if this means that all the working
+set data will fit into memory; this can increase query performance by as much as `10x`.
+
+It is **not recommended** to run production workloads on less than `4 vCPUs`, as below this number, parallel querying optimisations
+may be disabled. This is to ensure there is sufficient resources available for ingestion.
+
+#### Architecture
+
+QuestDB should be deployed on Intel/AMD architectures i.e. `x86_64` and **not** on `ARM` i.e. `aarch64`. Some optimisations are not available
+on `ARM`, e.g. `SIMD`.
+
+#### Storage
+
+Data should be stored on a data disk with at minimum 3000 IOPS/125 MBps, and ideally at least 5000 IOPS/300 MBps.
+Higher end workloads should scale up the disks appropriately, or use multiple disks if necessary.
+
+It is also worth checking the burst capacity of your storage. This capacity should only be used during
+heavy I/O spikes/infrequent out-of-order (O3) writes. It is useful to have in case you hit unexpected load bursts.

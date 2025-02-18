@@ -310,7 +310,37 @@ module.exports = {
       ],
     },
     {
-      label: "Deployment & Operations",
+      label: "Deployment",
+      type: "category",
+      items: [
+        "deployment/capacity-planning",
+        {
+          id: "configuration",
+          type: "doc",
+        },
+        {
+          label: "Deployment Options",
+          type: "category",
+          items: [
+            "deployment/docker",
+            "deployment/kubernetes",
+            "deployment/systemd",
+            {
+              label: "Cloud-specific",
+              type: "category",
+              items: [
+                  "deployment/aws",
+                  "deployment/azure",
+                  "deployment/gcp",
+                  "deployment/digital-ocean"
+              ]
+            }
+          ],
+        },
+      ],
+    },
+    {
+      label: "Operations",
       type: "category",
       items: [
         {
@@ -348,26 +378,12 @@ module.exports = {
           ],
         },
         "operations/backup",
-        "deployment/capacity-planning",
-        "reference/command-line-options",
+        "operations/command-line-options",
         {
           id: "configuration",
           type: "doc",
         },
         "operations/data-retention",
-        {
-          label: "Deployment Options",
-          type: "category",
-          items: [
-            "deployment/aws-official-ami",
-            "deployment/digitalocean",
-            "deployment/docker",
-            "deployment/google-cloud-platform",
-            "deployment/kubernetes",
-            "deployment/microsoft-azure-ubuntu",
-            "deployment/systemd",
-          ],
-        },
         "operations/design-for-performance",
         "operations/logging-metrics",
         "operations/updating-data",
