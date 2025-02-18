@@ -378,7 +378,7 @@ alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
 
 refreshMatView
-  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName
+  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL')
 
 dropMatView
   ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName  
