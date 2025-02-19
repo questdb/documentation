@@ -2,8 +2,8 @@
 title: Materialized Views
 sidebar_label: Materialized Views
 description:
-  Overview of QuestDB's materialized views. This is an important feature that
-  will help you speed up your aggregation queries.
+  Overview of QuestDB's materialized views. This feature helps you significantly
+  speed up your aggregation queries.
 ---
 
 A materialized view is a table-like object that holds the result set of a query,

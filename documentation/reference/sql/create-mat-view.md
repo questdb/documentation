@@ -1,28 +1,28 @@
 ---
 title: CREATE MATERIALIZED VIEW reference
 sidebar_label: CREATE MATERIALIZED VIEW
-description: CREATE MATERIALIZED VIEW SQL keywords reference documentation.
+description: Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-To create a new materialized view in the database, the
-`CREATE MATERIALIZED VIEW` keywords followed by the query are used. A
-materialized view holds the result set of the given query, automatically
-refreshed and persistent. For more information on the concept, see the
-[reference](/docs/concept/mat-views/) on materialized views.
+To create a new materialized view in the database, use the
+`CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
+materialized view. 
+
+A materialized view holds the result set of the given query, and is
+automatically refreshed and persistent. For more information on the concept,
+see the [reference](/docs/concept/mat-views/) on materialized views.
 
 ## Syntax
 
-To create a materialized view by manually entering parameters and settings:
+To create a materialized view, manually enter the parameters and settings:
 
 ![Flow chart showing the syntax of the CREATE MATERIALIZED VIEW keyword](/images/docs/diagrams/createMatViewDef.svg)
 
-:::note
+## Metadata
 
-Checking materialized view metadata can be done via the `mat_views()` function
-which is described in the [meta functions](/docs/reference/function/meta/)
-documentation page.
-
-:::
+To check materialized view metadata, use the `mat_views()` function, which is
+described in the [meta functions](/docs/reference/function/meta/) documentation
+page.
 
 ## Examples
 
@@ -43,7 +43,7 @@ PARTITION BY DAY;
 ```
 
 Now we can create a materialized view holding aggregated data from the base
-table.
+table:
 
 ```questdb-sql title="Hourly materialized view"
 CREATE MATERIALIZED VIEW trades_hourly_prices AS (
@@ -64,17 +64,16 @@ base table.
 :::note
 
 Queries supported by incrementally refreshed materialized views are limited to
-SAMPLE BY without FROM-TO and FILL clauses and GROUP BY queries with timestamp
-key.
+`SAMPLE BY` queries without `FROM-TO` and `FILL` clauses and `GROUP BY` queries
+with the designated timestamp as the grouping key.
 
 :::
 
 ## Base table
 
-Incrementally refreshed views require base table to be specified, so that the
-server refreshes the materialized view each time when the base table is updated.
-In case when the query used to create the view involves multiple tables, one of
-the tables has to be specified as the base table.
+Incrementally refreshed views require that the base table is specified, so that
+the server refreshes the materialized view each time the base table is updated.
+When creating a materialized view that queries multiple tables, you must specify one of them as the base table.
 
 ```questdb-sql title="Hourly materialized view with LT JOIN"
 CREATE MATERIALIZED VIEW trades_ext_hourly_prices
@@ -108,7 +107,7 @@ been created.
 
 ## Time To Live (TTL)
 
-To store only recent aggregated data, configure a time-to-live (TTL) period on a
+To store only recently aggregated data, configure a time-to-live (TTL) period on a
 materialized view using the `TTL` clause, placing it right after
 `PARTITION BY <unit>`.
 
@@ -140,7 +139,7 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 
 An optional `IF NOT EXISTS` clause may be added directly after the
 `CREATE MATERIALIZED VIEW` keywords to indicate that a new view should be
-created if one with the desired view name does not already exist.
+created only if a view with the desired view name does not already exist.
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS (
@@ -153,7 +152,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS (
 ) PARTITION BY YEAR;
 ```
 
-## Materialized view name
+## Materialized view names
 
 Materialized view names follow the
 [same rules](/docs/reference/sql/create-table/#table-name) as normal table
