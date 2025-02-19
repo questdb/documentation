@@ -128,6 +128,13 @@ essential, some will be removed in the next releases.
    modification, such as `UPDATE`.
 4. In case when the base table has deduplication enabled, the materialized view
    query has to use same grouping keys as the `UPSERT KEYS` in the base table.
+5. Replication Limitations (only available in QuestDB Enterprise):
+   - The data in materialized views is replicated in the same way as data for plain tables.
+   However, there are important limitations when it comes to the replication of their refresh state.
+   The refresh state - such as the refresh status or invalidation due to refresh failures—is not replicated.
+   As a result, the `mat_views()` will accurately reflect the list of materialized views,
+   but it will not display their actual refresh state. 
+   - When a replica is promoted to primary, all replicated materialized views will be triggered for a full refresh upon restart.
 
 ## Base table
 
