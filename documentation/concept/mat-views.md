@@ -75,11 +75,8 @@ function:
 ```questdb-sql
 SELECT
   name,
-  refresh_type,
-  base_table_name,
   last_refresh_timestamp,
   view_status,
-  invalidation_reason,
   base_table_txn,
   applied_base_table_txn
 FROM mat_views();
@@ -87,9 +84,9 @@ FROM mat_views();
 
 The above query returns our materialized view.
 
-| name                 | refresh_type | base_table_name | last_refresh_timestamp      | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
-| -------------------- | ------------ | --------------- | --------------------------- | ----------- | ------------------- | -------------- | ---------------------- |
-| trades_hourly_prices | incremental  | trades          | 2025-02-18T15:32:22.373513Z | valid       |                     | 42             | 42                     |
+| name                 | last_refresh_timestamp      | view_status | base_table_txn | applied_base_table_txn |
+| -------------------- | --------------------------- | ----------- | -------------- | ---------------------- |
+| trades_hourly_prices | 2025-02-18T15:32:22.373513Z | valid       | 42             | 42                     |
 
 Notice that the view has `valid` value for the `view_status` column which means
 that it's valid and gets updated by the incremental refresh process. Later on,
