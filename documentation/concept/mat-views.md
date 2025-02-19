@@ -75,30 +75,31 @@ function:
 ```questdb-sql
 SELECT
   name,
-  baseTableName,
-  lastRefreshTimestamp,
-  invalid,
-  invalidationReason,
-  baseTableTxn,
-  appliedBaseTableTxn
+  refresh_type,
+  base_table_name,
+  last_refresh_timestamp,
+  view_status,
+  invalidation_reason,
+  base_table_txn,
+  applied_base_table_txn
 FROM mat_views();
 ```
 
 The above query returns our materialized view.
 
-| name                 | baseTableName | lastRefreshTimestamp        | invalid | invalidationReason | baseTableTxn | appliedBaseTableTxn |
-| -------------------- | ------------- | --------------------------- | ------- | ------------------ | ------------ | ------------------- |
-| trades_hourly_prices | trades        | 2025-02-18T15:32:22.373513Z | false   |                    | 42           | 42                  |
+| name                 | refresh_type | base_table_name | last_refresh_timestamp      | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
+| -------------------- | ------------ | --------------- | --------------------------- | ----------- | ------------------- | -------------- | ---------------------- |
+| trades_hourly_prices | incremental  | trades          | 2025-02-18T15:32:22.373513Z | valid       |                     | 42             | 42                     |
 
-Notice that the view has `false` value for the `invalid` column which means that
-it's valid and gets updated by the incremental refresh process. Later on, we
-will learn more on invalid materialized views and how to make them valid once
+Notice that the view has `valid` value for the `view_status` column which means
+that it's valid and gets updated by the incremental refresh process. Later on,
+we will learn more on invalid materialized views and how to make them valid once
 again.
 
-The `lastRefreshTimestamp` column contains the last time when the materialized
-view was incrementally refreshed. The `baseTableTxn` column shows current
+The `last_refresh_timestamp` column contains the last time when the materialized
+view was incrementally refreshed. The `base_table_txn` column shows current
 transaction number available for readers of the base table while the
-`appliedBaseTableTxn` column shows the transaction up to which the view is
+`applied_base_table_txn` column shows the transaction up to which the view is
 refreshed. When these numbers match, it means that the materialized view is
 fully up-to-date.
 

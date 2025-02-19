@@ -497,15 +497,16 @@ SELECT * FROM table_partitions('my_table') WHERE active = true;
 
 Returns a `table` including the following information:
 
-- `name` - materialized view name
-- `baseTableName` - base table name
-- `lastRefreshTimestamp` - last time when the view was incrementally refreshed
-- `viewSql` - query used to populate view data
-- `viewTableDirName` - view directory name
-- `invalid` - invalid status flag
-- `invalidationReason` - message explaining why the view was marked as invalid
-- `baseTableTxn` - the last committed transaction in the base table
-- `appliedBaseTableTxn` - the last base table transaction used to refresh the
+- `view_name` - materialized view name
+- `refresh_type` - refresh strategy type
+- `base_table_name` - base table name
+- `last_refresh_timestamp` - last time when the view was incrementally refreshed
+- `view_sql` - query used to populate view data
+- `view_table_dir_name` - view directory name
+- `view_status` - view status: valid or invalid
+- `invalidation_reason` - message explaining why the view was marked as invalid
+- `base_table_txn` - the last committed transaction in the base table
+- `applied_base_table_txn` - the last base table transaction used to refresh the
   materialized view
 
 **Examples:**
@@ -514,9 +515,9 @@ Returns a `table` including the following information:
 mat_views();
 ```
 
-| name      | baseTableName | lastRefreshTimestamp        | viewSql                                                                          | viewTableDirName | invalid | invalidationReason | baseTableTxn | appliedBaseTableTxn |
-| --------- | ------------- | --------------------------- | -------------------------------------------------------------------------------- | ---------------- | ------- | ------------------ | ------------ | ------------------- |
-| trades_1h | trades        | 2024-10-24T17:22:09.842574Z | SELECT timestamp, symbol, side, avg(price) AS avg_price FROM trades SAMPLE BY 1h | trades_1h~10     | false   |                    | 42           | 42                  |
+| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql                                                                         | view_table_dir_name | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
+| --------- | ------------ | --------------- | --------------------------- | -------------------------------------------------------------------------------- | ------------------- | ----------- | ------------------- | -------------- | ---------------------- |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | SELECT timestamp, symbol, side, avg(price) AS avg_price FROM trades SAMPLE BY 1h | trades_1h~10        | valid       |                     | 42             | 42                     |
 
 ## version/pg_catalog.version
 
