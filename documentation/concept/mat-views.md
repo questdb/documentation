@@ -73,7 +73,7 @@ the same result.
 The list of all materialized views is available via the `mat_views()` meta
 function:
 
-```questdb-sql title="Listing all materialized views"
+```questdb-sql title="Listing all materialized views" demo
 SELECT
   name,
   last_refresh_timestamp,

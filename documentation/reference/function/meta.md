@@ -511,7 +511,7 @@ Returns a `table` including the following information:
 
 **Examples:**
 
-```questdb-sql title="List all materialized views"
+```questdb-sql title="List all materialized views" demo
 mat_views();
 ```
 
