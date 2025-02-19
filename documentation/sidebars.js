@@ -238,8 +238,8 @@ module.exports = {
               label: "MATERIALIZED VIEWS",
               collapsed: false,
               items: [
-                "reference/sql/create-mat-view",
                 "reference/sql/alter-mat-view-resume-wal",
+                "reference/sql/create-mat-view",
                 "reference/sql/drop-mat-view",
                 "reference/sql/refresh-mat-view",
               ],
