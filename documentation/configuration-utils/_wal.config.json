@@ -33,6 +33,6 @@
   },
   "cairo.wal.apply.parallel.sql.enabled": {
     "default": "true",
-    "description": "When disabled, SQL executed by WAL apply job always runs single-threaded."
+    "description": "When disabled, SQL executed by the WAL apply job will always run single-threaded."
   }
 }
