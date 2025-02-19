@@ -327,11 +327,29 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
+        "operations/capacity-planning",
         {
+          id: "configuration",
+          type: "doc",
+        },
+        "operations/command-line-options",
+        "operations/backup",
+        {
+          label: "Authentication",
           type: "category",
-          label: "Enterprise",
           collapsed: false,
           items: [
+            {
+              id: "operations/authentication",
+              type: "doc",
+              label: "Open Source Authentication",
+            },
+            {
+              id: "operations/rbac",
+              type: "doc",
+              label: "Role-Based Access Control (RBAC)",
+              customProps: { tag: "Enterprise" },
+            },
             {
               id: "operations/openid-connect-oidc-integration",
               type: "doc",
@@ -340,39 +358,27 @@ module.exports = {
             },
             {
               type: "doc",
-              id: "operations/replication",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "operations/multi-primary-ingestion",
-              type: "doc",
-              label: "Multi-primary ingestion",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "doc",
-              id: "operations/rbac",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "doc",
               id: "operations/tls",
               customProps: { tag: "Enterprise" },
             },
-          ],
+          ]
         },
-        "operations/capacity-planning",
-        "operations/backup",
-        "operations/command-line-options",
-        {
-          id: "configuration",
-          type: "doc",
-        },
+        "operations/logging-metrics",
         "operations/data-retention",
         "operations/design-for-performance",
-        "operations/logging-metrics",
         "operations/updating-data",
         "operations/task-automation",
+        {
+          type: "doc",
+          id: "operations/replication",
+          customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "operations/multi-primary-ingestion",
+          type: "doc",
+          label: "Multi-primary ingestion",
+          customProps: { tag: "Enterprise" },
+        },
       ],
     },
     {

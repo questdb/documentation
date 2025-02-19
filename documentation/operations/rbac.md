@@ -25,8 +25,7 @@ It covers:
 
 :::note
 
-Role-based Access Control (RBAC) is available in QuestDB Enterprise & QuestDB
-Cloud.
+Role-based Access Control (RBAC) is available in QuestDB Enterprise.
 
 :::
 
