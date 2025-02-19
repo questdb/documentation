@@ -517,7 +517,7 @@ mat_views();
 
 | view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql                                                                         | view_table_dir_name | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
 | --------- | ------------ | --------------- | --------------------------- | -------------------------------------------------------------------------------- | ------------------- | ----------- | ------------------- | -------------- | ---------------------- |
-| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | SELECT timestamp, symbol, side, avg(price) AS avg_price FROM trades SAMPLE BY 1h | trades_1h~10        | valid       |                     | 42             | 42                     |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | <query_text> | trades_1h~10        | valid       |                     | 42             | 42                     |
 
 ## version/pg_catalog.version
 
