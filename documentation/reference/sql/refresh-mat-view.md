@@ -1,5 +1,5 @@
 ---
-title: REFRESH MATERIALIZED VIEW keyword
+title: REFRESH MATERIALIZED VIEW
 sidebar_label: REFRESH MATERIALIZED VIEW
 description: Documentation for the REFRESH MATERIALIZED VIEW SQL keyword in QuestDB.
 ---

@@ -1,5 +1,5 @@
 ---
-title: DROP MATERIALIZED VIEW keyword
+title: DROP MATERIALIZED VIEW
 sidebar_label: DROP MATERIALIZED VIEW
 description: Documentation for the DROP MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
@@ -7,14 +7,13 @@ description: Documentation for the DROP MATERIALIZED VIEW SQL keyword in QuestDB
 `DROP MATERIALIZED VIEW` permanently deletes a materialized view and its
 contents.
 
-This command deletes the data in the target materialized view. The deletion is
-**permanent** and **not recoverable**, except when the view was created in a
-non-standard volume. In such cases, the view is only logically removed while the
+The deletion is **permanent** and **not recoverable**, except if the view was created in a
+non-standard volume. 
+
+In such cases, the view is only logically removed while the
 underlying data remains intact in its volume.
 
-Disk space is reclaimed asynchronously after the materialized view is dropped.
-
-Ongoing view reads might delay space reclamation.
+Disk space is reclaimed asynchronously after the materialized view is dropped. Ongoing view reads might delay space reclamation.
 
 ## Syntax
 

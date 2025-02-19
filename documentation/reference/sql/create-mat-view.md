@@ -1,5 +1,5 @@
 ---
-title: CREATE MATERIALIZED VIEW reference
+title: CREATE MATERIALIZED VIEW
 sidebar_label: CREATE MATERIALIZED VIEW
 description: Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
@@ -57,9 +57,9 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ```
 
 We've created a materialized view that will be automatically refreshed each time
-when the base table (`trades`) gets new data. The refreshes are incremental,
-i.e. the view data is populated partially, only for the changed parts of the
-base table.
+when the base table (`trades`) gets new data. 
+
+The refreshes are incremental. The view data is populated partially, and only for the changed parts of the base table.
 
 :::note
 
@@ -94,6 +94,7 @@ AS (
 
 `PARTITION BY` allows for specifying the
 [partitioning strategy](/docs/concept/partitions/) for the materialized view.
+
 Materialized views can be partitioned by one of the following:
 
 - `YEAR`
@@ -164,11 +165,12 @@ _Enterprise only._
 
 When a user creates a new materialized view, they automatically get all
 materialized view level permissions with the `GRANT` option for that view.
+
 However, if the `OWNED BY` clause is used, the permissions instead go to the
 user, group, or service account named in that clause.
 
 The `OWNED BY` clause cannot be omitted if the materialized view is created by
-an external user, because permissions cannot be granted to them.
+an external user, as permissions cannot be granted to them.
 
 ```questdb-sql
 CREATE GROUP analysts;

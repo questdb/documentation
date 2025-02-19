@@ -233,6 +233,17 @@ module.exports = {
             "reference/sql/join",
             "reference/sql/latest-on",
             "reference/sql/limit",
+            {
+              type: "category",
+              label: "MATERIALIZED VIEWS",
+              collapsed: false,
+              items: [
+                "reference/sql/create-mat-view",
+                "reference/sql/alter-mat-view-resume-wal",
+                "reference/sql/drop-mat-view",
+                "reference/sql/refresh-mat-view",
+              ],
+            },
             "reference/sql/order-by",
             "reference/sql/reindex",
             "reference/sql/rename",

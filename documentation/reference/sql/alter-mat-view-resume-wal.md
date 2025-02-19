@@ -5,22 +5,15 @@ description:
   Documentation for the ALTER MATERIALIZED VIEW RESUME WAL SQL keyword in QuestDB.
 ---
 
-Restarts underlying
-[WAL table](/docs/concept/write-ahead-log/) transactions that belong to a
-materialized view. Occurs after recovery from errors.
+`ALTER MATERIALIZED VIEW RESUME WAL` restarts [WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors. 
+
+Accepts the same optional `sequencerTxn` input as the [`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/) operation. Refer to that page for more details.
 
 ## Syntax
 
 ![Flow chart showing the syntax of the ALTER MATERIALIZED VIEW keyword](/images/docs/diagrams/alterMatView.svg)
 
 ![Flow chart showing the syntax of ALTER MATERIALIZED VIEW with RESUME WAL keyword](/images/docs/diagrams/resumeWal.svg)
-
-## Description
-
-`ALTER MATERIALIZED VIEW RESUME WAL` restarts WAL table transactions after
-resolving errors. This operation accepts the same optional `sequencerTxn` input
-as the [`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/)
-operation, so refer to that page for more details.
 
 ## Examples
 
