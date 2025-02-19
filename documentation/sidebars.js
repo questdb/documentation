@@ -431,6 +431,7 @@ module.exports = {
         "concept/partitions",
         "concept/ttl",
         "concept/symbol",
+        "concept/mat-views",
         "concept/indexes",
         "concept/interval-scan",
         "concept/geohashes",
