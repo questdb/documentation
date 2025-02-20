@@ -1,8 +1,12 @@
 ---
-title: Launch QuestDB on DigitalOcean
-sidebar_label: DigitalOcean Droplet
-description: This document describes how to launch DigitalOcean droplet with QuestDB
+title: Deploying to Digital Ocean
+sidebar_label: Digital Ocean
+description:
+  This document describes how to launch the official AWS Marketplace AMI with
+  QuestDB installed and how to access and secure the instance on Amazon Web
+  Services
 ---
+
 
 DigitalOcean is a platform with software listings from independent vendors that
 run on cloud resources. This guide describes how to launch QuestDB via the
@@ -35,10 +39,10 @@ method is preferred:
 import Screenshot from "@theme/Screenshot"
 
 <Screenshot
-  alt="Choosing the RAM and CPU capacity for a QuestDB DigitalOcean Droplet"
-  height={591}
-  src="images/blog/2021-07-09/choosing-droplet.webp"
-  width={770}
+alt="Choosing the RAM and CPU capacity for a QuestDB DigitalOcean Droplet"
+height={591}
+src="images/blog/2021-07-09/choosing-droplet.webp"
+width={770}
 />
 
 4. Choose a region closest to you
@@ -49,10 +53,10 @@ import Screenshot from "@theme/Screenshot"
    the bottom of the page
 
 <Screenshot
-  alt="Finalizing the creation step of a DigitalOcean Droplet running QuestDB"
-  height={591}
-  src="images/blog/2021-07-09/questdb-droplet.webp"
-  width={770}
+alt="Finalizing the creation step of a DigitalOcean Droplet running QuestDB"
+height={591}
+src="images/blog/2021-07-09/questdb-droplet.webp"
+width={770}
 />
 
 After 30 seconds, QuestDB should be ready to use. To validate that we set
