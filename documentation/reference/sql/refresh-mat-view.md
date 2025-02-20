@@ -1,14 +1,17 @@
 ---
 title: REFRESH MATERIALIZED VIEW
 sidebar_label: REFRESH MATERIALIZED VIEW
-description: Documentation for the REFRESH MATERIALIZED VIEW SQL keyword in QuestDB.
+description:
+  Documentation for the REFRESH MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-`REFRESH MATERIALIZED VIEW` refreshes the given materialized view. Helpful in situations when the view is invalid and no longer refreshes incrementally.
+`REFRESH MATERIALIZED VIEW` refreshes the given materialized view. Helpful in
+situations when the view is invalid and no longer refreshes incrementally.
 
 When the FULL keyword is specified, this command deletes the data in the target
-materialized view and inserts the results of the query into the view. It also marks
-the materialized view as valid, so that it activates the incremental refresh.
+materialized view and inserts the results of the query into the view. It also
+marks the materialized view as valid, so that it activates the incremental
+refresh.
 
 With the `INCREMENTAL` keyword, the `REFRESH` command schedules an incremental
 refresh of the materialized view. Usually, incremental refresh is automatic, so

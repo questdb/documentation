@@ -87,7 +87,7 @@ Some conditions may lead to invalidation of the dependent materialized views:
   - Operations that involve changes to the existing schema, such as `RENAME TABLE` or `ALTER TABLE DROP COLUMN`, or data deletion, such as `TRUNCATE` or `ALTER TABLE DROP PARTITION`, or data modification, such as `UPDATE` can cause invalidation
   - When using deduplication, views must use the same grouping keys as the base table’s `UPSERT KEYS`
 
-### Restoring an invalid view
+### Restoring an invalid view with refresh
 
 If a materialized view becomes invalid (e.g., due to `TRUNCATE` or `ALTER TABLE DROP PARTITION` on the base table), 
 you can check its status:
@@ -106,9 +106,11 @@ REFRESH MATERIALIZED VIEW view_name FULL;
 This command deletes existing data in the materialized view, re-runs its query,
 and marks it as valid so that it can be incrementally refreshed again.
 
-## Replication considerations (Enterprise only)
+For large base tables, a full refresh may take a significant amount of time.
+While the refresh is running, it's possible to cancel the operation using the
+[`CANCEL QUERY`](/docs/reference/sql/cancel-query/) SQL.
 
-For Enterprise deployments with replication:
+## Replication considerations (Enterprise only)
 
   - Refresh state is maintained independently on each node
   - Promotion of a replica to primary triggers a full refresh
@@ -123,7 +125,8 @@ Views interact with QuestDB’s resource management systems:
   - Separate partition management
   - Configurable refresh intervals
 
-For example, you can apply a TTL policy directly on the view to limit data growth:
+In situations when the unbounded growth of a materialized view is unwanted, it
+is possible to configure TTL on the view itself:
 
 ```questdb-sql title="Create a materialized view with a TTL policy"
 CREATE MATERIALIZED VIEW trades_hourly_prices AS (
