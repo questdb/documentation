@@ -10,11 +10,23 @@ A materialized view is a database object that stores the pre-computed results of
 Unlike regular views, which compute their results at query time, materialized views persist their data to disk, making them particularly efficient for expensive
 aggregate queries that are run frequently.
 
+## Related documentation
+
+- **SQL Commands**
+  - [CREATE MATERIALIZED VIEW](/docs/reference/sql/create-mat-view/): Create a new materialized view
+  - [DROP MATERIALIZED VIEW](/docs/reference/sql/drop-mat-view/): Remove a materialized view
+  - [REFRESH MATERIALIZED VIEW](/docs/reference/sql/refresh-mat-view/): Manually refresh a materialized view
+  - [ALTER MATERIALIZED VIEW RESUME WAL](/docs/reference/sql/alter-mat-view-resume-wal/): Resume WAL for a materialized view
+
+- **Configuration**
+  - [Materialized views configs](/docs/configuration/#materialized-views): Server configuration options for materialized views from `server.conf`
+
 > For a step-by-step guide on creating materialized views, see [our tutorial](/blog/how-to-create-materialized-views/).
 
 ## Architecture and behaviour
 
 ### Storage model
+
 Materialized views in QuestDB are implemented as special tables that maintain their
 data independently of their base tables. They use the same underlying storage
 engine as regular tables, benefiting from QuestDB's columnar storage and
@@ -63,7 +75,7 @@ Every materialized view is tied to a base table that serves as its primary data 
 
   - For single-table queries, the base table is automatically determined
   - For multi-table queries, one table must be explicitly designated as the base table using `WITH BASE`
-  - The view’s refresh cycle is triggered by changes to its base table
+  - The view's refresh cycle is triggered by changes to its base table
 
 For multi-table queries, one table must be explicitly designated as the base table using `WITH BASE`. This ensures that the refresh mechanism knows which table's updates should trigger the materialized view's updates.
 
@@ -79,13 +91,13 @@ Materialized views must meet specific requirements:
 
 ### Schema dependencies
 
-The view’s structure is tightly coupled with its base table.
+The view's structure is tightly coupled with its base table.
 
 Some conditions may lead to invalidation of the dependent materialized views:
 
   - Schema changes to the base table may invalidate the view
   - Operations that involve changes to the existing schema, such as `RENAME TABLE` or `ALTER TABLE DROP COLUMN`, or data deletion, such as `TRUNCATE` or `ALTER TABLE DROP PARTITION`, or data modification, such as `UPDATE` can cause invalidation
-  - When using deduplication, views must use the same grouping keys as the base table’s `UPSERT KEYS`
+  - When using deduplication, views must use the same grouping keys as the base table's `UPSERT KEYS`
 
 ### Restoring an invalid view with refresh
 
@@ -118,7 +130,7 @@ While the refresh is running, it's possible to cancel the operation using the
 
 ## Resource management
 
-Views interact with QuestDB’s resource management systems:
+Views interact with QuestDB's resource management systems:
 
   - Independent TTL settings from base tables
   - Ignore TTL-based deletions in base tables
