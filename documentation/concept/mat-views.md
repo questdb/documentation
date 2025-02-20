@@ -39,6 +39,7 @@ partitioning capabilities.
 :::note
 
 Currently, QuestDB only supports **incremental refresh** for materialized views.
+
 Future releases will include additional refresh strategies such as interval and
 manual refreshes.
 
