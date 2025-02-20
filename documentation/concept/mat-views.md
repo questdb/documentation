@@ -23,9 +23,11 @@ partitioning capabilities.
 ### Refresh mechanism
 
 :::note
+
 Currently, QuestDB only supports **incremental refresh** for materialized views.
 Future releases will include additional refresh strategies such as interval and
 manual refreshes.
+
 :::
 
 Unlike regular views, which recompute their results at query time, materialized views 
@@ -71,17 +73,19 @@ For multi-table queries, one table must be explicitly designated as the base tab
 
 Materialized views must meet specific requirements:
 
-  - Must use either SAMPLE BY or GROUP BY with the designated timestamp column
-  - Cannot use FROM-TO and FILL clauses in SAMPLE BY queries
+  - Must use either `SAMPLE BY` or `GROUP BY` with the designated timestamp column
+  - Cannot use `FROM-TO` and `FILL` clauses in `SAMPLE BY` queries
   - Join conditions must be compatible with incremental refresh
 
 ### Schema dependencies
 
-The view’s structure is tightly coupled with its base table:
+The view’s structure is tightly coupled with its base table.
+
+Some conditions may lead to invalidation of the dependent materialized views:
 
   - Schema changes to the base table may invalidate the view
-  - Operations like RENAME TABLE or ALTER TABLE DROP COLUMN require view recreation
-  - When using deduplication, views must use the same grouping keys as the base table’s UPSERT KEYS
+  - Operations that involve changes to the existing schema, such as `RENAME TABLE` or `ALTER TABLE DROP COLUMN`, or data deletion, such as `TRUNCATE` or `ALTER TABLE DROP PARTITION`, or data modification, such as `UPDATE` can cause invalidation
+  - When using deduplication, views must use the same grouping keys as the base table’s `UPSERT KEYS`
 
 ### Restoring an invalid view
 
