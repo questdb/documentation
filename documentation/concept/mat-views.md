@@ -16,10 +16,10 @@ aggregate queries that are run frequently.
   - [How to create a materialized view](/blog/how-to-create-a-materialized-view/): A full walkthrough of simple and advanced materialized views
 
 - **SQL Commands**
-  - [CREATE MATERIALIZED VIEW](/docs/reference/sql/create-mat-view/): Create a new materialized view
-  - [DROP MATERIALIZED VIEW](/docs/reference/sql/drop-mat-view/): Remove a materialized view
-  - [REFRESH MATERIALIZED VIEW](/docs/reference/sql/refresh-mat-view/): Manually refresh a materialized view
-  - [ALTER MATERIALIZED VIEW RESUME WAL](/docs/reference/sql/alter-mat-view-resume-wal/): Resume WAL for a materialized view
+  - [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view/): Create a new materialized view
+  - [`DROP MATERIALIZED VIEW`](/docs/reference/sql/drop-mat-view/): Remove a materialized view
+  - [`REFRESH MATERIALIZED VIEW`](/docs/reference/sql/refresh-mat-view/): Manually refresh a materialized view
+  - [`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/reference/sql/alter-mat-view-resume-wal/): Resume WAL for a materialized view
 
 - **Configuration**
   - [Materialized views configs](/docs/configuration/#materialized-views): Server configuration options for materialized views from `server.conf`
