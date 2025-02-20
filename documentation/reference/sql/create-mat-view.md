@@ -1,16 +1,17 @@
 ---
 title: CREATE MATERIALIZED VIEW
 sidebar_label: CREATE MATERIALIZED VIEW
-description: Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
+description:
+  Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
 To create a new materialized view in the database, use the
 `CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
-materialized view. 
+materialized view.
 
 A materialized view holds the result set of the given query, and is
-automatically refreshed and persistent. For more information on the concept,
-see the [reference](/docs/concept/mat-views/) on materialized views.
+automatically refreshed and persistent. For more information on the concept, see
+the [reference](/docs/concept/mat-views/) on materialized views.
 
 ## Syntax
 
@@ -57,9 +58,10 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ```
 
 We've created a materialized view that will be automatically refreshed each time
-when the base table (`trades`) gets new data. 
+when the base table (`trades`) gets new data.
 
-The refreshes are incremental. The view data is populated partially, and only for the changed parts of the base table.
+The refreshes are incremental. The view data is populated partially, and only
+for the changed parts of the base table.
 
 :::note
 
@@ -73,7 +75,8 @@ with the designated timestamp as the grouping key.
 
 Incrementally refreshed views require that the base table is specified, so that
 the server refreshes the materialized view each time the base table is updated.
-When creating a materialized view that queries multiple tables, you must specify one of them as the base table.
+When creating a materialized view that queries multiple tables, you must specify
+one of them as the base table.
 
 ```questdb-sql title="Hourly materialized view with LT JOIN"
 CREATE MATERIALIZED VIEW trades_ext_hourly_prices
@@ -108,8 +111,8 @@ been created.
 
 ## Time To Live (TTL)
 
-To store only recently aggregated data, configure a time-to-live (TTL) period on a
-materialized view using the `TTL` clause, placing it right after
+To store only recently aggregated data, configure a time-to-live (TTL) period on
+a materialized view using the `TTL` clause, placing it right after
 `PARTITION BY <unit>`.
 
 Follow the `TTL` keyword with a number and a time unit, one of:

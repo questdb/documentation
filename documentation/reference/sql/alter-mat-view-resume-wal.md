@@ -2,12 +2,16 @@
 title: ALTER MATERIALIZED VIEW RESUME WAL
 sidebar_label: RESUME WAL
 description:
-  Documentation for the ALTER MATERIALIZED VIEW RESUME WAL SQL keyword in QuestDB.
+  Documentation for the ALTER MATERIALIZED VIEW RESUME WAL SQL keyword in
+  QuestDB.
 ---
 
-`ALTER MATERIALIZED VIEW RESUME WAL` restarts [WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors. 
+`ALTER MATERIALIZED VIEW RESUME WAL` restarts
+[WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors.
 
-Accepts the same optional `sequencerTxn` input as the [`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/) operation. Refer to that page for more details.
+Accepts the same optional `sequencerTxn` input as the
+[`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/)
+operation. Refer to that page for more details.
 
 ## Syntax
 
@@ -17,8 +21,8 @@ Accepts the same optional `sequencerTxn` input as the [`ALTER TABLE RESUME WAL`]
 
 ## Examples
 
-Use the [`wal_tables()`](/docs/reference/function/meta/#wal_tables) function
-to investigate the materialized view status:
+Use the [`wal_tables()`](/docs/reference/function/meta/#wal_tables) function to
+investigate the materialized view status:
 
 ```questdb-sql title="List all tables and materialized views" demo
 wal_tables();
