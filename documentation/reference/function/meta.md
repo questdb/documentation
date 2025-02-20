@@ -485,6 +485,40 @@ SELECT * FROM table_partitions('my_table') WHERE active = true;
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
 | 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
 
+## mat_views
+
+`mat_views()` returns the list of all materialized views in the database.
+
+**Arguments:**
+
+- `mat_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `view_name` - materialized view name
+- `refresh_type` - refresh strategy type
+- `base_table_name` - base table name
+- `last_refresh_timestamp` - last time when the view was incrementally refreshed
+- `view_sql` - query used to populate view data
+- `view_table_dir_name` - view directory name
+- `view_status` - view status: valid or invalid
+- `invalidation_reason` - message explaining why the view was marked as invalid
+- `base_table_txn` - the last committed transaction in the base table
+- `applied_base_table_txn` - the last base table transaction used to refresh the
+  materialized view
+
+**Examples:**
+
+```questdb-sql title="List all materialized views"
+mat_views();
+```
+
+| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql                                                                         | view_table_dir_name | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
+| --------- | ------------ | --------------- | --------------------------- | -------------------------------------------------------------------------------- | ------------------- | ----------- | ------------------- | -------------- | ---------------------- |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | query text... | trades_1h~10        | valid       |                     | 42             | 42                     |
+
 ## version/pg_catalog.version
 
 `version()` or `pg_catalog.version()` returns the supported version of the

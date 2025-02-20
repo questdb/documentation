@@ -61,7 +61,8 @@ WITH
     (SELECT * FROM trades limit 10000000),
   Lookup AS
     (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
-SELECT * from Lookup
+SELECT *
+FROM Lookup
 INNER JOIN ManyTrades
   ON Lookup.symbol = Manytrades.symbol;
 ```
@@ -74,7 +75,8 @@ WITH
     (SELECT * FROM trades limit 10000000),
   Lookup AS
     (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
-SELECT * from ManyTrades
+SELECT *
+FROM ManyTrades
 INNER JOIN Lookup
   ON Lookup.symbol = Manytrades.symbol;
 ```
@@ -151,18 +153,19 @@ WITH
     WHERE timestamp in '2024-05'
     ORDER BY Symbol
     LIMIT 4
-    ),
+  ),
   juneTrades AS (
     SELECT symbol, side, COUNT(*) as total
     FROM trades
     WHERE timestamp in '2024-06'
     ORDER BY Symbol
     LIMIT 4
-    )
-SELECT * from mayTrades
+  )
+SELECT *
+FROM mayTrades
 JOIN JuneTrades
   ON mayTrades.symbol = juneTrades.symbol
-  AND mayTrades.side = juneTrades.side ;
+    AND mayTrades.side = juneTrades.side;
 ```
 
 The query can be simplified further since the column names are identical:
@@ -175,17 +178,17 @@ WITH
     WHERE timestamp in '2024-05'
     ORDER BY Symbol
     LIMIT 4
-    ),
+  ),
   juneTrades AS (
     SELECT symbol, side, COUNT(*) as total
     FROM trades
     WHERE timestamp in '2024-06'
     ORDER BY Symbol
     LIMIT 4
-    )
-SELECT * from mayTrades
-JOIN JuneTrades
-  ON (symbol, side);
+  )
+SELECT *
+FROM mayTrades
+JOIN JuneTrades ON (symbol, side);
 ```
 
 The result of both queries is the following:
@@ -228,11 +231,12 @@ The general syntax is as follows:
 
 ```questdb-sql title="LEFT JOIN ON"
 WITH
-   Manytrades AS
-     (SELECT * FROM trades limit 100),
-   Lookup AS
-     (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
-SELECT * from ManyTrades
+  Manytrades AS
+    (SELECT * FROM trades limit 100),
+  Lookup AS
+    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+SELECT *
+FROM ManyTrades
 LEFT OUTER JOIN Lookup
   ON Lookup.symbol = Manytrades.symbol;
 ```
@@ -244,11 +248,12 @@ columns `Symbol1` and `Description` will be `null`.
 ```sql
 -- Omitting 'OUTER' makes no difference:
 WITH
-    Manytrades AS
-      (SELECT * FROM trades limit 100),
-    Lookup AS
-      (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
-SELECT * from ManyTrades
+  Manytrades AS
+    (SELECT * FROM trades limit 100),
+  Lookup AS
+    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+SELECT *
+FROM ManyTrades
 LEFT JOIN Lookup
   ON Lookup.symbol = Manytrades.symbol;
 ```
@@ -258,13 +263,15 @@ that do not exist in the right table.
 
 ```questdb-sql
 WITH
-   Manytrades AS
-     (SELECT * FROM trades limit 100),
-   Lookup AS
-     (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
-SELECT * from ManyTrades LEFT OUTER JOIN Lookup
+  Manytrades AS
+    (SELECT * FROM trades limit 100),
+  Lookup AS
+    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+SELECT *
+FROM ManyTrades
+LEFT OUTER JOIN Lookup
   ON Lookup.symbol = Manytrades.symbol
-  WHERE Lookup.Symbol = NULL;
+WHERE Lookup.Symbol = NULL;
 ```
 
 In this case, the result has 71 rows out of the 100 in the larger table, and the
@@ -286,15 +293,14 @@ each other:
 
 WITH t AS (
   SELECT * FROM trades WHERE timestamp IN '2024-06-01'
-  )
+)
 SELECT * from t CROSS JOIN t AS t2
-WHERE
-t.timestamp < t2.timestamp
-AND datediff('s', t.timestamp , t2.timestamp ) < 10
-AND t.symbol = t2.symbol
-AND t.side = t2.side
-AND t.price = t2.price
-AND t.amount = t2.amount;
+WHERE t.timestamp < t2.timestamp
+  AND datediff('s', t.timestamp , t2.timestamp ) < 10
+  AND t.symbol = t2.symbol
+  AND t.side = t2.side
+  AND t.price = t2.price
+  AND t.amount = t2.amount;
 ```
 
 :::note
@@ -424,15 +430,15 @@ A `SPLICE JOIN` can be built as follows:
 ```questdb-sql
 WITH
 buy AS (  -- select the first 5 buys in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'buy' LIMIT 2
-   ),
+  SELECT timestamp, price FROM trades
+  WHERE timestamp IN '2024-06-22' AND side = 'buy' LIMIT 2
+),
 sell AS ( -- select the first 5 sells in June 22
-   SELECT timestamp, price FROM trades
-   WHERE timestamp IN '2024-06-22' AND side = 'sell' LIMIT 2
-   )
+  SELECT timestamp, price FROM trades
+  WHERE timestamp IN '2024-06-22' AND side = 'sell' LIMIT 2
+)
 SELECT
-   buy.timestamp, sell.timestamp, buy.price, sell.price
+  buy.timestamp, sell.timestamp, buy.price, sell.price
 FROM buy
 SPLICE JOIN sell;
 ```
