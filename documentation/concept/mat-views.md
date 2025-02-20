@@ -36,13 +36,13 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ```
 
 When run, the above statement creates an incrementally refreshed materialized
-view with `trades` as its base table. This means that each time new rows
-are inserted to the `trades` table, the `trades_hourly_prices` view is
-asynchronously refreshed to hold the result of its query. 
+view with `trades` as its base table. This means that each time new rows are
+inserted to the `trades` table, the `trades_hourly_prices` view is
+asynchronously refreshed to hold the result of its query.
 
-The refresh is incremental which means that the database refreshes only
-relevant time slices of the materialized view instead of running the query as is.
-For example, if the `trades` table gets new rows that belong to `2025-02-18`, the
+The refresh is incremental which means that the database refreshes only relevant
+time slices of the materialized view instead of running the query as is. For
+example, if the `trades` table gets new rows that belong to `2025-02-18`, the
 query will only run and produce refreshed materialized view data for that day.
 
 Refer to the `CREATE MATERIALIZED VIEW`
@@ -109,22 +109,19 @@ manual refreshes.
 
 :::
 
-Incremental refresh imposes a number of requirements for the base table and the
-query.
-
 ## Limitations
 
-Materialized views have a number of limitations. 
-
-Some of them are essential, while others will be removed in a future release.
+Incremental refresh imposes a number of requirements for the base table and the
+query. Some of them are essential, while others will be removed in a future
+release.
 
 1. The query used in a materialized view has to be a `SAMPLE BY` or a `GROUP BY`
    query involving the
    [designated timestamp](/docs/concept/designated-timestamp/) column as the
    grouping key. This limitation comes from the incremental refresh strategy
    which needs to determine time slices when updating the view.
-2. The `SAMPLE BY` query used in the materialized view **cannot** use `FROM-TO` and
-   `FILL` clauses.
+2. The `SAMPLE BY` query used in the materialized view **cannot** use `FROM-TO`
+   and `FILL` clauses.
 3. Certain operations on the base table lead to invalidation of the dependent
    materialized views. These are operations that involve existing schema
    changes, such as `RENAME TABLE` or `ALTER TABLE DROP COLUMN`, or data
@@ -133,8 +130,8 @@ Some of them are essential, while others will be removed in a future release.
 4. In cases when the base table has deduplication enabled, the materialized view
    query has to use same grouping keys as the `UPSERT KEYS` in the base table.
 5. Replication limitations (QuestDB Enterprise only):
-   - The data in materialized views is replicated the same way as data for
-     plain tables. However, there are important limitations when it comes to the
+   - The data in materialized views is replicated the same way as data for plain
+     tables. However, there are important limitations when it comes to the
      replication of their refresh state. The refresh state, such as the refresh
      status or invalidation due to refresh failures, is not replicated. As a
      result, the `mat_views()` function will accurately reflect the list of
@@ -199,8 +196,8 @@ so that it gets incrementally refreshed once again.
 
 :::note
 
-For large base tables, a full refresh may take a significant amount of time. While
-the refresh is running, it's possible to cancel the operation using the
+For large base tables, a full refresh may take a significant amount of time.
+While the refresh is running, it's possible to cancel the operation using the
 [`CANCEL QUERY`](/docs/reference/sql/cancel-query/) SQL.
 
 :::
@@ -212,8 +209,8 @@ Materialized views ignore data deletions in their base table when caused by the
 partitions are dropped due to TTL, the corresponding aggregated rows stay in the
 materialized view.
 
-In situations when the unbounded growth of a materialized view is unwanted, it is
-possible to configure TTL on the view itself:
+In situations when the unbounded growth of a materialized view is unwanted, it
+is possible to configure TTL on the view itself:
 
 ```questdb-sql title="Creating a materialized view with TTL"
 CREATE MATERIALIZED VIEW trades_hourly_prices AS (
