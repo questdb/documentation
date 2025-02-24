@@ -7,7 +7,7 @@ description:
 
 You should back up QuestDB to be prepared for the case where your original
 database or data is lost, or if your database or table is corrupted. The backup
-& restore process also speeds up the creation of
+& restore process is also necessary to create
 [replica instances](/docs/operations/replication/) in QuestDB Enterprise.
 
 ## Overview
