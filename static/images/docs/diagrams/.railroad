@@ -73,6 +73,13 @@ alterTable
 declare
 ::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
 
+pivot
+::= ( 'SELECT' '*' 'FROM' )? tableNameExpr 'PIVOT' aggregateExpr 'AS' aliasExpr
+    ( ',' aggregateExpr 'AS' aliasExpr )* 'FOR'
+    pivotColumn 'IN' '(' listExpr ')' ( pivotColumn 'IN' '(' listExpr ')' )*
+    ('GROUP' 'BY' groupByExpr ( ',' groupByExpr )* )?
+    ('ORDER' 'BY' orderByExpr ( ',' orderByExpr )* )?
+    ('LIMIT' limitExpr)?
 
 alterTableAddColumn
   ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?

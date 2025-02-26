@@ -234,6 +234,7 @@ module.exports = {
             "reference/sql/latest-on",
             "reference/sql/limit",
             "reference/sql/order-by",
+            "reference/sql/pivot",
             "reference/sql/reindex",
             "reference/sql/rename",
             {
@@ -257,6 +258,7 @@ module.exports = {
             },
             "reference/sql/truncate",
             "reference/sql/union-except-intersect",
+            "reference/sql/unpivot",
             "reference/sql/update",
             "reference/sql/vacuum-table",
             "reference/sql/where",
