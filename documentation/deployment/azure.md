@@ -65,7 +65,7 @@ We would recommend using `Azure Blob Storage` instead as a simpler, and cheaper,
 QuestDB supports `Azure Blob Storage` as its replication object-store in the Enterprise edition.
 
 To get started, use `Azure Storage Explorer` to create new `Blob Container`, and then follow the 
-[Enterprise Quick Start](../guides/enterprise-quick-start.md) steps to create a connection string and 
+[Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to create a connection string and 
 configure QuestDB.
 
 ### Minimum specification
