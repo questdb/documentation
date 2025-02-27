@@ -313,7 +313,6 @@ module.exports = {
       label: "Deployment",
       type: "category",
       items: [
-        "deployment/standalone",
         "deployment/docker",
         "deployment/kubernetes",
         "deployment/systemd",
@@ -339,11 +338,6 @@ module.exports = {
           type: "category",
           collapsed: false,
           items: [
-            {
-              id: "operations/authentication",
-              type: "doc",
-              label: "Open Source Authentication",
-            },
             {
               id: "operations/rbac",
               type: "doc",
