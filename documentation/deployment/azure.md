@@ -48,7 +48,7 @@ For open-source users, you may want to:
 
 :::warning
 
-QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](../operations/capacity-planning.md)
+QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](/docs/operations/capacity-planning/)
 
 :::
 
@@ -227,4 +227,4 @@ title="Click to zoom"
 ## Single Sign On with EntraID
 
 If you are using EntraID to manage users, [QuestDB enterprise](/enterprise/) offers the possibility to do Single Sign On and manage your database permissions.
-See more information at the [Microsoft EntraID OIDC guide](/docs/guides/microsoft-entraid-oidc).
+See more information at the [Microsoft EntraID OIDC guide](/docs/guides/microsoft-entraid-oidc/).

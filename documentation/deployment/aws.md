@@ -40,7 +40,7 @@ and cheaper, alternative.
 QuestDB supports `S3` as its replication object-store in the Enterprise edition.
 
 This requires very little provisioning - simply create a bucket or virtual subdirectory and follow
-the [Enterprise Quick Start](../guides/enterprise-quick-start.md) steps to configure replication.
+the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to configure replication.
 
 ### Minimum specification
 

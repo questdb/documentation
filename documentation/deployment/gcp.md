@@ -48,7 +48,7 @@ but `Google Cloud Storage` is likely simpler and cheaper to use.
 QuestDB supports `Google Cloud Storage` as its replication object-store in the Enterprise edition.
 
 To get started, create a bucket for the database to use. Then follow the 
-[Enterprise Quick Start](../guides/enterprise-quick-start.md) steps to create a connection string and
+[Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to create a connection string and
 configure QuestDB.
 
 ### Minimum specification
