@@ -207,6 +207,43 @@ This then scales up as you add more clauses to the `PIVOT`:
 
 ### With `ORDER BY`
 
+We can add an `ORDER BY` clause to sort the final result set by a column. For example, if
+we wanted to guarantee the ordering to be the `buy` row, then `sell`:
+
+```questdb-sql title="explicit group by and order by" demo
+(trades LIMIT 1000) 
+  PIVOT (
+    avg(price),
+    count(price)
+    FOR symbol IN ('BTC-USD', 'ETH-USD')
+    GROUP BY side
+    ORDER BY side
+  );
+```
+
+| side | BTC-USD_avg        | BTC-USD_count | ETH-USD_avg       | ETH-USD_count |
+| ---- | ------------------ | ------------- | ----------------- | ------------- |
+| buy  | 39286.997461139894 | 193           | 2616.850413223139 | 363           |
+| sell | 39276.41468750003  | 160           | 2616.253626760561 | 284           |
+
+
 ### With `LIMIT`
 
+Additionally, you can tag a `LIMIT` on the query. So we could take the above result set and select just the first row.
+
+```questdb-sql title="explicit group by and order by and limit" demo
+(trades LIMIT 1000) 
+  PIVOT (
+    avg(price),
+    count(price)
+    FOR symbol IN ('BTC-USD', 'ETH-USD')
+    GROUP BY side
+    ORDER BY side
+    LIMIT 1
+  );
+```
+
+| side | BTC-USD_avg        | BTC-USD_count | ETH-USD_avg       | ETH-USD_count |
+| ---- | ------------------ | ------------- | ----------------- | ------------- |
+| buy  | 39286.997461139894 | 193           | 2616.850413223139 | 363           |
 
