@@ -381,12 +381,12 @@ information about indexes.
 _Enterprise only._
 
 When a user creates a new table, they automatically get all table level
-permissions with the `GRANT` option for that table.
-However, if the `OWNED BY` clause is used, the permissions instead go
-to the user, group, or service account named in that clause.
+permissions with the `GRANT` option for that table. However, if the `OWNED BY`
+clause is used, the permissions instead go to the user, group, or service
+account named in that clause.
 
-The `OWNED BY` clause cannot be omitted if the table is created by an
-external user, because permissions cannot be granted to them.
+The `OWNED BY` clause cannot be omitted if the table is created by an external
+user, because permissions cannot be granted to them.
 
 ```questdb-sql
 CREATE GROUP analysts;
@@ -505,9 +505,9 @@ PARTITION BY MONTH;
 
 ## CREATE TABLE LIKE
 
-The `LIKE` keyword clones the table schema of an existing table without copying
-the data. Table settings and parameters such as designated timestamp and symbol
-column indexes will be cloned, too.
+The `LIKE` keyword clones the table schema of an existing table or materialized
+view without copying the data. Table settings and parameters such as designated
+timestamp and symbol column indexes will be cloned, too.
 
 ```questdb-sql title="Create table like"
 CREATE TABLE new_table (LIKE my_table);

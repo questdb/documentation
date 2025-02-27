@@ -40,7 +40,7 @@ partitioning capabilities.
 
 Currently, QuestDB only supports **incremental refresh** for materialized views.
 
-Future releases will include additional refresh strategies such as interval and
+Future releases will include additional refresh types such as interval and
 manual refreshes.
 
 :::
@@ -58,7 +58,7 @@ avoiding the need to recompute the entire dataset. The refresh process works as 
 For example, if a base table receives new rows for `2025-02-18`, only that day's relevant 
 time slices are recomputed instead of reprocessing all historical data.
 
-You can monitor refresh status using the `mat_views()` system function:
+You can monitor refresh status using the `materialized_views()` system function:
 
 ```questdb-sql title="Listing all materialized views"
 SELECT
@@ -67,7 +67,7 @@ SELECT
   view_status,
   base_table_txn,
   applied_base_table_txn
-FROM mat_views();
+FROM materialized_views();
 ```
 
 When `base_table_txn` matches `applied_base_table_txn`, the materialized view is fully up-to-date.
@@ -78,7 +78,7 @@ If a materialized view becomes invalid, check its status:
 
 ```questdb-sql title="Checking view status"
 SELECT name, base_table_name, invalid, invalidation_reason
-FROM mat_views();
+FROM materialized_views();
 ```
 
 To restore an invalid view and refresh its data from scratch, use:

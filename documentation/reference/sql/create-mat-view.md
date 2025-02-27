@@ -21,9 +21,9 @@ To create a materialized view, manually enter the parameters and settings:
 
 ## Metadata
 
-To check materialized view metadata, use the `mat_views()` function, which is
-described in the [meta functions](/docs/reference/function/meta/) documentation
-page.
+To check materialized view metadata, use the `materialized_views()` function,
+which is described in the [meta functions](/docs/reference/function/meta/)
+documentation page.
 
 ## Examples
 
