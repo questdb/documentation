@@ -15,6 +15,11 @@ module.exports = {
       customProps: { tag: "Popular" },
     },
     {
+      id: "guides/schema-design-essentials",
+      type: "doc",
+      customProps: { tag: "Popular" },
+    },
+    {
       id: "guides/influxdb-migration",
       type: "doc",
       customProps: { tag: "Popular" },
