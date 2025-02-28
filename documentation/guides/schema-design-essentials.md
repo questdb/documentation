@@ -222,7 +222,7 @@ id (tag)
 value (field)
 ```
 
-```sql
+```questdb-sql
 -- QuestDB Equivalent
 CREATE TABLE metrics (
     timestamp TIMESTAMP,      -- Explicit timestamp for time-series queries
