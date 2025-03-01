@@ -358,3 +358,20 @@ disableDedup
 
 enableDedup
  ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'ENABLE' 'UPSERT' 'KEYS' '(' (column ( ',' column )* ) ')'
+
+
+pivot
+::= ( 'SELECT' '*' 'FROM' )? tableNameExpr 'PIVOT' '(' aggregateExpr 'AS' aliasExpr
+    ( ',' aggregateExpr 'AS' aliasExpr )* 'FOR'
+    pivotColumn 'IN' '(' listExpr ')' ( pivotColumn 'IN' '(' listExpr ')' )*
+    ('GROUP' 'BY' groupByExpr ( ',' groupByExpr )* )?
+    ('ORDER' 'BY' orderByExpr ( ',' orderByExpr )* )?
+    ('LIMIT' limitExpr)?
+    ')'
+
+unpivot
+::= ( 'SELECT' '*' 'FROM' )? tableNameExpr 'UNPIVOT' ( ( EXCLUDE | INCLUDE ) NULLS )?
+    '('
+    valueColumnExpr 'FOR'
+    unpivotColumn 'IN' '(' listExpr ')'
+    ')'
