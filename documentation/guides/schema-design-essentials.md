@@ -19,7 +19,7 @@ If you need **multi-tenancy**, you must manage table names manually, often by us
 
 ## PostgreSQL protocol compatibility
 
-QuestDB is **not** a PostgreSQL database but is **compatible with the PostgreSQL wire protocol**. This means you can connect using PostgreSQL-compatible libraries and clients and execute SQL commands. However, compatibility with PostgreSQL system catalogs, metadata queries, data types, and functions is limited.
+QuestDB is **not** a PostgreSQL database but is **compatible with the [PostgreSQL wire protocol](/docs/reference/api/postgres/)**. This means you can connect using PostgreSQL-compatible libraries and clients and execute SQL commands. However, compatibility with PostgreSQL system catalogs, metadata queries, data types, and functions is limited.
 
 While most PostgreSQL-compatible low-level libraries work with QuestDB, some higher-level components that depend heavily on PostgreSQL metadata might fail. If you encounter such a case, please report it as an [issue on GitHub](https://github.com/questdb/questdb/issues) so we can track it.
 
@@ -29,20 +29,20 @@ While most PostgreSQL-compatible low-level libraries work with QuestDB, some hig
 
 The easiest way to create a schema is through the **[Web Console](/docs/web-console/)** or by sending SQL commands using:
 
-- The **REST API** (`CREATE TABLE` statements)
-- The **PostgreSQL wire protocol clients**
+- The [**REST API**](/docs/reference/api/rest/) (`CREATE TABLE` statements)
+- The **[PostgreSQL wire protocol](/docs/reference/api/postgres/) clients**
 
 ### Schema auto-creation with ILP protocol
 
-When using the **Influx Line Protocol (ILP)**, QuestDB automatically creates tables and columns based on incoming data. This is useful for users migrating from InfluxDB or using tools like **InfluxDB client libraries or Telegraf**, as they can send data directly to QuestDB without pre-defining schemas. However, this comes with limitations:
+When using the **[Influx Line Protocol](/docs/reference/api/ilp/overview/) (ILP)**, QuestDB automatically creates tables and columns based on incoming data. This is useful for users migrating from InfluxDB or using tools like **InfluxDB client libraries or Telegraf**, as they can send data directly to QuestDB without pre-defining schemas. However, this comes with limitations:
 
-- QuestDB applies **default settings** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
-- Users **cannot modify partitioning or symbol capacity later**, so they should create tables explicitly beforehand.
-- Auto-creation can be disabled via configuration.
+- QuestDB applies **[default settings](/docs/configuration/)** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
+- Users **cannot modify [partitioning](/docs/concept/partitions/) or [symbol capacity](/docs/concept/symbol/#usage-of-symbols) later**, so they should create tables explicitly beforehand.
+- Auto-creation can be [disabled via configuration](/docs/configuration/#influxdb-line-protocol-ilp).
 
 ## The designated timestamp and partitioning strategy
 
-QuestDB is designed for time-series workloads. The database engine is optimized to perform exceptionally well for time-series queries. One of the most important optimizations in QuestDB is that data is physically stored ordered by incremental timestamp. The user must choose the **designated timestamp** when creating a table.
+QuestDB is designed for time-series workloads. The database engine is optimized to perform exceptionally well for time-series queries. One of the most important optimizations in QuestDB is that data is physically stored ordered by incremental timestamp. The user must choose the **[designated timestamp](/docs/concept/designated-timestamp/)** when creating a table.
 
 The **designated timestamp** is crucial in QuestDB. It directly affects:
 
@@ -53,7 +53,7 @@ The **designated timestamp** is crucial in QuestDB. It directly affects:
 
 ### Partitioning guidelines
 
-When choosing the partition resolution for your tables, consider the time ranges you will query most frequently and keep in mind the following:
+When choosing the [partition](/docs/concept/partitions/) resolution for your tables, consider the time ranges you will query most frequently and keep in mind the following:
 
 - **Avoid very large partitions**: A partition should be at most **a few gigabytes**.
 - **Avoid too many small partitions**: Querying more partitions means opening more files.
@@ -62,7 +62,7 @@ When choosing the partition resolution for your tables, consider the time ranges
 
 ## Columnar storage model and table density
 
-QuestDB is **columnar**, meaning:
+QuestDB is **[columnar](/glossary/columnar-database/)**, meaning:
 
 - **Columns are stored separately**, allowing fast queries on specific columns without loading unnecessary data.
 - **Each column is stored in one or two files per partition**: The more columns you include in a `SELECT` and the more partitions the query spans, the more files will need to be opened and cached into working memory.
@@ -70,7 +70,7 @@ QuestDB is **columnar**, meaning:
 ### Sparse vs. dense tables
 
 - **QuestDB handles wide tables efficiently** due to its columnar architecture, as it will open only the column files referenced in each query.
-- **Null values take storage space**, so it is recommended to avoid sparse tables where possible.
+- **Null values take [storage space](/docs/reference/sql/datatypes/#type-nullability)**, so it is recommended to avoid sparse tables where possible.
 - **Dense tables** (where most columns have values) are more efficient in terms of storage and query performance. If you cannot design a dense table, consider creating different tables for distinct record structures.
 
 
@@ -78,7 +78,7 @@ QuestDB is **columnar**, meaning:
 
 ### Symbols (recommended for categorical data)
 
-QuestDB introduces a specialized `SYMBOL` data type. Symbols are **dictionary-encoded** and optimized for filtering and grouping:
+QuestDB introduces a specialized [`SYMBOL`](/docs/concept/symbol) data type. Symbols are **dictionary-encoded** and optimized for filtering and grouping:
 
 - Use symbols for **categorical data** with a limited number of unique values (e.g., country codes, stock tickers, factory floor IDs).
 - Symbols are fine for **storing up to a few million distinct values** but should be avoided beyond that.
@@ -96,26 +96,26 @@ QuestDB introduces a specialized `SYMBOL` data type. Symbols are **dictionary-en
 
 ### Strings vs. varchar
 
-- Avoid **`STRING`**: It is a legacy data type.
+- Avoid **[`STRING`](/docs/reference/sql/datatypes/#varchar-and-string-considerations)**: It is a legacy data type.
 - Use **`VARCHAR`** instead for general string storage.
 
 ### UUIDs
 
-- QuestDB has a dedicated **`UUID`** type, which is more efficient than storing UUIDs as `VARCHAR`.
+- QuestDB has a dedicated **[`UUID`](/blog/uuid-coordination-free-unique-keys/)** type, which is more efficient than storing UUIDs as `VARCHAR`.
 
 ### Other data types
 
 - **Booleans**: `true`/`false` values are supported.
 - **Bytes**: `BYTES` type allows storing raw binary data.
 - **IPv4**: QuestDB has a dedicated `IPv4` type for optimized IP storage and filtering.
-- **Several numeric datatypes** are supported.
-- **Geo**: QuestDB provides spatial support via geohashes.
+- **Several [numeric datatypes](/docs/reference/sql/datatypes)** are supported.
+- **Geo**: QuestDB provides [spatial support via geohashes](/docs/concept/geohashes/).
 
 ## Referential integrity, constraints, and deduplication
 
 - QuestDB **does not enforce** `PRIMARY KEYS`, `FOREIGN KEYS`, or **`NOT NULL`** constraints.
-- **Joins between tables work even without referential integrity**, as long as the data types on the join condition are compatible.
-- **Duplicate data is allowed by default**, but `UPSERT KEYS` can be defined to **ensure uniqueness**.
+- **Joins between tables work even without referential integrity**, as long as the data types on the [join condition](/docs/reference/sql/join/) are compatible.
+- **[Duplicate data](/docs/concept/deduplication/) is allowed by default**, but `UPSERT KEYS` can be defined to **ensure uniqueness**.
 - **Deduplication in QuestDB happens on an exact timestamp and optionally a set of other columns (`UPSERT KEYS`)**.
 - **Deduplication has no noticeable performance penalty**.
 
@@ -123,8 +123,8 @@ QuestDB introduces a specialized `SYMBOL` data type. Symbols are **dictionary-en
 
 Since **individual row deletions are not supported**, data retention is managed via:
 
-- **Setting a TTL retention period** per table to control partition expiration.
-- **Materialized views**: QuestDB **automatically refreshes** materialized views, storing aggregated data at lower granularity. You can also apply TTL expiration on the base table.
+- **Setting a [TTL retention](/docs/concept/ttl) period** per table to control partition expiration.
+- **Materialized views**: QuestDB **automatically refreshes** [materialized views](/reference/sql/create-mat-view/), storing aggregated data at lower granularity. You can also apply TTL expiration on the base table.
 
 ## Schema decisions that cannot be easily changed
 
@@ -137,9 +137,9 @@ Some table properties **cannot be modified after creation**, including:
 For changes, the typical workaround is:
 
 1. Create a **new column** with the updated configuration.
-2. Copy data from the old column into the new one.
+2. [Copy data](/reference/sql/update/) from the old column into the new one.
 3. Drop the old column and rename the new one.
-4. **If changes affect table-wide properties** (e.g., partitioning, timestamp column, or WAL settings), create a new table with the required properties, insert data from the old table, drop the old table, and rename the new table.
+4. **If changes affect table-wide properties** (e.g., partitioning, timestamp column, or WAL settings), create a new table with the required properties, [insert data from the old table](/reference/sql/insert/#inserting-query-results), drop the old table, and rename the new table.
 
 
 ## Examples of schema translations from other databases
