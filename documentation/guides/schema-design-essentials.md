@@ -1,6 +1,6 @@
 ---
 title: Schema Design Essentials
-slug: /schema-design-essentials
+slug: schema-design-essentials
 description:
   Learn how to design efficient schemas in QuestDB. This guide covers best practices for partitioning, indexing, symbols, timestamps, deduplication, retention strategies, and schema modifications to optimize performance in time-series workloads.
 ---
