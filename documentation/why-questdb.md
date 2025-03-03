@@ -12,7 +12,6 @@ This pages provides a brief overview on:
 
 - [Top QuestDB features](#features)
 - [Benefits of QuestDB](#benefits)
-- [QuestDB Enterprise](#questdb-enterprise)
 - [Where to next?](#next-up)
 - [Support](#support)
 

@@ -1,6 +1,6 @@
 ---
 title: Launch QuestDB with systemd
-sidebar_label: Systemd Service
+sidebar_label: systemd
 description: This document describes how to launch QuestBD using systemd.
 ---
 
