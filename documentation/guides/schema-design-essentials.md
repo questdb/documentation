@@ -10,7 +10,9 @@ This guide covers key concepts and best practices to take full advantage of Ques
 
 ## QuestDB’s Single Database Model
 
-QuestDB has a **single database per instance**. Unlike PostgreSQL and other database engines, where you may have multiple databases or multiple schemas within an instance, in QuestDB, you operate within a single namespace. The default database is named `qdb`, and this can be changed via configuration. However, there is no need to issue `USE DATABASE` commands—once connected, you can immediately start querying and inserting data.
+QuestDB has a **single database per instance**. Unlike PostgreSQL and other database engines, where you may have multiple databases or multiple schemas within an instance, in QuestDB, you operate within a single namespace. 
+
+The default database is named `qdb`, and this can be changed via configuration. However, unlike a standard SQL database, there is no need to issue `USE DATABASE` commands—once connected. You can immediately start querying and inserting data.
 
 ### Multi-Tenancy Considerations
 
