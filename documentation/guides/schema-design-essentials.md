@@ -30,7 +30,7 @@ QuestDB, some higher level components depending heavily on PostgreSQL metadata m
 
 ### Recommended Approach
 
-The easiest way to create a schema is through the **web interface** or by sending SQL commands using:
+The easiest way to create a schema is through the **[Web Console](/docs/web-console/)** or by sending SQL commands using:
 
 - The **REST API** (`CREATE TABLE` statements)
 - The **PostgreSQL wire protocol clients**
