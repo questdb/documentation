@@ -16,7 +16,7 @@ The default database is named `qdb`, and this can be changed via configuration. 
 
 ### Multi-Tenancy Considerations
 
-If you need **multi-tenancy**, you will need to manage table names manually, often by using **prefixes** for different datasets. Since QuestDB does not support multiple schemas, this is the primary way to segment data. In QuestDB Enterprise, you can enforce permissions per table to restrict access, allowing finer control over multi-tenant environments.
+If you need **multi-tenancy**, you will need to manage table names manually, often by using **prefixes** for different datasets. Since QuestDB does not support multiple schemas, this is the primary way to segment data. In QuestDB Enterprise, you can [enforce permissions per table to restrict access](/docs/operations/rbac/), allowing finer control over multi-tenant environments.
 
 ## PostgreSQL Protocol Compatibility
 
