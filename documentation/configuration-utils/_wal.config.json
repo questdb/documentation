@@ -30,5 +30,9 @@
   "cairo.wal.max.lag.txn.count": {
     "default": "20",
     "description": "Maximum number of transactions that can be kept invisible when writing to WAL table. Once the number is reached, full commit occurs. If not set, defaults to the rounded value of cairo.wal.squash.uncommitted.rows.multiplier."
+  },
+  "cairo.wal.apply.parallel.sql.enabled": {
+    "default": "true",
+    "description": "When disabled, SQL executed by the WAL apply job will always run single-threaded."
   }
 }

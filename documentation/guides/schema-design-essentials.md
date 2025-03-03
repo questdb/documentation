@@ -194,14 +194,13 @@ QuestDB introduces a specialized [`SYMBOL`](/docs/concept/symbol) data type. Sym
 - **Deduplication in QuestDB happens on an exact timestamp and optionally a set of other columns (`UPSERT KEYS`)**.
 - **Deduplication has no noticeable performance penalty**.
 
-<!--
 ## Retention strategies with TTL and materialized views
 
 Since **individual row deletions are not supported**, data retention is managed via:
 
 - **Setting a [TTL retention](/docs/concept/ttl) period** per table to control partition expiration.
 - **Materialized views**: QuestDB **automatically refreshes** [materialized views](/reference/sql/create-mat-view/), storing aggregated data at lower granularity. You can also apply TTL expiration on the base table.
- -->
+
 ## Schema decisions that cannot be easily changed
 
 Some table properties **cannot be modified after creation**, including:
