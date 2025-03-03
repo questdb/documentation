@@ -5,17 +5,93 @@ description:
  Learn how to design efficient schemas in QuestDB. This guide covers best practices for partitioning, indexing, symbols, timestamps, deduplication, retention strategies, and schema modifications to optimize performance in time-series workloads
 ---
 
-This guide covers key concepts and best practices to take full advantage of QuestDB’s performance-oriented architecture, highlighting some important differences with most databases.
+This guide covers key concepts and best practices to take full advantage of QuestDB's performance-oriented architecture, highlighting some important differences with most databases.
 
-## QuestDB’s single database model
+## QuestDB's single database model
 
 QuestDB has a **single database per instance**. Unlike PostgreSQL and other database engines, where you may have multiple databases or multiple schemas within an instance, in QuestDB, you operate within a single namespace.
 
-The default database is named `qdb`, and this can be changed via configuration. However, unlike a standard SQL database, there is no need to issue `USE DATABASE` commands—once connected, you can immediately start querying and inserting data.
+The default database is named `qdb`, and this can be changed via configuration. However, unlike a standard SQL database, there is no need to issue `USE DATABASE` commands. Once connected, you can immediately start querying and inserting data.
 
 ### Multi-tenancy considerations
 
 If you need **multi-tenancy**, you must manage table names manually, often by using **prefixes** for different datasets. Since QuestDB does not support multiple schemas, this is the primary way to segment data. In QuestDB Enterprise, you can [enforce permissions per table to restrict access](/docs/operations/rbac/), allowing finer control over multi-tenant environments.
+
+Here are common patterns for implementing multi-tenancy:
+
+#### Customer-specific tables
+
+```questdb-sql
+-- Customer-specific trading data
+CREATE TABLE customer1_trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+CREATE TABLE customer2_trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+#### Environment or region-based separation
+
+```questdb-sql
+-- Production vs. Development environments
+CREATE TABLE prod_metrics (
+    timestamp TIMESTAMP,
+    metric_name SYMBOL,
+    value DOUBLE
+) TIMESTAMP(timestamp);
+
+CREATE TABLE dev_metrics (
+    timestamp TIMESTAMP,
+    metric_name SYMBOL,
+    value DOUBLE
+) TIMESTAMP(timestamp);
+
+-- Regional data separation
+CREATE TABLE eu_users (
+    timestamp TIMESTAMP,
+    user_id SYMBOL,
+    action SYMBOL
+) TIMESTAMP(timestamp);
+
+CREATE TABLE us_users (
+    timestamp TIMESTAMP,
+    user_id SYMBOL,
+    action SYMBOL
+) TIMESTAMP(timestamp);
+```
+
+#### Department or team-based separation
+
+```questdb-sql
+-- Department-specific analytics
+CREATE TABLE sales_daily_stats (
+    timestamp TIMESTAMP,
+    region SYMBOL,
+    revenue DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+CREATE TABLE marketing_campaign_metrics (
+    timestamp TIMESTAMP,
+    campaign_id SYMBOL,
+    clicks LONG,
+    impressions LONG
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+:::tip
+
+When using table prefixes for multi-tenancy:
+- Use consistent naming conventions (e.g., always `<tenant>_<table>`)
+- Consider using uppercase for tenant identifiers to improve readability
+- Document your naming convention in your team's schema design guidelines
+
+:::
 
 ## PostgreSQL protocol compatibility
 
@@ -36,13 +112,13 @@ The easiest way to create a schema is through the **[Web Console](/docs/web-cons
 
 When using the **[Influx Line Protocol](/docs/reference/api/ilp/overview/) (ILP)**, QuestDB automatically creates tables and columns based on incoming data. This is useful for users migrating from InfluxDB or using tools like **InfluxDB client libraries or Telegraf**, as they can send data directly to QuestDB without pre-defining schemas. However, this comes with limitations:
 
-- QuestDB applies **[default settings](/docs/configuration/)** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
+- QuestDB applies **default settings** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
 - Users **cannot modify [partitioning](/docs/concept/partitions/) or [symbol capacity](/docs/concept/symbol/#usage-of-symbols) later**, so they should create tables explicitly beforehand.
 - Auto-creation can be [disabled via configuration](/docs/configuration/#influxdb-line-protocol-ilp).
 
 ## The designated timestamp and partitioning strategy
 
-QuestDB is designed for time-series workloads. The database engine is optimized to perform exceptionally well for time-series queries. One of the most important optimizations in QuestDB is that data is physically stored ordered by incremental timestamp. The user must choose the **[designated timestamp](/docs/concept/designated-timestamp/)** when creating a table.
+QuestDB is designed for time-series workloads. The database engine is optimized to perform exceptionally well for time-series queries. One of the most important optimizations in QuestDB is that data is physically stored and ordered by incremental timestamp. Therefore, the user must choose the **[designated timestamp](/docs/concept/designated-timestamp/)** when creating a table.
 
 The **designated timestamp** is crucial in QuestDB. It directly affects:
 
@@ -72,7 +148,6 @@ QuestDB is **[columnar](/glossary/columnar-database/)**, meaning:
 - **QuestDB handles wide tables efficiently** due to its columnar architecture, as it will open only the column files referenced in each query.
 - **Null values take [storage space](/docs/reference/sql/datatypes/#type-nullability)**, so it is recommended to avoid sparse tables where possible.
 - **Dense tables** (where most columns have values) are more efficient in terms of storage and query performance. If you cannot design a dense table, consider creating different tables for distinct record structures.
-
 
 ## Data types and best practices
 
@@ -119,13 +194,14 @@ QuestDB introduces a specialized [`SYMBOL`](/docs/concept/symbol) data type. Sym
 - **Deduplication in QuestDB happens on an exact timestamp and optionally a set of other columns (`UPSERT KEYS`)**.
 - **Deduplication has no noticeable performance penalty**.
 
+<!--
 ## Retention strategies with TTL and materialized views
 
 Since **individual row deletions are not supported**, data retention is managed via:
 
 - **Setting a [TTL retention](/docs/concept/ttl) period** per table to control partition expiration.
 - **Materialized views**: QuestDB **automatically refreshes** [materialized views](/reference/sql/create-mat-view/), storing aggregated data at lower granularity. You can also apply TTL expiration on the base table.
-
+ -->
 ## Schema decisions that cannot be easily changed
 
 Some table properties **cannot be modified after creation**, including:
@@ -245,4 +321,3 @@ CREATE TABLE metrics (
 PARTITION BY DAY WAL
 DEDUP UPSERT KEYS(timestamp, name);
 ```
-
