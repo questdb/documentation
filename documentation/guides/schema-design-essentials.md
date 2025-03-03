@@ -5,7 +5,6 @@ description:
   Learn how to design efficient schemas in QuestDB. This guide covers best practices for partitioning, indexing, symbols, timestamps, deduplication, retention strategies, and schema modifications to optimize performance in time-series workloads.
 ---
 
-# Schema Design in QuestDB
 
 This guide covers key concepts and best practices to take full advantage of QuestDB’s performance-oriented architecture, highlighting some important differences with most databases.
 
