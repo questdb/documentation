@@ -337,8 +337,8 @@ uses this timestamp column from metadata.
 
 :::caution
 
-`ASOF` join does not check timestamp order, if data is not in chronological
-order, the join result is non-deterministic.
+`ASOF` join requires that the tables or subqueries have designated timestamps. This means
+they have an ascending order timestamp column, which may need to be specified with `timestamp(ts)`. See below!
 
 :::
 
