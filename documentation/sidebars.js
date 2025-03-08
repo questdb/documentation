@@ -15,6 +15,11 @@ module.exports = {
       customProps: { tag: "Popular" },
     },
     {
+      id: "guides/schema-design-essentials",
+      type: "doc",
+      customProps: { tag: "Popular" },
+    },
+    {
       id: "guides/influxdb-migration",
       type: "doc",
       customProps: { tag: "Popular" },
@@ -321,14 +326,40 @@ module.exports = {
       ],
     },
     {
-      label: "Deployment & Operations",
+      label: "Deployment",
       type: "category",
       items: [
+        "deployment/docker",
+        "deployment/kubernetes",
+        "deployment/systemd",
+        "deployment/aws",
+        "deployment/azure",
+        "deployment/gcp",
+        "deployment/digital-ocean",
+      ],
+    },
+    {
+      label: "Operations",
+      type: "category",
+      items: [
+        "operations/capacity-planning",
         {
+          id: "configuration",
+          type: "doc",
+        },
+        "operations/command-line-options",
+        "operations/backup",
+        {
+          label: "Authentication",
           type: "category",
-          label: "Enterprise",
           collapsed: false,
           items: [
+            {
+              id: "operations/rbac",
+              type: "doc",
+              label: "Role-Based Access Control (RBAC)",
+              customProps: { tag: "Enterprise" },
+            },
             {
               id: "operations/openid-connect-oidc-integration",
               type: "doc",
@@ -337,52 +368,27 @@ module.exports = {
             },
             {
               type: "doc",
-              id: "operations/replication",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "operations/multi-primary-ingestion",
-              type: "doc",
-              label: "Multi-primary ingestion",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "doc",
-              id: "operations/rbac",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "doc",
               id: "operations/tls",
               customProps: { tag: "Enterprise" },
             },
-          ],
+          ]
         },
-        "operations/backup",
-        "deployment/capacity-planning",
-        "reference/command-line-options",
-        {
-          id: "configuration",
-          type: "doc",
-        },
-        "operations/data-retention",
-        {
-          label: "Deployment Options",
-          type: "category",
-          items: [
-            "deployment/aws-official-ami",
-            "deployment/digitalocean",
-            "deployment/docker",
-            "deployment/google-cloud-platform",
-            "deployment/kubernetes",
-            "deployment/microsoft-azure-ubuntu",
-            "deployment/systemd",
-          ],
-        },
-        "operations/design-for-performance",
         "operations/logging-metrics",
+        "operations/data-retention",
+        "operations/design-for-performance",
         "operations/updating-data",
         "operations/task-automation",
+        {
+          type: "doc",
+          id: "operations/replication",
+          customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "operations/multi-primary-ingestion",
+          type: "doc",
+          label: "Multi-primary ingestion",
+          customProps: { tag: "Enterprise" },
+        },
       ],
     },
     {
@@ -473,7 +479,7 @@ module.exports = {
             "third-party-tools/superset",
             "third-party-tools/flink",
             "third-party-tools/airflow",
-            "third-party-tools/dagster"
+            "third-party-tools/dagster",
           ],
         },
         {
@@ -495,10 +501,7 @@ module.exports = {
     {
       label: "Troubleshooting",
       type: "category",
-      items: [
-        "troubleshooting/faq",
-        "troubleshooting/os-error-codes",
-      ],
+      items: ["troubleshooting/faq", "troubleshooting/os-error-codes"],
     },
   ].filter(Boolean),
-};
+}

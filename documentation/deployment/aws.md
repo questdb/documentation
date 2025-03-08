@@ -1,27 +1,81 @@
 ---
-title: Launch the official QuestDB AMI via the AWS Marketplace
-sidebar_label: AWS Marketplace AMI
+title: Deploying to Amazon Web Services (AWS)
+sidebar_label: AWS
 description:
-  This document describes how to launch the official AWS Marketplace AMI with
-  QuestDB installed and how to access and secure the instance on Amazon Web
-  Services
+  This document explains what to hardware to use, and how to provision QuestDB on Amazon Web Services (AWS).
 ---
 
+import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
+import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
 
-AWS Marketplace is a digital catalog with software listings from independent
+
+## Hardware recommendations
+
+<MinimumHardware />
+
+### Elastic Compute Cloud (EC2) with Elastic Block Storage (EBS)
+
+We recommend starting with `M6` instances, with an upgrade to
+`R6` instances if extra RAM is needed. You can use either `i` (Intel) or `a` (AMD) instsance. 
+
+These should be deployed with an `x86_64` Linux distribution, such as Ubuntu.
+
+For storage, we recommend using `gp3` disks, as these provide a better price-to-performance
+ratio compared to `gp2` or `io1` offerings.`5000 IOPS/300 MBps` is a good starting point until
+you have tested your workload.
+
+<FileSystemChoice />
+
+### Elastic File System (EFS)
+
+QuestDB **does not** support `EFS` for its primary storage. Do not use it instead of `EBS`.
+
+You may be able to use it as an object store, but we would recommend using `S3` instead, as a simpler, 
+and cheaper, alternative.
+
+### Simple Storage Service (S3)
+
+QuestDB supports `S3` as its replication object-store in the Enterprise edition.
+
+This requires very little provisioning - simply create a bucket or virtual subdirectory and follow
+the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to configure replication.
+
+### Minimum specification
+
+- **Instance**: `m6i.xlarge` or `m6a.xlarge` `(4 vCPUs, 16 GiB RAM)`
+- **Storage**
+    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
+    - **Data disk**: `gp3 (100 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
+- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
+- **File System**: `ext4`
+
+### Better specification
+
+- **Instance**: `r6i.2xlarge` or `r6a.xlarge` `(8 vCPUs, 64 GiB RAM)`
+- **Storage**
+    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
+    - **Data disk**: `gp3 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
+- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
+- **File System**: `zfs` with `lz4` compression.
+
+## Launching QuestDB on EC2
+
+Once you have provisioned your `EC2` instance with attached `EBS` storage, you can simply
+follow the setup instructions for a [Docker](docker.md) or [systemd](systemd.md) installation.
+
+You can also keep it simple - just [download](https://questdb.com/download/) the binary and run it directly.
+QuestDB is a single self-contained binary and easy to deploy.
+
+## Launching QuestDB on the AWS Marketplace
+
+[AWS Marketplace](https://aws.amazon.com/marketplace) is a digital catalog with software listings from independent
 software vendors that runs on AWS. This guide describes how to launch QuestDB
 via the AWS Marketplace using the official listing. This document also describes
 usage instructions after you have launched the instance, including hints for
 authentication, the available interfaces, and tips for accessing the REST API
 and [Web Console](/docs/web-console/).
-
-## Prerequisites
-
-- An [Amazon Web Services](https://console.aws.amazon.com) account
-
-## Launching QuestDB on the AWS Marketplace
 
 The QuestDB listing can be found in the AWS Marketplace under the databases
 category. To launch a QuestDB instance:
