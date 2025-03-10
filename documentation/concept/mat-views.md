@@ -72,7 +72,7 @@ You can monitor refresh status using the `materialized_views()` system function:
 
 ```questdb-sql title="Listing all materialized views"
 SELECT
-  name,
+  view_name,
   last_refresh_timestamp,
   view_status,
   base_table_txn,
@@ -88,7 +88,11 @@ fully up-to-date.
 If a materialized view becomes invalid, check its status:
 
 ```questdb-sql title="Checking view status"
-SELECT name, base_table_name, invalid, invalidation_reason
+SELECT
+  view_name,
+  base_table_name,
+  invalid,
+  invalidation_reason
 FROM materialized_views();
 ```
 
@@ -114,12 +118,11 @@ Every materialized view is tied to a base table that serves as its primary data
 source:
 
 - For single-table queries, the base table is automatically determined
-- For multi-table queries, one table must be explicitly designated as the base
+- For multi-table queries, one table must be explicitly defined as the base
   table using `WITH BASE`
 - The view's refresh cycle is triggered by changes to its base table
 
-For multi-table queries, one table must be explicitly designated as the base
-table using `WITH BASE`. This ensures that the refresh mechanism knows which
+The base table definition ensures that the refresh mechanism knows which
 table's updates should trigger the materialized view's updates.
 
 ## Technical requirements
