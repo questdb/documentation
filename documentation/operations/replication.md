@@ -387,6 +387,12 @@ store.
 
 ### Flows
 
+:::note
+
+These flows are valid for QuestDB Enterprise 2.2.3 onwards.
+
+:::
+
 
 #### Planned primary migration
 
@@ -422,7 +428,7 @@ to ensure that all remaining data has been replicated before switching primary.
 
 :::
 
-### When will migration fail?
+#### When could migration fail?
 
 Two primaries started within the same `replication.primary.keepalive.interval=10s` may still break. 
 
@@ -430,6 +436,23 @@ It is important not to migrate the primary without stopping the first primary, i
 
 This config can be set in the range of 1 to 300 seconds.
 
+#### Point-in-time recovery.
+
+A QuestDB primary can be created matching point in time earlier than `latest`. This is useful for creating
+a new primary based on historical data.
+
+It can also be used if you wish to remove the latest transactions from the database, or if you encounter corrupted
+transactions (though replicating a corrupt transaction has never been observed).
+
+**Flow**
+
+- Create a new primary instance that is stopped.
+- Touch a `_recover_point_in_time` file.
+- Inside this file, add `replication.object.store` pointing to the object store you wish to load transactions from.
+- Also add `replication.recovery.timestamp` to set the time to which you would like to recover.
+    - This follows usual Java timestamp parsing rules, similar to the SQL engine.
+- (Optional) Configure replication settings in `server.conf` pointing at a **new** object store location.
+- Start primary instance.
 
 ## Multi-primary ingestion
 
