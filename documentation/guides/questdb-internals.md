@@ -5,48 +5,35 @@ slug: questdb-internals
 description: A deep technical dive into the internal architecture, storage engine, query processing, and native integrations of QuestDB.
 ---
 
-## Introduction
+QuestDB offers high-speed ingestion and low-latency analytics on time-series data. 
 
-QuestDB serves high-speed ingestion and low-latency analytics on time-series data. It
-ingests billions of rows per day and delivers sub-millisecond query latencies. This document
-explains QuestDB’s internal architecture, storage engine, query processing, data ingestion
-strategies, native memory management, and more.
+This document explains QuestDB's internal architecture.
 
-- **High performance:** The system ingests data rapidly and executes SQL queries fast.
-- **Columnar storage & sequential reads:** Data is stored by columns and partitioned by
-  incremental timestamp so that most queries read data sequentially.
-- **Direct memory & native integrations:** The engine uses off-heap memory and executes native
-  calls from Java to C++ and Rust to minimize hotpath allocations and reduce garbage collection
-  slowdowns.
-- **Multi-protocol support:** QuestDB supports a rich SQL interface, PostgreSQL wire protocol, a
-  REST API, and ILP (Influx Line Protocol) for high-speed ingestion.
-- **Parallel processing:** QuestDB uses available resources to run many operations in parallel.
+## Key components
 
-## High-level architecture
+QuestDB is comprised of several key components:
 
-QuestDB comprises several key components:
-
-- **Storage engine:**
+- **[Storage engine](#storage-engine):**
   The engine uses a column-oriented design to ensure high I/O performance and low latency.
 
-- **Memory management and native integration:**
+- **[Memory management and native integration](#memory-management-and-native-integration):**
   The system leverages both memory mapping and explicit memory management techniques,
   and integrates native code for performance-critical tasks.
 
-- **Query processor:**
+- **[Query processor](#query-engine):**
   A custom SQL parser, a just-in-time (JIT) compiler, and a vectorized execution engine process
   data in table page frames for better CPU use.
 
-- **Data ingestion engine:**
+- **[Data ingestion engine](#data-ingestion--write-path):**
   The engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead
   log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments
   ship to object storage for replication.
 
-- **Networking layer:**
+- **[Networking layer](#ilp-protocol-support):**
   The system exposes RESTful APIs and implements ILP and PostgreSQL wire protocols so that
   existing tools and drivers work out-of-the-box. It also offers a health and metrics endpoint.
 
-- **Observability:**
+- **[Observability](#observability--diagnostics):**
   QuestDB provides real-time metrics, a health check endpoint, and logging to monitor
   performance and simplify troubleshooting.
 
@@ -75,7 +62,7 @@ QuestDB comprises several key components:
 ### Memory-mapped files
 
 - **Direct OS integration:**
-  Memory-mapped files let QuestDB use the operating system’s page cache. This reduces explicit
+  Memory-mapped files let QuestDB use the operating system's page cache. This reduces explicit
   I/O calls and speeds up sequential reads.
 
 - **Sequential access:**
@@ -106,7 +93,7 @@ QuestDB comprises several key components:
 ### SQL parsing & optimization
 
 - **Custom SQL parser:**
-  The parser supports QuestDB’s SQL dialect and time-series extensions. It converts SQL queries
+  The parser supports QuestDB's SQL dialect and time-series extensions. It converts SQL queries
   into an optimized abstract syntax tree (AST).
 
 - **Compilation pipeline:**
