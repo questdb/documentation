@@ -5,7 +5,7 @@ description: DROP TABLE SQL keyword reference documentation.
 ---
 
 `DROP TABLE` permanently deletes a table and its contents. `DROP ALL TABLES`
-permanently deletes all the tables and their contents.
+permanently deletes all the tables and materialized views and their contents.
 
 :::note
 
