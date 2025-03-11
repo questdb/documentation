@@ -453,6 +453,8 @@ transactions (though replicating a corrupt transaction has never been observed).
 - Also add a `replication.recovery.timestamp` setting with the time to which you would like to recover.
     - This follows usual Java timestamp parsing rules, similar to the SQL engine.
 - (Optional) Configure replication settings in `server.conf` pointing at a **new** object store location.
+  - You can either configure this instance as a standalone (non-replicated) instance, or
+  - Configure it as a new primary by setting `replication.role=primary`. In this case, the `replication.object.store` **must** point to a fresh, empty location.
 - If you have created the new primary using a snapshot, touch a `_restore` file to trigger the snapshot recovery process.
     - More details can be found in the [backup and restore](/documentation/operations/backup.md) documentation.
 - Start new primary instance.
