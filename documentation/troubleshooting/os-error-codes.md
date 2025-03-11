@@ -1,5 +1,6 @@
 ---
 title: List of OS error codes
+sidebar_label: OS Error Codes
 description:
   List of OS error codes that may be reported by QuestDB running on Linux and
   Windows.
@@ -7,6 +8,8 @@ description:
 
 The following document contains a partial list of Operating System (OS) error
 codes that can be reported when running QuestDB and brief descriptions for them.
+
+If instead you come across a QuestDB error code (e.g. `ER001`), refer to the [QuestDB Error Codes](/docs/troubleshooting/error-codes) page.
 
 ## Where to find error codes
 
