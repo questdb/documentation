@@ -1,6 +1,6 @@
 ---
 title: List of  QuestDB Error Codes
-sidebar_label: Error Codes
+sidebar_label: QuestDB Error Codes
 description:
   A list of error codes that QuestDB may generate, with explanations and suggested actions.
 ---
