@@ -36,6 +36,7 @@ read by translating the record number into a file offset by a simple bit shift.
 The offset in the column file is then translated into an offset in a lazily
 mapped memory page, where the required value is read from.
 
+<!-- This image is used also at the questdb-internals page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   height={447}
@@ -95,6 +96,7 @@ Data committed by one process can be instantaneously read by another process,
 either randomly (via queries) or incrementally (as a data queue). QuestDB
 provides a variety of reader implementations.
 
+<!-- This image is used also at the questdb-internals page. Please keep in sync -->
 <Screenshot
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
   height={596}
