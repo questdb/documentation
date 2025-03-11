@@ -436,9 +436,9 @@ This config can be set in the range of 1 to 300 seconds.
 
 #### Point-in-time recovery
 
-Create a QuestDB primary matching a point in time earlier than `latest`. 
+Create a QuestDB instance matching a specific historical point in time. 
 
-This is builds a new primary based on a recently recovered snapshot and WAL data in the object store.
+This is builds a new instance based on a recently recovered snapshot and WAL data in the object store.
 
 It can also be used if you wish to remove the latest transactions from the database, or if you encounter corrupted
 transactions (though replicating a corrupt transaction has never been observed).
@@ -450,8 +450,8 @@ transactions (though replicating a corrupt transaction has never been observed).
 - Create the new primary instance, ideally from a snapshot, and ensure it is not running.
 - Touch a `_recover_point_in_time` file.
 - Inside this file, add a `replication.object.store` setting pointing to the object store you wish to load transactions from.
-- Also add a `replication.recovery.timestamp` setting with the time to which you would like to recover.
-    - This follows usual Java timestamp parsing rules, similar to the SQL engine.
+- Also add a `replication.recovery.timestamp` setting with the UTC time to which you would like to recover.
+    - The format is `YYYY-MM-DDThh:mm:ss.mmmZ`.
 - (Optional) Configure replication settings in `server.conf` pointing at a **new** object store location.
   - You can either configure this instance as a standalone (non-replicated) instance, or
   - Configure it as a new primary by setting `replication.role=primary`. In this case, the `replication.object.store` **must** point to a fresh, empty location.
