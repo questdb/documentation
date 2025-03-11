@@ -436,7 +436,7 @@ It is important not to migrate the primary without stopping the first primary, i
 
 This config can be set in the range of 1 to 300 seconds.
 
-#### Point-in-time recovery.
+#### Point-in-time recovery
 
 A QuestDB primary can be created matching point in time earlier than `latest`. This is useful for creating
 a new primary based on historical data.
@@ -446,13 +446,17 @@ transactions (though replicating a corrupt transaction has never been observed).
 
 **Flow**
 
-- Create a new primary instance that is stopped.
+- (Recommended) Locate a recent primary instance snapshot that predates your intended recovery timestamp.
+    - A snapshot taken from **after** your intended recovery timestamp will not work. 
+- Create the new primary instance, ideally from a snapshot, and ensure it is not running.
 - Touch a `_recover_point_in_time` file.
-- Inside this file, add `replication.object.store` pointing to the object store you wish to load transactions from.
-- Also add `replication.recovery.timestamp` to set the time to which you would like to recover.
+- Inside this file, add a `replication.object.store` setting pointing to the object store you wish to load transactions from.
+- Also add a `replication.recovery.timestamp` setting with the time to which you would like to recover.
     - This follows usual Java timestamp parsing rules, similar to the SQL engine.
 - (Optional) Configure replication settings in `server.conf` pointing at a **new** object store location.
-- Start primary instance.
+- (Recommended) If you have created the new primary using a snapshot, you should touch a `_restore` file, to trigger the snapshot recovery process.
+    - More details can be found in the [backup and restore](/documentation/operations/backup.md) documentation.
+- Start new primary instance.
 
 ## Multi-primary ingestion
 
