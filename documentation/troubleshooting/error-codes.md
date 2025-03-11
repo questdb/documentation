@@ -1,5 +1,6 @@
 ---
 title: List of  QuestDB Error Codes
+sidebar_label: Error Codes
 description:
   A list of error codes that QuestDB may generate, with explanations and suggested actions.
 ---
@@ -40,7 +41,7 @@ The workflow to enable replication on the primary instance and create replicas i
 * Reconfigure the replica instance with `replication.role=replica` and ensure its `replication.object.store` points to the same object store as the primary. Also, set a new and unique value to the `cairo.snapshot.instance.id` configuration.
 * Start the replica instance.
 
-See the [checkpointing](https://questdb.com/docs/reference/sql/checkpoint/) page for more details
+See the [checkpointing](/docs/reference/sql/checkpoint/) page for more details
 on how to create and restore snapshots.
 
 ## ER004
@@ -80,3 +81,8 @@ You have the following options:
 * Destroy this instance.
 * Reconfigure it as `replication.role=replica` and restart it.
 * Perform a planned primary migration and resume the primary role on this instance.
+
+# Operating system error codes
+
+Refer to the [OS error codes](/docs/troubleshooting/os-error-codes/) page for any
+file or network related errors that QuestDB may raise.
