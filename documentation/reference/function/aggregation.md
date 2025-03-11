@@ -133,6 +133,41 @@ SELECT approx_percentile(latency, 0.99) FROM request_logs;
 | :---------------- |
 | 101.5             |
 
+## approx_median
+
+`approx_median(value, precision)` calculates the approximate median (50th percentile) of a set of non-negative numeric values using the [HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to calling `approx_percentile(value, 0.5, precision)`.
+
+The function will throw an error if any negative values are encountered in the input. All input values must be non-negative.
+
+### Arguments
+
+- `value` is any non-negative numeric value.
+- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is the number of significant decimal digits to which the histogram will maintain value resolution and separation. Higher precision leads to more accurate results with increased memory usage. Defaults to 1 (lower accuracy, high efficiency).
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql title="Calculate approximate median price by symbol" demo
+SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
+```
+
+| symbol  | approx_median |
+| :------ | :----------- |
+| BTC-USD | 39265.31     |
+| ETH-USD | 2615.46      |
+
+```questdb-sql title="Calculate approximate median with higher precision" demo
+SELECT symbol, approx_median(price, 3) FROM trades GROUP BY symbol;
+```
+
+| symbol  | approx_median |
+| :------ | :----------- |
+| BTC-USD | 39265.312    |
+| ETH-USD | 2615.459     |
+
 ## avg
 
 `avg(value)` calculates simple average of values ignoring missing data (e.g
