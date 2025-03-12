@@ -501,7 +501,11 @@ module.exports = {
     {
       label: "Troubleshooting",
       type: "category",
-      items: ["troubleshooting/faq", "troubleshooting/os-error-codes"],
+      items: [
+        "troubleshooting/faq",
+        "troubleshooting/os-error-codes",
+        "troubleshooting/error-codes",
+      ],
     },
   ].filter(Boolean),
 }
