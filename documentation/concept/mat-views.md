@@ -62,7 +62,7 @@ process works as follows:
 - When new data is inserted into the base table, affected time slices are
   identified
 - Only these affected portions are recomputed and updated
-- Updates happen asynchronously to minimize impact on write performance
+- The refresh happen asynchronously to minimize impact on write performance
 - The refresh state is tracked using transaction numbers for consistency
 
 For example, if a base table receives new rows for `2025-02-18`, only that day's

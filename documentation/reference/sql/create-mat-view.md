@@ -47,18 +47,17 @@ Now we can create a materialized view holding aggregated data from the base
 table:
 
 ```questdb-sql title="Hourly materialized view"
-CREATE MATERIALIZED VIEW trades_hourly_prices AS (
+CREATE MATERIALIZED VIEW trades_hourly_prices AS
   SELECT
     timestamp,
     symbol,
     avg(price) AS avg_price
   FROM trades
-  SAMPLE BY 1h
-) PARTITION BY WEEK;
+  SAMPLE BY 1h;
 ```
 
-We've created a materialized view that will be automatically refreshed each time
-when the base table (`trades`) gets new data.
+Now, we've created a materialized view that will be automatically refreshed each
+time when the base table (`trades`) gets new data.
 
 The refreshes are incremental. The view data is populated partially, and only
 for the changed parts of the base table.
@@ -108,6 +107,32 @@ Materialized views can be partitioned by one of the following:
 
 The partitioning strategy **cannot be changed** after the materialized view has
 been created.
+
+`PARTITION BY` is optional and can be omitted when creating a materialized view:
+
+```questdb-sql title="Hourly materialized view (no partition by)"
+CREATE MATERIALIZED VIEW trades_hourly_prices AS
+  SELECT
+    timestamp,
+    symbol,
+    avg(price) AS avg_price
+  FROM trades
+  SAMPLE BY 1h;
+```
+
+Notice that since there are no optional clauses after the query text, we can
+also omit the parentheses.
+
+The database automatically assigns `PARTITION BY` unit based on the `SAMPLE BY`
+interval from the materialized view query. In this case, the interval is one
+hour, so the `PARTITION BY WEEK` partitioning will be used for the view.
+
+The rules for the `PARTITION BY` unit selection are the following:
+
+- If the `SAMPLE BY` interval is greater than one hour, `PARTITION BY YEAR` will
+  be used.
+- If the interval is greater than one minute, `PARTITION BY WEEK` will be used.
+- Otherwise, `PARTITION BY DAY` will be used.
 
 ## Time To Live (TTL)
 

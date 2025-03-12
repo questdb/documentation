@@ -362,17 +362,16 @@ createMatViewDef
   ('WITH BASE' baseTableName)?
   ('REFRESH' 'INCREMENTAL')?
   'AS'
+  ('(')?
+  (query)
+  (')')?
+  ('TIMESTAMP' '(' columnRef ')')?
   (
-    query
-  ) (
-    ('TIMESTAMP' '(' columnRef ')' )
-    (
-      'PARTITION' 'BY' ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')
-      ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
-    )?
+    'PARTITION' 'BY' ('YEAR' | 'MONTH' | 'DAY' | 'HOUR')
+    ('TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS'))?
   )?
- (viewTargetVolumeDef)?
- ('OWNED' 'BY' ownerName)?
+  (viewTargetVolumeDef)?
+  ('OWNED' 'BY' ownerName)?
 
 alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
