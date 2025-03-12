@@ -122,8 +122,8 @@ source:
   table using `WITH BASE`
 - The view's refresh cycle is triggered by changes to its base table
 
-The base table definition ensures that the refresh mechanism knows which
-table's updates should trigger the materialized view's updates.
+The base table definition ensures that the refresh mechanism knows which table's
+updates should trigger the materialized view's updates.
 
 ## Technical requirements
 
@@ -133,7 +133,8 @@ Materialized views must meet specific requirements:
 
 - Must use either `SAMPLE BY` or `GROUP BY` with the designated timestamp column
   key
-- Cannot use `FROM-TO` and `FILL` clauses in `SAMPLE BY` queries
+- Cannot use `FROM-TO`, `FILL`, and `ALIGN TO FIRST OBSERVATION` clauses in
+  `SAMPLE BY` queries
 - Join conditions must be compatible with incremental refresh
 
 ### Schema dependencies
