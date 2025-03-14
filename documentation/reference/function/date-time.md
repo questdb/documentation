@@ -67,27 +67,32 @@ The interpretation of `y` depends on the input digit number:
 
 ## Timestamp to Date conversion
 
-As described at the [data types section](/docs/reference/sql/datatypes), the only difference between `Timestamp` and `Date`
-in QuestDB type system is the resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in microseconds,
-`Date` stores the offset in milliseconds.
+As described at the [data types section](/docs/reference/sql/datatypes), the
+only difference between `Timestamp` and `Date` in QuestDB type system is the
+resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in
+microseconds, `Date` stores the offset in milliseconds.
 
 Since both types are backed by a signed long, this means the `DATE` type has a
-wider range. A `DATE` column can store about ±2.9 million years from the Unix epoch, whereas a `TIMESTAMP` has an approximate
-range of ±290,000 years.
+wider range. A `DATE` column can store about ±2.9 million years from the Unix
+epoch, whereas a `TIMESTAMP` has an approximate range of ±290,000 years.
 
-For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of functions whilst still being 8 bytes in size.
+For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of
+functions whilst still being 8 bytes in size.
 
-Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot set it to any value before the Unix epoch
-(`1970-01-01T00:00:00.000000Z`).
+Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot
+set it to any value before the Unix epoch (`1970-01-01T00:00:00.000000Z`).
 
-To explicitely convert from `TIMESTAMP` to `DATE` you can use `CAST(ts_column AS DATE)`. To convert
-from `DATE` to `TIMESTAMP` you can `CAST(date_column AS TIMESTAMP)`.
+To explicitely convert from `TIMESTAMP` to `DATE` you can use
+`CAST(ts_column AS DATE)`. To convert from `DATE` to `TIMESTAMP` you can
+`CAST(date_column AS TIMESTAMP)`.
 
 ### Programmatically convert from language-specific datetimes into QuestDB timestamps
 
-Different programming languages use different types of objects to represent the `Date` type. To learn how to convert
-from the `Date` type into a `Timestamp` object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
-our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion) reference.
+Different programming languages use different types of objects to represent the
+`Date` type. To learn how to convert from the `Date` type into a `Timestamp`
+object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
+our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion)
+reference.
 
 ---
 
@@ -136,13 +141,18 @@ date_trunc('year','2022-03-11T22:00:30.555555Z') year;
 
 ## dateadd
 
-`dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`, optionally respecting timezone DST transitions.
+`dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`,
+optionally respecting timezone DST transitions.
 
 :::tip
 
-When a timezone is specified, the function handles daylight savings time transitions correctly. This is particularly important when adding periods that could cross DST boundaries (like weeks, months, or years).
+When a timezone is specified, the function handles daylight savings time
+transitions correctly. This is particularly important when adding periods that
+could cross DST boundaries (like weeks, months, or years).
 
-Without the timezone parameter, the function performs simple UTC arithmetic which may lead to incorrect results when crossing DST boundaries. For timezone-aware calculations, use the timezone parameter.
+Without the timezone parameter, the function performs simple UTC arithmetic
+which may lead to incorrect results when crossing DST boundaries. For
+timezone-aware calculations, use the timezone parameter.
 
 :::
 
@@ -163,7 +173,8 @@ Without the timezone parameter, the function performs simple UTC arithmetic whic
 - `n` is an `int` indicating the number of periods to add.
 - `startDate` is a timestamp or date indicating the timestamp to add the period
   to.
-- `timezone` (optional) is a string specifying the timezone to use for DST-aware calculations - for example, 'Europe/London'.
+- `timezone` (optional) is a string specifying the timezone to use for DST-aware
+  calculations - for example, 'Europe/London'.
 
 **Return value:**
 
@@ -190,18 +201,19 @@ FROM long_sequence(1);
 | 2020-04-17T00:30:51.380499Z | 2020-04-19T00:30:51.380499Z |
 
 ```questdb-sql title="Adding weeks with timezone"
-SELECT 
+SELECT
     '2024-10-21T10:00:00Z',
     dateadd('w', 1, '2024-10-21T10:00:00Z', 'Europe/Bratislava') as with_tz,
     dateadd('w', 1, '2024-10-21T10:00:00Z') as without_tz
 FROM long_sequence(1);
 ```
 
-| timestamp                | with_tz                    | without_tz                 |
-| :----------------------- | :------------------------- | :------------------------- |
-| 2024-10-21T10:00:00.000Z | 2024-10-28T10:00:00.000Z  | 2024-10-28T09:00:00.000Z  |
+| timestamp                | with_tz                  | without_tz               |
+| :----------------------- | :----------------------- | :----------------------- |
+| 2024-10-21T10:00:00.000Z | 2024-10-28T10:00:00.000Z | 2024-10-28T09:00:00.000Z |
 
-Note how the timezone-aware calculation correctly handles the DST transition in Europe/Bratislava.
+Note how the timezone-aware calculation correctly handles the DST transition in
+Europe/Bratislava.
 
 ```questdb-sql title="Adding months"
 SELECT systimestamp(), dateadd('M', 2, systimestamp())
@@ -429,7 +441,8 @@ extract(second from '2023-03-11T22:00:30.555555Z') second;
 
 ## hour
 
-`hour(value)` - returns the `hour` of day for a given timestamp from `0` to `23`.
+`hour(value)` - returns the `hour` of day for a given timestamp from `0` to
+`23`.
 
 **Arguments:**
 
@@ -464,8 +477,8 @@ SELECT hour(ts), count() FROM transactions;
 
 ## interval
 
-`interval(start_timestamp, end_timestamp)` - creates a time interval from
-two timestamps.
+`interval(start_timestamp, end_timestamp)` - creates a time interval from two
+timestamps.
 
 **Arguments:**
 
@@ -862,11 +875,14 @@ WHERE now() IN today();
 
 ## today, tomorrow, yesterday with timezone
 
-- `today(timezone)` - returns an interval representing the current day with timezone adjustment.
+- `today(timezone)` - returns an interval representing the current day with
+  timezone adjustment.
 
-- `tomorrow(timezone)` - returns an interval representing the next day timezone adjustment.
+- `tomorrow(timezone)` - returns an interval representing the next day timezone
+  adjustment.
 
-- `yesterday(timezone)` - returns an interval representing the previous day timezone adjustment.
+- `yesterday(timezone)` - returns an interval representing the previous day
+  timezone adjustment.
 
 **Arguments:**
 
@@ -886,9 +902,11 @@ SELECT today() as today, today('CEST') as adjusted;
 | :------------------------------------------------------- | :------------------------------------------------------- |
 | ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
 
-This function allows the user to specify their local timezone and receive a UTC interval that corresponds to their 'day'.
+This function allows the user to specify their local timezone and receive a UTC
+interval that corresponds to their 'day'.
 
-In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM` `UTC` the day before.
+In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM`
+`UTC` the day before.
 
 ## sysdate
 
@@ -1016,16 +1034,18 @@ SELECT
 
 ## timestamp_floor
 
-`timestamp_floor(unit, timestamp)` - performs a floor calculation on a timestamp
-by given unit.
+`timestamp_floor(interval, timestamp)` - performs a floor calculation on a
+timestamp by given interval expression.
 
-A unit must be provided to specify which granularity to perform rounding.
+An interval expression must be provided to specify which granularity to perform
+rounding for.
 
 **Arguments:**
 
-`timestamp_floor(unit, timestamp)` has the following arguments:
+`timestamp_floor(interval, timestamp)` has the following arguments:
 
-`unit` - may be one of the following:
+`unit` - is a time interval expression that may use one of the following
+suffices:
 
 - `T` milliseconds
 - `s` seconds
@@ -1044,6 +1064,18 @@ Return value type is `timestamp`.
 **Examples:**
 
 ```questdb-sql
+SELECT timestamp_floor('5d', '2018-01-01')
+```
+
+Gives:
+
+| timestamp_floor             |
+| --------------------------- |
+| 2017-12-30T00:00:00.000000Z |
+
+The number part of the expression is optional:
+
+```questdb-sql
 WITH t AS (SELECT cast('2016-02-10T16:18:22.862145Z' AS timestamp) ts)
 SELECT
   ts,
@@ -1057,13 +1089,17 @@ SELECT
   FROM t
 ```
 
+Gives:
+
 | ts                          | f_milli                     | f_second                    | f_minute                    | f_hour                      | f_day                       | f_month                     | f_year                      |
 | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- | :-------------------------- |
 | 2016-02-10T16:18:22.862145Z | 2016-02-10T16:18:22.862000Z | 2016-02-10T16:18:22.000000Z | 2016-02-10T16:18:00.000000Z | 2016-02-10T16:00:00.000000Z | 2016-02-10T00:00:00.000000Z | 2016-02-01T00:00:00.000000Z | 2016-01-01T00:00:00.000000Z |
 
 #### timestamp_floor with offset
 
-When timestamps are floored by `timestamp_floor(unit, timestamp)`, they are based on a root timestamp of `0`. This means that some floorings with a stride can be confusing, since they are based on a modulo from `1970-01-01`.
+When timestamps are floored by `timestamp_floor(interval, timestamp)`, they are
+based on a root timestamp of `0`. This means that some floorings with a stride
+can be confusing, since they are based on a modulo from `1970-01-01`.
 
 For example:
 
@@ -1077,8 +1113,9 @@ Gives:
 | --------------------------- |
 | 2017-12-30T00:00:00.000000Z |
 
-If you wish to calculate bins from an offset other than `1970-01-01`, you can add a third parameter: `timestamp_floor(unit, timestamp, offset)`. The offset acts as a baseline from which
-further values are calculated.
+If you wish to calculate bins from an offset other than `1970-01-01`, you can
+add a third parameter: `timestamp_floor(interval, timestamp, offset)`. The
+offset acts as a baseline from which further values are calculated.
 
 ```questdb-sql
 SELECT timestamp_floor('5d', '2018-01-01', '2018-01-01')
