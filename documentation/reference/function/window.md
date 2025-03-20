@@ -489,9 +489,7 @@ FROM trades;
 ### dense_rank()
 
 In the context of window functions, `dense_rank()` assigns a unique rank to each row
-within the window frame, with a unique ran assigned to all rows.
-
-Rows with equal values will have different ranks, monotonically increasing.
+within the window frame. Rows with equal values will have different ranks, monotonically increasing.
 
 **Arguments:**
 
