@@ -53,7 +53,7 @@ the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to conf
 
 ### Better specification
 
-- **Instance**: `r6i.2xlarge` or `r6a.xlarge` `(8 vCPUs, 64 GiB RAM)`
+- **Instance**: `r6i.2xlarge` or `r6a.2xlarge` `(8 vCPUs, 64 GiB RAM)`
 - **Storage**
     - **OS disk**: `gp3 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
     - **Data disk**: `gp3 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
