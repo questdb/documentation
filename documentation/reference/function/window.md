@@ -115,6 +115,8 @@ Where:
 - [`min()`](#min) – Returns the minimum value within a window
 
 - [`rank()`](#rank) – Assigns a rank to rows
+- 
+- [`dense_rank()`](#dense_rank) – Assigns a rank to rows monotonically
 
 - [`row_number()`](#row_number) – Assigns sequential numbers to rows
 
@@ -484,6 +486,52 @@ SELECT
 FROM trades;
 ```
 
+### dense_rank()
+
+In the context of window functions, `dense_rank()` assigns a unique rank to each row
+within the window frame. Rows with equal values may have the same rank,
+but there are no gaps in the rank numbers - it increases sequentially.
+
+**Arguments:**
+
+- `dense_rank()` does not require arguments.
+
+**Return value:**
+
+- The increasing consecutive rank numbers of each row within the window frame. Return value type is `long`.
+
+**Description**
+
+When used as a window function, `dense_rank()` operates on a "window" of rows defined
+by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
+
+The `dense_rank()` function assigns a unique rank to each row within its window, with the same rank for the same values in the `ORDER BY` clause of
+the `OVER` clause. However, there are no gaps in the counter, unlike with `rank()` - it is guaranteed to be sequential.
+It ignores the frame clause, meaning it considers all rows in each partition, regardless of the frame specification.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="dense_rank() syntax" 
+dense_rank() OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="dense_rank() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    dense_rank() OVER (
+        PARTITION BY symbol
+        ORDER BY price DESC
+    ) AS price_rank
+FROM trades;
+```
+
 ### first_value()
 
 In the context of window functions, `first_value(value)` calculates the first
@@ -651,103 +699,6 @@ SELECT
 FROM trades;
 ```
 
-### rank()
-
-In the context of window functions, `rank()` assigns a unique rank to each row
-within the window frame, with the same rank assigned to rows with the same
-values. Rows with equal values receive the same rank, and a gap appears in the
-sequence for the next distinct value; that is, the `row_number` of the first row
-in its peer group.
-
-**Arguments:**
-
-- `rank()` does not require arguments.
-
-**Return value:**
-
-- The rank of each row within the window frame. Return value type is `long`.
-
-**Description**
-
-When used as a window function, `rank()` operates on a "window" of rows defined
-by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
-
-The `rank()` function assigns a unique rank to each row within its window, with
-the same rank assigned to rows with the same values in the `ORDER BY` clause of
-the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
-each partition, regardless of the frame specification.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-```questdb-sql title="rank() syntax" 
-rank() OVER (window_definition)
-```
-
-**Example:**
-```questdb-sql title="rank() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    rank() OVER (
-        PARTITION BY symbol
-        ORDER BY price DESC
-    ) AS price_rank
-FROM trades;
-```
-
-### row_number()
-
-In the context of window functions, `row_number()` assigns a unique row number
-to each row within the window frame. For each partition, the row number starts
-with one and increments by one.
-
-**Arguments:**
-
-- `row_number()` does not require arguments.
-
-**Return value:**
-
-- The row number of each row within the window frame. Return value type is
-  `long`.
-
-**Description**
-
-When used as a window function, `row_number()` operates on a "window" of rows
-defined by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
-
-The `row_number()` function assigns a unique row number to each row within its
-window, starting at one for the first row in each partition and incrementing by
-one for each subsequent row. It ignores the frame clause, meaning it considers
-all rows in each partition, regardless of the frame specification.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-```questdb-sql title="row_number() syntax" 
-row_number() OVER (window_definition)
-```
-
-**Example:**
-```questdb-sql title="row_number() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    row_number() OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS trade_number
-FROM trades;
-```
-
 ### lead()
 
 In the context of window functions, `lead()` accesses data from subsequent rows in the result set without using a self-join. For each row, `lead()` returns the value from a row at a specified offset following the current row within the partition.
@@ -903,6 +854,103 @@ This example:
 - Gets the last price within a 3-row window for each symbol (`last_price`)
 - Gets the last non-NULL price for each symbol (`last_non_null_price`)
 - Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
+
+### rank()
+
+In the context of window functions, `rank()` assigns a unique rank to each row
+within the window frame, with the same rank assigned to rows with the same
+values. Rows with equal values receive the same rank, and a gap appears in the
+sequence for the next distinct value; that is, the `row_number` of the first row
+in its peer group.
+
+**Arguments:**
+
+- `rank()` does not require arguments.
+
+**Return value:**
+
+- The rank of each row within the window frame. Return value type is `long`.
+
+**Description**
+
+When used as a window function, `rank()` operates on a "window" of rows defined
+by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
+
+The `rank()` function assigns a unique rank to each row within its window, with
+the same rank assigned to rows with the same values in the `ORDER BY` clause of
+the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
+each partition, regardless of the frame specification.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="rank() syntax" 
+rank() OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="rank() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    rank() OVER (
+        PARTITION BY symbol
+        ORDER BY price DESC
+    ) AS price_rank
+FROM trades;
+```
+
+### row_number()
+
+In the context of window functions, `row_number()` assigns a unique row number
+to each row within the window frame. For each partition, the row number starts
+with one and increments by one.
+
+**Arguments:**
+
+- `row_number()` does not require arguments.
+
+**Return value:**
+
+- The row number of each row within the window frame. Return value type is
+  `long`.
+
+**Description**
+
+When used as a window function, `row_number()` operates on a "window" of rows
+defined by the `OVER` clause. The rows in this window are determined by the
+`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
+
+The `row_number()` function assigns a unique row number to each row within its
+window, starting at one for the first row in each partition and incrementing by
+one for each subsequent row. It ignores the frame clause, meaning it considers
+all rows in each partition, regardless of the frame specification.
+
+Note that the order of rows in the result set is not guaranteed to be the same
+with each execution of the query. To ensure a consistent order, use an
+`ORDER BY` clause outside of the `OVER` clause.
+
+**Syntax:**
+```questdb-sql title="row_number() syntax" 
+row_number() OVER (window_definition)
+```
+
+**Example:**
+```questdb-sql title="row_number() example" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    row_number() OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS trade_number
+FROM trades;
+```
 
 ## Common window function examples
 
