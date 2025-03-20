@@ -489,7 +489,8 @@ FROM trades;
 ### dense_rank()
 
 In the context of window functions, `dense_rank()` assigns a unique rank to each row
-within the window frame. Rows with equal values will have different ranks, monotonically increasing.
+within the window frame. Rows with equal values may have the same rank,
+but there are no gaps in the rank numbers - it increases monotonically.
 
 **Arguments:**
 
@@ -497,7 +498,7 @@ within the window frame. Rows with equal values will have different ranks, monot
 
 **Return value:**
 
-- The monotonically increasing rank of each row within the window frame. Return value type is `long`.
+- The monotonically increasing ranks of each row within the window frame. Return value type is `long`.
 
 **Description**
 
@@ -505,10 +506,9 @@ When used as a window function, `dense_rank()` operates on a "window" of rows de
 by the `OVER` clause. The rows in this window are determined by the
 `PARTITION BY` and `ORDER BY` components of the `OVER` clause.
 
-The `dense_rank()` function assigns a unique rank to each row within its window, with
-a monotonic increasing counter for rows even with the same values in the `ORDER BY` clause of
-the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
-each partition, regardless of the frame specification.
+The `dense_rank()` function assigns a unique rank to each row within its window, with the same rank for the same values in the `ORDER BY` clause of
+the `OVER` clause. However, there are no gaps in the counter, unlike with `rank()` - it is guaranteed to be sequential.
+It ignores the frame clause, meaning it considers all rows in each partition, regardless of the frame specification.
 
 Note that the order of rows in the result set is not guaranteed to be the same
 with each execution of the query. To ensure a consistent order, use an
