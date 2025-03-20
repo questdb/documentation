@@ -490,7 +490,7 @@ FROM trades;
 
 In the context of window functions, `dense_rank()` assigns a unique rank to each row
 within the window frame. Rows with equal values may have the same rank,
-but there are no gaps in the rank numbers - it increases monotonically.
+but there are no gaps in the rank numbers - it increases sequentially.
 
 **Arguments:**
 
@@ -498,7 +498,7 @@ but there are no gaps in the rank numbers - it increases monotonically.
 
 **Return value:**
 
-- The monotonically increasing ranks of each row within the window frame. Return value type is `long`.
+- The increasing consecutive ranks of each row within the window frame. Return value type is `long`.
 
 **Description**
 
