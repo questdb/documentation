@@ -26,7 +26,7 @@ Existing read queries for this view may delay space reclamation.
 DROP MATERIALIZED VIEW trades_1h;
 ```
 
-### IF EXISTS
+## IF EXISTS
 
 Add an optional `IF EXISTS` clause after the `DROP MATERIALIZED VIEW` keywords
 to indicate that the selected materialized view should be dropped, but only if

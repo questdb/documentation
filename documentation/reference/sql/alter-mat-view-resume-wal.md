@@ -19,7 +19,7 @@ operation. Refer to that page for more details.
 
 ![Flow chart showing the syntax of ALTER MATERIALIZED VIEW with RESUME WAL keyword](/images/docs/diagrams/resumeWal.svg)
 
-## Examples
+## Example
 
 Use the [`wal_tables()`](/docs/reference/function/meta/#wal_tables) function to
 investigate the materialized view status:

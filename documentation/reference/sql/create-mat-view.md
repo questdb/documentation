@@ -25,11 +25,12 @@ To check materialized view metadata, use the `materialized_views()` function,
 which is described in the [meta functions](/docs/reference/function/meta/)
 documentation page.
 
-## Examples
-
-The following examples demonstrate creating materialized views from basic
+The following example demonstrate creating materialized views from basic
 statements, and introduces feature such as
 [partitioning](/glossary/database-partitioning/).
+
+
+## Creating a view
 
 Our examples use the following base table:
 
