@@ -189,8 +189,8 @@ statement without any arguments.
 
 ## tables
 
-`tables()` or `all_tables()` returns all tables in the database including table
-metadata.
+`tables()` or `all_tables()` returns all tables and materialized views in the
+database including table metadata.
 
 **Arguments:**
 
@@ -206,21 +206,21 @@ Returns a `table`.
 tables();
 ```
 
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup |
-| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- |
-| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false |
-| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false |
-| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false |
+| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | matView |
+| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | ------- |
+| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | false   |
+| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | false   |
+| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | false   |
 
 ```questdb-sql title="All tables in reverse alphabetical order"
 tables() ORDER BY name DESC;
 ```
 
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag  | walEnabled | directoryName    | dedup |
-| --- | ----------- | ------------------- | ----------- | ------------------ | --------- | ---------- | ---------------- | ----- |
-| 2   | device_data | null                | NONE        | 10000              | 30000000  | false      | device_data      | false |
-| 1   | my_table    | ts                  | DAY         | 500000             | 300000000 | false      | my_table         | false |
-| 3   | short_lived | ts                  | HOUR        | 10000              | 30000000  | false      | short_lived (->) | false |
+| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag  | walEnabled | directoryName    | dedup | matView |
+| --- | ----------- | ------------------- | ----------- | ------------------ | --------- | ---------- | ---------------- | ----- | ------- |
+| 2   | device_data | null                | NONE        | 10000              | 30000000  | false      | device_data      | false | false   |
+| 1   | my_table    | ts                  | DAY         | 500000             | 300000000 | false      | my_table         | false | false   |
+| 3   | short_lived | ts                  | HOUR        | 10000              | 30000000  | false      | short_lived (->) | false | false   |
 
 :::note
 
@@ -230,21 +230,21 @@ tables() ORDER BY name DESC;
 :::
 
 ```questdb-sql title="All tables with a daily partitioning strategy"
-tables() WHERE partitionBy = 'DAY'
+tables() WHERE partitionBy = 'DAY';
 ```
 
-| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup |
-| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- |
-| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false |
+| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | matView |
+| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | ------- |
+| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | false   |
 
 ## table_storage
 
-`table_storage()` - Returns a table containing information about the storage and
-structure of all user tables in the database.
+`table_storage()` - Returns information about the storage and structure of all
+user tables and materialized views in the database.
 
-Provides detailed storage information about all user tables within QuestDB. It
-returns one row per table, including information about partitioning, row counts,
-and disk usage.
+Provides detailed storage information about all user tables and materialized
+views within QuestDB. It returns one row per table, including information about
+partitioning, row counts, and disk usage.
 
 - The `table_storage()` function excludes system tables; it only lists
   user-created tables.
@@ -257,7 +257,7 @@ and disk usage.
 
 The function returns the following columns:
 
-- `tableName` (`string`): The name of the table.
+- `tableName` (`string`): The name of the table or materialized view.
 - `walEnabled` (`boolean`): Indicates whether Write-Ahead Logging (WAL) is
   enabled for the table.
 - `partitionBy` (`string`): The partitioning type of the table (e.g., NONE, DAY,
@@ -315,7 +315,8 @@ WHERE partitionBy = 'HOUR';
 ## wal_tables
 
 `wal_tables()` returns the WAL status for all
-[WAL tables](/docs/concept/write-ahead-log/) in the database.
+[WAL tables](/docs/concept/write-ahead-log/) or materialized views in the
+database.
 
 **Arguments:**
 
@@ -325,7 +326,7 @@ WHERE partitionBy = 'HOUR';
 
 Returns a `table` including the following information:
 
-- `name` - table name
+- `name` - table or materialized view name
 - `suspended` - suspended status flag
 - `writerTxn` - the last committed transaction in TableWriter
 - `writerLagTxnCount` - the number of transactions that are kept invisible when
@@ -347,11 +348,12 @@ wal_tables();
 
 ## table_columns
 
-`table_columns('tableName')` returns the schema of a table.
+`table_columns('tableName')` returns the schema of a table or a materialized
+view.
 
 **Arguments:**
 
-- `tableName` is the name of an existing table as a string.
+- `tableName` is the name of an existing table or materialized view as a string.
 
 **Return value:**
 
@@ -408,15 +410,15 @@ SELECT type, count() FROM table_columns('my_table');
 ## table_partitions
 
 `table_partitions('tableName')` returns information for the partitions of a
-table with the option to filter the partitions.
+table or a materialized view with the option to filter the partitions.
 
 **Arguments:**
 
-- `tableName` is the name of an existing table as a string.
+- `tableName` is the name of an existing table or materialized view as a string.
 
 **Return value:**
 
-Returns a `table` with the following columns:
+Returns a table with the following columns:
 
 - `index` - _INTEGER_, index of the partition (_NaN_ when the partition is not
   attached)
@@ -484,6 +486,41 @@ SELECT * FROM table_partitions('my_table') WHERE active = true;
 | index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
 | ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
 | 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
+
+## materialized_views
+
+`materialized_views()` returns the list of all materialized views in the
+database.
+
+**Arguments:**
+
+- `materialized_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `view_name` - materialized view name
+- `refresh_type` - refresh strategy type
+- `base_table_name` - base table name
+- `last_refresh_timestamp` - last time when the view was incrementally refreshed
+- `view_sql` - query used to populate view data
+- `view_table_dir_name` - view directory name
+- `view_status` - view status: valid or invalid
+- `invalidation_reason` - message explaining why the view was marked as invalid
+- `base_table_txn` - the last committed transaction in the base table
+- `applied_base_table_txn` - the last base table transaction used to refresh the
+  materialized view
+
+**Examples:**
+
+```questdb-sql title="List all materialized views"
+materialized_views();
+```
+
+| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql      | view_table_dir_name | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
+| --------- | ------------ | --------------- | --------------------------- | ------------- | ------------------- | ----------- | ------------------- | -------------- | ---------------------- |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | query text... | trades_1h~10        | valid       |                     | 42             | 42                     |
 
 ## version/pg_catalog.version
 
