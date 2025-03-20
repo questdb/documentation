@@ -9,13 +9,12 @@ description:
 contents.
 
 The deletion is **permanent** and **not recoverable**, except if the view was
-created in a non-standard volume.
-
-In such cases, the view is only logically removed while the underlying data
+created in a non-standard volume. In such cases, the view is only logically removed while the underlying data
 remains intact in its volume.
 
 Disk space is reclaimed asynchronously after the materialized view is dropped.
-Ongoing view reads might delay space reclamation.
+
+Existing read queries for this view may delay space reclamation.
 
 ## Syntax
 

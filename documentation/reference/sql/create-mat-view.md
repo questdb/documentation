@@ -10,7 +10,7 @@ To create a new materialized view in the database, use the
 materialized view.
 
 A materialized view holds the result set of the given query, and is
-automatically refreshed and persistent. For more information on the concept, see
+automatically refreshed and persisted. For more information on the concept, see
 the [reference](/docs/concept/mat-views/) on materialized views.
 
 ## Syntax
@@ -65,7 +65,7 @@ for the changed parts of the base table.
 :::note
 
 Queries supported by incrementally refreshed materialized views are limited to
-`SAMPLE BY` queries without `FROM-TO` and `FILL` clauses and `GROUP BY` queries
+`SAMPLE BY` queries without `FROM-TO` and `FILL` clauses, and `GROUP BY` queries
 with the designated timestamp as the grouping key.
 
 :::
@@ -129,15 +129,15 @@ hour, so the `PARTITION BY WEEK` partitioning will be used for the view.
 
 The rules for the `PARTITION BY` unit selection are the following:
 
-- If the `SAMPLE BY` interval is greater than one hour, `PARTITION BY YEAR` will
-  be used.
-- If the interval is greater than one minute, `PARTITION BY WEEK` will be used.
-- Otherwise, `PARTITION BY DAY` will be used.
+- If the `SAMPLE BY` interval is `x > 1h`, `PARTITION BY YEAR`.
+- If the `SAMPLE BY` interval is `1m <= x <= 1h`, `PARTITION BY WEEK` will be used.
+- Otherwise, `PARTITION BY DAY`.
 
 ## Time To Live (TTL)
 
-To store only recently aggregated data, configure a time-to-live (TTL) period on
-a materialized view using the `TTL` clause, placing it right after
+A retention policy can be set on the materialized view, bounding how much data is stored.
+
+Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right after
 `PARTITION BY <unit>`.
 
 Follow the `TTL` keyword with a number and a time unit, one of:
@@ -150,6 +150,12 @@ Follow the `TTL` keyword with a number and a time unit, one of:
 
 Refer to the [section on TTL in Concepts](/docs/concept/ttl/) for detailed
 information on the behavior of this feature.
+
+:::note
+
+The time-to-live (TTL) for the materialized view can differ from the base table, depending on your needs.
+
+:::
 
 ### Examples
 
@@ -184,17 +190,15 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS (
 ## Materialized view names
 
 Materialized view names follow the
-[same rules](/docs/reference/sql/create-table/#table-name) as normal table
-names.
+[same rules](/docs/reference/sql/create-table/#table-name) as regular tables.
 
-## OWNED BY
+## OWNED BY (Enterprise)
 
-_Enterprise only._
+When a user creates a new materialized view, they are automatically assigned all
+materialized view level permissions with the `GRANT` option for that view. 
+This behaviour can can be overridden using `OWNED BY`. 
 
-When a user creates a new materialized view, they automatically get all
-materialized view level permissions with the `GRANT` option for that view.
-
-However, if the `OWNED BY` clause is used, the permissions instead go to the
+If the `OWNED BY` clause is used, the permissions instead go to the
 user, group, or service account named in that clause.
 
 The `OWNED BY` clause cannot be omitted if the materialized view is created by
