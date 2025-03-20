@@ -154,11 +154,12 @@ To create a materialized view, your query:
 
 We intend to loosen some of these restrictions in future.
 
-### Schema dependencies
+### View invalidation
 
 The view's structure is tightly coupled with its base table.
 
-The main cause of invalidation for a materialised view, is when the base table schema is changed.
+The main cause of invalidation for a materialised view, is when the table schema or underlying data
+is modified.
 
 These changes include dropping columns, dropping partitions and renaming the table.
 
@@ -166,9 +167,8 @@ Data deletion or modification, for example, using `TRUNCATE` or `UPDATE`, may al
 
 Also, a materialized view must use the same `DEDUP` keys as the base table.
 
-Here are some scenarios that may lead to invalidation of the dependent materialized views:
 
-## Replication considerations (Enterprise only)
+## Replicated views (Enterprise only)
 
 Replication of the base table is independent of materialized view maintenance.
 
@@ -184,13 +184,12 @@ Materialized Views are compatible with the usual resource management systems:
 - Partitions are managed separately between the base table and the view.
 - Refresh intervals can be configured independently.
 
-### Materialized View with TTL
+### Materialized view with TTL
 
 Materialized Views take extra storage and resources to maintain. If your
 `SAMPLE BY` unit is small (seconds, milliseconds), this could be a significant amount of data.
 
 Therefore, you can decide on a retention policy for the data, and set it using `TTL`:
-
 
 ```questdb-sql title="Create a materialized view with a TTL policy"
 CREATE MATERIALIZED VIEW trades_hourly_prices AS (
@@ -204,4 +203,4 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ```
 
 In this example, the view stores hourly summaries of the pricing data, in weekly partitions,
-keeping the last 8 partitions.
+keeping the prior 8 partitions.
