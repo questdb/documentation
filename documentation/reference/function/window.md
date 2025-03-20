@@ -906,56 +906,6 @@ SELECT
 FROM trades;
 ```
 
-
-### rank()
-
-In the context of window functions, `rank()` assigns a unique rank to each row
-within the window frame, with the same rank assigned to rows with the same
-values. Rows with equal values receive the same rank, and a gap appears in the
-sequence for the next distinct value; that is, the `row_number` of the first row
-in its peer group.
-
-**Arguments:**
-
-- `rank()` does not require arguments.
-
-**Return value:**
-
-- The rank of each row within the window frame. Return value type is `long`.
-
-**Description**
-
-When used as a window function, `rank()` operates on a "window" of rows defined
-by the `OVER` clause. The rows in this window are determined by the
-`PARTITION BY` and `ORDER BY` components of the `OVER` clause.
-
-The `rank()` function assigns a unique rank to each row within its window, with
-the same rank assigned to rows with the same values in the `ORDER BY` clause of
-the `OVER` clause. It ignores the frame clause, meaning it considers all rows in
-each partition, regardless of the frame specification.
-
-Note that the order of rows in the result set is not guaranteed to be the same
-with each execution of the query. To ensure a consistent order, use an
-`ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-```questdb-sql title="rank() syntax" 
-rank() OVER (window_definition)
-```
-
-**Example:**
-```questdb-sql title="rank() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    rank() OVER (
-        PARTITION BY symbol
-        ORDER BY price DESC
-    ) AS price_rank
-FROM trades;
-```
-
 ### row_number()
 
 In the context of window functions, `row_number()` assigns a unique row number
