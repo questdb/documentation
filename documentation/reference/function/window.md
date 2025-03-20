@@ -498,7 +498,7 @@ but there are no gaps in the rank numbers - it increases sequentially.
 
 **Return value:**
 
-- The increasing consecutive ranks of each row within the window frame. Return value type is `long`.
+- The increasing consecutive rank numbers of each row within the window frame. Return value type is `long`.
 
 **Description**
 
