@@ -4,9 +4,66 @@ sidebar_label: Conditional
 description: Conditional functions reference documentation.
 ---
 
-Conditional functions allow for conditionally selecting input values. For
-instance, the `coalesce()` function is useful for handling null data values and
-providing replacement values.
+Conditional functions allow for conditionally selecting input values.
+
+## case
+
+![Flow chart showing the syntax of CASE](/images/docs/diagrams/case.svg)
+
+`CASE` goes through a set of conditions and returns a value corresponding to the
+first condition met. Each new condition follows the `WHEN condition THEN value`
+syntax. The user can define a return value when no condition is met using
+`ELSE`. If `ELSE` is not defined and no conditions are met, then case returns
+`null`.
+
+**Examples:**
+
+Assume the following data
+
+| name  | age |
+| ----- | --- |
+| Tom   | 4   |
+| Jerry | 19  |
+| Anna  | 25  |
+| Jack  | 8   |
+
+```questdb-sql title="CASE with ELSE"
+SELECT
+name,
+CASE
+    WHEN age > 18 THEN 'major'
+    ELSE 'minor'
+END
+FROM my_table
+```
+
+Result
+
+| name  | case  |
+| ----- | ----- |
+| Tom   | minor |
+| Jerry | major |
+| Anna  | major |
+| Jack  | minor |
+
+```questdb-sql title="CASE without ELSE"
+SELECT
+name,
+CASE
+    WHEN age > 18 THEN 'major'
+END
+FROM my_table
+```
+
+Result
+
+| name  | case  |
+| ----- | ----- |
+| Tom   | null  |
+| Jerry | major |
+| Anna  | major |
+| Jack  | null  |
+
 
 ## coalesce
 
