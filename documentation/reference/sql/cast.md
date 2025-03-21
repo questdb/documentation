@@ -1,6 +1,6 @@
 ---
 title: CAST keyword
-sidebar_label: Type conversion
+sidebar_label: CAST
 description: CAST SQL keyword reference documentation.
 ---
 

@@ -285,6 +285,8 @@ module.exports = {
               items: [
                 "reference/sql/select",
                 "reference/sql/asof-join",
+                "reference/sql/case",
+                "reference/sql/cast",
                 "reference/sql/declare",
                 "reference/sql/distinct",
                 "reference/sql/fill",
@@ -331,7 +333,6 @@ module.exports = {
             "reference/function/timestamp",
             "reference/function/touch",
             "reference/function/trigonometric",
-            "reference/sql/cast",
             "reference/function/uuid",
             "reference/function/window",
           ],
