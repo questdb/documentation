@@ -5,6 +5,25 @@ description:
   Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
+:::info
+
+Materialized View support is in **beta**.
+
+It may not be fit for production use.
+
+To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
+environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
+
+Please let us know if you run into issues.
+
+Either:
+
+1. Email us at [support@questdb.io](mailto:support@questdb.io)
+2. Join our [public Slack](https://slack.questdb.com/)
+3. Post on our [Discourse community](https://community.questdb.com/)
+
+:::
+
 To create a new materialized view in the database, use the
 `CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
 materialized view.
@@ -172,8 +191,8 @@ Materialized view names follow the
 ## OWNED BY (Enterprise)
 
 When a user creates a new materialized view, they are automatically assigned all
-materialized view level permissions with the `GRANT` option for that view. 
-This behaviour can can be overridden using `OWNED BY`. 
+materialized view level permissions with the `GRANT` option for that view.
+This behaviour can can be overridden using `OWNED BY`.
 
 If the `OWNED BY` clause is used, the permissions instead go to the
 user, group, or service account named in that clause.
