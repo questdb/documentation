@@ -12,6 +12,9 @@ Materialized View support is in **beta**.
 
 It may not be fit for production use.
 
+To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
+environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
+
 Please let us know if you run into issues.
 
 Either:
@@ -30,11 +33,12 @@ efficient for expensive aggregate queries that are run frequently.
 
 ## Related documentation
 
+<!--
 - **Step-by-step tutorial**
 
   - [How to create a materialized view](/blog/how-to-create-a-materialized-view/):
     A full walkthrough of simple and advanced materialized views
-
+-->
 - **SQL Commands**
 
   - [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view/): Create a

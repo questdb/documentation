@@ -11,6 +11,9 @@ Materialized View support is in **beta**.
 
 It may not be fit for production use.
 
+To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
+environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
+
 Please let us know if you run into issues.
 
 Either:
@@ -22,7 +25,7 @@ Either:
 :::
 
 
-`REFRESH MATERIALIZED VIEW` refreshes a materialized view. This is helpful when a view 
+`REFRESH MATERIALIZED VIEW` refreshes a materialized view. This is helpful when a view
 becomes invalid, and no longer refreshes incrementally.
 
 When the FULL keyword is specified, this command deletes the data in the target
