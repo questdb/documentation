@@ -5,6 +5,22 @@ description:
   Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
+:::info
+
+Materialized View support is in **beta**.
+
+It may not be fit for production use.
+
+Please let us know if you run into issues.
+
+Either:
+
+1. Email us at [support@questdb.io](mailto:support@questdb.io)
+2. Join our [public Slack](https://slack.questdb.com/)
+3. Post on our [Discourse community](https://community.questdb.com/)
+
+:::
+
 To create a new materialized view in the database, use the
 `CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
 materialized view.
