@@ -68,9 +68,9 @@ The interpretation of `y` depends on the input digit number:
 ## Timestamp to Date conversion
 
 As described at the [data types section](/docs/reference/sql/datatypes), the
-only difference between `Timestamp` and `Date` in QuestDB type system is the
-resolution. Whilst `Timestamp` stores resolution as an offset from Unix epoch in
-microseconds, `Date` stores the offset in milliseconds.
+only difference between `TIMESTAMP` and `DATE` in QuestDB type system is the
+resolution. Whilst `TIMESTAMP` stores resolution as an offset from Unix epoch in
+microseconds, `DATE` stores the offset in milliseconds.
 
 Since both types are backed by a signed long, this means the `DATE` type has a
 wider range. A `DATE` column can store about ±2.9 million years from the Unix
@@ -82,14 +82,14 @@ functions whilst still being 8 bytes in size.
 Be aware that, when using a `TIMESTAMP` as the designated timestamp, you cannot
 set it to any value before the Unix epoch (`1970-01-01T00:00:00.000000Z`).
 
-To explicitely convert from `TIMESTAMP` to `DATE` you can use
+To explicitly convert from `TIMESTAMP` to `DATE`, you can use
 `CAST(ts_column AS DATE)`. To convert from `DATE` to `TIMESTAMP` you can
 `CAST(date_column AS TIMESTAMP)`.
 
 ### Programmatically convert from language-specific datetimes into QuestDB timestamps
 
 Different programming languages use different types of objects to represent the
-`Date` type. To learn how to convert from the `Date` type into a `Timestamp`
+`DATE` type. To learn how to convert from the `DATE` type into a `TIMESTAMP`
 object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
 our [Date to Timestamp conversion](/docs/clients/date-to-timestamp-conversion)
 reference.
