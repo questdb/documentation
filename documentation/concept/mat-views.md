@@ -6,11 +6,6 @@ description:
   speed up your aggregation queries.
 ---
 
-A materialized view is a database object that stores the pre-computed results of
-a query. Unlike regular views, which compute their results at query time,
-materialized views persist their data to disk, making them particularly
-efficient for expensive aggregate queries that are run frequently.
-
 :::info
 
 Materialized View support is in **beta**.
@@ -27,6 +22,11 @@ Either:
 
 :::
 
+
+A materialized view is a database object that stores the pre-computed results of
+a query. Unlike regular views, which compute their results at query time,
+materialized views persist their data to disk, making them particularly
+efficient for expensive aggregate queries that are run frequently.
 
 ## Related documentation
 
