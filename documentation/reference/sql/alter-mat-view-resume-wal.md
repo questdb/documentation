@@ -12,6 +12,9 @@ Materialized View support is in **beta**.
 
 It may not be fit for production use.
 
+To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
+environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
+
 Please let us know if you run into issues.
 
 Either:
