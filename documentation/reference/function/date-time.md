@@ -213,7 +213,7 @@ FROM long_sequence(1);
 | 2024-10-21T10:00:00.000Z | 2024-10-28T10:00:00.000Z | 2024-10-28T09:00:00.000Z |
 
 Note how the timezone-aware calculation correctly handles the DST transition in
-Europe/Bratislava.
+`Europe/Bratislava`.
 
 ```questdb-sql title="Adding months"
 SELECT systimestamp(), dateadd('M', 2, systimestamp())
