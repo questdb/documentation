@@ -211,8 +211,7 @@ You can include multiple columns of different types in the `UPSERT KEYS` list.
 However, there are a few limitations to keep in mind:
 
 - You must include the designated timestamp column
-- You cannot use columns of type
-  [ARRAY, STRING, or BINARY](/docs/reference/sql/datatypes)
+- You cannot use an [ARRAY](/docs/reference/sql/datatypes) column
 
 You can change the deduplication configuration at any time using `ALTER TABLE`:
 
