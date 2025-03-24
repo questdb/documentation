@@ -198,26 +198,24 @@ information on the behavior of this feature.
 ## Deduplication
 
 When [Deduplication](/docs/concept/deduplication) is enabled, QuestDB only
-inserts rows that do not match the existing data. When rows are inserted into a
-table with the deduplication option configured, QuestDB searches for existing
-rows to match using the specified `UPSERT KEYS`. If a match is found, the
-existing rows are replaced with the new row. If no match is found, the new rows
-are inserted into the table.
+inserts rows that do not match the existing data. When you insert a row into a
+table with deduplication enabled, QuestDB searches for existing rows that have
+the same value in all the columns specified in `UPSERT KEYS`. If it finds
+matching rows, it replaces them with the new row; otherwise it inserts the new
+row as usual.
 
-Deduplication can only be enabled for
+Deduplication only works on
 [Write-Ahead Log (WAL)](/docs/concept/write-ahead-log/) tables.
 
-It is possible to include multiple columns of different types in the
-`UPSERT KEYS` list.
+You can include multiple columns of different types in the `UPSERT KEYS` list.
 
 However, there are a few limitations to keep in mind:
 
-- The designated timestamp column must be included in the list of columns
-- Columns of [STRING and BINARY](/docs/reference/sql/datatypes) types cannot be
-  used in `UPSERT KEYS` list
+- You must include the designated timestamp column
+- You cannot use columns of type
+  [ARRAY, STRING, or BINARY](/docs/reference/sql/datatypes)
 
-After table creation the deduplication configuration can be changed at any time
-using `ALTER` table:
+You can change the deduplication configuration at any time using `ALTER TABLE`:
 
 - Enable deduplication and change `UPSERT KEYS` with
   [`ALTER TABLE ENABLE`](/docs/reference/sql/alter-table-enable-deduplication/)
