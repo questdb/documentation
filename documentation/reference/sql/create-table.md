@@ -199,10 +199,9 @@ information on the behavior of this feature.
 
 When [Deduplication](/docs/concept/deduplication) is enabled, QuestDB only
 inserts rows that do not match the existing data. When you insert a row into a
-table with deduplication enabled, QuestDB searches for existing rows that have
-the same value in all the columns specified in `UPSERT KEYS`. If it finds
-matching rows, it replaces them with the new row; otherwise it inserts the new
-row as usual.
+table with deduplication enabled, QuestDB searches for existing rows with
+matching values in all the columns specified with `UPSERT KEYS`. It replaces all
+such matching rows with the new row.
 
 Deduplication only works on
 [Write-Ahead Log (WAL)](/docs/concept/write-ahead-log/) tables.
