@@ -37,6 +37,15 @@ The client provides the following benefits:
   health monitoring
 - **Automatic write retries**: Reuse connections and retry after interruptions
 
+## Compatible JDKs
+
+The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.
+
+Here is a list of known incompatible JDKs:
+
+- Azul Zing 17
+    - A fix is in progress. You can use Azul Zulu 17 in the meantime. 
+
 ## Quick start
 
 Add a QuestDB as a dependency in your project's build configuration file.
