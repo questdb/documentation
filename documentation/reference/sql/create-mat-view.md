@@ -11,8 +11,9 @@ Materialized View support is in **beta**.
 
 It may not be fit for production use.
 
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
-environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
+To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in
+`server.conf`, or export the equivalent environment variable:
+`QDB_CAIRO_MAT_VIEW_ENABLED=true`.
 
 Please let us know if you run into issues.
 
@@ -47,7 +48,6 @@ documentation page.
 The following example demonstrate creating materialized views from basic
 statements, and introduces feature such as
 [partitioning](/glossary/database-partitioning/).
-
 
 ## Creating a view
 
@@ -131,10 +131,11 @@ been created.
 
 ## Time To Live (TTL)
 
-A retention policy can be set on the materialized view, bounding how much data is stored.
+A retention policy can be set on the materialized view, bounding how much data
+is stored.
 
-Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right after
-`PARTITION BY <unit>`.
+Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right
+after `PARTITION BY <unit>`.
 
 Follow the `TTL` keyword with a number and a time unit, one of:
 
@@ -149,7 +150,8 @@ information on the behavior of this feature.
 
 :::note
 
-The time-to-live (TTL) for the materialized view can differ from the base table, depending on your needs.
+The time-to-live (TTL) for the materialized view can differ from the base table,
+depending on your needs.
 
 :::
 
@@ -191,11 +193,11 @@ Materialized view names follow the
 ## OWNED BY (Enterprise)
 
 When a user creates a new materialized view, they are automatically assigned all
-materialized view level permissions with the `GRANT` option for that view.
-This behaviour can can be overridden using `OWNED BY`.
+materialized view level permissions with the `GRANT` option for that view. This
+behaviour can can be overridden using `OWNED BY`.
 
-If the `OWNED BY` clause is used, the permissions instead go to the
-user, group, or service account named in that clause.
+If the `OWNED BY` clause is used, the permissions instead go to the user, group,
+or service account named in that clause.
 
 The `OWNED BY` clause cannot be omitted if the materialized view is created by
 an external user, as permissions cannot be granted to them.
@@ -212,3 +214,10 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ) PARTITION BY DAY
 OWNED BY analysts;
 ```
+
+## Query constraints
+
+There is a list of requirements for the queries that are used in materialized
+views. Refer to this
+[documentation section](/docs/concept/mat-views/#technical-requirements) to
+learn them.
