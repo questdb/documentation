@@ -10,9 +10,9 @@ analytics. It works well with a high performance time-series database like
 QuestDB.
 
 In [Embeddable](https://embeddable.com/) you define
-[Data Models](https://trevorio.notion.site/Data-modeling-35637bbbc01046a1bc47715456bfa1d8)
+[Data Models](https://docs.embeddable.com/data-modeling/introduction)
 and
-[Components](https://trevorio.notion.site/Using-components-761f52ac2d0743b488371088a1024e49)
+[Components](https://docs.embeddable.com/development/introduction)
 in code, which are stored in your own code repository, then use the **SDK** to make these
 available for your team in the powerful Embeddable **no-code builder.** The end
 result is the ability to deliver fast, interactive **customer-facing analytics**
@@ -77,4 +77,4 @@ The `credentials` is a javascript object containing the necessary credentials ex
 - These are securely encrypted and only used to retrieve exactly the data you have described in your data models.
 - Embeddable strongly encourage you to create a read-only database user for each connection (Embeddable will only ever read from your database, not write).
 
-In order to support connecting to different databases for prod, qa, test, etc (or to support different databases for different customers) you can assign each connection to an environment (see [Environments API](https://www.notion.so/Environments-API-497169036b5148b38f7936aa75e62949?pvs=21)).
+In order to support connecting to different databases for prod, qa, test, etc (or to support different databases for different customers) you can assign each connection to an environment (see [Environments API](https://docs.embeddable.com/data/environments)).
