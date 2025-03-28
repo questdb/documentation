@@ -26,6 +26,7 @@ The type system is derived from Java types.
 | `binary`          | `64+n*8`        | Yes      | Length-prefixed sequence of bytes whose length is stored as signed 64-bit integer with maximum value of `0x7fffffffffffffffL`.                                                                                                  |
 | `long256`         | `256`           | Yes      | Unsigned 256-bit integer. Does not support arithmetic operations, only equality checks. Suitable for storing a hash code, such as crypto public addresses.                                                                      |
 | `geohash(<size>)` | `8`-`64`        | Yes      | Geohash with precision specified as a number followed by `b` for bits, `c` for chars. See [the geohashes documentation](/docs/concept/geohashes/) for details on use and storage.                                               |
+| `array`           | See description | Yes      | Header: 20 + 4 \* `nDims` bytes. Payload: dense array of values. Example: `DOUBLE[3][4]`: header 28 bytes, payload 3\*4\*8 = 96 bytes.                                                                                    |
 | `interval`[^2]    | `128`           | Yes      | Pair of timestamps representing a time interval.                                                                                                                                                                                |
 
 [^1]: While the `date` type is available, we highly recommend using the
@@ -91,6 +92,7 @@ Many nullable types reserve a value that marks them `NULL`:
 | `varchar`        | `N/A`                                                                | Varchar column has an explicit `NULL` marker in the header.                              |
 | `string`         | `N/A`                                                                | String column is length-prefixed, the length is an `int` and `-1` marks it `NULL`.       |
 | `binary`         | `N/A`                                                                | Binary column is length prefixed, the length is a `long` and `-1` marks it `NULL`.       |
+| `array`          | `N/A`                                                                | Array column marks a `NULL` value with a zero in the `size` field of the header.         |
 
 To filter columns that contain, or don't contain, `NULL` values use a filter
 like:
