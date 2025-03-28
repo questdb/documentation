@@ -19,24 +19,15 @@ The type system is derived from Java types.
 | `varchar`         | `128 + utf8Len` | Yes      | Length-prefixed sequence of UTF-8 encoded characters, stored using a 128-bit header and UTF-8 encoded data. Sequences shorter than 9 bytes are fully inlined within the header and do not occupy any additional data space.     |
 | `string`          | `96+n*16`       | Yes      | Length-prefixed sequence of UTF-16 encoded characters whose length is stored as signed 32-bit integer with maximum value of `0x7fffffff`.                                                                                       |
 | `long`            | `64`            | Yes      | Signed integer `0x8000000000000000L` to `0x7fffffffffffffffL`.                                                                                                                                                                  |
-| `date`[^1]        | `64`            | Yes      | Signed offset in **milliseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
+| `date`            | `64`            | Yes      | Signed offset in **milliseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `timestamp`       | `64`            | Yes      | Signed offset in **microseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `double`          | `64`            | Yes      | Double precision IEEE 754 floating point value.                                                                                                                                                                                 |
 | `uuid`            | `128`           | Yes      | [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) values. See also [the UUID type](#the-uuid-type).                                                                                                           |
 | `binary`          | `64+n*8`        | Yes      | Length-prefixed sequence of bytes whose length is stored as signed 64-bit integer with maximum value of `0x7fffffffffffffffL`.                                                                                                  |
 | `long256`         | `256`           | Yes      | Unsigned 256-bit integer. Does not support arithmetic operations, only equality checks. Suitable for storing a hash code, such as crypto public addresses.                                                                      |
 | `geohash(<size>)` | `8`-`64`        | Yes      | Geohash with precision specified as a number followed by `b` for bits, `c` for chars. See [the geohashes documentation](/docs/concept/geohashes/) for details on use and storage.                                               |
-| `array`           | See description | Yes      | Header: 20 + 4 \* `nDims` bytes. Payload: dense array of values. Example: `DOUBLE[3][4]`: header 28 bytes, payload 3\*4\*8 = 96 bytes.                                                                                    |
-| `interval`[^2]    | `128`           | Yes      | Pair of timestamps representing a time interval.                                                                                                                                                                                |
-
-[^1]: While the `date` type is available, we highly recommend using the
-`timestamp` instead. The only material advantage of `date` is a wider time
-range, but `timestamp` is adequate in virtually all cases. It has microsecond
-resolution (vs. milliseconds for `date`), and is fully supported by all
-date/time functions, while support for `date` is limited.
-
-[^2]: `interval` is not a persisted type. You can use it in expressions, but
-can't have a database column of this type.
+| `array`           | See description | Yes      | Header: 20 + 4 \* `nDims` bytes. Payload: dense array of values. Example: `DOUBLE[3][4]`: header 28 bytes, payload 3\*4\*8 = 96 bytes.                                                                                          |
+| `interval`        | `128`           | Yes      | Pair of timestamps representing a time interval. Not a persisted type: you can use it in expressions, but can't have a database column of this type.                                                                            |
 
 ## VARCHAR and STRING considerations
 
@@ -48,6 +39,14 @@ characters. QuestDB keeps supporting it only to maintain backward compatibility.
 
 Additionally, `VARCHAR` includes several optimizations for fast access and
 storage.
+
+## TIMESTAMP and DATE considerations
+
+While the `date` type is available, we highly recommend using the `timestamp`
+instead. The only material advantage of `date` is a wider time range, but
+`timestamp` is adequate in virtually all cases. It has microsecond resolution
+(vs. milliseconds for `date`), and is fully supported by all date/time
+functions, while support for `date` is limited.
 
 ## Limitations for variable-sized types
 
