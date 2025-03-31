@@ -405,13 +405,13 @@ Taking the `trades` table again from our demo:
 trades LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| symbol     | side | price       | amount     | timestamp                   |
-| ---------- | ---- | ----------- | ---------- | --------------------------- |
-| XLM-BTC    | sell | 0.00000163  | 541        | 2024-08-21T16:56:15.038557Z |
-| AVAX-BTC   | sell | 0.00039044  | 10.125     | 2024-08-21T18:00:24.549949Z |
-| MATIC-BTC  | sell | 0.0000088   | 622.6      | 2024-08-21T18:01:21.607212Z |
-| ADA-BTC    | buy  | 0.00000621  | 127.32     | 2024-08-21T18:05:37.852092Z |
-| ... | ... | ... | ... | ... |
+| symbol    | side | price      | amount | timestamp                   |
+|-----------|------|------------|--------|-----------------------------|
+| XLM-BTC   | sell | 0.00000163 | 541    | 2024-08-21T16:56:15.038557Z |
+| AVAX-BTC  | sell | 0.00039044 | 10.125 | 2024-08-21T18:00:24.549949Z |
+| MATIC-BTC | sell | 0.0000088  | 622.6  | 2024-08-21T18:01:21.607212Z |
+| ADA-BTC   | buy  | 0.00000621 | 127.32 | 2024-08-21T18:05:37.852092Z |
+| ...       | ...  | ...        | ...    | ...                         |
 
 This takes around `2s` to execute. Now, let's see how much data needed to be scanned:
 
@@ -440,7 +440,7 @@ WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.1
 
 Yes, ~767 million rows, just to serve the most recent 42 rows, one for each symbol.
 
-So how can we help this, with a materialized view?
+So how can we help improve this using a materialized view?
 
 ### Building the view
 
@@ -448,8 +448,127 @@ Observe that we have 42 unique symbols in the dataset. If we were to take a `LAT
 we would therefore expect up to 42 rows:
 
 ```questdb-sql title="yesterday() LATEST ON" demo
-
+(trades WHERE timestamp IN yesterday()) 
+LATEST ON timestamp PARTITION BY symbol, side
+ORDER BY symbol, side, timestamp;
 ```
+
+| symbol    | side | price   | amount     | timestamp                   |
+|-----------|------|---------|------------|-----------------------------|
+| ADA-USD   | buy  | 0.6611  | 686.3557   | 2025-03-30T23:59:59.052000Z |
+| ADA-USD   | sell | 0.6609  | 270.8935   | 2025-03-30T23:59:46.585999Z |
+| ADA-USDC  | buy  | 0.6603  | 109.35     | 2025-03-30T23:57:56.194000Z |
+| ADA-USDC  | sell | 0.6607  | 755.9739   | 2025-03-30T23:59:35.635000Z |
+| ADA-USDT  | buy  | 0.6611  | 686.3557   | 2025-03-30T23:59:59.052000Z |
+| ADA-USDT  | sell | 0.6609  | 270.8935   | 2025-03-30T23:59:46.585999Z |
+| AVAX-USD  | buy  | 18.859  | 9.199842   | 2025-03-30T23:59:47.788000Z |
+| AVAX-USD  | sell | 18.846  | 7.70086    | 2025-03-30T23:59:13.130000Z |
+| AVAX-USDT | buy  | 18.859  | 9.199842   | 2025-03-30T23:59:47.788000Z |
+| AVAX-USDT | sell | 18.846  | 7.70086    | 2025-03-30T23:59:13.130000Z |
+| BTC-USD   | buy  | 82398.2 | 0.000025   | 2025-03-30T23:59:59.992000Z |
+| BTC-USD   | sell | 82397.9 | 0.00001819 | 2025-03-30T23:59:59.796999Z |
+| ...       | ...  | ...     | ...        | ...                         |
+
+This executes in `40ms`.
+
+A similar `GROUP BY` query looks like this:
+
+```questdb-sql title="LATEST ON as a GROUP BY" demo
+SELECT 
+  symbol, 
+  side,
+  last(price) AS price, 
+  last(amount) AS amount, 
+  last(timestamp) AS timestamp
+FROM trades
+WHERE timestamp IN yesterday()
+ORDER BY symbol, side, timestamp;
+```
+
+which executes in `8ms`.
+
+This rewrite forms the basis of our materialized view.
+
+Whilst we don't have a native `LATEST ON` materialized view, we can still use its down-sampling
+power to help us out.
+
+See, the problem is that `LATEST ON`, in the time-unbounded case, will scan as far back as it needs
+to find a row for every symbol.
+
+Unfortunately, if even one of your symbols is infrequently updated, the query will scan huge amounts of data
+just to find a single row. 
+
+#### Down-sampling
+
+Instead, let's try to reduce the size of our data-set dramatically. For example,
+let's say that instead of the 767m rows, we can have one row, per symbol, per side, per day.
+
+We can calculate such a range like this:
+
+```questdb-sql title="down-sampling the range" demo
+
+SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
+	SELECT timestamp, 
+				symbol, 
+				side, 
+				last(price) AS price, 
+				last(amount) AS amount, 
+				last(timestamp) as latest
+		FROM trades
+		WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z'
+		SAMPLE BY 1d
+) ORDER BY timestamp;
+```
+
+This gives us effectively a `LATEST ON` result for each `DAY` in that time range.
+
+This result set comprises just `14595` rows, instead of 767 million - and is much faster to scan.
+
+#### Back to the view
+
+Let's convert this into a materialized view definition:
+
+```questdb-sql title="LATEST ON materialized view"
+CREATE MATERIALIZED VIEW 'trades_latest_1d' WITH BASE 'trades' REFRESH INCREMENTAL AS (
+	SELECT 
+	  timestamp, 
+	  symbol, 
+	  side, 
+	  last(price) AS price, 
+	  last(amount) AS amount, 
+	  last(timestamp) as latest
+	FROM trades
+	SAMPLE BY 1d
+) PARTITION BY DAY;
+```
+
+You can query this view on demo:
+
+```questdb-sql title="trades_latest_1d" demo
+trades_latest_1d;
+```
+
+Now, this materialized view doesn't include the exact output from a `LATEST ON` query, but we can
+use it as a data source for this query.
+
+```questdb-sql title="LATEST ON over the trades_latest_1d" demo
+SELECT symbol, side, price, amount, "latest" as timestamp FROM (
+	trades_latest_1d 
+	LATEST ON timestamp 
+	PARTITION BY symbol, side
+) ORDER BY timestamp;
+```
+
+And in a few milliseconds, we get the result:
+
+| symbol   | side | price   | amount    | timestamp                   |
+|----------|------|---------|-----------|-----------------------------|
+| ETH-BTC  | sell | 0.02196 | 0.005998  | 2025-03-31T14:24:18.916000Z |
+| DAI-USDT | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
+| DAI-USD  | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
+| DAI-USD  | buy  | 1.0007  | 29.785106 | 2025-03-31T14:30:33.394000Z |
+| DAI-USDT | buy  | 1.0007  | 29.785106 | 2025-03-31T14:30:33.394000Z |
+| ...      | ...  | ...     | ...       | ...                         |
 
 
 ## Architecture and behaviour
