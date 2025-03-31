@@ -9,16 +9,16 @@ The type system is derived from Java types.
 | Type Name         | Storage bits    | Nullable | Description                                                                                                                                                                                                                     |
 |-------------------|-----------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `boolean`         | `1`             | No       | Boolean `true` or `false`.                                                                                                                                                                                                      |
-| `ipv4`            | `32`            | Yes      | `0.0.0.1` to `255.255.255. 255`                                                                                                                                                                                                 |
-| `byte`            | `8`             | No       | Signed integer `-128` to `127`.                                                                                                                                                                                                 |
-| `short`           | `16`            | No       | Signed integer `-32768` to `32767`.                                                                                                                                                                                             |
+| `ipv4`            | `32`            | Yes      | `0.0.0.1` to `255.255.255.255`                                                                                                                                                                                                  |
+| `byte`            | `8`             | No       | Signed integer, `-128` to `127`.                                                                                                                                                                                                |
+| `short`           | `16`            | No       | Signed integer, `-32,768` to `32,767`.                                                                                                                                                                                          |
 | `char`            | `16`            | Yes      | `unicode` character.                                                                                                                                                                                                            |
-| `int`             | `32`            | Yes      | Signed integer `0x80000000` to `0x7fffffff`.                                                                                                                                                                                    |
+| `int`             | `32`            | Yes      | Signed integer, `-2,147,483,648` to `2,147,483,647`.                                                                                                                                                                            |
 | `float`           | `32`            | Yes      | Single precision IEEE 754 floating point value.                                                                                                                                                                                 |
 | `symbol`          | `32`            | Yes      | A symbol, stored as a 32-bit signed index into the symbol table. Each index corresponds to a `string` value. The index is transparently translated to the string value. Symbol table is stored separately from the column data. |
 | `varchar`         | `128 + utf8Len` | Yes      | Length-prefixed sequence of UTF-8 encoded characters, stored using a 128-bit header and UTF-8 encoded data. Sequences shorter than 9 bytes are fully inlined within the header and do not occupy any additional data space.     |
 | `string`          | `96+n*16`       | Yes      | Length-prefixed sequence of UTF-16 encoded characters whose length is stored as signed 32-bit integer with maximum value of `0x7fffffff`.                                                                                       |
-| `long`            | `64`            | Yes      | Signed integer `0x8000000000000000L` to `0x7fffffffffffffffL`.                                                                                                                                                                  |
+| `long`            | `64`            | Yes      | Signed integer, `-9,223,372,036,854,775,808` to `9,223,372,036,854,775,807`.                                                                                                                                                    |
 | `date`            | `64`            | Yes      | Signed offset in **milliseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `timestamp`       | `64`            | Yes      | Signed offset in **microseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `double`          | `64`            | Yes      | Double precision IEEE 754 floating point value.                                                                                                                                                                                 |
@@ -87,7 +87,7 @@ Many nullable types reserve a value that marks them `NULL`:
 | `geohash(int)`   | `0xffffffff`                                                         | Valid for geohashes of 16 to 31 bits (inclusive).                                        |
 | `geohash(long)`  | `0xffffffffffffffff`                                                 | Valid for geohashes of 32 to 60 bits (inclusive).                                        |
 | `symbol`         | `0x80000000`                                                         | Symbol is stored as an `int` offset into a lookup file. The value `-1` marks it `NULL`.  |
-| `ipv4`           | `128.0.0.0` (`0x80000000`)                                           | IPv4 address is stored as `int` and uses the same `NULL` marker value.                   |
+| `ipv4`           | `0.0.0.0` (`0x00000000`)                                             | IPv4 address is stored as a 32-bit integer and the zero value represents `NULL`.         |
 | `varchar`        | `N/A`                                                                | Varchar column has an explicit `NULL` marker in the header.                              |
 | `string`         | `N/A`                                                                | String column is length-prefixed, the length is an `int` and `-1` marks it `NULL`.       |
 | `binary`         | `N/A`                                                                | Binary column is length prefixed, the length is a `long` and `-1` marks it `NULL`.       |
@@ -147,25 +147,22 @@ send `UUIDs` as `strings` to be converted to UUIDs by the server.
 
 ## IPv4
 
-QuestDB supports the IPv4 data type.
-
-The data type adds validity checks and type-specific functions.
-
-They are - as one would imagine - very useful when dealing with IP addresses.
+QuestDB supports the IPv4 data type. It has validity checks and some
+IPv4-specific functions.
 
 IPv4 addresses exist within the range of `0.0.0.1` - `255.255.255.255`.
 
-A full-zero address - `0.0.0.0` is interpreted as null.
+An all-zero address - `0.0.0.0` - is interpreted as `NULL`.
 
-Columns may be created with the IPv4 data type like so:
+Create a column with the IPv4 data type like this:
 
 ```sql
 -- Creating a table named traffic with two ipv4 columns: src and dst.
 CREATE TABLE traffic (ts timestamp, src ipv4, dst ipv4) timestamp(ts) PARTITION BY DAY;
 ```
 
-IPv4 addresses also support a wide range of existing SQL functions and contain
-their own operators. For a full list, see
+IPv4 addresses support a wide range of existing SQL functions, and there are
+some operators specifically for them. For a full list, see
 [IPv4 Operators](/docs/reference/operators/ipv4/).
 
 ### Limitations
@@ -239,7 +236,7 @@ the array values:
 
 4. _Transpose_: reverse the strides, changing the meaning of each coordinate.
    Example: transposing our array changes the strides from `(6, 2, 1)` to
-   `(1, 2, 6)`. What we used to access with the 3rd coordinate, now we access
+   `(1, 2, 6)`. What we used to access with the 3rd coordinate, we now access
    with the 1st coordinate. On a 2D array, this would have the effect of
    swapping rows and columns (transposing a matrix).
 
