@@ -96,7 +96,7 @@ CREATE TABLE 'trades' (
 
 It is straightforward to start using materialized views.
 
-A full syntax definition can be found in the `[CREATE MATERIALIZED VIEW](/docs/reference/create-mat-view)`
+A full syntax definition can be found in the [CREATE MATERIALIZED VIEW](/docs/reference/create-mat-view)
 documentation.
 
 Here is a view taken from our demo, which calculates OHLC bars for a candlestick chart.
@@ -166,7 +166,7 @@ there is minimal write overhead.
 
 Upon creation, or when the view is invalidated, a full refresh will occur, which rebuilds the view from scratch.
 
-#### `SAMPLE BY`
+#### SAMPLE BY
 
 Materialized views are populated using `SAMPLE BY` or time-based `GROUP BY` queries. 
 
@@ -176,14 +176,14 @@ data to the view.
 Not all `SAMPLE BY` syntax is supported. In general, you should aim to keep your query as simple as possible,
 and move complex transformations to an outside query that runs on the down-sampled data.
 
-#### `PARTITION BY`
+#### PARTITION BY
 
 You should choose a partition unit which is larger than the sampling interval. Ideally, the partition unit
 should be divisible by the sampling interval.
 
 For example, an `SAMPLE BY 8h` clause fits nicely with a `DAY` partitioning strategy, with 3 timestamp buckets per day.
 
-#### `TTL`
+#### TTL
 
 Though `TTL` was not included, it can be set on a materialized view, and does not need to match the base table.
 
@@ -226,14 +226,14 @@ Let's run the OHLC query without using the view, against our `trades` table:
 
 ```questdb-sql title="the OHLC query" demo
 SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  SAMPLE BY 15m;
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
 ```
 
 This takes several seconds to execute.
@@ -253,16 +253,16 @@ Let's try this calculation again, but just for one day instead of the entire 1.6
 
 ```questdb-sql title="OHLC query for yesterday" demo
 SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  WHERE timestamp IN yesterday()
-  SAMPLE BY 15m
-  ORDER BY timestamp, symbol;
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+WHERE timestamp IN yesterday()
+SAMPLE BY 15m
+ORDER BY timestamp, symbol;
 ```
 
 | timestamp                   | symbol    | open   | high   | low     | close  | volume             |
@@ -306,7 +306,7 @@ So even for **small amounts of data**, a materialized view can be extremely usef
 ### Beta
 
 - Full refreshes over large datasets may exhaust RSS i.e. run out of memory. 
-    - This will be amended to build the view incrementally, bounding memory usage. 
+    - This will be amended to perform the full refresh in stages, bounding memory usage. 
 - Not all `SAMPLE BY` syntax is well-supported, for example time zones and fills.
     - We will support these features in future.
 - The `INCREMENTAL` refresh strategy relies on deduplicated inserts (O3 writes)
@@ -316,13 +316,13 @@ So even for **small amounts of data**, a materialized view can be extremely usef
 ### Post-release
 
 - Only `INCREMENTAL` refresh is supported
-    - We intend to ad alternatives, such as:
+    - We intend to add alternatives, such as:
         - `PERIODIC` (once per partition), 
         - `TIMER` (once per time interval)
         - `MANUAL` (only when manually triggered)
 - `INCREMENTAL` refresh is only triggered by inserts into the `base` table. 
 
-## `LATEST ON` materialized views
+## LATEST ON materialized views
 
 `LATEST ON` queries can have variable performance, based on how frequently the symbols in the `PARTITION BY` column
 have new entries written to the table. Infrequently updated symbols require scanning more data to find their last entry.
@@ -427,14 +427,13 @@ of rows we need to query.
 Then, we run this `SAMPLE BY` automatically using a materialized view, so we always have the fastest possible
 `LATEST ON` query.
 
-
 ### Pre-aggregating the data
 
 We will pre-aggregate the ~767 million rows into just ~15000.
 
 Instead of storing the raw data, we will store one row, per symbol, per side, per day of data.
 
-```questdb-sql title="down-sampling the range" demo
+```questdb-sql title="down-sampling test query" demo
 
 SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
 	SELECT timestamp, 
