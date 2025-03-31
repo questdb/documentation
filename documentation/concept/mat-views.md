@@ -26,7 +26,7 @@ Either:
 
 :::
 
-A materialized view is a database object that stores the pre-computed results of
+A materialized view is a special QuestDB table that stores the pre-computed results of
 a query. Unlike regular views, which compute their results at query time,
 materialized views persist their data to disk, making them particularly
 efficient for expensive aggregate queries that are run frequently.
@@ -58,27 +58,29 @@ efficient for expensive aggregate queries that are run frequently.
 
 ## What are materialized views for?
 
-:::note 
+:::note
 
-**tl;dr**: materialized views should be used to pre-aggregate and down-sample historical data.
+**tl;dr**: 
 
-This data can then be used in more complex queries without the database having to scan and aggregate
-huge data sets that do not change frequently.
+Materialized views persistently cache the result of a `SAMPLE BY` or time-based `GROUP BY` query,
+and keep it automatically up to date. 
+
+The refresh of the materialized view is `INCREMENTAL` and very efficient, and using materialized views can offer
+100x or higher query speedups.
+
+If you require the lowest latency queries, for example, for charts and dashboards, use materialized views!
 
 :::
 
 There is a fundamental limit to how fast certain aggregation and scanning queries can execute,
 based on the data size, number of rows, disk speed, and number of cores.
 
-Materialized Views help to bound the runtime for common aggregation queries, by allowing you to 
+Materialized Views let you bound the runtime for common aggregation queries, by allowing you to 
 pre-aggregate historical data ahead-of-time. This means that for many queries, you only need to aggregate
 the latest partition's data, and then you can use already aggregated results for historical data.
 
-Let's take a simple example. 
-
-### Counting historical rows
-
-Say we have a trading table, such as the one we use on demo:
+Throughout this document, we will use the demo `trades` table. This is a table containing crypto trading data,
+with over 1.6 billion rows.
 
 ```questdb-sql title="trades ddl"
 CREATE TABLE 'trades' ( 
@@ -87,107 +89,30 @@ CREATE TABLE 'trades' (
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
-WITH maxUncommittedRows=500000, o3MaxLag=2000000us;
+) timestamp(timestamp) PARTITION BY DAY WAL;
 ```
 
-Let's ask the question 'how many entries are there for each symbol in the table, counted for every day'.
+## Creating a materialized view
 
-That corresponds to a query like this:
+It is straightforward to start using materialized views.
 
+A full syntax definition can be found in the `[CREATE MATERIALIZED VIEW](/docs/reference/create-mat-view)`
+documentation.
 
-```questdb-sql title="per-symbol count by day from demo trades" demo
-SELECT timestamp, symbol, count()
-FROM trades
-SAMPLE BY 1d;
-```
+Here is a view taken from our demo, which calculates OHLC bars for a candlestick chart.
 
-This executes in around `3s` on the demo box, and returns data like this:
+The view reads data from the base table, `trades`. It then calculates aggregate functions such as `first`, `sum` etc.
+over 15 minutes time buckets. 
 
-| timestamp                   | symbol  | count  |
-|-----------------------------|---------|--------|
-| 2022-03-08T00:00:00.000000Z | ETH-USD | 188733 |
-| 2022-03-08T00:00:00.000000Z | BTC-USD | 142338 |
-| 2022-03-09T00:00:00.000000Z | ETH-USD | 560405 |
-| 2022-03-09T00:00:00.000000Z | BTC-USD | 626094 |
-| 2022-03-10T00:00:00.000000Z | ETH-USD | 544526 |
-| 2022-03-10T00:00:00.000000Z | BTC-USD | 622345 |
-| 2022-03-11T00:00:00.000000Z | BTC-USD | 617055 |
-| 2022-03-11T00:00:00.000000Z | ETH-USD | 527577 |
-| ...                         | ...     | ...    |
+The view is incrementally refreshed, meaning it is always up to date with the latest `trades` data.
 
-This is fast considering the number of rows that had to be scanned and grouped:
+:::note
 
-```questdb-sql title="row count in demo trades table" demo
-SELECT count() FROM trades;
-```
+If you are unfamiliar with OHLC, please see our [OHLC guide](https://www.questdb.com/glossary/ohcl-candlestick).
 
-| count      |
-| ---------- |
-| 1668535733 |
+:::
 
-That's over 1.6 billion rows.
-
-But a single day has far fewer rows:
-
-```questdb-sql title="yesterday's row count" demo
-SELECT count() FROM trades WHERE timestamp in yesterday();
-```
-
-| count   |
-| ------- |
-| 1772562 |
-
-And those rows can be aggregated in just `8ms`:
-
-```questdb-sql title="counting for a single day" demo
-SELECT timestamp, symbol, count()
-FROM trades
-WHERE timestamp IN yesterday()
-SAMPLE BY 1d;
-```
-
-| timestamp                   | symbol    | count  |
-|-----------------------------|-----------|--------|
-| 2025-03-30T00:00:00.000000Z | ETH-USDT  | 260071 |
-| 2025-03-30T00:00:00.000000Z | ETH-USD   | 260071 |
-| 2025-03-30T00:00:00.000000Z | BTC-USDT  | 225629 |
-| 2025-03-30T00:00:00.000000Z | BTC-USD   | 225629 |
-| 2025-03-30T00:00:00.000000Z | BTC-USDC  | 21656  |
-| 2025-03-30T00:00:00.000000Z | DOGE-USDT | 88882  |
-| 2025-03-30T00:00:00.000000Z | DOGE-USD  | 88882  |
-| ...                         | ...       | ...    |
-
-Materialized Views allow you to get similar response times but for aggregations including historical data.
-
-### Caching OHLC results
-
-Let's look at a real-world example now - calculating OHLC bars over trading data.
-
-On demo, we have an example materialized view, `trades_OHLC_15m`. You can look at its latest data:
-
-```questdb-sql title="querying trades_OHLC_15m" demo
-trades_OHLC_15m WHERE timestamp IN today();
-```
-
-| timestamp                   | symbol   | open    | high    | low     | close   | volume             |
-|-----------------------------|----------|---------|---------|---------|---------|--------------------|
-| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |
-| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |
-| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |
-| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |
-| ...                         | ...      | ...     | ...     | ...     | ...     | ...                | ... |
-
-
-This data can be constructed from a `SAMPLE BY` query:
-
-```questdb-sql title="inspect the materialized view query" demo 
-SHOW CREATE MATERIALIZED VIEW trades_OHLC_15m;
-```
-
-which returns this ddl:
-
-```questdb-sql title="materialized view definition"
+```questdb-sql title="trades_OHLC_15m ddl"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m' 
 WITH BASE 'trades' REFRESH INCREMENTAL 
 AS (
@@ -203,8 +128,101 @@ AS (
 ) PARTITION BY DAY;
 ```
 
-Ignoring the outer query, you can see that there is a `SAMPLE BY` query inside, which is
-a classic example of a query to calculate OHLC bars, in 15 minute buckets:
+In this example:
+
+1. The view is called `trades_OHLC_15m`.
+2. The base table is `trades`
+    - This is the data source, and will trigger incremental refresh when new data is written.
+3. The refresh strategy is `INCREMENTAL` 
+    - The data is automatically refreshed and incrementally written; efficient, fast, low maintenance.
+4. The `SAMPLE BY` query contains two key column (timestamp, symbol) and five aggregates (first, max, min, last, price)
+calculated in `15m` time buckets.
+5. The view is partitioned by `DAY`.
+6. No TTL is defined 
+    - Therefore, the materialized view will contain a summary of all the `base` table's data.
+
+#### The view name
+
+We recommend naming the view with some reference to the base table, its purpose, and its sample size.
+
+In our `trades_OHLC_15m` example, we combine:
+
+- `trades` (the base table name)
+- `OHLC` (the purpose)
+- `15m` (the sample unit)
+
+#### The base table
+
+The base table triggers updating the materialized view, and is the main source of raw data.
+
+The `SAMPLE BY` query can contain a `JOIN`. However, the secondary `JOIN` tables will not trigger
+any sort of refresh.
+
+#### Refresh strategies
+
+Currently, only `INCREMENTAL` refresh is supported. This strategy incrementally updates the view when new
+data is inserted into the base table. This means that only new data is written to the view, so 
+there is minimal write overhead.
+
+Upon creation, or when the view is invalidated, a full refresh will occur, which rebuilds the view from scratch.
+
+#### `SAMPLE BY`
+
+Materialized views are populated using `SAMPLE BY` or time-based `GROUP BY` queries. 
+
+When new data is written into the `base` table, an incremental refresh is triggered, which adds this new
+data to the view.
+
+Not all `SAMPLE BY` syntax is supported. In general, you should aim to keep your query as simple as possible,
+and move complex transformations to an outside query that runs on the down-sampled data.
+
+#### `PARTITION BY`
+
+You should choose a partition unit which is larger than the sampling interval. Ideally, the partition unit
+should be divisible by the sampling interval.
+
+For example, an `SAMPLE BY 8h` clause fits nicely with a `DAY` partitioning strategy, with 3 timestamp buckets per day.
+
+#### `TTL`
+
+Though `TTL` was not included, it can be set on a materialized view, and does not need to match the base table.
+
+For example, if we only wanted to pre-aggregate the last 30 days of data, we could add:
+
+```questdb-sql
+PARTITION BY DAY TTL 30 DAYS;
+```
+
+to the end of our materialized view definition.
+
+## Querying materialized views
+
+:::note
+
+The example `trades_OHLC_15m` view is available on our demo, and contains realtime crypto data - try it out!
+
+:::
+
+Materialized Views support **all the same queries** as regular QuestDB tables.
+
+Here's how you can check today's trading data:
+
+```questdb-sql title="querying trades_OHLC_15m" demo
+trades_OHLC_15m WHERE timestamp IN today();
+```
+
+| timestamp                   | symbol   | open    | high    | low     | close   | volume             |
+|-----------------------------|----------|---------|---------|---------|---------|--------------------|
+| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |
+| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |
+| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |
+| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |
+| ...                         | ...      | ...     | ...     | ...     | ...     | ...                | ... |
+
+
+### How much faster is it?
+
+Let's run the OHLC query without using the view, against our `trades` table:
 
 ```questdb-sql title="the OHLC query" demo
 SELECT
@@ -218,9 +236,20 @@ SELECT
   SAMPLE BY 15m;
 ```
 
-This takes `5-6s` to execute on demo.
+This takes several seconds to execute.
 
-Let's now limit the calculation to a single day:
+Yet if we query the materialized view instead:
+
+```questdb-sql title="OHLC materialized view unbounded" demo
+trades_OHLC_15m;
+```
+
+This returns in milliseconds, since the database only has to respond with data, and not calculate anything - 
+that has all been done efficiently, ahead of time.
+
+### What about for fewer rows?
+
+Let's try this calculation again, but just for one day instead of the entire 1.6 billion rows.
 
 ```questdb-sql title="OHLC query for yesterday" demo
 SELECT
@@ -248,7 +277,7 @@ SELECT
 
 Calculating the OHLC for a single day takes only `15ms`.
 
-We can find the exact same data by querying the materialized view instead:
+We can get the same data using the materialized view:
 
 ```questdb-sql title="OHLC materialized view for yesterday" demo
 trades_OHLC_15m 
@@ -266,116 +295,25 @@ ORDER BY timestamp, symbol;
 | 2025-03-30T00:00:00.000000Z | BTC-USD   | 82650  | 82750  | 82563.6 | 82747  | 25.493136499999    |
 | ...                         | ...       | ...    | ...    | ...     | ...    | ...                |
 
+This returns the data in just `2ms` over 7x faster - again, because it doesn't have to calculate anything.
+The data has already been efficiently pre-aggregated, cached by the materialized view, and persisted to disk.
+No aggregation is required, and hardly any rows are scanned!
 
-This returns the exact same data in only `2ms` - because we already have it pre-aggregated, 
-cached by the materialized view, and persisted durably on disk. Only the sort and filter and 
-executed, no aggregation is needed.
+So even for **small amounts of data**, a materialized view can be extremely useful.
 
-We can query the historical time range too:
+## Limitations
 
-```questdb-sql title="OHLC materialized view unbounded" demo
-trades_OHLC_15m;
-```
+### Beta
 
-This returns in `1ms`.
-
-### Defining materialized views
-
-Materialized views can be created using a few definitions:
-
-1. A name for the view.
-2. A `base` table, from which data is sourced.
-3. A refresh strategy 
-4. A basic `SAMPLE BY` query, used to aggregate and down-sample the raw data.
-5. A partitioning strategy.
-6. (Optional) A time-to-live (TTL).
-
-Taking our earlier example:
-
-```questdb-sql title="trades_OHLC_15m ddl"
-CREATE MATERIALIZED VIEW 'trades_OHLC_15m' 
-WITH BASE 'trades' REFRESH INCREMENTAL 
-AS (
-  SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  SAMPLE BY 15m
-) PARTITION BY DAY;
-```
-
-In this example:
-
-1. The view is called `trades_OHLC_15m`.
-2. The base table is `trades`.
-3. The refresh strategy is `INCREMENTAL`.
-4. The `SAMPLE BY` query is an OHLC query sampled over `15m` intervals.
-5. The view will be partitioned by `DAY`
-6. No TTL is defined, therefore, the materialized view will contain a summary of all of the base table's data.
-
-#### The view name
-We would recommend naming the view with some reference to the base table, its purpose, and its sample size.
-
-In our `trades_OHLC_15m` example, we combine:
-
-- `trades` (the base table name)
-- `OHLC` (the purpose) 
-- `15m` (the sample unit) 
-
-#### The base table
-
-The base table drives updates to the materialized view, and is the main source of raw data.
-
-The `SAMPLE BY` query can contain a `JOIN`. However, the secondary `JOIN` tables will not trigger
-any sort of refresh strategy.
-
-#### Refresh strategies
-
-Currently, only `INCREMENTAL` is supported. This strategy incrementally updates the view when new
-data is inserted into the base table.
-
-Upon creation, or when the view is invalidated, a full refresh occurs.
-
-#### `SAMPLE BY`
-
-Not all `SAMPLE BY` syntax is supported. In general, you should aim to keep your query as simple as possible,
-and move complex transformations to an outside query that runs on the down-sampled data.
-
-#### `PARTITION BY`
-
-In the above example, the view is partitioned by day. In general, the sampling interval should be smaller than
-the partitioning interval, and ideally divisible.
-
-For example, an `SAMPLE BY 8h` clause fits nicely with a `DAY` partitioning strategy, with 3 timestamp buckets per day.
-
-#### `TTL`
-
-Though `TTL` was not included, it can be set on a materialized view, and does not need to match the base table.
-
-For example, if we only wanted to pre-aggregate the last 30 days of data, we could add:
-
-```questdb-sql
-PARTITION BY DAY TTL 30 DAYS;
-```
-
-to the end of our materialized view definition.
-
-### Limitations
-
-#### Beta
 - Full refreshes over large datasets may exhaust RSS i.e. run out of memory. 
     - This will be amended to build the view incrementally, bounding memory usage. 
 - Not all `SAMPLE BY` syntax is well-supported, for example time zones and fills.
-    - We will support these features in future. 
+    - We will support these features in future.
 - The `INCREMENTAL` refresh strategy relies on deduplicated inserts (O3 writes)
     - We will instead delete a time range and insert the data as an append, which is **much** faster.
     - This also means that currently, deduplication keys must be aligned across the `base` table and the view.
 
-#### Post-release
+### Post-release
 
 - Only `INCREMENTAL` refresh is supported
     - We intend to ad alternatives, such as:
@@ -384,22 +322,18 @@ to the end of our materialized view definition.
         - `MANUAL` (only when manually triggered)
 - `INCREMENTAL` refresh is only triggered by inserts into the `base` table. 
 
-## What about `LATEST ON` queries?
+## `LATEST ON` materialized views
 
-`LATEST ON` queries frequently have variable performance, based on how frequently the symbols in the `PARTITION BY` column
+`LATEST ON` queries can have variable performance, based on how frequently the symbols in the `PARTITION BY` column
 have new entries written to the table. Infrequently updated symbols require scanning more data to find their last entry.
 
-For example, pretend you have two symbols, `A` and `B`, and 100 million rows.
+For example, pretend you have two symbols, `A` and `B`, and 100 million rows. 
 
-Then there is 1 row with `B`, at the start of the data set, and the rest are `A`.
+Then, there is one row with `B`, at the start of the data set, and the rest are `A`.
 
 Unfortunately, the database will scan backwards and scan all 100 million rows of data just to find the `B` entry.
 
-But not to worry, materialized views help us here too!
-
-### A `LATEST ON` materialized view
-
-Taking the `trades` table again from our demo:
+But materialized views offer a solution to this performance issue too!
 
 ```questdb-sql title="LATEST ON on demo trades" demo
 trades LATEST ON timestamp PARTITION BY symbol;
@@ -426,7 +360,7 @@ PARTITION BY symbol;
 | --------------------------- | --------------------------- |
 | 2024-08-21T16:56:15.038557Z | 2025-03-31T12:55:28.193000Z |
 
-So we had to scan approximately 7 months of data to serve this query! How many rows is that?
+So the database scanned approximately 7 months of data to serve this query. How many rows was that?
 
 ```questdb-sql title="number of rows the LATEST ON scanned" demo
 SELECT count()
@@ -438,14 +372,14 @@ WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.1
 | --------- |
 | 766834703 |
 
-Yes, ~767 million rows, just to serve the most recent 42 rows, one for each symbol.
+Yes, **~767 million rows**, just to serve the most recent **42 rows**, one for each symbol.
 
-So how can we help improve this using a materialized view?
+Let's fix this using a new materialized view. 
 
-### Building the view
+Observe that we have `42` unique symbols in the dataset. 
 
-Observe that we have 42 unique symbols in the dataset. If we were to take a `LATEST ON` query for a single day,
-we would therefore expect up to 42 rows:
+If we were to take a `LATEST ON` query for a single day,
+we would therefore expect up to `84` rows (`42` buys, `42` sells):
 
 ```questdb-sql title="yesterday() LATEST ON" demo
 (trades WHERE timestamp IN yesterday()) 
@@ -487,23 +421,18 @@ ORDER BY symbol, side, timestamp;
 
 which executes in `8ms`.
 
-This rewrite forms the basis of our materialized view.
+Instead of using the `LATEST ON` syntax, we can use a `SAMPLE BY` equivalent, which massively reduces the number
+of rows we need to query.
 
-Whilst we don't have a native `LATEST ON` materialized view, we can still use its down-sampling
-power to help us out.
+Then, we run this `SAMPLE BY` automatically using a materialized view, so we always have the fastest possible
+`LATEST ON` query.
 
-See, the problem is that `LATEST ON`, in the time-unbounded case, will scan as far back as it needs
-to find a row for every symbol.
 
-Unfortunately, if even one of your symbols is infrequently updated, the query will scan huge amounts of data
-just to find a single row. 
+### Pre-aggregating the data
 
-#### Down-sampling
+We will pre-aggregate the ~767 million rows into just ~15000.
 
-Instead, let's try to reduce the size of our data-set dramatically. For example,
-let's say that instead of the 767m rows, we can have one row, per symbol, per side, per day.
-
-We can calculate such a range like this:
+Instead of storing the raw data, we will store one row, per symbol, per side, per day of data.
 
 ```questdb-sql title="down-sampling the range" demo
 
@@ -520,13 +449,10 @@ SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
 ) ORDER BY timestamp;
 ```
 
-This gives us effectively a `LATEST ON` result for each `DAY` in that time range.
+This result set comprises just `14595` rows, instead of ~767 million. That's 51000x fewer
+rows the database needs to scan to handle the query.
 
-This result set comprises just `14595` rows, instead of 767 million - and is much faster to scan.
-
-#### Back to the view
-
-Let's convert this into a materialized view definition:
+Here it is as a materialized view:
 
 ```questdb-sql title="LATEST ON materialized view"
 CREATE MATERIALIZED VIEW 'trades_latest_1d' WITH BASE 'trades' REFRESH INCREMENTAL AS (
@@ -542,14 +468,13 @@ CREATE MATERIALIZED VIEW 'trades_latest_1d' WITH BASE 'trades' REFRESH INCREMENT
 ) PARTITION BY DAY;
 ```
 
-You can query this view on demo:
+You can try this view out on our demo:
 
 ```questdb-sql title="trades_latest_1d" demo
 trades_latest_1d;
 ```
 
-Now, this materialized view doesn't include the exact output from a `LATEST ON` query, but we can
-use it as a data source for this query.
+Then, you can query this 'per-day LATEST ON' view to quickly calculate the 'true' `LATEST ON` result. 
 
 ```questdb-sql title="LATEST ON over the trades_latest_1d" demo
 SELECT symbol, side, price, amount, "latest" as timestamp FROM (
@@ -559,7 +484,7 @@ SELECT symbol, side, price, amount, "latest" as timestamp FROM (
 ) ORDER BY timestamp;
 ```
 
-And in a few milliseconds, we get the result:
+And in just a few milliseconds, we get the result:
 
 | symbol   | side | price   | amount    | timestamp                   |
 |----------|------|---------|-----------|-----------------------------|
@@ -570,8 +495,11 @@ And in a few milliseconds, we get the result:
 | DAI-USDT | buy  | 1.0007  | 29.785106 | 2025-03-31T14:30:33.394000Z |
 | ...      | ...  | ...     | ...       | ...                         |
 
+Seconds down to milliseconds - **100x, even 1000x faster!**
 
-## Architecture and behaviour
+## Architecture and internals
+
+The rest of this document contains information about how materialized views work internally.
 
 ### Storage model
 
