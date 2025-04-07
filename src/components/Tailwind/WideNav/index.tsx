@@ -32,8 +32,8 @@ const navLinks = [
     href: "/enterprise/",
   },
   {
-    name: "Market Data",
-    href: "/market-data/",
+    name: "Customers",
+    href: "/customers/",
   },
   {
     name: "Docs",
@@ -47,10 +47,10 @@ const navLinks = [
 
 const features = [
   {
-    name: "Case studies",
+    name: "Capital Markets",
     description:
-      "Explore leaders across finance and industry who upgraded and saved money with QuestDB.",
-    href: "/customers/",
+      "Explore QuestDB use cases across Capital Markets.",
+    href: "/market-data/",
     icon: RocketLaunchIcon,
   },
   {
@@ -156,7 +156,7 @@ export default function WideNav() {
               onMouseLeave={handleMouseLeave}
               onFocus={handleFocus}
               onBlur={handleBlur}
-              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap"
+              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer"
             >
               Product
               <ChevronDownIcon
@@ -179,13 +179,14 @@ export default function WideNav() {
                 onMouseLeave={handleMouseLeave}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
-                className="absolute inset-x-0 top-0 -z-10 bg-white dark:bg-[rgb(38,40,51)] pt-14 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
+                anchor="bottom"
+                className="absolute w-[70%] xl:w-[60%] 2xl:w-[50%] top-0 !left-1/2 -translate-x-1/2 translate-y-8 z-10 bg-white dark:bg-[rgb(38,40,51)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
-                <div className="mx-auto grid max-w-7xl grid-cols-4 gap-x-4 px-6 pt-24 pb-12 lg:px-8 xl:gap-x-8">
+                <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
                   {features.map((item) => (
                     <div
                       key={item.name}
-                      className="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-[rgb(33,34,44)]"
+                      className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-[rgb(33,34,44)]"
                     >
                       <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
                         {item.svg ? (
@@ -213,7 +214,7 @@ export default function WideNav() {
                     </div>
                   ))}
                 </div>
-                <div className="mx-auto max-w-7xl px-6 lg:px-8 pb-4">
+                <div className="mx-auto px-6 lg:px-8 pb-4">
                   <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
                     {callsToAction.map((item) => (
                       <a
