@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   Popover,
   PopoverButton,
@@ -127,6 +127,20 @@ export default function WideNav() {
     }
   }
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsPopoverOpen(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [handleKeyDown])
+
   return (
     <header className="fixed top-0 left-0 right-0 z-[99] bg-white dark:bg-[rgb(33,34,44)] shadow-md">
       <nav
@@ -156,7 +170,11 @@ export default function WideNav() {
               onMouseLeave={handleMouseLeave}
               onFocus={handleFocus}
               onBlur={handleBlur}
-              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault()
+                setIsPopoverOpen(!isPopoverOpen)
+              }}
+              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
             >
               Product
               <ChevronDownIcon
@@ -179,16 +197,15 @@ export default function WideNav() {
                 onMouseLeave={handleMouseLeave}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
-                anchor="bottom"
-                className="absolute w-[70%] xl:w-[60%] 2xl:w-[50%] top-0 !left-1/2 -translate-x-1/2 translate-y-8 z-10 bg-white dark:bg-[rgb(38,40,51)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] top-full !left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-[rgb(38,40,51)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
                 <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
                   {features.map((item) => (
                     <div
                       key={item.name}
-                      className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-[rgb(33,34,44)]"
+                      className="group relative rounded-lg p-3 text-sm leading-6"
                     >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
                         {item.svg ? (
                           <item.svg
                             aria-hidden="true"
