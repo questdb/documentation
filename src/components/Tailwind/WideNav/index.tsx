@@ -203,31 +203,34 @@ export default function WideNav() {
                   {features.map((item) => (
                     <div
                       key={item.name}
-                      className="group relative rounded-lg p-3 text-sm leading-6 border-solid border-[1px] border-[rgba(38,40,51,0)] hover:border-primary hover:bg-gray-700 transition"
+                      className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-700 cursor-pointer"
                     >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
-                        {item.svg ? (
-                          <item.svg
-                            aria-hidden="true"
-                            className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary"
-                          />
-                        ) : (
-                          <item.icon
-                            aria-hidden="true"
-                            className="h-6 w-6 text-gray-300 group-hover:text-primary"
-                          />
-                        )}
+                      <div className="relative">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
+                          {item.svg ? (
+                            <item.svg
+                              aria-hidden="true"
+                              className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary"
+                            />
+                          ) : (
+                            <item.icon
+                              aria-hidden="true"
+                              className="h-6 w-6 text-gray-300 group-hover:text-primary"
+                            />
+                          )}
+                        </div>
+                        <a
+                          href={item.href}
+                          className="mt-6 block font-semibold text-white hover:no-underline group-hover:text-primary"
+                        >
+                          {item.name}
+                          <span className="absolute inset-0" />
+                        </a>
+                        <p className="mt-1 text-gray-600 dark:text-gray-300">
+                          {item.description}
+                        </p>
                       </div>
-                      <a
-                        href={item.href}
-                        className="mt-6 block font-semibold text-white hover:no-underline hover:text-primary"
-                      >
-                        {item.name}
-                        <span className="absolute inset-0" />
-                      </a>
-                      <p className="mt-1 text-gray-600 dark:text-gray-300">
-                        {item.description}
-                      </p>
+                      <div className="absolute inset-0 rounded-lg bg-inherit transition-transform duration-200 ease-in-out group-hover:scale-[1.03] cursor-pointer -z-10" />
                     </div>
                   ))}
                 </div>
@@ -237,7 +240,7 @@ export default function WideNav() {
                       <a
                         key={item.name}
                         href={item.href}
-                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-white hover:bg-gray-700 rounded-lg hover:no-underline group hover:text-primary"
+                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-white hover:bg-gray-700 rounded-lg hover:no-underline group hover:text-primary transition duration-200"
                       >
                         <item.icon
                           aria-hidden="true"
