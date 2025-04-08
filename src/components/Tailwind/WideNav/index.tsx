@@ -197,30 +197,30 @@ export default function WideNav() {
                 onMouseLeave={handleMouseLeave}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
-                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] top-full !left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-[rgb(38,40,51)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
                 <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
                   {features.map((item) => (
                     <div
                       key={item.name}
-                      className="group relative rounded-lg p-3 text-sm leading-6"
+                      className="group relative rounded-lg p-3 text-sm leading-6 border-solid border-[1px] border-[rgba(38,40,51,0)] hover:border-primary hover:bg-gray-700 transition"
                     >
                       <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
                         {item.svg ? (
                           <item.svg
                             aria-hidden="true"
-                            className="h-6 w-6 fill-current text-gray-600 dark:text-white group-hover:text-primary dark:group-hover:text-primary"
+                            className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary"
                           />
                         ) : (
                           <item.icon
                             aria-hidden="true"
-                            className="h-6 w-6 text-gray-600 dark:text-white group-hover:text-primary dark:group-hover:text-primary"
+                            className="h-6 w-6 text-gray-300 group-hover:text-primary"
                           />
                         )}
                       </div>
                       <a
                         href={item.href}
-                        className="mt-6 block font-semibold text-gray-900 dark:text-white"
+                        className="mt-6 block font-semibold text-white hover:no-underline hover:text-primary"
                       >
                         {item.name}
                         <span className="absolute inset-0" />
@@ -232,16 +232,16 @@ export default function WideNav() {
                   ))}
                 </div>
                 <div className="mx-auto px-6 lg:px-8 pb-4">
-                  <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
+                <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg group-hover:bg-gray-700">
                     {callsToAction.map((item) => (
                       <a
                         key={item.name}
                         href={item.href}
-                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-white hover:bg-gray-700 rounded-lg hover:no-underline group hover:text-primary"
                       >
                         <item.icon
                           aria-hidden="true"
-                          className="h-5 w-5 flex-none text-gray-400"
+                          className="h-5 w-5 flex-none text-gray-400 group-hover:text-primary"
                         />
                         {item.name}
                       </a>
