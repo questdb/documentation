@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   Popover,
   PopoverButton,
@@ -32,8 +32,8 @@ const navLinks = [
     href: "/enterprise/",
   },
   {
-    name: "Market Data",
-    href: "/market-data/",
+    name: "Customers",
+    href: "/customers/",
   },
   {
     name: "Docs",
@@ -47,10 +47,10 @@ const navLinks = [
 
 const features = [
   {
-    name: "Case studies",
+    name: "Capital Markets",
     description:
-      "Explore leaders across finance and industry who upgraded and saved money with QuestDB.",
-    href: "/customers/",
+      "Explore QuestDB use cases across Capital Markets.",
+    href: "/market-data/",
     icon: RocketLaunchIcon,
   },
   {
@@ -127,6 +127,20 @@ export default function WideNav() {
     }
   }
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsPopoverOpen(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [handleKeyDown])
+
   return (
     <header className="fixed top-0 left-0 right-0 z-[99] bg-white dark:bg-[rgb(33,34,44)] shadow-md">
       <nav
@@ -156,7 +170,11 @@ export default function WideNav() {
               onMouseLeave={handleMouseLeave}
               onFocus={handleFocus}
               onBlur={handleBlur}
-              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap"
+              onClick={(e) => {
+                e.preventDefault()
+                setIsPopoverOpen(!isPopoverOpen)
+              }}
+              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
             >
               Product
               <ChevronDownIcon
@@ -179,51 +197,54 @@ export default function WideNav() {
                 onMouseLeave={handleMouseLeave}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
-                className="absolute inset-x-0 top-0 -z-10 bg-white dark:bg-[rgb(38,40,51)] pt-14 shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
-                <div className="mx-auto grid max-w-7xl grid-cols-4 gap-x-4 px-6 pt-24 pb-12 lg:px-8 xl:gap-x-8">
+                <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
                   {features.map((item) => (
                     <div
                       key={item.name}
-                      className="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50 dark:hover:bg-[rgb(33,34,44)]"
+                      className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-700 cursor-pointer"
                     >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
-                        {item.svg ? (
-                          <item.svg
-                            aria-hidden="true"
-                            className="h-6 w-6 fill-current text-gray-600 dark:text-white group-hover:text-primary dark:group-hover:text-primary"
-                          />
-                        ) : (
-                          <item.icon
-                            aria-hidden="true"
-                            className="h-6 w-6 text-gray-600 dark:text-white group-hover:text-primary dark:group-hover:text-primary"
-                          />
-                        )}
+                      <div className="relative">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
+                          {item.svg ? (
+                            <item.svg
+                              aria-hidden="true"
+                              className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary"
+                            />
+                          ) : (
+                            <item.icon
+                              aria-hidden="true"
+                              className="h-6 w-6 text-gray-300 group-hover:text-primary"
+                            />
+                          )}
+                        </div>
+                        <a
+                          href={item.href}
+                          className="mt-6 block font-semibold text-white hover:no-underline group-hover:text-primary"
+                        >
+                          {item.name}
+                          <span className="absolute inset-0" />
+                        </a>
+                        <p className="mt-1 text-gray-600 dark:text-gray-300">
+                          {item.description}
+                        </p>
                       </div>
-                      <a
-                        href={item.href}
-                        className="mt-6 block font-semibold text-gray-900 dark:text-white"
-                      >
-                        {item.name}
-                        <span className="absolute inset-0" />
-                      </a>
-                      <p className="mt-1 text-gray-600 dark:text-gray-300">
-                        {item.description}
-                      </p>
+                      <div className="absolute inset-0 rounded-lg bg-inherit transition-transform duration-200 ease-in-out group-hover:scale-[1.03] cursor-pointer -z-10" />
                     </div>
                   ))}
                 </div>
-                <div className="mx-auto max-w-7xl px-6 lg:px-8 pb-4">
-                  <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)] group-hover:bg-white dark:group-hover:bg-gray-700">
+                <div className="mx-auto px-6 lg:px-8 pb-4">
+                <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg group-hover:bg-gray-700">
                     {callsToAction.map((item) => (
                       <a
                         key={item.name}
                         href={item.href}
-                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-white hover:bg-gray-700 rounded-lg hover:no-underline group hover:text-primary transition duration-200"
                       >
                         <item.icon
                           aria-hidden="true"
-                          className="h-5 w-5 flex-none text-gray-400"
+                          className="h-5 w-5 flex-none text-gray-400 group-hover:text-primary"
                         />
                         {item.name}
                       </a>
