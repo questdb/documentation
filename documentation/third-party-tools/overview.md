@@ -19,6 +19,9 @@ platforms:
   and interactive graphs for [time-series data](/blog/what-is-time-series-data/) visualization.
 - [Superset](/docs/third-party-tools/superset/): Build interactive
   visualizations and perform ad-hoc data analysis.
+- **[PowerBI](/docs/third-party-tools/powerbi/):** Create interactive data visualizations and dashboards.
+- [qStudio](/docs/third-party-tools/qstudio/): A free SQL GUI for query
+  execution, table browsing, and result charting.
 
 ## Data Ingestion and Streaming
 
@@ -29,14 +32,11 @@ integrations:
   event streaming platform for high-throughput data pipelines.
 - [Telegraf](/docs/third-party-tools/telegraf/): Collect and report metrics from
   various sources.
-- **[Redpanda](/docs/third-party-tools/redpanda/): A Kafka-compatible streaming
-  platform for simplified data pipelines.**
+- **[Redpanda](/docs/third-party-tools/redpanda/):** A Kafka-compatible streaming
+  platform for simplified data pipelines.
 - [Apache Flink](/docs/third-party-tools/flink/): Process real-time data streams
   efficiently.
-- [Apache Spark](/docs/third-party-tools/spark/): Handle complex data processing
   tasks at scale.
-- [Airbyte](/docs/third-party-tools/airbyte/): Performs streamlined ETL across 
-  diverse data sources.
 
 ## Workflow Orchestrators
 
@@ -52,13 +52,11 @@ Automate your data pipelines with these workflow orchestrators:
 Enhance your data analysis and processing capabilities with QuestDB through
 these tools:
 
-- [**PowerBI**](/docs/third-party-tools/powerbi/): Create interactive data visualizations and dashboards.
 - [Pandas](/docs/third-party-tools/pandas/): Analyze [time-series data](/blog/what-is-time-series-data/) in Python
   with powerful data structures.
 - [MindsDB](/docs/third-party-tools/mindsdb/): Build machine learning models for
-  predictive analytics on[time-series data](/blog/what-is-time-series-data/).
-- [Embeddable](/docs/third-party-tools/embeddable/): Developer toolkit for
-  building fast, interactive customer-facing analytics.
+  predictive analytics on [time-series data](/blog/what-is-time-series-data/).
+- [Apache Spark](/docs/third-party-tools/spark/): Handle complex data processing
 
 ## Tooling and Interfaces
 
@@ -68,8 +66,6 @@ Improve your interactions with QuestDB using these tools and interfaces:
   analyze monitoring metrics.
 - [SQLAlchemy](/docs/third-party-tools/sqlalchemy/): Utilize Python's ORM
   capabilities for database interactions.
-- [qStudio](/docs/third-party-tools/qstudio/): A free SQL GUI for query
-  execution, table browsing, and result charting.
 
 Is there an integration you'd like to see that's not listed? Let us know by
 opening an issue on [QuestDB Github](https://github.com/questdb/questdb/issues/new/choose).

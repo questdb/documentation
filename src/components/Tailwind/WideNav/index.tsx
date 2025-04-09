@@ -206,7 +206,7 @@ export default function WideNav() {
                       className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-700 cursor-pointer"
                     >
                       <div className="relative">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 dark:bg-[rgb(33,34,44)]">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg">
                           {item.svg ? (
                             <item.svg
                               aria-hidden="true"
