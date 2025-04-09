@@ -70,12 +70,6 @@ the array values:
    with the 1st coordinate. On a 2D array, this would have the effect of
    swapping rows and columns (transposing a matrix).
 
-:::note
-
-QuestDB does not currently support the `flatten` operation.
-
-:::
-
 ## Importance of the "vanilla" array shape
 
 QuestDB stores the _shape_ along with the array. However, it has no need to
