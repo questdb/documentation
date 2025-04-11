@@ -63,7 +63,7 @@ configure QuestDB.
 
 ### Better specification
 
-- **Instance**: `c3-highmem-8` or `c3d-standard-8` `(8 vCPUs, 64 GB RAM)`
+- **Instance**: `c3-highmem-8` or `c3d-highmem-8` `(8 vCPUs, 64 GB RAM)`
 - **Storage**
     - **OS disk**: `Hyperdisk Balanced (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
     - **Data disk**: `Hyperdisk Balanced (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
