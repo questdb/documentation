@@ -72,7 +72,7 @@ configure QuestDB.
 
 :::note
 
-You can use the `highcpu` and `highmem` variants to adjust the `standard` `4:1` vCPU/RAM
+You can use the `highcpu` and `highmem` variants to adjust the `standard` `4:1` RAM/vCPU
 ratio to `2:1` or `8:1` respectively. Higher RAM can improve performance dramatically
 if it means your working set data will fit entirely into memory.
 
