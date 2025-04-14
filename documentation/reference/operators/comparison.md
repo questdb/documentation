@@ -28,8 +28,6 @@ SELECT 5 IN (1, 2, 7, 5, 8)
 
 `(value1) = (value2)` - returns true if the two values are the same.
 
-`=` can be used with [`>` or `<`](#description).
-
 #### Arguments
 
 - `value1` is any data type.

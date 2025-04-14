@@ -1192,7 +1192,7 @@ argument. When the `format` definition does not match the `string` input, the
 result will be `null`.
 
 For more information about recognized timestamp formats, see the
-[timestamp format section](#date-and-timestamp-format).
+[timestamp format section](#timestamp-format).
 
 **Arguments:**
 
@@ -1243,7 +1243,7 @@ an argument. When elements in the `format` definition are unrecognized, they
 will be passed-through as string.
 
 For more information about recognized timestamp formats, see the
-[timestamp format section](#date-and-timestamp-format).
+[timestamp format section](#timestamp-format).
 
 **Arguments:**
 
@@ -1285,7 +1285,7 @@ When the `format` definition does not match the `string` input, the result will
 be `null`.
 
 For more information about recognized timestamp formats, see the
-[timestamp format section](#date-and-timestamp-format).
+[timestamp format section](#timestamp-format).
 
 **Arguments:**
 

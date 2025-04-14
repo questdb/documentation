@@ -56,7 +56,7 @@ The private key file must contain the key in one of the following formats:
 - A SEC1-encoded plaintext private key; as specified in RFC5915
 
 If you need to create a quick `.pem` file for testing, see the
-[below steps](/docs/operations/tls/#generating-a-test-pem-certificate).
+[below steps](/docs/operations/tls/#generating-a-test-pem-certificate-manually).
 
 ### Enabling TLS for InfluxDB Line Protocol
 

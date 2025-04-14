@@ -134,7 +134,7 @@ csvstack *.csv > singleFile.csv
 ### Create the target table schema
 
 If you know the target table schema already, you can
-[skip this section](/docs/guides/import-csv/#import-csv-via-copy-sql/#import-csv).
+[skip this section](#import-csv).
 
 QuestDB could analyze the input file and "guess" the schema. This logic is
 activated when target table does not exist.
@@ -202,8 +202,8 @@ process running in the background:
 
    5.1. The generated schema may not be completely correct. Check the log table
    and log file to resolve common errors using the id (see also
-   [Track import progress](/docs/guides/import-csv/#import-csv-via-copy-sql/#track-import-progress)
-   and [FAQ](/docs/guides/import-csv/#import-csv-via-copy-sql/#faq)):
+   [Track import progress](#track-import-progress)
+   and [FAQ](#faq)):
 
    ```questdb-sql
    SELECT * FROM sys.text_import_log WHERE id = '5179978a6d7a1772' ORDER BY ts DESC;
@@ -675,7 +675,7 @@ curl \
 ```
 
 More information on the patterns for timestamps can be found on the
-[date and time functions](/docs/reference/function/date-time/#date-and-timestamp-format)
+[date and time functions](/docs/reference/function/date-time/#timestamp-format)
 page.
 
 :::note

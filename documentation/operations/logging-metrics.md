@@ -153,7 +153,7 @@ Which one you need depends on your use case.
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | file              | Select from one of the two above patterns. Write to a single log that will grow indefinitely, or write a rolling log. Rolling logs can be split into `minute`, `hour`, `day`, `month` or `year`. |
 | stdout            | Writes logs to standard output.                                                                                                                                                                  |
-| http.min          | Enabled at port `9003` by default. For more information, see the next section: [minimal HTTP server](#-minimal-http-server).                                                                     |
+| http.min          | Enabled at port `9003` by default. For more information, see the next section: [minimal HTTP server](#minimal-http-server).                                                                      |
 
 ### Minimal HTTP server
 
@@ -205,7 +205,7 @@ The following configuration options can be set in your `server.conf`:
 :::warning
 
 On systems with
-[8 Cores and less](/docs/deployment/capacity-planning/#cpu-cores), contention
+[8 Cores and less](/docs/operations/capacity-planning/#cpu-cores), contention
 for threads might increase the latency of health check service responses. If you use 
 a load balancer thinks the QuestDB service is dead with nothing apparent in the
 QuestDB logs, you may need to configure a dedicated thread pool for the health

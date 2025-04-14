@@ -148,7 +148,7 @@ From there, you can learn more about what's to offer.
   upload/export functionality
 - [Grafana guide](/docs/third-party-tools/grafana/) to visualize your data as
   beautiful and functional charts.
-- [Capacity planning](/docs/deployment/capacity-planning/) to optimize your
+- [Capacity planning](/docs/operations/capacity-planning/) to optimize your
   QuestDB deployment for production workloads.
 
 ## Support

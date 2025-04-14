@@ -454,7 +454,7 @@ geo_data geohash="46swgj10"
 ## CSV import
 
 Geohashes may also be inserted via
-[REST API](/docs/guides/import-csv/#import-csv-via-rest/). In order to perform
+[REST API](/docs/guides/import-csv/#import-csv-via-rest). In order to perform
 inserts in this way;
 
 1. Create a table with columns of geohash type beforehand:
