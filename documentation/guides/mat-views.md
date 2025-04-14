@@ -62,25 +62,17 @@ efficient for expensive aggregate queries that are run frequently.
 
 ## What are materialized views for?
 
-As data grows in size, the performance of certain queries can degrade.
-
-The "materialized views" is a feature that allows you to mitigate this issue for
-time-based grouping queries such as `SAMPLE BY` and `GROUP BY`.
-
-For a better understanding of what materialized views are for, read the
-[Introduction to materialized views](/docs/concept/mat-views/).
-
-## How they work
-
-Materialized views persistently cache the result of a `SAMPLE BY` or time-based `GROUP BY` query,
-and keep it automatically up to date. 
+As data grows in size, the performance of certain queries can degrade. Materialized views persistently cache the result of a `SAMPLE BY` or time-based `GROUP BY` query, and keep it automatically up to date. 
 
 The refresh of the materialized view is `INCREMENTAL` and very efficient, and using materialized views can offer
 100x or higher query speedups.
 
 If you require the lowest latency queries, for example, for charts and dashboards, use materialized views!
 
-:::
+For a better understanding of what materialized views are for, read the
+[introduction to materialized views](/docs/concept/mat-views/) documentation.
+
+## Creating a materialized view
 
 There is a fundamental limit to how fast certain aggregation and scanning queries can execute,
 based on the data size, number of rows, disk speed, and number of cores.
@@ -102,7 +94,6 @@ CREATE TABLE 'trades' (
 ) timestamp(timestamp) PARTITION BY DAY WAL;
 ```
 
-## Creating a materialized view
 
 A full syntax definition can be found in the [CREATE MATERIALIZED VIEW](/docs/reference/sql/create-mat-view)
 documentation.
@@ -444,15 +435,15 @@ Instead of storing the raw data, we will store one row, per symbol, per side, pe
 ```questdb-sql title="down-sampling test query" demo
 
 SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
-	SELECT timestamp, 
-				symbol, 
-				side, 
-				last(price) AS price, 
-				last(amount) AS amount, 
-				last(timestamp) as latest
-		FROM trades
-		WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z'
-		SAMPLE BY 1d
+    SELECT timestamp, 
+                symbol, 
+		side, 
+		last(price) AS price, 
+		last(amount) AS amount, 
+		last(timestamp) as latest
+    FROM trades
+    WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z'
+    SAMPLE BY 1d
 ) ORDER BY timestamp;
 ```
 
