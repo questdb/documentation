@@ -55,4 +55,5 @@ it exists.
 ## See also
 
 For more information on the concept, see the
-[reference](/docs/concept/mat-views/) on materialized views.
+the [introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/)
+on materialized views.

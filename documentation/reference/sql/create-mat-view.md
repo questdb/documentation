@@ -31,7 +31,8 @@ materialized view.
 
 A materialized view holds the result set of the given query, and is
 automatically refreshed and persisted. For more information on the concept, see
-the [reference](/docs/concept/mat-views/) on materialized views.
+the [introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/)
+on materialized views.
 
 ## Syntax
 
