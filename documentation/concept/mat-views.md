@@ -60,10 +60,8 @@ SELECT
   symbol,
   side,
   sum(price * amount) AS notional
-FROM
-  trades
-SAMPLE BY
-  1m
+FROM trades
+SAMPLE BY 1m;
 ```
 
 Each time this query is run it will scan the entire dataset. This type of query
@@ -96,10 +94,8 @@ AS (
     symbol,
     side,
     sum(price * amount) AS notional
-  FROM
-    trades
-  SAMPLE BY
-    1m
+  FROM trades
+  SAMPLE BY 1m
 ) PARTITION BY DAY;
 ```
 
@@ -107,10 +103,8 @@ Querying a materialized view can be up to hundreds of times faster than
 executing the same query on the base table.
 
 ```questdb-sql title="querying a materialized view"
-SELECT
-  *
-FROM
-  trades_notional_1m
+SELECT *
+FROM trades_notional_1m;
 ```
 
 ## Roadmap and limitations
