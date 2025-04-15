@@ -118,6 +118,16 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
   when [ZFS compression](/docs/guides/compression-zfs/) is enabled. Parquet files generated
   by QuestDB use native compression.
 
+### Data Deduplication
+
+When enabled, [data deduplication](https://questdb.com/docs/concept/deduplication/) works on all the data inserted into
+the table and replaces matching rows with the new versions. Only new rows that do no match existing data will be inserted.
+
+Generally, if the data have mostly unique timestamps across all the rows, the performance impact of deduplication is low.
+Conversely, the most demanding data pattern occurs when there are many rows with the same timestamp that need to be
+deduplicated on additional columns.
+
+
 ## Memory management and native integration
 
 ### Memory-mapped files
@@ -258,6 +268,7 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 - **Partitioning by time:**
   Data [partitions by timestamp](/docs/concept/partitions/) with hourly, daily, weekly, monthly, or yearly resolution.
 
+
 <!-- This image is used also at the partition concepts page. Please keep in sync -->
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
@@ -268,6 +279,7 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
   forceTheme="dark"
 />
 
+
 - **Partition pruning:**
   The design lets the engine skip partitions that fall outside query filters. Combined with
   incremental timestamp sorting, this reduces latency.
@@ -276,6 +288,19 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 - **Lifecycle policies:**
   The system can delete partitions manually or automatically via TTL. It also supports
   detaching or attaching partitions using SQL commands.
+
+### Materialized views
+
+  - [Materialize views](https://questdb.com/docs/concept/mat-views/) are auto-refreshing tables storing the pre-computed results of a query. Unlike regular views, which
+  compute their results at query time, materialized views persist their data to disk, making them particularly efficient
+  for expensive aggregate queries that are run frequently.
+
+  - QuestDB supports materialized views for `SAMPLE BY` queries, including those joining with other tables.
+
+  - Materialized sampled intervals are automatically refreshed whenever the base table receivews new or updated rows.
+
+  - Materialized views can be chained, with the output of one being the input of another one, and support TTLs for lifecycle management.
+
 
 ### In-memory processing
 
