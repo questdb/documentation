@@ -116,7 +116,7 @@ AS (
 
 ## Partitioning
 
-`PARTITION BY` allows for specifying the
+`PARTITION BY` optionally allows specifying the
 [partitioning strategy](/docs/concept/partitions/) for the materialized view.
 
 Materialized views can be partitioned by one of the following:
@@ -129,6 +129,9 @@ Materialized views can be partitioned by one of the following:
 
 The partitioning strategy **cannot be changed** after the materialized view has
 been created.
+
+If unspecified, the `CREATE MATERIALIZED VIEW` statement will infer the
+[default partitioning strategy](/docs/guides/mat-views/#default-partitioning).
 
 ## Time To Live (TTL)
 
@@ -215,6 +218,23 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ) PARTITION BY DAY
 OWNED BY analysts;
 ```
+
+## Compact syntax
+
+The `CREATE MATERIALIZED VIEW` statement also supports a compact syntax
+which can be used when one is happy with default parameters.
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly_prices AS
+  SELECT
+    timestamp,
+    symbol,
+    avg(price) AS avg_price
+  FROM trades
+  SAMPLE BY 1h
+```
+
+For more on this logic, see the [materialized view guide](/docs/guides/mat-views/#compact-syntax).
 
 ## Query constraints
 
