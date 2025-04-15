@@ -124,7 +124,7 @@ AS (
       sum(amount) AS volume
   FROM trades
   SAMPLE BY 15m
-) PARTITION BY DAY;
+) PARTITION BY MONTH;
 ```
 
 In this example:
@@ -139,6 +139,10 @@ calculated in `15m` time buckets.
 5. The view is partitioned by `DAY`.
 6. No TTL is defined 
     - Therefore, the materialized view will contain a summary of _all_ the base `trades` table's data.
+
+::: note
+
+This particular example can also be written via the [compact syntax](#compact-syntax).
 
 #### The view name
 
@@ -177,10 +181,24 @@ and move complex transformations to an outside query that runs on the down-sampl
 
 #### PARTITION BY
 
+Optionally, you may specify a partitioning scheme.
+
 You should choose a partition unit which is larger than the sampling interval. Ideally, the partition unit
 should be divisible by the sampling interval.
 
 For example, an `SAMPLE BY 8h` clause fits nicely with a `DAY` partitioning strategy, with 3 timestamp buckets per day.
+
+#### Default partitioning
+
+If the `PARTITION BY` clauses is omitted, the partitioning scheme is automatically inferred from the `SAMPLE BY` clause.
+
+| -------------- | --------------------- |
+| Interval       | Default partitioning  |
+| -------------- | --------------------- |
+| &gt; 1 hour    | `PARTITION BY YEAR`   |
+| &gt; 1 minute  | `PARTITION BY MONTH`  |
+| &lt;= 1 minute | `PARTITION BY DAY`    |
+| -------------- | --------------------- |
 
 #### TTL
 
@@ -193,6 +211,26 @@ PARTITION BY DAY TTL 30 DAYS;
 ```
 
 to the end of our materialized view definition.
+
+#### Compact syntax
+
+If you don't need to specify `INDEX`, `TIMESTAMP`, `PARTITION BY`, `TTL` or `VOLUME` clauses you can use the
+compact syntax. This syntax is closer to that used by other databases and omits the parentheses.
+
+The earlier example can be rewritten as:
+
+```questdb-sql title="trades_OHLC_15m compact syntax"
+CREATE MATERIALIZED VIEW trades_OHLC_15m AS
+  SELECT
+      timestamp, symbol,
+      first(price) AS open,
+      max(price) as high,
+      min(price) as low,
+      last(price) AS close,
+      sum(amount) AS volume
+  FROM trades
+  SAMPLE BY 15m;
+```
 
 ## Querying materialized views
 
