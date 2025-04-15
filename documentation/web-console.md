@@ -35,7 +35,7 @@ running locally, this will be [http://localhost:9000](http://localhost:9000).
 
 It is possible to hide QuestDB system tables (`telemetry` and
 `telemetry_config`) in Schema explorer by setting up the following configuration
-option in a [server.conf](/docs/concept/root-directory-structure/#serverconf)
+option in a [server.conf](/docs/concept/root-directory-structure/#conf-directory)
 file:
 
 ```bash title="/var/lib/questdb/conf/server.conf"

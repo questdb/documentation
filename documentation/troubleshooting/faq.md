@@ -112,7 +112,7 @@ inserted with identical fields. Until then, you need to
 ## Can I query by time?
 
 Yes! When using the `WHERE` statement to define the time range for a query, the
-[`IN`](/docs/reference/sql/where/#time-range-with-modifier) keyword allows
+[`IN`](/docs/reference/sql/where/#time-range-with-interval-modifier) keyword allows
 modifying the range and interval of the search. The range can be tuned to a
 second resolution.
 

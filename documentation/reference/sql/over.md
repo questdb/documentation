@@ -49,7 +49,7 @@ They are often used in analytics for tasks such as:
 - Finding the maximum or minimum value in a sequence or partition
 - Ranking items within a specific category or partition
 - Calculating [moving averages](/docs/reference/function/window#avg) or
-  [cumulative sums](/docs/reference/function/window#cumulative-sum)
+  [cumulative sums](/docs/reference/function/window#cumulative-bid-size)
 
 Window functions are tough to grok.
 
@@ -120,7 +120,7 @@ Where:
 
 - [`row_number()`](/docs/reference/function/window#row_number) – Assigns sequential numbers to rows
 
-- [`sum()`](/docs/reference/function/window#cumulative-sum) – Calculates the sum within a window
+- [`sum()`](/docs/reference/function/window#cumulative-bid-size) – Calculates the sum within a window
 
 ## Components of a window function
 

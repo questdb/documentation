@@ -52,7 +52,7 @@ Greatest hits include:
 
 - [`SAMPLE BY`](/docs/reference/sql/sample-by/) summarizes data into chunks
   based on a specified time interval, from a year to a microsecond
-- [`WHERE IN`](/docs/reference/sql/where/#time-range) to compress time ranges
+- [`WHERE IN`](/docs/reference/sql/where/#time-range-where-in) to compress time ranges
   into concise intervals
 - [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
   multiple series within a table
