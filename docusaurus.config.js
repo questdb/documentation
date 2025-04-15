@@ -20,9 +20,9 @@ const config = {
   staticDirectories: ['static'],
   projectName: "questdb",
   customFields,
-  onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
-  onBrokenAnchors: "warn",
+  onBrokenLinks: isPreviews ? "warn" : "throw",
+  onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
+  onBrokenAnchors: isPreviews ? "warn" : "throw",
   trailingSlash: true,
   stylesheets: [
     {
