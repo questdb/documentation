@@ -220,5 +220,5 @@ OWNED BY analysts;
 
 There is a list of requirements for the queries that are used in materialized
 views. Refer to this
-[documentation section](/docs/guides/mat-views/#technical-requirements) to
-learn them.
+[documentation section](/docs/guides/mat-views/#technical-requirements) to learn
+about them.

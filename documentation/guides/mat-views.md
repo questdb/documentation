@@ -214,10 +214,9 @@ to the end of our materialized view definition.
 
 #### Compact syntax
 
-If you don't need to specify `INDEX`, `TIMESTAMP`, `PARTITION BY`, `TTL` or `VOLUME` clauses you can use the
-compact syntax. This syntax is closer to that used by other databases and omits the parentheses.
-
-The earlier example can be rewritten as:
+If you're happy with the defaults and don't need to customize materialized view
+parameters such as `PARTITION BY` or `TTL`, then you can use the compact syntax
+which omits the parentheses.
 
 ```questdb-sql title="trades_OHLC_15m compact syntax"
 CREATE MATERIALIZED VIEW trades_OHLC_15m AS
