@@ -48,20 +48,19 @@ efficient for expensive aggregate queries that are run frequently.
     Resume WAL for a materialized view
 
 - **Configuration**
-  - [Materialized views configs](/docs/configuration/#materialized-views):
+  - [Materialized views settings](/docs/configuration/#materialized-views):
     Server configuration options for materialized views from `server.conf`
 
 ## What are materialized views for?
 
 As data grows in size, the performance of certain queries can degrade.
-Materialized views persistently cache the result of a `SAMPLE BY` or time-based
-`GROUP BY` query, and keep it automatically up to date.
+Materialized views store the result of a `SAMPLE BY` or time-based `GROUP BY`
+query on disk, and keep it automatically up to date.
 
-The refresh of the materialized view is `INCREMENTAL` and very efficient, and
-using materialized views can offer 100x or higher query speedups.
-
-If you require the lowest latency queries, for example, for charts and
-dashboards, use materialized views!
+The refresh of a materialized view is `INCREMENTAL` and very efficient, and
+using materialized views can offer 100x or higher query speedups. If you require
+the lowest latency queries, for example, for charts and dashboards, use
+materialized views!
 
 For a better understanding of what materialized views are for, read the
 [introduction to materialized views](/docs/concept/mat-views/) documentation.
@@ -72,39 +71,37 @@ There is a fundamental limit to how fast certain aggregation and scanning
 queries can execute, based on the data size, number of rows, disk speed, and
 number of cores.
 
-Materialized Views let you bound the runtime for common aggregation queries, by
+Materialized views let you bound the runtime for common aggregation queries, by
 allowing you to pre-aggregate historical data ahead-of-time. This means that for
 many queries, you only need to aggregate the latest partition's data, and then
 you can use already aggregated results for historical data.
 
-Throughout this document, we will use the demo `trades` table. This is a table
-containing crypto trading data, with over 1.6 billion rows.
+Throughout this document, we will use the [demo](https://demo.questdb.com/)
+`trades` table. This is a table containing crypto trading data, with over 1.6
+billion rows.
 
 ```questdb-sql title="trades ddl"
 CREATE TABLE 'trades' (
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
+	symbol SYMBOL,
+	side SYMBOL,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 A full syntax definition can be found in the
 [CREATE MATERIALIZED VIEW](/docs/reference/sql/create-mat-view) documentation.
 
-Here is a view taken from our demo, which calculates OHLC bars for a candlestick
-chart.
-
-The view reads data from the base table, `trades`. It then calculates aggregate
-functions such as `first`, `sum` etc. over 15 minutes time buckets.
-
-The view is incrementally refreshed, meaning it is always up to date with the
-latest `trades` data.
+Here is a materialized view taken from our demo, which calculates OHLC bars for
+a candlestick chart. The view reads data from the base table, `trades`. It then
+calculates aggregate functions such as `first`, `sum` etc. over 15 minutes time
+buckets. The view is incrementally refreshed, meaning it is always up to date
+with the latest `trades` data.
 
 :::note
 
-If you are unfamiliar with OHLC, please see our
+If you are unfamiliar with the OHLC concept, please see our
 [OHLC guide](https://www.questdb.com/glossary/ohcl-candlestick).
 
 :::
@@ -134,8 +131,9 @@ In this example:
 3. The refresh strategy is `INCREMENTAL`
    - The data is automatically refreshed and incrementally written; efficient,
      fast, low maintenance.
-4. The `SAMPLE BY` query contains two key column (timestamp, symbol) and five
-   aggregates (first, max, min, last, price) calculated in `15m` time buckets.
+4. The `SAMPLE BY` query contains two key column (`timestamp`, `symbol`) and
+   five aggregates (`first`, `max`, `min`, `last`, `price`) calculated in `15m`
+   time buckets.
 5. The view is partitioned by `DAY`.
 6. No TTL is defined
    - Therefore, the materialized view will contain a summary of _all_ the base

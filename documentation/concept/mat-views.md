@@ -30,12 +30,12 @@ Soon your QuestDB instance will grow from gigabytes to terabytes.
 
 ```questdb-sql title="trades ddl"
 CREATE TABLE 'trades' ( 
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
+	symbol SYMBOL,
+	side SYMBOL,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Queries that rely on a specific subset of the data (say, the last hour) will
@@ -57,10 +57,10 @@ SAMPLE BY 1m;
 ```
 
 Each time this query is run it will scan the entire dataset. This type of query
-will become slower as the dataset grows.
-
-Materialized views are designed to maintain the speed of your queries as you
-scale your data.
+will become slower as the dataset grows. Materialized views run the query only
+on small subset of rows of the base table each time when new rows are inserted.
+In other words, materialized views are designed to maintain the speed of your
+queries as you scale your data.
 
 When you create a materialized view you register your time-based grouping
 query with the QuestDB database against a base table.
