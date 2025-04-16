@@ -53,7 +53,7 @@ ALTER TABLE ratings ADD COLUMN IF NOT EXISTS score DOUBLE;
 
 When adding a column of `Symbol` type, optional keywords may be passed which are
 unique to this type. These keywords are described in the
-[Symbol type](/docs/reference/sql/create-table/#symbol) section of the
+[Symbol type](/docs/reference/sql/create-table/#symbols) section of the
 `CREATE TABLE` documentation.
 
 The following example shows how to add a new `SYMBOL` column with `NOCACHE` and

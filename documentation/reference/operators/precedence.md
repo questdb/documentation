@@ -55,8 +55,8 @@ See the next section for the current precedence.
 | [`&`](bitwise.md#-and)                                   | bitwise and                  | 8          | bitwise AND of two numbers        |
 | [`^`](bitwise.md#-xor)                                   | bitwise xor                  | 9          | bitwise XOR of two numbers        |
 | [`\|`](bitwise.md#-or)                                   | bitwise or                   | 10         | bitwise OR of two numbers         |
-| [`IN`](date-time.md#in)                                  | in                           | 11         | check if value in list or range   |
-| [`BETWEEN`](date-time.md#between)                        | between                      | 11         | check if timestamp in range       |
+| [`IN`](date-time.md#in-timerange)                        | in                           | 11         | check if value in list or range   |
+| [`BETWEEN`](date-time.md#between-value1-and-value2)      | between                      | 11         | check if timestamp in range       |
 | [`WITHIN`](spatial.md#within)                            | within geohash               | 11         | prefix matches geohash            |
 | [`<`](comparison.md#-lesser-than)                        | lesser than                  | 12         | lt comparison                     |
 | [`<=`](comparison.md#-lesser-than-or-equal-to)           | lesser than or equal to      | 12         | leq comparison                    |
@@ -69,6 +69,6 @@ See the next section for the current precedence.
 | [`!~`](text.md#-regex-doesnt-match)                      | regex does not match         | 13         | regex pattern does not match      |
 | [`LIKE`](text.md#like)                                   | match string                 | 13         | pattern matching                  |
 | [`ILIKE`](text.md#ilike)                                 | match string without case    | 13         | case insensitive pattern matching |
-| [`NOT`](logical.md#not)                                  | logical not                  | 14         | logical NOT of two numbers        |
-| [`AND`](logical.md#and)                                  | logical and                  | 15         | logical AND of two numbers        |
-| [`OR`](logical.md#or)                                    | logical or                   | 16         | logical OR of two numbers         |
+| [`NOT`](logical.md#not-logical-not)                      | logical not                  | 14         | logical NOT of two numbers        |
+| [`AND`](logical.md#and-logical-and)                      | logical and                  | 15         | logical AND of two numbers        |
+| [`OR`](logical.md#or-logical-or)                         | logical or                   | 16         | logical OR of two numbers         |

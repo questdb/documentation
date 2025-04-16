@@ -385,13 +385,9 @@ run_query("UPDATE trades SET value = 9876 WHERE name = 'abc'")
 
 :::info
 
-Apache Parquet support is in **beta**.
+Apache Parquet support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
@@ -447,7 +443,7 @@ And to learn about some of our favourite, most powerful syntax:
   date and time
 - [`SAMPLE BY`](/docs/reference/sql/sample-by/) to summarize data into chunks
   based on a specified time interval, from a year to a microsecond
-- [`WHERE IN`](/docs/reference/sql/where/#time-range) to compress time ranges
+- [`WHERE IN`](/docs/reference/sql/where/#time-range-where-in) to compress time ranges
   into concise intervals
 - [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
   multiple series within a table

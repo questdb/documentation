@@ -42,7 +42,7 @@ The following are required prior to following this guide:
 
 - QuestDB Enterprise binary with an active license
   - No license? [Contact us](/enterprise/contact/) for more information.
-- Use of a [supported file system](/docs/deployment/capacity-planning/#supported-filesystems)
+- Use of a [supported file system](/docs/operations/capacity-planning/#supported-filesystems)
   - A [Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page) is recommended to enable compression
 
 ## Installation guide
@@ -453,7 +453,7 @@ of Kubernetes is supported.
 QuestDB works together with your server operating system to achieve maximum
 performance. Prior to putting your server under heavy loads, consider checking
 your
-[kernel-based limitations](/docs/deployment/capacity-planning/#os-configuration).
+[kernel-based limitations](/docs/operations/capacity-planning/#os-configuration).
 
 Specifically, increase the limits for how many files can be opened by your OS
 and its users, and the maximum amount of virtual memory allowed. This helps

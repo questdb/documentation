@@ -12,7 +12,7 @@ To monitor various metrics of the QuestDB instances, refer to the
 [Prometheus monitoring](/docs/third-party-tools/prometheus/) page or the
 [Logging & Monitoring](/docs/operations/logging-metrics/) page.
 
-Refer to [Capacity planning](/docs/deployment/capacity-planning/) for deployment
+Refer to [Capacity planning](/docs/operations/capacity-planning/) for deployment
 considerations.
 
 ## Optimizing queries
@@ -101,7 +101,7 @@ This example adds a `symbol` type with:
 - **index** for the symbol column with a storage block value
 
 A full description of the options used above for `symbol` types can be found in
-the [CREATE TABLE](/docs/reference/sql/create-table/#symbol) page.
+the [CREATE TABLE](/docs/reference/sql/create-table/#symbols) page.
 
 #### Symbol caching
 

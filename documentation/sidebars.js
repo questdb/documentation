@@ -446,6 +446,7 @@ module.exports = {
         "guides/compression-zfs",
         "reference/api/java-embedded",
         "guides/import-csv",
+        "guides/mat-views",
         "guides/modifying-data",
         "guides/replication-tuning",
         "guides/working-with-timestamps-timezones",

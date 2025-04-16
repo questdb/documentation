@@ -70,7 +70,7 @@ Configure the thread pools, buffer and queue sizes, receiver IP address and
 port, load balancing, and more.
 
 For more guidance in how to tune QuestDB, see
-[capacity planning](/docs/deployment/capacity-planning/).
+[capacity planning](/docs/operations/capacity-planning/).
 
 ## Transport selection
 
