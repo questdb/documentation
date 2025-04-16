@@ -201,10 +201,11 @@ strategy, with 3 timestamp buckets per day.
 If the `PARTITION BY` clauses is omitted, the partitioning scheme is
 automatically inferred from the `SAMPLE BY` clause.
 
-| -------------- | --------------------- | | Interval | Default partitioning | |
--------------- | --------------------- | | &gt; 1 hour | `PARTITION BY YEAR` | |
-&gt; 1 minute | `PARTITION BY MONTH` | | &lt;= 1 minute | `PARTITION BY DAY` | |
--------------- | --------------------- |
+| Interval       | Default partitioning  |
+| -------------- | --------------------- |
+| &gt; 1 hour    | `PARTITION BY YEAR`   |
+| &gt; 1 minute  | `PARTITION BY MONTH`  |
+| &lt;= 1 minute | `PARTITION BY DAY`    |
 
 #### TTL
 
@@ -267,12 +268,12 @@ Here's how you can check today's trading data:
 trades_OHLC_15m WHERE timestamp IN today();
 ```
 
-| timestamp                   | symbol   | open    | high    | low     | close   | volume             |
+| timestamp                   | symbol   | open    | high    | low     | close   | volume             |     |
 | --------------------------- | -------- | ------- | ------- | ------- | ------- | ------------------ | --- |
-| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |
-| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |
-| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |
-| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |
+| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |     |
+| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |     |
+| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |     |
+| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |     |
 | ...                         | ...      | ...     | ...     | ...     | ...     | ...                | ... |
 
 ### How much faster is it?
