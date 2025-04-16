@@ -201,11 +201,11 @@ strategy, with 3 timestamp buckets per day.
 If the `PARTITION BY` clauses is omitted, the partitioning scheme is
 automatically inferred from the `SAMPLE BY` clause.
 
-| Interval       | Default partitioning  |
-| -------------- | --------------------- |
-| &gt; 1 hour    | `PARTITION BY YEAR`   |
-| &gt; 1 minute  | `PARTITION BY MONTH`  |
-| &lt;= 1 minute | `PARTITION BY DAY`    |
+| Interval       | Default partitioning |
+|----------------|----------------------|
+| &gt; 1 hour    | `PARTITION BY YEAR`  |
+| &gt; 1 minute  | `PARTITION BY MONTH` |
+| &lt;= 1 minute | `PARTITION BY DAY`   |
 
 #### TTL
 
@@ -257,13 +257,13 @@ Here's how you can check today's trading data:
 trades_OHLC_15m WHERE timestamp IN today();
 ```
 
-| timestamp                   | symbol   | open    | high    | low     | close   | volume             |     |
-| --------------------------- | -------- | ------- | ------- | ------- | ------- | ------------------ | --- |
-| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |     |
-| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |     |
-| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |     |
-| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |     |
-| ...                         | ...      | ...     | ...     | ...     | ...     | ...                | ... |
+| timestamp                   | symbol   | open    | high    | low     | close   | volume             |
+|-----------------------------|----------|---------|---------|---------|---------|--------------------|
+| 2025-03-31T00:00:00.000000Z | ETH-USD  | 1807.94 | 1813.32 | 1804.69 | 1808.58 | 1784.144071999995  |
+| 2025-03-31T00:00:00.000000Z | BTC-USD  | 82398.4 | 82456.5 | 82177.6 | 82284.5 | 34.47331241        |
+| 2025-03-31T00:00:00.000000Z | DOGE-USD | 0.16654 | 0.16748 | 0.16629 | 0.16677 | 3052051.6327359965 |
+| 2025-03-31T00:00:00.000000Z | AVAX-USD | 18.87   | 18.885  | 18.781  | 18.826  | 6092.852976000005  |
+| ...                         | ...      | ...     | ...     | ...     | ...     | ...                |
 
 ### How much faster is it?
 
@@ -312,7 +312,7 @@ ORDER BY timestamp, symbol;
 ```
 
 | timestamp                   | symbol    | open   | high   | low     | close  | volume             |
-| --------------------------- | --------- | ------ | ------ | ------- | ------ | ------------------ |
+|-----------------------------|-----------|--------|--------|---------|--------|--------------------|
 | 2025-03-30T00:00:00.000000Z | ADA-USD   | 0.6732 | 0.6744 | 0.671   | 0.6744 | 132304.36510000005 |
 | 2025-03-30T00:00:00.000000Z | ADA-USDC  | 0.6727 | 0.673  | 0.671   | 0.6729 | 15614.750700000002 |
 | 2025-03-30T00:00:00.000000Z | ADA-USDT  | 0.6732 | 0.6744 | 0.671   | 0.6744 | 132304.36510000005 |
@@ -332,7 +332,7 @@ ORDER BY timestamp, symbol;
 ```
 
 | timestamp                   | symbol    | open   | high   | low     | close  | volume             |
-| --------------------------- | --------- | ------ | ------ | ------- | ------ | ------------------ |
+|-----------------------------|-----------|--------|--------|---------|--------|--------------------|
 | 2025-03-30T00:00:00.000000Z | ADA-USD   | 0.6732 | 0.6744 | 0.671   | 0.6744 | 132304.36510000005 |
 | 2025-03-30T00:00:00.000000Z | ADA-USDC  | 0.6727 | 0.673  | 0.671   | 0.6729 | 15614.750700000002 |
 | 2025-03-30T00:00:00.000000Z | ADA-USDT  | 0.6732 | 0.6744 | 0.671   | 0.6744 | 132304.36510000005 |
@@ -353,12 +353,7 @@ useful.
 
 ### Beta
 
-- Full refreshes over large datasets may exhaust RSS i.e. run out of memory.
-  - This will be amended to perform the full refresh in stages, bounding memory
-    usage.
-- Not all `SAMPLE BY` syntax is well-supported, for example time zones and
-  fills.
-  - We will support these features in future.
+- Not all `SAMPLE BY` syntax is supported, for example, `FILL`.
 - The `INCREMENTAL` refresh strategy relies on deduplicated inserts (O3 writes)
   - We will instead delete a time range and insert the data as an append, which
     is **much** faster.
@@ -372,7 +367,7 @@ useful.
     - `PERIODIC` (once per partition),
     - `TIMER` (once per time interval)
     - `MANUAL` (only when manually triggered)
-- `INCREMENTAL` refresh is only triggered by inserts into the `base` table.
+- `INCREMENTAL` refresh is only triggered by inserts into the `base` table, not join tables.
 
 ## LATEST ON materialized views
 
@@ -387,7 +382,7 @@ Then, there is one row with `B`, at the start of the data set, and the rest are
 `A`.
 
 Unfortunately, the database will scan backwards and scan all 100 million rows of
-data just to find the `B` entry.
+data, just to find the `B` entry.
 
 But materialized views offer a solution to this performance issue too!
 
@@ -497,11 +492,11 @@ per day of data.
 
 SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
     SELECT timestamp,
-                symbol,
-		side,
-		last(price) AS price,
-		last(amount) AS amount,
-		last(timestamp) as latest
+           symbol,
+           side,
+           last(price) AS price,
+           last(amount) AS amount,
+           last(timestamp) as latest
     FROM trades
     WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z'
     SAMPLE BY 1d
@@ -547,7 +542,7 @@ SELECT symbol, side, price, amount, "latest" as timestamp FROM (
 And in just a few milliseconds, we get the result:
 
 | symbol   | side | price   | amount    | timestamp                   |
-| -------- | ---- | ------- | --------- | --------------------------- |
+|----------|------|---------|-----------|-----------------------------|
 | ETH-BTC  | sell | 0.02196 | 0.005998  | 2025-03-31T14:24:18.916000Z |
 | DAI-USDT | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
 | DAI-USD  | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
@@ -614,7 +609,7 @@ FROM materialized_views();
 Here is an example output:
 
 | view_name   | last_refresh_timestamp | view_status | base_table_txn | applied_base_table_txn |
-| ----------- | ---------------------- | ----------- | -------------- | ---------------------- |
+|-------------|------------------------|-------------|----------------|------------------------|
 | trades_view | null                   | valid       | 102            | 102                    |
 
 When `base_table_txn` matches `applied_base_table_txn`, the materialized view is
@@ -634,7 +629,7 @@ FROM materialized_views();
 ```
 
 | view_name     | base_table_name | view_status | invalidation_reason                          |
-| ------------- | --------------- | ----------- | -------------------------------------------- |
+|---------------|-----------------|-------------|----------------------------------------------|
 | trades_view   | trades          | valid       | null                                         |
 | exchange_view | exchange        | invalid     | [-105] table does not exist [table=exchange] |
 
