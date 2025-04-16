@@ -226,6 +226,17 @@ CREATE MATERIALIZED VIEW trades_OHLC_15m AS
   SAMPLE BY 15m;
 ```
 
+The database automatically assigns `PARTITION BY` unit based on the `SAMPLE BY`
+interval from the materialized view query. In this case, the interval is one
+hour, so the `PARTITION BY WEEK` partitioning will be used for the view.
+
+The rules for the `PARTITION BY` unit selection are the following:
+
+- If the `SAMPLE BY` interval is greater than one hour, `PARTITION BY YEAR` will
+  be used.
+- If the interval is greater than one minute, `PARTITION BY MONTH` will be used.
+- Otherwise, `PARTITION BY DAY` will be used.
+
 ## Querying materialized views
 
 :::note
