@@ -17,7 +17,7 @@ It covers:
 
 - A [conceptual overview](/docs/operations/rbac/#rbac-conceptual-review)
 - [Permission reference](/docs/operations/rbac/#permissions) with
-  [examples](/docs/operations/rbac/#database-vs-table-vs-column-permissions)
+  [examples](/docs/operations/rbac/#permission-levels)
 - Full list of related
   [SQL statements](/docs/operations/rbac/#full-sql-grammar-list)
 - Special cases such as within the

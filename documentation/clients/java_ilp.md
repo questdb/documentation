@@ -96,11 +96,12 @@ The valid transport protocols are:
 - `tcp`: ILP/TCP
 - `tcps`: ILP/TCP with TLS encryption
 
-A [transport protocol](#transport-selection) and the key `addr=host:port` are
-required. The key `addr` defines the hostname and port of the QuestDB server. If
-the port is not specified, it defaults to 9000 for HTTP(s) transports and 9009
-for TCP(s) transports. For a complete list of options, refer to the
-[Configuration Options](#configuration-options) section.
+A [transport protocol](/docs/reference/api/ilp/overview/#transport-selection)
+and the key `addr=host:port` are required. The key `addr` defines the hostname
+and port of the QuestDB server. If the port is not specified, it defaults to
+9000 for HTTP(s) transports and 9009 for TCP(s) transports. For a complete list
+of options, refer to the [Configuration Options](#configuration-options)
+section.
 
 ## Example with TLS and Authentication enabled
 

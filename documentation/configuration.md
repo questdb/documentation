@@ -96,9 +96,9 @@ export QDB_SHARED_WORKER_COUNT=5
 
 ## Reloadable settings
 
-Certain configuration settings can be reloaded without having to restart
-the server. To reload a setting, edit its value in the `server.conf` file
-and then run the `reload_config` SQL function:
+Certain configuration settings can be reloaded without having to restart the
+server. To reload a setting, edit its value in the `server.conf` file and then
+run the `reload_config` SQL function:
 
 ```questdb-sql title="Reload server configuration"
 SELECT reload_config();
@@ -145,9 +145,10 @@ configuration) every other subsystem.
 
 ### HTTP server
 
-This section describes configuration settings for the [Web Console](/docs/web-console/) and the REST
-API available by default on port `9000`. For details on the use of this
-component, refer to the [web console documentation](/docs/web-console/) page.
+This section describes configuration settings for the
+[Web Console](/docs/web-console/) and the REST API available by default on port
+`9000`. For details on the use of this component, refer to the
+[web console documentation](/docs/web-console/) page.
 
 <ConfigTable rows={httpConfig} />
 
@@ -173,16 +174,16 @@ CSV files.
 Settings for `COPY`:
 
 <ConfigTable
-rows={csvImportConfig}
-pick={[
-"cairo.sql.copy.root",
-"cairo.sql.copy.work.root",
-"cairo.iouring.enabled",
-"cairo.sql.copy.buffer.size",
-"cairo.sql.copy.log.retention.days",
-"cairo.sql.copy.max.index.chunk.size",
-"cairo.sql.copy.queue.capacity",
-]}
+  rows={csvImportConfig}
+  pick={[
+    "cairo.sql.copy.root",
+    "cairo.sql.copy.work.root",
+    "cairo.iouring.enabled",
+    "cairo.sql.copy.buffer.size",
+    "cairo.sql.copy.log.retention.days",
+    "cairo.sql.copy.max.index.chunk.size",
+    "cairo.sql.copy.queue.capacity",
+  ]}
 />
 
 #### CSV import configuration for Docker
@@ -238,12 +239,12 @@ PostgresSQL wire protocol.
 This section describes ingestion settings for incoming messages using InfluxDB
 Line Protocol.
 
-| Property                      | Default | Description                                                                                                                                                                |
+| Property                     | Default | Description                                                                                                                                                                |
 | ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
 | line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
-| line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                   |
-| line.log.message.on.error   | true    | Controls whether malformed ILP messages are printed to the server log when errors occur.                                                                                   |
+| line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                    |
+| line.log.message.on.error    | true    | Controls whether malformed ILP messages are printed to the server log when errors occur.                                                                                   |
 
 #### HTTP specific settings
 
@@ -263,8 +264,9 @@ ILP over HTTP is the preferred way of ingesting data.
 
 :::note
 
-The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend ILP over
-HTTP instead, or less frequently [ILP over TCP](/docs/reference/api/ilp/overview/).
+The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend ILP
+over HTTP instead, or less frequently
+[ILP over TCP](/docs/reference/api/ilp/overview/).
 
 :::
 
@@ -286,7 +288,7 @@ For setup instructions, see the
 For an overview of the concept, see the
 [replication concept](/docs/concept/replication/) page.
 
-For a tuning guide see... the
+For a tuning guide see, the
 [replication tuning guide](/docs/guides/replication-tuning/).
 
 <ConfigTable rows={replicationConfig} />
@@ -295,12 +297,13 @@ For a tuning guide see... the
 
 :::note
 
-Identity and Access Management is available within [QuestDB Enterprise](/enterprise/).
+Identity and Access Management is available within
+[QuestDB Enterprise](/enterprise/).
 
 :::
 
-Identity and Access Management (IAM) ensures that data can be accessed only
-by authorized users. The below configuration properties relate to various
+Identity and Access Management (IAM) ensures that data can be accessed only by
+authorized users. The below configuration properties relate to various
 authentication and authorization features.
 
 For a full explanation of IAM, see the
@@ -316,8 +319,9 @@ OpenID Connect is [Enterprise](/enterprise/) only.
 
 :::
 
-OpenID Connect (OIDC) support is part of QuestDB's Identity and Access Management.
-The database can be integrated with any OAuth2/OIDC Identity Provider (IdP).
+OpenID Connect (OIDC) support is part of QuestDB's Identity and Access
+Management. The database can be integrated with any OAuth2/OIDC Identity
+Provider (IdP).
 
 For detailed information about OIDC, see the
 [OpenID Connect (OIDC) integration guide](/docs/operations/openid-connect-oidc-integration).
@@ -337,9 +341,10 @@ database to fail its startup.
   rows={{
     "config.validation.strict": {
       default: "false",
-      description: "When enabled, startup fails if there are configuration errors.",
-      reloadable: false
-    }
+      description:
+        "When enabled, startup fails if there are configuration errors.",
+      reloadable: false,
+    },
   }}
 />
 
@@ -356,18 +361,20 @@ information, and we do not share any of this data with third parties.
     "telemetry.enabled": {
       default: "true",
       description: "Enable or disable anonymous usage metrics collection.",
-      reloadable: false
+      reloadable: false,
     },
     "telemetry.hide.tables": {
       default: "false",
-      description: "Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view.",
-      reloadable: false
+      description:
+        "Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view.",
+      reloadable: false,
     },
     "telemetry.queue.capacity": {
       default: "512",
-      description: "Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking.",
-      reloadable: false
-    }
+      description:
+        "Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking.",
+      reloadable: false,
+    },
   }}
 />
 
@@ -375,23 +382,15 @@ information, and we do not share any of this data with third parties.
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
-environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
 3. Post on our [Discourse community](https://community.questdb.com/)
 
 :::
-
 
 The following settings are available in `server.conf`:
 
@@ -403,4 +402,6 @@ The following settings are available in `server.conf`:
 
 <ConfigTable rows={logConfig} />
 
-Further settings are available in `log.conf`. For more information, and details of our Prometheus metrics, please visit the [Logging & Metrics](/docs/operations/logging-metrics/) documentation.
+Further settings are available in `log.conf`. For more information, and details
+of our Prometheus metrics, please visit the
+[Logging & Metrics](/docs/operations/logging-metrics/) documentation.

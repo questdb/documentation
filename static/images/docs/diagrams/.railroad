@@ -376,6 +376,11 @@ createMatViewDef
   (viewTargetVolumeDef)?
   ('OWNED' 'BY' ownerName)?
 
+createMatViewCompactDef
+  ::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
+  'AS'
+  (query)
+
 alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
 

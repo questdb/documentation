@@ -18,7 +18,7 @@ for other types will be added over time.
 The following are ways to index a `symbol` column:
 
 - At table creation time using
-  [CREATE TABLE](/docs/reference/sql/create-table/#index)
+  [CREATE TABLE](/docs/reference/sql/create-table/#column-indexes)
 - Using
   [ALTER TABLE ALTER COLUMN ADD INDEX](/docs/reference/sql/alter-table-alter-column-add-index/)
   to index an existing `symbol` column

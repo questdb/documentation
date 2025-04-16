@@ -310,5 +310,5 @@ The following functions allow querying tables with filters and using the results
 as part of a function:
 
 - [table_columns()](/docs/reference/function/meta/#table_columns)
-- [tables()](/docs/reference/function/meta/#all_tables)
+- [tables()](/docs/reference/function/meta/#tables)
 - [table_partitions()](/docs/reference/function/meta/#table_partitions)
