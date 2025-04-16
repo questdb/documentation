@@ -31,4 +31,4 @@ ALTER TABLE employees ALTER COLUMN department SYMBOL CAPACITY 10000;
 - The operation does not rewrite existing data in partitions, making it an efficient way to adjust SYMBOL column configurations.
 - The new capacity value must be a positive integer.
 - The specified capacity will be automatically ceiled to the next power of two.
-- If you need to both change the data type and capacity, refer to the [ALTER TABLE COLUMN TYPE](/docs/reference/sql/alter-table-column-type/) documentation.
+- If you need to both change the data type and capacity, refer to the [ALTER TABLE COLUMN TYPE](/docs/reference/sql/alter-table-change-column-type/) documentation.
