@@ -375,10 +375,9 @@ information, and we do not share any of this data with third parties.
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use. Please
-let us know if you run into issues.
+Materialized View support is in **beta**. It may not be fit for production use.
 
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
