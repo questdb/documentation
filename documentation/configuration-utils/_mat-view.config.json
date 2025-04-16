@@ -1,7 +1,7 @@
 {
   "cairo.mat.view.enabled": {
-    "default": "false",
-    "description": "Enables SQL support and refresh job for materialized views."
+    "default": "true",
+    "description": "Enables or disables SQL support and refresh job for materialized views."
   },
   "cairo.mat.view.parallel.sql.enabled": {
     "default": "true",

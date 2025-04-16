@@ -7,15 +7,8 @@ description:
 
 :::info
 
-Materialized View support is in **beta**.
-
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in
-`server.conf`, or export the equivalent environment variable:
-`QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
+Materialized View support is in **beta**. It may not be fit for production use. Please
+let us know if you run into issues.
 
 Either:
 
@@ -228,18 +221,18 @@ OWNED BY analysts;
 ## Compact syntax
 
 The `CREATE MATERIALIZED VIEW` statement also supports a compact syntax
-which can be used when the default paramaters are sufficient.
+which can be used when the default parameters are sufficient.
 
 ![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly_prices AS
-  SELECT
-    timestamp,
-    symbol,
-    avg(price) AS avg_price
-  FROM trades
-  SAMPLE BY 1h;
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1h;
 ```
 
 For more on the semantics of the compact syntax, see the [materialized view guide](/docs/guides/mat-views/#compact-syntax).
