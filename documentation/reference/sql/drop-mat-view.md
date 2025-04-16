@@ -17,13 +17,12 @@ Please let us know if you run into issues. Either:
 
 :::
 
-
 `DROP MATERIALIZED VIEW` permanently deletes a materialized view and its
 contents.
 
 The deletion is **permanent** and **not recoverable**, except if the view was
-created in a non-standard volume. In such cases, the view is only logically removed while the underlying data
-remains intact in its volume.
+created in a non-standard volume. In such cases, the view is only logically
+removed while the underlying data remains intact in its volume.
 
 Disk space is reclaimed asynchronously after the materialized view is dropped.
 
@@ -47,6 +46,6 @@ it exists.
 
 ## See also
 
-For more information on the concept, see the
-the [introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/)
-on materialized views.
+For more information on the concept, see the the
+[introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/) on
+materialized views.

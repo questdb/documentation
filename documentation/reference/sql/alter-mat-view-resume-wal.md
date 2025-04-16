@@ -18,16 +18,12 @@ Please let us know if you run into issues. Either:
 
 :::
 
-
 `ALTER MATERIALIZED VIEW RESUME WAL` restarts
 [WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors.
 
 Accepts the same optional `sequencerTxn` input as the
 [`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/)
 operation. Refer to that page for more details.
-
-
-
 
 ## Syntax
 
