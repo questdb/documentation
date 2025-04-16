@@ -40,6 +40,12 @@ To create a materialized view, manually enter the parameters and settings:
 
 ![Flow chart showing the syntax of the CREATE MATERIALIZED VIEW keyword](/images/docs/diagrams/createMatViewDef.svg)
 
+:::tip
+
+For simple materialized views, you can alternatively use the [compact syntax](#compact-syntax).
+
+:::
+
 ## Metadata
 
 To check materialized view metadata, use the `materialized_views()` function,
@@ -222,7 +228,9 @@ OWNED BY analysts;
 ## Compact syntax
 
 The `CREATE MATERIALIZED VIEW` statement also supports a compact syntax
-which can be used when one is happy with default parameters.
+which can be used when the default paramaters are sufficient.
+
+![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly_prices AS
@@ -231,10 +239,10 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS
     symbol,
     avg(price) AS avg_price
   FROM trades
-  SAMPLE BY 1h
+  SAMPLE BY 1h;
 ```
 
-For more on this logic, see the [materialized view guide](/docs/guides/mat-views/#compact-syntax).
+For more on the semantics of the compact syntax, see the [materialized view guide](/docs/guides/mat-views/#compact-syntax).
 
 ## Query constraints
 

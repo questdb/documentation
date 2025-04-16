@@ -140,9 +140,11 @@ calculated in `15m` time buckets.
 6. No TTL is defined 
     - Therefore, the materialized view will contain a summary of _all_ the base `trades` table's data.
 
-:::note
+:::tip
 
 This particular example can also be written via the [compact syntax](#compact-syntax).
+
+:::
 
 #### The view name
 
