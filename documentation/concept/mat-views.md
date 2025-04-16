@@ -8,17 +8,9 @@ description:
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in
-`server.conf`, or export the equivalent environment variable:
-`QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
@@ -43,7 +35,7 @@ CREATE TABLE 'trades' (
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 ```
 
 Queries that rely on a specific subset of the data (say, the last hour) will
@@ -86,9 +78,7 @@ To create a materialize view, surround your `SAMPLE BY` or time-based `GROUP BY`
 query with a [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view) statement.
 
 ```questdb-sql title="trades_notional_1m ddl"
-CREATE MATERIALIZED VIEW 'trades_notional_1m' 
-WITH BASE 'trades' REFRESH INCREMENTAL 
-AS (
+CREATE MATERIALIZED VIEW 'trades_notional_1m' AS (
   SELECT
     timestamp,
     symbol,
@@ -142,4 +132,3 @@ but does not yet support all query types.
 - **Configuration**
   - [Materialized views configs](/docs/configuration/#materialized-views):
     Server configuration options for materialized views from `server.conf`
-

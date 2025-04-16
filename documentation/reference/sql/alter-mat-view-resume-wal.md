@@ -8,16 +8,9 @@ description:
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
-environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
@@ -25,16 +18,12 @@ Either:
 
 :::
 
-
 `ALTER MATERIALIZED VIEW RESUME WAL` restarts
 [WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors.
 
 Accepts the same optional `sequencerTxn` input as the
 [`ALTER TABLE RESUME WAL`](/docs/reference/sql/alter-table-resume-wal/)
 operation. Refer to that page for more details.
-
-
-
 
 ## Syntax
 

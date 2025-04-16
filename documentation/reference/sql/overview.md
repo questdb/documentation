@@ -385,13 +385,9 @@ run_query("UPDATE trades SET value = 9876 WHERE name = 'abc'")
 
 :::info
 
-Apache Parquet support is in **beta**.
+Apache Parquet support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
