@@ -194,13 +194,11 @@ For example, an `SAMPLE BY 8h` clause fits nicely with a `DAY` partitioning stra
 
 If the `PARTITION BY` clauses is omitted, the partitioning scheme is automatically inferred from the `SAMPLE BY` clause.
 
-| -------------- | --------------------- |
 | Interval       | Default partitioning  |
 | -------------- | --------------------- |
 | &gt; 1 hour    | `PARTITION BY YEAR`   |
 | &gt; 1 minute  | `PARTITION BY MONTH`  |
 | &lt;= 1 minute | `PARTITION BY DAY`    |
-| -------------- | --------------------- |
 
 #### TTL
 
