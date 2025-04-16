@@ -20,7 +20,7 @@ transactions.
 When `sequencerTxn` is not specified, the operation resumes the WAL apply job
 from the next uncommitted transaction, including the failed one.
 
-When `sequencerTxn` is not specified, the operation resumes the WAL apply job
+When `sequencerTxn` is specified, the operation resumes the WAL apply job
 from the provided `sequencerTxn` number explicitly.
 
 `ALTER TABLE RESUME WAL` is used to restart WAL table transactions after
