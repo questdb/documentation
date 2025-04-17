@@ -396,7 +396,7 @@ the `timestamp.string.fields` option. Set the timestamp format with the
 `timestamp.string.format` option, which adheres to the QuestDB timestamp format.
 
 See the
-[QuestDB timestamp](/docs/reference/function/date-time/#date-and-timestamp-format)
+[QuestDB timestamp](/docs/reference/function/date-time/#timestamp-format)
 documentation for more details.
 
 #### Example

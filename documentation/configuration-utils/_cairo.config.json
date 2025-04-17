@@ -413,7 +413,7 @@
   },
   "cairo.o3.partition.split.min.size": {
     "default": "50MB",
-    "description": "The estimated partition size on disk. This setting is one of the conditions to trigger [auto-partitioning](/docs/deployment/capacity-planning/#auto-partitioning)."
+    "description": "The estimated partition size on disk. This setting is one of the conditions to trigger [auto-partitioning](/docs/operations/capacity-planning/#auto-partitioning)."
   },
   "cairo.o3.last.partition.max.splits": {
     "default": "20",

@@ -59,7 +59,7 @@ questdb.exe [start|stop|status|install|remove] \
 
 | Option | Description                                                                                                                                                                                                             |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-d`   | Expects a `dir` directory value which is a folder that will be used as QuestDB's root directory. For more information and the default values, see the [default root](#default-root-directory) section below.            |
+| `-d`   | Expects a `dir` directory value which is a folder that will be used as QuestDB's root directory. For more information and the default values, see the [default root](#default-root-directory-1) section below.          |
 | `-t`   | Expects a `tag` string value which will be as a tag for the service. This option allows users to run several QuestDB services and manage them separately. If this option is omitted, the default tag will be `questdb`. |
 | `-f`   | Force re-deploying the [Web Console](/docs/web-console/). Without this option, the [Web Console](/docs/web-console/) is cached and deployed only when missing.                                                          |
 | `-n`   | Do not respond to the HUP signal. This keeps QuestDB alive after you close the terminal window where you started it.                                                                                                    |

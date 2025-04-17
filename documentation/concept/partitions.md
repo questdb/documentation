@@ -60,7 +60,7 @@ We recommend partitioning tables to benefit from the following advantages:
 - Enables out-of-order indexing. From QuestDB 7.2, heavily out-of-order commits
   can [split the partitions](#splitting-and-squashing-time-partitions) into
   parts to reduce
-  [write amplification](/docs/deployment/capacity-planning/#write-amplification).
+  [write amplification](/docs/operations/capacity-planning/#write-amplification).
 
 ## Checking time partition information
 

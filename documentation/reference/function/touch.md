@@ -26,9 +26,6 @@ Returns an `object` representing index state.
 }
 ```
 
-See the [Index documentation](/docs/concept/indexes/#index-capacity-1) for more
-information on how the above values are determined.
-
 ### General example
 
 Consider a table with an indexed symbol column:

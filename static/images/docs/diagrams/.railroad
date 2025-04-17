@@ -282,6 +282,9 @@ addColumn
 alterColumnType
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
 
+alterTableSymbolCapacity
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity  
+
 dropPartition
   ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
 
@@ -372,6 +375,11 @@ createMatViewDef
   )?
   (viewTargetVolumeDef)?
   ('OWNED' 'BY' ownerName)?
+
+createMatViewCompactDef
+  ::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
+  'AS'
+  (query)
 
 alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName

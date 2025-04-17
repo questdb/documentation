@@ -40,7 +40,7 @@ This command starts a Docker container from `questdb/questdb` image. In
 addition, it exposes some ports, allowing you to explore QuestDB.
 
 In order to configure QuestDB, it is recommended to mount a
-[volume](#v-parameter-to-mount-storage) to allow data persistance. This can be
+[volume](#-v-parameter-to-mount-storage) to allow data persistance. This can be
 done by adding a `-v` flag to the above command:
 
 ```

@@ -7,16 +7,9 @@ description:
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is in **beta**. It may not be fit for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
-environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
+Please let us know if you run into issues. Either:
 
 1. Email us at [support@questdb.io](mailto:support@questdb.io)
 2. Join our [public Slack](https://slack.questdb.com/)
@@ -30,13 +23,20 @@ materialized view.
 
 A materialized view holds the result set of the given query, and is
 automatically refreshed and persisted. For more information on the concept, see
-the [reference](/docs/concept/mat-views/) on materialized views.
+the [introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/)
+on materialized views.
 
 ## Syntax
 
 To create a materialized view, manually enter the parameters and settings:
 
 ![Flow chart showing the syntax of the CREATE MATERIALIZED VIEW keyword](/images/docs/diagrams/createMatViewDef.svg)
+
+:::tip
+
+For simple materialized views, you can alternatively use the [compact syntax](#compact-syntax).
+
+:::
 
 ## Metadata
 
@@ -47,7 +47,6 @@ documentation page.
 The following example demonstrate creating materialized views from basic
 statements, and introduces feature such as
 [partitioning](/glossary/database-partitioning/).
-
 
 ## Creating a view
 
@@ -115,7 +114,7 @@ AS (
 
 ## Partitioning
 
-`PARTITION BY` allows for specifying the
+`PARTITION BY` optionally allows specifying the
 [partitioning strategy](/docs/concept/partitions/) for the materialized view.
 
 Materialized views can be partitioned by one of the following:
@@ -129,12 +128,16 @@ Materialized views can be partitioned by one of the following:
 The partitioning strategy **cannot be changed** after the materialized view has
 been created.
 
+If unspecified, the `CREATE MATERIALIZED VIEW` statement will infer the
+[default partitioning strategy](/docs/guides/mat-views/#default-partitioning).
+
 ## Time To Live (TTL)
 
-A retention policy can be set on the materialized view, bounding how much data is stored.
+A retention policy can be set on the materialized view, bounding how much data
+is stored.
 
-Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right after
-`PARTITION BY <unit>`.
+Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right
+after `PARTITION BY <unit>`.
 
 Follow the `TTL` keyword with a number and a time unit, one of:
 
@@ -149,7 +152,8 @@ information on the behavior of this feature.
 
 :::note
 
-The time-to-live (TTL) for the materialized view can differ from the base table, depending on your needs.
+The time-to-live (TTL) for the materialized view can differ from the base table,
+depending on your needs.
 
 :::
 
@@ -191,11 +195,11 @@ Materialized view names follow the
 ## OWNED BY (Enterprise)
 
 When a user creates a new materialized view, they are automatically assigned all
-materialized view level permissions with the `GRANT` option for that view.
-This behaviour can can be overridden using `OWNED BY`.
+materialized view level permissions with the `GRANT` option for that view. This
+behaviour can can be overridden using `OWNED BY`.
 
-If the `OWNED BY` clause is used, the permissions instead go to the
-user, group, or service account named in that clause.
+If the `OWNED BY` clause is used, the permissions instead go to the user, group,
+or service account named in that clause.
 
 The `OWNED BY` clause cannot be omitted if the materialized view is created by
 an external user, as permissions cannot be granted to them.
@@ -212,3 +216,29 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ) PARTITION BY DAY
 OWNED BY analysts;
 ```
+
+## Compact syntax
+
+The `CREATE MATERIALIZED VIEW` statement also supports a compact syntax
+which can be used when the default parameters are sufficient.
+
+![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly_prices AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1h;
+```
+
+For more on the semantics of the compact syntax, see the [materialized view guide](/docs/guides/mat-views/#compact-syntax).
+
+## Query constraints
+
+There is a list of requirements for the queries that are used in materialized
+views. Refer to this
+[documentation section](/docs/guides/mat-views/#technical-requirements) to learn
+about them.

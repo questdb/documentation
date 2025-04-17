@@ -255,7 +255,7 @@ QuestDB supports the following filesystems:
 
 Other file systems are untested and while they may work, we do not officially
 support them. See the
-[filesystem compatibility](/docs/deployment/capacity-planning/#supported-filesystems)
+[filesystem compatibility](/docs/operations/capacity-planning/#supported-filesystems)
 section for more information.
 
 ## Further reading

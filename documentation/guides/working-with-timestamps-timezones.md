@@ -46,7 +46,7 @@ my_table;
 | 2021-06-08T16:45:45.123456Z | 13   |
 
 When inserting timestamps into a table, it is also possible to use
-[timestamp units](/docs/reference/function/date-time/#date-and-timestamp-format)
+[timestamp units](/docs/reference/function/date-time/#timestamp-format)
 to define the timestamp format, in order to process trailing zeros in exported
 data sources such as PostgreSQL:
 

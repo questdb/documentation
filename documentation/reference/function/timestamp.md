@@ -7,8 +7,8 @@ description: Timestamp function reference documentation.
 `timestamp(columnName)` elects a
 [designated timestamp](/docs/concept/designated-timestamp/):
 
-- during a [CREATE TABLE](/docs/reference/sql/create-table/#timestamp) operation
-- during a [SELECT](/docs/reference/sql/select#timestamp/) operation
+- during a [CREATE TABLE](/docs/reference/sql/create-table/#designated-timestamp) operation
+- during a [SELECT](/docs/reference/sql/select#timestamp) operation
   (`dynamic timestamp`)
 - when ingesting data via InfluxDB Line Protocol, for tables that do not already
   exist in QuestDB, partitions are applied automatically by day by default with
