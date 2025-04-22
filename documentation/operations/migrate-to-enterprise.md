@@ -108,8 +108,8 @@ Enterprise features would not be initialized and the database would not operate
 correctly.
 
 If you have a production instance of QuestDB Open Source and have already been 
-testing the new features of the Enterprise edition, delete all files and
-settings from this test instance first. If you had activated the replication
+testing the new features of the Enterprise edition on a second instance, ensure that you are starting
+with an empty database directory. If you had activated the replication
 features, this includes clearing out the object store.
 
 If you have a more complex migration scenario, please contact us and we'll be
