@@ -109,9 +109,11 @@ Enterprise features would not be initialized and the database would not operate
 correctly.
 
 If you have a production instance of QuestDB Open Source and have already been 
-testing the new features of the Enterprise edition on a second instance, ensure that you are starting
-with an empty database directory. If you had activated the replication
-features, this includes clearing out the object store.
+testing the new features of the Enterprise edition on a second instance,
+ensure that the two instances don't share any filesystem directories.
+If you had activated the replication features on this second instance and want
+to reuse the same object store location, you must first clear it to transfer
+ownership to the new migrated instance.
 
 If you have a more complex migration scenario, please contact us and we'll be
 happy to help with your specific setup.
