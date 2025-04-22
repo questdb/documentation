@@ -374,11 +374,12 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
-        "operations/capacity-planning",
         {
-          id: "configuration",
+          id: "operations/migrate-to-enterprise",
           type: "doc",
+          customProps: { tag: "Enterprise" },
         },
+        "operations/capacity-planning",
         "operations/command-line-options",
         "operations/backup",
         {
@@ -420,6 +421,10 @@ module.exports = {
           type: "doc",
           label: "Multi-primary ingestion",
           customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "configuration",
+          type: "doc",
         },
       ],
     },
