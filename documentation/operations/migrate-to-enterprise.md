@@ -60,6 +60,7 @@ to consult the latest changes and features.
 ### Step 2: Install and restart the database
 
 * Unpack the binaries in a directory of your choice.
+* Replace your existing QuestDB binaries with the new ones.
 * Stop the database.
 * Start the database with the new binaries _in place_.
 
