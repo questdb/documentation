@@ -82,16 +82,59 @@ generate a
 
 ### Step 4: Set up user accounts and permissions
 
-TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+First override the default admin credentials in `server.conf`.
+It is recommended to select a non-trivial username and password.
+```
+acl.admin.user=myadmin
+acl.admin.password=mypwd
+```
+The above settings will replace the default built-in admin account
+(`admin`/`quest`) to make the database safer.
+
+However, the password is still stored in the configuration file as
+plain text.
+We also recommend to create your own admin account(s), and completely
+disable the built-in admin.
+
+To create your own database administrators, start the database up, and
+login via the Web Console with the admin credentials specified previously
+in `server.conf`. Then create one or more admin accounts which will be
+used for database and user management.
+
+For example, the simplest way to create a full admin:
+```questdb-sql
+CREATE USER administrator WITH PASSWORD adminpwd;
+GRANT ALL TO administrator WITH GRANT OPTION;
+```
+
+The above `administrator` user replaces the built-in admin, which can be
+disabled now in the configuration file:
+```
+acl.admin.user.enabled=false
+```
+
+The built-in admin settings can stay in `server.conf`, and can be
+re-enabled in emergency situations, such as all database administrators
+have forgotten their passwords.
+
+Now we can go ahead and setup groups, user and service accounts with the
+help of the new database administrator(s).
+More details on this topic can be found in the
+[RBAC documentation](/docs/operations/rbac/#user-management).
+
+For setting up Single Sign-On (SSO), please, refer to the
+[OIDC Integration](/docs/operations/openid-connect-oidc-integration) guide,
+which explains how QuestDB integrates with OAuth2/OIDC providers in general.
+Although we cannot cover all OAuth2 providers, we also documented
+[PingFederate](/docs/guides/active-directory-pingfederate)
+and [Microsoft EntraID](/docs/guides/microsoft-entraid-oidc)
+example setups. Other providers should be configured similarly.
 
 ### Step 5: Setting up replication
 
 If you wish to use the replication features, continue with setting up the
 object store and `server.conf` changes as detailed in the
-[Database Replication](/docs/operations/replication/) guide.
+[Database Replication](/docs/operations/replication) guide.
 
 ## Unsupported Migration Workflows
 
