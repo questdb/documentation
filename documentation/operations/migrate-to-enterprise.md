@@ -93,7 +93,7 @@ The above settings will replace the default built-in admin account
 
 However, the password is still stored in the configuration file as
 plain text.
-We also recommend to create your own admin account(s), and completely
+We recommend to create your own admin account(s), and completely
 disable the built-in admin.
 
 To create your own database administrators, start the database up, and
@@ -129,6 +129,12 @@ Although we cannot cover all OAuth2 providers, we also documented
 [PingFederate](/docs/guides/active-directory-pingfederate)
 and [Microsoft EntraID](/docs/guides/microsoft-entraid-oidc)
 example setups. Other providers should be configured similarly.
+
+:::warning
+
+It is important to disable the built-in admin user for security purposes.
+
+:::
 
 ### Step 5: Setting up replication
 
