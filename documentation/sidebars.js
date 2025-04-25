@@ -144,7 +144,6 @@ module.exports = {
                     "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-column-type",
                     "reference/sql/alter-table-change-symbol-capacity",
-                    "reference/sql/alter-mat-view-change-symbol-capacity",
                   ],
                 },
                 {
