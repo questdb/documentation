@@ -384,6 +384,9 @@ createMatViewCompactDef
 alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
 
+alterMatViewSymbolCapacity
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity  
+
 refreshMatView
   ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL')
 
