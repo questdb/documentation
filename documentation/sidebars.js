@@ -144,9 +144,9 @@ module.exports = {
                     "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-column-type",
                     "reference/sql/alter-table-change-symbol-capacity",
+                    "reference/sql/alter-mat-view-change-symbol-capacity",
                   ],
                 },
-                "reference/sql/alter-mat-view-resume-wal",
                 {
                   id: "reference/sql/acl/alter-service-account",
                   type: "doc",
@@ -171,6 +171,14 @@ module.exports = {
                     "reference/sql/alter-table-set-type",
                     "reference/sql/alter-table-set-ttl",
                     "reference/sql/alter-table-squash-partitions",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER MATERIALIZED VIEW",
+                  items: [
+                    "reference/sql/alter-mat-view-change-symbol-capacity",
+                    "reference/sql/alter-mat-view-resume-wal",
                   ],
                 },
                 {
