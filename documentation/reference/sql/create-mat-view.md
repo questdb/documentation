@@ -238,7 +238,7 @@ SAMPLE BY 1h;
 For more on the semantics of the compact syntax, see the
 [materialized view guide](/docs/guides/mat-views/#compact-syntax).
 
-## SYMBOL column capacities
+## SYMBOL column capacity
 
 By default, SYMBOL column capacities in a materialized view are set to the same
 values as in the base table. It is also possible to change SYMBOL capacities via
