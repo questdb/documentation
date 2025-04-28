@@ -61,7 +61,7 @@ This optimization is particularly beneficial when:
 
 - The joined table is significantly larger than the main table
 - The filter on the joined table has low selectivity (doesn't filter out many rows)
-  The joined table is likely to be "cold" (not cached in memory)
+- The joined table is likely to be "cold" (not cached in memory)
 
 In these scenarios, the default parallel filtering strategy may process too many rows, resulting in a large intermediate
 result set that still needs to be joined. The binary search approach can be more efficient by working record-by-record
