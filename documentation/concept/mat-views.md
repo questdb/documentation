@@ -8,13 +8,9 @@ description:
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use.
+Materialized View support is now generally available (GA) and ready for production use!
 
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience!
 
 :::
 
