@@ -508,9 +508,9 @@ Returns a `table` including the following information:
 - `view_table_dir_name` - view directory name
 - `view_status` - view status: valid or invalid
 - `invalidation_reason` - message explaining why the view was marked as invalid
-- `base_table_txn` - the last committed transaction in the base table
-- `applied_base_table_txn` - the last base table transaction used to refresh the
+- `refresh_base_table_txn` - the last base table transaction used to refresh the
   materialized view
+- `base_table_txn` - the last committed transaction in the base table
 
 **Examples:**
 
@@ -518,9 +518,9 @@ Returns a `table` including the following information:
 materialized_views();
 ```
 
-| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql      | view_table_dir_name | view_status | invalidation_reason | base_table_txn | applied_base_table_txn |
-| --------- | ------------ | --------------- | --------------------------- | ------------- | ------------------- | ----------- | ------------------- | -------------- | ---------------------- |
-| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | query text... | trades_1h~10        | valid       |                     | 42             | 42                     |
+| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql      | view_table_dir_name | view_status | invalidation_reason | refresh_base_table_txn | base_table_txn |
+| --------- | ------------ | --------------- | --------------------------- | ------------- | ------------------- | ----------- | ------------------- | ---------------------- | -------------- |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | query text... | trades_1h~10        | valid       |                     | 42                     | 42             |
 
 ## version/pg_catalog.version
 
