@@ -8,7 +8,7 @@ description:
 
 :::info
 
-Materialized View support is now generally available (GA) and ready for production use!
+Materialized View support is now generally available (GA) and ready for production use.
 
 If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience!
 
