@@ -34,15 +34,12 @@ two parameters - the table aliases involved in the join.
 
 ```questdb-sql title="Optimizing ASOF join with binary search"
 SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
-  orders.ts, bid, md.market_data_symbol, 
-  orders.order_symbol, md.md_ts as order_ts, price
+  orders.ts, orders.price, md.ask, md.bid, md.order_ts
 FROM orders
 ASOF JOIN (
-  SELECT ts as md_ts, market_data_symbol, bid FROM market_data
-  WHERE market_data_symbol = 'sym_109'
-) md
-WHERE orders.ts > '2025-01-23T00:00:00.000000000Z'
-AND bid > price;
+  SELECT ts as order_ts, bid, ask FROM market_data
+  WHERE state = 'VALID'
+) md;
 ```
 
 #### How it works
