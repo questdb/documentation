@@ -55,6 +55,13 @@ With the `USE_ASOF_BINARY_SEARCH` hint, QuestDB changes the execution strategy:
    table
 2. It then iterates backward in a single thread until finding joined records that match the filter
 
+<Screenshot
+alt="Diagram showing execution of the USE_ASOF_BINARY_SEARCH hint"
+height={447}
+src="images/docs/concepts/asof-join-binary-search-strategy.svg"
+width={745}
+/>
+
 #### When to use
 
 This optimization is particularly beneficial when:

@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="800"
+   height="640"
+   viewBox="0 0 800 640"
+   version="1.1"
+   id="svg419"
+   sodipodi:docname="binary-search-strategy.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview421"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="3.209375"
+     inkscape:cx="257.21519"
+     inkscape:cy="374.68354"
+     inkscape:window-width="3840"
+     inkscape:window-height="2091"
+     inkscape:window-x="0"
+     inkscape:window-y="32"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg419" />
+  <!-- Background -->
+  <rect
+     width="800"
+     height="640"
+     fill="#21222c"
+     id="rect364"
+     x="-2.2620115"
+     y="0" />
+  <!-- Title -->
+  <text
+     x="400"
+     y="40"
+     font-family="Arial"
+     font-size="24"
+     text-anchor="middle"
+     font-weight="bold"
+     fill="#ffffff"
+     id="text366">Binary Search ASOF JOIN Strategy</text>
+  <!-- Tables -->
+  <g
+     id="g7734"
+     transform="translate(35.613361)">
+    <rect
+       x="115.39553"
+       y="100"
+       width="200"
+       height="80"
+       rx="10"
+       fill="#21222c"
+       stroke="#8be9fd"
+       stroke-width="2"
+       id="rect368" />
+  </g>
+  <text
+     x="250.88939"
+     y="145"
+     font-family="Arial"
+     font-size="16px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text370">Main Table</text>
+  <g
+     id="g7768"
+     transform="translate(-31.697983)">
+    <rect
+       x="510.53918"
+       y="100"
+       width="200"
+       height="80"
+       rx="10"
+       fill="#21222c"
+       stroke="#fc78c4"
+       stroke-width="2"
+       id="rect372" />
+    <text
+       x="607.84003"
+       y="145"
+       font-family="Arial"
+       font-size="16px"
+       text-anchor="middle"
+       fill="#ffffff"
+       id="text374">Joined Table</text>
+  </g>
+  <!-- Sequential Processing -->
+  <!-- Binary Search Operation -->
+  <rect
+     x="314.26334"
+     y="238.87674"
+     width="200"
+     height="80"
+     rx="10"
+     fill="#21222c"
+     stroke="#fc78c4"
+     stroke-width="2"
+     id="rect380" />
+  <text
+     x="413.93372"
+     y="264.65347"
+     font-family="Arial"
+     font-size="16px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text382"><tspan
+       sodipodi:role="line"
+       id="tspan5481"
+       x="413.93372"
+       y="264.65347">Binary Search</tspan><tspan
+       sodipodi:role="line"
+       id="tspan5483"
+       x="413.93372"
+       y="284.65347">the Joined table to</tspan><tspan
+       sodipodi:role="line"
+       x="413.93372"
+       y="304.65347"
+       id="tspan5485">find a matching timestamp</tspan></text>
+  <!-- Filter Operation -->
+  <rect
+     x="314.26334"
+     y="378.87674"
+     width="200"
+     height="80"
+     rx="10"
+     fill="#21222c"
+     stroke="#fc78c4"
+     stroke-width="2"
+     id="rect386" />
+  <text
+     x="414.26334"
+     y="404.38239"
+     font-family="Arial"
+     font-size="16px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text388"><tspan
+       sodipodi:role="line"
+       id="tspan574"
+       x="414.26334"
+       y="404.38239">Iterate the Joined table</tspan><tspan
+       sodipodi:role="line"
+       x="414.26334"
+       y="424.38239"
+       id="tspan578">backwards to find</tspan><tspan
+       sodipodi:role="line"
+       x="414.26334"
+       y="444.38239"
+       id="tspan9661">a row matching the filter</tspan></text>
+  <text
+     x="500"
+     y="435"
+     font-family="Arial"
+     font-size="14px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text390" />
+  <!-- Results -->
+  <rect
+     x="260.0119"
+     y="519.71912"
+     width="300"
+     height="80"
+     rx="10"
+     fill="#21222c"
+     stroke="#8be9fd"
+     stroke-width="2"
+     id="rect392"
+     style="stroke:url(#linearGradient28069);stroke-opacity:1" />
+  <text
+     x="411.85025"
+     y="565"
+     font-family="Arial"
+     font-size="16px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text394">Append to Results</text>
+  <!-- Arrows -->
+  <path
+     d="m 414.26333,318.283 v 56.2422"
+     fill="none"
+     stroke="#fc78c4"
+     stroke-width="2.90454"
+     marker-end="url(#arrow)"
+     id="path400"
+     style="marker-end:url(#Arrow3)" />
+  <path
+     d="m 416.9036,460.44093 v 56.2422"
+     fill="none"
+     stroke="#fc78c4"
+     stroke-width="2.90454"
+     marker-end="url(#arrow)"
+     id="path400-9"
+     style="marker-end:url(#Arrow3-6)" />
+  <path
+     d="m 666.30013,181.272 c 1.78115,17.5658 -0.7343,84.5914 -64.546,97.6435"
+     fill="none"
+     stroke="#fc78c4"
+     stroke-width="3"
+     marker-end="url(#arrow-3)"
+     id="path400-7"
+     style="marker-end:url(#Arrow3)"
+     sodipodi:nodetypes="cc"
+     class="UnoptimicedTransforms"
+     transform="translate(-85.736672,-1.1232656)" />
+  <path
+     d="m 666.30013,181.272 c 1.78115,17.5658 -0.7343,84.5914 -64.546,97.6435"
+     fill="none"
+     stroke="#fc78c4"
+     stroke-width="3"
+     marker-end="url(#arrow-3)"
+     id="path400-7-6"
+     style="marker-end:url(#Arrow3-9);stroke:#78f5fc;stroke-opacity:1"
+     sodipodi:nodetypes="cc"
+     class="UnoptimicedTransforms"
+     transform="matrix(-1,0,0,1,911.97464,-0.1895048)" />
+  <!-- Iterate to next record (dashed line) -->
+  <!-- Connection from Joined Table -->
+  <!-- Descriptions -->
+  <text
+     x="540.59631"
+     y="477.01627"
+     font-family="Arial"
+     font-size="14px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text410"><tspan
+       style="font-style:italic"
+       id="tspan580">Single-threaded</tspan></text>
+  <text
+     x="327.91077"
+     y="218.66769"
+     font-family="Arial"
+     font-size="14px"
+     text-anchor="middle"
+     fill="#ffffff"
+     id="text410-0"
+     inkscape:transform-center-x="-152.41571"
+     inkscape:transform-center-y="8.4554908"><tspan
+       style="font-style:italic"
+       id="tspan580-6">For each Main table row</tspan></text>
+  <!-- Markers -->
+  <defs
+     id="defs417">
+    <linearGradient
+       id="linearGradient28067"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#78f5fc;stop-opacity:1;"
+         offset="0"
+         id="stop28065" />
+    </linearGradient>
+    <linearGradient
+       id="linearGradient14966">
+      <stop
+         style="stop-color:#78fcfc;stop-opacity:1;"
+         offset="0"
+         id="stop14964" />
+      <stop
+         style="stop-color:#fa5dc5;stop-opacity:1;"
+         offset="1"
+         id="stop33480" />
+    </linearGradient>
+    <marker
+       style="overflow:visible"
+       id="Arrow3"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow3"
+       markerWidth="4.2071066"
+       markerHeight="6.9999995"
+       viewBox="0 0 4.2071068 7"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         id="arrow3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc" />
+    </marker>
+    <marker
+       id="arrow"
+       markerWidth="9"
+       markerHeight="6"
+       refX="9"
+       refY="3"
+       orient="auto"
+       viewBox="0 0 9 6"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 0,0 V 6 L 9,3 Z"
+         fill="#ffffff"
+         id="path414" />
+    </marker>
+    <marker
+       id="arrow-3"
+       markerWidth="9"
+       markerHeight="6"
+       refX="9"
+       refY="3"
+       orient="auto"
+       viewBox="0 0 9 6"
+       preserveAspectRatio="xMidYMid">
+      <path
+         d="M 0,0 V 6 L 9,3 Z"
+         fill="#ffffff"
+         id="path414-6" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Arrow3-6"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow3"
+       markerWidth="4.2071066"
+       markerHeight="6.9999995"
+       viewBox="0 0 4.2071068 7"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         id="arrow3-2"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Arrow3-9"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow3"
+       markerWidth="4.2071066"
+       markerHeight="6.9999995"
+       viewBox="0 0 4.2071068 7"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
+         d="M 3,-3 0,0 3,3"
+         id="arrow3-3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc" />
+    </marker>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient14966"
+       id="linearGradient28069"
+       x1="249"
+       y1="560"
+       x2="551"
+       y2="560"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(10.011905,-0.28085443)" />
+  </defs>
+  <rect
+     style="fill:#000000;stroke-width:3.315;stroke-dasharray:none"
+     id="rect7893"
+     width="2.144824"
+     height="0.37208268"
+     x="222.39194"
+     y="249.20522" />
+</svg>
