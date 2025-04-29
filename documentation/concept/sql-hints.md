@@ -34,10 +34,10 @@ This hint takes two parameters - the table aliases involved in the join.
 
 ```questdb-sql title="Optimizing ASOF join with binary search"
 SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
-  orders.ts, orders.price, md.ask, md.bid, md.order_ts
+  orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
-  SELECT ts as order_ts, bid, ask FROM market_data
+  SELECT ts as md_ts, bid, ask FROM market_data
   WHERE state = 'VALID'
 ) md;
 ```
