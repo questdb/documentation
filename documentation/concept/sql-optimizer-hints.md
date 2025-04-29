@@ -5,9 +5,10 @@ description:
   This document describes available hints and when to use them.
 ---
 
-QuestDB's query optimizer automatically selects execution plans for SQL queries based on heuristics. However, in some
-scenarios, the optimizer may not have all the information needed to choose the most efficient plan. SQL Hints provide
-a mechanism for expert users to influence the execution strategy without changing the semantic meaning of their queries.
+QuestDB's query optimizer automatically selects execution plans for SQL queries based on heuristics. The default
+execution strategy should be the fastest for most datasets. You may use hints to select a specific execution strategy
+which may (or may not) outperform the default strategy. SQL hints influence the execution strategy of queries without
+changing their semantics.
 
 ## Hint Syntax
 
