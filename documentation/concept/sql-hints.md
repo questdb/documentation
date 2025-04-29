@@ -38,7 +38,7 @@ SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */
 FROM orders
 ASOF JOIN (
   SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'VALID'
+  WHERE state = 'VALID';
 ) md;
 ```
 
