@@ -75,9 +75,11 @@ When joined table data is cold, the default strategy must read all rows from dis
 especially expensive on slower I/O systems like EBS (Elastic Block Storage). The binary search approach significantly
 reduces I/O operations by reading only the specific portions of data needed for each join operation.
 
-However, when a filter is highly selective (eliminates most rows), the binary search strategy may be less efficient. In
-these cases, the default strategy's parallel processing can filter the joined table more quickly, making it the better
-choice despite the initial full table scan.
+However, when a filter is highly selective (eliminates most rows), the binary search strategy may be less efficient.
+This happens because after finding a timestamp match, the strategy must iterate backward in a single thread, evaluating
+the filter condition at each step. With highly selective filters, this sequential processing becomes time-consuming. In
+contrast, the default strategy processes and filters the joined table in parallel, which can be much faster for highly
+selective filters despite requiring an initial full table scan.
 
 #### Execution Plan Observation
 To observe the execution plan for a query with the `USE_ASOF_BINARY_SEARCH` hint, you can use the 
