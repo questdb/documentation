@@ -489,6 +489,7 @@ module.exports = {
         },
         "concept/root-directory-structure",
         "concept/sql-extensions",
+        "concept/sql-optimizer-hints",
         "concept/storage-model",
         "concept/symbol",
         "concept/ttl",
