@@ -15,7 +15,7 @@ In QuestDB, SQL hints are specified as SQL block comments with a plus sign after
 be placed immediately after the SELECT keyword:
 
 ```questdb-sql title="SQL hint syntax"
-SELECT /*+ HINT_NAME(parameter1 parameter2) */ columns FROM table
+SELECT /*+ HINT_NAME(parameter1 parameter2) */ columns FROM table;
 ```
 
 Hints are entirely optional and designed to be a safe optimization mechanism:
@@ -29,8 +29,9 @@ Hints are entirely optional and designed to be a safe optimization mechanism:
 
 ### USE_ASOF_BINARY_SEARCH
 
-The `USE_ASOF_BINARY_SEARCH` hint enables a specialized optimization strategy for non-keyd [ASOF joins](/reference/sql/asof-join/).
-This hint takes two parameters - the table aliases involved in the join.
+The `USE_ASOF_BINARY_SEARCH` hint enables a specialized binary search optimization for
+non-keyed [ASOF joins](/reference/sql/asof-join/) when filtering is applied to the joined table. This hint requires two
+parameters that specify the table aliases participating in the join.
 
 ```questdb-sql title="Optimizing ASOF join with binary search"
 SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
@@ -38,7 +39,7 @@ SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */
 FROM orders
 ASOF JOIN (
   SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'VALID';
+  WHERE state = 'VALID' --filter on the joined table
 ) md;
 ```
 
