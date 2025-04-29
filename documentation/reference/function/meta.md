@@ -206,21 +206,11 @@ Returns a `table`.
 tables();
 ```
 
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | matView |
-| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | ------- |
-| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | false   |
-| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | false   |
-| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | false   |
-
-```questdb-sql title="All tables in reverse alphabetical order"
-tables() ORDER BY name DESC;
-```
-
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag  | walEnabled | directoryName    | dedup | matView |
-| --- | ----------- | ------------------- | ----------- | ------------------ | --------- | ---------- | ---------------- | ----- | ------- |
-| 2   | device_data | null                | NONE        | 10000              | 30000000  | false      | device_data      | false | false   |
-| 1   | my_table    | ts                  | DAY         | 500000             | 300000000 | false      | my_table         | false | false   |
-| 3   | short_lived | ts                  | HOUR        | 10000              | 30000000  | false      | short_lived (->) | false | false   |
+| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | ttlValue | ttlUnit | matView |
+| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | 0        | HOUR    | false   |
+| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | 0        | HOUR    | false   |
+| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | 1        | HOUR    | false   |
 
 :::note
 
@@ -233,9 +223,9 @@ tables() ORDER BY name DESC;
 tables() WHERE partitionBy = 'DAY';
 ```
 
-| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | matView |
-| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | ------- |
-| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | false   |
+| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup |     | ttlValue | ttlUnit | matView |
+| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | --- | -------- | ------- | ------- |
+| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | 0   | HOUR     | false   |
 
 ## table_storage
 
