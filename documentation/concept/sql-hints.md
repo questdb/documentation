@@ -1,5 +1,5 @@
 ---
-title: SQL Hints
+title: SQL optimizer hints
 description:
   SQL Hints allow expert users to guide the query optimizer in QuestDB when default optimization strategies are not optimal.
   This document describes available hints and when to use them.
