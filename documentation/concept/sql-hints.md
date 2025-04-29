@@ -108,3 +108,13 @@ indicating that the binary search strategy is being used.
 alt="Screen capture of the EXPLAIN output for USE_ASOF_BINARY_SEARCH"
 src="images/docs/concepts/filtered-asof-plan-example.png"
 />
+
+When executing the same query without the hint, QuestDB uses a different execution plan:
+
+- Instead of the `Filtered AsOf Join Fast Scan` operator, the plan uses the standard `AsOf Join` operator
+- The database applies filtering to the joined table in parallel before performing the join
+
+<Screenshot
+alt="Screen capture of the EXPLAIN output for default ASOF join"
+src="images/docs/concepts/default-asof-plan-example.png"
+/>
