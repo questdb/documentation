@@ -67,16 +67,16 @@ width={745}
 This optimization is particularly beneficial when:
 
 - The joined table is significantly larger than the main table
-- The filter on the joined table has low selectivity (doesn't filter out many rows)
-- The joined table is likely to be "cold" (not cached in memory)
+- The filter on the joined table has low selectivity (meaning it doesn't eliminate many rows)
+- The joined table data is likely to be "cold" (not cached in memory)
 
-In these scenarios, the default parallel filtering strategy may process too many rows, resulting in a large intermediate
-result set that still needs to be joined. The binary search approach can be more efficient by working record-by-record
-from the main table perspective.
+When joined table data is cold, the default strategy must read all rows from disk to evaluate the filter. This becomes
+especially expensive on slower I/O systems like EBS (Elastic Block Storage). The binary search approach significantly
+reduces I/O operations by reading only the specific portions of data needed for each join operation.
 
-When data is cold (not in cache), the default strategy must read all rows from the joined table from disk to evaluate
-the filter, which can be particularly expensive on slower I/O systems like EBS (Elastic Block Storage). The binary
-search approach can significantly reduce I/O operations by reading only relevant portions of the data.
+However, when a filter is highly selective (eliminates most rows), the binary search strategy may be less efficient. In
+these cases, the default strategy's parallel processing can filter the joined table more quickly, making it the better
+choice despite the initial full table scan.
 
 #### Performance trade-offs
 
