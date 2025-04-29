@@ -78,17 +78,6 @@ However, when a filter is highly selective (eliminates most rows), the binary se
 these cases, the default strategy's parallel processing can filter the joined table more quickly, making it the better
 choice despite the initial full table scan.
 
-#### Performance trade-offs
-
-- The binary search strategy processes records sequentially rather than in parallel
-- It may perform better when the joined table is very large relative to the main table
-- It's particularly useful when filters don't eliminate many rows from the joined table
-- It can significantly reduce I/O costs when working with cold data on slower storage systems
-- It's more efficient in environments with limited I/O bandwidth or high latency storage
-
-Use this hint when you observe that your ASOF join queries are slow and match the characteristics described above,
-especially in cloud environments where storage performance may be variable.
-
 ## Error Handling
 
 SQL hints in QuestDB are designed to be robust:
