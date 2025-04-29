@@ -77,9 +77,15 @@ reduces I/O operations by reading only the specific portions of data needed for 
 
 However, when a filter is highly selective (eliminates most rows), the binary search strategy may be less efficient.
 This happens because after finding a timestamp match, the strategy must iterate backward in a single thread, evaluating
-the filter condition at each step. With highly selective filters, this sequential processing becomes time-consuming. In
-contrast, the default strategy processes and filters the joined table in parallel, which can be much faster for highly
-selective filters despite requiring an initial full table scan.
+the filter condition at each step until it finds a matching row. With highly selective filters, this sequential search
+may need to examine many rows before finding a match.
+
+As a rule of thumb, the binary search strategy tends to outperform the default strategy when the filter eliminates less
+than 5% of rows from the joined table. However, optimal performance also depends on other factors such as the ratio
+between main and joined table sizes, available hardware resources, disk I/O performance, and data distribution.
+
+In contrast, the default strategy processes and filters the joined table in parallel, which can be much faster for
+highly selective filters despite requiring an initial full table scan.
 
 #### Execution Plan Observation
 To observe the execution plan for a query with the `USE_ASOF_BINARY_SEARCH` hint, you can use the 
