@@ -223,9 +223,9 @@ tables();
 tables() WHERE partitionBy = 'DAY';
 ```
 
-| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup |     | ttlValue | ttlUnit | matView |
-| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | --- | -------- | ------- | ------- |
-| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | 0   | HOUR     | false   |
+| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | ttlValue | ttlUnit | matView |
+| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | 0        | HOUR    | false   |
 
 ## table_storage
 
