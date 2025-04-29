@@ -29,8 +29,8 @@ Hints are entirely optional and designed to be a safe optimization mechanism:
 
 ### USE_ASOF_BINARY_SEARCH
 
-The `USE_ASOF_BINARY_SEARCH` hint enables a specialized optimization strategy for non-keyd ASOF joins. This hint takes
-two parameters - the table aliases involved in the join.
+The `USE_ASOF_BINARY_SEARCH` hint enables a specialized optimization strategy for non-keyd [ASOF joins](/reference/sql/asof-join/).
+This hint takes two parameters - the table aliases involved in the join.
 
 ```questdb-sql title="Optimizing ASOF join with binary search"
 SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
