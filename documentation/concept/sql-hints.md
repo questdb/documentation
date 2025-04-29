@@ -54,7 +54,8 @@ With the `USE_ASOF_BINARY_SEARCH` hint, QuestDB changes the execution strategy:
 
 1. For each record in the main table, it uses binary search to locate a record with a matching timestamp in the joined
    table
-2. It then iterates backward in a single thread until finding joined records that match the filter
+2. Starting from this located timestamp match, it then iterates backward through rows in the joined table, in a single
+   thread, until finding a row that matches the filter condition
 
 <Screenshot
 alt="Diagram showing execution of the USE_ASOF_BINARY_SEARCH hint"
