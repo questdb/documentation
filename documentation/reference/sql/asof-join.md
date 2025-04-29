@@ -364,7 +364,8 @@ ASOF JOIN (
 ) order_book;
 ```
 
-For more information on when and how to use these optimization hints, see the [SQL Hints](/concept/sql-hints/) documentation.
+For more information on when and how to use these optimization hints, see the [SQL Hints](/concept/sql-optimizer-hints/)
+documentation.
 
 ## SPLICE JOIN
 
