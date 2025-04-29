@@ -100,12 +100,3 @@ indicating that the binary search strategy is being used.
 alt="Screen capture of the EXPLAIN output for USE_ASOF_BINARY_SEARCH"
 src="images/docs/concepts/filtered-asof-plan-example.png"
 />
-
-## Error Handling
-
-SQL hints in QuestDB are designed to be robust:
-
-- If there are syntax errors inside a hint block, the entire query won't fail
-- The database will apply correctly parsed hints and ignore anything after an error
-- Unknown or invalid hints are safely ignored
-- The query execution falls back to default behavior when hints can't be applied
