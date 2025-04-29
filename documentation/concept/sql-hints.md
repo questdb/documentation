@@ -89,8 +89,8 @@ In contrast, the default strategy processes and filters the joined table in para
 highly selective filters despite requiring an initial full table scan.
 
 #### Execution Plan Observation
-To observe the execution plan for a query with the `USE_ASOF_BINARY_SEARCH` hint, you can use the 
-[`EXPLAIN` statement](/reference/sql/explain/):
+You can verify how QuestDB executes your query by examining its execution plan
+with the [`EXPLAIN` statement](/reference/sql/explain/):
 
 ```questdb-sql title="Observing execution plan with USE_ASOF_BINARY_SEARCH"
 EXPLAIN SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
@@ -101,19 +101,31 @@ ASOF JOIN (
   WHERE state = 'VALID'
 ) md;
 ```
-This will provide you with a detailed breakdown of the execution plan, including the use of the binary search strategy.
-When the hint is applied, you will see the `Filtered AsOf Join Fast Scan` operator in the plan,
-indicating that the binary search strategy is being used.
+
+When the hint is applied successfully, the execution plan will show a Filtered AsOf Join Fast Scan operator,
+confirming that the binary search strategy is being used:
 
 <Screenshot
 alt="Screen capture of the EXPLAIN output for USE_ASOF_BINARY_SEARCH"
 src="images/docs/concepts/filtered-asof-plan-example.png"
 />
 
-When executing the same query without the hint, QuestDB uses a different execution plan:
+For comparison, here's what happens without the hint:
 
-- Instead of the `Filtered AsOf Join Fast Scan` operator, the plan uses the standard `AsOf Join` operator
-- The database applies filtering to the joined table in parallel before performing the join
+```questdb-sql title="Observing execution plan without USE_ASOF_BINARY_SEARCH"
+EXPLAIN SELECT 
+  orders.ts, orders.price, md.md_ts, md.bid, md.ask
+FROM orders
+ASOF JOIN (
+  SELECT ts as md_ts, bid, ask FROM market_data
+  WHERE state = 'VALID'
+) md;
+```
+
+The execution plan will show:
+
+- A standard `AsOf Join` operator instead of `Filtered AsOf Join Fast Scan`
+- A separate filtering step that processes the joined table in parallel first
 
 <Screenshot
 alt="Screen capture of the EXPLAIN output for default ASOF join"
