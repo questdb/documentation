@@ -97,7 +97,7 @@ const config = {
     colorMode: {
       defaultMode: "dark",
       disableSwitch: true,
-      respectPrefersColorScheme: false,
+      respectPrefersColorScheme: false, // the user preference is also overriden, see ssr.template.js
     },
     image: "/images/og.gif",
     prism: {
