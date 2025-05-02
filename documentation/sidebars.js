@@ -120,6 +120,15 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "reference/sql/overview",
+        {
+          type: "category",
+          label: "PGWire Clients",
+          collapsed: false,
+          items: [
+             "pgwire/pgwire-intro",
+             "pgwire/python",
+          ]
+        },
         "reference/sql/datatypes",
         "concept/sql-execution-order",
         {
