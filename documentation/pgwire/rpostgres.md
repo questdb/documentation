@@ -59,7 +59,7 @@ It uses the DBI interface for a consistent workflow with other database types in
 
 Install the required packages from CRAN:
 
-```r
+```
 install.packages(c("RPostgres", "DBI"), repos = "https://cloud.r-project.org")
 ```
 
@@ -67,7 +67,7 @@ install.packages(c("RPostgres", "DBI"), repos = "https://cloud.r-project.org")
 
 Here's a basic example of connecting to QuestDB using RPostgres:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -100,7 +100,7 @@ if (dbIsValid(con)) {
 
 RPostgres with DBI provides several functions for executing queries:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -140,7 +140,7 @@ dbDisconnect(con)
 
 Using parameterized queries helps prevent SQL injection and improves code readability:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -180,7 +180,7 @@ dbDisconnect(con)
 
 Here's how to create, insert data, and query a table in QuestDB:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -220,7 +220,7 @@ dbDisconnect(con)
 
 You can easily work with R data frames, which is one of the most powerful features for data analysis:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -273,7 +273,7 @@ dbDisconnect(con)
 
 For applications that need multiple database connections, you can use the pool package:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 library(pool)
@@ -313,7 +313,7 @@ poolClose(pool)
 
 QuestDB provides specialized time-series functions that can be used with RPostgres:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
@@ -355,7 +355,7 @@ dbDisconnect(con)
 
 Here's how to integrate QuestDB with popular R analysis packages:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 library(dplyr)
@@ -515,7 +515,7 @@ For data type-related problems:
 
 Here's a complete example that demonstrates creating a table, inserting data, and performing time-series queries:
 
-```r
+```
 library(RPostgres)
 library(DBI)
 
