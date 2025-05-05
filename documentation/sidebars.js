@@ -130,6 +130,7 @@ module.exports = {
              "pgwire/javascript",
              "pgwire/java",
              "pgwire/c-sharp",
+             "pgwire/php",
           ]
         },
         "reference/sql/datatypes",
