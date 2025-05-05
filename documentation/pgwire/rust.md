@@ -60,13 +60,13 @@ PostgreSQL-compatible databases, including QuestDB.
 
 To use tokio-postgres in your Rust project, add the following dependencies to your `Cargo.toml`:
 
-```toml
+```
 [dependencies]
 tokio = { version = "1.28", features = ["full"] }
 tokio-postgres = "0.7.9"
 ```
 
-If you need TLS support, you can add one of these optional dependencies:
+For TLS connectivity with QuestDB Enterprise, add one of these optional dependency sets to your project:
 
 ```toml
 # For OpenSSL support

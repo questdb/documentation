@@ -1,5 +1,5 @@
 ---
-title: PGWire Java clients
+title: Java clients
 description:
   Java clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with Java for querying data. 

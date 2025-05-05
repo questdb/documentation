@@ -1,5 +1,5 @@
 ---
-title: JavaScript
+title: JavaScript clients
 description:
   JavaScript clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with JavaScript for querying data. 
