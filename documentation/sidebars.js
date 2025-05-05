@@ -133,6 +133,7 @@ module.exports = {
              "pgwire/c-sharp",
              "pgwire/go",
              "pgwire/php",
+             "pgwire/rpostgres",
           ]
         },
         "reference/sql/datatypes",
