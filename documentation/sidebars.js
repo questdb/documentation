@@ -128,7 +128,8 @@ module.exports = {
              "pgwire/pgwire-intro",
              "pgwire/python",
              "pgwire/javascript",
-             "pgwire/java"
+             "pgwire/java",
+             "pgwire/c-sharp",
           ]
         },
         "reference/sql/datatypes",
