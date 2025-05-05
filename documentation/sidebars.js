@@ -131,6 +131,7 @@ module.exports = {
              "pgwire/javascript",
              "pgwire/java",
              "pgwire/c-sharp",
+             "pgwire/go",
              "pgwire/php",
           ]
         },
