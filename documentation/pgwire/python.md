@@ -917,17 +917,17 @@ For optimal query performance with QuestDB:
 
 QuestDB provides specialized time-series functions that work with all PGWire clients:
 
-```python
+```
 # Example time-series query patterns
 
 # 1. Sample by query (works with all clients)
 """
 SELECT 
     ts,
-    avg(value) as avg_value
-FROM sensors
-WHERE ts >= '2023-01-01'
-SAMPLE BY 1h
+    avg(price) as avg_value
+FROM trades
+WHERE timestamp >= '2020-01-01'
+SAMPLE BY 1h;
 """
 
 # 2. Latest by query (efficient way to get most recent values)

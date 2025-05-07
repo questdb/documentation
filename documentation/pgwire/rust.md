@@ -63,7 +63,8 @@ To use tokio-postgres in your Rust project, add the following dependencies to yo
 ```
 [dependencies]
 tokio = { version = "1.28", features = ["full"] }
-tokio-postgres = "0.7.9"
+tokio-postgres = {  version = "0.7.9", features = ["with-chrono-0_4"] }
+chrono = "0.4.40"
 ```
 
 For TLS connectivity with QuestDB Enterprise, add one of these optional dependency sets to your project:
@@ -91,8 +92,8 @@ async fn main() -> Result<(), Error> {
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
     
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own
+    // Spawn a background task that keeps the connection alive for its entire lifetime
+    // This task will terminate only when the connection closes
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
@@ -152,36 +153,44 @@ async fn main() -> Result<(), Error> {
 Here's how to execute a simple query and process the results:
 
 ```rust
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio_postgres::{NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
+    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
-    // Execute a query
+
     let rows = client.query("SELECT * FROM trades LIMIT 10", &[]).await?;
-    
-    // Process the results
+
     println!("Recent trades:");
     for row in rows {
-        let timestamp: chrono::DateTime<chrono::Utc> = row.get("ts");
+        let timestamp: NaiveDateTime = row.get("ts");
+        let timestamp_utc = into_utc(timestamp);
         let symbol: &str = row.get("symbol");
         let price: f64 = row.get("price");
-        
-        println!("Time: {}, Symbol: {}, Price: {:.2}", timestamp, symbol, price);
+
+        println!("Time: {}, Symbol: {}, Price: {:.2}", timestamp_utc, symbol, price);
     }
-    
+
     Ok(())
 }
 ```
+
+:::note
+
+Note: Time in QuestDB is always in UTC. When using the `postgres` or `tokio-postgres` crates, the timezone is not sent
+over the wire. As such you need to first extract timestamp fileds as `chrono::NaiveDateTime` (in other words, void of
+timezone information) and then convert them to `chrono::DateTime<Utc>`.
+
+:::
 
 ### Parameterized Queries
 
@@ -189,85 +198,80 @@ Using parameterized queries helps prevent SQL injection and can improve performa
 
 ```rust
 use tokio_postgres::{NoTls, Error};
-use chrono::{DateTime, Utc, Duration};
+use chrono::{Utc, Duration, NaiveDateTime, DateTime};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
+    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
-    // Define parameters
+
     let symbol = "BTC-USD";
     let start_time = Utc::now() - Duration::days(7); // 7 days ago
-    
-    // Execute a parameterized query
+
     let rows = client.query(
         "SELECT * FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10",
-        &[&symbol, &start_time],
+        &[&symbol, &start_time.naive_utc()], // note the conversion to naive UTC
     ).await?;
-    
-    // Process the results
+
     println!("Recent {} trades:", symbol);
     for row in rows {
-        let timestamp: DateTime<Utc> = row.get("ts");
+        let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
         let price: f64 = row.get("price");
-        
+
         println!("Time: {}, Price: {:.2}", timestamp, price);
     }
-    
+
     Ok(())
 }
 ```
 
-Note: When binding parameters related to timestamps, there are some considerations with QuestDB. Make sure your DateTime
-objects are properly formatted for QuestDB to understand them.
+Note: When binding parameters related to timestamps you must use `chrono::NaiveDateTime` to
+represent the timestamp in UTC. 
 
 ### Prepared Statements
 
 For queries that will be executed multiple times with different parameters, you can use prepared statements:
 
 ```rust
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio_postgres::{NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
+    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
-    // Prepare a statement
+
     let statement = client.prepare(
         "SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2"
     ).await?;
-    
-    // Execute the prepared statement with different parameters
+
     let symbols = vec!["BTC-USD", "ETH-USD", "SOL-USD"];
-    
+
     for symbol in symbols {
-        let rows = client.query(&statement, &[&symbol, &5]).await?;
-        
+        let rows = client.query(&statement, &[&symbol, &5i64]).await?;
+
         println!("\nRecent {} trades:", symbol);
         for row in rows {
-            let timestamp: chrono::DateTime<chrono::Utc> = row.get("ts");
+            let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
             let price: f64 = row.get("price");
-            
+
             println!("Time: {}, Price: {:.2}", timestamp, price);
         }
     }
-    
     Ok(())
 }
 ```
@@ -293,7 +297,7 @@ struct Trade {
 impl From<Row> for Trade {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: row.get("ts"),
+            timestamp: DateTime::from_naive_utc_and_offset(row.get("ts"), Utc),
             symbol: row.get("symbol"),
             price: row.get("price"),
             amount: row.get("amount"),
@@ -303,32 +307,28 @@ impl From<Row> for Trade {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
-    // Execute a query
+
     let rows = client.query("SELECT * FROM trades LIMIT 10", &[]).await?;
-    
-    // Convert rows to Trade structs
+
     let trades: Vec<Trade> = rows.into_iter()
         .map(Trade::from)
         .collect();
-    
-    // Print the trades
+
     for trade in trades {
         println!(
             "Time: {}, Symbol: {}, Price: {:.2}, Amount: {:.4}",
             trade.timestamp, trade.symbol, trade.price, trade.amount
         );
     }
-    
+
     Ok(())
 }
 ```
@@ -340,7 +340,7 @@ library like bb8:
 
 First, add the bb8 dependency to your `Cargo.toml`:
 
-```toml
+```
 [dependencies]
 bb8 = "0.8.1"
 bb8-postgres = "0.8.1"
@@ -351,11 +351,11 @@ Then, implement connection pooling:
 ```rust
 use bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio_postgres::{config::Config, NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Configure the connection
     let mut config = Config::new();
     config
         .host("localhost")
@@ -363,63 +363,60 @@ async fn main() -> Result<(), Error> {
         .user("admin")
         .password("quest")
         .dbname("qdb");
-    
-    // Create a connection manager
+
     let manager = PostgresConnectionManager::new(config, NoTls);
-    
-    // Create a connection pool
+
     let pool = Pool::builder()
-        .max_size(15) // Maximum connections in the pool
+        .max_size(15)
         .build(manager)
         .await
         .expect("Failed to create pool");
-    
-    // Use the pool to execute queries
-    async fn execute_query(pool: &Pool<PostgresConnectionManager<NoTls>>, symbol: &str) -> Result<(), Error> {
-        // Get a connection from the pool
-        let conn: PooledConnection<'_, PostgresConnectionManager<NoTls>> = pool.get().await
-            .expect("Failed to get connection from pool");
-        
-        // Execute a query
+
+    async fn execute_query(conn: &PooledConnection<'_, PostgresConnectionManager<NoTls>>, symbol: &str) -> Result<(), Error> {
+        let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+
         let rows = conn.query(
             "SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT 5",
             &[&symbol],
         ).await?;
-        
-        // Process the results
+
+        // Note: Concurrent query executions race to write to stdout, a shared global resource.
+        // This means their output might be inter-leaved as tasks execute independently.
+        // In a real application, you would typically collect results from all tasks
+        // before presentation, or send them to a dedicated logging/processing component,
+        // rather than directly printing from each concurrent task.
         println!("\nRecent {} trades:", symbol);
         for row in rows {
-            let timestamp: chrono::DateTime<chrono::Utc> = row.get("ts");
+            let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
             let price: f64 = row.get("price");
-            
+
             println!("Time: {}, Price: {:.2}", timestamp, price);
         }
-        
+
         Ok(())
     }
-    
-    // Execute concurrent queries
+
     let symbols = vec!["BTC-USD", "ETH-USD", "SOL-USD"];
     let mut handles = vec![];
-    
+
     for symbol in symbols {
-        let pool_clone = pool.clone();
         let symbol_clone = symbol.to_string();
-        
+        let pool = pool.clone();
         let handle = tokio::spawn(async move {
-            if let Err(e) = execute_query(&pool_clone, &symbol_clone).await {
+            // note: using unwrap for simplicity, do not use in production code!
+            let conn: PooledConnection<PostgresConnectionManager<NoTls>> = pool.get().await.unwrap();
+            if let Err(e) = execute_query(&conn, &symbol_clone).await {
                 eprintln!("Query error for {}: {}", symbol_clone, e);
             }
         });
-        
+
         handles.push(handle);
     }
-    
-    // Wait for all queries to complete
+
     for handle in handles {
         handle.await.expect("Task failed");
     }
-    
+
     Ok(())
 }
 ```
@@ -430,7 +427,7 @@ QuestDB provides specialized time-series functions that can be used with tokio-p
 
 ```rust
 use tokio_postgres::{NoTls, Error, Row};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 // Define structs for the query results
 #[derive(Debug)]
@@ -450,11 +447,15 @@ struct LatestTrade {
     amount: f64,
 }
 
+fn utc_datetime_from_naive(timestamp: NaiveDateTime) -> DateTime<Utc> {
+    DateTime::from_naive_utc_and_offset(timestamp, Utc)
+}
+
 // Implement From<Row> for the structs
 impl From<Row> for SampledData {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: row.get("ts"),
+            timestamp: utc_datetime_from_naive(row.get("ts")),
             symbol: row.get("symbol"),
             avg_price: row.get("avg_price"),
             min_price: row.get("min_price"),
@@ -466,7 +467,7 @@ impl From<Row> for SampledData {
 impl From<Row> for LatestTrade {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: row.get("ts"),
+            timestamp: utc_datetime_from_naive(row.get("ts")),
             symbol: row.get("symbol"),
             price: row.get("price"),
             amount: row.get("amount"),
@@ -479,55 +480,55 @@ async fn main() -> Result<(), Error> {
     // Connect to QuestDB
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     // SAMPLE BY query (time-based downsampling)
     println!("Hourly price samples (last 7 days):");
     let sample_by_query = "
-        SELECT 
-            ts, 
-            symbol, 
-            avg(price) as avg_price, 
-            min(price) as min_price, 
-            max(price) as max_price 
-        FROM trades 
-        WHERE ts >= dateadd('d', -7, now()) 
+        SELECT
+            ts,
+            symbol,
+            avg(price) as avg_price,
+            min(price) as min_price,
+            max(price) as max_price
+        FROM trades
+        WHERE ts >= dateadd('d', -7, now())
         SAMPLE BY 1h
     ";
-    
+
     let rows = client.query(sample_by_query, &[]).await?;
     let sampled_data: Vec<SampledData> = rows.into_iter()
         .map(SampledData::from)
         .collect();
-    
+
     for data in sampled_data {
         println!(
             "Time: {}, Symbol: {}, Avg: {:.2}, Range: {:.2} - {:.2}",
             data.timestamp, data.symbol, data.avg_price, data.min_price, data.max_price
         );
     }
-    
+
     // LATEST BY query (last value per group)
     println!("\nLatest trades by symbol:");
-    let latest_by_query = "SELECT * FROM trades LATEST BY symbol";
-    
+    let latest_by_query = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+
     let rows = client.query(latest_by_query, &[]).await?;
     let latest_trades: Vec<LatestTrade> = rows.into_iter()
         .map(LatestTrade::from)
         .collect();
-    
+
     for trade in latest_trades {
         println!(
-            "Symbol: {}, Latest Price: {:.2} at {}", 
-            trade.symbol, trade.price, trade.timestamp
+            "Symbol: {}, Latest Price: {:.2}, Amount: {} at {}",
+            trade.symbol, trade.price, trade.amount, trade.timestamp
         );
     }
-    
+
     Ok(())
 }
 ```
@@ -539,8 +540,8 @@ When using tokio-postgres with QuestDB, be aware of these limitations:
 
 1. **Transaction Semantics**: QuestDB has different transaction semantics compared to traditional RDBMS.
 2. **Type System Differences**: QuestDB's type system differs from PostgreSQL's, which can lead to incompatibilities in
-   certain situations.
-3. **PostgreSQL-Specific Features**: Some PostgreSQL-specific features like temporary tables or indexes are not
+   certain situations. `NaiveDateTime` vs `DateTime<Utc>` is a common issue see examples above how to handle this.
+3. **PostgreSQL-Specific Features**: Some PostgreSQL features like temporary tables or indexes are not
    supported in QuestDB.
 4. **Cursor Support**: QuestDB's support for cursors differs from PostgreSQL, which may affect certain query patterns.
 
@@ -551,7 +552,7 @@ When using tokio-postgres with QuestDB, be aware of these limitations:
 3. **Async/Await**: Take advantage of the asynchronous nature of tokio-postgres to handle multiple operations
    concurrently.
 4. **Batching**: Batch related queries together when possible to reduce network overhead.
-5. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+5. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST ON` for
    efficient queries.
 6. **Limit Result Sets**: When dealing with large datasets, use appropriate limits to avoid transferring excessive data.
 
@@ -564,13 +565,12 @@ QuestDB provides specialized time-series functions that can be used with tokio-p
 SAMPLE BY is used for time-based downsampling:
 
 ```sql
-SELECT ts,
-       symbol,
-       avg(price) as avg_price,
-       min(price) as min_price,
-       max(price) as max_price
+SELECT
+   ts,
+   avg(price) as avg_value
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= '2020-01-01'
+SAMPLE BY 1h;
 ```
 
 ### LATEST BY Queries
@@ -578,24 +578,8 @@ WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
 LATEST BY is an efficient way to get the most recent values:
 
 ```sql
-SELECT *
-FROM trades LATEST BY symbol
-```
-
-### Time Window Functions
-
-For more complex time-based aggregations:
-
-```sql
-SELECT timestamp_floor('15m', ts) as time_bucket,
-       symbol,
-       avg(price)                 as avg_price,
-       min(price)                 as min_price,
-       max(price)                 as max_price
-FROM trades
-WHERE ts >= dateadd('d', -1, now())
-GROUP BY time_bucket, symbol
-ORDER BY time_bucket, symbol
+SELECT * FROM trades
+                 LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ## Troubleshooting
@@ -616,14 +600,13 @@ For query-related errors:
 1. Verify that the table you're querying exists.
 2. Check the syntax of your SQL query.
 3. Ensure that you're using the correct data types for parameters, especially with timestamp types.
-4. Look for any unsupported PostgreSQL features that might be causing issues.
 
 ### Parameter Binding Issues
 
 There have been reports of issues with binding parameters for timestamp types:
 
-1. Try using string literals for timestamps instead of binding parameters.
-2. Ensure that you're using the correct chrono types (e.g., `DateTime<Utc>` or `NaiveDateTime`).
+1. Ensure that you're using the correct chrono types (e.g., `DateTime<Utc>` or `NaiveDateTime`).
+2. Try using string literals for timestamps instead of binding parameters.
 3. Check if your timestamp format is compatible with QuestDB.
 
 ## Conclusion
