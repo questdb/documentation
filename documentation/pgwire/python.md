@@ -129,8 +129,7 @@ async def query_with_asyncpg():
     # Fetch a single row
     single_row = await conn.fetchrow("""
         SELECT * FROM trades
-        ORDER BY ts DESC
-        LIMIT 1
+        LIMIT -1
     """)
     
     if single_row:
@@ -422,8 +421,8 @@ with psycopg.connect(
     dbname='qdb',
     autocommit=True
 ) as conn:
-    # Create a named server-side cursor
-    with conn.cursor(name="large_result_set") as cur:
+    # Create a server-side cursor
+    with conn.cursor() as cur:
         # Execute a query that might return many rows
         cur.execute("SELECT * FROM trades")
         
@@ -459,32 +458,30 @@ from datetime import datetime, timedelta
 
 # Connect to QuestDB
 with psycopg.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb',
-    autocommit=True
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        dbname='qdb',
+        autocommit=True
 ) as conn:
     with conn.cursor() as cur:
         # Define query parameters
         end_time = datetime.now()
         start_time = end_time - timedelta(days=7)
-        symbols = ['BTC-USD', 'ETH-USD']
-        
+
         # Execute a parameterized query
         cur.execute("""
-            SELECT 
-                symbol,
-                avg(price) as avg_price,
-                min(price) as min_price,
-                max(price) as max_price
-            FROM trades
-            WHERE ts >= %s AND ts <= %s
-              AND symbol IN %s
-            GROUP BY symbol
-        """, (start_time, end_time, tuple(symbols)))
-        
+                    SELECT symbol,
+                           avg(price) as avg_price,
+                           min(price) as min_price,
+                           max(price) as max_price
+                    FROM trades
+                    WHERE ts >= %s
+                      AND ts <= %s
+                    GROUP BY symbol
+                    """, (start_time, end_time))
+
         # Fetch and process results
         rows = cur.fetchall()
         for row in rows:
@@ -497,7 +494,7 @@ psycopg3 supports async operations:
 
 ```python
 import asyncio
-import psycopg.AsyncConnection
+import psycopg
 
 async def async_psycopg3():
     # Connect asynchronously
@@ -513,10 +510,10 @@ async def async_psycopg3():
         async with aconn.cursor() as acur:
             # Execute a query
             await acur.execute("SELECT * FROM trades LIMIT 10")
-            
+
             # Fetch results
             rows = await acur.fetchall()
-            
+
             print(f"Fetched {len(rows)} rows")
             for row in rows:
                 print(row)
@@ -527,13 +524,18 @@ asyncio.run(async_psycopg3())
 
 ### Connection Pooling
 
-psycopg3 provides connection pooling capabilities:
+psycopg3 provides connection pooling capabilities. This reduces the overhead of establishing new connections
+and allows for efficient reuse of existing connections. The feature requires the `psycopg_pool` package.
+
+```bash title="psycopg_pool installation"
+pip install psycopg_pool
+```
 
 ```python
-import psycopg.pool
+from psycopg_pool import ConnectionPool
 
 # Create a connection pool
-pool = psycopg.pool.ConnectionPool(
+pool = ConnectionPool(
     min_size=5,
     max_size=20,
     kwargs={
@@ -557,48 +559,9 @@ with pool.connection() as conn:
 pool.close()
 ```
 
-### Integration with pandas
-
-psycopg3 works seamlessly with pandas:
-
-```python
-import psycopg
-import pandas as pd
-from datetime import datetime, timedelta
-
-# Connect to QuestDB
-with psycopg.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb',
-    autocommit=True
-) as conn:
-    # Define query parameters
-    end_time = datetime.now()
-    start_time = end_time - timedelta(days=1)
-    
-    # Create a query
-    query = """
-        SELECT * FROM trades
-        WHERE ts >= %s AND ts <= %s
-        ORDER BY ts
-    """
-    
-    # Execute the query directly into a pandas DataFrame
-    df = pd.read_sql(query, conn, params=(start_time, end_time))
-    
-    # Display basic information
-    print(f"DataFrame shape: {df.shape}")
-    print(f"DataFrame columns: {df.columns.tolist()}")
-    print(f"Sample data:\n{df.head()}")
-```
-
 ### Known Limitations with QuestDB
 
 - Some PostgreSQL-specific features may not be available in QuestDB
-- For optimal performance, ensure autocommit is set to True
 
 ### Performance Tips
 
@@ -610,7 +573,8 @@ with psycopg.connect(
 ## psycopg2
 
 [psycopg2](https://www.psycopg.org/docs/) is a mature PostgreSQL adapter for Python. While not as performant as asyncpg
-or psycopg3, it's widely used and has excellent compatibility.
+or psycopg3, it's widely used and has excellent compatibility. This driver is recommended as a last resort for QuestDB
+if asyncpg or psycopg3 are not working for you.
 
 ### Features
 
@@ -714,7 +678,6 @@ finally:
 psycopg2 provides dictionary cursors to access rows by column name:
 
 ```python
-import psycopg2
 import psycopg2.extras
 
 # Connect to QuestDB
@@ -732,16 +695,16 @@ try:
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
-        
+
         # Access columns by name
         for row in rows:
             print(f"Symbol: {row['symbol']}, Price: {row['price']}")
-    
+
     # Create a real dictionary cursor
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
-        
+
         # Each row is a true Python dict
         for row in rows:
             print(row)  # Prints as a dict
@@ -751,7 +714,7 @@ finally:
 
 ### Server-Side Cursors
 
-For large result sets, you can use named server-side cursors:
+For large result sets, you can use server-side cursors:
 
 ```python
 import psycopg2
@@ -767,30 +730,30 @@ conn = psycopg2.connect(
 conn.autocommit = True
 
 try:
-    # Create a named server-side cursor
-    with conn.cursor(name="large_result_set") as cur:
+    # Create a server-side cursor
+    with conn.cursor() as cur:
         # Execute a query that might return many rows
         cur.execute("SELECT * FROM trades")
-        
+
         # Fetch rows in batches
         batch_size = 1000
         total_processed = 0
-        
+
         while True:
             # Fetch a batch of rows
             batch = cur.fetchmany(batch_size)
-            
+
             # If no more rows, break the loop
             if not batch:
                 break
-            
+
             # Process the batch
             total_processed += len(batch)
-            
+
             # Print progress
             if total_processed % 10000 == 0:
                 print(f"Processed {total_processed} rows so far...")
-        
+
         print(f"Finished processing {total_processed} total rows")
 finally:
     conn.close()
@@ -818,22 +781,20 @@ try:
     with conn.cursor() as cur:
         # Define query parameters
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=7)
-        symbols = ['BTC-USD', 'ETH-USD']
-        
+        start_time = end_time - timedelta(days=7000)
+
         # Execute a parameterized query
         cur.execute("""
-            SELECT 
-                symbol,
-                avg(price) as avg_price,
-                min(price) as min_price,
-                max(price) as max_price
-            FROM trades
-            WHERE ts >= %s AND ts <= %s
-              AND symbol IN %s
-            GROUP BY symbol
-        """, (start_time, end_time, tuple(symbols)))
-        
+                    SELECT symbol,
+                           avg(price) as avg_price,
+                           min(price) as min_price,
+                           max(price) as max_price
+                    FROM trades
+                    WHERE ts >= %s
+                      AND ts <= %s
+                    GROUP BY symbol
+                    """, (start_time, end_time))
+
         # Fetch and process results
         rows = cur.fetchall()
         for row in rows:
@@ -847,7 +808,7 @@ finally:
 For connection pooling with psycopg2, you can use external libraries like psycopg2-pool:
 
 ```python
-from psycopg2_pool import ThreadedConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 
 # Create a connection pool
 pool = ThreadedConnectionPool(
@@ -866,7 +827,7 @@ conn = pool.getconn()
 try:
     # Set autocommit
     conn.autocommit = True
-    
+
     # Use the connection
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM trades LIMIT 10")
@@ -882,50 +843,56 @@ pool.closeall()
 
 ### Integration with pandas
 
-psycopg2 integrates well with pandas:
+psycopg2 integrates with pandas over SQLAlchemy, allowing you to read data directly into a DataFrame. This feature
+requires the `pandas`, `sqlalchemy`, and `questdb-connect` packages.
+
+```bash title="pandas, sqlalchemy, and questdb-connect installation"
+pip install pandas sqlalchemy questdb-connect
+```
+
+:::note
+
+This example shows how to use the SQLAlchemy engine with psycopg2 for querying QuestDB into a pandas DataFrame.
+For ingestion from Pandas to QuestDB see our [pandas ingestion guide](/docs/third-party-tools/pandas/).
+
+:::
 
 ```python
-import psycopg2
 import pandas as pd
+from sqlalchemy import create_engine
+
 from datetime import datetime, timedelta
 
-# Connect to QuestDB
-conn = psycopg2.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb'
-)
-conn.autocommit = True
+# Create SQLAlchemy engine
+engine = create_engine("questdb://admin:quest@localhost:8812/qdb")
 
-try:
+# Connect to the database
+with engine.connect() as conn:
     # Define query parameters
     end_time = datetime.now()
-    start_time = end_time - timedelta(days=1)
-    
+    start_time = end_time - timedelta(days=10000)
+
     # Create a query
     query = """
-        SELECT * FROM trades
-        WHERE ts >= %s AND ts <= %s
-        ORDER BY ts
-    """
-    
+            SELECT * \
+            FROM trades
+            WHERE ts >= %s \
+              AND ts <= %s
+            ORDER BY ts \
+            """
+
     # Execute the query directly into a pandas DataFrame
     df = pd.read_sql(query, conn, params=(start_time, end_time))
-    
+
     # Display basic information
     print(f"DataFrame shape: {df.shape}")
     print(f"DataFrame columns: {df.columns.tolist()}")
     print(f"Sample data:\n{df.head()}")
-finally:
-    conn.close()
 ```
 
 ### Known Limitations with QuestDB
 
-- psycopg2 is generally slower than asyncpg and psycopg3 for querying large datasets
-- For optimal performance, ensure autocommit is set to True
+- psycopg2 is generally slower than asyncpg and psycopg3
 
 ### Performance Tips
 
@@ -965,20 +932,10 @@ SAMPLE BY 1h
 
 # 2. Latest by query (efficient way to get most recent values)
 """
-SELECT * FROM sensors
-LATEST BY sensor_id
+SELECT * FROM trades
+LATEST ON timestamp PARTITION BY symbol;
 """
 
-# 3. Time-based aggregation with floor
-"""
-SELECT 
-    timestamp_floor('15m', ts) as time_bucket,
-    avg(value) as avg_value
-FROM sensors
-WHERE ts >= dateadd('d', -1, now())
-GROUP BY time_bucket
-ORDER BY time_bucket
-"""
 ```
 
 ### Error Handling
@@ -988,7 +945,7 @@ Always implement proper error handling for database operations:
 ```python
 # Example error handling for psycopg3
 import psycopg
-from psycopg import errors
+from psycopg import errors, DataError
 
 try:
     with psycopg.connect(
@@ -1004,8 +961,6 @@ try:
                 # Execute a query that might fail
                 cur.execute("SELECT * FROM non_existent_table")
                 results = cur.fetchall()
-            except errors.UndefinedTable:
-                print("Table does not exist")
             except Exception as e:
                 print(f"Query error: {e}")
 except Exception as e:
