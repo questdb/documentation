@@ -108,36 +108,46 @@ The `pg` client provides several ways to execute queries:
 ```javascript
 const {Client} = require('pg')
 const client = new Client({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
+  host: '127.0.0.1',
+  port: 8812,
+  user: 'admin',
+  password: 'quest',
+  database: 'qdb',
 })
 
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
 async function queryData() {
-    try {
-        await client.connect()
+  try {
+    await client.connect()
 
-        // Simple query
-        const result = await client.query('SELECT * FROM trades LIMIT 10')
+    // Simple query
+    const result = await client.query('SELECT * FROM trades LIMIT 10')
 
-        console.log(`Fetched ${result.rows.length} rows`)
-        console.log(`Column names: ${result.fields.map(field => field.name).join(', ')}`)
+    console.log(`Fetched ${result.rows.length} rows`)
+    console.log(`Column names: ${result.fields.map(field => field.name).join(', ')}`)
 
-        // Process the results
-        for (const row of result.rows) {
-            console.log(`Timestamp: ${row.ts}, Symbol: ${row.symbol}, Price: ${row.price}`)
-        }
-    } catch (error) {
-        console.error('Query error:', error)
-    } finally {
-        await client.end()
+    // Process the results
+    for (const row of result.rows) {
+      console.log(`Timestamp: ${row.ts}, Symbol: ${row.symbol}, Price: ${row.price}`)
     }
+  } catch (error) {
+    console.error('Query error:', error)
+  } finally {
+    await client.end()
+  }
 }
 
 queryData()
 ```
+
+:::note
+    **Note**: The `pg` client uses the system timezone by default. QuestDB always sends timestamp in UTC. 
+    To set the timezone to UTC, you can set the `TZ` environment variable before running your script.
+    This is important for time-series data to ensure consistent timestamps.
+:::
+
 
 ### Parameterized Queries
 
@@ -146,39 +156,39 @@ The `pg` client supports parameterized queries using the `$1`, `$2`, etc. notati
 ```javascript
 const {Client} = require('pg')
 const client = new Client({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
+  host: '127.0.0.1',
+  port: 8812,
+  user: 'admin',
+  password: 'quest',
+  database: 'qdb'
 })
 
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
 async function parameterizedQuery() {
-    try {
-        await client.connect()
+  try {
+    await client.connect()
 
-        // Define query parameters
-        const symbol = 'BTC-USD'
-        const startDate = new Date()
-        startDate.setDate(startDate.getDate() - 7) // 7 days ago
+    const symbol = 'BTC-USD'
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 7) // 7 days ago
 
-        // Execute a parameterized query
-        const result = await client.query(
+    const result = await client.query(
             'SELECT * FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10',
             [symbol, startDate]
-        )
+    )
 
-        console.log(`Fetched ${result.rows.length} rows for ${symbol} since ${startDate}`)
+    console.log(`Fetched ${result.rows.length} rows for ${symbol} since ${startDate}`)
 
-        // Process the results
-        for (const row of result.rows) {
-            console.log(`Timestamp: ${row.ts}, Price: ${row.price}`)
-        }
-    } catch (error) {
-        console.error('Query error:', error)
-    } finally {
-        await client.end()
+    for (const row of result.rows) {
+      console.log(`Timestamp: ${row.ts}, Price: ${row.price}`)
     }
+  } catch (error) {
+    console.error('Query error:', error)
+  } finally {
+    await client.end()
+  }
 }
 
 parameterizedQuery()
@@ -191,43 +201,43 @@ For queries that are executed repeatedly, you can use prepared statements to imp
 ```javascript
 const {Client} = require('pg')
 const client = new Client({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
+  host: '127.0.0.1',
+  port: 8812,
+  user: 'admin',
+  password: 'quest',
+  database: 'qdb'
 })
 
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
 async function preparedStatement() {
-    try {
-        await client.connect()
+  try {
+    await client.connect()
 
-        // Define a prepared statement
-        await client.query({
-            name: 'get-trades-by-symbol',
-            text: 'SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2',
-            values: [] // Values are provided later
-        })
+    await client.query({
+      name: 'get-trades-by-symbol',
+      text: 'SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2',
+    })
 
-        // Execute the prepared statement with different values
-        const symbols = ['BTC-USD', 'ETH-USD', 'SOL-USD']
+    const symbols = ['BTC-USD', 'ETH-USD', 'SOL-USD']
 
-        for (const symbol of symbols) {
-            const result = await client.query({
-                name: 'get-trades-by-symbol',
-                values: [symbol, 5] // Get 5 most recent trades for each symbol
-            })
+    for (const symbol of symbols) {
+      const result = await client.query({
+        name: 'get-trades-by-symbol',
+        values: [symbol, 5] // Get 5 most recent trades for each symbol
+      })
 
-            console.log(`\nLatest trades for ${symbol}:`)
-            for (const row of result.rows) {
-                console.log(`  ${row.ts}: ${row.price}`)
-            }
-        }
-    } catch (error) {
-        console.error('Prepared statement error:', error)
-    } finally {
-        await client.end()
+      console.log(`\nLatest trades for ${symbol}:`)
+      for (const row of result.rows) {
+        console.log(`  ${row.ts}: ${row.price}`)
+      }
     }
+  } catch (error) {
+    console.error('Prepared statement error:', error)
+  } finally {
+    await client.end()
+  }
 }
 
 preparedStatement()
@@ -242,115 +252,54 @@ const {Pool} = require('pg')
 
 // Create a connection pool
 const pool = new Pool({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb',
-    max: 20,           // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000  // Close idle clients after 30 seconds
+  host: '127.0.0.1',
+  port: 8812,
+  user: 'admin',
+  password: 'quest',
+  database: 'qdb',
+  max: 20,           // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000  // Close idle clients after 30 seconds
 })
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 async function queryWithPool() {
-    // Get a client from the pool
-    const client = await pool.connect()
+  const client = await pool.connect()
 
-    try {
-        // Execute a query
-        const result = await client.query('SELECT * FROM trades LIMIT 10')
-        console.log(`Fetched ${result.rows.length} rows`)
+  try {
+    const result = await client.query('SELECT * FROM trades LIMIT 10')
+    console.log(`Fetched ${result.rows.length} rows`)
 
-        // Process the results
-        for (const row of result.rows) {
-            console.log(row)
-        }
-    } catch (error) {
-        console.error('Query error:', error)
-    } finally {
-        // Release the client back to the pool
-        client.release()
+    for (const row of result.rows) {
+      console.log(row)
     }
+  } catch (error) {
+    console.error('Query error:', error)
+  } finally {
+    // Release the client back to the pool
+    client.release()
+  }
 }
 
-// Query function using the pool directly
 async function simplePoolQuery() {
-    try {
-        // This automatically acquires and releases a client
-        const result = await pool.query('SELECT COUNT(*) FROM trades')
-        console.log(`Total trades: ${result.rows[0].count}`)
-    } catch (error) {
-        console.error('Pool query error:', error)
-    }
+  try {
+    // This automatically acquires and releases a client
+    const result = await pool.query('SELECT COUNT(*) FROM trades')
+    console.log(`Total trades: ${result.rows[0].count}`)
+  } catch (error) {
+    console.error('Pool query error:', error)
+  }
 }
 
 async function main() {
-    try {
-        await queryWithPool()
-        await simplePoolQuery()
-    } finally {
-        // Close the pool when done
-        await pool.end()
-    }
-}
-
-main()
-```
-
-### Error Handling
-
-Proper error handling is important when working with databases:
-
-```javascript
-const {Pool} = require('pg')
-const pool = new Pool({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
-})
-
-// Listen for errors on the pool
-pool.on('error', (err, client) => {
-    console.error('Unexpected error on idle client', err)
-    process.exit(-1)
-})
-
-async function robustQuery() {
-    const client = await pool.connect()
-
-    try {
-        // Begin a transaction
-        await client.query('BEGIN')
-
-        try {
-            // Execute multiple queries in a transaction
-            const result1 = await client.query('SELECT * FROM trades LIMIT 5')
-            console.log(`Query 1 returned ${result1.rows.length} rows`)
-
-            // This query might fail if the table doesn't exist
-            const result2 = await client.query('SELECT * FROM non_existent_table')
-            console.log(`Query 2 returned ${result2.rows.length} rows`)
-
-            // Commit the transaction if all queries succeed
-            await client.query('COMMIT')
-        } catch (error) {
-            // Rollback the transaction if any query fails
-            await client.query('ROLLBACK')
-            console.error('Transaction error:', error)
-        }
-    } finally {
-        // Always release the client
-        client.release()
-    }
-}
-
-async function main() {
-    try {
-        await robustQuery()
-    } finally {
-        await pool.end()
-    }
+  try {
+    await queryWithPool()
+    await simplePoolQuery()
+  } finally {
+    // Close the pool when done
+    await pool.end()
+  }
 }
 
 main()
@@ -367,7 +316,6 @@ const {Pool} = require('pg')
 const app = express()
 const port = 3000
 
-// Create a connection pool
 const pool = new Pool({
     host: '127.0.0.1',
     port: 8812,
@@ -375,6 +323,9 @@ const pool = new Pool({
     password: 'quest',
     database: 'qdb'
 })
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 // Add middleware to parse JSON body
 app.use(express.json())
@@ -416,7 +367,7 @@ app.get('/api/stats', async (req, res) => {
         MIN(price) as min_price,
         MAX(price) as max_price
       FROM trades
-      WHERE ts >= dateadd('d', -$1, now())
+      WHERE ts >= dateadd('d', -$1::int, now())
       GROUP BY symbol
       ORDER BY trade_count DESC
     `, [days])
@@ -428,12 +379,10 @@ app.get('/api/stats', async (req, res) => {
     }
 })
 
-// Start the server
 app.listen(port, () => {
     console.log(`API server running at http://localhost:${port}`)
 })
 
-// Handle process termination
 process.on('SIGINT', async () => {
     await pool.end()
     console.log('Pool has ended')
@@ -508,6 +457,9 @@ The `postgres` client uses template literals for queries:
 ```javascript
 const postgres = require('postgres')
 
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
 const sql = postgres({
     host: '127.0.0.1',
     port: 8812,
@@ -544,6 +496,9 @@ The `postgres` client automatically parameterizes values passed in template lite
 
 ```javascript
 const postgres = require('postgres')
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 const sql = postgres({
     host: '127.0.0.1',
@@ -585,52 +540,15 @@ async function parameterizedQuery() {
 parameterizedQuery()
 ```
 
-### Transactions
-
-The `postgres` client supports transactions:
-
-```javascript
-const postgres = require('postgres')
-
-const sql = postgres({
-    host: '127.0.0.1',
-    port: 8812,
-    username: 'admin',
-    password: 'quest',
-    database: 'qdb',
-    ssl: false
-})
-
-async function transactionExample() {
-    try {
-        // Begin a transaction
-        const result = await sql.begin(async sql => {
-            // All queries in this callback are part of the transaction
-            const result1 = await sql`SELECT * FROM trades LIMIT 5`
-            console.log(`Query 1 returned ${result1.length} rows`)
-
-            // Return results from the transaction
-            return result1
-        })
-
-        console.log('Transaction completed successfully')
-        console.log(`Result: ${result.length} rows`)
-    } catch (error) {
-        console.error('Transaction error:', error)
-    } finally {
-        await sql.end()
-    }
-}
-
-transactionExample()
-```
-
 ### Connection Pooling
 
 The `postgres` client includes built-in connection pooling:
 
 ```javascript
 const postgres = require('postgres')
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 // Create a connection with custom pool settings
 const sql = postgres({
@@ -667,42 +585,6 @@ async function concurrentQueries() {
 concurrentQueries()
 ```
 
-### Error Handling
-
-Here's how to handle errors with the `postgres` client:
-
-```javascript
-const postgres = require('postgres')
-
-const sql = postgres({
-    host: '127.0.0.1',
-    port: 8812,
-    username: 'admin',
-    password: 'quest',
-    database: 'qdb',
-    ssl: false
-})
-
-async function errorHandling() {
-    try {
-        // This query might fail if the table doesn't exist
-        const result = await sql`SELECT * FROM non_existent_table`
-        console.log(`Query returned ${result.length} rows`)
-    } catch (error) {
-        console.error('Caught an error:', error.message)
-
-        // Check for specific error conditions
-        if (error.code === '42P01') {
-            console.error('Table does not exist')
-        }
-    } finally {
-        await sql.end()
-    }
-}
-
-errorHandling()
-```
-
 ### Integration with Express.js
 
 Here's an example of how to integrate `postgres` with Express.js:
@@ -710,6 +592,9 @@ Here's an example of how to integrate `postgres` with Express.js:
 ```javascript
 const express = require('express')
 const postgres = require('postgres')
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 const app = express()
 const port = 3000
@@ -770,7 +655,7 @@ app.get('/api/stats', async (req, res) => {
         MIN(price) as min_price,
         MAX(price) as max_price
       FROM trades
-      WHERE ts >= dateadd('d', -${days}, now())
+      WHERE ts >= dateadd('d', -${days}::int, now())
       GROUP BY symbol
       ORDER BY trade_count DESC
     `
@@ -795,12 +680,12 @@ process.on('SIGINT', async () => {
 })
 ```
 
-### Performance Tips
+### Tips
 
 - Use parameterized queries via tagged templates to prevent SQL injection
 - For large result sets, use LIMIT and pagination
-- Execute independent queries concurrently with Promise.all
-- Close connections when they're no longer needed with sql.end()
+- Execute independent queries concurrently with `Promise.all()`
+)
 
 ## Best Practices for QuestDB Time Series Queries
 
@@ -810,6 +695,10 @@ QuestDB provides specialized time-series functions that work well with JavaScrip
 
 ```javascript
 const {Client} = require('pg')
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
 const client = new Client({
     host: '127.0.0.1',
     port: 8812,
@@ -822,7 +711,6 @@ async function sampleByQuery() {
     try {
         await client.connect()
 
-        // Execute a SAMPLE BY query
         const result = await client.query(`
       SELECT 
         ts,
@@ -831,13 +719,11 @@ async function sampleByQuery() {
         min(price) as min_price,
         max(price) as max_price
       FROM trades
-      WHERE ts >= dateadd('d', -7, now())
+      WHERE ts >= dateadd('d', -7000, now())
       SAMPLE BY 1h
     `)
-
         console.log(`Got ${result.rows.length} hourly samples`)
-
-        // Process the results
+    
         for (const row of result.rows) {
             console.log(`${row.ts} - ${row.symbol}: Avg: ${row.avg_price}, Range: ${row.min_price} - ${row.max_price}`)
         }
@@ -851,10 +737,13 @@ async function sampleByQuery() {
 sampleByQuery()
 ```
 
-### Latest By Queries
+### Latest On Queries
 
 ```javascript
 const postgres = require('postgres')
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
 
 const sql = postgres({
     host: '127.0.0.1',
@@ -870,7 +759,7 @@ async function latestByQuery() {
         // Get the latest values for each symbol
         const latest = await sql`
       SELECT * FROM trades
-      LATEST BY symbol
+      LATEST ON timestamp PARTITION BY symbol
     `
 
         console.log(`Latest prices for ${latest.length} symbols:`)
@@ -887,50 +776,6 @@ async function latestByQuery() {
 latestByQuery()
 ```
 
-### Time Series Aggregations
-
-```javascript
-const {Pool} = require('pg')
-const pool = new Pool({
-    host: '127.0.0.1',
-    port: 8812,
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
-})
-
-async function timeSeriesAggregation() {
-    try {
-        // Hourly aggregation for the last 7 days
-        const result = await pool.query(`
-      SELECT 
-        timestamp_floor('1h', ts) as hour,
-        symbol,
-        avg(price) as avg_price,
-        min(price) as min_price,
-        max(price) as max_price,
-        count(*) as sample_count
-      FROM trades
-      WHERE ts >= dateadd('d', -7, now())
-      GROUP BY hour, symbol
-      ORDER BY hour, symbol
-    `)
-
-        console.log(`Got ${result.rows.length} hourly aggregations`)
-
-        // Process the results
-        for (const row of result.rows) {
-            console.log(`${row.hour} - ${row.symbol}: Avg: ${row.avg_price}, Samples: ${row.sample_count}`)
-        }
-    } catch (error) {
-        console.error('Query error:', error)
-    } finally {
-        await pool.end()
-    }
-}
-
-timeSeriesAggregation()
-```
 
 ## Troubleshooting
 
@@ -949,19 +794,17 @@ For query-related errors:
 
 1. Verify that the table you're querying exists
 2. Check the syntax of your SQL query
-3. Ensure that you're using the correct data types for parameters
+3. Ensure that you're using the correct data types for parameters, this can be tricky with JavaScript where 
+   all numbers are floats. You may need to cast them explicitly in your SQL query. 
 
 ## Conclusion
 
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard JavaScript PostgreSQL clients for querying
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
-For most use cases, we recommend:
-
-- Use the `pg` client for mature production applications with complex requirements
-- Use the `postgres` client for modern applications that benefit from its cleaner API and built-in connection pooling
-- For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
-  throughput
+We recommend the `pg` client for querying. 
+For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
+throughput.
 
 Remember that QuestDB is optimized for time-series data, so make the most of its specialized time-series functions like
-`SAMPLE BY` and `LATEST BY` for efficient queries.
+`SAMPLE BY` and `LATEST ON` for efficient queries.
