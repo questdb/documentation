@@ -88,7 +88,6 @@ use tokio_postgres::{NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
     
@@ -429,7 +428,6 @@ QuestDB provides specialized time-series functions that can be used with tokio-p
 use tokio_postgres::{NoTls, Error, Row};
 use chrono::{DateTime, NaiveDateTime, Utc};
 
-// Define structs for the query results
 #[derive(Debug)]
 struct SampledData {
     timestamp: DateTime<Utc>,
@@ -451,7 +449,6 @@ fn utc_datetime_from_naive(timestamp: NaiveDateTime) -> DateTime<Utc> {
     DateTime::from_naive_utc_and_offset(timestamp, Utc)
 }
 
-// Implement From<Row> for the structs
 impl From<Row> for SampledData {
     fn from(row: Row) -> Self {
         Self {
@@ -477,7 +474,6 @@ impl From<Row> for LatestTrade {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Connect to QuestDB
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
 
