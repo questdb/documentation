@@ -9,10 +9,10 @@ QuestDB offers high-speed ingestion and low-latency analytics on time-series dat
 
 
 <Screenshot
-  alt="QuestDB High Level Architecture"
-  title="QuestDB High Level Architecture"
+  alt="QuestDB: High-Speed Ingestion, Low Latency analytics"
+  title="QuestDB: High-Speed Ingestion, Low Latency analytics"
   height={435}
-  src="images/guides/questdb-internals/questdb-high-level-architecture.svg"
+  src="images/guides/questdb-internals/questdbBasic.svg"
   width={745}
 />
 
@@ -46,11 +46,15 @@ QuestDB is comprised of several key components:
   QuestDB Enterprise supports horizontal scalability for reads with read replicas, and for
   writes with multi-primary.
 
+- **[Security](#security):**
+  QuestDB provides real-time metrics, a health check endpoint, and logging to monitor
+  performance and simplify troubleshooting.
+
 - **[Observability](#observability--diagnostics):**
   QuestDB provides real-time metrics, a health check endpoint, and logging to monitor
   performance and simplify troubleshooting.
 
-- **[Web console](/docs/web-console/):**
+- **[Web console](#web-console):**
   The engine includes a web console to run SQL statements, bulk load CSV files, and show
   monitoring dashboards. QuestDB Enterprise supports single sign-on (SSO) in the web console.
 
@@ -71,14 +75,6 @@ concurrent data ingestion, modifications, and schema changes without locking the
 - **WAL Consistency**: QuestDB implements a component called "Sequencer", which ensures that data
 appears consistent to all readers, even during ongoing write operations.
 
-<!-- diagram used at the write-ahead-log concepts page. Please keep in sync -->
-<Screenshot
-  alt="Diagram showing the sequencer allocating txn numbers to events cronologically"
-  title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth."
-  height={435}
-  src="images/docs/concepts/wal_sequencer.webp"
-  width={745}
-/>
 
 - **TableWriter**: Changes stored in the WAL, is stored in columnat format by the TableWriter, which
 can handle and resolve out-of-order data writes, and enables deduplication. Column files use an
@@ -86,12 +82,23 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
 
 <!-- diagram used at the write-ahead-log concepts page. Please keep in sync -->
 <Screenshot
-  alt="Diagram showing the WAL job application and WAL collect events and commit to QuestDB"
-  title="The WAL job application collects the transactions sequencially for the TableWriter to commit to QuestDB."
+  alt="Diagram showing WAL files consolidation"
+  title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth, allowing for data deduplication and consolidation."
   height={435}
-  src="images/docs/concepts/wal_process.webp"
+  src="images/guides/questdb-internals/walData.svg"
   width={745}
 />
+
+
+### Data Deduplication
+
+When enabled, [data deduplication](https://questdb.com/docs/concept/deduplication/) works on all the data inserted into
+the table and replaces matching rows with the new versions. Only new rows that do no match existing data will be inserted.
+
+Generally, if the data have mostly unique timestamps across all the rows, the performance impact of deduplication is low.
+Conversely, the most demanding data pattern occurs when there are many rows with the same timestamp that need to be
+deduplicated on additional columns.
+
 
 ### Column-oriented storage
 
@@ -104,8 +111,8 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
   title="Architecture of the storage model with column files, readers/writers and the mapped memory"
   height={596}
-  src="images/docs/concepts/storageSummarized.svg"
-  width={745}
+  src="images/guides/questdb-internals/columnarStorage.svg"
+  width={400}
 />
 
 
@@ -117,16 +124,6 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
   Uniform data types allow efficient compression that reduces disk space and speeds up reads
   when [ZFS compression](/docs/guides/compression-zfs/) is enabled. Parquet files generated
   by QuestDB use native compression.
-
-### Data Deduplication
-
-When enabled, [data deduplication](https://questdb.com/docs/concept/deduplication/) works on all the data inserted into
-the table and replaces matching rows with the new versions. Only new rows that do no match existing data will be inserted.
-
-Generally, if the data have mostly unique timestamps across all the rows, the performance impact of deduplication is low.
-Conversely, the most demanding data pattern occurs when there are many rows with the same timestamp that need to be
-deduplicated on additional columns.
-
 
 ## Memory management and native integration
 
@@ -361,7 +358,8 @@ Varchar data (column file):
 
 ```text
 
-Contents of the `db` folder, showing multiple pending WAL files, and the binary columnar data.
+Contents of the `db` folder, showing multiple pending WAL files,
+and the binary columnar data.
 
 ├── db
 │   ├── Table
@@ -439,6 +437,41 @@ page.
 high availabilty. A [distributed sequencer](/docs/operations/multi-primary-ingestion/#distributed-sequencer-with-foundationdb) makes sure transactions are conflict-free, and
 tracks status of the cluster to enable instance discovery and automatic failover.
 
+
+
+## Security
+
+- **Built-in admin and read-only users:**
+  QuestDB includes built-in admin and read-only users for the pgwire protocol and HTTP endpoints using HTTP Basic Auth.
+
+- **HTTP basic authentication:**
+  You can enable HTTP Basic Authentication for the HTTP API, web console, and pgwire
+  protocol. Health-check and metrics endpoints can be configured independently.
+
+- **Token-based authentication:**
+  QuestDB Enterprise offers HTTP and JWT token authentication. QuestDB Open Source
+  supports token authentication for ILP over TCP.
+
+- **TLS on all protocols:**
+  QuestDB Enterprise supports TLS on all protocols and endpoints.
+
+- **Single sign-on:**
+  QuestDB Enterprise supports SSO via OIDC with Active Directory, EntraID, or OAuth2.
+
+- **Role-based access control:**
+  Enterprise users can create user groups and assign service accounts and users.
+   Grants [can be configured](/docs/operations/rbac/) individually or at the
+   group level with fine granularity, including column-level  access.
+
+<!-- This image is used also at the operations rbac page. Please keep in sync -->
+<Screenshot
+  alt="Diagram showing users, service accounts and groups in QuestDB"
+  title="Users, service accounts and groups"
+  src="images/docs/acl/users_service_accounts_groups.webp"
+  width={745}
+/>
+
+
 ## Observability & diagnostics
 
 - **Metrics:**
@@ -466,6 +499,25 @@ tracks status of the cluster to enable instance discovery and automatic failover
   width={745}
 />
 
+## Web Console
+
+The [QuestDB Web console](/docs/web-console/) is ideal for interactive exploration, and implements:
+
+- **SQL Editor** featuring tabs and SQL autocompletion.
+- **Table and Materialized View** explorer.
+- **CSV import** manager.
+- **Single-sign-on**, when enabled for enterprise users.
+- **Basic Auth**, when enabled for both OSS and Enterprise users.
+- **Real-time metric dashboards**, to track transactions throughput, latency, and write amplification.
+
+<Screenshot
+  alt="The QuestDB Console"
+  title="The QuestDB Web Console"
+  src="images/guides/questdb-internals/web-console.webp"
+  width={745}
+/>
+
+
 ## Design patterns & best practices throughout the code base
 
 - **Immutable data structures:**
@@ -485,38 +537,6 @@ tracks status of the cluster to enable instance discovery and automatic failover
   [Unit tests, integration tests](https://github.com/questdb/questdb/tree/master/core/src/test),
   and performance benchmarks ensure that new enhancements do  not compromise
   reliability or speed.
-
-## Security
-
-- **Built-in admin and read-only users:**
-  QuestDB includes built-in admin and read-only users for the pgwire protocol and HTTP endpoints using HTTP Basic Auth.
-
-- **HTTP basic authentication:**
-  You can enable HTTP Basic Authentication for the HTTP API, web console, and pgwire
-  protocol. Health-check and metrics endpoints can be configured independently.
-
-- **Token-based authentication:**
-  QuestDB Enterprise offers HTTP and JWT token authentication. QuestDB Open Source
-  supports token authentication for ILP over TCP.
-
-- **TLS on all protocols:**
-  QuestDB Enterprise supports TLS on all protocols and endpoints.
-
-- **Role-based access control:**
-  Enterprise users can create user groups and assign service accounts and users.
-   Grants [can be configured](/docs/operations/rbac/) individually or at the
-   group level with fine granularity, including column-level  access.
-
-<!-- This image is used also at the operations rbac page. Please keep in sync -->
-<Screenshot
-  alt="Diagram showing users, service accounts and groups in QuestDB"
-  title="Users, service accounts and groups"
-  src="images/docs/acl/users_service_accounts_groups.webp"
-  width={745}
-/>
-
-- **Single sign-on:**
-  QuestDB Enterprise supports SSO via OIDC with Active Directory, EntraID, or OAuth2.
 
 ## Further reading & resources
 
