@@ -5,7 +5,8 @@ import dotenv from "dotenv"
 const ssrTemplate = require("./src/internals/ssr.template")
 const customFields = require("./src/config/customFields")
 const path = require("path")
-const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
+const isPreviews = process.env.IS_PREVIEW
+//process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
 
 console.log({ envNetlify: process.env.NETLIFY, envContext: process.env.CONTEXT, isPreviews })
 
