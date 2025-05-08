@@ -52,7 +52,7 @@ Greatest hits include:
 
 - [`SAMPLE BY`](/docs/reference/sql/sample-by/) summarizes data into chunks
   based on a specified time interval, from a year to a microsecond
-- [`WHERE IN`](/docs/reference/sql/where/#time-range) to compress time ranges
+- [`WHERE IN`](/docs/reference/sql/where/#time-range-where-in) to compress time ranges
   into concise intervals
 - [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
   multiple series within a table
@@ -148,7 +148,7 @@ From there, you can learn more about what's to offer.
   upload/export functionality
 - [Grafana guide](/docs/third-party-tools/grafana/) to visualize your data as
   beautiful and functional charts.
-- [Capacity planning](/docs/deployment/capacity-planning/) to optimize your
+- [Capacity planning](/docs/operations/capacity-planning/) to optimize your
   QuestDB deployment for production workloads.
 
 ## Support

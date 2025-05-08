@@ -83,7 +83,7 @@ WAL-enabled tables are the default table.
 You can choose to use non-WAL tables, if it's appropriate for your usecase.
 
 For more information, see the
-[`CREATE TABLE`](/docs/reference/sql/create-table/#wal-table-parameter)
+[`CREATE TABLE`](/docs/reference/sql/create-table/#write-ahead-log-wal-settings)
 reference.
 
 Other related configurations include:

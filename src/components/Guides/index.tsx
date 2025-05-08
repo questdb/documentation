@@ -2,7 +2,7 @@ import { DocButton } from '../DocButton'
 
 const guides = [
   {
-    href: '/docs/deployment/capacity-planning/',
+    href: '/docs/operations/capacity-planning/',
     name: 'Capacity planning',
     description: 'Select a storage medium, plan, size and compress your QuestDB deployment.',
   },

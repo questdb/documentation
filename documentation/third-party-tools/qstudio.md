@@ -14,7 +14,7 @@ every database including QuestDB via the PostgreSQL driver.
 
 ## Prerequisites
 
-- A running QuestDB instance (See [Getting Started](/docs/#getting-started))
+- A running QuestDB instance (See [Getting Started](/docs/quick-start/))
 
 ## Configure QuestDB connection
 

@@ -6,8 +6,6 @@ description:
   roadmap, down to limitations.
 ---
 
-import Screenshot from "@theme/Screenshot"
-
 QuestDB Enterprise offers primary-replica replication with eventual consistency.
 
 This document will teach you about the architecture, some configuration, a

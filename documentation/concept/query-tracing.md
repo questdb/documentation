@@ -1,6 +1,6 @@
 ---
-title: Query Tracing
-sidebar_label: Query Tracing
+title: Query tracing
+sidebar_label: Query tracing
 description:
   Query tracing is a feature that helps you diagnose performance issues with
   queries by recording each query's execution time in a system table.

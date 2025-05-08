@@ -70,7 +70,7 @@ operation. There are two root directories to be defined:
   `root_directory/tmp` directory.
 
 Use the [configuration keys](/docs/configuration/) to edit these properties in
-[`COPY` configuration settings](/docs/configuration/#bulk-csv-import):
+[`COPY` configuration settings](/docs/configuration/#csv-import):
 
 ```shell title="Example"
 cairo.sql.copy.root=/Users/UserName/Desktop
@@ -139,7 +139,7 @@ progress.
   imported.
 - `FORMAT`: Timestamp column format when the format is not the default
   (`yyyy-MM-ddTHH:mm:ss.SSSUUUZ`) or cannot be detected. See
-  [Date and Timestamp format](/docs/reference/function/date-time/#date-and-timestamp-format)
+  [Date and Timestamp format](/docs/reference/function/date-time/#timestamp-format)
   for more information.
 - `DELIMITER`: Default setting is `,`.
 - `PARTITION BY`: Partition unit.
@@ -153,7 +153,7 @@ progress.
 ## Examples
 
 For more details on parallel import, please also see
-[Importing data in bulk via CSV](/docs/guides/import-csv/#import-csv-via-copy-sql/).
+[Importing data in bulk via CSV](/docs/guides/import-csv/#import-csv-via-copy-sql).
 
 ```questdb-sql title="COPY"
 COPY weather FROM 'weather.csv' WITH HEADER true FORMAT 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ' ON ERROR SKIP_ROW;

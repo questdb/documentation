@@ -1,6 +1,6 @@
 ---
 title: SELECT keyword
-sidebar_label: SELECT
+sidebar_label: SELECT OVERVIEW
 description: SELECT SQL keyword reference documentation.
 ---
 
@@ -187,7 +187,7 @@ Conditional results based on expressions.
 ![Flow chart showing the syntax of CASE](/images/docs/diagrams/case.svg)
 
 For more information, please refer to the
-[CASE reference](/docs/reference/sql/case/)
+[CASE reference](/docs/reference/function/conditional/)
 
 ### CAST
 

@@ -17,7 +17,7 @@ It covers:
 
 - A [conceptual overview](/docs/operations/rbac/#rbac-conceptual-review)
 - [Permission reference](/docs/operations/rbac/#permissions) with
-  [examples](/docs/operations/rbac/#database-vs-table-vs-column-permissions)
+  [examples](/docs/operations/rbac/#permission-levels)
 - Full list of related
   [SQL statements](/docs/operations/rbac/#full-sql-grammar-list)
 - Special cases such as within the
@@ -412,38 +412,41 @@ select * from all_permissions();
 
 #### Database permissions
 
-| permission         | level                               | description                                                                                                                                                               |
-|--------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ADD COLUMN         | Database &#124; Table               | Allows adding new column to existing table in rest api and pg wire protocol.                                                                                              |
-| ADD INDEX          | Database &#124; Table &#124; Column | Allows adding an index on symbol column.                                                                                                                                  |
-| ALTER COLUMN CACHE | Database &#124; Table &#124; Column | Allows disabling or enabling caching of symbol column values via ALTER TABLE command.                                                                                     |
-| ALTER COLUMN TYPE  | Database &#124; Table &#124; Column | Allows changing the type of columns via ALTER TABLE command.                                                                                                              |
-| ATTACH PARTITION   | Database &#124; Table               | Allows attaching partition to existing table.                                                                                                                             |
-| BACKUP DATABASE    | Database                            | Allows creating database backup via BACKUP DATABASE command.                                                                                                              |
-| BACKUP TABLE       | Database &#124; Table               | Allows creating table BACKUP TABLE command.                                                                                                                               |
-| CANCEL ANY COPY    | Database                            | Allows cancelling running COPY command via COPY importId CANCEL command.                                                                                                  |
-| CREATE TABLE       | Database                            | Allows creating tables.                                                                                                                                                   |
-| DEDUP ENABLE       | Database &#124; Table               | Allows enabling deduplication and setting of upsert keys.                                                                                                                 |
-| DEDUP DISABLE      | Database &#124; Table               | Allows disabling deduplication.                                                                                                                                           |
-| DETACH PARTITION   | Database &#124; Table               | Allows detaching partitions from tables.                                                                                                                                  |
-| DROP COLUMN        | Database &#124; Table &#124; Column | Allows dropping table columns.                                                                                                                                            |
-| DROP INDEX         | Database &#124; Table &#124; Column | Allows dropping symbol columns indexes via ALTER TABLE command.                                                                                                           |
-| DROP PARTITION     | Database &#124; Table               | Allows dropping or squashing existing table partitions.                                                                                                                   |
-| DROP TABLE         | Database &#124; Table               | Allows dropping tables.                                                                                                                                                   |
-| INSERT             | Database &#124; Table               | Allows inserting data into table columns.                                                                                                                                 |
-| REINDEX            | Database &#124; Table &#124; Column | Allows reindexing table's columns.                                                                                                                                        |
-| RENAME COLUMN      | Database &#124; Table &#124; Column | Allows renaming columns.                                                                                                                                                  |
-| RENAME TABLE       | Database &#124; Table               | Allows renaming tables.                                                                                                                                                   |
-| RESUME WAL         | Database &#124; Table               | Allows resuming WAL processing via ALTER TABLE RESUME WAL command.                                                                                                        |
-| SELECT             | Database &#124; Table &#124; Column | Allows selecting/reading table or column data.                                                                                                                            |
-| SET TABLE PARAM    | Database &#124; Table               | Allows setting table parameters via ALTER TABLE SET PARAM command.                                                                                                        |
-| SET TABLE TYPE     | Database &#124; Table               | Allows changing table type via ALTER TABLE SET TYPE command.                                                                                                              |
-| SNAPSHOT           | Database                            | Allows preparing database snapshot.                                                                                                                                       |
-| SQL ENGINE ADMIN   | Database                            | Allows the listing of currently running queries, and cancelling them via CANCEL QUERY command.                                                                            |
-| SYSTEM ADMIN       | Database                            | Allows the execution of various system related functions, such as reload_tls(), dump_memory_usage(), dump_thread_stacks(), flush_query_cache(), hydrate_table_metadata(). |
-| TRUNCATE TABLE     | Database &#124; Table               | Allows truncating tables.                                                                                                                                                 |
-| UPDATE             | Database &#124; Table &#124; Column | Allows updating table columns.                                                                                                                                            |
-| VACUUM TABLE       | Database &#124; Table               | Allows reclaiming storage via VACUUM TABLE command.                                                                                                                       |
+| permission                | level                               | description                                                                                                                                                               |
+|---------------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ADD COLUMN                | Database &#124; Table               | Allows adding new column to existing table in rest api and pg wire protocol.                                                                                              |
+| ADD INDEX                 | Database &#124; Table &#124; Column | Allows adding an index on symbol column.                                                                                                                                  |
+| ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Allows disabling or enabling caching of symbol column values via ALTER TABLE command.                                                                                     |
+| ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Allows changing the type of columns via ALTER TABLE command.                                                                                                              |
+| ATTACH PARTITION          | Database &#124; Table               | Allows attaching partition to existing table.                                                                                                                             |
+| BACKUP DATABASE           | Database                            | Allows creating database backup via BACKUP DATABASE command.                                                                                                              |
+| BACKUP TABLE              | Database &#124; Table               | Allows creating table BACKUP TABLE command.                                                                                                                               |
+| CANCEL ANY COPY           | Database                            | Allows cancelling running COPY command via COPY importId CANCEL command.                                                                                                  |
+| CREATE TABLE              | Database                            | Allows creating tables.                                                                                                                                                   |
+| CREATE MATERIALIZED VIEW  | Database                            | Allows creating materialized views.                                                                                                                                       |
+| DEDUP ENABLE              | Database &#124; Table               | Allows enabling deduplication and setting of upsert keys.                                                                                                                 |
+| DEDUP DISABLE             | Database &#124; Table               | Allows disabling deduplication.                                                                                                                                           |
+| DETACH PARTITION          | Database &#124; Table               | Allows detaching partitions from tables.                                                                                                                                  |
+| DROP COLUMN               | Database &#124; Table &#124; Column | Allows dropping table columns.                                                                                                                                            |
+| DROP INDEX                | Database &#124; Table &#124; Column | Allows dropping symbol columns indexes via ALTER TABLE command.                                                                                                           |
+| DROP PARTITION            | Database &#124; Table               | Allows dropping or squashing existing table partitions.                                                                                                                   |
+| DROP TABLE                | Database &#124; Table               | Allows dropping tables.                                                                                                                                                   |
+| DROP MATERIALIZED VIEW    | Database &#124; Table               | Allows dropping materialized views.                                                                                                                                       |
+| INSERT                    | Database &#124; Table               | Allows inserting data into table columns.                                                                                                                                 |
+| REFRESH MATERIALIZED VIEW | Database &#124; Table               | Allows refreshing/rebuilding materialized views.                                                                                                                          |
+| REINDEX                   | Database &#124; Table &#124; Column | Allows reindexing table's columns.                                                                                                                                        |
+| RENAME COLUMN             | Database &#124; Table &#124; Column | Allows renaming columns.                                                                                                                                                  |
+| RENAME TABLE              | Database &#124; Table               | Allows renaming tables.                                                                                                                                                   |
+| RESUME WAL                | Database &#124; Table               | Allows resuming WAL processing via ALTER TABLE RESUME WAL command.                                                                                                        |
+| SELECT                    | Database &#124; Table &#124; Column | Allows selecting/reading table or column data.                                                                                                                            |
+| SET TABLE PARAM           | Database &#124; Table               | Allows setting table parameters via ALTER TABLE SET PARAM command.                                                                                                        |
+| SET TABLE TYPE            | Database &#124; Table               | Allows changing table type via ALTER TABLE SET TYPE command.                                                                                                              |
+| SNAPSHOT                  | Database                            | Allows preparing database snapshot.                                                                                                                                       |
+| SQL ENGINE ADMIN          | Database                            | Allows the listing of currently running queries, and cancelling them via CANCEL QUERY command.                                                                            |
+| SYSTEM ADMIN              | Database                            | Allows the execution of various system related functions, such as reload_tls(), dump_memory_usage(), dump_thread_stacks(), flush_query_cache(), hydrate_table_metadata(). |
+| TRUNCATE TABLE            | Database &#124; Table               | Allows truncating tables.                                                                                                                                                 |
+| UPDATE                    | Database &#124; Table &#124; Column | Allows updating table columns.                                                                                                                                            |
+| VACUUM TABLE              | Database &#124; Table               | Allows reclaiming storage via VACUUM TABLE command.                                                                                                                       |
 
 #### User management permissions
 

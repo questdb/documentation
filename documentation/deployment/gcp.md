@@ -63,7 +63,7 @@ configure QuestDB.
 
 ### Better specification
 
-- **Instance**: `c3-highmem-8` or `c3d-standard-8` `(8 vCPUs, 64 GB RAM)`
+- **Instance**: `c3-highmem-8` or `c3d-highmem-8` `(8 vCPUs, 64 GB RAM)`
 - **Storage**
     - **OS disk**: `Hyperdisk Balanced (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
     - **Data disk**: `Hyperdisk Balanced (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
@@ -72,7 +72,7 @@ configure QuestDB.
 
 :::note
 
-You can use the `highcpu` and `highmem` variants to adjust the `standard` `4:1` vCPU/RAM
+You can use the `highcpu` and `highmem` variants to adjust the `standard` `4:1` RAM/vCPU
 ratio to `2:1` or `8:1` respectively. Higher RAM can improve performance dramatically
 if it means your working set data will fit entirely into memory.
 

@@ -4,9 +4,14 @@ sidebar_label: Conditional
 description: Conditional functions reference documentation.
 ---
 
-Conditional functions allow for conditionally selecting input values. For
-instance, the `coalesce()` function is useful for handling null data values and
-providing replacement values.
+Conditional functions allow for conditionally selecting input values.
+
+## case
+
+The `case` keyword  goes through a set of conditions and returns a value corresponding to the
+first condition met.
+
+For full syntax and examples, please visit the [CASE Keyword Reference](/docs/reference/sql/case)
 
 ## coalesce
 

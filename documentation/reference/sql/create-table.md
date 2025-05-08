@@ -44,12 +44,12 @@ This first iteration of our example creates a table with a designated timestamp
 and also applies a partitioning strategy, `BY DAY`:
 
 ```questdb-sql title="Basic example, partitioned by day"
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY;
 ```
 
@@ -57,12 +57,12 @@ Now we can add a time-to-live (TTL) period. Once an entire data partition is
 past its TTL, it becomes eligible for automatic removal.
 
 ```questdb-sql title="With TTL"
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY
 TTL 1 WEEK;
 ```
@@ -71,29 +71,29 @@ Next, we enable data deduplication. This will discard exact duplicates on the
 timestamp and ticker columns:
 
 ```questdb-sql title="With deduplication, adding ticker as an upsert key."
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY
 TTL 1 WEEK
-DEDUP UPSERT KEYS(timestamp, symbol);
+DEDUP UPSERT KEYS (timestamp, symbol);
 ```
 
 Finally, we add additional parameters for our SYMBOL type:
 
 ```questdb-sql title="Adding parameters for symbol type"
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL CAPACITY 256 NOCACHE,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY
 TTL 1 WEEK
-DEDUP UPSERT KEYS(timestamp, symbol);
+DEDUP UPSERT KEYS (timestamp, symbol);
 ```
 
 ## Write-Ahead Log (WAL) Settings
@@ -198,26 +198,22 @@ information on the behavior of this feature.
 ## Deduplication
 
 When [Deduplication](/docs/concept/deduplication) is enabled, QuestDB only
-inserts rows that do not match the existing data. When rows are inserted into a
-table with the deduplication option configured, QuestDB searches for existing
-rows to match using the specified `UPSERT KEYS`. If a match is found, the
-existing rows are replaced with the new row. If no match is found, the new rows
-are inserted into the table.
+inserts rows that do not match the existing data. When you insert a row into a
+table with deduplication enabled, QuestDB searches for existing rows with
+matching values in all the columns specified with `UPSERT KEYS`. It replaces all
+such matching rows with the new row.
 
-Deduplication can only be enabled for
+Deduplication only works on
 [Write-Ahead Log (WAL)](/docs/concept/write-ahead-log/) tables.
 
-It is possible to include multiple columns of different types in the
-`UPSERT KEYS` list.
+You can include multiple columns of different types in the `UPSERT KEYS` list.
 
 However, there are a few limitations to keep in mind:
 
-- The designated timestamp column must be included in the list of columns
-- Columns of [STRING and BINARY](/docs/reference/sql/datatypes) types cannot be
-  used in `UPSERT KEYS` list
+- You must include the designated timestamp column
+- You cannot use an [`ARRAY`](/docs/reference/sql/datatypes) column
 
-After table creation the deduplication configuration can be changed at any time
-using `ALTER` table:
+You can change the deduplication configuration at any time using `ALTER TABLE`:
 
 - Enable deduplication and change `UPSERT KEYS` with
   [`ALTER TABLE ENABLE`](/docs/reference/sql/alter-table-enable-deduplication/)
@@ -227,18 +223,18 @@ using `ALTER` table:
 ### Examples
 
 ```questdb-sql title="Creating a table for tracking ticker prices with daily partitions and upsert deduplication"
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY
-DEDUP UPSERT KEYS(timestamp, symbol);
+DEDUP UPSERT KEYS (timestamp, symbol);
 ```
 
 ```questdb-sql title="Enabling dedup on an existing table, for timestamp and ticker columns"
-ALTER TABLE trades DEDUP ENABLE UPSERT KEYS(timestamp, symbol);
+ALTER TABLE trades DEDUP ENABLE UPSERT KEYS (timestamp, symbol);
 ```
 
 ```questdb-sql title="Disabling dedup on the entire table"
@@ -250,7 +246,7 @@ SELECT dedup FROM tables() WHERE table_name = '<the table name>';
 ```
 
 ```questdb-sql title="Checking whether a column has dedup enabled"
-SELECT `column`, upsertKey from table_columns('<the table name>');
+SELECT `column`, upsertKey FROM table_columns('<the table name>');
 ```
 
 ## IF NOT EXISTS
@@ -260,12 +256,12 @@ An optional `IF NOT EXISTS` clause may be added directly after the
 with the desired table name does not already exist.
 
 ```questdb-sql
-CREATE TABLE IF NOT EXISTS trades(
+CREATE TABLE IF NOT EXISTS trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY;
 ```
 
@@ -281,7 +277,7 @@ and `EXAMPLE` are all treated the same. Table names containing spaces or period
 
 ```questdb-sql
 CREATE TABLE "example out of.space" (a INT);
-INSERT INTO "example out of.space" values (1);
+INSERT INTO "example out of.space" VALUES (1);
 ```
 
 ## Column name
@@ -320,12 +316,12 @@ When `distinctValueEstimate` is not explicitly specified, a default value of
 [symbols](/docs/concept/symbol/).
 
 ```questdb-sql
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL CAPACITY 50,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY;
 ```
 
@@ -335,12 +331,12 @@ PARTITION BY DAY;
 default value is `CACHE` unless otherwise specified.
 
 ```questdb-sql
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL CAPACITY 50 NOCACHE,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp);
+) TIMESTAMP(timestamp);
 ```
 
 ### Casting types
@@ -353,7 +349,7 @@ existing column in the `selectSql`
 ```questdb-sql
 CREATE TABLE test AS (
   SELECT x FROM long_sequence(10)
-  ), CAST (x AS DOUBLE);
+), CAST (x AS DOUBLE);
 ```
 
 ## Column indexes
@@ -365,12 +361,12 @@ must be of type [symbol](/docs/concept/symbol/).
 ![Flow chart showing the syntax of the index function](/images/docs/diagrams/indexDef.svg)
 
 ```questdb-sql
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ), INDEX(symbol) TIMESTAMP(timestamp);
+), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
 See the [Index concept](/docs/concept/indexes/#how-indexes-work) for more
@@ -381,21 +377,22 @@ information about indexes.
 _Enterprise only._
 
 When a user creates a new table, they automatically get all table level
-permissions with the `GRANT` option for that table.
-However, if the `OWNED BY` clause is used, the permissions instead go
-to the user, group, or service account named in that clause.
+permissions with the `GRANT` option for that table. However, if the `OWNED BY`
+clause is used, the permissions instead go to the user, group, or service
+account named in that clause.
 
-The `OWNED BY` clause cannot be omitted if the table is created by an
-external user, because permissions cannot be granted to them.
+The `OWNED BY` clause cannot be omitted if the table is created by an external
+user, because permissions cannot be granted to them.
 
 ```questdb-sql
 CREATE GROUP analysts;
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp) PARTITION BY DAY
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
 OWNED BY analysts;
 ```
 
@@ -405,7 +402,7 @@ Creates a table, using the results from the `SELECT` statement to determine the
 column names and data types.
 
 ```questdb-sql title="Create table as select"
-CREATE TABLE new_trades AS(
+CREATE TABLE new_trades AS (
   SELECT *
   FROM
     trades
@@ -416,7 +413,7 @@ We can use keywords such as `IF NOT EXISTS`, `PARTITION BY`..., as needed for
 the new table. The data type of a column can be changed:
 
 ```questdb-sql title="Clone an existing wide table and change type of cherry-picked columns"
-CREATE TABLE new_trades AS(
+CREATE TABLE new_trades AS (
   SELECT *
   FROM
     trades
@@ -454,7 +451,7 @@ inserts, this may have performance issues.
 To force this behaviour, one can use the `ATOMIC` keyword:
 
 ```questdb-sql title="Create atomic table as select"
-CREATE ATOMIC TABLE new_trades AS(
+CREATE ATOMIC TABLE new_trades AS (
   SELECT *
   FROM
     trades
@@ -472,7 +469,7 @@ The size of the batches can be configured:
 - locally, by using the `BATCH` keyword in the `CREATE TABLE` statement.
 
 ```questdb-sql title="Create batched table as select"
-CREATE BATCH 4096 TABLE new_trades AS(
+CREATE BATCH 4096 TABLE new_trades AS (
   SELECT *
   FROM
     trades
@@ -483,10 +480,8 @@ One can also specify the out-of-order commit lag for these batched writes, using
 the o3MaxLag option:
 
 ```questdb-sql title="Create table as select with batching and O3 lag"
-CREATE BATCH 4096 o3MaxLag 1s TABLE new_trades AS(
-  SELECT *
-  FROM
-    trades
+CREATE BATCH 4096 o3MaxLag 1s TABLE new_trades AS (
+  SELECT * FROM trades
 ) TIMESTAMP(timestamp);
 ```
 
@@ -498,7 +493,7 @@ through ordering trips by `pickup_time`, assign dedicated timestamp and
 partition by month:
 
 ```questdb-sql title="Create table as select with data manipulation"
-CREATE TABLE taxi_trips AS(
+CREATE TABLE taxi_trips AS (
   SELECT * FROM taxi_trips_unordered ORDER BY pickup_time
 ) TIMESTAMP(pickup_time)
 PARTITION BY MONTH;
@@ -506,9 +501,9 @@ PARTITION BY MONTH;
 
 ## CREATE TABLE LIKE
 
-The `LIKE` keyword clones the table schema of an existing table without copying
-the data. Table settings and parameters such as designated timestamp and symbol
-column indexes will be cloned, too.
+The `LIKE` keyword clones the table schema of an existing table or materialized
+view without copying the data. Table settings and parameters such as designated
+timestamp and symbol column indexes will be cloned, too.
 
 ```questdb-sql title="Create table like"
 CREATE TABLE new_table (LIKE my_table);
@@ -530,12 +525,12 @@ occurrences of resource-intensive commits when ingesting out-of-order data.
 The global setting for the same parameter is `cairo.max.uncommitted.rows`.
 
 ```questdb-sql title="Setting out-of-order table parameters via SQL"
-CREATE TABLE trades(
+CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-  ) TIMESTAMP(timestamp)
+) TIMESTAMP(timestamp)
 PARTITION BY DAY
 WITH maxUncommittedRows=250000;
 ```
@@ -564,11 +559,11 @@ The use of the comma (`,`) depends on the existence of the `WITH` clause:
 - If the `WITH` clause is present, a comma is mandatory before `IN VOLUME`:
 
   ```questdb-sql
-  CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE
+  CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
   ) TIMESTAMP(timestamp)
   PARTITION BY DAY
   WITH maxUncommittedRows=250000,
@@ -579,11 +574,11 @@ The use of the comma (`,`) depends on the existence of the `WITH` clause:
   segment:
 
   ```questdb-sql
-  CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE
+  CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
   ) TIMESTAMP(timestamp)
   PARTITION BY DAY
   IN VOLUME SECONDARY_VOLUME;
@@ -594,11 +589,11 @@ The use of quotation marks (`'`) depends on the volume alias:
 - If the alias contains spaces, the quotation marks are required:
 
   ```questdb-sql
-  CREATE TABLE trades(
-  timestamp TIMESTAMP,
-  symbol SYMBOL,
-  price DOUBLE,
-  amount DOUBLE
+  CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
   ) TIMESTAMP(timestamp)
   PARTITION BY DAY
   IN VOLUME 'SECONDARY_VOLUME';
