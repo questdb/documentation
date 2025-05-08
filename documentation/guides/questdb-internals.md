@@ -410,7 +410,7 @@ and the binary columnar data.
 ### Ingestion via ILP protocol
 
 - **Native ILP integration:**
-  QuestDB supports the [Influx Line Protocol](docs/reference/api/ilp/overview/)
+  QuestDB supports the [Influx Line Protocol](/docs/reference/api/ilp/overview/)
    (ILP) for high-speed data ingestion.
 
 - **Extensions to ILP:**
