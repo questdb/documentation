@@ -29,16 +29,20 @@ QuestDB is comprised of several key components:
   The system leverages both memory mapping and explicit memory management techniques,
   and integrates native code for performance-critical tasks.
 
-- **[Query processor](#query-engine):**
+- **[Query engine](#query-engine):**
   A custom SQL parser, a just-in-time (JIT) compiler, and a vectorized execution engine process
   data in table page frames for better CPU use.
+
+- **[Time-series Optimizations](#time-series-optimizations):**
+  QuestDB is specifically designed for time-series, and it provides several optimizations, like a
+  designated timestamp, sequential reads, materialized-views, or in-memory processing.
 
 - **[Data ingestion engine](#data-ingestion--write-path):**
   The engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead
   log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments
   ship to object storage for replication.
 
-- **[Networking layer](#ilp-protocol-support):**
+- **[Networking layer](#networking-layer):**
   The system exposes RESTful APIs and implements ILP and PostgreSQL wire protocols so that
   existing tools and drivers work out-of-the-box. It also offers a health and metrics endpoint.
 
@@ -310,9 +314,13 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
   collection overhead.
 
 - **Optimized in-memory handling:**
-  Apart from using CPU-level optimizations such as SIMD, QuestDB uses specialized hash tables (all of them with open addressing and linear probing), and implements algorithms for reducing the memory
-  footprint of many operations. Specialized data types, like `Symbol`, `VARCHAR`, or `UUID`, are
-  designed to use minimal disk and memory.
+  Apart from using CPU-level optimizations such as SIMD, QuestDB uses specialized hash tables (all of them with open
+  addressing and linear probing), and implements algorithms for reducing the memory
+  footprint of many operations.
+
+- **Custom memory layout for different data types:**
+  Specialized data types, like `Symbol`, `VARCHAR`, or `UUID`, are designed to use minimal disk and memory. For example,
+  char sequences shorter than 9 bytes are fully inlined within our `VARCHAR` header and do not occupy any additional data space.
 
  ```text
  Internal Representation of the VARCHAR data type
@@ -438,6 +446,45 @@ high availabilty. A [distributed sequencer](/docs/operations/multi-primary-inges
 tracks status of the cluster to enable instance discovery and automatic failover.
 
 
+## Networking layer
+
+QuestDB exposes several network interfaces and protocols to allow different client applications to interact with the database
+
+### InfluxDB Line protocol (ILP) over HTTP or TCP
+
+The [Influx Line Protocol](/docs/reference/api/ilp/overview/) allows for very high throughput of incoming data. It supports
+both HTTP (recommended) or TCP. QuestDB provides official clients in seven different programming languages, as well as
+integrations with third-party tools like Apache Kafka, Apache Flink, or Telegraf. Any ILP-compatible library can be used
+for ingesting data into QuestDB over HTTP.
+
+The default port number for ILP over HTTP is `9000`, and for ILP over TCP is `9009`.
+
+### PostgreSQL wire protocol
+
+QuestDB exposes a [PostgreSQL wire](/docs/reference/sql/overview/#postgresql) protocol, which can be used to send SQL
+statements both for data definition or for data manipulation. When used for data ingestion, throughput is noticeably
+lower than using the ILP protocol.
+
+QuestDB implements the wire protocol, allowing many third-party libraries to query QuestDB directly. Some client libraries
+might be incompatible if they rely heavily on PostgreSQL metadata, as QuestDB implements only a subset of it. For an
+overview of some key differences on QuestDB schema design, please visit our
+[Schema Design Essentials](/docs/guides/schema-design-essentials/) guide.
+
+The default port number for the pg-wire interface is `8812`.
+
+### HTTP Rest API
+
+QuestDB [REST API](/docs/reference/sql/overview/#rest-http-api) can be used to issue SQL statements over HTTP. It also
+exposes and endpoint for importing CSV files, and for exporting tables and query results.
+
+The default port number for the REST API is `9000`.
+
+### Minimal HTTP server for health-check and metrics
+
+QuestDB exposes an HTTP interface for monitoring. Please see the [Observability](#observability--diagnostics) section
+for more information.
+
+The default port number for the minimal HTTP server is `9003`.
 
 ## Security
 
