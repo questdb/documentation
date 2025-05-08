@@ -84,7 +84,6 @@ appears consistent to all readers, even during ongoing write operations.
 can handle and resolve out-of-order data writes, and enables deduplication. Column files use an
 [append model](/docs/concept/storage-model/).
 
-<!-- diagram used at the write-ahead-log concepts page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing WAL files consolidation"
   title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth, allowing for data deduplication and consolidation."
@@ -110,7 +109,6 @@ deduplicated on additional columns.
   The system stores each table as separate files per column. Fixed-size data types use one file
   per column, while variable-size data types (such as `VARCHAR` or `STRING`) use two files per column.
 
-<!-- This image is used also at the storage-model concepts page. Please keep in sync -->
 <Screenshot
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
   title="Architecture of the storage model with multiple column files per partition"
@@ -181,7 +179,6 @@ deduplicated on additional columns.
    the record number into a file offset by a simple bit shift. The offset in the column file is then
     translated into an offset in a lazily mapped memory page, where the required value is read from.
 
-<!-- This image is used also at the storage-model concepts page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   title="Diagram showing how the data from a column file is mapped to the memory"
@@ -449,6 +446,13 @@ tracks status of the cluster to enable instance discovery and automatic failover
 ## Networking layer
 
 QuestDB exposes several network interfaces and protocols to allow different client applications to interact with the database
+
+<Screenshot
+  alt="QuestDB Network Protocols"
+  title="QuestDB Network Protocols"
+  src="images/guides/questdb-internals/questdb_network_protocols.svg"
+  width={734}
+/>
 
 ### InfluxDB Line protocol (ILP) over HTTP or TCP
 
