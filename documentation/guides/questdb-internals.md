@@ -109,7 +109,7 @@ deduplicated on additional columns.
 <!-- This image is used also at the storage-model concepts page. Please keep in sync -->
 <Screenshot
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
-  title="Architecture of the storage model with column files, readers/writers and the mapped memory"
+  title="Architecture of the storage model with multiple column files per partition"
   height={596}
   src="images/guides/questdb-internals/columnarStorage.svg"
   width={400}
