@@ -385,7 +385,13 @@ alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
 
 alterMatViewSymbolCapacity
-  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity  
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity
+
+alterMatViewSetTtl
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'TTL' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
+
+alterMatViewSetRefreshLimit
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' 'LIMIT' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
 
 refreshMatView
   ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL')
