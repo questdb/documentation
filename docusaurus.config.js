@@ -7,6 +7,8 @@ const customFields = require("./src/config/customFields")
 const path = require("path")
 const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
 
+console.log({ envNetlify: process.env.NETLIFY, envContext: process.env.CONTEXT, isPreviews })
+
 dotenv.config()
 
 const config = {
