@@ -136,6 +136,16 @@ module.exports = {
               label: "Python",
             },
             {
+              id: "pgwire/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "pgwire/java",
+              type: "doc",
+              label: "Java",
+            },
+            {
               id: "pgwire/rust",
               type: "doc",
               label: "Rust",
@@ -146,19 +156,9 @@ module.exports = {
               label: "Node.js",
             },
             {
-              id: "pgwire/java",
-              type: "doc",
-              label: "Java",
-            },
-            {
               id: "pgwire/c-sharp",
               type: "doc",
               label: ".NET",
-            },
-            {
-              id: "pgwire/go",
-              type: "doc",
-              label: "Go",
             },
             {
               id: "pgwire/php",
