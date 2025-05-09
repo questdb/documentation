@@ -7,9 +7,6 @@ description:
 
 ## Introduction to PGWire in QuestDB
 
-QuestDB supports the PostgreSQL Wire Protocol (PGWire) for querying data. This compatibility allows you to use familiar
-PostgreSQL clients and drivers with QuestDB's high-performance time-series database.
-
 QuestDB is tested with the following Python clients:
 
 - [asyncpg](https://pypi.org/project/asyncpg/)
@@ -27,7 +24,7 @@ flavors, and some of them are not optimized for performance. We found psycopg2 t
 the slowest of the three clients. Our recommendation is to use asyncpg or psycopg3 for the best performance when
 querying data.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the InfluxDB Line Protocol (ILP)
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)]((/docs/ingestion-overview/))
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
 
 ## Connection Parameters
@@ -35,7 +32,6 @@ querying data.
 All Python PostgreSQL clients need similar connection parameters to connect to QuestDB:
 
 ```python
-# Connection parameters
 CONNECTION_PARAMS = {
     'host': '127.0.0.1',
     'port': 8812,  # Default PGWire port for QuestDB
@@ -71,7 +67,6 @@ import asyncio
 import asyncpg
 
 async def connect_to_questdb():
-    # Connect to QuestDB
     conn = await asyncpg.connect(
         host='127.0.0.1',
         port=8812,
@@ -80,14 +75,11 @@ async def connect_to_questdb():
         database='qdb'
     )
     
-    # Execute a simple query
     version = await conn.fetchval("SELECT version()")
     print(f"Connected to QuestDB version: {version}")
     
-    # Close the connection
     await conn.close()
 
-# Run the async function
 asyncio.run(connect_to_questdb())
 ```
 
@@ -161,7 +153,6 @@ async def stream_with_cursor():
         database='qdb'
     )
     
-    # Create a cursor for streaming results
     async with conn.transaction():
         # Execute a query that might return a large number of rows
         cursor = await conn.cursor("""
@@ -169,19 +160,16 @@ async def stream_with_cursor():
             ORDER BY ts
         """)
         
-        # Fetch rows in batches
         batch_size = 100
         total_processed = 0
         
         while True:
-            # Fetch a batch of rows
             batch = await cursor.fetch(batch_size)
             
             # If no more rows, break the loop
             if not batch:
                 break
             
-            # Process the batch
             total_processed += len(batch)
             print(f"Processed {total_processed} rows so far...")
     
@@ -200,7 +188,6 @@ import asyncio
 import asyncpg
 
 async def connection_pool_example():
-    # Create a connection pool
     pool = await asyncpg.create_pool(
         host='127.0.0.1',
         port=8812,
@@ -211,12 +198,10 @@ async def connection_pool_example():
         max_size=20
     )
     
-    # Use the pool to execute queries
     async with pool.acquire() as conn:
         result = await conn.fetch("SELECT * FROM trades LIMIT 10")
         print(f"Fetched {len(result)} rows")
     
-    # Close the pool
     await pool.close()
 
 asyncio.run(connection_pool_example())
@@ -240,11 +225,9 @@ async def parameterized_query():
         database='qdb'
     )
     
-    # Define time range for query
     end_time = datetime.now()
     start_time = end_time - timedelta(days=7)
     
-    # Execute a parameterized query
     rows = await conn.fetch("""
         SELECT 
             symbol,
@@ -269,11 +252,6 @@ asyncio.run(parameterized_query())
 
 asyncpg uses the binary protocol by default, which improves performance by avoiding text encoding/decoding for data
 transfer.
-
-### Known Limitations with QuestDB
-
-- Some asyncpg features like explicit `prepare()` method might have compatibility issues with QuestDB
-- For such cases, use simple parameterized queries without explicit preparation
 
 ### Performance Tips
 
@@ -306,7 +284,6 @@ pip install psycopg
 ```python
 import psycopg
 
-# Connect to QuestDB
 conn = psycopg.connect(
     host='127.0.0.1',
     port=8812,
@@ -316,14 +293,11 @@ conn = psycopg.connect(
     autocommit=True  # Important for QuestDB
 )
 
-# Create a cursor
 with conn.cursor() as cur:
-    # Execute a query
     cur.execute("SELECT version()")
     version = cur.fetchone()
     print(f"Connected to QuestDB version: {version[0]}")
 
-# Close the connection
 conn.close()
 ```
 
@@ -339,7 +313,6 @@ psycopg3 provides several methods for fetching data:
 import psycopg
 from datetime import datetime, timedelta
 
-# Connect to QuestDB
 with psycopg.connect(
     host='127.0.0.1',
     port=8812,
@@ -349,11 +322,9 @@ with psycopg.connect(
     autocommit=True
 ) as conn:
     with conn.cursor() as cur:
-        # Define query parameters
         end_time = datetime.now()
         start_time = end_time - timedelta(days=1)
         
-        # Execute a parameterized query
         cur.execute("""
             SELECT * FROM trades
             WHERE ts >= %s AND ts <= %s
@@ -361,11 +332,9 @@ with psycopg.connect(
             LIMIT 10
         """, (start_time, end_time))
         
-        # Fetch all results
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
         
-        # Process the results
         for row in rows:
             print(f"Timestamp: {row[0]}, Symbol: {row[1]}, Price: {row[2]}")
 ```
@@ -377,7 +346,6 @@ psycopg3 allows you to specify how rows are returned using row factories:
 ```python
 import psycopg
 
-# Connect to QuestDB
 with psycopg.connect(
     host='127.0.0.1',
     port=8812,
@@ -386,21 +354,17 @@ with psycopg.connect(
     dbname='qdb',
     autocommit=True
 ) as conn:
-    # Create a cursor with dict_row factory
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
         
-        # Access columns by name
         for row in rows:
             print(f"Symbol: {row['symbol']}, Price: {row['price']}")
     
-    # Create a cursor with named tuple factory
     with conn.cursor(row_factory=psycopg.rows.namedtuple_row) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
         
-        # Access columns as named attributes
         for row in rows:
             print(f"Symbol: {row.symbol}, Price: {row.price}")
 ```
@@ -412,7 +376,6 @@ For large result sets, you can use server-side cursors:
 ```python
 import psycopg
 
-# Connect to QuestDB
 with psycopg.connect(
     host='127.0.0.1',
     port=8812,
@@ -421,27 +384,20 @@ with psycopg.connect(
     dbname='qdb',
     autocommit=True
 ) as conn:
-    # Create a server-side cursor
     with conn.cursor() as cur:
         # Execute a query that might return many rows
         cur.execute("SELECT * FROM trades")
         
-        # Fetch rows in batches
         batch_size = 1000
         total_processed = 0
         
         while True:
-            # Fetch a batch of rows
             batch = cur.fetchmany(batch_size)
             
-            # If no more rows, break the loop
             if not batch:
                 break
             
-            # Process the batch
             total_processed += len(batch)
-            
-            # Print progress
             if total_processed % 10000 == 0:
                 print(f"Processed {total_processed} rows so far...")
         
@@ -456,7 +412,6 @@ psycopg3 uses placeholder parameters (`%s`) for prepared statements:
 import psycopg
 from datetime import datetime, timedelta
 
-# Connect to QuestDB
 with psycopg.connect(
         host='127.0.0.1',
         port=8812,
@@ -482,7 +437,6 @@ with psycopg.connect(
                     GROUP BY symbol
                     """, (start_time, end_time))
 
-        # Fetch and process results
         rows = cur.fetchall()
         for row in rows:
             print(f"Symbol: {row[0]}, Avg Price: {row[1]:.2f}")
@@ -497,7 +451,6 @@ import asyncio
 import psycopg
 
 async def async_psycopg3():
-    # Connect asynchronously
     async with await psycopg.AsyncConnection.connect(
         host='127.0.0.1',
         port=8812,
@@ -506,19 +459,15 @@ async def async_psycopg3():
         dbname='qdb',
         autocommit=True
     ) as aconn:
-        # Create an async cursor
         async with aconn.cursor() as acur:
-            # Execute a query
             await acur.execute("SELECT * FROM trades LIMIT 10")
 
-            # Fetch results
             rows = await acur.fetchall()
 
             print(f"Fetched {len(rows)} rows")
             for row in rows:
                 print(row)
 
-# Run the async function
 asyncio.run(async_psycopg3())
 ```
 
@@ -534,7 +483,6 @@ pip install psycopg_pool
 ```python
 from psycopg_pool import ConnectionPool
 
-# Create a connection pool
 pool = ConnectionPool(
     min_size=5,
     max_size=20,
@@ -548,20 +496,14 @@ pool = ConnectionPool(
     }
 )
 
-# Use the pool to execute queries
 with pool.connection() as conn:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM trades LIMIT 10")
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
 
-# Close the pool
 pool.close()
 ```
-
-### Known Limitations with QuestDB
-
-- Some PostgreSQL-specific features may not be available in QuestDB
 
 ### Performance Tips
 
@@ -595,7 +537,6 @@ pip install psycopg2-binary
 ```python
 import psycopg2
 
-# Connect to QuestDB
 conn = psycopg2.connect(
     host='127.0.0.1',
     port=8812,
@@ -604,17 +545,13 @@ conn = psycopg2.connect(
     dbname='qdb'
 )
 
-# Enable autocommit mode
 conn.autocommit = True
 
-# Create a cursor
 with conn.cursor() as cur:
-    # Execute a query
     cur.execute("SELECT version()")
     version = cur.fetchone()
     print(f"Connected to QuestDB version: {version[0]}")
 
-# Close the connection
 conn.close()
 ```
 
@@ -630,7 +567,6 @@ psycopg2 provides several methods for fetching data:
 import psycopg2
 from datetime import datetime, timedelta
 
-# Connect to QuestDB
 conn = psycopg2.connect(
     host='127.0.0.1',
     port=8812,
@@ -642,14 +578,11 @@ conn.autocommit = True
 
 try:
     with conn.cursor() as cur:
-        # Execute a query
         cur.execute("SELECT * FROM trades LIMIT 10")
         
-        # Fetch all results
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
         
-        # Process the results
         for row in rows:
             print(f"Timestamp: {row[0]}, Symbol: {row[1]}, Price: {row[2]}")
         
@@ -680,7 +613,6 @@ psycopg2 provides dictionary cursors to access rows by column name:
 ```python
 import psycopg2.extras
 
-# Connect to QuestDB
 conn = psycopg2.connect(
     host='127.0.0.1',
     port=8812,
@@ -691,21 +623,17 @@ conn = psycopg2.connect(
 conn.autocommit = True
 
 try:
-    # Create a dictionary cursor
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
 
-        # Access columns by name
         for row in rows:
             print(f"Symbol: {row['symbol']}, Price: {row['price']}")
 
-    # Create a real dictionary cursor
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
 
-        # Each row is a true Python dict
         for row in rows:
             print(row)  # Prints as a dict
 finally:
@@ -719,7 +647,6 @@ For large result sets, you can use server-side cursors:
 ```python
 import psycopg2
 
-# Connect to QuestDB
 conn = psycopg2.connect(
     host='127.0.0.1',
     port=8812,
@@ -730,27 +657,21 @@ conn = psycopg2.connect(
 conn.autocommit = True
 
 try:
-    # Create a server-side cursor
     with conn.cursor() as cur:
         # Execute a query that might return many rows
         cur.execute("SELECT * FROM trades")
 
-        # Fetch rows in batches
         batch_size = 1000
         total_processed = 0
 
         while True:
-            # Fetch a batch of rows
             batch = cur.fetchmany(batch_size)
 
             # If no more rows, break the loop
             if not batch:
                 break
 
-            # Process the batch
             total_processed += len(batch)
-
-            # Print progress
             if total_processed % 10000 == 0:
                 print(f"Processed {total_processed} rows so far...")
 
@@ -767,7 +688,6 @@ psycopg2 uses placeholder parameters (`%s`) for prepared statements:
 import psycopg2
 from datetime import datetime, timedelta
 
-# Connect to QuestDB
 conn = psycopg2.connect(
     host='127.0.0.1',
     port=8812,
@@ -779,11 +699,9 @@ conn.autocommit = True
 
 try:
     with conn.cursor() as cur:
-        # Define query parameters
         end_time = datetime.now()
         start_time = end_time - timedelta(days=7000)
 
-        # Execute a parameterized query
         cur.execute("""
                     SELECT symbol,
                            avg(price) as avg_price,
@@ -795,7 +713,6 @@ try:
                     GROUP BY symbol
                     """, (start_time, end_time))
 
-        # Fetch and process results
         rows = cur.fetchall()
         for row in rows:
             print(f"Symbol: {row[0]}, Avg Price: {row[1]:.2f}")
@@ -810,7 +727,6 @@ For connection pooling with psycopg2, you can use external libraries like psycop
 ```python
 from psycopg2.pool import ThreadedConnectionPool
 
-# Create a connection pool
 pool = ThreadedConnectionPool(
     minconn=5,
     maxconn=20,
@@ -821,23 +737,18 @@ pool = ThreadedConnectionPool(
     dbname='qdb'
 )
 
-# Get a connection from the pool
 conn = pool.getconn()
 
 try:
-    # Set autocommit
     conn.autocommit = True
 
-    # Use the connection
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM trades LIMIT 10")
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
 finally:
-    # Return the connection to the pool
     pool.putconn(conn)
 
-# Close the pool when done
 pool.closeall()
 ```
 
@@ -863,16 +774,12 @@ from sqlalchemy import create_engine
 
 from datetime import datetime, timedelta
 
-# Create SQLAlchemy engine
 engine = create_engine("questdb://admin:quest@localhost:8812/qdb")
 
-# Connect to the database
 with engine.connect() as conn:
-    # Define query parameters
     end_time = datetime.now()
     start_time = end_time - timedelta(days=10000)
 
-    # Create a query
     query = """
             SELECT * \
             FROM trades
@@ -884,7 +791,6 @@ with engine.connect() as conn:
     # Execute the query directly into a pandas DataFrame
     df = pd.read_sql(query, conn, params=(start_time, end_time))
 
-    # Display basic information
     print(f"DataFrame shape: {df.shape}")
     print(f"DataFrame columns: {df.columns.tolist()}")
     print(f"Sample data:\n{df.head()}")
@@ -937,35 +843,6 @@ LATEST ON timestamp PARTITION BY symbol;
 
 ```
 
-### Error Handling
-
-Always implement proper error handling for database operations:
-
-```python
-# Example error handling for psycopg3
-import psycopg
-from psycopg import errors, DataError
-
-try:
-    with psycopg.connect(
-        host='127.0.0.1',
-        port=8812,
-        user='admin',
-        password='quest',
-        dbname='qdb',
-        autocommit=True
-    ) as conn:
-        with conn.cursor() as cur:
-            try:
-                # Execute a query that might fail
-                cur.execute("SELECT * FROM non_existent_table")
-                results = cur.fetchall()
-            except Exception as e:
-                print(f"Query error: {e}")
-except Exception as e:
-    print(f"Connection error: {e}")
-```
-
 ## Conclusion
 
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use a variety of Python clients to query your
@@ -973,7 +850,7 @@ time-series data:
 
 - **asyncpg**: Best performance, especially for large result sets, uses binary protocol by default
 - **psycopg3**: Excellent balance of features and performance, supports both sync and async operations
-- **psycopg2**: Mature and stable client with wide compatibility
+- **psycopg2**: Mature and stable client with wide compatibility, but slower than asyncpg and psycopg3
 
 For most use cases, we recommend using asyncpg or psycopg3 for better performance. For data ingestion, consider using
 QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum throughput.
