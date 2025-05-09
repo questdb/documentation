@@ -50,7 +50,7 @@ QuestDB accepts both singular and plural forms:
 - `MONTH` or `MONTHS`
 - `YEAR` or `YEARS`
 
-It also supports shorthand notation: `3H` for 3 hours, `2M` for 2 months.
+It also supports shorthand notation: `3h` for 3 hours, `2M` for 2 months.
 
 :::note
 
@@ -81,5 +81,5 @@ ALTER TABLE weather SET TTL 3 WEEKS;
 Set the TTL to 12 hours, using the shorthand syntax for the time unit:
 
 ```sql
-ALTER TABLE weather SET TTL 12H;
+ALTER TABLE weather SET TTL 12h;
 ```
