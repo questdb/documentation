@@ -39,7 +39,6 @@ jobs:
         run: yarn build
 
       - name: Deploy to Netlify
-        uses: jsmrcaga/action-netlify-deploy@v2.0.0
         env:
           NETLIFY: true
           CONTEXT: deploy-preview
