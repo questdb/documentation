@@ -51,13 +51,9 @@ performance than the older `lib/pq` driver, which is now in maintenance mode.
 - Supports both standard `database/sql` interface and a more powerful native interface
 - Connection pooling with the pgxpool package
 - Prepared statements and parameterized queries
-- Transaction management
 - High performance with optimized binary protocol
 - Context support for cancellation and timeouts
-- Comprehensive error handling
 - Support for PostgreSQL-specific data types
-- COPY protocol support for efficient bulk data transfer
-- Automatic retries and connection recovery
 
 ### Installation
 
