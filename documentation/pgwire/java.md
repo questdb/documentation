@@ -87,19 +87,14 @@ import java.util.Properties;
 
 public class QuestDBConnection {
     public static void main(String[] args) {
-        // Connection parameters
         String url = "jdbc:postgresql://localhost:8812/qdb";
         Properties props = new Properties();
         props.setProperty("user", "admin");
         props.setProperty("password", "quest");
-        props.setProperty("sslmode", "disable");
-        
+
         try (Connection conn = DriverManager.getConnection(url, props)) {
             System.out.println("Connected to QuestDB successfully!");
-            
-            // Additional connection properties
             System.out.println("Auto-commit: " + conn.getAutoCommit());
-            
         } catch (SQLException e) {
             System.err.println("Connection error: " + e.getMessage());
             e.printStackTrace();
@@ -111,12 +106,10 @@ public class QuestDBConnection {
 ### Querying Data
 
 ```java
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
+import java.util.Calendar;
 import java.util.Properties;
+import java.util.TimeZone;
 
 public class QuestDBQuery {
     public static void main(String[] args) {
@@ -124,24 +117,30 @@ public class QuestDBQuery {
         Properties props = new Properties();
         props.setProperty("user", "admin");
         props.setProperty("password", "quest");
-        props.setProperty("sslmode", "disable");
-        
+
+        // By default, the PostgreSQL JDBC driver (PG JDBC) assumes that
+        // timestamps retrieved from the database are in the JVM's local timezone.
+        // However, QuestDB stores timestamps in UTC. To ensure correct interpretation
+        // and avoid unintended timezone conversions, we explicitly instruct the
+        // PG JDBC driver to interpret all retrieved timestamps as UTC.
+        // This is achieved by providing a Calendar object configured to UTC
+        // when calling ResultSet.getTimestamp().
+        java.util.Calendar utcCalendar = Calendar.getInstance();
+        utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+
         try (Connection conn = DriverManager.getConnection(url, props);
              Statement stmt = conn.createStatement()) {
-            
-            // Execute a simple query
-            ResultSet rs = stmt.executeQuery("SELECT * FROM trades LIMIT 10");
-            
-            // Process the results
-            while (rs.next()) {
-                String timestamp = rs.getString("ts");
-                String symbol = rs.getString("symbol");
-                double price = rs.getDouble("price");
-                
-                System.out.printf("Timestamp: %s, Symbol: %s, Price: %.2f%n", 
-                                  timestamp, symbol, price);
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM trades LIMIT 10")) {
+                while (rs.next()) {
+                    Timestamp timestamp = rs.getTimestamp("ts", utcCalendar);
+                    String symbol = rs.getString("symbol");
+                    double price = rs.getDouble("price");
+
+                    System.out.printf("Timestamp: %s, Symbol: %s, Price: %.2f%n",
+                            timestamp, symbol, price);
+                }
             }
-            
+
         } catch (SQLException e) {
             System.err.println("Query error: " + e.getMessage());
             e.printStackTrace();
@@ -161,10 +160,12 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Calendar;
 import java.util.Properties;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.sql.Timestamp;
+import java.util.TimeZone;
 
 public class QuestDBParameterizedQuery {
     public static void main(String[] args) {
@@ -173,31 +174,34 @@ public class QuestDBParameterizedQuery {
         props.setProperty("user", "admin");
         props.setProperty("password", "quest");
         props.setProperty("sslmode", "disable");
-        
-        try (Connection conn = DriverManager.getConnection(url, props)) {
-            // Create a prepared statement with parameters
-            String sql = "SELECT * FROM trades WHERE symbol = ? AND ts >= ? ORDER BY ts LIMIT 10";
-            
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                // Set parameter values
-                pstmt.setString(1, "BTC-USD");
-                
-                // Set timestamp for 7 days ago
-                LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
-                Timestamp timestamp = Timestamp.from(sevenDaysAgo.toInstant(ZoneOffset.UTC));
-                pstmt.setTimestamp(2, timestamp);
-                
-                // Execute the query
-                ResultSet rs = pstmt.executeQuery();
-                
-                // Process the results
+
+        // By default, the PostgreSQL JDBC driver (PG JDBC) assumes that
+        // timestamps retrieved from the database are in the JVM's local timezone.
+        // However, QuestDB stores timestamps in UTC. To ensure correct interpretation
+        // and avoid unintended timezone conversions, we explicitly instruct the
+        // PG JDBC driver to interpret all retrieved timestamps as UTC.
+        // This is achieved by providing a Calendar object configured to UTC
+        // when calling ResultSet.getTimestamp().
+        java.util.Calendar utcCalendar = Calendar.getInstance();
+        utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+        String sql = "SELECT * FROM trades WHERE symbol = ? AND ts >= ? ORDER BY ts LIMIT 10";
+        try (Connection conn = DriverManager.getConnection(url, props);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, "BTC-USD");
+
+            LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            Timestamp timestamp = Timestamp.from(sevenDaysAgo.toInstant(ZoneOffset.UTC));
+            pstmt.setTimestamp(2, timestamp);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    String ts = rs.getString("ts");
+                    Timestamp ts = rs.getTimestamp("ts", utcCalendar);
                     String symbol = rs.getString("symbol");
                     double price = rs.getDouble("price");
-                    
-                    System.out.printf("Timestamp: %s, Symbol: %s, Price: %.2f%n", 
-                                      ts, symbol, price);
+
+                    System.out.printf("Timestamp: %s, Symbol: %s, Price: %.2f%n",
+                            ts, symbol, price);
                 }
             }
         } catch (SQLException e) {
@@ -221,46 +225,40 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 public class QuestDBConnectionPool {
-    private static HikariDataSource dataSource;
-    
+    private static final HikariDataSource dataSource;
+
     static {
-        // Configure connection pool
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://localhost:8812/qdb");
         config.setUsername("admin");
         config.setPassword("quest");
         config.addDataSourceProperty("sslmode", "disable");
-        
-        // Connection pool settings
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setIdleTimeout(30000);
         config.setConnectionTimeout(10000);
-        
-        // Initialize the data source
+
         dataSource = new HikariDataSource(config);
     }
-    
+
     public static Connection getConnection() throws SQLException {
         return dataSource.getConnection();
     }
-    
+
     public static void closePool() {
         if (dataSource != null) {
             dataSource.close();
         }
     }
-    
+
     public static void main(String[] args) {
         try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM trades LIMIT 5")) {
-            
-            ResultSet rs = pstmt.executeQuery();
-            
+             PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM trades LIMIT 5");
+             ResultSet rs = pstmt.executeQuery()) {
+
             while (rs.next()) {
                 System.out.println(rs.getString("symbol") + ": " + rs.getDouble("price"));
             }
-            
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
@@ -279,14 +277,14 @@ Add the HikariCP dependency to your project:
 <dependency>
     <groupId>com.zaxxer</groupId>
     <artifactId>HikariCP</artifactId>
-    <version>5.1.0</version>
+    <version>6.3.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.zaxxer:HikariCP:5.1.0'
+implementation 'com.zaxxer:HikariCP:6.3.0'
 ```
 
 
@@ -300,7 +298,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Calendar;
 import java.util.Properties;
+import java.util.TimeZone;
 
 public class QuestDBTimeSeries {
     public static void main(String[] args) {
@@ -309,42 +309,51 @@ public class QuestDBTimeSeries {
         props.setProperty("user", "admin");
         props.setProperty("password", "quest");
         props.setProperty("sslmode", "disable");
-        
+
+        // By default, the PostgreSQL JDBC driver (PG JDBC) assumes that
+        // timestamps retrieved from the database are in the JVM's local timezone.
+        // However, QuestDB stores timestamps in UTC. To ensure correct interpretation
+        // and avoid unintended timezone conversions, we explicitly instruct the
+        // PG JDBC driver to interpret all retrieved timestamps as UTC.
+        // This is achieved by providing a Calendar object configured to UTC
+        // when calling ResultSet.getTimestamp().
+        java.util.Calendar utcCalendar = Calendar.getInstance();
+        utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+
         try (Connection conn = DriverManager.getConnection(url, props);
              Statement stmt = conn.createStatement()) {
-            
+
             // SAMPLE BY query (time-based downsampling)
-            String sampleByQuery = 
-                "SELECT ts, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
-                "FROM trades " +
-                "WHERE ts >= dateadd('d', -7, now()) " +
-                "SAMPLE BY 1h";
-            
+            String sampleByQuery =
+                    "SELECT ts, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
+                            "FROM trades " +
+                            "WHERE ts >= dateadd('d', -7, now()) " +
+                            "SAMPLE BY 1h";
+
             System.out.println("Executing SAMPLE BY query...");
-            ResultSet rs1 = stmt.executeQuery(sampleByQuery);
-            
-            while (rs1.next()) {
-                System.out.printf("Time: %s, Symbol: %s, Avg Price: %.2f, Range: %.2f - %.2f%n",
-                                 rs1.getString("ts"),
-                                 rs1.getString("symbol"),
-                                 rs1.getDouble("avg_price"),
-                                 rs1.getDouble("min_price"),
-                                 rs1.getDouble("max_price"));
+            try (ResultSet rs1 = stmt.executeQuery(sampleByQuery)) {
+                while (rs1.next()) {
+                    System.out.printf("Time: %s, Symbol: %s, Avg Price: %.2f, Range: %.2f - %.2f%n",
+                            rs1.getTimestamp("ts", utcCalendar),
+                            rs1.getString("symbol"),
+                            rs1.getDouble("avg_price"),
+                            rs1.getDouble("min_price"),
+                            rs1.getDouble("max_price"));
+                }
             }
-            
-            // LATEST BY query (last value per group)
-            String latestByQuery = "SELECT * FROM trades LATEST BY symbol";
-            
+
+            // LATEST ON query (last value per group)
+            String latestByQuery = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
+
             System.out.println("\nExecuting LATEST BY query...");
-            ResultSet rs2 = stmt.executeQuery(latestByQuery);
-            
-            while (rs2.next()) {
-                System.out.printf("Symbol: %s, Latest Price: %.2f at %s%n",
-                                 rs2.getString("symbol"),
-                                 rs2.getDouble("price"),
-                                 rs2.getString("ts"));
+            try (ResultSet rs2 = stmt.executeQuery(latestByQuery)) {
+                while (rs2.next()) {
+                    System.out.printf("Symbol: %s, Latest Price: %.2f at %s%n",
+                            rs2.getString("symbol"),
+                            rs2.getDouble("price"),
+                            rs2.getTimestamp("ts", utcCalendar));
+                }
             }
-            
         } catch (SQLException e) {
             System.err.println("Query error: " + e.getMessage());
             e.printStackTrace();
@@ -353,11 +362,13 @@ public class QuestDBTimeSeries {
 }
 ```
 
-### Integration with Spring Framework
+### Integration with Spring Boot
 
 For Spring applications, here's an example using `JdbcTemplate`:
 
 ```java
+package com.example.demo;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -373,126 +384,154 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
+import java.util.TimeZone;
+
 import com.zaxxer.hikari.HikariDataSource;
 
 @SpringBootApplication
 public class QuestDBSpringApplication {
-    
-    public static void main(String[] args) {
-        SpringApplication.run(QuestDBSpringApplication.class, args);
-    }
-    
-    @Bean
-    public DataSource dataSource() {
-        HikariDataSource dataSource = new HikariDataSource();
-        dataSource.setJdbcUrl("jdbc:postgresql://localhost:8812/qdb");
-        dataSource.setUsername("admin");
-        dataSource.setPassword("quest");
-        dataSource.addDataSourceProperty("sslmode", "disable");
-        dataSource.setMaximumPoolSize(10);
-        return dataSource;
-    }
-    
-    @Bean
-    public JdbcTemplate jdbcTemplate(DataSource dataSource) {
-        return new JdbcTemplate(dataSource);
-    }
+
+	public static void main(String[] args) {
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+		SpringApplication.run(QuestDBSpringApplication.class, args);
+	}
+
+	@Bean
+	public DataSource dataSource() {
+		HikariDataSource dataSource = new HikariDataSource();
+		dataSource.setJdbcUrl("jdbc:postgresql://localhost:8812/qdb");
+		dataSource.setUsername("admin");
+		dataSource.setPassword("quest");
+		dataSource.addDataSourceProperty("sslmode", "disable");
+		dataSource.setMaximumPoolSize(10);
+		return dataSource;
+	}
+
+	@Bean
+	public JdbcTemplate jdbcTemplate(DataSource dataSource) {
+		return new JdbcTemplate(dataSource);
+	}
 }
 
-// Trade model class
 class Trade {
-    private String timestamp;
-    private String symbol;
-    private double price;
-    private double amount;
-    
-    // Getters and setters
-    // ...
-    
-    @Override
-    public String toString() {
-        return "Trade{" +
-                "timestamp='" + timestamp + '\'' +
-                ", symbol='" + symbol + '\'' +
-                ", price=" + price +
-                ", amount=" + amount +
-                '}';
-    }
+	private Instant instant;
+	private String symbol;
+	private double price;
+	private double amount;
+
+	@Override
+	public String toString() {
+		return "Trade{" +
+				"timestamp='" + instant + '\'' +
+				", symbol='" + symbol + '\'' +
+				", price=" + price +
+				", amount=" + amount +
+				'}';
+	}
+
+	public void setInstant(Instant instant) {
+		this.instant = instant;
+	}
+
+	public Instant getInstant() {
+		return instant;
+	}
+
+	public void setSymbol(String symbol) {
+		this.symbol = symbol;
+	}
+
+	public String getSymbol() {
+		return symbol;
+	}
+
+	public void setPrice(double price) {
+		this.price = price;
+	}
+
+	public double getPrice() {
+		return price;
+	}
+
+	public void setAmount(double amount) {
+		this.amount = amount;
+	}
+
+	public double getAmount() {
+		return amount;
+	}
 }
 
-// RowMapper implementation for Trade
 class TradeRowMapper implements RowMapper<Trade> {
-    @Override
-    public Trade mapRow(ResultSet rs, int rowNum) throws SQLException {
-        Trade trade = new Trade();
-        trade.setTimestamp(rs.getString("ts"));
-        trade.setSymbol(rs.getString("symbol"));
-        trade.setPrice(rs.getDouble("price"));
-        trade.setAmount(rs.getDouble("amount"));
-        return trade;
-    }
+	@Override
+	public Trade mapRow(ResultSet rs, int rowNum) throws SQLException {
+		Trade trade = new Trade();
+		trade.setInstant(rs.getTimestamp("ts").toInstant());
+		trade.setSymbol(rs.getString("symbol"));
+		trade.setPrice(rs.getDouble("price"));
+		trade.setAmount(rs.getDouble("amount"));
+		return trade;
+	}
 }
 
-// Repository using JdbcTemplate
 @Repository
 class TradeRepository {
-    private final JdbcTemplate jdbcTemplate;
-    
-    @Autowired
-    public TradeRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-    
-    public List<Trade> findRecentTrades(String symbol, int limit) {
-        String sql = "SELECT * FROM trades WHERE symbol = ? ORDER BY ts DESC LIMIT ?";
-        return jdbcTemplate.query(sql, new TradeRowMapper(), symbol, limit);
-    }
-    
-    public List<Trade> findLatestTradesForAllSymbols() {
-        String sql = "SELECT * FROM trades LATEST BY symbol";
-        return jdbcTemplate.query(sql, new TradeRowMapper());
-    }
+	private final JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	public TradeRepository(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
+	}
+
+	public List<Trade> findRecentTrades(String symbol, int limit) {
+		String sql = "SELECT * FROM trades WHERE symbol = ? ORDER BY ts DESC LIMIT ?";
+		return jdbcTemplate.query(sql, new TradeRowMapper(), symbol, limit);
+	}
+
+	public List<Trade> findLatestTradesForAllSymbols() {
+		String sql = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+		return jdbcTemplate.query(sql, new TradeRowMapper());
+	}
 }
 
-// Service layer
 @Service
 class TradeService {
-    private final TradeRepository tradeRepository;
-    
-    @Autowired
-    public TradeService(TradeRepository tradeRepository) {
-        this.tradeRepository = tradeRepository;
-    }
-    
-    public List<Trade> getRecentTrades(String symbol, int limit) {
-        return tradeRepository.findRecentTrades(symbol, limit);
-    }
-    
-    public List<Trade> getLatestTradesForAllSymbols() {
-        return tradeRepository.findLatestTradesForAllSymbols();
-    }
+	private final TradeRepository tradeRepository;
+
+	@Autowired
+	public TradeService(TradeRepository tradeRepository) {
+		this.tradeRepository = tradeRepository;
+	}
+
+	public List<Trade> getRecentTrades(String symbol, int limit) {
+		return tradeRepository.findRecentTrades(symbol, limit);
+	}
+
+	public List<Trade> getLatestTradesForAllSymbols() {
+		return tradeRepository.findLatestTradesForAllSymbols();
+	}
 }
 
-// REST controller
 @RestController
 class TradeController {
-    private final TradeService tradeService;
-    
-    @Autowired
-    public TradeController(TradeService tradeService) {
-        this.tradeService = tradeService;
-    }
-    
-    @GetMapping("/api/trades")
-    public List<Trade> getTrades(@RequestParam(required = false) String symbol,
-                                @RequestParam(defaultValue = "10") int limit) {
-        if (symbol != null) {
-            return tradeService.getRecentTrades(symbol, limit);
-        } else {
-            return tradeService.getLatestTradesForAllSymbols();
-        }
-    }
+	private final TradeService tradeService;
+
+	@Autowired
+	public TradeController(TradeService tradeService) {
+		this.tradeService = tradeService;
+	}
+
+	@GetMapping("/api/trades")
+	public List<Trade> getTrades(@RequestParam(required = false) String symbol,
+								 @RequestParam(defaultValue = "10") int limit) {
+		if (symbol != null) {
+			return tradeService.getRecentTrades(symbol, limit);
+		} else {
+			return tradeService.getLatestTradesForAllSymbols();
+		}
+	}
 }
 ```
 
@@ -501,24 +540,67 @@ Add Spring Boot and JDBC dependencies to your project:
 #### Maven
 
 ```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>demo</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>demo</name>
+    <description>Demo project for Spring Boot</description>
 
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-jdbc</artifactId>
-</dependency>
-<dependency>
-<groupId>org.springframework.boot</groupId>
-<artifactId>spring-boot-starter-web</artifactId>
-</dependency>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+```
+
+And create the `application.properties` file in `src/main/resources`:
+
+```properties
+spring.application.name=demo
+spring.datasource.url=jdbc:postgresql://localhost:8812/qd
+spring.datasource.username=admin
+spring.datasource.password=quest
 ```
 
 ### Known Limitations with QuestDB
 
 When using the PostgreSQL JDBC driver with QuestDB, be aware of these limitations:
-
 - Some PostgreSQL-specific features like scrollable cursors may not be fully supported
 - Complex transaction patterns might have compatibility issues
-- QuestDB may not support all PostgreSQL data types
+- QuestDB does not support all PostgreSQL data types
 - Some metadata queries (like those used by database tools) might not work as expected
 
 ### Performance Tips
@@ -526,8 +608,7 @@ When using the PostgreSQL JDBC driver with QuestDB, be aware of these limitation
 - Use connection pooling for better performance
 - Set appropriate fetch sizes for large result sets
 - Use prepared statements for frequently executed queries
-- Leverage QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY`
-- Set autoCommit to true for read-only operations
+- Leverage QuestDB's time-series functions like `SAMPLE BY` and `LATEST ON`
 
 ## R2DBC-PostgreSQL
 
