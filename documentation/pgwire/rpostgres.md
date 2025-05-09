@@ -19,8 +19,9 @@ QuestDB is designed to be a high-performance database. The PGWire protocol has m
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
 R, we recommend using RPostgres with the DBI interface.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the InfluxDB Line Protocol (ILP)
-> instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with
+> the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) instead of PGWire.
+> PGWire should primarily be used for querying data in QuestDB.
 
 ## Introduction to PGWire in QuestDB
 

@@ -22,8 +22,9 @@ flavors, and some of them are not optimized for performance. We found psycopg2 t
 the slowest of the three clients. Our recommendation is to use asyncpg or psycopg3 for the best performance when
 querying data.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)]((/docs/ingestion-overview/))
-> instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
+> instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
+> official [Python client](/docs/clients/ingest-python/) for data ingestion using ILP.
 
 ## Connection Parameters
 
