@@ -125,7 +125,11 @@ module.exports = {
           label: "PGWire Clients",
           collapsed: false,
           items: [
-             "pgwire/pgwire-intro",
+            {
+              id: "pgwire/pgwire-intro",
+              type: "doc",
+              label: "Overview",
+            },
             {
               id: "pgwire/python",
               type: "doc",

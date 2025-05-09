@@ -1,5 +1,5 @@
 ---
-title: Clients overview
+title: PGWire Client Overview
 description:
   QuestDB PGWire clients overview. Learn about the PGWire protocol and how to
   use it with QuestDB.
