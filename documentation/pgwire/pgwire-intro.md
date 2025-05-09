@@ -11,8 +11,6 @@ QuestDB implements the PostgreSQL wire protocol (PGWire) to allow clients to con
 libraries. This is a great way to get started with QuestDB, as it allows you to use existing PostgreSQL clients and
 libraries.
 
-See individual client library documentation for specific instructions on how to use them with QuestDB.
-
 <Clients showProtocol="PGWire"/>
 
 When using PGWire with QuestDB, there are a few important things to know and the rest of this document will cover them
