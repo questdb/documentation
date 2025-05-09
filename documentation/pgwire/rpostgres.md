@@ -1,5 +1,5 @@
 ---
-title: R clients
+title: R PGwire Guide
 description:
   R clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with R for querying data. 

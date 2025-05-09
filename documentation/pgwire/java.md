@@ -1,5 +1,5 @@
 ---
-title: Java clients
+title: Java PGWire Guide
 description:
   Java clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with Java for querying data. 
@@ -20,16 +20,8 @@ QuestDB is designed to be a high-performance database. The PGWire protocol has m
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
 Java, we recommend using the PostgreSQL JDBC driver with connection pooling.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the InfluxDB Line Protocol (ILP)
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)]((/docs/ingestion-overview/))
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
-
-## Introduction to PGWire in QuestDB
-
-QuestDB supports the PostgreSQL Wire Protocol (PGWire) for querying data. This compatibility allows you to use standard
-Java PostgreSQL clients with QuestDB's high-performance time-series database.
-
-It's important to note that QuestDB's underlying storage model differs from PostgreSQL's, which means some PostgreSQL
-features may not be available in QuestDB.
 
 ## Connection Parameters
 
@@ -140,7 +132,6 @@ public class QuestDBQuery {
                             timestamp, symbol, price);
                 }
             }
-
         } catch (SQLException e) {
             System.err.println("Query error: " + e.getMessage());
             e.printStackTrace();
@@ -155,11 +146,7 @@ Using `PreparedStatement` provides protection against SQL injection and can impr
 queries:
 
 ```java
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Calendar;
 import java.util.Properties;
 import java.time.LocalDateTime;
@@ -192,7 +179,7 @@ public class QuestDBParameterizedQuery {
 
             LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
             Timestamp timestamp = Timestamp.from(sevenDaysAgo.toInstant(ZoneOffset.UTC));
-            pstmt.setTimestamp(2, timestamp);
+            pstmt.setTimestamp(2, timestamp, utcCalendar);
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {

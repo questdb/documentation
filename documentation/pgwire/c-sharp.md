@@ -1,5 +1,5 @@
 ---
-title: C# clients
+title: C# PGWire Guide
 description:
   C# clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with C# for querying data. 

@@ -1,5 +1,5 @@
 ---
-title: Go clients
+title: Go PGWire Guide
 description:
   Go clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with Go for querying data. 

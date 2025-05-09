@@ -1,5 +1,5 @@
 ---
-title: Rust clients
+title: Rust PGWire Guide
 description:
   Rust clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with Rust for querying data. 

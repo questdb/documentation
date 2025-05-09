@@ -1,5 +1,5 @@
 ---
-title: PHP clients
+title: PHP PGWire Guide
 description:
   PHP clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with PHP for querying data. 

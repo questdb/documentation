@@ -7,7 +7,7 @@ description:
 
 QuestDB implements the PostgreSQL wire protocol (PGWire) to allow clients to connect to QuestDB using PostgreSQL client
 libraries. This is a great way to get started with QuestDB, as it allows you to use existing PostgreSQL clients and
-libraries. The PGWire protocol is a standardized protocol that allows clients to communicate with PostgreSQL servers.
+libraries.
 
 This overview should help you get started. For detailed instructions and best practices for specific languages and their
 clients, please refer to the dedicated client library pages.
@@ -28,13 +28,13 @@ QuestDB stores all timestamps internally in [UTC](https://en.wikipedia.org/wiki/
 However, when transmitting timestamps over the PGWire protocol, QuestDB represents them as `TIMESTAMP WITHOUT TIMEZONE`.
 This can lead to client
 libraries interpreting these timestamps in their local timezone by default, potentially causing confusion or incorrect
-data representation. Our language-specific guides (e.g., for C#, Java, JavaScript, Python) provide detailed examples
-on how to configure your client to correctly interpret these timestamps as UTC.
+data representation. Our language-specific guides provide detailed examples on how to configure your client to correctly
+interpret these timestamps as UTC.
 
 ### PGWire vs. SQL Semantics
 
 While QuestDB supports the PGWire protocol for communication, its SQL dialect and feature
-set are not identical to PostgreSQL. QuestDB is a specialized time-series database and may not support all SQL
+set are not identical to PostgreSQL. QuestDB is a specialized time-series database and does not support all SQL
 features, functions, or data types that a standard PostgreSQL server does. Always refer to the QuestDB SQL
 documentation for supported operations.
 

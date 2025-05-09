@@ -126,14 +126,46 @@ module.exports = {
           collapsed: false,
           items: [
              "pgwire/pgwire-intro",
-             "pgwire/python",
-             "pgwire/rust",
-             "pgwire/javascript",
-             "pgwire/java",
-             "pgwire/c-sharp",
-             "pgwire/go",
-             "pgwire/php",
-             "pgwire/rpostgres",
+            {
+              id: "pgwire/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "pgwire/rust",
+              type: "doc",
+              label: "Rust",
+            },
+            {
+              id: "pgwire/javascript",
+              type: "doc",
+              label: "Node.js",
+            },
+            {
+              id: "pgwire/java",
+              type: "doc",
+              label: "Java",
+            },
+            {
+              id: "pgwire/c-sharp",
+              type: "doc",
+              label: ".NET",
+            },
+            {
+              id: "pgwire/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "pgwire/php",
+              type: "doc",
+              label: "PHP",
+            },
+            {
+              id: "pgwire/rpostgres",
+              type: "doc",
+              label: "R",
+            },
           ]
         },
         "reference/sql/datatypes",

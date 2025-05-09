@@ -1,11 +1,9 @@
 ---
-title: Python clients
+title: Python PGWire Guide
 description:
   Python clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with Python for querying data. 
 ---
-
-## Introduction to PGWire in QuestDB
 
 QuestDB is tested with the following Python clients:
 
