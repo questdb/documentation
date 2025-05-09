@@ -79,7 +79,7 @@ Install-Package Npgsql
 ```xml
 
 <ItemGroup>
-    <PackageReference Include="Npgsql" Version="8.0.1"/>
+    <PackageReference Include="Npgsql" Version="9.0.3"/>
 </ItemGroup>
 ```
 
@@ -87,20 +87,18 @@ Install-Package Npgsql
 
 ```csharp
 using Npgsql;
-using System;
-using System.Threading.Tasks;
 
 namespace QuestDBExample
 {
     class Program
     {
         static async Task Main(string[] args)
-        {
+        {   
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             // Connection string with required ServerCompatibilityMode=NoTypeLoading
             string connectionString = 
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
-            
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
@@ -108,7 +106,6 @@ namespace QuestDBExample
                 
                 Console.WriteLine("Connected to QuestDB successfully!");
                 
-                // Close the connection
                 await connection.CloseAsync();
             }
             catch (Exception ex)
@@ -119,17 +116,20 @@ namespace QuestDBExample
     }
 }
 ```
-
 > **Important**: Always include `ServerCompatibilityMode=NoTypeLoading` in your connection string when connecting to
 > QuestDB. This is necessary because QuestDB's type system differs from PostgreSQL's, and this setting prevents Npgsql
 > from attempting to load PostgreSQL-specific types that aren't supported by QuestDB.
 
+
+
+The `AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true)` setting is required because
+QuestDB handles timestamps differently than PostgreSQL. While QuestDB timestamps are always stored in UTC, they are
+transmitted over PGWire protocol as 'TIMESTAMP WITHOUT TIMEZONE' for legacy compatibility reasons. This setting
+ensures Npgsql properly handles these timestamps as DateTime values rather than attempting timezone conversions.
 ### Querying Data
 
 ```csharp
 using Npgsql;
-using System;
-using System.Threading.Tasks;
 
 namespace QuestDBExample
 {
@@ -137,23 +137,21 @@ namespace QuestDBExample
     {
         static async Task Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             string connectionString = 
-                "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
-                "ServerCompatibilityMode=NoTypeLoading;";
+               "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
+               "ServerCompatibilityMode=NoTypeLoading;";
             
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
                 
-                // Create a command
-                string sql = "SELECT * FROM trades LIMIT 10";
+                string sql = "SELECT symbol, price, amount, ts FROM trades LIMIT 10";
                 await using var command = new NpgsqlCommand(sql, connection);
                 
-                // Execute the command and process the results
                 await using var reader = await command.ExecuteReaderAsync();
                 
-                // Read column names
                 var columns = new string[reader.FieldCount];
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
@@ -162,14 +160,16 @@ namespace QuestDBExample
                 }
                 Console.WriteLine();
                 
-                // Read data
                 while (await reader.ReadAsync())
                 {
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        Console.Write($"{reader[i]}\t");
-                    }
-                    Console.WriteLine();
+                    
+                    var symbol = reader.GetString(0);
+                    var price = reader.GetDouble(1);
+                    var amount = reader.GetDouble(2);
+                    // Get the DateTime and specify it as UTC since we know QuestDB timestamps are in UTC
+                    DateTime dateTime = DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc);
+                    
+                    Console.Write($"{symbol}\t{price}\t{amount}\t{dateTime}\t\n");
                 }
             }
             catch (Exception ex)
@@ -188,8 +188,6 @@ executing similar queries repeatedly:
 
 ```csharp
 using Npgsql;
-using System;
-using System.Threading.Tasks;
 
 namespace QuestDBExample
 {
@@ -197,6 +195,7 @@ namespace QuestDBExample
     {
         static async Task Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             string connectionString = 
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
@@ -206,11 +205,9 @@ namespace QuestDBExample
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
                 
-                // Parameters
                 string symbol = "BTC-USD";
-                DateTime startTime = DateTime.UtcNow.AddDays(-7); // 7 days ago
+                DateTime startTime = DateTime.UtcNow.AddDays(-7000); // 7 days ago
                 
-                // Parameterized query
                 string sql = @"
                     SELECT * 
                     FROM trades 
@@ -220,17 +217,16 @@ namespace QuestDBExample
                 
                 await using var command = new NpgsqlCommand(sql, connection);
                 
-                // Add parameters
                 command.Parameters.AddWithValue("@symbol", symbol);
                 command.Parameters.AddWithValue("@startTime", startTime);
                 
-                // Execute the command
                 await using var reader = await command.ExecuteReaderAsync();
                 
-                // Process results
                 while (await reader.ReadAsync())
                 {
-                    string timestamp = reader["ts"].ToString();
+                    DateTime timestamp = (DateTime)reader["ts"];
+                    timestamp = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
+                    
                     string tradingSymbol = reader["symbol"].ToString();
                     double price = reader.GetDouble(reader.GetOrdinal("price"));
                     
@@ -253,8 +249,6 @@ default, but you can configure various pooling settings in the connection string
 
 ```csharp
 using Npgsql;
-using System;
-using System.Threading.Tasks;
 
 namespace QuestDBExample
 {
@@ -262,7 +256,7 @@ namespace QuestDBExample
     {
         static async Task Main(string[] args)
         {
-            // Connection string with connection pooling settings
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             string connectionString = 
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;" +
@@ -285,19 +279,14 @@ namespace QuestDBExample
                         // Simulate some work
                         await Task.Delay(1000);
                         
-                        // Execute a simple query
                         await using var cmd = new NpgsqlCommand("SELECT 1", connection);
                         int result = (int)await cmd.ExecuteScalarAsync();
                         
                         Console.WriteLine($"Connection {connectionId} executed query with result: {result}");
-                        
-                        // Connection returned to the pool when disposed
                     });
                 }
                 
-                // Wait for all tasks to complete
                 await Task.WhenAll(tasks);
-                
                 Console.WriteLine("All connections have been processed");
             }
             catch (Exception ex)
@@ -315,8 +304,6 @@ QuestDB provides specialized time-series functions that can be used with Npgsql:
 
 ```csharp
 using Npgsql;
-using System;
-using System.Threading.Tasks;
 
 namespace QuestDBExample
 {
@@ -324,6 +311,7 @@ namespace QuestDBExample
     {
         static async Task Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             string connectionString = 
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
@@ -342,7 +330,7 @@ namespace QuestDBExample
                         min(price) as min_price, 
                         max(price) as max_price 
                     FROM trades 
-                    WHERE ts >= dateadd('d', -7, now()) 
+                    WHERE ts >= dateadd('d', -7000, now()) 
                     SAMPLE BY 1h";
                 
                 Console.WriteLine("Executing SAMPLE BY query...");
@@ -360,10 +348,10 @@ namespace QuestDBExample
                     }
                 }
                 
-                // LATEST BY query (last value per group)
-                string latestByQuery = "SELECT * FROM trades LATEST BY symbol";
+                // LATEST ON query (last value per group)
+                string latestByQuery = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
                 
-                Console.WriteLine("\nExecuting LATEST BY query...");
+                Console.WriteLine("\nExecuting LATEST ON query...");
                 await using (var cmd2 = new NpgsqlCommand(latestByQuery, connection))
                 {
                     await using var reader = await cmd2.ExecuteReaderAsync();
@@ -390,20 +378,11 @@ namespace QuestDBExample
 Here's an example of integrating QuestDB with an ASP.NET Core web application using direct Npgsql access:
 
 ```csharp
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Npgsql;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace QuestDBAspNetCoreExample
 {
-    // Model class
     public class Trade
     {
         public DateTime Timestamp { get; set; }
@@ -412,7 +391,6 @@ namespace QuestDBAspNetCoreExample
         public double Amount { get; set; }
     }
     
-    // Service for database operations
     public class QuestDBService
     {
         private readonly string _connectionString;
@@ -451,7 +429,7 @@ namespace QuestDBAspNetCoreExample
             {
                 trades.Add(new Trade
                 {
-                    Timestamp = reader.GetDateTime(0),
+                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(0), DateTimeKind.Utc),
                     Symbol = reader.GetString(1),
                     Price = reader.GetDouble(2),
                     Amount = reader.GetDouble(3)
@@ -468,7 +446,7 @@ namespace QuestDBAspNetCoreExample
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
             
-            string sql = "SELECT * FROM trades LATEST BY symbol";
+            string sql = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
             await using var command = new NpgsqlCommand(sql, connection);
             
             await using var reader = await command.ExecuteReaderAsync();
@@ -476,7 +454,7 @@ namespace QuestDBAspNetCoreExample
             {
                 trades.Add(new Trade
                 {
-                    Timestamp = reader.GetDateTime(reader.GetOrdinal("ts")),
+                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("ts")), DateTimeKind.Utc),
                     Symbol = reader.GetString(reader.GetOrdinal("symbol")),
                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                     Amount = reader.GetDouble(reader.GetOrdinal("amount"))
@@ -527,7 +505,6 @@ namespace QuestDBAspNetCoreExample
         }
     }
     
-    // Startup configuration
     public class Startup
     {
         public Startup(IConfiguration configuration)
@@ -539,7 +516,6 @@ namespace QuestDBAspNetCoreExample
         
         public void ConfigureServices(IServiceCollection services)
         {
-            // Register QuestDB service
             services.AddSingleton<QuestDBService>();
             
             services.AddControllers();
@@ -563,7 +539,6 @@ namespace QuestDBAspNetCoreExample
         }
     }
     
-    // API Controller
     [ApiController]
     [Route("api/[controller]")]
     public class TradesController : ControllerBase
@@ -597,11 +572,11 @@ namespace QuestDBAspNetCoreExample
         }
     }
     
-    // Program entry point
     public class Program
     {
         public static void Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             CreateHostBuilder(args).Build().Run();
         }
         
@@ -650,26 +625,30 @@ Here's an example of using Dapper with QuestDB:
 ```csharp
 using Dapper;
 using Npgsql;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace QuestDBDapperExample
 {
-    // Entity model
     public class Trade
     {
-        public DateTime Timestamp { get; set; }
+        private DateTime _timestamp;
+        public DateTime Timestamp
+        {
+            get => _timestamp;
+            set => _timestamp = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        }
         public string Symbol { get; set; }
         public double Price { get; set; }
         public double Amount { get; set; }
     }
-    
-    // Example of a result from a time-series query
+
     public class TimeSeriesPoint
     {
-        public DateTime Timestamp { get; set; }
+        private DateTime _timestamp;
+        public DateTime Timestamp
+        {
+            get => _timestamp;
+            set => _timestamp = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        }
         public string Symbol { get; set; }
         public double AvgPrice { get; set; }
         public double MinPrice { get; set; }
@@ -680,6 +659,7 @@ namespace QuestDBDapperExample
     {
         static async Task Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             string connectionString = 
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
@@ -705,7 +685,7 @@ namespace QuestDBDapperExample
                 
                 // Parameterized query
                 string symbol = "BTC-USD";
-                DateTime startTime = DateTime.UtcNow.AddDays(-7);
+                DateTime startTime = DateTime.UtcNow.AddDays(-7000);
                 
                 var filteredTrades = await connection.QueryAsync<Trade>(
                     "SELECT ts AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
@@ -732,7 +712,7 @@ namespace QuestDBDapperExample
                     "   min(price) AS MinPrice, " +
                     "   max(price) AS MaxPrice " +
                     "FROM trades " +
-                    "WHERE ts >= dateadd('d', -1, now()) " +
+                    "WHERE ts >= dateadd('d', -10000, now()) " +
                     "SAMPLE BY 1h");
                 
                 Console.WriteLine($"\nRetrieved {timeSeriesData.Count()} time series points:");
@@ -771,13 +751,11 @@ When using Npgsql with QuestDB, be aware of these limitations:
    applications.
 2. **Prepared Statements**: Use prepared statements for frequently executed queries to improve performance.
 3. **Batch Operations**: When possible, batch multiple operations together to reduce network overhead.
-4. **Asynchronous API**: Use the asynchronous methods (`OpenAsync`, `ExecuteReaderAsync`, etc.) to avoid blocking
-   threads, especially in web applications.
-5. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+4. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
    efficient queries.
-6. **Limit Result Sets**: When dealing with large time-series datasets, use `LIMIT` clauses to avoid retrieving too much
+5. **Limit Result Sets**: When dealing with large time-series datasets, use `LIMIT` clauses to avoid retrieving too much
    data at once.
-7. **Use Appropriate Types**: Match C# types to QuestDB types correctly to avoid unnecessary conversions.
+6. **Use Appropriate Types**: Match C# types to QuestDB types correctly to avoid unnecessary conversions.
 
 ## QuestDB Time Series Features
 
@@ -797,29 +775,13 @@ FROM trades
 WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
 ```
 
-### LATEST BY Queries
+### LATEST ON Queries
 
-LATEST BY is an efficient way to get the most recent values:
+LATEST ON is an efficient way to get the most recent values:
 
 ```sql
 SELECT *
-FROM trades LATEST BY symbol
-```
-
-### Time Window Functions
-
-For more complex time-based aggregations:
-
-```sql
-SELECT timestamp_floor('15m', ts) as time_bucket,
-       symbol,
-       avg(price)                 as avg_price,
-       min(price)                 as min_price,
-       max(price)                 as max_price
-FROM trades
-WHERE ts >= dateadd('d', -1, now())
-GROUP BY time_bucket, symbol
-ORDER BY time_bucket, symbol
+FROM trades LATEST ON timestamp PARTITION BY symbol
 ```
 
 ## Troubleshooting
