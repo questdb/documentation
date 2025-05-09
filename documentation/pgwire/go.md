@@ -558,11 +558,11 @@ func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days 
 			min(price) as min_price, 
 			max(price) as max_price 
 		FROM trades 
-		WHERE symbol = $1 AND ts >= dateadd('d', -($2::int), now()) 
+		WHERE symbol = $1 AND ts >= dateadd('d', $2, now()) 
 		SAMPLE BY 1h
 	`
 
-	rows, err := c.pool.Query(ctx, query, symbol, days)
+	rows, err := c.pool.Query(ctx, query, symbol, -days)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
