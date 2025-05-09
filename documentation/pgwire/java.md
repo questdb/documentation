@@ -345,7 +345,7 @@ public class QuestDBTimeSeries {
             // LATEST ON query (last value per group)
             String latestByQuery = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
 
-            System.out.println("\nExecuting LATEST BY query...");
+            System.out.println("\nExecuting LATEST ON query...");
             try (ResultSet rs2 = stmt.executeQuery(latestByQuery)) {
                 while (rs2.next()) {
                     System.out.printf("Symbol: %s, Latest Price: %.2f at %s%n",
@@ -880,7 +880,7 @@ public class QuestDBR2dbcTimeSeries {
         ).blockLast();
 
         // LATEST ON query
-        System.out.println("\nExecuting LATEST BY query...");
+        System.out.println("\nExecuting LATEST ON query...");
         connectionMono = Mono.from(connectionFactory.create());
         connectionMono.flatMapMany(connection ->
                 Flux.from(connection.createStatement("SELECT * FROM trades LATEST ON ts PARTITION BY symbol").execute())

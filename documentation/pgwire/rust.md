@@ -509,7 +509,7 @@ async fn main() -> Result<(), Error> {
         );
     }
 
-    // LATEST BY query (last value per group)
+    // LATEST ON query (last value per group)
     println!("\nLatest trades by symbol:");
     let latest_by_query = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
 
@@ -569,13 +569,13 @@ WHERE timestamp >= '2020-01-01'
 SAMPLE BY 1h;
 ```
 
-### LATEST BY Queries
+### LATEST ON Queries
 
-LATEST BY is an efficient way to get the most recent values:
+LATEST ON is an efficient way to get the most recent values:
 
 ```sql
 SELECT * FROM trades
-                 LATEST ON timestamp PARTITION BY symbol;
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ## Troubleshooting
@@ -614,5 +614,5 @@ with various Rust applications.
 For data ingestion, it's recommended to use QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for
 high-throughput data insertion.
 
-QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST BY`, provide powerful tools for analyzing
+QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through tokio-postgres.

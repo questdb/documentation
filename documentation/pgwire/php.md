@@ -356,7 +356,7 @@ When using PDO with QuestDB, be aware of these limitations:
    issues.
 2. **Close Connections**: Make sure to close PDO connections when they're no longer needed, especially in long-running
    scripts.
-3. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+3. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST ON` for
    efficient queries.
 4. **Fetch Mode**: Choose the most appropriate fetch mode for your use case to minimize memory usage and processing
    time.
@@ -417,5 +417,5 @@ PHP applications.
 For data ingestion, it's recommended to use QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for
 high-throughput data insertion.
 
-QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST BY`, provide powerful tools for analyzing
+QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through PDO.

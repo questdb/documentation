@@ -911,7 +911,6 @@ For optimal query performance with QuestDB:
    leverage QuestDB's time-series optimizations
 2. **Use appropriate time ranges**: Avoid querying unnecessarily large time ranges
 3. **Use SAMPLE BY for large datasets**: Downsample data when appropriate
-4. **Use LATEST BY for last-value queries**: More efficient than ORDER BY/LIMIT
 
 ### Common Time Series Queries
 
@@ -930,7 +929,7 @@ WHERE timestamp >= '2020-01-01'
 SAMPLE BY 1h;
 """
 
-# 2. Latest by query (efficient way to get most recent values)
+# 2. Latest on query (efficient way to get most recent values)
 """
 SELECT * FROM trades
 LATEST ON timestamp PARTITION BY symbol;

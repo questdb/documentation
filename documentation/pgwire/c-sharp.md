@@ -751,7 +751,7 @@ When using Npgsql with QuestDB, be aware of these limitations:
    applications.
 2. **Prepared Statements**: Use prepared statements for frequently executed queries to improve performance.
 3. **Batch Operations**: When possible, batch multiple operations together to reduce network overhead.
-4. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+4. **Query Optimization**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST ON` for
    efficient queries.
 5. **Limit Result Sets**: When dealing with large time-series datasets, use `LIMIT` clauses to avoid retrieving too much
    data at once.
@@ -814,7 +814,7 @@ For data ingestion, remember that QuestDB provides an
 official [.NET client](https://questdb.com/docs/clients/ingest-dotnet/) that uses the InfluxDB Line Protocol (ILP) for
 high-throughput data insertion. For optimal performance, use this client for data ingestion and Npgsql for querying.
 
-QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST BY`, provide powerful tools for analyzing
+QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through Npgsql.
 
 For production applications, consider using the QuestDB.Net library or direct Npgsql queries, as they offer more direct

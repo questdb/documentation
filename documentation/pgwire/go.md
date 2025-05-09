@@ -447,7 +447,7 @@ func main() {
 
 	rows, err = conn.Query(ctx, latestByQuery)
 	if err != nil {
-		log.Fatalf("LATEST BY query failed: %v", err)
+		log.Fatalf("LATEST ON query failed: %v", err)
 	}
 
 	for rows.Next() {
@@ -812,7 +812,7 @@ When using pgx with QuestDB, be aware of these limitations:
 2. **Prepared Statements**: Use prepared statements for queries that are executed multiple times to improve performance.
 3. **Batch Operations**: When possible, batch operations together to reduce network overhead.
 4. **Transaction Management**: Be mindful of QuestDB's transaction semantics when using transactions.
-5. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+5. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST ON` for
    efficient queries.
 
 ## QuestDB Time Series Features
