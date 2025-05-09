@@ -43,14 +43,13 @@ jobs:
         run: cat build/index.html
 
       - name: Deploy to Netlify
-        uses: jsmrcaga/action-netlify-deploy@v2.0.0
-        with:
+        env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          build_directory: build
-          install_command: "echo Skipping installing the dependencies"
-          build_command: "echo Skipping building the web files"
-          deploy_alias: preview-${{ github.event.pull_request.number }}
+        run: |
+          NETLIFY_OUTPUT=$(netlify deploy --dir=build --auth=$NETLIFY_AUTH_TOKEN --site=$NETLIFY_SITE_ID --alias=preview-${{ github.event.pull_request.number }} --message="Preview Deploy from GitHub Actions")
+          PREVIEW_URL=$(echo "$NETLIFY_OUTPUT" | grep -o 'Website Draft URL: .*$' | sed 's/Website Draft URL: //')
+          echo "NETLIFY_PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
 
       - name: "Update PR"
         if: ${{ env.NETLIFY_PREVIEW_URL }}
