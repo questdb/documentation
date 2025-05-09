@@ -394,7 +394,7 @@ alterMatViewSetRefreshLimit
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' 'LIMIT' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
 
 refreshMatView
-  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL')
+  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('INTERVAL' 'FROM' fromTimestamp 'TO' toTimestamp))
 
 dropMatView
   ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName  
