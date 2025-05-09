@@ -193,6 +193,8 @@ module.exports = {
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
                     "reference/sql/alter-mat-view-change-symbol-capacity",
+                    "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-ttl",
                     "reference/sql/alter-mat-view-resume-wal",
                   ],
                 },
