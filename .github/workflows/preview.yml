@@ -64,7 +64,6 @@ jobs:
             Commit SHA: ${{ github.event.pull_request.head.sha }}
 
             > :package: Build generates a preview & updates link on each commit.
-          comment_tag: preview
 
   validate-links:
     name: "Validate broken links"
