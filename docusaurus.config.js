@@ -169,3 +169,6 @@ module.exports = {
   ...config,
   ssrTemplate: ssrTemplate(config),
 }
+
+console.log("isPreviews", isPreviews);
+console.log("baseUrl", config.baseUrl);
