@@ -97,7 +97,10 @@ against the demo instance.
 
 Query QuestDB using the PostgreSQL endpoint via the default port `8812`.
 
-Examples in multiple languages are shown below.
+See [PGWire Client overview](/docs/pgwire/pgwire-intro/) for details on how to
+connect to QuestDB using PostgreSQL clients.
+
+Brief examples in multiple languages are shown below.
 
 <Tabs defaultValue="python" values={[ { label: "Python", value: "python" },
 { label: "Java", value: "java" }, { label: "NodeJS", value: "nodejs" }, { label:
@@ -138,11 +141,6 @@ Examples in multiple languages are shown below.
 
 </Tabs>
 
-### PostgreSQL compatibility
-
-QuestDB offers broad compatibility with the PostgreSQL ecosystem.
-
-However, please note some limitations.
 
 #### Forward-only cursors
 

@@ -120,6 +120,58 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "reference/sql/overview",
+        {
+          type: "category",
+          label: "PGWire Clients",
+          collapsed: false,
+          items: [
+            {
+              id: "pgwire/pgwire-intro",
+              type: "doc",
+              label: "Overview",
+            },
+            {
+              id: "pgwire/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "pgwire/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "pgwire/java",
+              type: "doc",
+              label: "Java",
+            },
+            {
+              id: "pgwire/rust",
+              type: "doc",
+              label: "Rust",
+            },
+            {
+              id: "pgwire/javascript",
+              type: "doc",
+              label: "Node.js",
+            },
+            {
+              id: "pgwire/c-sharp",
+              type: "doc",
+              label: ".NET",
+            },
+            {
+              id: "pgwire/php",
+              type: "doc",
+              label: "PHP",
+            },
+            {
+              id: "pgwire/rpostgres",
+              type: "doc",
+              label: "R",
+            },
+          ]
+        },
         "reference/sql/datatypes",
         "concept/sql-execution-order",
         {
