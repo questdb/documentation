@@ -56,6 +56,8 @@ REFRESH MATERIALIZED VIEW trades_1h INCREMENTAL;
 REFRESH MATERIALIZED VIEW trades_1h INTERVAL FROM '2025-05-05T01:00:00.000000Z' TO '2025-05-05T02:00:00.000000Z';
 ```
 
+Both timestamps in the `INTERVAL` refresh command are inclusive.
+
 ## See also
 
 For more information on the concept, see the the
