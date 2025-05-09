@@ -13,7 +13,7 @@ const config = {
   title: "QuestDB",
   tagline: "QuestDB is the fastest open source time series database",
   url: `https://${customFields.domain}`,
-  baseUrl: isPreviews ? '/' : '/docs/',
+  baseUrl: isPreviews ? '/docs/' : '/docs/',
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
