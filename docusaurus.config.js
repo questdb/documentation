@@ -6,7 +6,7 @@ const ssrTemplate = require("./src/internals/ssr.template")
 const customFields = require("./src/config/customFields")
 const path = require("path")
 const isPreviews = (process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview') || process.env.DOCUSAURUS_BASE_URL
-
+console.log({ isPreviews, envNetlify: process.env.NETLIFY, envContext: process.env.CONTEXT, envDocu: process.env.DOCUSAURUS_BASE_URL })
 dotenv.config()
 
 const config = {
