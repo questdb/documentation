@@ -46,19 +46,22 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
-          NETLIFY_OUTPUT=$(netlify deploy --dir=build --no-build --auth=$NETLIFY_AUTH_TOKEN --site=$NETLIFY_SITE_ID --alias=preview-${{ github.event.pull_request.number }} --message="Preview Deploy from GitHub Actions")
-          echo "$NETLIFY_OUTPUT"
-          PREVIEW_URL=$(echo "$NETLIFY_OUTPUT" | grep -Eo 'https://[^ ]+.netlify.app')
-          echo "NETLIFY_PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
+          netlify deploy \
+            --dir=build \
+            --no-build \
+            --auth=$NETLIFY_AUTH_TOKEN \
+            --site=$NETLIFY_SITE_ID \
+            --alias=preview-${{ github.event.pull_request.number }} \
+            --message="Preview Deploy from GitHub Actions"
 
       - name: "Update PR"
-        if: ${{ env.NETLIFY_PREVIEW_URL }}
+        if: success()
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
             :rocket: **Build success!**
 
-            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
+            Latest successful preview: https://preview-${{ github.event.pull_request.number }}--questdb-documentation.netlify.app
 
             Commit SHA: ${{ github.event.pull_request.head.sha }}
 
