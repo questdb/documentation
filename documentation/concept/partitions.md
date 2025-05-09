@@ -15,6 +15,7 @@ each interval is stored in separate sets of files.
 
 import Screenshot from "@theme/Screenshot"
 
+<!-- This image is used also at the questdb-internals page. Please keep in sync -->
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
   height={373}

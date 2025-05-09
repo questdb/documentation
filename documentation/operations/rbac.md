@@ -63,6 +63,8 @@ this ability.
 The below diagram is an example of a QuestDB access control system. Inherited
 permissions are shown in grey colour:
 
+<!-- This image is used also at the questdb-internals page. Please keep in sync -->
+
 <Screenshot
   alt="Diagram showing users, service accounts and groups in QuestDB"
   title="Users, service accounts and groups"
@@ -506,7 +508,7 @@ Let's look at some examples!
 
 - `BACKUP DATABASE` is a global action, it does not make sense to grant it to
   a specific table or column.
- 
+
   The backup captures the state of the entire database as a whole, therefore
   this permission has **database** granularity, and _can be granted on database
   level only_.
@@ -518,10 +520,10 @@ GRANT BACKUP DATABASE TO user;
 - `ATTACH PARTITION` makes sense only in the context of a table, because a
   partition is always attached to a table. This permission has **table**
   granularity, and _can be granted on database or table level_.
- 
+
   When granted to specific tables, the user can attach partitions only to
   the tables specified.
- 
+
   If granted on database level, the user can attach partitions to any tables
   of the database.
 ```questdb-sql
@@ -535,13 +537,13 @@ GRANT ATTACH PARTITION ON table1, table2 TO user;
 - `SELECT` works on any level. Data is queried from columns, so this permission
   has **column** granularity, and _can be granted on database, table or column
   level_.
- 
+
   When granted on specific columns of a table, the user can query only the columns
   specified.
- 
+
   When granted on a table or on a list of tables, the user can query any data from
   the tables specified.
- 
+
   If granted on database level, the user can query any column of any table in the
   entire database.
 ```questdb-sql
