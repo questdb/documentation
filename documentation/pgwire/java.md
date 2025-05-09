@@ -648,6 +648,7 @@ public class QuestDBR2dbcConnection {
                         .username("admin")
                         .password("quest")
                         .database("qdb")
+                        .timeZone("UTC")
                         .build()
         );
 
