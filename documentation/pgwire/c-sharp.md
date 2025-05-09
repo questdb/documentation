@@ -50,13 +50,11 @@ connect to and interact with PostgreSQL databases, including QuestDB.
 ### Features
 
 - Full ADO.NET implementation
-- Entity Framework Core provider
 - Connection pooling
 - Prepared statements
 - Support for asynchronous operations
-- Transaction management
 - Batch operations
-- Full type handling for PostgreSQL types
+
 
 ### Installation
 
