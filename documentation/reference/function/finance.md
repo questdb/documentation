@@ -10,12 +10,14 @@ This page describes functions specific to the financial services domain.
 
 Trade price calculation.
 
-`l2price(target_quantity, quantity_1, price_1, quantity_2, price_2, ..., quantity_n, price_n)`
+`l2price(target_size, size_array, price_array)`
 
-Consider `quantity_1`, `price_1`, `quantity_2`, `price_2`, ..., `quantity_n`,
+`l2price(target_size, size_1, price_1, size_2, price_2, ..., size_n, price_n)`
+
+Consider `size_1`, `price_1`, `size_2`, `price_2`, ..., `size_n`,
 `price_n` to be either side of an order book with `n` price levels. Then, the
 return value of the function is the average trade price of a market order
-executed with the size of `target_quantity` against the book.
+executed with the size of `target_size` against the book.
 
 Let's take the below order book as an example.
 
@@ -46,6 +48,12 @@ This average trade price is the output of the function when executed with the
 parameters taken from the above example:
 
 ```questdb-sql
+select l2price(50, ARRAY[14.0, 16.0, 23.0, 12.0], ARRAY[14.50, 14.60, 14.80, 15.10]);
+```
+
+or
+
+```questdb-sql
 select l2price(50, 14, 14.50, 16, 14.60, 23, 14.80, 12, 15.10);
 ```
 
@@ -55,25 +63,89 @@ select l2price(50, 14, 14.50, 16, 14.60, 23, 14.80, 12, 15.10);
 
 ### Parameters
 
-The function takes a `target quantity`, and a variable number of
-`quantity`/`price` pairs. Each represents a price level of the order book.
+There are two variants of the function, one accepting arrays of numbers,
+and the other accepting individual numbers:
 
-Each parameter is expected to be a double, or convertible to double (float,
-long, int, short, byte).
+The variant with arrays takes a `target size`, and a pair of arrays of type
+`DOUBLE[]`: `size` and `price`. The arrays must match in length. Each
+element of the array represents a price level of the order book.
 
-- `target_quantity`: The size of a hypothetical market order to be filled.
-- `quantity*`: The number of instruments available at the corresponding price
-  levels.
+The variant with individual numbers takes a `target size`, and a variable
+number of `size`/`price` pairs of type `DOUBLE`, or convertible to `DOUBLE`
+(`FLOAT`, `LONG`, `INT`, `SHORT`, `BYTE`).
+
+- `target_size`: The size of a hypothetical market order to be filled.
+- `size*`: The sizes of offers available at the corresponding price levels (can
+  be fractional).
 - `price*`: Price levels of the order book.
 
 ### Return value
 
-The function returns with a `double`, representing the average trade price.
+The function returns a `double`, representing the average trade price.
 
-Returns null if the price is not calculable. For example, if the target quantity
-cannot be filled, or there is incomplete data in the set (nulls).
+It returns `NULL` if the price is not calculable. For example, if the target
+size cannot be filled, or there is incomplete data in the set (nulls).
 
-### Examples
+### Examples - ARRAY
+
+Test data:
+
+```questdb-sql
+CREATE TABLE order_book (
+  ts TIMESTAMP,
+  bidSize DOUBLE[], bid DOUBLE[],
+  askSize DOUBLE[], ask DOUBLE[]
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+INSERT INTO order_book VALUES
+  ('2024-05-22T09:40:15.006000Z',
+    ARRAY[40.0, 47.0, 39.0], ARRAY[14.10, 14.00, 13.90],
+    ARRAY[54.0, 36.0, 23.0], ARRAY[14.50, 14.60, 14.80]),
+  ('2024-05-22T09:40:15.175000Z',
+    ARRAY[42.0, 45.0, 35.0], ARRAY[14.00, 13.90, 13.80],
+    ARRAY[16.0, 57.0, 30.0], ARRAY[14.30, 14.50, 14.60]),
+  ('2024-05-22T09:40:15.522000Z',
+    ARRAY[36.0, 38.0, 31.0], ARRAY[14.10, 14.00, 13.90],
+    ARRAY[30.0, 47.0, 34.0], ARRAY[14.40, 14.50, 14.60]);
+```
+
+Trading price of instrument when buying 100:
+
+```questdb-sql
+SELECT ts, L2PRICE(100, askSize, ask) AS buy FROM order_book;
+```
+
+| ts                          | buy             |
+| --------------------------- | --------------- |
+| 2024-05-22T09:40:15.006000Z | 14.565999999999 |
+| 2024-05-22T09:40:15.175000Z | 14.495          |
+| 2024-05-22T09:40:15.522000Z | 14.493          |
+
+Trading price of instrument when selling 100:
+
+```questdb-sql
+SELECT ts, L2PRICE(100, bidSize, bid) AS sell FROM order_book;
+```
+
+| ts                          | sell   |
+| --------------------------- | ------ |
+| 2024-05-22T09:40:15.006000Z | 14.027 |
+| 2024-05-22T09:40:15.175000Z | 13.929 |
+| 2024-05-22T09:40:15.522000Z | 14.01  |
+
+The spread for target quantity 100:
+
+```questdb-sql
+SELECT ts, L2PRICE(100, askSize, ask) - L2PRICE(100, bidSize, bid) AS spread FROM order_book;
+```
+
+| ts                          | spread         |
+| --------------------------- | -------------- |
+| 2024-05-22T09:40:15.006000Z | 0.538999999999 |
+| 2024-05-22T09:40:15.175000Z | 0.565999999999 |
+| 2024-05-22T09:40:15.522000Z | 0.483          |
+
+### Examples - scalar columns
 
 Test data:
 
@@ -114,7 +186,7 @@ SELECT ts, L2PRICE(100, bidSize1, bid1, bidSize2, bid2, bidSize3, bid3) AS sell 
 | 2024-05-22T09:40:15.175000Z | 13.929 |
 | 2024-05-22T09:40:15.522000Z | 14.01  |
 
-The spread for target quantity 100:
+The spread for target size of 100:
 
 ```questdb-sql
 SELECT ts, L2PRICE(100, askSize1, ask1, askSize2, ask2, askSize3, ask3)
@@ -172,6 +244,7 @@ b_0 = \bar{y} - b_1 \bar{x}
 $$
 
 Where:
+
 - $\bar{y}$ is the mean of y values
 - $\bar{x}$ is the mean of x values
 - $b_1$ is the slope calculated by `regr_slope(y, x)`
