@@ -38,6 +38,17 @@ set are not identical to PostgreSQL. QuestDB is a specialized time-series databa
 features, functions, or data types that a standard PostgreSQL server does. Always refer to the QuestDB SQL
 documentation for supported operations.
 
+### Forward-only Cursors
+
+QuestDB's cursors are forward-only, differing from PostgreSQL's support for scrollable cursors (which allow
+bidirectional navigation and arbitrary row access). With QuestDB, you can iterate through query results sequentially
+from start to finish, but you cannot move backward or jump to specific rows. Explicit DECLARE CURSOR statements for
+scrollable types, or operations like fetching in reverse (e.g., Workspace BACKWARD), are not supported.
+
+This limitation can impact client libraries that rely on scrollable cursor features. For example, Python's psycopg2
+driver might encounter issues if attempting such operations. For optimal compatibility, choose drivers or configure
+existing ones to use forward-only cursors, such as Python's asyncpg driver.
+
 ### Protocol Flavors and Encoding
 
 The PostgreSQL wire protocol has different implementations and options. When your
