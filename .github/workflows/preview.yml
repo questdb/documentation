@@ -36,6 +36,7 @@ jobs:
         env:
           CONTEXT: deploy-preview
           NETLIFY: true
+          DOCUSAURUS_BASE_URL: /
         run: yarn build
 
       - name: Deploy to Netlify
