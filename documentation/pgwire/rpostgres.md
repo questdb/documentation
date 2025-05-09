@@ -49,12 +49,7 @@ It uses the DBI interface for a consistent workflow with other database types in
 ### Features
 
 - DBI compliance for consistent database programming in R
-- Support for PostgreSQL data types
-- Connection pooling capabilities
-- Efficient data transfer
 - Support for parameterized queries
-- Comprehensive error handling
-- Integration with R's data.frame objects
 
 ### Installation
 
