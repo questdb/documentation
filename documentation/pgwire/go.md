@@ -67,13 +67,6 @@ To use pgx in your Go project, you need to install it using Go modules:
 go get github.com/jackc/pgx/v5
 ```
 
-If you need to use an older version:
-
-```bash
-# For version 4
-go get github.com/jackc/pgx/v4
-```
-
 ### Basic Connection
 
 pgx provides multiple ways to connect to QuestDB:
@@ -125,10 +118,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-
 	"github.com/jackc/pgx/v5"
+	"log"
+	"time"
 )
 
 func main() {
@@ -137,11 +129,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to parse config: %v", err)
 	}
-	
-	// You can modify config here if needed
-	// config.RuntimeParams["application_name"] = "MyApp"
-	// config.ConnectTimeout = time.Second * 10
-	
+
+	config.ConnectTimeout = time.Second * 10
+
 	// Connect with config
 	ctx := context.Background()
 	conn, err := pgx.ConnectConfig(ctx, config)
@@ -149,7 +139,7 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	fmt.Println("Successfully connected to QuestDB with custom configuration!")
 }
 ```
@@ -177,14 +167,12 @@ func main() {
 	}
 	defer conn.Close(ctx)
 	
-	// Execute a simple query
 	rows, err := conn.Query(ctx, "SELECT * FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
 	
-	// Iterate through results
 	for rows.Next() {
 		// Create a map to hold the row data
 		values, err := rows.Values()
@@ -196,7 +184,6 @@ func main() {
 		fmt.Println(values)
 	}
 	
-	// Check for errors from iterating over rows
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
 	}
@@ -288,12 +275,10 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
-	// Define parameters
+
 	symbol := "BTC-USD"
 	startTime := time.Now().Add(-7 * 24 * time.Hour) // 7 days ago
-	
-	// Execute parameterized query
+
 	rows, err := conn.Query(ctx,
 		"SELECT ts, symbol, price, amount FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10",
 		symbol, startTime)
@@ -301,8 +286,7 @@ func main() {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
-	
-	// Process results
+
 	fmt.Printf("Recent %s trades:\n", symbol)
 	for rows.Next() {
 		var ts time.Time
@@ -313,71 +297,9 @@ func main() {
 		}
 		fmt.Printf("  %s: Price: %.2f, Amount: %.6f\n", ts, price, amount)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
-	}
-}
-```
-
-### Prepared Statements
-
-For queries that are executed multiple times, prepared statements can improve performance:
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/jackc/pgx/v5"
-)
-
-func main() {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://admin:quest@localhost:8812/qdb")
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
-	}
-	defer conn.Close(ctx)
-	
-	// Prepare a statement
-	stmt, err := conn.Prepare(ctx, "get_trades_by_symbol",
-		"SELECT ts, symbol, price, amount FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2")
-	if err != nil {
-		log.Fatalf("Failed to prepare statement: %v", err)
-	}
-	
-	// Symbols to query
-	symbols := []string{"BTC-USD", "ETH-USD", "SOL-USD"}
-	limit := 5
-	
-	// Execute the prepared statement for each symbol
-	for _, symbol := range symbols {
-		rows, err := conn.Query(ctx, "get_trades_by_symbol", symbol, limit)
-		if err != nil {
-			log.Fatalf("Query failed for symbol %s: %v", symbol, err)
-		}
-		
-		fmt.Printf("Latest %d trades for %s:\n", limit, symbol)
-		for rows.Next() {
-			var ts time.Time
-			var sym string
-			var price, amount float64
-			if err := rows.Scan(&ts, &sym, &price, &amount); err != nil {
-				log.Fatalf("Error scanning row: %v", err)
-			}
-			fmt.Printf("  %s: Price: %.2f, Amount: %.6f\n", ts, price, amount)
-		}
-		rows.Close()
-		
-		if err := rows.Err(); err != nil {
-			log.Fatalf("Error iterating rows: %v", err)
-		}
-		fmt.Println()
 	}
 }
 ```
@@ -401,44 +323,36 @@ import (
 
 func main() {
 	ctx := context.Background()
-	
-	// Create a connection pool
+
 	poolConfig, err := pgxpool.ParseConfig("postgres://admin:quest@localhost:8812/qdb")
 	if err != nil {
 		log.Fatalf("Unable to parse pool config: %v", err)
 	}
-	
-	// Set pool configuration
+
 	poolConfig.MaxConns = 10
 	poolConfig.MinConns = 1
 	poolConfig.MaxConnLifetime = time.Hour
 	poolConfig.MaxConnIdleTime = 30 * time.Minute
-	
-	// Create the pool
+
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("Unable to create connection pool: %v", err)
 	}
 	defer pool.Close()
-	
-	// Test the pool with a ping
+
 	if err := pool.Ping(ctx); err != nil {
 		log.Fatalf("Unable to ping database: %v", err)
 	}
-	
-	// Symbols to query
+
 	symbols := []string{"BTC-USD", "ETH-USD", "SOL-USD", "ADA-USD", "XRP-USD"}
-	
-	// Use a wait group to wait for all goroutines to complete
+
 	var wg sync.WaitGroup
-	
-	// Query data for each symbol concurrently
+
 	for _, symbol := range symbols {
 		wg.Add(1)
 		go func(sym string) {
 			defer wg.Done()
-			
-			// Acquire a connection from the pool
+
 			rows, err := pool.Query(ctx,
 				"SELECT ts, price FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT 5",
 				sym)
@@ -447,8 +361,7 @@ func main() {
 				return
 			}
 			defer rows.Close()
-			
-			// Process results
+
 			fmt.Printf("Latest trades for %s:\n", sym)
 			for rows.Next() {
 				var ts time.Time
@@ -459,84 +372,19 @@ func main() {
 				}
 				fmt.Printf("  %s: %.2f\n", ts, price)
 			}
-			
+
 			if err := rows.Err(); err != nil {
 				log.Printf("Error iterating rows: %v", err)
 			}
 			fmt.Println()
 		}(symbol)
 	}
-	
-	// Wait for all queries to complete
+
 	wg.Wait()
 }
+
 ```
 
-### Transactions
-
-While QuestDB has different transaction semantics compared to traditional RDBMS, pgx still provides transaction support
-that can be used with QuestDB:
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-
-	"github.com/jackc/pgx/v5"
-)
-
-func main() {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://admin:quest@localhost:8812/qdb")
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
-	}
-	defer conn.Close(ctx)
-	
-	// Begin a transaction
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		log.Fatalf("Begin transaction failed: %v", err)
-	}
-	
-	// Defer a rollback in case anything fails
-	defer tx.Rollback(ctx)
-	
-	// Execute multiple queries within the transaction
-	var count int
-	err = tx.QueryRow(ctx, "SELECT COUNT(*) FROM trades").Scan(&count)
-	if err != nil {
-		log.Fatalf("First query failed: %v", err)
-	}
-	fmt.Printf("Total trades: %d\n", count)
-	
-	// Execute another query
-	rows, err := tx.Query(ctx, "SELECT DISTINCT symbol FROM trades LIMIT 5")
-	if err != nil {
-		log.Fatalf("Second query failed: %v", err)
-	}
-	
-	fmt.Println("Available symbols:")
-	for rows.Next() {
-		var symbol string
-		if err := rows.Scan(&symbol); err != nil {
-			log.Fatalf("Error scanning row: %v", err)
-		}
-		fmt.Printf("  %s\n", symbol)
-	}
-	rows.Close()
-	
-	// Commit the transaction
-	if err := tx.Commit(ctx); err != nil {
-		log.Fatalf("Failed to commit transaction: %v", err)
-	}
-	
-	fmt.Println("Transaction completed successfully")
-}
-```
 
 ### Handling QuestDB-Specific Time-Series Queries
 
@@ -561,7 +409,7 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	// SAMPLE BY query (time-based downsampling)
 	sampleByQuery := `
 		SELECT 
@@ -574,13 +422,13 @@ func main() {
 		WHERE ts >= dateadd('d', -7, now()) 
 		SAMPLE BY 1h
 	`
-	
+
 	fmt.Println("Executing SAMPLE BY query...")
 	rows, err := conn.Query(ctx, sampleByQuery)
 	if err != nil {
 		log.Fatalf("SAMPLE BY query failed: %v", err)
 	}
-	
+
 	for rows.Next() {
 		var ts time.Time
 		var symbol string
@@ -592,16 +440,16 @@ func main() {
 			ts, symbol, avgPrice, minPrice, maxPrice)
 	}
 	rows.Close()
-	
-	// LATEST BY query (last value per group)
-	fmt.Println("\nExecuting LATEST BY query...")
-	latestByQuery := "SELECT * FROM trades LATEST BY symbol"
-	
+
+	// LATEST ON query (last value per group)
+	fmt.Println("\nExecuting LATEST ON query...")
+	latestByQuery := "SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol"
+
 	rows, err = conn.Query(ctx, latestByQuery)
 	if err != nil {
 		log.Fatalf("LATEST BY query failed: %v", err)
 	}
-	
+
 	for rows.Next() {
 		var ts time.Time
 		var symbol string
@@ -613,75 +461,6 @@ func main() {
 		fmt.Printf("Symbol: %s, Latest Price: %.2f at %s\n", symbol, price, ts)
 	}
 	rows.Close()
-}
-```
-
-### Error Handling
-
-Proper error handling is essential for robust applications:
-
-```go
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"log"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-)
-
-func main() {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://admin:quest@localhost:8812/qdb")
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
-	}
-	defer conn.Close(ctx)
-	
-	// Attempt to query a table that might not exist
-	rows, err := conn.Query(ctx, "SELECT * FROM non_existent_table")
-	if err != nil {
-		// Check if it's a PostgreSQL error
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			fmt.Printf("PostgreSQL error: %s (Code: %s)\n", pgErr.Message, pgErr.Code)
-		} else {
-			fmt.Printf("Other error: %v\n", err)
-		}
-	} else {
-		rows.Close()
-	}
-	
-	// Try again with error handling
-	fmt.Println("\nTrying a safer approach...")
-	
-	// Check if table exists first
-	var tableExists bool
-	err = conn.QueryRow(ctx, "SELECT count(*) > 0 FROM information_schema.tables WHERE table_name = $1", "trades").Scan(&tableExists)
-	if err != nil {
-		log.Fatalf("Error checking table existence: %v", err)
-	}
-	
-	if tableExists {
-		fmt.Println("Table 'trades' exists, proceeding with query...")
-		rows, err := conn.Query(ctx, "SELECT * FROM trades LIMIT 5")
-		if err != nil {
-			log.Fatalf("Query failed: %v", err)
-		}
-		defer rows.Close()
-		
-		// Process results
-		count := 0
-		for rows.Next() {
-			count++
-		}
-		fmt.Printf("Query returned %d rows\n", count)
-	} else {
-		fmt.Println("Table 'trades' does not exist")
-	}
 }
 ```
 
@@ -698,7 +477,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -713,29 +491,25 @@ func NewQuestDBClient(ctx context.Context, connString string) (*QuestDBClient, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse connection string: %w", err)
 	}
-	
-	// Configure the pool
+
 	poolConfig.MaxConns = 10
 	poolConfig.MinConns = 1
 	poolConfig.MaxConnLifetime = time.Hour
 	poolConfig.MaxConnIdleTime = 30 * time.Minute
-	
-	// Create the pool
+
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
-	
-	// Verify the connection
+
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
-	
+
 	return &QuestDBClient{pool: pool}, nil
 }
 
-// Close closes the connection pool
 func (c *QuestDBClient) Close() {
 	if c.pool != nil {
 		c.pool.Close()
@@ -751,13 +525,13 @@ func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limi
 		ORDER BY ts DESC 
 		LIMIT $2
 	`
-	
+
 	rows, err := c.pool.Query(ctx, query, symbol, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var trades []Trade
 	for rows.Next() {
 		var t Trade
@@ -766,16 +540,16 @@ func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limi
 		}
 		trades = append(trades, t)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-	
+
 	return trades, nil
 }
 
 // GetSampledData fetches downsampled price data
-func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, interval string, days int) ([]PriceSample, error) {
+func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days int) ([]PriceSample, error) {
 	query := `
 		SELECT 
 			ts, 
@@ -784,16 +558,16 @@ func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, inter
 			min(price) as min_price, 
 			max(price) as max_price 
 		FROM trades 
-		WHERE symbol = $1 AND ts >= dateadd('d', -$2, now()) 
-		SAMPLE BY $3
+		WHERE symbol = $1 AND ts >= dateadd('d', -($2::int), now()) 
+		SAMPLE BY 1h
 	`
-	
-	rows, err := c.pool.Query(ctx, query, symbol, days, interval)
+
+	rows, err := c.pool.Query(ctx, query, symbol, days)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var samples []PriceSample
 	for rows.Next() {
 		var s PriceSample
@@ -802,24 +576,24 @@ func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, inter
 		}
 		samples = append(samples, s)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-	
+
 	return samples, nil
 }
 
 // GetLatestPrices fetches the latest price for each symbol
 func (c *QuestDBClient) GetLatestPrices(ctx context.Context) ([]Trade, error) {
-	query := `SELECT * FROM trades LATEST BY symbol`
-	
+	query := `SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol`
+
 	rows, err := c.pool.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var trades []Trade
 	for rows.Next() {
 		var t Trade
@@ -828,15 +602,14 @@ func (c *QuestDBClient) GetLatestPrices(ctx context.Context) ([]Trade, error) {
 		}
 		trades = append(trades, t)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-	
+
 	return trades, nil
 }
 
-// Trade represents a row in the trades table
 type Trade struct {
 	Timestamp time.Time
 	Symbol    string
@@ -844,7 +617,6 @@ type Trade struct {
 	Amount    float64
 }
 
-// PriceSample represents a sampled price data point
 type PriceSample struct {
 	Timestamp time.Time
 	Symbol    string
@@ -855,43 +627,42 @@ type PriceSample struct {
 
 func main() {
 	ctx := context.Background()
-	
-	// Create a new QuestDB client
+
 	client, err := NewQuestDBClient(ctx, "postgres://admin:quest@localhost:8812/qdb")
 	if err != nil {
 		log.Fatalf("Failed to create QuestDB client: %v", err)
 	}
 	defer client.Close()
-	
+
 	// Get recent trades
 	trades, err := client.GetRecentTrades(ctx, "BTC-USD", 5)
 	if err != nil {
 		log.Fatalf("Failed to get recent trades: %v", err)
 	}
-	
+
 	fmt.Println("Recent BTC-USD trades:")
 	for _, t := range trades {
 		fmt.Printf("  %s: Price: %.2f, Amount: %.6f\n", t.Timestamp, t.Price, t.Amount)
 	}
-	
+
 	// Get sampled data
-	samples, err := client.GetSampledData(ctx, "BTC-USD", "1h", 1)
+	samples, err := client.GetSampledData(ctx, "BTC-USD", 1)
 	if err != nil {
 		log.Fatalf("Failed to get sampled data: %v", err)
 	}
-	
+
 	fmt.Println("\nHourly BTC-USD price samples (last 24 hours):")
 	for _, s := range samples {
-		fmt.Printf("  %s: Avg: %.2f, Range: %.2f - %.2f\n", 
+		fmt.Printf("  %s: Avg: %.2f, Range: %.2f - %.2f\n",
 			s.Timestamp, s.AvgPrice, s.MinPrice, s.MaxPrice)
 	}
-	
+
 	// Get latest prices
 	latestPrices, err := client.GetLatestPrices(ctx)
 	if err != nil {
 		log.Fatalf("Failed to get latest prices: %v", err)
 	}
-	
+
 	fmt.Println("\nLatest prices for all symbols:")
 	for _, t := range latestPrices {
 		fmt.Printf("  %s: %.2f\n", t.Symbol, t.Price)
@@ -913,53 +684,52 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// QuestDBClient as defined in the previous example
+// QuestDBClient, Trade and PriceSample as defined in the previous example
 // ...
 
 // API handlers
 func main() {
 	ctx := context.Background()
-	
+
 	// Create a database connection pool
 	pool, err := pgxpool.New(ctx, "postgres://admin:quest@localhost:8812/qdb")
 	if err != nil {
 		log.Fatalf("Unable to create connection pool: %v", err)
 	}
 	defer pool.Close()
-	
-	// Create a client
+
 	client := &QuestDBClient{pool: pool}
-	
-	// Define API routes
+
 	http.HandleFunc("/api/trades", func(w http.ResponseWriter, r *http.Request) {
 		handleTrades(w, r, client)
 	})
-	
+
 	http.HandleFunc("/api/sampled", func(w http.ResponseWriter, r *http.Request) {
 		handleSampledData(w, r, client)
 	})
-	
+
 	http.HandleFunc("/api/latest", func(w http.ResponseWriter, r *http.Request) {
 		handleLatestPrices(w, r, client)
 	})
-	
-	// Start the server
+
 	port := 8080
 	fmt.Printf("Starting server on port %d...\n", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
-// Handler for /api/trades endpoint
 func handleTrades(w http.ResponseWriter, r *http.Request, client *QuestDBClient) {
 	// Parse query parameters
 	symbol := r.URL.Query().Get("symbol")
 	limitStr := r.URL.Query().Get("limit")
-	
+
+	if symbol == "" {
+		symbol = "BTC-USD" // Default symbol
+	}
+
 	limit := 10 // Default
 	if limitStr != "" {
 		var err error
@@ -969,35 +739,26 @@ func handleTrades(w http.ResponseWriter, r *http.Request, client *QuestDBClient)
 			return
 		}
 	}
-	
-	// Get trades
+
 	trades, err := client.GetRecentTrades(r.Context(), symbol, limit)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching trades: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
-	// Return as JSON
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(trades); err != nil {
 		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
 	}
 }
 
-// Handler for /api/sampled endpoint
 func handleSampledData(w http.ResponseWriter, r *http.Request, client *QuestDBClient) {
-	// Parse query parameters
 	symbol := r.URL.Query().Get("symbol")
 	if symbol == "" {
 		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
 		return
 	}
-	
-	interval := r.URL.Query().Get("interval")
-	if interval == "" {
-		interval = "1h" // Default
-	}
-	
+
 	daysStr := r.URL.Query().Get("days")
 	days := 7 // Default
 	if daysStr != "" {
@@ -1008,31 +769,26 @@ func handleSampledData(w http.ResponseWriter, r *http.Request, client *QuestDBCl
 			return
 		}
 	}
-	
-	// Get sampled data
-	samples, err := client.GetSampledData(r.Context(), symbol, interval, days)
+
+	samples, err := client.GetSampledData(r.Context(), symbol, days)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching sampled data: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
-	// Return as JSON
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(samples); err != nil {
 		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
 	}
 }
 
-// Handler for /api/latest endpoint
 func handleLatestPrices(w http.ResponseWriter, r *http.Request, client *QuestDBClient) {
-	// Get latest prices
 	latestPrices, err := client.GetLatestPrices(r.Context())
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching latest prices: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
-	// Return as JSON
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(latestPrices); err != nil {
 		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
@@ -1046,31 +802,17 @@ When using pgx with QuestDB, be aware of these limitations:
 
 1. **Cursor Support**: QuestDB does not support scrollable cursors that require explicit creation and management through
    `DECLARE CURSOR` and subsequent operations.
-
 2. **Transaction Semantics**: QuestDB has different transaction semantics compared to traditional RDBMS.
-
 3. **Schema Management**: QuestDB's table creation and schema modification capabilities differ from PostgreSQL.
 
-4. **PostgreSQL-Specific Features**: Some PostgreSQL-specific features like extensions might not be available in
-   QuestDB.
-
-5. **Binary Data Types**: QuestDB's support for binary data types might differ from PostgreSQL.
 
 ### Performance Tips
-
 1. **Use Connection Pooling**: For applications with multiple concurrent queries, use connection pooling through the
    `pgxpool` package.
-
 2. **Prepared Statements**: Use prepared statements for queries that are executed multiple times to improve performance.
-
 3. **Batch Operations**: When possible, batch operations together to reduce network overhead.
-
-4. **Use Context for Cancellation**: Always use context with timeout or cancellation for queries that might take a long
-   time.
-
-5. **Transaction Management**: Be mindful of QuestDB's transaction semantics when using transactions.
-
-6. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
+4. **Transaction Management**: Be mindful of QuestDB's transaction semantics when using transactions.
+5. **Optimize Queries**: Take advantage of QuestDB's time-series functions like `SAMPLE BY` and `LATEST BY` for
    efficient queries.
 
 ## QuestDB Time Series Features
@@ -1091,29 +833,13 @@ FROM trades
 WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
 ```
 
-### LATEST BY Queries
+### LATEST ON Queries
 
-LATEST BY is an efficient way to get the most recent values:
+LATEST ON is an efficient way to get the most recent values:
 
 ```sql
 SELECT *
-FROM trades LATEST BY symbol
-```
-
-### Time Window Functions
-
-For more complex time-based aggregations:
-
-```sql
-SELECT timestamp_floor('15m', ts) as time_bucket,
-       symbol,
-       avg(price)                 as avg_price,
-       min(price)                 as min_price,
-       max(price)                 as max_price
-FROM trades
-WHERE ts >= dateadd('d', -1, now())
-GROUP BY time_bucket, symbol
-ORDER BY time_bucket, symbol
+FROM trades LATEST ON timestamp PARTITION BY symbol
 ```
 
 ## Troubleshooting
@@ -1145,5 +871,5 @@ Go applications.
 For data ingestion, it's recommended to use QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for
 high-throughput data insertion.
 
-QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST BY`, provide powerful tools for analyzing
+QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through pgx.
