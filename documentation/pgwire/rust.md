@@ -19,7 +19,7 @@ QuestDB is designed to be a high-performance database. The PGWire protocol has m
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
 Rust, we recommend using tokio-postgres with connection pooling.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the InfluxDB Line Protocol (ILP)
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)]((/docs/ingestion-overview/))
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
 
 ## Introduction to PGWire in QuestDB
@@ -53,8 +53,6 @@ PostgreSQL-compatible databases, including QuestDB.
 - Prepared statements for better performance and security
 - Transaction support
 - Support for binary data formats
-- Comprehensive error handling
-- Support for various PostgreSQL data types
 
 ### Installation
 
@@ -536,10 +534,9 @@ When using tokio-postgres with QuestDB, be aware of these limitations:
 
 1. **Transaction Semantics**: QuestDB has different transaction semantics compared to traditional RDBMS.
 2. **Type System Differences**: QuestDB's type system differs from PostgreSQL's, which can lead to incompatibilities in
-   certain situations. `NaiveDateTime` vs `DateTime<Utc>` is a common issue see examples above how to handle this.
+   certain situations. `NaiveDateTime` vs `DateTime<Utc>` is a common issue. See examples above how to handle this.
 3. **PostgreSQL-Specific Features**: Some PostgreSQL features like temporary tables or indexes are not
    supported in QuestDB.
-4. **Cursor Support**: QuestDB's support for cursors differs from PostgreSQL, which may affect certain query patterns.
 
 ### Performance Tips
 

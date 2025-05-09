@@ -20,23 +20,15 @@ QuestDB is designed to be a high-performance database. The PGWire protocol has m
 flavors, and some of them are not optimized for performance. Our recommendation is to use the `pg` client for most use
 cases as it's well-supported with QuestDB.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the InfluxDB Line Protocol (ILP)
+> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)]((/docs/ingestion-overview/))
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
 
-## Introduction to PGWire in QuestDB
-
-QuestDB supports the PostgreSQL Wire Protocol (PGWire) for querying data. This compatibility allows you to use familiar
-PostgreSQL client libraries with QuestDB's high-performance time-series database.
-
-It's important to note that QuestDB's underlying storage model differs from PostgreSQL's, which means some PostgreSQL
-features may not be available in QuestDB.
 
 ## Connection Parameters
 
 All JavaScript PostgreSQL clients need similar connection parameters to connect to QuestDB:
 
 ```javascript
-// Connection parameters
 const CONNECTION_PARAMS = {
     host: '127.0.0.1',
     port: 8812,      // Default PGWire port for QuestDB
@@ -57,8 +49,6 @@ with PostgreSQL databases. It's a widely used library that offers both callback 
 - Connection pooling
 - Prepared statements
 - Parameterized queries
-- Transaction support
-- Type parsing
 - Cursor support for large result sets
 
 ### Installation
@@ -277,7 +267,6 @@ async function queryWithPool() {
   } catch (error) {
     console.error('Query error:', error)
   } finally {
-    // Release the client back to the pool
     client.release()
   }
 }
@@ -297,7 +286,6 @@ async function main() {
     await queryWithPool()
     await simplePoolQuery()
   } finally {
-    // Close the pool when done
     await pool.end()
   }
 }
@@ -410,7 +398,6 @@ features.
 - Connection pooling included
 - Automatic type conversion
 - Tagged template literals for queries
-- Transaction support
 - TypeScript support
 
 ### Installation
@@ -424,7 +411,6 @@ npm install postgres
 ```javascript
 const postgres = require('postgres')
 
-// Create a connection
 const sql = postgres({
     host: '127.0.0.1',
     port: 8812,
@@ -471,12 +457,9 @@ const sql = postgres({
 
 async function queryData() {
     try {
-        // Execute a simple query
         const trades = await sql`SELECT * FROM trades LIMIT 10`
-
         console.log(`Fetched ${trades.length} rows`)
 
-        // Process the results
         for (const trade of trades) {
             console.log(`Timestamp: ${trade.ts}, Symbol: ${trade.symbol}, Price: ${trade.price}`)
         }
@@ -526,7 +509,6 @@ async function parameterizedQuery() {
 
         console.log(`Fetched ${trades.length} rows for ${symbol} since ${startDate}`)
 
-        // Process the results
         for (const trade of trades) {
             console.log(`Timestamp: ${trade.ts}, Price: ${trade.price}`)
         }
@@ -573,8 +555,6 @@ async function concurrentQueries() {
 
         console.log(`Total trades: ${tradeCount[0].count}`)
         console.log(`Unique symbols: ${symbols.length}`)
-
-        // The pool automatically handles the connections
     } catch (error) {
         console.error('Concurrent query error:', error)
     } finally {
@@ -599,7 +579,6 @@ process.env.TZ = 'UTC';
 const app = express()
 const port = 3000
 
-// Create a connection
 const sql = postgres({
     host: '127.0.0.1',
     port: 8812,
