@@ -15,7 +15,7 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 ### Performance Considerations
 
-QuestDB is designed to be a high-performance database. The PGWire protocol has many
+QuestDB is a high-performance database. The PGWire protocol has many
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
 C#, we recommend using Npgsql with connection pooling.
 
