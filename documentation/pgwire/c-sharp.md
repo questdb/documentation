@@ -1,15 +1,15 @@
 ---
-title: C# PGWire Guide
+title: .NET PGWire Guide
 description:
-  C# clients for QuestDB PGWire protocol. Learn how to use the PGWire
+  .NET clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with C# for querying data. 
 ---
 
-QuestDB is tested with the following C# client:
+QuestDB is tested with the following .NET client:
 
 - [Npgsql](https://www.npgsql.org/)
 
-Other C# clients that are compatible with the PostgreSQL wire protocol
+Other .NET clients that are compatible with the PostgreSQL wire protocol
 should also work with QuestDB, but we do not test them. If you find a client that
 does not work, please [open an issue](https://github.com/questdb/questdb/issues/new?template=bug_report.yaml)
 
@@ -17,7 +17,7 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 QuestDB is a high-performance database. The PGWire protocol has many
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
-C#, we recommend using Npgsql with connection pooling.
+.NET, we recommend using Npgsql with connection pooling.
 
 > **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
@@ -26,7 +26,7 @@ C#, we recommend using Npgsql with connection pooling.
 ## Introduction to PGWire in QuestDB
 
 QuestDB supports the PostgreSQL Wire Protocol (PGWire) for querying data. This compatibility allows you to use standard
-C# PostgreSQL clients with QuestDB's high-performance time-series database.
+.NET PostgreSQL clients with QuestDB's high-performance time-series database.
 
 It's important to note that QuestDB's underlying storage model differs from PostgreSQL's, which means some PostgreSQL
 features may not be available in QuestDB.
@@ -44,7 +44,7 @@ The Npgsql client needs the following connection parameters to connect to QuestD
 
 ## Npgsql
 
-[Npgsql](https://www.npgsql.org/) is an open-source ADO.NET Data Provider for PostgreSQL. It enables C# applications to
+[Npgsql](https://www.npgsql.org/) is an open-source ADO.NET Data Provider for PostgreSQL. It enables .NET applications to
 connect to and interact with PostgreSQL databases, including QuestDB.
 
 ### Features
@@ -753,7 +753,7 @@ When using Npgsql with QuestDB, be aware of these limitations:
    efficient queries.
 5. **Limit Result Sets**: When dealing with large time-series datasets, use `LIMIT` clauses to avoid retrieving too much
    data at once.
-6. **Use Appropriate Types**: Match C# types to QuestDB types correctly to avoid unnecessary conversions.
+6. **Use Appropriate Types**: Match .NET types to QuestDB types correctly to avoid unnecessary conversions.
 
 ## QuestDB Time Series Features
 
@@ -804,7 +804,7 @@ For query-related errors:
 
 ## Conclusion
 
-Npgsql provides a robust way to connect C# applications to QuestDB through the PostgreSQL Wire Protocol. By following
+Npgsql provides a robust way to connect .NET applications to QuestDB through the PostgreSQL Wire Protocol. By following
 the guidelines in this documentation, you can effectively query time-series data from QuestDB and integrate it with
 various .NET applications.
 
@@ -815,6 +815,6 @@ high-throughput data insertion. For optimal performance, use this client for dat
 QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through Npgsql.
 
-For production applications, consider using the QuestDB.Net library or direct Npgsql queries, as they offer more direct
+For production applications, consider using the QuestDB.NET library or direct Npgsql queries, as they offer more direct
 control over queries and better compatibility with QuestDB's time-series model than higher-level ORMs like Entity
 Framework Core, which are better suited for traditional OLTP databases.
