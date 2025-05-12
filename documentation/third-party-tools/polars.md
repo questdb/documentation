@@ -53,7 +53,7 @@ Note that the URL uses the `redshift` schema. This is important because
 it makes ConnectorX to avoid using features not supported by QuestDB.
 
 ## Ingestion vs Querying
-This guides deals with querying data from QuestDB using Polars. For ingestion to QuestDB, you we recomment using the
+This guides deals with querying data from QuestDB using Polars. For ingestion to QuestDB we recommend using the
 [QuestDB Python client](/docs/clients/ingest-python/).
 
 ## Additional Resources
