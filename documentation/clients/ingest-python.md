@@ -270,3 +270,8 @@ To learn _The Way_ of QuestDB SQL, see the
 
 Alone? Stuck? Want help? Visit us in our
 [Community Forum](https://community.questdb.com/).
+
+## Additional resources
+- [QuestDB Python clients guide](/docs/pgwire/python/)
+- [Integration with Polars](/docs/third-party-tools/polars/)
+- [Integration with Pandas](/docs/third-party-tools/pandas/)

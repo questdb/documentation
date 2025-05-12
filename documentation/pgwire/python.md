@@ -853,3 +853,7 @@ time-series data:
 
 For most use cases, we recommend using asyncpg or psycopg3 for better performance. For data ingestion, consider using
 QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum throughput.
+
+## Additional Resources
+- [Polars Integration with QuestDB](/docs/third-party-tools/polars)
+- [QuestDB Client for fast ingestion](/docs/clients/ingest-python/)
