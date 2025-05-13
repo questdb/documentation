@@ -1,5 +1,6 @@
 ---
 title: "Apache Airflow"
+sidebar_label: Airflow
 description: Learn how to use Apache Airflow to automate QuestDB workflows.
 ---
 

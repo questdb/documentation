@@ -76,7 +76,7 @@ io.questdb.cairo.CairoException: [24] could not open read-only [file=/root/.ques
 
 The machine may have insufficient limits for the maximum number of open files.
 Try checking the `ulimit` value on your machine. Refer to
-[capacity planning](/docs/deployment/capacity-planning/#maximum-open-files) page
+[capacity planning](/docs/operations/capacity-planning/#maximum-open-files) page
 for more details.
 
 ## Why do I see `errno=12` mmap messages in the server logs?
@@ -90,7 +90,7 @@ Log messages may appear like the following:
 The machine may have insufficient limits of memory map areas a process may have.
 Try checking and increasing the `vm.max_map_count` value on your machine. Refer
 to
-[capacity planning](/docs/deployment/capacity-planning/#max-virtual-memory-areas-limit)
+[capacity planning](/docs/operations/capacity-planning/#max-virtual-memory-areas-limit)
 page for more details.
 
 ## Why do I see `async command/event queue buffer overflow` messages when dropping partitions?
@@ -112,7 +112,7 @@ inserted with identical fields. Until then, you need to
 ## Can I query by time?
 
 Yes! When using the `WHERE` statement to define the time range for a query, the
-[`IN`](/docs/reference/sql/where/#time-range-with-modifier) keyword allows
+[`IN`](/docs/reference/sql/where/#time-range-with-interval-modifier) keyword allows
 modifying the range and interval of the search. The range can be tuned to a
 second resolution.
 
@@ -182,7 +182,7 @@ you cannot navigate backwards or access result positions as you might with
 scrollable cursors in PostgreSQL.
 
 For more information and for tips to work around, see the
-[PostgreSQL compatability seciton](/docs/reference/sql/overview/#postgresql-compatibility)
+[PostgreSQL compatability section](/docs/pgwire/pgwire-intro/#forward-only-cursors)
 in our Query & SQL overview.
 
 ## My table has corrupted WAL data due to a previous full disk or kernel limits error. What do I do?

@@ -351,6 +351,22 @@ FROM (a timestamp(ts))
 ASOF JOIN (b timestamp (ts));
 ```
 
+### SQL Performance Hints for ASOF JOIN
+
+QuestDB supports SQL hints that can optimize non-keyed ASOF join performance when filters are applied to the joined table:
+
+```questdb-sql title="ASOF JOIN with optimization hint"
+SELECT /*+ USE_ASOF_BINARY_SEARCH(trades order_book) */ *
+FROM trades 
+ASOF JOIN (
+  SELECT * FROM order_book 
+  WHERE state = 'VALID'
+) order_book;
+```
+
+For more information on when and how to use these optimization hints, see the [SQL Hints](/concept/sql-optimizer-hints/)
+documentation.
+
 ## SPLICE JOIN
 
 Want to join all records from both tables?

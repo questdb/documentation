@@ -120,6 +120,58 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "reference/sql/overview",
+        {
+          type: "category",
+          label: "PGWire Clients",
+          collapsed: false,
+          items: [
+            {
+              id: "pgwire/pgwire-intro",
+              type: "doc",
+              label: "Overview",
+            },
+            {
+              id: "pgwire/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "pgwire/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "pgwire/java",
+              type: "doc",
+              label: "Java",
+            },
+            {
+              id: "pgwire/rust",
+              type: "doc",
+              label: "Rust",
+            },
+            {
+              id: "pgwire/javascript",
+              type: "doc",
+              label: "Node.js",
+            },
+            {
+              id: "pgwire/c-sharp",
+              type: "doc",
+              label: ".NET",
+            },
+            {
+              id: "pgwire/php",
+              type: "doc",
+              label: "PHP",
+            },
+            {
+              id: "pgwire/rpostgres",
+              type: "doc",
+              label: "R",
+            },
+          ]
+        },
         "reference/sql/datatypes",
         "concept/sql-execution-order",
         {
@@ -143,9 +195,9 @@ module.exports = {
                     "reference/sql/alter-table-alter-column-cache",
                     "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-column-type",
+                    "reference/sql/alter-table-change-symbol-capacity",
                   ],
                 },
-                "reference/sql/alter-mat-view-resume-wal",
                 {
                   id: "reference/sql/acl/alter-service-account",
                   type: "doc",
@@ -158,6 +210,7 @@ module.exports = {
                     "reference/sql/alter-table-add-column",
                     "reference/sql/alter-table-attach-partition",
                     "reference/sql/alter-table-change-column-type",
+                    "reference/sql/alter-table-change-symbol-capacity",
                     "reference/sql/alter-table-detach-partition",
                     "reference/sql/alter-table-disable-deduplication",
                     "reference/sql/alter-table-drop-column",
@@ -169,6 +222,16 @@ module.exports = {
                     "reference/sql/alter-table-set-type",
                     "reference/sql/alter-table-set-ttl",
                     "reference/sql/alter-table-squash-partitions",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER MATERIALIZED VIEW",
+                  items: [
+                    "reference/sql/alter-mat-view-change-symbol-capacity",
+                    "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-ttl",
+                    "reference/sql/alter-mat-view-resume-wal",
                   ],
                 },
                 {
@@ -446,6 +509,7 @@ module.exports = {
         "guides/compression-zfs",
         "reference/api/java-embedded",
         "guides/import-csv",
+        "guides/mat-views",
         "guides/modifying-data",
         "guides/replication-tuning",
         "guides/working-with-timestamps-timezones",
@@ -479,6 +543,7 @@ module.exports = {
         },
         "concept/root-directory-structure",
         "concept/sql-extensions",
+        "concept/sql-optimizer-hints",
         "concept/storage-model",
         "concept/symbol",
         "concept/ttl",
@@ -498,18 +563,18 @@ module.exports = {
           label: "Recommended",
           collapsed: false,
           items: [
-            "third-party-tools/databento",
             "third-party-tools/grafana",
             "third-party-tools/kafka",
             "third-party-tools/redpanda",
             "third-party-tools/powerbi",
             "third-party-tools/pandas",
+            "third-party-tools/polars",
+            "third-party-tools/telegraf",
             "third-party-tools/prometheus",
             "third-party-tools/qstudio",
             "third-party-tools/superset",
             "third-party-tools/flink",
-            "third-party-tools/airflow",
-            "third-party-tools/dagster",
+            "third-party-tools/spark",
           ],
         },
         {
@@ -518,10 +583,11 @@ module.exports = {
           collapsed: false,
           items: [
             "third-party-tools/sqlalchemy",
-            "third-party-tools/telegraf",
             "third-party-tools/mindsdb",
-            "third-party-tools/spark",
+            "third-party-tools/airflow",
+            "third-party-tools/dagster",
             "third-party-tools/cube",
+            "third-party-tools/databento",
             "third-party-tools/embeddable",
             "third-party-tools/airbyte",
           ],

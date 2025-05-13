@@ -13,7 +13,7 @@ leverage time-oriented language features and high-performance functionalities.
 A designated timestamp is elected by using the
 [`timestamp(columnName)`](/docs/reference/function/timestamp/) function:
 
-- during a [CREATE TABLE](/docs/reference/sql/create-table/#timestamp) operation
+- during a [CREATE TABLE](/docs/reference/sql/create-table/#designated-timestamp) operation
 - during a [SELECT](/docs/reference/sql/select/#timestamp) operation
   (`dynamic timestamp`)
 - when ingesting data via InfluxDB Line Protocol, for tables that do not already

@@ -20,7 +20,7 @@ transactions.
 When `sequencerTxn` is not specified, the operation resumes the WAL apply job
 from the next uncommitted transaction, including the failed one.
 
-When `sequencerTxn` is not specified, the operation resumes the WAL apply job
+When `sequencerTxn` is specified, the operation resumes the WAL apply job
 from the provided `sequencerTxn` number explicitly.
 
 `ALTER TABLE RESUME WAL` is used to restart WAL table transactions after
@@ -72,7 +72,7 @@ If you have [data deduplication](/concept/deduplication/) enabled on your tables
 
 :::
 
-Sometimes a table may get suspended due to full disk or [kernel limits](/docs/deployment/capacity-planning/#os-configuration). In this case, an entire WAL segment may be corrupted. This means that there will be multiple transactions that rely on the corrupted segment, and finding the transaction number to resume from may be difficult.
+Sometimes a table may get suspended due to full disk or [kernel limits](/docs/operations/capacity-planning/#os-configuration). In this case, an entire WAL segment may be corrupted. This means that there will be multiple transactions that rely on the corrupted segment, and finding the transaction number to resume from may be difficult.
 
 When you run RESUME WAL on such suspended table, you may see an error like this:
 

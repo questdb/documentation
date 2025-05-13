@@ -23,8 +23,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'yarn'
+          node-version: "18"
+          cache: "yarn"
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -39,17 +39,23 @@ jobs:
         run: yarn build
 
       - name: Deploy to Netlify
-        uses: jsmrcaga/action-netlify-deploy@v2.0.0
-        with:
+        id: netlify
+        env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          build_directory: build
-          install_command: "echo Skipping installing the dependencies"
-          build_command: "echo Skipping building the web files"
-          deploy_alias: preview-${{ github.event.pull_request.number }}
+        run: |
+          PREVIEW_URL=$(netlify deploy \
+            --dir=build \
+            --no-build \
+            --auth=$NETLIFY_AUTH_TOKEN \
+            --site=$NETLIFY_SITE_ID \
+            --alias=preview-${{ github.event.pull_request.number }} \
+            --message="Preview Deploy from GitHub Actions" \
+            --json | jq -r '.deploy_url')
+          echo "NETLIFY_PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
 
       - name: "Update PR"
-        if: ${{ env.NETLIFY_PREVIEW_URL }}
+        if: env.NETLIFY_PREVIEW_URL
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
@@ -61,3 +67,26 @@ jobs:
 
             > :package: Build generates a preview & updates link on each commit.
           comment_tag: preview
+
+  validate-links:
+    name: "Validate broken links"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build site for broken link validation
+        run: |
+          yarn build

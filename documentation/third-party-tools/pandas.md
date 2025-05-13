@@ -21,6 +21,10 @@ Protocol.
 - [pyarrow](https://pypi.org/project/pyarrow/)
 - [NumPy](https://numpy.org/)
 
+## Querying vs. Ingestion
+This page focuses on ingestion, which is the process of inserting data into
+QuestDB. For querying data, see [PGWire client guide](/docs/pgwire/python/#integration-with-pandas).
+
 ## Overview
 
 The QuestDB Python client implements the `dataframe()` method to transform

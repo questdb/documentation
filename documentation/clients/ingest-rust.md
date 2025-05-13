@@ -19,6 +19,15 @@ are some of the highlights:
 
 <ILPClientsTable language="Rust" />
 
+:::info
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible Rust library](/docs/pgwire/rust/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
+
 ## Requirements
 
 - Requires Rust 1.40 or later.

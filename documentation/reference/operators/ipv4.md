@@ -14,11 +14,11 @@ The following operators support `string` type arguments to permit the passing of
 netmasks:
 
 - `<<`
-  [Strict IP address contained by](/docs/reference/operators/ipv4/#-strict-ip-address-contained-by)
+  [Strict IP address contained by](/docs/reference/operators/ipv4/#-left-strict-ip-address-contained-by)
 - `<<=`
-  [IP address contained by or equal](/docs/reference/operators/ipv4/#--ip-address-contained-by-or-equal)
-- [rnd_ipv4(string, int)](/docs/reference/operators/ipv4/#random-address-range-generator---rnd_ipv4string-int)
-- [netmask()](/docs/reference/operators/ipv4/#return-netmask---netmask)
+  [IP address contained by or equal](/docs/reference/operators/ipv4/#-left-ip-address-contained-by-or-equal)
+- [rnd_ipv4(string, int)](/docs/reference/function/random-value-generator/#rnd_ipv4string-int)
+- [netmask()](/docs/reference/operators/ipv4/#return-netmask---netmaskstring)
 
 ## `<` Less than
 

@@ -7,30 +7,18 @@ description:
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is now generally available (GA) and ready for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in `server.conf`, or export the equivalent
-environment variable: `QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
 
 :::
-
 
 `DROP MATERIALIZED VIEW` permanently deletes a materialized view and its
 contents.
 
 The deletion is **permanent** and **not recoverable**, except if the view was
-created in a non-standard volume. In such cases, the view is only logically removed while the underlying data
-remains intact in its volume.
+created in a non-standard volume. In such cases, the view is only logically
+removed while the underlying data remains intact in its volume.
 
 Disk space is reclaimed asynchronously after the materialized view is dropped.
 
@@ -54,5 +42,6 @@ it exists.
 
 ## See also
 
-For more information on the concept, see the
-[reference](/docs/concept/mat-views/) on materialized views.
+For more information on the concept, see the the
+[introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/) on
+materialized views.

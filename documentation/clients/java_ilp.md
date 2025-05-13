@@ -37,6 +37,15 @@ The client provides the following benefits:
   health monitoring
 - **Automatic write retries**: Reuse connections and retry after interruptions
 
+:::info
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
+
 ## Compatible JDKs
 
 The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.
@@ -96,11 +105,12 @@ The valid transport protocols are:
 - `tcp`: ILP/TCP
 - `tcps`: ILP/TCP with TLS encryption
 
-A [transport protocol](#transport-selection) and the key `addr=host:port` are
-required. The key `addr` defines the hostname and port of the QuestDB server. If
-the port is not specified, it defaults to 9000 for HTTP(s) transports and 9009
-for TCP(s) transports. For a complete list of options, refer to the
-[Configuration Options](#configuration-options) section.
+A [transport protocol](/docs/reference/api/ilp/overview/#transport-selection)
+and the key `addr=host:port` are required. The key `addr` defines the hostname
+and port of the QuestDB server. If the port is not specified, it defaults to
+9000 for HTTP(s) transports and 9009 for TCP(s) transports. For a complete list
+of options, refer to the [Configuration Options](#configuration-options)
+section.
 
 ## Example with TLS and Authentication enabled
 

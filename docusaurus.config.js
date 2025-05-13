@@ -20,8 +20,9 @@ const config = {
   staticDirectories: ['static'],
   projectName: "questdb",
   customFields,
-  onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
+  onBrokenLinks: isPreviews ? "warn" : "throw",
+  onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
+  onBrokenAnchors: isPreviews ? "warn" : "throw",
   trailingSlash: true,
   stylesheets: [
     {
@@ -96,7 +97,7 @@ const config = {
     colorMode: {
       defaultMode: "dark",
       disableSwitch: true,
-      respectPrefersColorScheme: false,
+      respectPrefersColorScheme: false, // the user preference is also overriden, see ssr.template.js
     },
     image: "/images/og.gif",
     prism: {

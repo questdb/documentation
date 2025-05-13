@@ -15,7 +15,9 @@ export default function CopyButton({ code, className }: Props): JSX.Element {
   const handleCopyCode = useCallback(() => {
     copy(code)
     setIsCopied(true)
-    window.posthog.capture("snippet_copied")
+    if (window.posthog) {
+      window.posthog.capture("snippet_copied")
+    }
     copyTimeout.current = window.setTimeout(() => {
       setIsCopied(false)
     }, 1000)

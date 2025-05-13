@@ -2,36 +2,104 @@
 title: Materialized views
 sidebar_label: Materialized views
 description:
-  Overview of QuestDB's materialized views. This feature helps you significantly
-  speed up your aggregation queries.
+  Materialized views are designed to maintain the speed of your queries as you scale your data.
+  Understand how to structure your queries to take advantage of this feature.
 ---
 
 :::info
 
-Materialized View support is in **beta**.
+Materialized View support is now generally available (GA) and ready for production use.
 
-It may not be fit for production use.
-
-To enable **beta** materialized views, set `cairo.mat.view.enabled=true` in
-`server.conf`, or export the equivalent environment variable:
-`QDB_CAIRO_MAT_VIEW_ENABLED=true`.
-
-Please let us know if you run into issues.
-
-Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
 
 :::
 
-A materialized view is a database object that stores the pre-computed results of
+A materialized view is a special QuestDB table that stores the pre-computed results of
 a query. Unlike regular views, which compute their results at query time,
 materialized views persist their data to disk, making them particularly
 efficient for expensive aggregate queries that are run frequently.
 
-## Related documentation
+## What are materialized views for?
+
+Let's say that your application is ingesting vast amounts of time series data.
+Soon your QuestDB instance will grow from gigabytes to terabytes.
+
+```questdb-sql title="trades ddl"
+CREATE TABLE 'trades' ( 
+	symbol SYMBOL,
+	side SYMBOL,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+Queries that rely on a specific subset of the data (say, the last hour) will
+continue to run fast, but anything that requires scanning large numbers of rows
+or the entire dataset will begin to slow down.
+
+One of the most common queries for time series data is the `SAMPLE BY` query.
+This query is used to aggregate data into time-window buckets. Here's an example
+that can analyze trade volumes by the minute, broken down by symbol.
+
+```questdb-sql title="SAMPLE BY query"
+SELECT
+  timestamp,
+  symbol,
+  side,
+  sum(price * amount) AS notional
+FROM trades
+SAMPLE BY 1m;
+```
+
+Each time this query is run it will scan the entire dataset. This type of query
+will become slower as the dataset grows. Materialized views run the query only
+on small subset of rows of the base table each time when new rows are inserted.
+In other words, materialized views are designed to maintain the speed of your
+queries as you scale your data.
+
+When you create a materialized view you register your time-based grouping
+query with the QuestDB database against a base table.
+
+![sampling into a materialized view](/images/docs/concepts/mat-view-agg.svg)
+
+Conceptually a materialized view is an on-disk table tied to a query:
+As you add new data to the base table, the materialized view will efficiently
+update itself. You can then query the materialized view as a regular table
+without the impact of a full table scan of the base table.
+
+## Creating a materialized view
+
+To create a materialize view, surround your `SAMPLE BY` or time-based `GROUP BY`
+query with a [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view) statement.
+
+```questdb-sql title="trades_notional_1m ddl"
+CREATE MATERIALIZED VIEW 'trades_notional_1m' AS (
+  SELECT
+    timestamp,
+    symbol,
+    side,
+    sum(price * amount) AS notional
+  FROM trades
+  SAMPLE BY 1m
+) PARTITION BY DAY;
+```
+
+Querying a materialized view can be up to hundreds of times faster than
+executing the same query on the base table.
+
+```questdb-sql title="querying a materialized view"
+SELECT *
+FROM trades_notional_1m;
+```
+
+## Roadmap and limitations
+
+We aim to expand the scope materialized view over time. For now, the feature
+focuses on time-based aggregations. It currently supports JOIN operations,
+but does not yet support all query types.
+
+## Continue learning
 
 <!--
 - **Step-by-step tutorial**
@@ -39,6 +107,12 @@ efficient for expensive aggregate queries that are run frequently.
   - [How to create a materialized view](/blog/how-to-create-a-materialized-view/):
     A full walkthrough of simple and advanced materialized views
 -->
+
+- **Guide**
+
+  - [Materialized views guide](/docs/guides/mat-views/): A
+    comprehensive guide to materialized views, including examples and
+    explanations of the different options available
 
 - **SQL Commands**
 
@@ -54,184 +128,3 @@ efficient for expensive aggregate queries that are run frequently.
 - **Configuration**
   - [Materialized views configs](/docs/configuration/#materialized-views):
     Server configuration options for materialized views from `server.conf`
-
-## Architecture and behaviour
-
-### Storage model
-
-Materialized views in QuestDB are implemented as special tables that maintain
-their data independently of their base tables. They use the same underlying
-storage engine as regular tables, benefiting from QuestDB's columnar storage and
-partitioning capabilities.
-
-### Refresh mechanism
-
-:::note
-
-Currently, QuestDB only supports **incremental refresh** for materialized views.
-
-Future releases will include additional refresh types, such as time-interval and
-manual refreshes.
-
-:::
-
-Unlike regular views, which recompute their results at query time, materialized
-views in QuestDB are incrementally refreshed as new data is added to the base
-table. This approach ensures that only the **relevant time slices** of the view
-are updated, avoiding the need to recompute the entire dataset. The refresh
-process works as follows:
-
-1. New data is inserted into the base table.
-2. The time-range of this data is identified.
-3. This data is extracted and used to recompute the materialised view.
-
-This refresh happens asynchronously, minimising any impact on write performance.
-The refresh state of the materialized view is tracked using transaction numbers.
-The transaction numbers can be compared with the base table, for monitoring the
-'refresh lag'.
-
-For example, if a base table receives new rows for `2025-02-18`, only that day's
-relevant time slices are recomputed, rather than reprocessing all historical
-data.
-
-You can monitor refresh status using the `materialized_views()` system function:
-
-```questdb-sql title="Listing all materialized views"
-SELECT
-  view_name,
-  last_refresh_timestamp,
-  view_status,
-  base_table_txn,
-  applied_base_table_txn
-FROM materialized_views();
-```
-
-Here is an example output:
-
-| view_name   | last_refresh_timestamp | view_status | base_table_txn | applied_base_table_txn |
-| ----------- | ---------------------- | ----------- | -------------- | ---------------------- |
-| trades_view | null                   | valid       | 102            | 102                    |
-
-When `base_table_txn` matches `applied_base_table_txn`, the materialized view is
-fully up-to-date.
-
-#### Refreshing an invalid view
-
-If a materialized view becomes invalid, you can check its status:
-
-```questdb-sql title="Checking view status"
-SELECT
-  view_name,
-  base_table_name,
-  view_status,
-  invalidation_reason
-FROM materialized_views();
-```
-
-| view_name     | base_table_name | view_status | invalidation_reason                          |
-| ------------- | --------------- | ----------- | -------------------------------------------- |
-| trades_view   | trades          | valid       | null                                         |
-| exchange_view | exchange        | invalid     | [-105] table does not exist [table=exchange] |
-
-To restore an invalid view, and refresh its data from scratch, use:
-
-```questdb-sql title="Restoring an invalid view"
-REFRESH MATERIALIZED VIEW view_name FULL;
-```
-
-This command deletes existing data in the materialized view, and re-runs its
-query.
-
-Once the view is repopulated, the view is marked as 'valid' so that it can be
-incrementally refreshed.
-
-For large base tables, a full refresh may take a significant amount of time. You
-can cancel the refresh using the
-[`CANCEL QUERY`](/docs/reference/sql/cancel-query/) SQL.
-
-For the conditions which can invalidate a materialized view, see the
-[technical requirements](#technical-requirements) section.
-
-### Base table relationship
-
-Every materialized view is tied to a base table that serves as its primary data
-source.
-
-- For single-table queries, the base table is automatically determined.
-- For multi-table queries, one table must be explicitly defined as the base
-  table using `WITH BASE`.
-
-The view is automatically refreshed when the base table is changed. Therefore,
-you should make sure the table that you wish to drive the view is defined
-correctly. If you use the wrong base table, then the view may not be refreshed
-at the times you expect.
-
-## Technical requirements
-
-### Query constraints
-
-To create a materialized view, your query:
-
-- Must use either `SAMPLE BY` or `GROUP BY` with a designated timestamp column
-  key.
-- Must not contain `FROM-TO`, `FILL`, and `ALIGN TO FIRST OBSERVATION` clauses
-  in `SAMPLE BY` queries
-- Must use join conditions that are compatible with incremental refreshing.
-- When the base table has [deduplication](/docs/concept/deduplication/) enabled,
-  the non-aggregate columns selected by the materialized view query must be a
-  subset of the `DEDUP` keys from the base table.
-
-We intend to loosen some of these restrictions in future.
-
-### View invalidation
-
-The view's structure is tightly coupled with its base table.
-
-The main cause of invalidation for a materialised view, is when the table schema
-or underlying data is modified.
-
-These changes include dropping columns, dropping partitions and renaming the
-table.
-
-Data deletion or modification, for example, using `TRUNCATE` or `UPDATE`, may
-also cause invalidation.
-
-## Replicated views (Enterprise only)
-
-Replication of the base table is independent of materialized view maintenance.
-
-If you promote a replica to a new primary instance, this may trigger a full
-materialized view refresh in the case where the replica did not already have a
-fully up-to-date materialized view.
-
-## Resource management
-
-Materialized Views are compatible with the usual resource management systems:
-
-- View TTL settings are separate from the base table.
-- TTL deletions in the base table will not be propagated to the view.
-- Partitions are managed separately between the base table and the view.
-- Refresh intervals can be configured independently.
-
-### Materialized view with TTL
-
-Materialized Views take extra storage and resources to maintain. If your
-`SAMPLE BY` unit is small (seconds, milliseconds), this could be a significant
-amount of data.
-
-Therefore, you can decide on a retention policy for the data, and set it using
-`TTL`:
-
-```questdb-sql title="Create a materialized view with a TTL policy"
-CREATE MATERIALIZED VIEW trades_hourly_prices AS (
-  SELECT
-    timestamp,
-    symbol,
-    avg(price) AS avg_price
-  FROM trades
-  SAMPLE BY 1h
-) PARTITION BY WEEK TTL 8 WEEKS;
-```
-
-In this example, the view stores hourly summaries of the pricing data, in weekly
-partitions, keeping the prior 8 partitions.
