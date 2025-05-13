@@ -35,8 +35,8 @@ The dots are the individual values (`DOUBLE` numbers in our case). Each row
 shows the whole array, but with different subdivisions according to the
 dimension. So, in `dim 1`, the row is divided into two slots, the sub-arrays at
 coordinates 1 and 2 along that dimension, and the distance between the start of
-slot 1 and slot 2 is equal to 6 (the stride for that dimension). In `dim 3`,
-each slots contains an individual number, and the stride is 1.
+slot 1 and slot 2 is 6 (the stride for that dimension). In `dim 3`, each slot
+contains an individual number, and the stride is 1.
 
 The legal values for the coordinate in `dim 3` are just 1 and 2, even though you
 would be able to access any array element just by using a large-enough number.
@@ -86,9 +86,9 @@ So, while performing a shape transformation is cheap on its own, whole-array
 operations on transformed arrays, such as equality checks, adding/multiplying
 two arrays, etc., are expected to be slower than on vanilla arrays.
 
-QuestDB always stores arrays in vanilla form. Even if you transform an array's
-shape and then store the result to the database, it will be stored in vanilla
-form.
+QuestDB always stores arrays in vanilla form. When you transform an array's
+shape and then store the resulting array to the database, it will be stored in
+vanilla form.
 
 ## Array access syntax
 
@@ -129,6 +129,12 @@ arr[1]
 ```
 
 This selects the first 2D sub-array in `arr`.
+
+:::note
+
+If you use an index larger than the array length, the result will be `NULL`.
+
+:::
 
 **Example:** select a 1D sub-array.
 
@@ -172,6 +178,14 @@ arr[2:3, 3:4]
 
 This returns a `DOUBLE[1][1][3]`.
 
+:::note
+
+The slice's upper bound can be larger than the length of the array. The
+result will be the same as if the upper bound was left out — the slice
+will include all the elements up to the end along that dimension.
+
+:::
+
 ### Mixing selectors
 
 You can use both types of selectors within the same bracket expression.
@@ -194,3 +208,16 @@ arr[1:4, 3, 2]
 This leaves the top dimension unconstrained, then takes the 3rd sub-array in
 each of the top-level sub-arrays, and then selects just the 2nd element in each
 of them.
+
+## Find the length along a dimension
+
+Use the function `dim_length()` to get the length of the array along a specific
+dimension.
+
+**Example:** get the length of `arr` along the 1st dimension.
+
+```questdb-sql
+dim_length(arr, 1)
+```
+
+For an array of shape `DOUBLE[3][5]`, this will return `3`.
