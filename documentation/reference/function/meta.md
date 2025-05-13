@@ -206,21 +206,11 @@ Returns a `table`.
 tables();
 ```
 
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | matView |
-| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | ------- |
-| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | false   |
-| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | false   |
-| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | false   |
-
-```questdb-sql title="All tables in reverse alphabetical order"
-tables() ORDER BY name DESC;
-```
-
-| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag  | walEnabled | directoryName    | dedup | matView |
-| --- | ----------- | ------------------- | ----------- | ------------------ | --------- | ---------- | ---------------- | ----- | ------- |
-| 2   | device_data | null                | NONE        | 10000              | 30000000  | false      | device_data      | false | false   |
-| 1   | my_table    | ts                  | DAY         | 500000             | 300000000 | false      | my_table         | false | false   |
-| 3   | short_lived | ts                  | HOUR        | 10000              | 30000000  | false      | short_lived (->) | false | false   |
+| id  | name        | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | ttlValue | ttlUnit | matView |
+| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | 0        | HOUR    | false   |
+| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | 0        | HOUR    | false   |
+| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | 1        | HOUR    | false   |
 
 :::note
 
@@ -233,9 +223,9 @@ tables() ORDER BY name DESC;
 tables() WHERE partitionBy = 'DAY';
 ```
 
-| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | matView |
-| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | ------- |
-| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | false   |
+| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | ttlValue | ttlUnit | matView |
+| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | 0        | HOUR    | false   |
 
 ## table_storage
 
@@ -503,10 +493,13 @@ Returns a `table` including the following information:
 - `view_name` - materialized view name
 - `refresh_type` - refresh strategy type
 - `base_table_name` - base table name
-- `last_refresh_timestamp` - last time when the view was incrementally refreshed
+- `last_refresh_start_timestamp` - last time when an incremental refresh for the
+  view was started
+- `last_refresh_finish_timestamp` - last time when an incremental refresh for
+  the view finished
 - `view_sql` - query used to populate view data
 - `view_table_dir_name` - view directory name
-- `view_status` - view status: valid or invalid
+- `view_status` - view status: 'valid', 'refreshing', or 'invalid'
 - `invalidation_reason` - message explaining why the view was marked as invalid
 - `refresh_base_table_txn` - the last base table transaction used to refresh the
   materialized view
@@ -518,9 +511,9 @@ Returns a `table` including the following information:
 materialized_views();
 ```
 
-| view_name | refresh_type | base_table_name | last_refresh_timestamp      | view_sql      | view_table_dir_name | view_status | invalidation_reason | refresh_base_table_txn | base_table_txn |
-| --------- | ------------ | --------------- | --------------------------- | ------------- | ------------------- | ----------- | ------------------- | ---------------------- | -------------- |
-| trades_1h | incremental  | trades          | 2024-10-24T17:22:09.842574Z | query text... | trades_1h~10        | valid       |                     | 42                     | 42             |
+| view_name | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql      | view_table_dir_name | view_status | invalidation_reason | refresh_base_table_txn | base_table_txn |
+| --------- | ------------ | --------------- | ---------------------------- | ----------------------------- | ------------- | ------------------- | ----------- | ------------------- | ---------------------- | -------------- |
+| trades_1h | incremental  | trades          | 2024-10-24T17:22:20.536577Z  | 2024-10-24T17:22:09.842574Z   | query text... | trades_1h~10        | refreshing  |                     | 42                     | 42             |
 
 ## version/pg_catalog.version
 
