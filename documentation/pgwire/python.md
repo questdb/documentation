@@ -277,6 +277,13 @@ adapter. It's a complete rewrite of psycopg2 with support for both synchronous a
 pip install psycopg[binary]
 ```
 
+:::tip
+
+Use `psycopg[binary]` to install the binary version of psycopg3, which is faster and more efficient. In our testing, we
+found that the binary version of psycopg3 is significantly faster than the pure-Python version.
+
+:::
+
 ### Basic Connection
 
 ```python
