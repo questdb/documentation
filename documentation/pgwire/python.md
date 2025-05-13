@@ -8,8 +8,8 @@ description:
 QuestDB is tested with the following Python clients:
 
 - [asyncpg](https://pypi.org/project/asyncpg/)
-- [psycopg2](https://www.psycopg.org/docs/)
 - [psycopg3](https://www.psycopg.org/psycopg3/docs/)
+- [psycopg2](https://www.psycopg.org/docs/)
 
 Other Python clients that are compatible with the PostgreSQL wire protocol
 should also work with QuestDB, but we do not test them. If you find a client that
