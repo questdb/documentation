@@ -18,9 +18,13 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized
 for performance. For best performance when querying data from QuestDB with Go, we recommend using pgx.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
-> instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-> official [Go client](/docs/clients/ingest-go/) for data ingestion using ILP.
+:::tip
+
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
+instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
+official [Go client](/docs/clients/ingest-go/) for data ingestion using ILP.
+
+:::
 
 ## Introduction to PGWire in QuestDB
 

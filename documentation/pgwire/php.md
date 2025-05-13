@@ -19,9 +19,13 @@ QuestDB is a high-performance database. The PGWire protocol has many flavors, an
 for performance. For best performance when querying data from QuestDB with PHP, we recommend using PDO with connection
 pooling.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with
-> the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) instead of PGWire.
-> PGWire should primarily be used for querying data in QuestDB.
+:::tip
+
+For data ingestion, we recommend using QuestDB's first-party clients with
+the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) instead of PGWire.
+PGWire should primarily be used for querying data in QuestDB.
+
+:::
 
 ## Introduction to PGWire in QuestDB
 

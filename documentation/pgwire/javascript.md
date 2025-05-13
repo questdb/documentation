@@ -19,11 +19,14 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized
 for performance. Our recommendation is to use the `pg` client for most use cases as it's well-supported with QuestDB.
 
-> **Note**: For data ingestion, we recommend using QuestDB's first-party clients with
-> the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
-> instead of PGWire. PGWire should primarily be used for querying data in QuestDB. PGWire should primarily be used for
-> querying data in QuestDB. QuestDB provides an
-> official [JavaScript client](/docs/clients/ingest-node/) for data ingestion using ILP.
+:::tip
+
+For data ingestion, we recommend using QuestDB's first-party clients with
+the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) instead of PGWire. PGWire should primarily be used for
+querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/clients/ingest-node/) for data
+ingestion using ILP.
+
+:::
 
 
 ## Connection Parameters
