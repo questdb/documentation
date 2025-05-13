@@ -1,11 +1,11 @@
 ---
 title: .NET PGWire Guide
 description:
-  .NET clients for QuestDB PGWire protocol. Learn how to use the PGWire
+  .NET/C# clients for QuestDB PGWire protocol. Learn how to use the PGWire
   protocol with C# for querying data. 
 ---
 
-QuestDB is tested with the following .NET client:
+QuestDB is tested with the following C# client:
 
 - [Npgsql](https://www.npgsql.org/)
 
@@ -17,7 +17,7 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 QuestDB is a high-performance database. The PGWire protocol has many
 flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
-.NET, we recommend using Npgsql with connection pooling.
+C#, we recommend using Npgsql with connection pooling.
 
 :::tip
 
@@ -757,7 +757,6 @@ When using Npgsql with QuestDB, be aware of these limitations:
    efficient queries.
 5. **Limit Result Sets**: When dealing with large time-series datasets, use `LIMIT` clauses to avoid retrieving too much
    data at once.
-6. **Use Appropriate Types**: Match .NET types to QuestDB types correctly to avoid unnecessary conversions.
 
 ## QuestDB Time Series Features
 
@@ -808,7 +807,7 @@ For query-related errors:
 
 ## Conclusion
 
-Npgsql provides a robust way to connect .NET applications to QuestDB through the PostgreSQL Wire Protocol. By following
+Npgsql provides a robust way to connect C# applications to QuestDB through the PostgreSQL Wire Protocol. By following
 the guidelines in this documentation, you can effectively query time-series data from QuestDB and integrate it with
 various .NET applications.
 
@@ -819,6 +818,6 @@ high-throughput data insertion. For optimal performance, use this client for dat
 QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing
 time-series data that can be easily accessed through Npgsql.
 
-For production applications, consider using the QuestDB.NET library or direct Npgsql queries, as they offer more direct
+For production applications, consider using direct Npgsql queries, as they offer more direct
 control over queries and better compatibility with QuestDB's time-series model than higher-level ORMs like Entity
 Framework Core, which are better suited for traditional OLTP databases.
