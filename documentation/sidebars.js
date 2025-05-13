@@ -459,6 +459,7 @@ module.exports = {
         "guides/import-csv",
         "guides/mat-views",
         "guides/modifying-data",
+        "guides/questdb-architecture",
         "guides/replication-tuning",
         "guides/working-with-timestamps-timezones",
         "web-console",

@@ -1,7 +1,7 @@
 ---
-id: questdb-internals
-title: QuestDB Internals
-slug: questdb-internals
+id: questdb-architecture
+title: QuestDB Architecture
+slug: questdb-architecture
 description: A deep technical dive into the internal architecture, storage engine, query processing, and native integrations of QuestDB.
 ---
 
