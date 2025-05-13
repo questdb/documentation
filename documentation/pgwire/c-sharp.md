@@ -11,7 +11,7 @@ QuestDB is tested with the following .NET client:
 
 Other .NET clients that are compatible with the PostgreSQL wire protocol
 should also work with QuestDB, but we do not test them. If you find a client that
-does not work, please [open an issue](https://github.com/questdb/questdb/issues/new?template=bug_report.yaml)
+does not work, please [open an issue](https://github.com/questdb/questdb/issues/new?template=bug_report.yaml).
 
 ### Performance Considerations
 
