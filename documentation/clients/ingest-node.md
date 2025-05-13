@@ -30,7 +30,7 @@ QuestDB.
 :::info
 
 This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [Node.js-compatible Go library](/docs/pgwire/javascript/) or our
+For retrieving data, we recommend using a [PostgreSQL-compatible Node.js library](/docs/pgwire/javascript/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
