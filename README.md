@@ -1,6 +1,6 @@
 # QuestDB Documentation
 
-Uses [Docusaurus](https://docusaurus.io/). 
+Uses [Docusaurus](https://docusaurus.io/).
 
 ## Quick start
 
@@ -31,7 +31,7 @@ Most changes are reflected live without having to restart the server.
 docker-compose up
 ```
 
-## Contributing 
+## Contributing
 
 You'll need to sign a quick CLA.
 
@@ -49,15 +49,17 @@ Then push your branch to GitHub and create a PR.
 
 We'll review the PR and generate a preview build.
 
-A QuestDB member must add the `preview` label to your PR to deploy a preview build.
+A QuestDB member must add the `preview` label to your PR to deploy a preview
+build.
 
 Once it looks good, we'll merge!
 
-### Enhancements, bugs, typos 
+### Enhancements, bugs, typos
 
 We'd love your help!
 
-Raise a [GH issue](https://github.com/questdb/documentation/issues/new/choose) or tackle a PR.
+Raise a [GH issue](https://github.com/questdb/documentation/issues/new/choose)
+or tackle a PR.
 
 ## Syntax
 
@@ -65,7 +67,8 @@ Raise a [GH issue](https://github.com/questdb/documentation/issues/new/choose) o
 
 Our SQL syntax diagrams are created using Railroad.
 
-To create a diagram, use the [Railroad online editor](https://www.bottlecaps.de/rr/ui) to see it rendered.
+To create a diagram, use the
+[Railroad online editor](https://www.bottlecaps.de/rr/ui) to see it rendered.
 
 Once you're happy with it, copy the Railroad syntax and add it to:
 
@@ -90,19 +93,21 @@ For example:
 python3 scripts/railroad.py renameTable
 ```
 
-During its final output, a markdown image with the appropriate syntax is printed:
+During its final output, a markdown image with the appropriate syntax is
+printed:
 
 ```text
 Copy the image syntax below and paste it into your markdown file:
 ![Diagram for renameTable](/images/docs/diagrams/renameTable.svg)
 ```
 
-Copy this syntax and paste it into the markdown file where you want the diagram to appear.
+Copy this syntax and paste it into the markdown file where you want the diagram
+to appear.
 
 The script requires:
 
-* Java (to run the `rr.war` file)
-* Python (to execute the `railroad.py` script)
+- Java (to run the `rr.war` file)
+- Python (to execute the `railroad.py` script)
 
 ### Math Expressions
 
@@ -189,3 +194,7 @@ On top of this, we follow the rules set by the
 
 You do not need to run the linting task manually, Webpack will take care of that
 for you.
+
+In your editor, turn on "format on save".
+
+It'll help!
