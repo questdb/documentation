@@ -11,9 +11,8 @@ QuestDB offers high-speed ingestion and low-latency analytics on time-series dat
 <Screenshot
   alt="QuestDB: High-Speed Ingestion, Low Latency analytics"
   title="QuestDB: High-Speed Ingestion, Low Latency analytics"
-  height={435}
-  src="images/guides/questdb-internals/questdbBasic.svg"
-  width={745}
+  src="images/guides/questdb-internals/questdb-high-level-architecture.svg"
+  width={1000}
 />
 
 This document explains QuestDB's internal architecture.
@@ -87,9 +86,8 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
 <Screenshot
   alt="Diagram showing WAL files consolidation"
   title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth, allowing for data deduplication and consolidation."
-  height={435}
   src="images/guides/questdb-internals/walData.svg"
-  width={745}
+  width={1000}
 />
 
 
