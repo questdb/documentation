@@ -110,9 +110,8 @@ deduplicated on additional columns.
 <Screenshot
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
   title="Architecture of the storage model with multiple column files per partition"
-  height={596}
   src="images/guides/questdb-internals/columnarStorage.svg"
-  width={400}
+  width={1000}
 />
 
 
@@ -180,9 +179,8 @@ deduplicated on additional columns.
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   title="Diagram showing how the data from a column file is mapped to the memory"
-  height={447}
-  src="images/docs/concepts/columnRead.svg"
-  width={745}
+  src="images/guides/questdb-internals/columnRead.svg"
+  width={1000}
 />
 
 ### Execution model
@@ -208,17 +206,12 @@ deduplicated on additional columns.
   multi-core fashion. Some queries, for example those involving an index, are executed on a single
   thread. Other queries, like those involving `GROUP BY` and `SAMPLE BY`, execute a pipeline with some  single-threaded stages and some multi-threaded stages to avoid slow downs when groups are unbalanced.
 
-<div style={{textAlign: 'center'}}>
-
-```mermaid
-graph TD
-    A["Publish aggregate tasks<br/><i>(Single thread)</i>"] --> B["Filter & Aggregate<br/><i>(N threads)</i>"]
-    B --> C["Publish merge tasks<br/><i>(Single thread)</i>"]
-    C --> D["Merge partition parts<br/><i>(N threads)</i>"]
-    D --> E["Collect results<br/><i>(Single thread)</i>"]
-```
-
-</div>
+<Screenshot
+  alt="Execution pipeline with mixed stages, some single-threaded, some multi-threaded."
+  title="Execution pipeline with mixed stages, some single-threaded, some multi-threaded"
+  src="images/guides/questdb-internals/multiThreadedExecution.svg"
+  width={1000}
+/>
 
 - **Worker pools:** QuestDB allows to configure different pools for specialized functions, like
 parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire protocol, or responding to HTTP connections. By default, most tasks are handled by a shared worker pool.
@@ -249,9 +242,8 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 <Screenshot
   alt="Interval scan"
   title="Interval scan"
-  height={433}
-  src="images/blog/2023-04-25/interval_scan.svg"
-  width={650}
+  src="images/guides/questdb-internals/interval_scan.svg"
+  width={750}
 />
 
 - **Out-of-order data:**
@@ -269,9 +261,8 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
   title="Diagram of data column files and how they are partitioned to form a table"
-  height={373}
-  src="images/docs/concepts/partitionModel.svg"
-  width={745}
+  src="images/guides/questdb-internals/partitionModel.svg"
+  width={1000}
   forceTheme="dark"
 />
 
@@ -512,14 +503,6 @@ The default port number for the minimal HTTP server is `9003`.
    Grants [can be configured](/docs/operations/rbac/) individually or at the
    group level with fine granularity, including column-level  access.
 
-<!-- This image is used also at the operations rbac page. Please keep in sync -->
-<Screenshot
-  alt="Diagram showing users, service accounts and groups in QuestDB"
-  title="Users, service accounts and groups"
-  src="images/docs/acl/users_service_accounts_groups.webp"
-  width={745}
-/>
-
 
 ## Observability & diagnostics
 
@@ -563,7 +546,7 @@ The [QuestDB Web console](/docs/web-console/) is ideal for interactive explorati
   alt="The QuestDB Console"
   title="The QuestDB Web Console"
   src="images/guides/questdb-internals/web-console.webp"
-  width={745}
+  width={1000}
 />
 
 
