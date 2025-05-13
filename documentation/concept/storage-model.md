@@ -36,7 +36,6 @@ read by translating the record number into a file offset by a simple bit shift.
 The offset in the column file is then translated into an offset in a lazily
 mapped memory page, where the required value is read from.
 
-<!-- This image is used also at the questdb-internals page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   height={447}

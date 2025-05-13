@@ -39,7 +39,6 @@ that falls outside the relevant intervals. However, it's important to note that
 **Interval Scan** does not apply to the results of sub-queries, as the data
 returned from a sub-query is not guaranteed to be in timestamp order.
 
-<!-- this image is used also at the questdb-internals page. Please keep in sync -->
 <Screenshot
   alt="Interval scan."
   height={433}

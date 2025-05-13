@@ -125,7 +125,6 @@ A WAL table uses the following components to manage concurrent commit requests:
 - **TableWriter**: updates the database and resolves any out-of-order data
   writes.
 
-<!-- diagram used at the questb-internals page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing the sequencer allocating txn numbers to events cronologically"
   title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth."
@@ -134,7 +133,6 @@ A WAL table uses the following components to manage concurrent commit requests:
   width={745}
 />
 
-<!-- diagram used at the questb-internals page. Please keep in sync -->
 <Screenshot
   alt="Diagram showing the WAL job application and WAL collect events and commit to QuestDB"
   title="The WAL job application collects the transactions sequencially for the TableWriter to commit to QuestDB."
