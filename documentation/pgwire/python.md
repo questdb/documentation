@@ -33,15 +33,11 @@ official [Python client](/docs/clients/ingest-python/) for data ingestion using 
 
 All Python PostgreSQL clients need similar connection parameters to connect to QuestDB:
 
-```python
-CONNECTION_PARAMS = {
-    'host': '127.0.0.1',
-    'port': 8812,  # Default PGWire port for QuestDB
-    'user': 'admin',
-    'password': 'quest',
-    'database': 'qdb'
-}
-```
+- **host**: The hostname or IP address of the QuestDB server (default: `localhost`)
+- **port**: The PostgreSQL wire protocol port (default: `8812`)
+- **user**: The username for authentication (default: `admin`)
+- **password**: The password for authentication (default: `quest`)
+- **database**: The database name (default: `qdb`)
 
 ## asyncpg
 

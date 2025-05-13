@@ -33,15 +33,11 @@ ingestion using ILP.
 
 All JavaScript PostgreSQL clients need similar connection parameters to connect to QuestDB:
 
-```javascript
-const CONNECTION_PARAMS = {
-    host: '127.0.0.1',
-    port: 8812,      // Default PGWire port for QuestDB
-    user: 'admin',
-    password: 'quest',
-    database: 'qdb'
-}
-```
+- **host**: The hostname or IP address of the QuestDB server (default: `localhost`)
+- **port**: The PostgreSQL wire protocol port (default: `8812`)
+- **user**: The username for authentication (default: `admin`)
+- **password**: The password for authentication (default: `quest`)
+- **database**: The database name (default: `qdb`)
 
 ## pg (node-postgres)
 
