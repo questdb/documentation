@@ -17,10 +17,9 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 ### Performance Considerations
 
-QuestDB is designed to be a high-performance database. The PGWire protocol has many
-flavors, and some of them are not optimized for performance. We found psycopg2 to be
-the slowest of the three clients. Our recommendation is to use asyncpg or psycopg3 for the best performance when
-querying data.
+QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized for
+performance. We found psycopg2 to be the slowest of the three clients. Our recommendation is to use asyncpg or psycopg3
+for the best performance when querying data.
 
 > **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an

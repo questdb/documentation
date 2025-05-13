@@ -16,9 +16,8 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 ### Performance Considerations
 
-QuestDB is designed to be a high-performance database. The PGWire protocol has many
-flavors, and some of them are not optimized for performance. Our recommendation is to use the `pg` client for most use
-cases as it's well-supported with QuestDB.
+QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized
+for performance. Our recommendation is to use the `pg` client for most use cases as it's well-supported with QuestDB.
 
 > **Note**: For data ingestion, we recommend using QuestDB's first-party clients with
 > the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)

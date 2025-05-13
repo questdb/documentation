@@ -15,9 +15,9 @@ does not work, please [open an issue](https://github.com/questdb/questdb/issues/
 
 ### Performance Considerations
 
-QuestDB is designed to be a high-performance database. The PGWire protocol has many
-flavors, and some of them are not optimized for performance. For best performance when querying data from QuestDB with
-Rust, we recommend using tokio-postgres with connection pooling.
+QuestDB is a high-performance database. The PGWire protocol has many flavors, and some of them are not optimized
+for performance. For best performance when querying data from QuestDB with Rust, we recommend using tokio-postgres with
+connection pooling.
 
 > **Note**: For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
 > instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
