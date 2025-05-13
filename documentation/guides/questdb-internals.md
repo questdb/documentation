@@ -439,7 +439,7 @@ QuestDB exposes several network interfaces and protocols to allow different clie
 <Screenshot
   alt="QuestDB Network Protocols"
   title="QuestDB Network Protocols"
-  src="images/guides/questdb-internals/questdb_network_protocols.svg"
+  src="images/guides/questdb-internals/questdb_network_protocols.webp"
   width={734}
 />
 
