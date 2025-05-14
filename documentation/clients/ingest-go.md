@@ -28,6 +28,14 @@ some common insert patterns.
 
 <ILPClientsTable language="Golang" />
 
+:::info
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible Go library](/docs/pgwire/go/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
 ## Requirements
 
 - Requires Go 1.19 or later.

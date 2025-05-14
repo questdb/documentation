@@ -31,6 +31,16 @@ It covers basic connection, authentication and some insert patterns.
 
 <ILPClientsTable language="Python" />
 
+:::info
+
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible Python library](/docs/pgwire/python/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
+
 ## Requirements
 
 Requires Python >= 3.8 Assumes QuestDB is running. Not running? See the
@@ -270,3 +280,8 @@ To learn _The Way_ of QuestDB SQL, see the
 
 Alone? Stuck? Want help? Visit us in our
 [Community Forum](https://community.questdb.com/).
+
+## Additional resources
+- [QuestDB Python clients guide](/docs/pgwire/python/)
+- [Integration with Polars](/docs/third-party-tools/polars/)
+- [Integration with Pandas](/docs/third-party-tools/pandas/)
