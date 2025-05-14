@@ -80,12 +80,11 @@ For full query details and examples, see the PostgreSQL section in the
 ### List of supported features
 
 - Querying (all types expect `BLOB`)
-- Prepared statements with bind parameters (check for specific libraries
-  [below](/docs/reference/api/postgres/#libraries--programmatic-clients))
+- Prepared statements with bind parameters
 - `INSERT` statements with bind parameters
 - `UPDATE` statements with bind parameters
 - DDL execution
-- Batch inserts with `JDBC`
+- Batch inserts
 - Plain authentication
 
 ### List of supported connection properties
