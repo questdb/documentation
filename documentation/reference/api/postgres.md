@@ -14,7 +14,7 @@ import RustInsertPartial from "../../partials/_rust.sql.insert.partial.mdx"
 
 QuestDB supports the Postgres Wire Protocol (PGWire) for data-in.
 
-For querying and data-out, QuestDB is compatible with PostgreSQL queries.
+For querying and data-out, QuestDB is compatible with PostgreSQL protocol.
 
 This means that you can use your favorite PostgreSQL client or driver with
 QuestDB.
@@ -26,7 +26,7 @@ For information querying and data-out, see the
 
 The PostgreSQL storage model is fundamentally different than that of QuestDB.
 
-As a result, some features that exists for Postgres do not exist in QuestDB.
+As a result, some features that exists for PostgreSQL do not exist in QuestDB.
 
 :::
 
@@ -106,34 +106,4 @@ For full query details and examples, see the PostgreSQL section in the
 
 ## Recommended third party tools
 
-The following list of third party tools includes drivers, clients or utility
-CLIs that our team has tested extensively. Picking an item from it will
-guarantee that your code will work with QuestDB.
-
-We recognize that our community might value some features more than others. This
-is why we encourage you to [open an issue on GitHub](https://github.com/questdb/questdb/issues) if
-you think we are missing something important for your workflow.
-
-### CLIs
-
-#### [PSQL](https://www.postgresql.org/docs/current/app-psql.html) `12`
-
-Support for `SELECT`, `INSERT`, `UPDATE`, `CREATE`, `DROP`, `TRUNCATE`.
-
-### Libraries / Programmatic clients
-
-#### [node-postgres](https://node-postgres.com/) (NodeJS) `8.4`
-
-#### [pq](https://github.com/lib/pq) (Go) `1.8`
-
-#### [pq](https://www.postgresql.org/docs/12/libpq.html) (C) `12`
-
-#### [Psycopg](https://www.psycopg.org) (Python) `2.9.3` and `3.1`
-
-#### [ruby-pg](https://github.com/ged/ruby-pg) (Ruby) `1.4.3`
-
-#### [pg_connect](https://www.php.net/manual/en/function.pg-connect.php) (PHP) `8.1.0`
-
-### Drivers
-
-#### [JDBC](https://jdbc.postgresql.org/) `42.2`
+See [PGWire client guides](/docs/pgwire/pgwire-intro/) for more information about supported PostgreSQL clients and libraries.
