@@ -7,11 +7,11 @@ import {
   Transition,
 } from "@headlessui/react"
 import {
-  EnvelopeIcon,
   Bars3Icon,
   PlayCircleIcon,
   RocketLaunchIcon,
   PresentationChartLineIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline"
 import { ChevronDownIcon } from "@heroicons/react/20/solid"
 import SearchBar from "@theme/SearchBar"
@@ -83,9 +83,9 @@ const callsToAction = [
     icon: PlayCircleIcon,
   },
   {
-    name: "Contact for pricing",
-    href: "/enterprise/contact/",
-    icon: EnvelopeIcon,
+    name: "Download QuestDB",
+    href: "/download/",
+    icon: ArrowDownTrayIcon,
   },
   {
     name: "View real-time crypto dashboards",

@@ -12,9 +12,9 @@ const useButtonProps = () => {
   const { pathname } = useLocation()
   const origin = pathname.split("/")[1]
   const source = origin === "" ? "Main" : hyphenToPascalCase(origin)
-  const url = "/download/"
-  const destination = "Download"
-  const ctaLabel = "Download"
+  const url = "/enterprise/contact/"
+  const destination = "CONTACT"
+  const ctaLabel = "CONTACT"
 
   return { ctaLabel, source, destination, url }
 }
