@@ -37,6 +37,10 @@
   object-fit: cover;
 }
 
+.logo[data-language="Rust"] img {
+  filter: invert(1);
+}
+
 .buttons {
   display: flex;
   flex-direction: column;
@@ -46,7 +50,7 @@
 
 .button {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 1rem;
   background-color: var(--palette-white-20);
@@ -60,6 +64,14 @@
   text-decoration: none;
   background-color: var(--theme-button-secondary-hover-background-color);
   color: var(--theme-button-secondary-text-color);
+}
+
+.button:hover .docsIcon {
+  filter: invert(1);
+}
+
+.button:not(:hover) .ghIcon {
+  filter: invert(1);
 }
 
 :global(html[data-theme="light"]) .button {
