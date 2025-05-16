@@ -3,3 +3,9 @@ from = "/docs/troubleshooting/log/"
 to = "/docs/operations/logging-metrics/"
 status = 301
 force = true
+
+[[context.deploy-preview.redirects]]
+  from = "/"
+  to = "/docs/"
+  status = 200
+  force = true

@@ -36,7 +36,7 @@ jobs:
         env:
           CONTEXT: deploy-preview
           NETLIFY: true
-        run: yarn build
+        run: yarn build --out-dir build/docs
 
       - name: Deploy to Netlify
         id: netlify
@@ -48,6 +48,7 @@ jobs:
             --dir=build \
             --no-build \
             --auth=$NETLIFY_AUTH_TOKEN \
+            --context=deploy-preview \
             --site=$NETLIFY_SITE_ID \
             --alias=preview-${{ github.event.pull_request.number }} \
             --message="Preview Deploy from GitHub Actions" \
