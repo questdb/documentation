@@ -48,7 +48,6 @@ jobs:
             --dir=build \
             --no-build \
             --auth=$NETLIFY_AUTH_TOKEN \
-            --context=deploy-preview \
             --site=$NETLIFY_SITE_ID \
             --alias=preview-${{ github.event.pull_request.number }} \
             --message="Preview Deploy from GitHub Actions" \
@@ -62,7 +61,7 @@ jobs:
           message: |
             :rocket: **Build success!**
 
-            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
+            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}/docs/
 
             Commit SHA: ${{ github.event.pull_request.head.sha }}
 
