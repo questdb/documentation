@@ -340,7 +340,7 @@ show
   | 'SERVICE' 'ACCOUNTS' userName?
   | 'PERMISSIONS' entityName?
   | 'SERVER_VERSION'
-  | 'SERVER_CONF'
+  | 'PARAMETERS'
   )
 
 truncateTable
