@@ -1,73 +1,88 @@
-import clsx from "clsx"
-import { useThemeConfig, usePrismTheme } from "@docusaurus/theme-common"
+import React, { useState } from "react"; // Ensure React and useState are imported
+import clsx from "clsx";
+import { useThemeConfig, usePrismTheme } from "@docusaurus/theme-common";
 import {
   parseLanguage,
   parseLines,
   containsLineNumbers,
   useCodeWordWrap,
-} from "@docusaurus/theme-common/internal"
-import { Highlight, type Language } from "prism-react-renderer"
-import Line from "@theme/CodeBlock/Line"
-import CopyButton from "@theme/CodeBlock/CopyButton"
-import WordWrapButton from "@theme/CodeBlock/WordWrapButton"
-import Container from "@theme/CodeBlock/Container"
-import type { Props as OriginalProps } from "@theme/CodeBlock"
+} from "@docusaurus/theme-common/internal";
+import { Highlight, type Language } from "prism-react-renderer";
+import Line from "@theme/CodeBlock/Line";
+import CopyButton from "@theme/CodeBlock/CopyButton";
+import WordWrapButton from "@theme/CodeBlock/WordWrapButton";
+import Container from "@theme/CodeBlock/Container";
+import type { Props as OriginalProps } from "@theme/CodeBlock";
 
-import styles from "./styles.module.css"
+import { QuestDbSqlRunnerEmbedded } from '@site/src/components/QuestDbSqlRunnerEmbedded'; // Adjust path as needed
 
-type Props = OriginalProps & { demo?: boolean }
+import styles from "./styles.module.css";
 
-const codeBlockTitleRegex = /title=(?<quote>["'])(?<title>.*?)\1/
-const codeBlockDemoRegex = /\bdemo\b/
+type Props = OriginalProps & {
+  demo?: boolean;
+  execute?: boolean; // For inline SQL execution
+  questdbUrl?: string; // URL for QuestDB instance
+};
 
-function normalizeLanguage(language: string | undefined): string | undefined {
-  return language?.toLowerCase()
-}
+const codeBlockTitleRegex = /title=(?<quote>["'])(?<title>.*?)\1/;
+const codeBlockDemoRegex = /\bdemo\b/;
+const codeBlockExecuteRegex = /\bexecute\b/;
 
-function parseCodeBlockTitle(metastring?: string): string {
-  return metastring?.match(codeBlockTitleRegex)?.groups?.title ?? ""
-}
+function normalizeLanguage(language: string | undefined): string | undefined { return language?.toLowerCase(); }
+function parseCodeBlockTitle(metastring?: string): string { return metastring?.match(codeBlockTitleRegex)?.groups?.title ?? ""; }
+function parseCodeBlockDemo(metastring?: string): boolean { return codeBlockDemoRegex.test(metastring ?? ""); }
+function parseCodeBlockExecute(metastring?: string): boolean { return codeBlockExecuteRegex.test(metastring ?? "");}
 
-function parseCodeBlockDemo(metastring?: string): boolean {
-  return codeBlockDemoRegex.test(metastring ?? "")
-}
 
 export default function CodeBlockString({
-  children,
-  className: blockClassName = "",
-  metastring,
-  title: titleProp,
-  showLineNumbers: showLineNumbersProp,
-  language: languageProp,
-  demo: demoProp,
-}: Props): JSX.Element {
+                                          children,
+                                          className: blockClassName = "",
+                                          metastring,
+                                          title: titleProp,
+                                          showLineNumbers: showLineNumbersProp,
+                                          language: languageProp,
+                                          demo: demoProp,
+                                          execute: executeProp,
+                                          questdbUrl: questdbUrlProp,
+                                        }: Props): JSX.Element {
   const {
     prism: { defaultLanguage, magicComments },
-  } = useThemeConfig()
+  } = useThemeConfig();
   const language = normalizeLanguage(
     languageProp ?? parseLanguage(blockClassName) ?? defaultLanguage,
-  )
+  );
 
-  const prismTheme = usePrismTheme()
-  const wordWrap = useCodeWordWrap()
+  const prismTheme = usePrismTheme();
+  const wordWrap = useCodeWordWrap();
 
-  const title = parseCodeBlockTitle(metastring) || titleProp
-  const demo = parseCodeBlockDemo(metastring) || demoProp
+  const title = parseCodeBlockTitle(metastring) || titleProp;
+  const demo = parseCodeBlockDemo(metastring) || demoProp;
+  const enableExecute = parseCodeBlockExecute(metastring) || executeProp;
 
   const { lineClassNames, code } = parseLines(children, {
     metastring,
     language,
     magicComments,
-  })
-  const showLineNumbers = showLineNumbersProp ?? containsLineNumbers(metastring)
+  });
+  const showLineNumbers = showLineNumbersProp ?? containsLineNumbers(metastring);
 
   const demoUrl = demo
     ? `https://demo.questdb.io/?query=${encodeURIComponent(code)}&executeQuery=true`
-    : null
+    : null;
 
   const handleDemoClick = () => {
-    window.posthog.capture("demo_started", { title })
-  }
+    if (typeof (window as any).posthog?.capture === 'function') {
+      (window as any).posthog.capture("demo_started", { title });
+    }
+  };
+
+  const [showExecutionResults, setShowExecutionResults] = useState<boolean>(false);
+
+  const currentQuestDbUrl = questdbUrlProp; // If passed, use it, otherwise QuestDbSqlRunnerEmbedded will use its default.
+
+  const handleExecuteToggle = () => {
+    setShowExecutionResults(prev => !prev);
+  };
 
   return (
     <Container
@@ -137,8 +152,24 @@ export default function CodeBlockString({
             />
           )}
           <CopyButton className={styles.codeButton} code={code} />
+          {enableExecute && (
+            <button
+              onClick={handleExecuteToggle}
+              className={clsx(styles.codeButton, styles.executeButton)}
+              title={showExecutionResults ? "Hide execution results" : "Execute this query"}
+            >
+              {showExecutionResults ? 'Hide Results' : 'Execute Query'}
+            </button>
+          )}
         </div>
       </div>
+
+      {enableExecute && showExecutionResults && (
+        <QuestDbSqlRunnerEmbedded
+          queryToExecute={code}
+          questdbUrl={currentQuestDbUrl}
+        />
+      )}
     </Container>
-  )
+  );
 }
