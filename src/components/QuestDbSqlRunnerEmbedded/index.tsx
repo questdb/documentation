@@ -6,6 +6,7 @@ interface QuestDBErrorResponse {query: string; error: string; position?: number;
 type QuestDBResponse = QuestDBSuccessfulResponse | QuestDBErrorResponse;
 
 const QUESTDB_DEMO_URL_EMBEDDED: string = 'https://demo.questdb.io';
+const ROW_LIMIT = 20;
 
 interface QuestDbSqlRunnerEmbeddedProps {
   queryToExecute: string;
@@ -42,7 +43,7 @@ export function QuestDbSqlRunnerEmbedded({
     setNonTabularResponse(null); setRowCount(null);
 
     const encodedQuery = encodeURIComponent(queryToExecute);
-    const url = `${questdbUrl}/exec?query=${encodedQuery}&count=true&timings=true&limit=20`;
+    const url = `${questdbUrl}/exec?query=${encodedQuery}&count=true&timings=true&limit=${ROW_LIMIT}`;
 
     try {
       const response = await fetch(url);
@@ -129,7 +130,7 @@ export function QuestDbSqlRunnerEmbedded({
               </table>
             </div>
           )}
-          {rowCount !== null && <p>Total rows: {rowCount}</p>}
+          {rowCount !== null && <p>Showing {Math.min(rowCount, ROW_LIMIT)} out of {rowCount} rows</p>}
         </div>
       )}
     </div>
