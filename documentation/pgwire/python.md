@@ -78,8 +78,17 @@ async def connect_to_questdb():
     
     await conn.close()
 
+// Set the timezone to UTC
+os.environ['TZ'] = 'UTC'
+time.tzset()
 asyncio.run(connect_to_questdb())
 ```
+
+:::note
+**Note**: The `asyncpg` client uses the system timezone by default. QuestDB always sends timestamp in UTC.
+To set the timezone to UTC, you can set the `TZ` environment variable before running your script.
+This is important for time-series data to ensure consistent timestamps.
+:::
 
 ### Querying Data
 
@@ -131,6 +140,8 @@ async def query_with_asyncpg():
     
     await conn.close()
 
+os.environ['TZ'] = 'UTC'
+time.tzset()
 asyncio.run(query_with_asyncpg())
 ```
 
@@ -174,6 +185,8 @@ async def stream_with_cursor():
     await conn.close()
     print(f"Finished processing {total_processed} total rows")
 
+os.environ['TZ'] = 'UTC'
+time.tzset()
 asyncio.run(stream_with_cursor())
 ```
 
@@ -202,6 +215,8 @@ async def connection_pool_example():
     
     await pool.close()
 
+os.environ['TZ'] = 'UTC'
+time.tzset()
 asyncio.run(connection_pool_example())
 ```
 
@@ -243,8 +258,71 @@ async def parameterized_query():
     
     await conn.close()
 
+os.environ['TZ'] = 'UTC'
+time.tzset()
 asyncio.run(parameterized_query())
 ```
+
+### Batch Inserts with `executemany()`
+While we recommend using the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) for ingestion, you can also use
+the `executemany()` method to insert multiple rows in a single query. It is highly efficient for executing the same
+parameterized statements multiple times with different sets of data. This method is significantly faster than executing
+individual statements in a loop because it reduces network round-trips and allows for potential batching optimizations
+by the database. In our testing, we found that `executemany()` is about 10x-100x faster than using a loop with `execute()`.
+
+It's particularly useful for bulk data insertion, such as recording multiple trades as they occur. INSERT performance
+grows with the batch size, so you should experiment with the batch size to find the optimal value for your use case. We
+recommend starting with a batch size of 1000 and adjusting it based on your performance requirements.
+
+```python
+import asyncio
+import os
+import time
+
+import asyncpg
+from datetime import datetime, timedelta, timezone
+
+async def execute_many_market_data_example():
+
+    conn = await asyncpg.connect(
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        database='qdb'
+    )
+
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS trades (
+            ts TIMESTAMP,
+            symbol SYMBOL,
+            price DOUBLE,
+            volume LONG,
+            exchange SYMBOL
+        ) timestamp(ts) PARTITION BY DAY;
+    """)
+
+    base_timestamp = datetime.now()
+
+    trades_data = [
+        ( (base_timestamp + timedelta(microseconds=10)), 'BTC-USD', 68500.50, 0.5, 'Coinbase'),
+        ( (base_timestamp + timedelta(microseconds=20)), 'ETH-USD', 3800.20, 2.1, 'Kraken'),
+        ( (base_timestamp + timedelta(microseconds=30)), 'BTC-USD', 68501.75, 0.25, 'Binance'),
+        ( (base_timestamp + timedelta(microseconds=40)), 'SOL-USD', 170.80, 10.5, 'Coinbase'),
+        ( (base_timestamp + timedelta(microseconds=50)), 'ETH-USD', 3799.90, 1.5, 'Binance'),
+    ]
+
+    await conn.executemany("""
+        INSERT INTO trades (ts, symbol, price, volume, exchange)
+        VALUES ($1, $2, $3, $4, $5)
+    """, trades_data)
+    print(f"Successfully inserted {len(trades_data)} trade records using executemany.")
+
+os.environ['TZ'] = 'UTC'
+time.tzset()
+asyncio.run(execute_many_market_data_example())
+```
+
 
 ### Binary Protocol
 
