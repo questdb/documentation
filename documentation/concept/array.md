@@ -1,6 +1,6 @@
 ---
-title: N-Dim array
-sidebar_label: N-Dimensional array
+title: N-Dimensional array
+sidebar_label: N-Dim array
 description: Explains the technical design and syntax to use N-dimensional arrays.
 ---
 
@@ -106,85 +106,154 @@ Each `dimN-selector` can be one of two forms:
 
 ### Single-integer array selector
 
-Using single integers you select individual array elements. An element of a
-2D array is a 1D sub-array, and an element of a 1D array is an individual
-scalar value, like a `DOUBLE`.
+Using single integers you select individual array elements. An element of a 2D
+array is a 1D sub-array, and an element of a 1D array is an individual scalar
+value, like a `DOUBLE`. If you use a coordinate larger than the array's given
+dimension length, the result will be `NULL` for scalars, and an empty array for
+sub-arrays.
 
 All the following examples use the 3D array named `arr`, of type
-`DOUBLE[3][3][3]`.
-
-**Example:** select a number.
+`DOUBLE[3][3][3]`:
 
 ```questdb-sql
-arr[1, 3, 2]
+CREATE TABLE tango AS (SELECT ARRAY[
+   [ [ 1,  2,  3], [ 4,  5,  6], [ 7,  8,  9] ],
+   [ [10, 11, 12], [13, 14, 15], [16, 17, 18] ],
+   [ [19, 20, 21], [22, 23, 24], [25, 26, 27] ]
+] arr from long_sequence(1));
 ```
 
-This selects the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
+**Example:** select a number from the array.
+
+```questdb-sql
+SELECT arr[1, 3, 2] elem FROM tango;
+```
+
+| elem |
+| ---- |
+| 8.0  |
+
+This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
 coordinates are 1-based!
+
+**Example:** select an out-of-range element from the array.
+
+```questdb-sql
+SELECT arr[1, 3, 4] elem FROM tango;
+```
+
+| elem |
+| ---- |
+| NULL |
 
 **Example:** select a 2D sub-array.
 
 ```questdb-sql
-arr[1]
+SELECT arr[1] subarr FROM tango;
 ```
 
-This selects the first 2D sub-array in `arr`.
+|                   subarr                    |
+| ------------------------------------------- |
+| {{1.0,2.0,3.0},{4.0,5.0,6.0},{7.0,8.0,9.0}} |
 
-:::note
+This selected the first 2D sub-array in `arr`.
 
-If you use an index larger than the array length, the result will be `NULL`.
+**Example:** select a sub-array that is out-of-range.
 
-:::
+```questdb-sql
+SELECT arr[4] subarr FROM tango;
+```
+
+| subarr |
+| ------ |
+| {}     |
 
 **Example:** select a 1D sub-array.
 
 ```questdb-sql
-arr[1, 3]
+SELECT arr[1, 3] subarr FROM tango;
 ```
 
-This selects the first 2D-subarray in `arr`, and then the 3rd 1D-subarray in
-it. You can also write
+|    subarr     |
+| ------------- |
+| {7.0,8.0,9.0} |
 
-```questdb-sql
-arr[1][3]
-```
+This selected the first 2D-subarray in `arr`, and then the 3rd 1D-subarray in
+it.
 
-Semantically, this is two operations, like this:
-
-```questdb-sql
-(arr[1]) [3]
-```
-
-However, the performance of all expressions is the same.
+You can also write `arr[1][3]`. Semantically, this is two operations, like this:
+`(arr[1]) [3]`. However, the performance of all three expressions is the same.
 
 ### Range selector - slicing
 
-A range of integers selects a slice of the array. The dimensionality of the
-result remains the same, even if the range contains just one number.
+A range of integers selects a slice of the array. You can think of slicing as
+leaving the array intact, but constraining the range of numbers you can use for
+a coordinate. The lowest valid coordinate remains `1`, but it gets remapped to
+the coordinate indicated by the lower bound of the slicing range.
+
+The dimensionality of the result remains the same, even if the range contains
+just one number. The slice includes the lower bound, but excludes the upper
+bound. If the upper bound of the range exceeds the array's length, the result
+is the same as if the upper bound was left out — the result extends to the
+end of the array along that dimension.
 
 **Example:** select a slice of `arr` by constraining the first dimension.
 
 ```questdb-sql
-arr[2:3]
+SELECT arr[2:3] slice FROM tango;
 ```
 
-This returns a `DOUBLE[1][3][3]`, containing just the second sub-array of `arr`.
+|                         slice                          |
+| ------------------------------------------------------ |
+| {{{10.0,11.0,12.0},{13.0,14.0,15.0},{16.0,17.0,18.0}}} |
+
+This returned a `DOUBLE[1][3][3]`, containing just the second sub-array of
+`arr`.
+
+You can omit the upper bound, letting the slice extend to the end of the array.
+
+**Example:** select a slice of `arr` with a right-open range.
+
+```questdb-sql
+SELECT arr[2:] slice FROM tango;
+```
+
+|                          slice                            |
+| --------------------------------------------------------- |
+|  {{{10.0,11.0,12.0},{13.0,14.0,15.0},{16.0,17.0,18.0}},   |
+|    {{19.0,20.0,21.0},{22.0,23.0,24.0},{25.0,26.0,27.0}}}  |
+
+This returns a `DOUBLE[2][3][3]` and contains everything except the first
+sub-array along the first dimension.
+
+:::note
+
+You cannot omit the lower bound. The expression `:3` would conflict with the
+syntax for a variable placeholder in SQL.
+
+:::
 
 **Example:** select a slice of `arr` by constraining the first and second dimensions.
 
 ```questdb-sql
-arr[2:3, 3:4]
+SELECT arr[2:3, 3:4] slice FROM tango;
 ```
 
-This returns a `DOUBLE[1][1][3]`.
+|          slice         |
+| ---------------------- |
+|  {{{16.0,17.0,18.0}}}  |
 
-:::note
+**Example:** select a slice of `arr` with large upper bounds.
 
-The slice's upper bound can be larger than the length of the array. The
-result will be the same as if the upper bound was left out — the slice
-will include all the elements up to the end along that dimension.
+```questdb-sql
+SELECT arr[2:100, 3:100] slice FROM tango;
+```
 
-:::
+|                   slice                   |
+| ----------------------------------------- |
+|  {{{16.0,17.0,18.0}},{{25.0,26.0,27.0}}}  |
+
+The result is the same same as if using `arr[2:, 3:]`.
 
 ### Mixing selectors
 
@@ -193,31 +262,26 @@ You can use both types of selectors within the same bracket expression.
 **Example:** select the first sub-array of `arr`, and slice it.
 
 ```questdb-sql
-arr[1, 2:4]
+SELECT arr[1, 2:4] subarr FROM tango;
 ```
 
-This returns a `DOUBLE[2][3]`. The top dimension is gone because the first
+|             subarr              |
+| ------------------------------- |
+|  {{4.0,5.0,6.0},{7.0,8.0,9.0}}  |
+
+This returned a `DOUBLE[2][3]`. The top dimension is gone because the first
 selector took out a sub-array and not a one-element slice.
 
 **Example:** select discontinuous elements from sub-arrays.
 
 ```questdb-sql
-arr[1:4, 3, 2]
+SELECT arr[1:, 3, 2] subarr FROM tango;
 ```
 
-This leaves the top dimension unconstrained, then takes the 3rd sub-array in
-each of the top-level sub-arrays, and then selects just the 2nd element in each
+|      subarr       |
+| ----------------- |
+|  {8.0,17.0,26.0}  |
+
+This left the top dimension unconstrained, then took the 3rd sub-array in
+each of the top-level sub-arrays, and then selected just the 2nd element in each
 of them.
-
-## Find the length along a dimension
-
-Use the function `dim_length()` to get the length of the array along a specific
-dimension.
-
-**Example:** get the length of `arr` along the 1st dimension.
-
-```questdb-sql
-dim_length(arr, 1)
-```
-
-For an array of shape `DOUBLE[3][5]`, this will return `3`.
