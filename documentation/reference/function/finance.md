@@ -8,7 +8,7 @@ This page describes functions specific to the financial services domain.
 
 ## l2price
 
-Trade price calculation.
+Level-2 trade price calculation.
 
 `l2price(target_size, size_array, price_array)`
 
