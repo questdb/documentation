@@ -19,20 +19,38 @@ dimension `dim`.
 - `array` — the array
 - `dim` — the dimension (1-based) whose length to get
 
+### Example
+
+Get the length of `arr` along the 1st dimension.
+
+```questdb-sql
+SELECT dim_length(ARRAY[42, 42], 1);
+```
+
+|  dim_length  |
+| ------------ |
+|       2      |
+
 ## flatten
 
 `flatten(array, dim)` removes the dimension `dim` from the array, flattening it
 into the next dimension. All elements are still available because the next
 dimension's length gets multiplied by the removed dimension's length.
 
-Example: given an array of shape `DOUBLE[2][3][2]`, `flatten(array, 2)` gives us
-an array of shape `DOUBLE[2, 6]`. The second dimension is gone, and the third
-dimension's length increased from 2 to 3 \* 2 = 6.
-
 ### Parameters
 
 - `array` — the array
 - `dim` — the dimension (1-based) to flatten. Cannot be the last dimension.
+
+### Example
+
+```questdb-sql
+SELECT flatten(ARRAY[[1, 2], [3, 4]], 1);
+```
+
+|       flatten       |
+| ------------------- |
+|  [1.0,2.0,3.0,4.0]  |
 
 ## matmul
 
@@ -52,9 +70,42 @@ corresponding row of `left_matrix` and column of `right_matrix`:
 
 `result[row, col] := sum_over_i(left_matrix[row, i] * right_matrix[i, col])`
 
+### Example
+
+Multiply the matrices:
+
+```text
+| 1 2 |   | 2 3 |
+|     | x |     |
+| 3 4 |   | 2 3 |
+```
+
+```questdb-sql
+SELECT matmul(ARRAY[[1, 2], [3, 4]], ARRAY[[2, 3], [2, 3]]);
+```
+
+|          matmul           |
+| ------------------------- |
+|  [[6.0,9.0],[14.0,21.0]]  |
+
 ## transpose
 
 `transpose(array)` transposes an array, reversing the order of its coordinates.
-Example: given `array: DOUBLE[2, 5]`, `result = transpose(array)` returns an
-array of shape `DOUBLE[5, 2]`, such that `array[i, j] = result[j, i]` for any
-valid `i` and `j` coordinates.
+
+### Example
+
+Transpose the matrix:
+
+```text
+| 1 2 | T     | 1 3 |
+|     |    =  |     |
+| 3 4 |       | 2 4 |
+```
+
+```questdb-sql
+SELECT transpose(ARRAY[[1, 2], [3, 4]]);
+```
+
+|        transpose        |
+| ----------------------- |
+|  [[1.0,3.0],[2.0,4.0]]  |
