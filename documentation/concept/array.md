@@ -123,9 +123,7 @@ CREATE TABLE tango AS (SELECT ARRAY[
 ] arr from long_sequence(1));
 ```
 
-### Example
-
-select a number from the array.
+#### Example: select a number from the array
 
 ```questdb-sql
 SELECT arr[1, 3, 2] elem FROM tango;
@@ -138,9 +136,7 @@ SELECT arr[1, 3, 2] elem FROM tango;
 This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
 coordinates are 1-based!
 
-### Example
-
-select an out-of-range element from the array.
+#### Example: select an out-of-range element from the array
 
 ```questdb-sql
 SELECT arr[1, 3, 4] elem FROM tango;
@@ -150,9 +146,7 @@ SELECT arr[1, 3, 4] elem FROM tango;
 | ---- |
 | NULL |
 
-### Example
-
-select a 2D sub-array.
+#### Example: select a 2D sub-array
 
 ```questdb-sql
 SELECT arr[1] subarr FROM tango;
@@ -164,9 +158,7 @@ SELECT arr[1] subarr FROM tango;
 
 This selected the first 2D sub-array in `arr`.
 
-### Example
-
-select a sub-array that is out-of-range.
+#### Example: select a sub-array that is out-of-range
 
 ```questdb-sql
 SELECT arr[4] subarr FROM tango;
@@ -176,9 +168,7 @@ SELECT arr[4] subarr FROM tango;
 | ------ |
 | []     |
 
-### Example
-
-select a 1D sub-array.
+#### Example: select a 1D sub-array
 
 ```questdb-sql
 SELECT arr[1, 3] subarr FROM tango;
@@ -214,9 +204,7 @@ If the upper bound of the range exceeds the array's length, the result
 is the same as if the upper bound was left out — the result extends to the
 end of the array along that dimension.
 
-### Example
-
-Select a slice of `arr` by constraining the first dimension.
+#### Example: select a slice of `arr` by constraining the first dimension
 
 ```questdb-sql
 SELECT arr[2:3] slice FROM tango;
@@ -229,9 +217,7 @@ SELECT arr[2:3] slice FROM tango;
 This returned a `DOUBLE[1][3][3]`, containing just the second sub-array of
 `arr`.
 
-### Example
-
-Select a slice of `arr` with a right-open range.
+#### Example: select a slice of `arr` with a right-open range
 
 ```questdb-sql
 SELECT arr[2:] slice FROM tango;
@@ -244,9 +230,7 @@ SELECT arr[2:] slice FROM tango;
 This returned a `DOUBLE[2][3][3]` and contains everything except the first
 sub-array along the first dimension.
 
-### Example
-
-Select a slice of `arr` by constraining the first and second dimensions.
+#### Example: Select a slice of `arr` by constraining the first and second dimensions
 
 ```questdb-sql
 SELECT arr[2:3, 3:4] slice FROM tango;
@@ -258,9 +242,7 @@ SELECT arr[2:3, 3:4] slice FROM tango;
 
 Note that the returned array is still 3D.
 
-### Example
-
-Select a slice of `arr` with large upper bounds.
+#### Example: select a slice of `arr` with large upper bounds
 
 ```questdb-sql
 SELECT arr[2:100, 3:100] slice FROM tango;
@@ -276,9 +258,7 @@ The result is the same same as if using `arr[2:, 3:]`.
 
 You can use both types of selectors within the same bracket expression.
 
-### Example
-
-Select the first sub-array of `arr`, and slice it.
+#### Example: select the first sub-array of `arr`, and slice it
 
 ```questdb-sql
 SELECT arr[1, 2:4] subarr FROM tango;
@@ -291,9 +271,7 @@ SELECT arr[1, 2:4] subarr FROM tango;
 This returned a `DOUBLE[2][3]`. The top dimension is gone because the first
 selector took out a sub-array and not a one-element slice.
 
-### Example
-
-Select discontinuous elements from sub-arrays.
+#### Example: select discontinuous elements from sub-arrays
 
 ```questdb-sql
 SELECT arr[1:, 3, 2] subarr FROM tango;
