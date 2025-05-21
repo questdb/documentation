@@ -323,6 +323,109 @@ time.tzset()
 asyncio.run(execute_many_market_data_example())
 ```
 
+### Inserting Arrays
+
+QuestDB, via the PostgreSQL wire protocol, supports [array data types](/docs/concept/array/), including multidimensional
+arrays. asyncpg makes working with these arrays straightforward by automatically converting Python lists (or lists of lists
+for multidimensional arrays) into the appropriate PostgreSQL array format and vice-versa when fetching data.
+
+:::caution asyncpg & QuestDB Arrays: Manual Setup Needed
+Using array types with asyncpg against QuestDB requires manual type registration.
+
+asyncpg's standard type introspection query is not yet supported by QuestDB. Therefore, you must manually register a "codec"
+for your array types with the asyncpg connection, as shown in the preceding code example. This ensures correct array
+handling and avoids errors.
+
+This is a temporary workaround until a permanent solution is available in asyncpg or QuestDB.
+:::
+
+When you need to insert multiple rows containing array data, such as a series of order book snapshots, `executemany()`
+offers a more performant way to do so compared to inserting row by row with execute().
+
+```python title="Batch Inserting L3 Order Book Snapshots"
+import asyncio
+import os
+import time
+
+import asyncpg
+from datetime import datetime, timedelta
+
+
+async def batch_insert_l3_order_book_arrays():
+    conn = await asyncpg.connect(
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        database='qdb'
+    )
+
+    # Workaround for asyncpg using introspection to determine array types.
+    # The introspection query uses a construct that is not supported by QuestDB.
+    # This is a temporary workaround before this PR or its equivalent is merged to asyncpg: 
+    # https://github.com/MagicStack/asyncpg/pull/1260
+    arrays = [{
+        'oid': 1022,
+        'elemtype': 701,
+        'kind': 'b',
+        'name': '_float8',
+        'elemtype_name': 'float8',
+        'ns': 'pg_catalog',
+        'elemdelim': ',',
+        'depth': 0,
+        'range_subtype': None,
+        'attrtypoids': None,
+        'basetype': None
+    }]
+    conn._protocol.get_settings().register_data_types(arrays)
+
+    await conn.execute("""
+                       CREATE TABLE IF NOT EXISTS l3_order_book
+                       (
+                           bid DOUBLE [][],
+                           ask DOUBLE [][],
+                           ts TIMESTAMP
+                       ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                       """)
+
+    # Prepare a list of L3 order book snapshots for batch insertion
+    snapshots_to_insert = []
+    base_timestamp = datetime.now()
+
+    # First row
+    bids1 = [[68500.50, 0.5], [68500.00, 1.2], [68499.50, 0.3]]
+    asks1 = [[68501.00, 0.8], [68501.50, 0.4], [68502.00, 1.1]]
+    ts1 = (base_timestamp + timedelta(seconds=1))
+    snapshots_to_insert.append((bids1, asks1, ts1))
+
+    # Second row
+    bids2 = [[68502.10, 0.3], [68501.80, 0.9], [68501.20, 1.5]]
+    asks2 = [[68502.50, 1.1], [68503.00, 0.6], [68503.50, 0.2]]
+    ts2 = (base_timestamp + timedelta(seconds=2))
+    snapshots_to_insert.append((bids2, asks2, ts2))
+
+    # Third row
+    bids3 = [[68490.60, 2.5], [68489.00, 3.2]]
+    asks3 = [[68491.20, 1.8], [68492.80, 0.7]]
+    ts3 = (base_timestamp + timedelta(seconds=3))
+    snapshots_to_insert.append((bids3, asks3, ts3))
+
+    print(f"Prepared {len(snapshots_to_insert)} snapshots for batch insertion.")
+
+    # Insert the snapshots into the database in a single batch
+    await conn.executemany(
+        """
+        INSERT INTO l3_order_book (bid, ask, ts)
+        VALUES ($1, $2, $3)
+        """,
+        snapshots_to_insert  # List of tuples, each tuple is a row
+    )
+    print(f"Successfully inserted {len(snapshots_to_insert)} L3 order book snapshots using executemany().")
+
+os.environ['TZ'] = 'UTC'
+time.tzset()
+asyncio.run(batch_insert_l3_order_book_arrays())
+```
 
 ### Binary Protocol
 
