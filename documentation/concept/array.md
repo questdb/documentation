@@ -123,7 +123,9 @@ CREATE TABLE tango AS (SELECT ARRAY[
 ] arr from long_sequence(1));
 ```
 
-**Example:** select a number from the array.
+### Example
+
+select a number from the array.
 
 ```questdb-sql
 SELECT arr[1, 3, 2] elem FROM tango;
@@ -136,7 +138,9 @@ SELECT arr[1, 3, 2] elem FROM tango;
 This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
 coordinates are 1-based!
 
-**Example:** select an out-of-range element from the array.
+### Example
+
+select an out-of-range element from the array.
 
 ```questdb-sql
 SELECT arr[1, 3, 4] elem FROM tango;
@@ -146,7 +150,9 @@ SELECT arr[1, 3, 4] elem FROM tango;
 | ---- |
 | NULL |
 
-**Example:** select a 2D sub-array.
+### Example
+
+select a 2D sub-array.
 
 ```questdb-sql
 SELECT arr[1] subarr FROM tango;
@@ -154,11 +160,13 @@ SELECT arr[1] subarr FROM tango;
 
 |                   subarr                    |
 | ------------------------------------------- |
-| {{1.0,2.0,3.0},{4.0,5.0,6.0},{7.0,8.0,9.0}} |
+| [[1.0,2.0,3.0],[4.0,5.0,6.0],[7.0,8.0,9.0]] |
 
 This selected the first 2D sub-array in `arr`.
 
-**Example:** select a sub-array that is out-of-range.
+### Example
+
+select a sub-array that is out-of-range.
 
 ```questdb-sql
 SELECT arr[4] subarr FROM tango;
@@ -166,9 +174,11 @@ SELECT arr[4] subarr FROM tango;
 
 | subarr |
 | ------ |
-| {}     |
+| []     |
 
-**Example:** select a 1D sub-array.
+### Example
+
+select a 1D sub-array.
 
 ```questdb-sql
 SELECT arr[1, 3] subarr FROM tango;
@@ -176,7 +186,7 @@ SELECT arr[1, 3] subarr FROM tango;
 
 |    subarr     |
 | ------------- |
-| {7.0,8.0,9.0} |
+| [7.0,8.0,9.0] |
 
 This selected the first 2D-subarray in `arr`, and then the 3rd 1D-subarray in
 it.
@@ -193,11 +203,20 @@ the coordinate indicated by the lower bound of the slicing range.
 
 The dimensionality of the result remains the same, even if the range contains
 just one number. The slice includes the lower bound, but excludes the upper
-bound. If the upper bound of the range exceeds the array's length, the result
+bound.
+
+You can omit the upper bound, like this: `arr[2:]`. The slice will then extend
+to the end of the array in the corresponding dimension. The lower bound is
+mandatory, due to syntax conflict with variable placeholders such as `:a` or
+`:2`.
+
+If the upper bound of the range exceeds the array's length, the result
 is the same as if the upper bound was left out — the result extends to the
 end of the array along that dimension.
 
-**Example:** select a slice of `arr` by constraining the first dimension.
+### Example
+
+Select a slice of `arr` by constraining the first dimension.
 
 ```questdb-sql
 SELECT arr[2:3] slice FROM tango;
@@ -205,14 +224,14 @@ SELECT arr[2:3] slice FROM tango;
 
 |                         slice                          |
 | ------------------------------------------------------ |
-| {{{10.0,11.0,12.0},{13.0,14.0,15.0},{16.0,17.0,18.0}}} |
+| [[[10.0,11.0,12.0],[13.0,14.0,15.0],[16.0,17.0,18.0]]] |
 
 This returned a `DOUBLE[1][3][3]`, containing just the second sub-array of
 `arr`.
 
-You can omit the upper bound, letting the slice extend to the end of the array.
+### Example
 
-**Example:** select a slice of `arr` with a right-open range.
+Select a slice of `arr` with a right-open range.
 
 ```questdb-sql
 SELECT arr[2:] slice FROM tango;
@@ -220,20 +239,14 @@ SELECT arr[2:] slice FROM tango;
 
 |                          slice                            |
 | --------------------------------------------------------- |
-|  {{{10.0,11.0,12.0},{13.0,14.0,15.0},{16.0,17.0,18.0}},   |
-|    {{19.0,20.0,21.0},{22.0,23.0,24.0},{25.0,26.0,27.0}}}  |
+|  [[[10.0,11.0,12.0],[13.0,14.0,15.0],[16.0,17.0,18.0]],<br />[[19.0,20.0,21.0],[22.0,23.0,24.0],[25.0,26.0,27.0]]]  |
 
-This returns a `DOUBLE[2][3][3]` and contains everything except the first
+This returned a `DOUBLE[2][3][3]` and contains everything except the first
 sub-array along the first dimension.
 
-:::note
+### Example
 
-You cannot omit the lower bound. The expression `:3` would conflict with the
-syntax for a variable placeholder in SQL.
-
-:::
-
-**Example:** select a slice of `arr` by constraining the first and second dimensions.
+Select a slice of `arr` by constraining the first and second dimensions.
 
 ```questdb-sql
 SELECT arr[2:3, 3:4] slice FROM tango;
@@ -241,9 +254,13 @@ SELECT arr[2:3, 3:4] slice FROM tango;
 
 |          slice         |
 | ---------------------- |
-|  {{{16.0,17.0,18.0}}}  |
+|  [[[16.0,17.0,18.0]]]  |
 
-**Example:** select a slice of `arr` with large upper bounds.
+Note that the returned array is still 3D.
+
+### Example
+
+Select a slice of `arr` with large upper bounds.
 
 ```questdb-sql
 SELECT arr[2:100, 3:100] slice FROM tango;
@@ -251,7 +268,7 @@ SELECT arr[2:100, 3:100] slice FROM tango;
 
 |                   slice                   |
 | ----------------------------------------- |
-|  {{{16.0,17.0,18.0}},{{25.0,26.0,27.0}}}  |
+|  [[[16.0,17.0,18.0]],[[25.0,26.0,27.0]]]  |
 
 The result is the same same as if using `arr[2:, 3:]`.
 
@@ -259,7 +276,9 @@ The result is the same same as if using `arr[2:, 3:]`.
 
 You can use both types of selectors within the same bracket expression.
 
-**Example:** select the first sub-array of `arr`, and slice it.
+### Example
+
+Select the first sub-array of `arr`, and slice it.
 
 ```questdb-sql
 SELECT arr[1, 2:4] subarr FROM tango;
@@ -267,12 +286,14 @@ SELECT arr[1, 2:4] subarr FROM tango;
 
 |             subarr              |
 | ------------------------------- |
-|  {{4.0,5.0,6.0},{7.0,8.0,9.0}}  |
+|  [[4.0,5.0,6.0],[7.0,8.0,9.0]]  |
 
 This returned a `DOUBLE[2][3]`. The top dimension is gone because the first
 selector took out a sub-array and not a one-element slice.
 
-**Example:** select discontinuous elements from sub-arrays.
+### Example
+
+Select discontinuous elements from sub-arrays.
 
 ```questdb-sql
 SELECT arr[1:, 3, 2] subarr FROM tango;
@@ -280,7 +301,7 @@ SELECT arr[1:, 3, 2] subarr FROM tango;
 
 |      subarr       |
 | ----------------- |
-|  {8.0,17.0,26.0}  |
+|  [8.0,17.0,26.0]  |
 
 This left the top dimension unconstrained, then took the 3rd sub-array in
 each of the top-level sub-arrays, and then selected just the 2nd element in each
