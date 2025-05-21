@@ -6,7 +6,7 @@ description: Array functions reference documentation.
 
 This page documents functions for n-dimensional arrays. This isn't an exhaustive
 list of all functions that may take an array parameter. For example, financial
-functions are listed in [their own section](/docs/reference/finance), whether or
+functions are listed in [their own section](/docs/reference/function/finance/), whether or
 not they can take an array parameter.
 
 ## dim_length
