@@ -18,8 +18,8 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
   height={373}
-  src="images/docs/concepts/partitionModel.svg"
-  width={745}
+  src="images/docs/concepts/partitionModel.webp"
+  width={700}
   forceTheme="dark"
 />
 
