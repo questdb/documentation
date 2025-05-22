@@ -36,7 +36,7 @@ jobs:
         env:
           CONTEXT: deploy-preview
           NETLIFY: true
-        run: yarn build
+        run: yarn build --out-dir build/docs
 
       - name: Deploy to Netlify
         id: netlify
@@ -61,7 +61,7 @@ jobs:
           message: |
             :rocket: **Build success!**
 
-            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}
+            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}/docs/
 
             Commit SHA: ${{ github.event.pull_request.head.sha }}
 

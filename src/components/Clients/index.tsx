@@ -1,4 +1,5 @@
 import { DocButton } from '../DocButton'; // Assuming DocButton is in the parent directory
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 interface Client {
   href: string;
@@ -171,7 +172,7 @@ export function Clients({ showProtocol }: ClientDisplayProps) {
               </p>
             </div>
             <img
-              src={client.logo}
+              src={useBaseUrl(client.logo)}
               alt={`${client.name} logo`}
               className={`h-12 w-12 ${client.name === 'Rust' ? 'dark:invert' : ''}`}
             />

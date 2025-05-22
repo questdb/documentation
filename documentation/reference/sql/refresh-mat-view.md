@@ -28,13 +28,13 @@ incremental refresh of the materialized view. Usually, incremental refresh is
 automatic, so this command is useful only in niche situations when incremental
 refresh is not working as expected, but the view is still valid.
 
-When the `INTERVAL` keyword is specified, this command refreshes the data in the
-specified time interval only. This command is useful for a valid materialized
+When the `RANGE` keyword is specified, this command refreshes the data in the
+specified time range only. This command is useful for a valid materialized
 view with configured
 [`REFRESH LIMIT`](/docs/reference/sql/alter-mat-view-set-refresh-limit/). That's
 because inserted base table rows with timestamps older than the refresh limit
-are ignored by incremental refresh, so interval refresh may be used to
-recalculate materialized view on older rows. Interval refresh does not affect
+are ignored by incremental refresh, so range refresh may be used to
+recalculate materialized view on older rows. Range refresh does not affect
 incremental refresh, e.g. it does not update the last base table transaction
 used by incremental refresh.
 
@@ -53,7 +53,7 @@ REFRESH MATERIALIZED VIEW trades_1h INCREMENTAL;
 ```
 
 ```questdb-sql
-REFRESH MATERIALIZED VIEW trades_1h INTERVAL FROM '2025-05-05T01:00:00.000000Z' TO '2025-05-05T02:00:00.000000Z';
+REFRESH MATERIALIZED VIEW trades_1h RANGE FROM '2025-05-05T01:00:00.000000Z' TO '2025-05-05T02:00:00.000000Z';
 ```
 
 ## See also
