@@ -86,7 +86,7 @@ can handle and resolve out-of-order data writes, and enables deduplication. Colu
 <Screenshot
   alt="Diagram showing WAL files consolidation"
   title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth, allowing for data deduplication and consolidation."
-  src="images/guides/questdb-internals/walData.svg"
+  src="images/guides/questdb-internals/walData.webp"
   width={1000}
 />
 
@@ -110,8 +110,8 @@ deduplicated on additional columns.
 <Screenshot
   alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
   title="Architecture of the storage model with multiple column files per partition"
-  src="images/guides/questdb-internals/columnarStorage.svg"
-  width={1000}
+  src="images/guides/questdb-internals/columnarStorage.webp"
+  width={700}
 />
 
 
@@ -179,8 +179,8 @@ deduplicated on additional columns.
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   title="Diagram showing how the data from a column file is mapped to the memory"
-  src="images/guides/questdb-internals/columnRead.svg"
-  width={1000}
+  src="images/guides/questdb-internals/columnRead.webp"
+  width={700}
 />
 
 ### Execution model
@@ -192,9 +192,7 @@ deduplicated on additional columns.
 <Screenshot
   alt="Query Plan for a query with multi-threaded count with a group by"
   title="Query Plan for a query with multi-threaded count with a group by"
-  height={447}
   src="images/guides/questdb-internals/query_plan.webp"
-  width={745}
 />
 
 - **JIT compilation and Vectorized processing:**
@@ -205,13 +203,6 @@ deduplicated on additional columns.
   On top of the JIT, QuestDB tries to execute as many queries as possible in a multi-threaded,
   multi-core fashion. Some queries, for example those involving an index, are executed on a single
   thread. Other queries, like those involving `GROUP BY` and `SAMPLE BY`, execute a pipeline with some  single-threaded stages and some multi-threaded stages to avoid slow downs when groups are unbalanced.
-
-<Screenshot
-  alt="Execution pipeline with mixed stages, some single-threaded, some multi-threaded."
-  title="Execution pipeline with mixed stages, some single-threaded, some multi-threaded"
-  src="images/guides/questdb-internals/multiThreadedExecution.svg"
-  width={1000}
-/>
 
 - **Worker pools:** QuestDB allows to configure different pools for specialized functions, like
 parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire protocol, or responding to HTTP connections. By default, most tasks are handled by a shared worker pool.
@@ -242,7 +233,7 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 <Screenshot
   alt="Interval scan"
   title="Interval scan"
-  src="images/guides/questdb-internals/interval_scan.svg"
+  src="images/guides/questdb-internals/intervalScan.webp"
   width={750}
 />
 
@@ -261,7 +252,7 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 <Screenshot
   alt="Diagram of data column files and how they are partitioned to form a table"
   title="Diagram of data column files and how they are partitioned to form a table"
-  src="images/guides/questdb-internals/partitionModel.svg"
+  src="images/guides/questdb-internals/partitionModel.webp"
   width={1000}
   forceTheme="dark"
 />
@@ -436,13 +427,6 @@ tracks status of the cluster to enable instance discovery and automatic failover
 
 QuestDB exposes several network interfaces and protocols to allow different client applications to interact with the database
 
-<Screenshot
-  alt="QuestDB Network Protocols"
-  title="QuestDB Network Protocols"
-  src="images/guides/questdb-internals/questdb_network_protocols.webp"
-  width={734}
-/>
-
 ### InfluxDB Line protocol (ILP) over HTTP or TCP
 
 The [Influx Line Protocol](/docs/reference/api/ilp/overview/) allows for very high throughput of incoming data. It supports
@@ -546,7 +530,6 @@ The [QuestDB Web console](/docs/web-console/) is ideal for interactive explorati
   alt="The QuestDB Console"
   title="The QuestDB Web Console"
   src="images/guides/questdb-internals/web-console.webp"
-  width={1000}
 />
 
 
