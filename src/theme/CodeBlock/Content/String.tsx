@@ -1,4 +1,4 @@
-import React, { useState } from "react"; // Ensure React and useState are imported
+import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import { useThemeConfig, usePrismTheme } from "@docusaurus/theme-common";
 import {
@@ -14,7 +14,7 @@ import WordWrapButton from "@theme/CodeBlock/WordWrapButton";
 import Container from "@theme/CodeBlock/Container";
 import type { Props as OriginalProps } from "@theme/CodeBlock";
 
-import { QuestDbSqlRunnerEmbedded } from '@site/src/components/QuestDbSqlRunnerEmbedded'; // Adjust path as needed
+import { QuestDbSqlRunnerEmbedded } from '@site/src/components/QuestDbSqlRunnerEmbedded';
 
 import styles from "./styles.module.css";
 
@@ -59,15 +59,22 @@ export default function CodeBlockString({
   const demo = parseCodeBlockDemo(metastring) || demoProp;
   const enableExecute = parseCodeBlockExecute(metastring) || executeProp;
 
-  const { lineClassNames, code } = parseLines(children, {
+  const { lineClassNames, code: initialCode, tokens: initialTokens } = parseLines(children, {
     metastring,
     language,
     magicComments,
   });
   const showLineNumbers = showLineNumbersProp ?? containsLineNumbers(metastring);
 
+  const [editableCode, setEditableCode] = useState<string>(initialCode);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+
+  useEffect(() => {
+    setEditableCode(initialCode);
+  }, [initialCode]);
+
   const demoUrl = demo
-    ? `https://demo.questdb.io/?query=${encodeURIComponent(code)}&executeQuery=true`
+    ? `https://demo.questdb.io/?query=${encodeURIComponent(editableCode)}&executeQuery=true` // Use editableCode
     : null;
 
   const handleDemoClick = () => {
@@ -78,11 +85,20 @@ export default function CodeBlockString({
 
   const [showExecutionResults, setShowExecutionResults] = useState<boolean>(false);
 
-  const currentQuestDbUrl = questdbUrlProp; // If passed, use it, otherwise QuestDbSqlRunnerEmbedded will use its default.
+  const currentQuestDbUrl = questdbUrlProp;
 
   const handleExecuteToggle = () => {
     setShowExecutionResults(prev => !prev);
   };
+
+  const handleEditToggle = () => {
+    setIsEditing(prev => !prev);
+  };
+
+  const currentLineClassNames = isEditing
+    ? lineClassNames
+    : parseLines(editableCode, { metastring, language, magicComments }).lineClassNames;
+
 
   return (
     <Container
@@ -90,8 +106,9 @@ export default function CodeBlockString({
       className={clsx(
         blockClassName,
         language &&
-          !blockClassName.includes(`language-${language}`) &&
-          `language-${language}`,
+        !blockClassName.includes(`language-${language}`) &&
+        `language-${language}`,
+        isEditing && styles.codeBlockEditing
       )}
     >
       {title && (
@@ -111,39 +128,69 @@ export default function CodeBlockString({
         </div>
       )}
       <div className={styles.codeBlockContent}>
-        <Highlight
-          theme={prismTheme}
-          code={code}
-          language={(language ?? "text") as Language}
-        >
-          {({ className, style, tokens, getLineProps, getTokenProps }) => (
-            <pre
-              tabIndex={0}
-              ref={wordWrap.codeBlockRef}
-              className={clsx(className, styles.codeBlock, "thin-scrollbar")}
-              style={style}
-            >
-              <code
-                className={clsx(
-                  styles.codeBlockLines,
-                  showLineNumbers && styles.codeBlockLinesWithNumbering,
-                )}
+        {isEditing ? (
+          <textarea
+            value={editableCode}
+            onChange={(e) => setEditableCode(e.target.value)}
+            className={clsx(styles.codeBlock, styles.editableCodeArea, "thin-scrollbar")}
+            spellCheck="false"
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            rows={Math.max(10, editableCode.split('\n').length)}
+            style={{
+              width: '100%',
+              fontFamily: 'var(--ifm-font-family-monospace)',
+              fontSize: 'var(--ifm-code-font-size)',
+              lineHeight: 'var(--ifm-pre-line-height)',
+              backgroundColor: prismTheme.plain.backgroundColor,
+              color: prismTheme.plain.color,
+              border: 'none',
+              resize: 'vertical',
+            }}
+          />
+        ) : (
+          <Highlight
+            theme={prismTheme}
+            code={editableCode} // Use editableCode
+            language={(language ?? "text") as Language}
+          >
+            {({ className, style, tokens, getLineProps, getTokenProps }) => (
+              <pre
+                tabIndex={0}
+                ref={wordWrap.codeBlockRef}
+                className={clsx(className, styles.codeBlock, "thin-scrollbar")}
+                style={style}
               >
-                {tokens.map((line, i) => (
-                  <Line
-                    key={i}
-                    line={line}
-                    getLineProps={getLineProps}
-                    getTokenProps={getTokenProps}
-                    classNames={lineClassNames[i]}
-                    showLineNumbers={showLineNumbers}
-                  />
-                ))}
-              </code>
-            </pre>
-          )}
-        </Highlight>
+                <code
+                  className={clsx(
+                    styles.codeBlockLines,
+                    showLineNumbers && styles.codeBlockLinesWithNumbering,
+                  )}
+                >
+                  {tokens.map((line, i) => (
+                    <Line
+                      key={i}
+                      line={line}
+                      getLineProps={getLineProps}
+                      getTokenProps={getTokenProps}
+                      classNames={currentLineClassNames[i]}
+                      showLineNumbers={showLineNumbers}
+                    />
+                  ))}
+                </code>
+              </pre>
+            )}
+          </Highlight>
+        )}
         <div className={styles.buttonGroup}>
+          <button
+            onClick={handleEditToggle}
+            className={clsx(styles.codeButton, styles.editButton)}
+            title={isEditing ? "View Code" : "Edit Code"}
+          >
+            {isEditing ? 'View Code' : 'Edit Code'}
+          </button>
           {(wordWrap.isEnabled || wordWrap.isCodeScrollable) && (
             <WordWrapButton
               className={styles.codeButton}
@@ -151,7 +198,7 @@ export default function CodeBlockString({
               isEnabled={wordWrap.isEnabled}
             />
           )}
-          <CopyButton className={styles.codeButton} code={code} />
+          <CopyButton className={styles.codeButton} code={editableCode} />
           {enableExecute && (
             <button
               onClick={handleExecuteToggle}
@@ -166,7 +213,7 @@ export default function CodeBlockString({
 
       {enableExecute && showExecutionResults && (
         <QuestDbSqlRunnerEmbedded
-          queryToExecute={code}
+          queryToExecute={editableCode}
           questdbUrl={currentQuestDbUrl}
         />
       )}

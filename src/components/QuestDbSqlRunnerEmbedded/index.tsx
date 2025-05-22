@@ -52,9 +52,9 @@ export function QuestDbSqlRunnerEmbedded({
       if (!response.ok) {
         try {
           const errorJson = JSON.parse(responseBody) as { error?: string; position?: number };
-          throw new Error(`QuestDB Error (HTTP ${response.status}): ${errorJson.error || responseBody} at position ${errorJson.position || 'N/A'}`);
+          throw new Error(`Bad query: ${errorJson.error || responseBody} at position ${errorJson.position || 'N/A'}`);
         } catch (e: any) {
-          if (e.message.startsWith('QuestDB Error')) throw e;
+          if (e.message.startsWith('Bad query')) throw e;
           throw new Error(`HTTP Error ${response.status}: ${response.statusText}. Response: ${responseBody}`);
         }
       }
