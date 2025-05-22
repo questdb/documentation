@@ -74,15 +74,14 @@ To create a materialize view, surround your `SAMPLE BY` or time-based `GROUP BY`
 query with a [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view) statement.
 
 ```questdb-sql title="trades_notional_1m ddl"
-CREATE MATERIALIZED VIEW 'trades_notional_1m' AS (
-  SELECT
-    timestamp,
-    symbol,
-    side,
-    sum(price * amount) AS notional
-  FROM trades
-  SAMPLE BY 1m
-) PARTITION BY DAY;
+CREATE MATERIALIZED VIEW 'trades_notional_1m' AS
+SELECT
+  timestamp,
+  symbol,
+  side,
+  sum(price * amount) AS notional
+FROM trades
+SAMPLE BY 1m;
 ```
 
 Querying a materialized view can be up to hundreds of times faster than
