@@ -25,7 +25,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Architecture of the file storing a column"
   height={435}
-  src="images/docs/concepts/columnUpdate.svg"
+  src="images/docs/concepts/columnUpdate.webp"
   width={745}
 />
 
