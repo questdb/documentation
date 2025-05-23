@@ -657,6 +657,122 @@ async def async_psycopg3():
 asyncio.run(async_psycopg3())
 ```
 
+### Inserting Arrays
+
+QuestDB, via the PostgreSQL wire protocol, supports [array data types](/docs/concept/array/), including multidimensional
+arrays.
+
+When you need to insert multiple rows containing array data, such as a series of order book snapshots, `executemany()`
+offers a more performant way to do so compared to inserting row by row with execute().
+
+:::tip
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
+instead of PGWire. PGWire should primarily be used for querying data in QuestDB. If you cannot use ILP for some reason,
+you should prefer [asyncpg](#inserting-arrays) over psycopg3 for performance reasons. We found that asyncpg is significantly faster than psycopg3
+when inserting batches of data including arrays.
+:::
+
+```python title="Batch Inserting L3 Order Book Snapshots"
+import asyncio
+import os
+import time
+from datetime import datetime, timedelta
+
+import psycopg
+
+async def batch_insert_l3_order_book_arrays():
+    conn_str = "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest"
+
+    async with await psycopg.AsyncConnection.connect(conn_str) as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("""
+                              CREATE TABLE IF NOT EXISTS l3_order_book
+                              (
+                                  bid DOUBLE [][],
+                                  ask DOUBLE [][],
+                                  ts TIMESTAMP
+                              ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                              """)
+            print("Table 'l3_order_book' is ready.")
+
+            # Prepare a list of L3 order book snapshots for batch insertion
+            snapshots_to_insert = []
+            base_timestamp = datetime.now()
+
+            # First row
+            bids1 = [[68500.50, 0.5], [68500.00, 1.2], [68499.50, 0.3]]
+            asks1 = [[68501.00, 0.8], [68501.50, 0.4], [68502.00, 1.1]]
+            ts1 = (base_timestamp + timedelta(seconds=1))
+            snapshots_to_insert.append((bids1, asks1, ts1))
+
+            # Second row
+            bids2 = [[68502.10, 0.3], [68501.80, 0.9], [68501.20, 1.5]]
+            asks2 = [[68502.50, 1.1], [68503.00, 0.6], [68503.50, 0.2]]
+            ts2 = (base_timestamp + timedelta(seconds=2))
+            snapshots_to_insert.append((bids2, asks2, ts2))
+
+            # Third row
+            bids3 = [[68490.60, 2.5], [68489.00, 3.2]]
+            asks3 = [[68491.20, 1.8], [68492.80, 0.7]]
+            ts3 = (base_timestamp + timedelta(seconds=3))
+            snapshots_to_insert.append((bids3, asks3, ts3))
+
+            print(f"Prepared {len(snapshots_to_insert)} snapshots for batch insertion.")
+
+            # Insert the snapshots into the database in a single batch
+            await cur.executemany(
+                """
+                INSERT INTO l3_order_book (bid, ask, ts)
+                VALUES (%b, %b, %b)
+                """,
+                snapshots_to_insert
+            )
+            print(f"Successfully inserted {cur.rowcount} L3 order book snapshots using executemany().")
+
+
+if __name__ == "__main__":
+    # Set timezone to UTC
+    os.environ['TZ'] = 'UTC'
+    if hasattr(time, 'tzset'):
+        time.tzset()
+
+    asyncio.run(batch_insert_l3_order_book_arrays())
+```
+
+
+### Connection Pooling with psycopg2-pool
+
+For connection pooling with psycopg2, you can use external libraries like psycopg2-pool:
+
+```python
+from psycopg2.pool import ThreadedConnectionPool
+
+pool = ThreadedConnectionPool(
+    minconn=5,
+    maxconn=20,
+    host='127.0.0.1',
+    port=8812,
+    user='admin',
+    password='quest',
+    dbname='qdb'
+)
+
+conn = pool.getconn()
+
+try:
+    conn.autocommit = True
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM trades LIMIT 10")
+        rows = cur.fetchall()
+        print(f"Fetched {len(rows)} rows")
+finally:
+    pool.putconn(conn)
+
+pool.closeall()
+```
+
+
 ### Connection Pooling
 
 psycopg3 provides connection pooling capabilities. This reduces the overhead of establishing new connections
@@ -904,38 +1020,6 @@ try:
             print(f"Symbol: {row[0]}, Avg Price: {row[1]:.2f}")
 finally:
     conn.close()
-```
-
-### Connection Pooling with psycopg2-pool
-
-For connection pooling with psycopg2, you can use external libraries like psycopg2-pool:
-
-```python
-from psycopg2.pool import ThreadedConnectionPool
-
-pool = ThreadedConnectionPool(
-    minconn=5,
-    maxconn=20,
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb'
-)
-
-conn = pool.getconn()
-
-try:
-    conn.autocommit = True
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM trades LIMIT 10")
-        rows = cur.fetchall()
-        print(f"Fetched {len(rows)} rows")
-finally:
-    pool.putconn(conn)
-
-pool.closeall()
 ```
 
 ### Integration with pandas
