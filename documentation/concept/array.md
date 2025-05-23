@@ -90,6 +90,33 @@ QuestDB always stores arrays in vanilla form. When you transform an array's
 shape and then store the resulting array to the database, it will be stored in
 vanilla form.
 
+## The ARRAY literal
+
+You can create an array from scalar values using the `ARRAY[...]` syntax, as
+in this example:
+
+```questdb-sql
+CREATE TABLE tango AS (SELECT ARRAY[
+   [ [ 1,  2,  3], [ 4,  5,  6], [ 7,  8,  9] ],
+   [ [10, 11, 12], [13, 14, 15], [16, 17, 18] ],
+   [ [19, 20, 21], [22, 23, 24], [25, 26, 27] ]
+] arr from long_sequence(1));
+```
+
+Values can be any expressions that yield scalars, so you can construct the array
+from existing column data.
+
+Values can also be arrays, creating a higher-dimensional array:
+
+```questdb-sql
+CREATE TABLE tango AS (SELECT ARRAY[1, 2] arr, ARRAY[3, 4] brr FROM long_sequence(1));
+SELECT ARRAY[arr, brr] FROM tango;
+```
+
+|       array_2d        |
+| --------------------- |
+| [[1.0,2.0],[3.0,4.0]] |
+
 ## Array access syntax
 
 We model our N-dimensional array access syntax on Python's `NDArray`, except that
