@@ -132,12 +132,12 @@ In this example:
 4. The `SAMPLE BY` query contains two key column (`timestamp`, `symbol`) and
    five aggregates (`first`, `max`, `min`, `last`, `price`) calculated in `15m`
    time buckets.
-5. The view is partitioned by `DAY`.
+5. The view is partitioned by `MONTH`.
 6. No TTL is defined
    - Therefore, the materialized view will contain a summary of _all_ the base
      `trades` table's data.
 
-Many parts of the above DDL statement are optional and can be ommited:
+Many parts of the above DDL statement are optional and can be omitted:
 
 ```questdb-sql title="trades_OHLC_15m compact DDL"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m' AS
