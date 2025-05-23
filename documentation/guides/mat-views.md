@@ -117,7 +117,7 @@ AS (
       sum(amount) AS volume
   FROM trades
   SAMPLE BY 15m
-) PARTITION BY MONTH;
+);
 ```
 
 In this example:
@@ -132,7 +132,8 @@ In this example:
 4. The `SAMPLE BY` query contains two key column (`timestamp`, `symbol`) and
    five aggregates (`first`, `max`, `min`, `last`, `price`) calculated in `15m`
    time buckets.
-5. The view is partitioned by `MONTH`.
+5. The view is partitioned by `MONTH`. This partitioning is selected
+   [by default](#default-partitioning) based on the `SAMPLE BY` interval.
 6. No TTL is defined
    - Therefore, the materialized view will contain a summary of _all_ the base
      `trades` table's data.
@@ -496,7 +497,6 @@ Instead of storing the raw data, we will store one row, per symbol, per side,
 per day of data.
 
 ```questdb-sql title="down-sampling test query" demo
-
 SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
     SELECT timestamp,
            symbol,
