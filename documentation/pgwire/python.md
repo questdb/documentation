@@ -333,7 +333,7 @@ for multidimensional arrays) into the appropriate PostgreSQL array format and vi
 Using array types with asyncpg against QuestDB requires manual type registration.
 
 asyncpg's standard type introspection query is not yet supported by QuestDB. Therefore, you must manually register a "codec"
-for your array types with the asyncpg connection, as shown in the preceding code example. This ensures correct array
+for your array types with the asyncpg connection, as shown in the code example below. This ensures correct array
 handling and avoids errors.
 
 This is a temporary workaround until a permanent solution is available in asyncpg or QuestDB.
