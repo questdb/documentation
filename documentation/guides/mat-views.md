@@ -106,18 +106,16 @@ If you are unfamiliar with the OHLC concept, please see our
 
 ```questdb-sql title="trades_OHLC_15m DDL"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m'
-WITH BASE 'trades' REFRESH INCREMENTAL
-AS (
-  SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  SAMPLE BY 15m
-);
+WITH BASE 'trades' REFRESH INCREMENTAL AS
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
 ```
 
 In this example:
