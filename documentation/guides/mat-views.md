@@ -104,7 +104,7 @@ If you are unfamiliar with the OHLC concept, please see our
 
 :::
 
-```questdb-sql title="trades_OHLC_15m ddl"
+```questdb-sql title="trades_OHLC_15m DDL"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m'
 WITH BASE 'trades' REFRESH INCREMENTAL
 AS (
@@ -137,12 +137,20 @@ In this example:
    - Therefore, the materialized view will contain a summary of _all_ the base
      `trades` table's data.
 
-:::tip
+Many parts of the above DDL statement are optional and can be ommited:
 
-This particular example can also be written via the
-[compact syntax](#compact-syntax).
-
-:::
+```questdb-sql title="trades_OHLC_15m compact DDL"
+CREATE MATERIALIZED VIEW 'trades_OHLC_15m' AS
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
+```
 
 #### The view name
 
@@ -227,15 +235,15 @@ which omits the parentheses.
 
 ```questdb-sql title="trades_OHLC_15m compact syntax"
 CREATE MATERIALIZED VIEW trades_OHLC_15m AS
-  SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  SAMPLE BY 15m;
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
 ```
 
 ## Querying materialized views
@@ -508,17 +516,16 @@ This result set comprises just `14595` rows, instead of ~767 million. That's
 Here it is as a materialized view:
 
 ```questdb-sql title="LATEST ON materialized view"
-CREATE MATERIALIZED VIEW 'trades_latest_1d' WITH BASE 'trades' REFRESH INCREMENTAL AS (
-	SELECT
-	  timestamp,
-	  symbol,
-	  side,
-	  last(price) AS price,
-	  last(amount) AS amount,
-	  last(timestamp) as latest
-	FROM trades
-	SAMPLE BY 1d
-) PARTITION BY DAY;
+CREATE MATERIALIZED VIEW 'trades_latest_1d' AS
+SELECT
+  timestamp,
+  symbol,
+  side,
+  last(price) AS price,
+  last(amount) AS amount,
+  last(timestamp) as latest
+FROM trades
+SAMPLE BY 1d;
 ```
 
 You can try this view out on our demo:
