@@ -268,11 +268,11 @@ While we recommend using the [InfluxDB Line Protocol (ILP)](/docs/ingestion-over
 the `executemany()` method to insert multiple rows in a single query. It is highly efficient for executing the same
 parameterized statements multiple times with different sets of data. This method is significantly faster than executing
 individual statements in a loop because it reduces network round-trips and allows for potential batching optimizations
-by the database. In our testing, we found that `executemany()` is about 10x-100x faster than using a loop with `execute()`.
+by the database. In our testing, we found that `executemany()` can be 10x-100x faster than using a loop with `execute()`.
 
-It's particularly useful for bulk data insertion, such as recording multiple trades as they occur. INSERT performance
+It's particularly useful for bulk data insertion, such as recording multiple trades as they occur. `INSERT` performance
 grows with the batch size, so you should experiment with the batch size to find the optimal value for your use case. We
-recommend starting with a batch size of 1000 and adjusting it based on your performance requirements.
+recommend starting with a batch size of 1,000 and adjusting it based on further testing.
 
 ```python
 import asyncio
