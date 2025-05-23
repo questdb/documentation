@@ -667,9 +667,10 @@ offers a more performant way to do so compared to inserting row by row with exec
 
 :::tip
 For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
-instead of PGWire. PGWire should primarily be used for querying data in QuestDB. If you cannot use ILP for some reason,
-you should prefer [asyncpg](#inserting-arrays) over psycopg3 for performance reasons. We found that asyncpg is significantly faster than psycopg3
-when inserting batches of data including arrays.
+instead of PGWire. PGWire should primarily be used for querying data in QuestDB. 
+
+If you cannot use ILP for some reason, you should prefer [asyncpg](#inserting-arrays) over psycopg3 for performance
+reasons. We found that asyncpg is significantly faster than psycopg3 when inserting batches of data including arrays.
 :::
 
 ```python title="Batch Inserting L3 Order Book Snapshots"
@@ -739,6 +740,11 @@ if __name__ == "__main__":
     asyncio.run(batch_insert_l3_order_book_arrays())
 ```
 
+The example above uses `%b` as placeholder parameters instead of the usual `%s` placeholder. This is because
+`%b` format forces the use of the binary protocol. By default, psycopg3 uses the text encoding for array
+parameters. The binary protocol is more efficient for transferring large amounts of data, especially for
+arrays. The binary protocol is also the default for asyncpg, which is why we recommend using asyncpg for
+data ingestion over PGWire.
 
 ### Connection Pooling with psycopg2-pool
 
