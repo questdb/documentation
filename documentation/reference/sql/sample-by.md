@@ -86,7 +86,7 @@ other than the timestamp.
 
 Specify the shape of the query using `FROM` and `TO`:
 
-```questdb-sql title='Pre-filling trip data' demo
+```questdb-sql title='Pre-filling trip data' demo execute
 SELECT pickup_datetime as t, count()
 FROM trips
 SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
