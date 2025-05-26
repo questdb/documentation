@@ -4,6 +4,13 @@ sidebar_label: N-Dim array
 description: Explains the technical design and syntax to use N-dimensional arrays.
 ---
 
+:::note
+
+N-dimensional arrays are still in Beta phase. The only supported element type is
+`DOUBLE`.
+
+:::
+
 QuestDB supports the N-dimensional array type. Its design matches that of the
 `NDArray` type in NumPy, which has become the de-facto standard for handling
 N-dimensional data. In order to effectively use arrays in QuestDB, you should
