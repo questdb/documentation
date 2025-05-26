@@ -39,21 +39,22 @@ The client provides the following benefits:
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
 
-
 ## Compatible JDKs
 
-The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.
+The client relies on some JDK internal libraries, which certain specialised JDK
+offerings may not support.
 
 Here is a list of known incompatible JDKs:
 
 - Azul Zing 17
-    - A fix is in progress. You can use Azul Zulu 17 in the meantime. 
+  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
 
 ## Quick start
 
@@ -68,7 +69,7 @@ Add a QuestDB as a dependency in your project's build configuration file.
       renderText={(release) => (
         <CodeBlock className="language-xml">
           {`<dependency>
-  <groupId>org.questdb</groupId> 
+  <groupId>org.questdb</groupId>
   <artifactId>questdb</artifactId>
   <version>${release.name}</version>
 </dependency>`}
@@ -133,24 +134,30 @@ There are three ways to create a client instance:
    string. See [Configuration options](#configuration-options) for all available
    options. It allows sharing the same configuration across clients in different
    languages.
+
    ```java
    try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;")) {
        // ...
    }
    ```
+
 2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
    is used to set the configuration string. Moving configuration parameters to
    an environment variable allows you to avoid hard-coding sensitive information
    such as tokens and password in your code.
+
    ```bash
    export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
    ```
+
    ```java
    try (Sender sender = Sender.fromEnv()) {
        // ...
    }
    ```
+
 3. **Using the Java builder API.** This provides type-safe configuration.
+
    ```java
    try (Sender sender = Sender.builder(Sender.Transport.HTTP)
            .address("localhost:9000")
@@ -176,7 +183,7 @@ There are three ways to create a client instance:
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
 
-5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit) ` or `atNow()` to
+5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
    set a designated timestamp.
 6. Optionally: You can use `flush()` to send locally buffered data into a
    server.
@@ -300,6 +307,7 @@ There are two ways to assign a designated timestamp to a row:
 
 2. Server-assigned timestamp: The server automatically assigns a timestamp to
    the row based on the server's wall-clock time. Example:
+
    ```java
    sender.table("trades")
          .symbol("symbol", "ETH-USD")
