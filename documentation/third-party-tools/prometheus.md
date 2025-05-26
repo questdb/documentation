@@ -237,7 +237,10 @@ The following metrics are available:
 | `questdb_wal_apply_physically_written_rows_total` | counter | Total number of physically written rows during WAL apply.                                                                                                                                                    |
 | `questdb_wal_apply_rows_per_second`      | gauge   | Rate of rows applied per second during WAL apply.                                                                                                                                                           |
 | `questdb_wal_apply_written_rows_total`   | counter | Total number of rows written during WAL apply.                                                                                                                                                             |
+| `questdb_wal_apply_seq_txn_total`               | counter | Sum of all committed transaction sequence numbers.                               |
+| `questdb_wal_apply_writer_txn_total`            | counter | Sum of all transaction sequence numbers applied to tables.                       |
 | `questdb_wal_written_rows_total`         | counter | Total number of rows written to WAL.                                                                                                                                                                       |
+| `questdb_suspended_tables`                      | gauge   | The number of tables currently in the suspended state.                           |
 | `questdb_workers_job_start_micros_max`  | gauge   | Maximum time taken to start a worker job in microseconds.                                                                                                                                                     |
 | `questdb_workers_job_start_micros_min`  | gauge   | Minimum time taken to start a worker job in microseconds.                                                                                                                                                     |
 
@@ -275,7 +278,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' aler
 To run QuestDB and point it towards Alertmanager for alerting, first create a
 file `./conf/log.conf` with the following contents. `172.17.0.2` in this case is
 the IP address of the docker container for alertmanager that was discovered by
-running the `docker inspect ` command above.
+running the `docker inspect` command above.
 
 ```ini title="./conf/log.conf"
 # Which writers to enable
