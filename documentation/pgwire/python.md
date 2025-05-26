@@ -62,7 +62,11 @@ pip install asyncpg
 
 ```python
 import asyncio
+import os
+import time
+
 import asyncpg
+
 
 async def connect_to_questdb():
     conn = await asyncpg.connect(
@@ -72,15 +76,17 @@ async def connect_to_questdb():
         password='quest',
         database='qdb'
     )
-    
+
     version = await conn.fetchval("SELECT version()")
     print(f"Connected to QuestDB version: {version}")
-    
+
     await conn.close()
 
-// Set the timezone to UTC
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    # tzset is only available on Unix-like systems
+    time.tzset()
 asyncio.run(connect_to_questdb())
 ```
 
@@ -88,6 +94,9 @@ asyncio.run(connect_to_questdb())
 **Note**: The `asyncpg` client uses the system timezone by default. QuestDB always sends timestamp in UTC.
 To set the timezone to UTC, you can set the `TZ` environment variable before running your script.
 This is important for time-series data to ensure consistent timestamps.
+
+See the [Timestamp Handling](/docs/pgwire/pgwire-intro#timestamp-handling) chapter for additional context on how
+on how QuestDB handles timezones.
 :::
 
 ### Querying Data
@@ -103,6 +112,9 @@ asyncpg provides several methods for fetching data:
 import asyncio
 import asyncpg
 from datetime import datetime, timedelta
+import os
+import time
+
 
 async def query_with_asyncpg():
     conn = await asyncpg.connect(
@@ -112,36 +124,39 @@ async def query_with_asyncpg():
         password='quest',
         database='qdb'
     )
-    
+
     # Fetch multiple rows
     rows = await conn.fetch("""
-        SELECT * FROM trades
-        WHERE ts >= $1
-        ORDER BY ts DESC
-        LIMIT 10
-    """, datetime.now() - timedelta(days=1))
-    
+                            SELECT *
+                            FROM trades
+                            WHERE ts >= $1
+                            ORDER BY ts DESC LIMIT 10
+                            """, datetime.now() - timedelta(days=1))
+
     print(f"Fetched {len(rows)} rows")
     for row in rows:
         print(f"Timestamp: {row['ts']}, Symbol: {row['symbol']}, Price: {row['price']}")
-    
+
     # Fetch a single row
     single_row = await conn.fetchrow("""
-        SELECT * FROM trades
-        LIMIT -1
-    """)
-    
+                                     SELECT *
+                                     FROM trades LIMIT -1
+                                     """)
+
     if single_row:
         print(f"Latest trade: {single_row['symbol']} at {single_row['price']}")
-    
+
     # Fetch a single value
     count = await conn.fetchval("SELECT count(*) FROM trades")
     print(f"Total trades: {count}")
-    
+
     await conn.close()
 
+
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(query_with_asyncpg())
 ```
 
@@ -152,6 +167,8 @@ For large result sets, you can use a cursor to fetch results in batches:
 ```python
 import asyncio
 import asyncpg
+import os
+import time
 
 async def stream_with_cursor():
     conn = await asyncpg.connect(
@@ -161,32 +178,36 @@ async def stream_with_cursor():
         password='quest',
         database='qdb'
     )
-    
+
     async with conn.transaction():
         # Execute a query that might return a large number of rows
         cursor = await conn.cursor("""
-            SELECT * FROM trades
-            ORDER BY ts
-        """)
-        
+                                   SELECT *
+                                   FROM trades
+                                   ORDER BY ts
+                                   """)
+
         batch_size = 100
         total_processed = 0
-        
+
         while True:
             batch = await cursor.fetch(batch_size)
-            
+
             # If no more rows, break the loop
             if not batch:
                 break
-            
+
             total_processed += len(batch)
             print(f"Processed {total_processed} rows so far...")
-    
+
     await conn.close()
     print(f"Finished processing {total_processed} total rows")
 
+
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(stream_with_cursor())
 ```
 
@@ -197,6 +218,8 @@ For applications that need to execute many queries, you can use connection pooli
 ```python
 import asyncio
 import asyncpg
+import os
+import time
 
 async def connection_pool_example():
     pool = await asyncpg.create_pool(
@@ -215,8 +238,10 @@ async def connection_pool_example():
     
     await pool.close()
 
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(connection_pool_example())
 ```
 
@@ -228,6 +253,8 @@ asyncpg uses numbered parameters (`$1`, `$2`, etc.) for prepared statements:
 import asyncio
 import asyncpg
 from datetime import datetime, timedelta
+import os
+import time
 
 async def parameterized_query():
     conn = await asyncpg.connect(
@@ -258,8 +285,10 @@ async def parameterized_query():
     
     await conn.close()
 
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(parameterized_query())
 ```
 
@@ -318,8 +347,10 @@ async def execute_many_market_data_example():
     """, trades_data)
     print(f"Successfully inserted {len(trades_data)} trade records using executemany.")
 
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(execute_many_market_data_example())
 ```
 
@@ -422,8 +453,10 @@ async def batch_insert_l3_order_book_arrays():
     )
     print(f"Successfully inserted {len(snapshots_to_insert)} L3 order book snapshots using executemany().")
 
+# Set the timezone to UTC
 os.environ['TZ'] = 'UTC'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 asyncio.run(batch_insert_l3_order_book_arrays())
 ```
 
