@@ -95,7 +95,7 @@ wall-clock time.
 The configuration for the client is specified using a configuration string. This
 string follows the format:
 
-```
+```text
 <protocol>::<key>=<value>;<key>=<value>;...;
 ```
 
@@ -180,6 +180,7 @@ There are three ways to create a client instance:
    - `longColumn(CharSequence, long)`
    - `doubleColumn(CharSequence, double)`
    - `boolColumn(CharSequence, boolean)`
+   - `arrayColumn()` -- several variants, see below
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
 
@@ -189,6 +190,31 @@ There are three ways to create a client instance:
    server.
 7. Go to the step no. 2 to start a new row.
 8. Use `close()` to dispose the Sender after you no longer need it.
+
+## Ingesting arrays
+
+To ingest a 1D or 2D array, simply construct a Java array of the appropriate
+type (`double[]`, `double[][]`) and supply it to the `arrayColumn()` method. In
+order to avoid GC overheads, you are highly encouraged create the array instance
+once, and then populate it with the data of each row.
+
+For arrays of higher dimensionality, use the `DoubleArray` class. Here's a basic
+example for a 3D array:
+
+```java
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
+     DoubleArray ary = new DoubleArray(3, 3, 3);
+) {
+    for (int i = 0; i < ROW_COUNT; i++) {
+        for (int value = 0; value < 3 * 3 * 3; value++) {
+            ary.append(value);
+        }
+        sender.table("tango")
+              .doubleArray("array", ary)
+              .at(getTimestamp(), ChronoUnit.MICROS);
+    }
+}
+```
 
 ## Flushing
 
