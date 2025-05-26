@@ -465,6 +465,10 @@ found that the binary version of psycopg3 is significantly faster than the pure-
 
 :::
 
+We recommend always passing `binary=True` to the `cursor()` method to use the binary protocol for better performance.
+This is especially important for large datasets and array types.
+
+
 ### Basic Connection
 
 ```python
@@ -479,7 +483,7 @@ conn = psycopg.connect(
     autocommit=True  # Important for QuestDB
 )
 
-with conn.cursor() as cur:
+with conn.cursor(binary=True) as cur:
     cur.execute("SELECT version()")
     version = cur.fetchone()
     print(f"Connected to QuestDB version: {version[0]}")
@@ -500,27 +504,28 @@ import psycopg
 from datetime import datetime, timedelta
 
 with psycopg.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb',
-    autocommit=True
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        dbname='qdb',
+        autocommit=True
 ) as conn:
-    with conn.cursor() as cur:
+    with conn.cursor(binary=True) as cur:
         end_time = datetime.now()
         start_time = end_time - timedelta(days=1)
-        
+
         cur.execute("""
-            SELECT * FROM trades
-            WHERE ts >= %s AND ts <= %s
-            ORDER BY ts DESC
-            LIMIT 10
-        """, (start_time, end_time))
-        
+                    SELECT *
+                    FROM trades
+                    WHERE ts >= %s
+                      AND ts <= %s
+                    ORDER BY ts DESC LIMIT 10
+                    """, (start_time, end_time))
+
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
-        
+
         for row in rows:
             print(f"Timestamp: {row[0]}, Symbol: {row[1]}, Price: {row[2]}")
 ```
@@ -533,24 +538,24 @@ psycopg3 allows you to specify how rows are returned using row factories:
 import psycopg
 
 with psycopg.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb',
-    autocommit=True
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        dbname='qdb',
+        autocommit=True
 ) as conn:
-    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+    with conn.cursor(row_factory=psycopg.rows.dict_row, binary=True) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
-        
+
         for row in rows:
             print(f"Symbol: {row['symbol']}, Price: {row['price']}")
-    
-    with conn.cursor(row_factory=psycopg.rows.namedtuple_row) as cur:
+
+    with conn.cursor(row_factory=psycopg.rows.namedtuple_row, binary=True) as cur:
         cur.execute("SELECT * FROM trades LIMIT 5")
         rows = cur.fetchall()
-        
+
         for row in rows:
             print(f"Symbol: {row.symbol}, Price: {row.price}")
 ```
@@ -563,30 +568,30 @@ For large result sets, you can use server-side cursors:
 import psycopg
 
 with psycopg.connect(
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb',
-    autocommit=True
+        host='127.0.0.1',
+        port=8812,
+        user='admin',
+        password='quest',
+        dbname='qdb',
+        autocommit=True
 ) as conn:
-    with conn.cursor() as cur:
+    with conn.cursor(binary=True) as cur:
         # Execute a query that might return many rows
         cur.execute("SELECT * FROM trades")
-        
+
         batch_size = 1000
         total_processed = 0
-        
+
         while True:
             batch = cur.fetchmany(batch_size)
-            
+
             if not batch:
                 break
-            
+
             total_processed += len(batch)
             if total_processed % 10000 == 0:
                 print(f"Processed {total_processed} rows so far...")
-        
+
         print(f"Finished processing {total_processed} total rows")
 ```
 
@@ -606,7 +611,7 @@ with psycopg.connect(
         dbname='qdb',
         autocommit=True
 ) as conn:
-    with conn.cursor() as cur:
+    with conn.cursor(binary=True) as cur:
         # Define query parameters
         end_time = datetime.now()
         start_time = end_time - timedelta(days=7)
@@ -645,7 +650,7 @@ async def async_psycopg3():
         dbname='qdb',
         autocommit=True
     ) as aconn:
-        async with aconn.cursor() as acur:
+        async with aconn.cursor(binary=True) as acur:
             await acur.execute("SELECT * FROM trades LIMIT 10")
 
             rows = await acur.fetchall()
@@ -685,7 +690,7 @@ async def batch_insert_l3_order_book_arrays():
     conn_str = "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest"
 
     async with await psycopg.AsyncConnection.connect(conn_str) as conn:
-        async with conn.cursor() as cur:
+        async with conn.cursor(binary=True) as cur:
             await cur.execute("""
                               CREATE TABLE IF NOT EXISTS l3_order_book
                               (
@@ -746,38 +751,6 @@ parameters. The binary protocol is more efficient for transferring large amounts
 arrays. The binary protocol is also the default for asyncpg, which is why we recommend using asyncpg for
 data ingestion over PGWire.
 
-### Connection Pooling with psycopg2-pool
-
-For connection pooling with psycopg2, you can use external libraries like psycopg2-pool:
-
-```python
-from psycopg2.pool import ThreadedConnectionPool
-
-pool = ThreadedConnectionPool(
-    minconn=5,
-    maxconn=20,
-    host='127.0.0.1',
-    port=8812,
-    user='admin',
-    password='quest',
-    dbname='qdb'
-)
-
-conn = pool.getconn()
-
-try:
-    conn.autocommit = True
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM trades LIMIT 10")
-        rows = cur.fetchall()
-        print(f"Fetched {len(rows)} rows")
-finally:
-    pool.putconn(conn)
-
-pool.closeall()
-```
-
 
 ### Connection Pooling
 
@@ -805,7 +778,7 @@ pool = ConnectionPool(
 )
 
 with pool.connection() as conn:
-    with conn.cursor() as cur:
+    with conn.cursor(binary=True) as cur:
         cur.execute("SELECT * FROM trades LIMIT 10")
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
@@ -1026,6 +999,38 @@ try:
             print(f"Symbol: {row[0]}, Avg Price: {row[1]:.2f}")
 finally:
     conn.close()
+```
+
+### Connection Pooling with psycopg2-pool
+
+For connection pooling with psycopg2, you can use external libraries like psycopg2-pool:
+
+```python
+from psycopg2.pool import ThreadedConnectionPool
+
+pool = ThreadedConnectionPool(
+    minconn=5,
+    maxconn=20,
+    host='127.0.0.1',
+    port=8812,
+    user='admin',
+    password='quest',
+    dbname='qdb'
+)
+
+conn = pool.getconn()
+
+try:
+    conn.autocommit = True
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM trades LIMIT 10")
+        rows = cur.fetchall()
+        print(f"Fetched {len(rows)} rows")
+finally:
+    pool.putconn(conn)
+
+pool.closeall()
 ```
 
 ### Integration with pandas
