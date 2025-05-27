@@ -40,7 +40,7 @@ The default port number for the REST API is `9000`.
 
 ### Minimal HTTP server for health-check and metrics
 
-QuestDB exposes an HTTP interface for monitoring. Please see the [Observability](#observability--diagnostics) section
+QuestDB exposes an HTTP interface for monitoring. Please see the [Observability](/docs/guides/architecture/observability) section
 for more information.
 
 The default port number for the minimal HTTP server is `9003`.
