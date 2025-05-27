@@ -138,14 +138,6 @@ Each `dimN-selector` can be one of two forms:
 - single integer
 - range in the form `low:high`
 
-### Single-integer array selector
-
-Using single integers you select individual array elements. An element of a 2D
-array is a 1D sub-array, and an element of a 1D array is an individual scalar
-value, like a `DOUBLE`. If you use a coordinate larger than the array's given
-dimension length, the result will be `NULL` for scalars, and an empty array for
-sub-arrays.
-
 All the following examples use the 3D array named `arr`, of type
 `DOUBLE[3][3][3]`:
 
@@ -156,6 +148,14 @@ CREATE TABLE tango AS (SELECT ARRAY[
    [ [19, 20, 21], [22, 23, 24], [25, 26, 27] ]
 ] arr from long_sequence(1));
 ```
+
+### Single-integer array selector
+
+Using single integers you select individual array elements. An element of a 2D
+array is a 1D sub-array, and an element of a 1D array is an individual scalar
+value, like a `DOUBLE`. If you use a coordinate larger than the array's given
+dimension length, the result will be `NULL` for scalars, and an empty array for
+sub-arrays.
 
 #### Example: select a number from the array
 
