@@ -516,7 +516,23 @@ module.exports = {
         "guides/import-csv",
         "guides/mat-views",
         "guides/modifying-data",
-        "guides/questdb-architecture",
+        {
+          label: "QuestDB Architecture",
+          type: "category",
+          items: [
+            "guides/architecture/overview",
+            "guides/architecture/storage-engine",
+            "guides/architecture/memory-management",
+            "guides/architecture/query-engine",
+            "guides/architecture/time-series-optimizations",
+            "guides/architecture/data-ingestion-engine",
+            "guides/architecture/networking-layer",
+            "guides/architecture/replication-layer",
+            "guides/architecture/security",
+            "guides/architecture/observability",
+            "guides/architecture/web-console"
+          ]
+        },
         "guides/replication-tuning",
         "guides/working-with-timestamps-timezones",
         "web-console",
