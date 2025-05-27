@@ -91,7 +91,7 @@ calculate the position of each element.
 
 So, while performing a shape transformation is cheap on its own, whole-array
 operations on transformed arrays, such as equality checks, adding/multiplying
-two arrays, etc., are expected to be slower than on vanilla arrays.
+two arrays, etc., are expected to be faster on vanilla arrays.
 
 QuestDB always stores arrays in vanilla form. When you transform an array's
 shape and then store the resulting array to the database, it will be stored in
