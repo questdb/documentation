@@ -93,9 +93,9 @@ So, while performing a shape transformation is cheap on its own, whole-array
 operations on transformed arrays, such as equality checks, adding/multiplying
 two arrays, etc., are expected to be faster on vanilla arrays.
 
-QuestDB always stores arrays in vanilla form. When you transform an array's
-shape and then store the resulting array to the database, it will be stored in
-vanilla form.
+QuestDB always stores arrays in vanilla form. If you transform an array's shape
+and then store it to the database, QuestDB will physically rearrange the
+elements, and store the new array in vanilla shape.
 
 ## The ARRAY literal
 
