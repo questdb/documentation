@@ -35,7 +35,7 @@ QuestDB is comprised of several key components:
   QuestDB is specifically designed for time-series, and it provides several optimizations, like a
   designated timestamp, sequential reads, materialized-views, or in-memory processing.
 
-- **[Data ingestion engine](/docs/guides/architecture/data-ingestion-engine):**
+- **[Data ingestion engine](/docs/guides/architecture/data-ingestion):**
   The engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead
   log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments
   ship to object storage for replication.
@@ -44,7 +44,7 @@ QuestDB is comprised of several key components:
   The system exposes RESTful APIs and implements ILP and PostgreSQL wire protocols so that
   existing tools and drivers work out-of-the-box. It also offers a health and metrics endpoint.
 
-- **[Replication layer](/docs/guides/architecture/replication):**
+- **[Replication layer](/docs/guides/architecture/replication-layer):**
   QuestDB Enterprise supports horizontal scalability for reads with read replicas, and for
   writes with multi-primary.
 
