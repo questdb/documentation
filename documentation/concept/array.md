@@ -71,11 +71,11 @@ the array values:
    `DOUBLE[2, 6]`. All elements are still available, but using just 2
    coordinates.
 
-4. _Transpose_: reverse the strides, changing the meaning of each coordinate.
-   Example: transposing our array changes the strides from `(6, 2, 1)` to
-   `(1, 2, 6)`. What we used to access with the 3rd coordinate, we now access
-   with the 1st coordinate. On a 2D array, this would have the effect of
-   swapping rows and columns (transposing a matrix).
+4. _Transpose_: reverse the shape and the strides, changing the meaning of each
+   coordinate. Example: transposing our array changes the strides from
+   `(6, 2, 1)` to `(1, 2, 6)`. What we used to access with the 3rd coordinate,
+   we now access with the 1st coordinate. On a 2D array, this would have the
+   effect of swapping rows and columns (transposing a matrix).
 
 ## Importance of the "vanilla" array shape
 
