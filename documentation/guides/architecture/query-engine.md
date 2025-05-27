@@ -72,6 +72,6 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
 
 ## Next Steps
 
-- Back to the [QuestDB Architecture](/docs/guides/questdb-architecture) overview
+- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)

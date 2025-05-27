@@ -47,7 +47,8 @@ The default port number for the minimal HTTP server is `9003`.
 
 ## Next Steps
 
-- Back to the [QuestDB Architecture](/docs/guides/questdb-architecture) overview
+- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
+
 
