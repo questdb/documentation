@@ -109,6 +109,6 @@ Varchar data (column file):
 
 ## Next Steps
 
-- Back to the [QuestDB Architecture](../questdb-architecture) overview
+- Back to the [QuestDB Architecture](/docs/guides/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
