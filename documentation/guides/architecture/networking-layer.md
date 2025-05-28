@@ -29,7 +29,7 @@ might be incompatible if they rely heavily on PostgreSQL metadata, as QuestDB im
 overview of some key differences on QuestDB schema design, please visit our
 [Schema Design Essentials](/docs/guides/schema-design-essentials/) guide.
 
-The default port number for the pg-wire interface is `8812`.
+The default port number for the PGWire interface is `8812`.
 
 ### HTTP Rest API
 
@@ -50,5 +50,3 @@ The default port number for the minimal HTTP server is `9003`.
 - Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
-
-

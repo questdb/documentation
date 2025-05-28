@@ -51,7 +51,7 @@ to process data in table page frames for better CPU use.
 />
 
 - **JIT compilation and Vectorized processing:**
-  Queries with a `WHERE` clause [compile](/docs/concept/jit-compiler) critical parts of the execution plan to native machine code (SIMD AVX-2 instructions) just in time. Vectorised instructions apply
+  Queries with a `WHERE` clause [compile](/docs/concept/jit-compiler) critical parts of the execution plan to native machine code (SIMD AVX-2 instructions) just in time. Vectorized instructions apply
   the same operation to many data elements simultaneously. This maximizes CPU cache use and reduces overhead.
 
 - **Multi-threaded execution:**
