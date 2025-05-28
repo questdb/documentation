@@ -493,48 +493,28 @@ module.exports = {
       label: "Guides & Tutorials",
       type: "category",
       items: [
-        {
-          id: "guides/microsoft-entraid-oidc",
-          label: "Active Directory - Microsoft Entra ID",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        {
-          id: "guides/active-directory-pingfederate",
-          label: "Active Directory - PingFederate",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
         "guides/create-database",
+        "guides/import-csv",
+        "guides/mat-views",
+        "guides/working-with-timestamps-timezones",
+        "guides/compression-zfs",
         {
           id: "guides/enterprise-quick-start",
           type: "doc",
           customProps: { tag: "Enterprise" },
         },
-        "guides/compression-zfs",
-        "reference/api/java-embedded",
-        "guides/import-csv",
-        "guides/mat-views",
-        "guides/modifying-data",
         {
-          label: "QuestDB Architecture",
+          label: "Active Directory",
           type: "category",
+          customProps: { tag: "Enterprise" },
           items: [
-            "guides/architecture/overview",
-            "guides/architecture/storage-engine",
-            "guides/architecture/memory-management",
-            "guides/architecture/query-engine",
-            "guides/architecture/time-series-optimizations",
-            "guides/architecture/data-ingestion-engine",
-            "guides/architecture/networking-layer",
-            "guides/architecture/replication-layer",
-            "guides/architecture/security",
-            "guides/architecture/observability",
-            "guides/architecture/web-console"
+            "guides/microsoft-entraid-oidc",
+            "guides/active-directory-pingfederate"
           ]
         },
         "guides/replication-tuning",
-        "guides/working-with-timestamps-timezones",
+        "reference/api/java-embedded",
+        "guides/modifying-data",
         "web-console",
         {
           label: "Blog tutorials 🔗",
@@ -571,6 +551,23 @@ module.exports = {
         "concept/ttl",
         "concept/write-ahead-log",
       ],
+    },
+    {
+        label: "QuestDB Architecture",
+        type: "category",
+        items: [
+          "guides/architecture/overview",
+          "guides/architecture/storage-engine",
+          "guides/architecture/memory-management",
+          "guides/architecture/query-engine",
+          "guides/architecture/time-series-optimizations",
+          "guides/architecture/data-ingestion-engine",
+          "guides/architecture/networking-layer",
+          "guides/architecture/replication-layer",
+          "guides/architecture/security",
+          "guides/architecture/observability",
+          "guides/architecture/web-console"
+        ]
     },
     {
       label: "Third-party Tools",
