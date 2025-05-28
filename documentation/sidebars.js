@@ -553,7 +553,7 @@ module.exports = {
       ],
     },
     {
-        label: "QuestDB Architecture",
+        label: "Architecture",
         type: "category",
         items: [
           "guides/architecture/overview",
