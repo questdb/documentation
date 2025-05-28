@@ -150,6 +150,75 @@ fn main() -> Result<()> {
 Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+## Ingesting arrays
+
+The `Sender::column_arr` interface supports efficient ingestion of N-dimensionals array data with various array types:
+
+- Built-in Rust Arrays (up to 3-dimensionals)
+- Vectors and Slices (up to 3-dimensionals)
+- [Ndarray](https://docs.rs/ndarray) Structures
+
+1. Recording 1D Array (Built-in)
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+
+    buffer
+        .table("x")?
+        .symbol("device_id", "sensor")?
+        .column_arr("measurements", [1.0f64, 2.0, 3.0, 4.0])?;
+    buffer.send()?;
+    Ok(())
+}
+```
+
+2. Recording 2D Vector 
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+    
+    // 2D vector
+    let matrix_data = vec![
+        vec![1.1, 2.2, 3.3],
+        vec![4.4, 5.5, 6.6]
+    ];
+
+    buffer
+        .table("matrix_data")?
+        .column_arr("values", &matrix_data)?;
+
+    buffer.send()?;
+    Ok(())
+}
+```
+
+3. Recording a [Ndarray](https://docs.rs/ndarray):
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+use ndarray::arr3;
+
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+    let tensor = arr3(&[
+        [[1.0], [2.0]], 
+        [[3.0], [4.0]], 
+        [[5.0], [6.0]]
+    ]);
+    buffer
+        .table("x")?
+        .column_arr("tensor_data", &tensor.view())?;  // Efficient view ingestion
+    buffer.send()?;
+    Ok(())
+}
+
+```
+
 ## Configuration options
 
 The easiest way to configure the line sender is the configuration string. The
@@ -224,6 +293,28 @@ You can inspect the sender's error state by calling `sender.must_close()`.
 For more details about the HTTP and TCP transports, please refer to the
 [ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
+## Protocol Version
+To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through the sender's parameter `protocol_version`.
+
+For HTTP implementations:  
+- Protocol version auto-negotiation occurs during handshake
+- No manual configuration required in most scenarios  
+- Advanced use case: Set `protocol_version=2|1` to bypass initial protocol discovery for ultra-low latency requirements 
+
+For TCP connections:  
+- Lacks automatic protocol detection capability  
+- Defaults to text-based format (protocol_version=1)  
+- Mandatory configuration:  
+  Set `protocol_version=2` when:  
+  a) Connecting to servers built after `8.4.0`
+  b) Requiring array data writes
+
+Here is a configuration string with `protocol_version=2` for `TCP`:
+
+```
+tcp::addr=localhost:9000;protocol_version=2;
+```
+
 ## Crate features
 
 The QuestDB client crate supports some optional features, mostly related to
@@ -245,6 +336,7 @@ These features are opt-in:
   certificates store.
 - `insecure-skip-verify`: Allows skipping server certificate validation in TLS
   (this compromises security).
+- `ndarray`: Enables ingestion of arrays through the `column_arr()` interface using [ndarray](https://docs.rs/ndarray) crate.
 
 ## Next steps
 

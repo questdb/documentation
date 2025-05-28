@@ -67,6 +67,22 @@ controls the auto-flushing behavior of the TCP transport.
   `request_timeout`. This is useful for large requests. You can set this value
   to `0` to disable this logic.
 
+### Protocol Version
+`protocol_version` : Specifies the version of Ingestion Line Protocol to use.
+Valid options are:
+
+- `1` - Text-based format compatible with InfluxDB line protocol.
+- `2` - Binary format with array and f64 support.
+- `auto` (default) - Automatic version selection based on connection type.
+
+Behavior details:
+
+| Value  | Behavior                                                                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`    | - Plain text serialization <br> - Compatible with InfluxDB servers <br> No array type support                                                                 |
+| `2`    | - Binary encoding for f64 <br> - Full support for array                                                                                                       |
+| `auto` | - **HTTP/HTTPS**: Auto-detects server capability during handshake (supports version negotiation) <br> - **TCP/TCPS**: Defaults to version 1 for compatibility |
+
 ### TLS encryption
 
 To enable TLS, select the `https` or `tcps` protocol.

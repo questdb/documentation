@@ -354,6 +354,28 @@ rows with older timestamps are ingested before rows with newer timestamps.
 
 :::
 
+## Protocol Version
+To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through the sender's parameter `protocol_version`.
+
+For HTTP implementations:  
+- Protocol version auto-negotiation occurs during handshake
+- No manual configuration required in most scenarios  
+- Advanced use case: Set `protocol_version=2|1` to bypass initial protocol discovery for ultra-low latency requirements 
+
+For TCP connections:  
+- Lacks automatic protocol detection capability  
+- Defaults to text-based format (protocol_version=1)  
+- Mandatory configuration:  
+  Set `protocol_version=2` when:  
+  a) Connecting to servers built after `8.4.0`
+  b) Requiring array-type data writes
+
+Here is a configuration string with `protocol_version=2` for `TCP`:
+
+```
+tcp::addr=localhost:9000;protocol_version=2;
+```
+
 ## Configuration options
 
 Client can be configured either by using a configuration string as shown in the
