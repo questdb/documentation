@@ -1,5 +1,5 @@
 ---
-title: Active Directory (PingFederate) guide
+title: Active Directory (PingFederate)
 description: ""
 ---
 
