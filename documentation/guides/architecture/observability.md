@@ -7,6 +7,8 @@ description: QuestDB provides real-time metrics, a health check endpoint, and lo
 
 ## Observability & diagnostics
 
+QuestDB provides real-time metrics, a health check endpoint, and logging to monitor performance and simplify troubleshooting.
+
 - **Metrics:**
   QuestDB exposes detailed [metrics in Prometheus format](/docs/operations/logging-metrics/#metrics), including query
   statistics, memory usage, and I/O details.

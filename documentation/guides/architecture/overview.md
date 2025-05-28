@@ -49,8 +49,8 @@ QuestDB is comprised of several key components:
   writes with multi-primary.
 
 - **[Security](/docs/guides/architecture/security):**
-  QuestDB provides real-time metrics, a health check endpoint, and logging to monitor
-  performance and simplify troubleshooting.
+  QuestDB implements enterprise-grade security with TLS, single-sign-on, and role-based access control with
+  fine-grained granularity.
 
 - **[Observability](/docs/guides/architecture/observability):**
   QuestDB provides real-time metrics, a health check endpoint, and logging to monitor

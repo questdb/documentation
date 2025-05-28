@@ -1,13 +1,13 @@
 ---
 title: Memory Management
 slug: memory-management
-description: The system leverages both memory mapping and explicit memory management techniques, and integrates native code for performance-critical tasks.
+description: QuestDB leverages both memory mapping and explicit memory management techniques, and integrates native code for performance-critical tasks.
 ---
-
-QuestDB offers high-speed ingestion and low-latency analytics on time-series data.
 
 
 ## Memory management and native integration
+
+QuestDB leverages both memory mapping and explicit memory management techniques, and integrates native code for performance-critical tasks.
 
 ### Memory-mapped files
 

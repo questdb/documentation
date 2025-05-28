@@ -7,6 +7,10 @@ description: The QuestDB Storage Engine uses a column-oriented design to ensure 
 
 ## Storage engine
 
+The QuestDB Storage Engine implements a row-based write path for maximum ingestion throughput, and a column-based
+read path for maximum query performance.
+
+
 ### Parallel Write-Ahead-Log
 
 - **Two-phase writes**: All changes to data are recorded in a Write-Ahead-Log (WAL) before they

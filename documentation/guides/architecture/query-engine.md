@@ -1,16 +1,16 @@
 ---
 title: Query Engine
 slug: query-engine
-description: Questrb Query Engine includes A custom SQL parser, a just-in-time (JIT) compiler, and a vectorized execution engine process data in table page frames for better CPU use.
+description: The QuestDB Query Engine includes A custom SQL parser, a just-in-time (JIT) compiler, and a vectorized execution engine to process data in table page frames for better CPU use.
 
 
 ---
 
-QuestDB offers high-speed ingestion and low-latency analytics on time-series data.
-
-
-
 ## Query engine
+
+The QuestDB Query Engine includes A custom SQL parser, a just-in-time (JIT) compiler, and a vectorized execution engine
+to process data in table page frames for better CPU use.
+
 
 ### SQL parsing & optimization
 

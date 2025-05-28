@@ -7,6 +7,9 @@ description: The QuestDB Data Ingestion Engine supports bulk and streaming inges
 
 ## Data ingestion & write path
 
+The QuestDB Data Ingestion Engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead log
+(WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments ship to object storage for replication.
+
 ### Bulk ingestion
 
 - **CSV ingestion:**

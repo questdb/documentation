@@ -1,11 +1,14 @@
 ---
 title: Security
 slug: security
-description: QuestDB provides real-time metrics, a health check endpoint, and logging to monitor performance and simplify troubleshooting.
+description: QuestDB implements enterprise-grade security with TLS, single-sign-on, and role-based access control with fine-grained granularity.
 ---
 
 
 ## Security
+
+ QuestDB implements enterprise-grade security with TLS, single-sign-on, and role-based access control with
+  fine-grained granularity.
 
 - **Built-in admin and read-only users:**
   QuestDB includes built-in admin and read-only users for the pgwire protocol and HTTP endpoints using HTTP Basic Auth.

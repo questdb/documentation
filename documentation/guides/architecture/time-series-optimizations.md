@@ -7,6 +7,9 @@ description: QuestDB is specifically designed for time-series, and it provides s
 
 ## Time-series optimizations
 
+QuestDB is specifically designed for time-series, and it provides several optimizations, like a designated timestamp,
+sequential reads, materialized-views, or in-memory processing.
+
 ### Designated timestamp
 
 - **Timestamp sorting:**
