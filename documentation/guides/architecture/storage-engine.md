@@ -27,8 +27,8 @@ concurrent data ingestion, modifications, and schema changes without locking the
 appears consistent to all readers, even during ongoing write operations.
 
 
-- **TableWriter**: Changes stored in the WAL, is stored in columnat format by the TableWriter, which
-can handle and resolve out-of-order data writes, and enables deduplication. Column files use an
+- **TableWriter**: Changes stored in the WAL are stored in columnar format by the TableWriter. The TableWriter
+also handles and resolves out-of-order data writes, and enables deduplication. Column files use an
 [append model](/docs/concept/storage-model/).
 
 <Screenshot
