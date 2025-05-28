@@ -10,33 +10,31 @@ import { ILPClientsTable } from "@theme/ILPClientsTable"
 QuestDB offers a Rust client designed for high-performance data ingestion. These
 are some of the highlights:
 
-- **Creates tables automatically**: no need to define your schema up-front.
+- **Creates tables automatically**: no need to define your schema up-front
 - **Concurrent schema changes**: seamlessly handle multiple data streams that
   modify the table schema on the fly
-- **Optimized batching**: buffer the data and send many rows in one go.
+- **Optimized batching**: buffer the data and send many rows in one go
 - **Health checks and feedback**: built-in health monitoring ensures the health
-  of your system.
+  of your system
 
 <ILPClientsTable language="Rust" />
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Rust library](/docs/pgwire/rust/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible Rust library](/docs/pgwire/rust/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
 
-
-## Requirements
-
-- Requires Rust 1.40 or later.
-- Assumes your QuestDB server is already running. If you don't have a QuestDB
-  server yet, refer to [the general quick start](/docs/quick-start/).
+If you don't have a QuestDB server yet, follow the
+[Quick Start](/docs/quick-start/) section to set it up.
 
 ## Add the client crate to your project
 
-Add the QuestDB client to your project using the command line:
+QuestDB clients requires Rust 1.40 or later. Add its crate to your project using
+the command line:
 
 ```bash
 cargo add questdb-rs
@@ -44,8 +42,7 @@ cargo add questdb-rs
 
 ## Authentication
 
-This is how you'd set up the client to authenticate using the HTTP Basic
-authentication:
+This is how you authenticate using the HTTP Basic authentication:
 
 ```rust
 let mut sender = Sender::from_conf(
@@ -66,9 +63,8 @@ Then you use it like this:
 let mut sender = Sender::from_env()?;
 ```
 
-When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
-info.
+When using QuestDB Enterprise, you can authenticate via a REST token. Please
+check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
 ## Basic insert
 
@@ -147,18 +143,25 @@ fn main() -> Result<()> {
 }
 ```
 
-Using the current timestamp hinder the ability to deduplicate rows which is
+:::warning
+
+Avoid using `at_now()` instead of `at(some_timestamp)` because this removes the
+ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+
+:::
 
 ## Ingesting arrays
 
-The `Sender::column_arr` interface supports efficient ingestion of N-dimensionals array data with various array types:
+The `Sender::column_arr` method supports efficient ingestion of N-dimensional
+arrays using several convenient types:
 
-- Built-in Rust Arrays (up to 3-dimensionals)
-- Vectors and Slices (up to 3-dimensionals)
-- [Ndarray](https://docs.rs/ndarray) Structures
+- native Rust arrays and slices (up to 3-dimensional)
+- native Rust vectors (up to 3-dimensional)
+- arrays from the [ndarray](https://docs.rs/ndarray) crate
 
-1. Recording 1D Array (Built-in)
+### 1. Record a 1D Array (Built-in)
+
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
 fn main() -> Result<()> {
@@ -174,14 +177,15 @@ fn main() -> Result<()> {
 }
 ```
 
-2. Recording 2D Vector 
+### 2. Record a 2D Vector
+
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
 
 fn main() -> Result<()> {
     let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
     let mut buffer = sender.new_buffer();
-    
+
     // 2D vector
     let matrix_data = vec![
         vec![1.1, 2.2, 3.3],
@@ -197,7 +201,8 @@ fn main() -> Result<()> {
 }
 ```
 
-3. Recording a [Ndarray](https://docs.rs/ndarray):
+### 3. Record an array from [ndarray](https://docs.rs/ndarray)
+
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
 use ndarray::arr3;
@@ -206,8 +211,8 @@ fn main() -> Result<()> {
     let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
     let mut buffer = sender.new_buffer();
     let tensor = arr3(&[
-        [[1.0], [2.0]], 
-        [[3.0], [4.0]], 
+        [[1.0], [2.0]],
+        [[3.0], [4.0]],
         [[5.0], [6.0]]
     ]);
     buffer
@@ -294,24 +299,23 @@ For more details about the HTTP and TCP transports, please refer to the
 [ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
 ## Protocol Version
-To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through the sender's configuration `protocol_version`.
 
-For HTTP protocol:  
-- Protocol version auto-negotiation occurs during handshake
-- No manual configuration required in most scenarios  
-- Advanced use case: Set `protocol_version=2|1` to bypass initial protocol discovery for ultra-low latency requirements 
+To enhance data ingestion performance, QuestDB introduced an upgrade to the
+text-based InfluxDB Line Protocol which encodes arrays and f64 values in binary
+form. Arrays are supported only in this upgraded protocol version.
 
-For TCP protocol:  
-- Lacks automatic protocol detection capability  
-- Defaults to text-based format (protocol_version=1)  
-- Mandatory configuration:  
-  Set `protocol_version=2` when:  
-  a) Connecting to servers built after `8.4.0`
-  b) Requiring array data writes
+You can select the protocol version with the `protocol_version` setting in the
+configuration string.
 
-Here is a configuration string with `protocol_version=2` for `TCP`:
+HTTP transport automatically negotiates the protocol version by default. In order
+to avoid the slight latency cost at connection time, you can explicitly configure
+the protocol version by setting `protocol_version=2|1;`.
 
-```
+TCP transport does not negotiate the protocol version and uses version 1 by
+default. You must explicitly set `protocol_version=2;` in order to ingest
+arrays, as in this example:
+
+```text
 tcp::addr=localhost:9000;protocol_version=2;
 ```
 
@@ -336,7 +340,8 @@ These features are opt-in:
   certificates store.
 - `insecure-skip-verify`: Allows skipping server certificate validation in TLS
   (this compromises security).
-- `ndarray`: Enables ingestion of arrays through the `column_arr()` interface using [ndarray](https://docs.rs/ndarray) crate.
+- `ndarray`: Enables ingestion of arrays from the
+  [ndarray](https://docs.rs/ndarray) crate.
 
 ## Next steps
 
