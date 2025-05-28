@@ -294,14 +294,14 @@ For more details about the HTTP and TCP transports, please refer to the
 [ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
 ## Protocol Version
-To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through the sender's parameter `protocol_version`.
+To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through the sender's configuration `protocol_version`.
 
-For HTTP implementations:  
+For HTTP protocol:  
 - Protocol version auto-negotiation occurs during handshake
 - No manual configuration required in most scenarios  
 - Advanced use case: Set `protocol_version=2|1` to bypass initial protocol discovery for ultra-low latency requirements 
 
-For TCP connections:  
+For TCP protocol:  
 - Lacks automatic protocol detection capability  
 - Defaults to text-based format (protocol_version=1)  
 - Mandatory configuration:  

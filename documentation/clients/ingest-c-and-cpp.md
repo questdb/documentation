@@ -188,6 +188,62 @@ using the original event timestamps when ingesting data into QuestDB. Using the
 current timestamp will hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+### Array Insertion
+
+Currently, the C++ interface supports `std::array` for data, while the C interface offers a lower-level and more flexible option:
+
+```cpp
+#include <questdb/ingress/line_sender.hpp>
+#include <iostream>
+#include <vector>
+
+using namespace std::literals::string_view_literals;
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        auto sender = questdb::ingress::line_sender::from_conf(
+            "tcp::addr=127.0.0.1:9000;protocol_version=2;");
+        const auto table_name = "cpp_market_orders_byte_strides"_tn;
+        const auto symbol_col = "symbol"_cn;
+        const auto book_col = "order_book"_cn;
+        size_t rank = 3;
+        std::vector<uintptr_t> shape{2, 3, 2};
+        std::vector<intptr_t> strides{48, 16, 8};
+        std::array<double, 12> arr_data = {
+            48123.5,
+            2.4,
+            48124.0,
+            1.8,
+            48124.5,
+            0.9,
+            48122.5,
+            3.1,
+            48122.0,
+            2.7,
+            48121.5,
+            4.3};
+
+        questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
+        buffer.table(table_name)
+            .symbol(symbol_col, "BTC-USD"_utf8)
+            .column<true>(book_col, 3, shape, strides, arr_data)
+            .at(questdb::ingress::timestamp_nanos::now());
+        sender.flush(buffer);
+        return true;
+    }
+    catch (const questdb::ingress::line_sender_error& err)
+    {
+        std::cerr << "[ERROR] " << err.what() << std::endl;
+        return false;
+    }
+}
+```
+
+If your strides match the element size, call `column<false>(book_col, 3, shape, strides, arr_data)` (note the false generic parameter).
+
 ## C
 
 :::note
@@ -424,6 +480,99 @@ original event timestamps when ingesting data into QuestDB. Using the current
 timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+### Array Insertion
+
+```c
+int main()
+{
+    line_sender_error* err = NULL;
+    line_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+    char* conf_str = concat("tcp::addr=", host, ":", port, ";protocol_version=2;");
+    if (!conf_str)
+    {
+        fprintf(stderr, "Could not concatenate configuration string.\n");
+        return false;
+    }
+
+    line_sender_utf8 conf_str_utf8 = {0, NULL};
+    if (!line_sender_utf8_init(
+            &conf_str_utf8, strlen(conf_str), conf_str, &err))
+        goto on_error;
+
+    sender = line_sender_from_conf(conf_str_utf8, &err);
+    if (!sender)
+        goto on_error;
+
+    free(conf_str);
+    conf_str = NULL;
+
+    buffer = line_sender_buffer_new_for_sender(sender);
+    line_sender_buffer_reserve(buffer, 64 * 1024);
+
+    line_sender_table_name table_name = QDB_TABLE_NAME_LITERAL("market_orders_byte_strides");
+    line_sender_column_name symbol_col = QDB_COLUMN_NAME_LITERAL("symbol");
+    line_sender_column_name book_col = QDB_COLUMN_NAME_LITERAL("order_book");
+
+    if (!line_sender_buffer_table(buffer, table_name, &err))
+        goto on_error;
+
+    line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("BTC-USD");
+    if (!line_sender_buffer_symbol(buffer, symbol_col, symbol_val, &err))
+        goto on_error;
+
+    size_t array_rank = 3;
+    uintptr_t array_shape[] = {2, 3, 2};
+    intptr_t array_strides[] = {48, 16, 8};
+
+    double array_data[] = {
+        48123.5,
+        2.4,
+        48124.0,
+        1.8,
+        48124.5,
+        0.9,
+        48122.5,
+        3.1,
+        48122.0,
+        2.7,
+        48121.5,
+        4.3};
+
+    if (!line_sender_buffer_column_f64_arr_byte_strides(
+            buffer,
+            book_col,
+            array_rank,
+            array_shape,
+            array_strides,
+            (const uint8_t*)array_data,
+            sizeof(array_data),
+            &err))
+        goto on_error;
+
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+        goto on_error;
+
+    if (!line_sender_flush(sender, buffer, &err))
+        goto on_error;
+
+    line_sender_close(sender);
+    return true;
+
+on_error:;
+    size_t err_len = 0;
+    const char* err_msg = line_sender_error_msg(err, &err_len);
+    fprintf(stderr, "Error: %.*s\n", (int)err_len, err_msg);
+    free(conf_str);
+    line_sender_error_free(err);
+    line_sender_buffer_free(buffer);
+    line_sender_close(sender);
+    return false;
+}
+```
+
+If your strides match the element size, call `line_sender_buffer_column_f64_arr_elem_strides`.
+
 ## Other Considerations for both C and C++
 
 ### Configuration options
@@ -472,6 +621,29 @@ To ensure in advance that a flush will not affect more than one table, call
 demonstrated on the examples in this document.
 
 This call will return false if the flush wouldn't be data-transactional.
+
+### Protocol version
+
+To enhance data ingestion performance, the client-server communication protocol is being upgraded from text-based to binary encoding. The transition can be managed through configuration `protocol_version`.
+
+For HTTP protocol:  
+- Protocol version auto-negotiation occurs during handshake
+- No manual configuration required in most scenarios  
+- Advanced use case: Set `protocol_version=2|1` to bypass initial protocol discovery for ultra-low latency requirements 
+
+For TCP protocol:  
+- Lacks automatic protocol detection capability  
+- Defaults to text-based format (protocol_version=1)  
+- Mandatory configuration:  
+  Set `protocol_version=2` when:  
+  a) Connecting to servers built after `8.4.0`
+  b) Requiring array data writes
+
+Here is a configuration string with `protocol_version=2` for `TCP`:
+
+```
+tcp::addr=localhost:9000;protocol_version=2;
+```
 
 ## Next Steps
 

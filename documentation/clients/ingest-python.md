@@ -233,6 +233,43 @@ with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name='trades', at='timestamp')
 ```
 
+## Insert numpy.ndarray
+
+- Direct Array Insertion：
+
+```python
+from questdb.ingress import Sender, TimestampNanos
+import numpy as np
+
+arr1 = np.array([1.2345678901234567, 2.3456789012345678], dtype=np.float64)
+arr2 = np.arange(6, dtype=np.float64).reshape(2, 3)
+arr3 = base[:, ::2]
+
+conf = f'http::addr=localhost:9000;'
+with Sender.from_conf(conf) as sender:
+    sender.row(
+        'tango',
+        columns={'arr1': arr1, 'arr2': arr2, 'arr3': arr3},
+        at=TimestampNanos.now())
+    sender.flush()
+```
+
+- DataFrame Insertion
+
+```python
+import pandas as pd
+from questdb.ingress import Sender
+import numpy as np
+
+df = pd.DataFrame({
+    'array': [np.array([1.0], np.float64), np.array([2.0], np.float64)]
+    'timestamp': pd.to_datetime(['2022-03-08T18:03:57.609765Z', '2022-03-08T18:03:57.710419Z'])})
+
+conf = f'http::addr=localhost:9000;'
+with Sender.from_conf(conf) as sender:
+    sender.dataframe(df, table_name='tango', at='timestamp')
+```
+
 ## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as
