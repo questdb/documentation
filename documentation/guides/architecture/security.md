@@ -11,10 +11,10 @@ description: QuestDB implements enterprise-grade security with TLS, single-sign-
   fine-grained granularity.
 
 - **Built-in admin and read-only users:**
-  QuestDB includes built-in admin and read-only users for the pgwire protocol and HTTP endpoints using HTTP Basic Auth.
+  QuestDB includes built-in admin and read-only users for the PGWire protocol and HTTP endpoints using HTTP Basic Auth.
 
 - **HTTP basic authentication:**
-  You can enable HTTP Basic Authentication for the HTTP API, web console, and pgwire
+  You can enable HTTP Basic Authentication for the HTTP API, web console, and PGWire
   protocol. Health-check and metrics endpoints can be configured independently.
 
 - **Token-based authentication:**

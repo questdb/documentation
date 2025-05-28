@@ -28,7 +28,7 @@ primary to replicate changes to the object store, even if there are no read repl
 could be used for point-in-time recovery.
 
 For demanding scenarios, QuestDB Enterprise allows [multi-primary ingestion](/docs/operations/multi-primary-ingestion/),
-which allows both increasing the write throughput, and enabling high availabilty. In order to enable multi-primary ingestion,
+which allows both increasing the write throughput, and enabling high availability. In order to enable multi-primary ingestion,
 a `Distributed Sequencer` instance will need to be created.
 
 
@@ -57,4 +57,3 @@ across primaries.
 - Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
-

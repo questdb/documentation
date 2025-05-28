@@ -34,7 +34,7 @@ QuestDB is comprised of several key components:
   QuestDB is specifically designed for time-series, and it provides several optimizations, such as a designated timestamp, sequential reads, materialized views, and in-memory processing.
 
 - **[Data ingestion engine](/docs/guides/architecture/data-ingestion):**
-  TSupports both bulk and streaming ingestion. It writes data to a row-based write-ahead
+  Supports both bulk and streaming ingestion. It writes data to a row-based write-ahead
   log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments
   are shipped to object storage for replication.
 
@@ -54,8 +54,6 @@ QuestDB is comprised of several key components:
 
 - **[Web console](/docs/guides/architecture/web-console):**
   The engine includes a web console for running SQL statements, bulk loading CSV files, and displaying monitoring dashboards. QuestDB Enterprise supports single sign-on (SSO) in the web console.
-
-
 
 
 ## Design patterns & best practices throughout the codebase

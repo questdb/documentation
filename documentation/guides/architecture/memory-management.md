@@ -43,6 +43,3 @@ QuestDB leverages both memory mapping and explicit memory management techniques,
 - Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
-
-
-

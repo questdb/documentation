@@ -67,7 +67,7 @@ sequential reads, materialized-views, or in-memory processing.
 
   - QuestDB supports materialized views for `SAMPLE BY` queries, including those joining with other tables.
 
-  - Materialized sampled intervals are automatically refreshed whenever the base table receivews new or updated rows.
+  - Materialized sampled intervals are automatically refreshed whenever the base table receives new or updated rows.
 
   - Materialized views can be chained, with the output of one being the input of another one, and support TTLs for lifecycle management.
 
@@ -107,7 +107,6 @@ Varchar data (column file):
 +---+---+---+---+---+---+---+---+---+---+---+
 | H | e | l | l | o |   | w | o | r | l | d |
 +---+---+---+---+---+---+---+---+---+---+---+
-
 ```
 
 ## Next Steps
@@ -115,4 +114,3 @@ Varchar data (column file):
 - Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
-
