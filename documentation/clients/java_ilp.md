@@ -39,21 +39,22 @@ The client provides the following benefits:
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
 
-
 ## Compatible JDKs
 
-The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.
+The client relies on some JDK internal libraries, which certain specialised JDK
+offerings may not support.
 
 Here is a list of known incompatible JDKs:
 
 - Azul Zing 17
-    - A fix is in progress. You can use Azul Zulu 17 in the meantime. 
+  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
 
 ## Quick start
 
@@ -68,7 +69,7 @@ Add a QuestDB as a dependency in your project's build configuration file.
       renderText={(release) => (
         <CodeBlock className="language-xml">
           {`<dependency>
-  <groupId>org.questdb</groupId> 
+  <groupId>org.questdb</groupId>
   <artifactId>questdb</artifactId>
   <version>${release.name}</version>
 </dependency>`}
@@ -94,7 +95,7 @@ wall-clock time.
 The configuration for the client is specified using a configuration string. This
 string follows the format:
 
-```
+```text
 <protocol>::<key>=<value>;<key>=<value>;...;
 ```
 
@@ -133,24 +134,30 @@ There are three ways to create a client instance:
    string. See [Configuration options](#configuration-options) for all available
    options. It allows sharing the same configuration across clients in different
    languages.
+
    ```java
    try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;")) {
        // ...
    }
    ```
+
 2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
    is used to set the configuration string. Moving configuration parameters to
    an environment variable allows you to avoid hard-coding sensitive information
    such as tokens and password in your code.
+
    ```bash
    export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
    ```
+
    ```java
    try (Sender sender = Sender.fromEnv()) {
        // ...
    }
    ```
+
 3. **Using the Java builder API.** This provides type-safe configuration.
+
    ```java
    try (Sender sender = Sender.builder(Sender.Transport.HTTP)
            .address("localhost:9000")
@@ -173,15 +180,41 @@ There are three ways to create a client instance:
    - `longColumn(CharSequence, long)`
    - `doubleColumn(CharSequence, double)`
    - `boolColumn(CharSequence, boolean)`
+   - `arrayColumn()` -- several variants, see below
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
 
-5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit) ` or `atNow()` to
+5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
    set a designated timestamp.
 6. Optionally: You can use `flush()` to send locally buffered data into a
    server.
 7. Go to the step no. 2 to start a new row.
 8. Use `close()` to dispose the Sender after you no longer need it.
+
+## Ingesting arrays
+
+To ingest a 1D or 2D array, simply construct a Java array of the appropriate
+type (`double[]`, `double[][]`) and supply it to the `arrayColumn()` method. In
+order to avoid GC overheads, you are highly encouraged create the array instance
+once, and then populate it with the data of each row.
+
+For arrays of higher dimensionality, use the `DoubleArray` class. Here's a basic
+example for a 3D array:
+
+```java
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
+     DoubleArray ary = new DoubleArray(3, 3, 3);
+) {
+    for (int i = 0; i < ROW_COUNT; i++) {
+        for (int value = 0; value < 3 * 3 * 3; value++) {
+            ary.append(value);
+        }
+        sender.table("tango")
+              .doubleArray("array", ary)
+              .at(getTimestamp(), ChronoUnit.MICROS);
+    }
+}
+```
 
 ## Flushing
 
@@ -300,6 +333,7 @@ There are two ways to assign a designated timestamp to a row:
 
 2. Server-assigned timestamp: The server automatically assigns a timestamp to
    the row based on the server's wall-clock time. Example:
+
    ```java
    sender.table("trades")
          .symbol("symbol", "ETH-USD")
@@ -319,6 +353,27 @@ QuestDB works best when rows are ingested in chronological order. This means
 rows with older timestamps are ingested before rows with newer timestamps.
 
 :::
+
+## Protocol Version
+
+To enhance data ingestion performance, QuestDB introduced an upgrade to the
+text-based InfluxDB Line Protocol which encodes arrays and f64 values in binary
+form. Arrays are supported only in this upgraded protocol version.
+
+You can select the protocol version with the `protocol_version` setting in the
+configuration string.
+
+HTTP transport automatically negotiates the protocol version by default. In order
+to avoid the slight latency cost at connection time, you can explicitly configure
+the protocol version by setting `protocol_version=2|1;`.
+
+TCP transport does not negotiate the protocol version and uses version 1 by
+default. You must explicitly set `protocol_version=2;` in order to ingest
+arrays, as in this example:
+
+```text
+tcp::addr=localhost:9000;protocol_version=2;
+```
 
 ## Configuration options
 
