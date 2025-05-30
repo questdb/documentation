@@ -357,22 +357,7 @@ useful.
 
 ## Limitations
 
-### Beta
-
 - Not all `SAMPLE BY` syntax is supported, for example, `FILL`.
-- The `INCREMENTAL` refresh strategy relies on deduplicated inserts (O3 writes)
-  - We will instead delete a time range and insert the data as an append, which
-    is **much** faster.
-  - This also means that currently, deduplication keys must be aligned across
-    the `base` table and the view.
-
-### Post-release
-
-- Only `INCREMENTAL` refresh is supported
-  - We intend to add alternatives, such as:
-    - `PERIODIC` (once per partition),
-    - `TIMER` (once per time interval)
-    - `MANUAL` (only when manually triggered)
 - `INCREMENTAL` refresh is only triggered by inserts into the `base` table, not
   join tables.
 

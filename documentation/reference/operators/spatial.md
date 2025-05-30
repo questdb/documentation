@@ -22,8 +22,8 @@ execute in parallel.
 
 In QuestDB 8.3.2, the `within` implementation was upgraded, and now supports general `WHERE` filtering.
 
-The prior implementation executed `LATEST ON` before `WHERE`, only support geohash constants, and all involved symbol 
-columns had to be indexed. However, it is highly optimised for that specific execution, using SIMD instructions.
+The prior implementation executed `LATEST ON` before `WHERE`, only support geohashed constants, and all involved symbol 
+columns had to be indexed. However, it is highly optimised for that specific execution and uses SIMD instructions.
 
 To re-enable this implementation, you must set `query.within.latest.by.optimisation.enabled=true` in server.conf.
 
