@@ -125,10 +125,10 @@ More details on this topic can be found in the
 For setting up Single Sign-On (SSO), please, refer to the
 [OIDC Integration](/docs/operations/openid-connect-oidc-integration) guide,
 which explains how QuestDB integrates with OAuth2/OIDC providers in general.
-Although we cannot cover all OAuth2 providers, we also documented
-[PingFederate](/docs/guides/active-directory-pingfederate)
-and [Microsoft EntraID](/docs/guides/microsoft-entraid-oidc)
-example setups. Other providers should be configured similarly.
+Although we cannot cover all OAuth2 providers, we have documented
+PingFederate and Microsoft EntraID example setups. 
+
+Other providers should be configured similarly.
 
 :::warning
 
