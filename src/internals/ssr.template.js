@@ -39,6 +39,14 @@ module.exports = ({ customFields, favicon, organizationName, url }) => `
     <% it.scripts.forEach((script) => { %>
       <script type="text/javascript" src="<%= it.baseUrl %><%= script %>" defer></script>
     <% }); %>
+    <script>
+      (function()  {
+        if (localStorage.getItem('theme') !== 'dark') {
+          window.localStorage.removeItem('theme');
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })()
+    </script>
     <%~ it.postBodyTags %>
   </body>
 </html>

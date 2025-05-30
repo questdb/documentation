@@ -7,13 +7,11 @@ description:
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use.
+Materialized View support is now generally available (GA) and ready for
+production use.
 
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your
+earliest convenience.
 
 :::
 
@@ -106,7 +104,7 @@ If you are unfamiliar with the OHLC concept, please see our
 
 :::
 
-```questdb-sql title="trades_OHLC_15m ddl"
+```questdb-sql title="trades_OHLC_15m DDL"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m'
 WITH BASE 'trades' REFRESH INCREMENTAL
 AS (
@@ -139,12 +137,20 @@ In this example:
    - Therefore, the materialized view will contain a summary of _all_ the base
      `trades` table's data.
 
-:::tip
+Many parts of the above DDL statement are optional and can be ommited:
 
-This particular example can also be written via the
-[compact syntax](#compact-syntax).
-
-:::
+```questdb-sql title="trades_OHLC_15m compact DDL"
+CREATE MATERIALIZED VIEW 'trades_OHLC_15m' AS
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
+```
 
 #### The view name
 
@@ -229,15 +235,15 @@ which omits the parentheses.
 
 ```questdb-sql title="trades_OHLC_15m compact syntax"
 CREATE MATERIALIZED VIEW trades_OHLC_15m AS
-  SELECT
-      timestamp, symbol,
-      first(price) AS open,
-      max(price) as high,
-      min(price) as low,
-      last(price) AS close,
-      sum(amount) AS volume
-  FROM trades
-  SAMPLE BY 15m;
+SELECT
+    timestamp, symbol,
+    first(price) AS open,
+    max(price) as high,
+    min(price) as low,
+    last(price) AS close,
+    sum(amount) AS volume
+FROM trades
+SAMPLE BY 15m;
 ```
 
 ## Querying materialized views
@@ -510,17 +516,16 @@ This result set comprises just `14595` rows, instead of ~767 million. That's
 Here it is as a materialized view:
 
 ```questdb-sql title="LATEST ON materialized view"
-CREATE MATERIALIZED VIEW 'trades_latest_1d' WITH BASE 'trades' REFRESH INCREMENTAL AS (
-	SELECT
-	  timestamp,
-	  symbol,
-	  side,
-	  last(price) AS price,
-	  last(amount) AS amount,
-	  last(timestamp) as latest
-	FROM trades
-	SAMPLE BY 1d
-) PARTITION BY DAY;
+CREATE MATERIALIZED VIEW 'trades_latest_1d' AS
+SELECT
+  timestamp,
+  symbol,
+  side,
+  last(price) AS price,
+  last(amount) AS amount,
+  last(timestamp) as latest
+FROM trades
+SAMPLE BY 1d;
 ```
 
 You can try this view out on our demo:
@@ -600,7 +605,8 @@ You can monitor refresh status using the `materialized_views()` system function:
 ```questdb-sql title="Listing all materialized views"
 SELECT
   view_name,
-  last_refresh_timestamp,
+  last_refresh_start_timestamp,
+  last_refresh_finish_timestamp,
   view_status,
   refresh_base_table_txn,
   base_table_txn
@@ -609,9 +615,9 @@ FROM materialized_views();
 
 Here is an example output:
 
-| view_name   | last_refresh_timestamp | view_status | refresh_base_table_txn | base_table_txn |
-| ----------- | ---------------------- | ----------- | ---------------------- | -------------- |
-| trades_view | null                   | valid       | 102                    | 102            |
+| view_name   | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_status | refresh_base_table_txn | base_table_txn |
+| ----------- | ---------------------------- | ----------------------------- | ----------- | ---------------------- | -------------- |
+| trades_view | 2025-05-02T13:46:11.828212Z  | 2025-05-02T13:46:21.828212Z   | valid       | 102                    | 102            |
 
 When `refresh_base_table_txn` matches `base_table_txn`, the materialized view is
 fully up-to-date.
@@ -676,7 +682,8 @@ To create a materialized view, your query:
 - Must use either `SAMPLE BY` or `GROUP BY` with a designated timestamp column
   key.
 - Must not contain `FROM-TO`, `FILL`, and `ALIGN TO FIRST OBSERVATION` clauses
-  in `SAMPLE BY` queries
+  in `SAMPLE BY` queries.
+- Must not use non-deterministic SQL functions like `now()` or `rnd_uuid4()`.
 - Must use join conditions that are compatible with incremental refreshing.
 - When the base table has [deduplication](/docs/concept/deduplication/) enabled,
   the non-aggregate columns selected by the materialized view query must be a

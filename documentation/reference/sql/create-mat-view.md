@@ -7,13 +7,11 @@ description:
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use.
+Materialized View support is now generally available (GA) and ready for
+production use.
 
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your
+earliest convenience.
 
 :::
 
@@ -28,16 +26,19 @@ the [introduction](/docs/concept/mat-views/) and
 
 ## Syntax
 
-To create a materialized view, manually enter the parameters and settings:
+The `CREATE MATERIALIZED VIEW` statement comes in two flavors: compact and full
+syntax. The compact syntax can be used when the default parameters are
+sufficient.
+
+![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
+
+For more on the semantics of the compact syntax, see the
+[materialized view guide](/docs/guides/mat-views/#compact-syntax).
+
+To create a materialized view with full syntax, you need to enter the following
+parameters and settings:
 
 ![Flow chart showing the syntax of the CREATE MATERIALIZED VIEW keyword](/images/docs/diagrams/createMatViewDef.svg)
-
-:::tip
-
-For simple materialized views, you can alternatively use the
-[compact syntax](#compact-syntax).
-
-:::
 
 ## Metadata
 
@@ -67,14 +68,13 @@ Now we can create a materialized view holding aggregated data from the base
 table:
 
 ```questdb-sql title="Hourly materialized view"
-CREATE MATERIALIZED VIEW trades_hourly_prices AS (
-  SELECT
-    timestamp,
-    symbol,
-    avg(price) AS avg_price
-  FROM trades
-  SAMPLE BY 1h
-) PARTITION BY HOUR;
+CREATE MATERIALIZED VIEW trades_hourly_prices AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1h;
 ```
 
 Now, we've created a materialized view that will be automatically refreshed each
@@ -100,17 +100,15 @@ one of them as the base table.
 
 ```questdb-sql title="Hourly materialized view with LT JOIN"
 CREATE MATERIALIZED VIEW trades_ext_hourly_prices
-WITH BASE trades
-AS (
-  SELECT
-    t.timestamp,
-    t.symbol,
-    avg(t.price) AS avg_price,
-    avg(e.price) AS avg_ext_price
-  FROM trades t
-  LT JOIN ext_trades e ON (symbol)
-  SAMPLE BY 1d
-) PARTITION BY WEEK;
+WITH BASE trades AS
+SELECT
+  t.timestamp,
+  t.symbol,
+  avg(t.price) AS avg_price,
+  avg(e.price) AS avg_ext_price
+FROM trades t
+LT JOIN ext_trades e ON (symbol)
+SAMPLE BY 1d;
 ```
 
 ## Partitioning
@@ -160,7 +158,7 @@ depending on your needs.
 
 ### Examples
 
-```questdb-sql title="Creating a materialized view with TTL"
+```questdb-sql title="Creating a materialized view with PARTITION BY and TTL"
 CREATE MATERIALIZED VIEW trades_hourly_prices AS (
   SELECT
     timestamp,
@@ -178,14 +176,13 @@ An optional `IF NOT EXISTS` clause may be added directly after the
 created only if a view with the desired view name does not already exist.
 
 ```questdb-sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS (
-  SELECT
-    timestamp,
-    symbol,
-    avg(price) AS avg_price
-  FROM trades
-  SAMPLE BY 7d
-) PARTITION BY YEAR;
+CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 7d;
 ```
 
 ## Materialized view names
@@ -217,26 +214,6 @@ CREATE MATERIALIZED VIEW trades_hourly_prices AS (
 ) PARTITION BY DAY
 OWNED BY analysts;
 ```
-
-## Compact syntax
-
-The `CREATE MATERIALIZED VIEW` statement also supports a compact syntax which
-can be used when the default parameters are sufficient.
-
-![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
-
-```questdb-sql
-CREATE MATERIALIZED VIEW trades_hourly_prices AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h;
-```
-
-For more on the semantics of the compact syntax, see the
-[materialized view guide](/docs/guides/mat-views/#compact-syntax).
 
 ## SYMBOL column capacity
 

@@ -5,15 +5,16 @@ import dotenv from "dotenv"
 const ssrTemplate = require("./src/internals/ssr.template")
 const customFields = require("./src/config/customFields")
 const path = require("path")
-const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
 
 dotenv.config()
+
+const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
 
 const config = {
   title: "QuestDB",
   tagline: "QuestDB is the fastest open source time series database",
   url: `https://${customFields.domain}`,
-  baseUrl: isPreviews ? '/' : '/docs/',
+  baseUrl: '/docs/',
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
@@ -97,7 +98,7 @@ const config = {
     colorMode: {
       defaultMode: "dark",
       disableSwitch: true,
-      respectPrefersColorScheme: false,
+      respectPrefersColorScheme: false, // the user preference is also overriden, see ssr.template.js
     },
     image: "/images/og.gif",
     prism: {

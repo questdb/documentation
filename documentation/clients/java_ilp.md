@@ -37,6 +37,15 @@ The client provides the following benefits:
   health monitoring
 - **Automatic write retries**: Reuse connections and retry after interruptions
 
+:::info
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
+
 ## Compatible JDKs
 
 The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.

@@ -97,7 +97,10 @@ against the demo instance.
 
 Query QuestDB using the PostgreSQL endpoint via the default port `8812`.
 
-Examples in multiple languages are shown below.
+See [PGWire Client overview](/docs/pgwire/pgwire-intro/) for details on how to
+connect to QuestDB using PostgreSQL clients.
+
+Brief examples in multiple languages are shown below.
 
 <Tabs defaultValue="python" values={[ { label: "Python", value: "python" },
 { label: "Java", value: "java" }, { label: "NodeJS", value: "nodejs" }, { label:
@@ -138,35 +141,11 @@ Examples in multiple languages are shown below.
 
 </Tabs>
 
-### PostgreSQL compatibility
 
-QuestDB offers broad compatibility with the PostgreSQL ecosystem.
+#### Further Reading
 
-However, please note some limitations.
-
-#### Forward-only cursors
-
-QuestDB diverges from PostgreSQL in its handling of
-[cursor commands](https://www.postgresql.org/docs/current/plpgsql-cursors.html).
-While PostgreSQL supports scrollable cursors, enabling backward and forward
-navigation through the results of a SQL query, QuestDB applies a different
-approach.
-
-QuestDB does not support scrollable cursors that require explicit creation and
-management through `DECLARE CURSOR` and subsequent operations like `FETCH`.
-Instead, QuestDB supports non-scrollable, or "forward-only", cursors. This
-distinction means that while you can iterate over query results sequentially,
-you cannot navigate backwards or access result positions as you might with
-scrollable cursors in PostgreSQL.
-
-As a result, some PostgreSQL drivers and libraries that rely on scrollable
-cursors may not be fully compatible with QuestDB. For instance,
-[psycopg2](https://pypi.org/project/psycopg2/) — a popular PostgreSQL driver for
-Python — utilizes scrollable cursors extensively. If possible, select drivers
-that support non-scrollable cursors for optimal compatibility. One such example
-is
-[asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#cursors),
-which is database driver for asyncio and PostgreSQL.
+See the [PGWire Client overview](/docs/pgwire/pgwire-intro/) for more details on how to use PostgreSQL
+clients to connect to QuestDB.
 
 ## REST HTTP API
 

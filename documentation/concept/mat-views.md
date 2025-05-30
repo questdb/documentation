@@ -8,13 +8,9 @@ description:
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use.
+Materialized View support is now generally available (GA) and ready for production use.
 
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
 
 :::
 
@@ -78,15 +74,14 @@ To create a materialize view, surround your `SAMPLE BY` or time-based `GROUP BY`
 query with a [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view) statement.
 
 ```questdb-sql title="trades_notional_1m ddl"
-CREATE MATERIALIZED VIEW 'trades_notional_1m' AS (
-  SELECT
-    timestamp,
-    symbol,
-    side,
-    sum(price * amount) AS notional
-  FROM trades
-  SAMPLE BY 1m
-) PARTITION BY DAY;
+CREATE MATERIALIZED VIEW 'trades_notional_1m' AS
+SELECT
+  timestamp,
+  symbol,
+  side,
+  sum(price * amount) AS notional
+FROM trades
+SAMPLE BY 1m;
 ```
 
 Querying a materialized view can be up to hundreds of times faster than

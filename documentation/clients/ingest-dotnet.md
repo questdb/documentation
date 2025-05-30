@@ -27,6 +27,15 @@ perform basic insert operations.
 
 <ILPClientsTable language=".NET" />
 
+:::info
+
+This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
+For retrieving data, we recommend using a [PostgreSQL-compatible .NET library](/docs/pgwire/c-sharp/) or our
+[HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
+
+:::
+
+
 ## Requirements
 
 - .NET 6.0 or higher is required.

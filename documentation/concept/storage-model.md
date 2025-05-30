@@ -25,7 +25,7 @@ import Screenshot from "@theme/Screenshot"
 <Screenshot
   alt="Architecture of the file storing a column"
   height={435}
-  src="images/docs/concepts/columnUpdate.svg"
+  src="images/docs/concepts/columnUpdate.webp"
   width={745}
 />
 
@@ -39,7 +39,7 @@ mapped memory page, where the required value is read from.
 <Screenshot
   alt="Diagram showing how the data from a column file is mapped to the memory"
   height={447}
-  src="images/docs/concepts/columnRead.svg"
+  src="images/docs/concepts/columnRead.webp"
   width={745}
 />
 
@@ -96,10 +96,7 @@ either randomly (via queries) or incrementally (as a data queue). QuestDB
 provides a variety of reader implementations.
 
 <Screenshot
-  alt="Architecture of the storage model with column files, readers/writers and the mapped memory"
-  height={596}
-  src="images/docs/concepts/storageSummarized.svg"
-  width={745}
+  src="images/docs/concepts/storageSummary.webp"
 />
 
 <span />

@@ -490,9 +490,9 @@ geohashes in text mode (i.e. as strings) as opposed to binary
 
 The Python example below demonstrates how to connect to QuestDB over postgres
 wire, insert and query geohashes. It uses the
-[psychopg3](https://www.psycopg.org/psycopg3/docs/) adapter.
+[psycopg3](https://www.psycopg.org/psycopg3/docs/) adapter.
 
-To install `psychopg3`, use `pip`:
+To install `psycopg3`, use `pip`:
 
 ```shell
 python3 -m pip install "psycopg[binary]"

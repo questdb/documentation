@@ -7,28 +7,36 @@ description:
 
 :::info
 
-Materialized View support is in **beta**. It may not be fit for production use.
+Materialized View support is now generally available (GA) and ready for
+production use.
 
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
+If you are using versions earlier than `8.3.1`, we suggest you upgrade at your
+earliest convenience.
 
 :::
 
 `REFRESH MATERIALIZED VIEW` refreshes a materialized view. This is helpful when
 a view becomes invalid, and no longer refreshes incrementally.
 
-When the FULL keyword is specified, this command deletes the data in the target
-materialized view and inserts the results of the query into the view. It also
-marks the materialized view as valid, reactivating the incremental refresh
+When the `FULL` keyword is specified, this command deletes the data in the
+target materialized view and inserts the results of the query into the view. It
+also marks the materialized view as valid, reactivating the incremental refresh
 processes.
 
 When the `INCREMENTAL` keyword is used, the `REFRESH` command schedules an
 incremental refresh of the materialized view. Usually, incremental refresh is
 automatic, so this command is useful only in niche situations when incremental
 refresh is not working as expected, but the view is still valid.
+
+When the `RANGE` keyword is specified, this command refreshes the data in the
+specified time range only. This command is useful for a valid materialized
+view with configured
+[`REFRESH LIMIT`](/docs/reference/sql/alter-mat-view-set-refresh-limit/). That's
+because inserted base table rows with timestamps older than the refresh limit
+are ignored by incremental refresh, so range refresh may be used to
+recalculate materialized view on older rows. Range refresh does not affect
+incremental refresh, e.g. it does not update the last base table transaction
+used by incremental refresh.
 
 ## Syntax
 
@@ -42,6 +50,10 @@ REFRESH MATERIALIZED VIEW trades_1h FULL;
 
 ```questdb-sql
 REFRESH MATERIALIZED VIEW trades_1h INCREMENTAL;
+```
+
+```questdb-sql
+REFRESH MATERIALIZED VIEW trades_1h RANGE FROM '2025-05-05T01:00:00.000000Z' TO '2025-05-05T02:00:00.000000Z';
 ```
 
 ## See also

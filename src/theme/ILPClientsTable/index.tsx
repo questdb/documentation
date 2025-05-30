@@ -1,3 +1,4 @@
+import useBaseUrl from '@docusaurus/useBaseUrl'
 import style from "./style.module.css"
 
 type Client = {
@@ -82,8 +83,8 @@ export const ILPClientsTable = ({ language }: ILPClientsTableProps) => {
         )
         .map(({ label, logoSrc, lightThemeLogoSrc, docsUrl, sourceUrl }) => (
           <div className={style.client} key={label}>
-            <div className={style.logo}>
-              <img src={lightThemeLogoSrc ?? logoSrc} alt={label} />
+            <div className={style.logo} data-language={label}>
+              <img src={useBaseUrl(lightThemeLogoSrc ?? logoSrc)} alt={label} />
             </div>
 
             <div className={style.buttons}>
@@ -96,8 +97,8 @@ export const ILPClientsTable = ({ language }: ILPClientsTableProps) => {
                   <img
                     alt="Documentation icon"
                     height={22}
-                    src="/images/icons/open-book.svg"
-                    style={{ filter: "invert(1)" }}
+                    src={useBaseUrl("/images/icons/open-book.svg")}
+                    className={style.docsIcon}
                     title="Documentation"
                     width={22}
                   />
@@ -113,7 +114,8 @@ export const ILPClientsTable = ({ language }: ILPClientsTableProps) => {
                   <img
                     alt="Github icon"
                     height={22}
-                    src="/images/github.svg"
+                    src={useBaseUrl("/images/github.svg")}
+                    className={style.ghIcon}
                     title="Source"
                     width={22}
                   />

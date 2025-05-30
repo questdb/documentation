@@ -120,6 +120,58 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "reference/sql/overview",
+        {
+          type: "category",
+          label: "PGWire Clients",
+          collapsed: false,
+          items: [
+            {
+              id: "pgwire/pgwire-intro",
+              type: "doc",
+              label: "Overview",
+            },
+            {
+              id: "pgwire/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "pgwire/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "pgwire/java",
+              type: "doc",
+              label: "Java",
+            },
+            {
+              id: "pgwire/rust",
+              type: "doc",
+              label: "Rust",
+            },
+            {
+              id: "pgwire/javascript",
+              type: "doc",
+              label: "Node.js",
+            },
+            {
+              id: "pgwire/c-sharp",
+              type: "doc",
+              label: ".NET",
+            },
+            {
+              id: "pgwire/php",
+              type: "doc",
+              label: "PHP",
+            },
+            {
+              id: "pgwire/rpostgres",
+              type: "doc",
+              label: "R",
+            },
+          ]
+        },
         "reference/sql/datatypes",
         "concept/sql-execution-order",
         {
@@ -177,6 +229,8 @@ module.exports = {
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
                     "reference/sql/alter-mat-view-change-symbol-capacity",
+                    "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-ttl",
                     "reference/sql/alter-mat-view-resume-wal",
                   ],
                 },
@@ -381,11 +435,12 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
-        "operations/capacity-planning",
         {
-          id: "configuration",
+          id: "operations/migrate-to-enterprise",
           type: "doc",
+          customProps: { tag: "Enterprise" },
         },
+        "operations/capacity-planning",
         "operations/command-line-options",
         "operations/backup",
         {
@@ -428,6 +483,10 @@ module.exports = {
           label: "Multi-primary ingestion",
           customProps: { tag: "Enterprise" },
         },
+        {
+          id: "configuration",
+          type: "doc",
+        },
       ],
     },
     {
@@ -435,18 +494,27 @@ module.exports = {
       type: "category",
       items: [
         "guides/create-database",
+        "guides/import-csv",
+        "guides/mat-views",
+        "guides/working-with-timestamps-timezones",
+        "guides/compression-zfs",
         {
           id: "guides/enterprise-quick-start",
           type: "doc",
           customProps: { tag: "Enterprise" },
         },
-        "guides/compression-zfs",
-        "reference/api/java-embedded",
-        "guides/import-csv",
-        "guides/mat-views",
-        "guides/modifying-data",
+        {
+          label: "Active Directory",
+          type: "category",
+          customProps: { tag: "Enterprise" },
+          items: [
+            "guides/microsoft-entraid-oidc",
+            "guides/active-directory-pingfederate"
+          ]
+        },
         "guides/replication-tuning",
-        "guides/working-with-timestamps-timezones",
+        "reference/api/java-embedded",
+        "guides/modifying-data",
         "web-console",
         {
           label: "Blog tutorials 🔗",
@@ -477,11 +545,29 @@ module.exports = {
         },
         "concept/root-directory-structure",
         "concept/sql-extensions",
+        "concept/sql-optimizer-hints",
         "concept/storage-model",
         "concept/symbol",
         "concept/ttl",
         "concept/write-ahead-log",
       ],
+    },
+    {
+        label: "Architecture",
+        type: "category",
+        items: [
+          "guides/architecture/overview",
+          "guides/architecture/storage-engine",
+          "guides/architecture/memory-management",
+          "guides/architecture/query-engine",
+          "guides/architecture/time-series-optimizations",
+          "guides/architecture/data-ingestion-engine",
+          "guides/architecture/networking-layer",
+          "guides/architecture/replication-layer",
+          "guides/architecture/security",
+          "guides/architecture/observability",
+          "guides/architecture/web-console"
+        ]
     },
     {
       label: "Third-party Tools",
@@ -501,6 +587,7 @@ module.exports = {
             "third-party-tools/redpanda",
             "third-party-tools/powerbi",
             "third-party-tools/pandas",
+            "third-party-tools/polars",
             "third-party-tools/telegraf",
             "third-party-tools/prometheus",
             "third-party-tools/qstudio",
