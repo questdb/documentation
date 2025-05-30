@@ -503,15 +503,6 @@ module.exports = {
           type: "doc",
           customProps: { tag: "Enterprise" },
         },
-        {
-          label: "Active Directory",
-          type: "category",
-          customProps: { tag: "Enterprise" },
-          items: [
-            "guides/microsoft-entraid-oidc",
-            "guides/active-directory-pingfederate"
-          ]
-        },
         "guides/replication-tuning",
         "reference/api/java-embedded",
         "guides/modifying-data",
