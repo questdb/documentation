@@ -21,7 +21,7 @@ results with increased memory usage. The default is 1.
 This function is useful within [high cardinality](/glossary/high-cardinality/)
 datasets where an exact count is not required. Thus consider it the higher
 cardinality alternative to
-[`count_dinstinct`](/docs/reference/function/aggregation/#count_distinct).
+[`count_distinct`](/docs/reference/function/aggregation/#count_distinct).
 
 ### Parameters
 
