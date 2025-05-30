@@ -14,9 +14,8 @@ calculations. For more information on this type of data, see the
 `within(geohash, ...)` - evaluates if a comma-separated list of geohashes are
 equal to or within another geohash.
 
-By default, the operator follows normal syntax rules, and `WHERE` is executed before `LATEST ON`. The filter will
-execute in parallel.
-
+By default, the operator follows normal syntax rules, and `WHERE` is executed before `LATEST ON`. The filter is
+compatible with parallel execution in most cases.
 
 :::note
 
