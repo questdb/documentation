@@ -42,7 +42,7 @@ returned from a sub-query is not guaranteed to be in timestamp order.
 <Screenshot
   alt="Interval scan."
   height={433}
-  src="images/blog/2023-04-25/interval_scan.svg"
+  src="images/blog/2023-04-25/intervalScan.webp"
   width={650}
 />
 
