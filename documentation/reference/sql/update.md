@@ -39,13 +39,13 @@ UPDATE spreads s SET s.spread = p.ask - p.bid FROM prices p WHERE s.symbol = p.s
 
 ```questdb-sql title="Update with multiple joins"
 WITH up AS (
-    SELECT p.ask - p.bid AS spread, s.timestamp
+    SELECT p.ask - p.bid AS spread, p.timestamp
     FROM prices p
     JOIN instruments i ON p.symbol = i.symbol
     WHERE i.type = 'BOND'
 )
 UPDATE spreads s
-SET s.spread = up.spread
+SET spread = up.spread
 FROM up
 WHERE s.timestamp = up.timestamp;
 ```
