@@ -340,7 +340,7 @@ show
   | 'SERVICE' 'ACCOUNTS' userName?
   | 'PERMISSIONS' entityName?
   | 'SERVER_VERSION'
-  | 'SERVER_CONF'
+  | 'PARAMETERS'
   )
 
 truncateTable
@@ -363,7 +363,7 @@ enableDedup
 createMatViewDef
   ::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
   ('WITH BASE' baseTableName)?
-  ('REFRESH' 'INCREMENTAL')?
+  ('REFRESH' ( 'INCREMENTAL' | ( ('START' timestamp)? 'EVERY' interval) ))?
   'AS'
   ('(')?
   (query)
@@ -392,6 +392,9 @@ alterMatViewSetTtl
 
 alterMatViewSetRefreshLimit
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' 'LIMIT' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
+
+alterMatViewSetRefreshStart
+::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' ( ('START' timestamp)? 'EVERY' interval )
 
 refreshMatView
   ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('INTERVAL' 'FROM' fromTimestamp 'TO' toTimestamp))

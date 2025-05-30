@@ -16,23 +16,23 @@ and partition storage size on disk.
 
 ## Description
 
-- `SHOW` returns all the tables.
+- `SHOW TABLES` returns all the tables.
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
-- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW PARTITIONS` returns the partition information for the selected table.
-- `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
-  their values and the source of the value
-- `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
+- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW USER` shows user secret (enterprise-only)
-- `SHOW USERS` shows all users (enterprise-only)
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
-  (enterprise-only)
+    (enterprise-only)
+- `SHOW USERS` shows all users (enterprise-only)
+- `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
 - `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
   user/group (enterprise-only)
-- `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
 - `SHOW PERMISSIONS` displays permissions of user, group or service account
   (enterprise-only)
+- `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
+- `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
+  their values and the source of the value
 
 ## Examples
 

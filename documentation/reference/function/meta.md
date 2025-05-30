@@ -499,11 +499,16 @@ Returns a `table` including the following information:
   the view finished
 - `view_sql` - query used to populate view data
 - `view_table_dir_name` - view directory name
-- `view_status` - view status: 'valid', 'refreshing', or 'invalid'
 - `invalidation_reason` - message explaining why the view was marked as invalid
+- `view_status` - view status: 'valid', 'refreshing', or 'invalid'
 - `refresh_base_table_txn` - the last base table transaction used to refresh the
   materialized view
 - `base_table_txn` - the last committed transaction in the base table
+- `refresh_limit_value` - how many units back in time the refresh limit goes
+- `refresh_limit_unit` - how long each unit is
+- `timer_start` - start date for the scheduled refresh timer
+- `timer_interval_value` - how many interval units between each refresh
+- `timer_interval_unit` - how long each unit is
 
 **Examples:**
 
@@ -511,9 +516,11 @@ Returns a `table` including the following information:
 materialized_views();
 ```
 
-| view_name | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql      | view_table_dir_name | view_status | invalidation_reason | refresh_base_table_txn | base_table_txn |
-| --------- | ------------ | --------------- | ---------------------------- | ----------------------------- | ------------- | ------------------- | ----------- | ------------------- | ---------------------- | -------------- |
-| trades_1h | incremental  | trades          | 2024-10-24T17:22:20.536577Z  | 2024-10-24T17:22:09.842574Z   | query text... | trades_1h~10        | refreshing  |                     | 42                     | 42             |
+| view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
+|------------------|--------------|-----------------|------------------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------------------|-------------|------------------------|----------------|---------------------|--------------------|-------------|----------------------|---------------------|
+| trades_OHLC_15m  | incremental  | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+| trades_latest_1d | incremental  | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+
 
 ## version/pg_catalog.version
 

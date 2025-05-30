@@ -91,6 +91,32 @@ with the designated timestamp as the grouping key.
 
 :::
 
+## Alternate refresh modes
+
+By default, QuestDB will incrementally refresh the view each time new data is written to the base table.
+
+If your data is written rapidly in small transactions, this will trigger additional small writes to the view.
+
+Instead, you can specify a refresh schedule, which trigger and incremental refresh after certain time intervals:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW price_1h REFRESH START '2025-05-30T00:00:00.000000Z' EVERY 1h AS ...
+```
+
+In this example, the view will start refreshing from the specified timestamp on an hourly schedule. 
+
+The refresh itself will still be incremental, but will no longer be triggered on every new insert.
+
+You can omit the `START <timestamp>` clause in order to just start refreshing from `now`.
+
+
+:::tip
+
+The minimum timed interval is one minute (`1m`). If you need to refresh faster than this, please use
+the default incremental refresh.
+
+:::
+
 ## Base table
 
 Incrementally refreshed views require that the base table is specified, so that

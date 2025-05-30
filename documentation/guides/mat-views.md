@@ -357,13 +357,6 @@ useful.
 ## Limitations
 
 - Not all `SAMPLE BY` syntax is supported, for example, `FILL`.
-- The `INCREMENTAL` refresh strategy relies on deduplicated inserts (O3 writes)
-  - This means that currently, deduplication keys must be aligned across
-    the `base` table and the view.
-- Only `INCREMENTAL` refresh is supported
-  - In next versions, we intend to add alternatives, such as:
-    - `TIMER` (once per time interval)
-    - `MANUAL` (only when manually triggered)
 - `INCREMENTAL` refresh is only triggered by inserts into the `base` table, not
   join tables.
 

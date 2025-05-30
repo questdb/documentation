@@ -111,6 +111,8 @@ SELECT floor(15.75) as RoundedDown;
 
 `greatest(args...)` returns the largest entry in a series of numbers. 
 
+`null` will be returned only if all of the arguments are `null`.
+
 **Arguments:**
 
 - `args...` is a variable-size list of `long` or `double` values.
@@ -135,6 +137,9 @@ SELECT greatest(11, 3, 8, 15)
 
 `least(args...)` returns the smallest entry in a series of numbers.
 
+
+`null` will be returned only if all of the arguments are `null`.
+
 **Arguments:**
 
 - `args...` is a variable-size list of `long` or `double` values.
@@ -152,8 +157,6 @@ SELECT least(11, 3, 8, 15)
 | least |
 |-------|
 | 3     |
-
-
 
 
 ## ln
