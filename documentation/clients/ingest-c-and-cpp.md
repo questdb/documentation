@@ -11,7 +11,7 @@ import { ILPClientsTable } from "@theme/ILPClientsTable"
 QuestDB supports the C & C++ programming languages, providing a high-performance
 ingestion client tailored for insert-only operations. This integration ensures
 peak efficiency in time series data ingestion and analysis, perfectly suited for
-systems for systems which require top performance and minimal latency.
+systems which require top performance and minimal latency.
 
 Key features of the QuestDB C & C++ client include:
 
@@ -253,7 +253,7 @@ This sectioni s for the QuestDB C client.
 Skip to the bottom of this page for information relating to both the C and C++
 clients.
 
-::: 
+:::
 
 <ILPClientsTable language="C" />
 
