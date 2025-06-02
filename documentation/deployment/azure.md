@@ -227,4 +227,4 @@ title="Click to zoom"
 ## Single Sign On with EntraID
 
 If you are using EntraID to manage users, [QuestDB enterprise](/enterprise/) offers the possibility to do Single Sign On and manage your database permissions.
-See more information at the [Microsoft EntraID OIDC guide](/docs/operations/openid-connect-oidc-integration/).
+See more information at the [Microsoft EntraID OIDC guide](/docs/operations/openid-connect-oidc-integration/#microsoft-entraid).
