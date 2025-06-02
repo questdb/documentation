@@ -230,6 +230,7 @@ module.exports = {
                   items: [
                     "reference/sql/alter-mat-view-change-symbol-capacity",
                     "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-refresh-start",
                     "reference/sql/alter-mat-view-set-ttl",
                     "reference/sql/alter-mat-view-resume-wal",
                   ],
@@ -502,15 +503,6 @@ module.exports = {
           id: "guides/enterprise-quick-start",
           type: "doc",
           customProps: { tag: "Enterprise" },
-        },
-        {
-          label: "Active Directory",
-          type: "category",
-          customProps: { tag: "Enterprise" },
-          items: [
-            "guides/microsoft-entraid-oidc",
-            "guides/active-directory-pingfederate"
-          ]
         },
         "guides/replication-tuning",
         "reference/api/java-embedded",
