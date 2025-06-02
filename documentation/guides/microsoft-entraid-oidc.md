@@ -1,5 +1,5 @@
 ---
-title: Microsoft EntraID OIDC guide
+title: Microsoft EntraID OIDC
 description: "QuestDB Enterprise guide to demonstrate Microsoft EntraID OpenID Connect."
 ---
 
