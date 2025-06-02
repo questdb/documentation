@@ -40,7 +40,7 @@ the command line:
 cargo add questdb-rs
 ```
 
-## Authentication
+## Authenticate
 
 This is how you authenticate using the HTTP Basic authentication:
 
@@ -66,9 +66,9 @@ let mut sender = Sender::from_env()?;
 When using QuestDB Enterprise, you can authenticate via a REST token. Please
 check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
-## Basic insert
+## Insert data
 
-Basic insertion (no-auth):
+This snippet connects to QuestDB and inserts one row of data:
 
 ```rust
 use questdb::{
@@ -145,13 +145,13 @@ fn main() -> Result<()> {
 
 :::warning
 
-Avoid using `at_now()` instead of `at(some_timestamp)` because this removes the
-ability to deduplicate rows, which is
+Avoid using `at_now()` instead of `at(some_timestamp)`. This removes the ability
+to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::
 
-## Ingesting arrays
+## Ingest arrays
 
 The `Sender::column_arr` method supports efficient ingestion of N-dimensional
 arrays using several convenient types:
@@ -160,7 +160,17 @@ arrays using several convenient types:
 - native Rust vectors (up to 3-dimensional)
 - arrays from the [ndarray](https://docs.rs/ndarray) crate
 
-### 1. Record a 1D Array (Built-in)
+:::note
+
+You must use protocol version 2 to ingest arrays. HTTP transport will
+automatically enable it as long as you're connecting to an up-to-date QuestDB
+server (version 8.4.0 or later), but with TCP you must explicitly specify it in
+the configuration string: `protocol_version=2;` See [below](#protocol-version)
+for more details on protocol versions.
+
+:::
+
+### 1. Ingest a 1D Rust array
 
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
@@ -177,7 +187,7 @@ fn main() -> Result<()> {
 }
 ```
 
-### 2. Record a 2D Vector
+### 2. Ingest a 2D Rust vector
 
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
@@ -201,7 +211,7 @@ fn main() -> Result<()> {
 }
 ```
 
-### 3. Record an array from [ndarray](https://docs.rs/ndarray)
+### 3. Ingest an array from [ndarray](https://docs.rs/ndarray)
 
 ```rust
 use questdb::{Result, ingress::{Buffer, SenderBuilder}};
