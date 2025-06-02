@@ -22,7 +22,7 @@ The schedule is defined using a start time and then a timing unit, with a minimu
 
 Each triggered refresh is itself incremental, and will only consider data since the last refresh.
 
-The unit follows the same format as `SAMPLE BY`.
+The unit follows the same format as [SAMPLE BY](/docs/reference/sql/sample-by/).
 
 ## Examples
 
