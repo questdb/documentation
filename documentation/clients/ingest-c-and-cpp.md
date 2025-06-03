@@ -105,7 +105,7 @@ int main()
     .symbol("side","sell")
     .column("price", 2615.54)
     .column("amount", 0.00044)
-    .at(questdb::ingress::timestamp_nanos::now());
+    .at_now());
 
     // To insert more records, call `buffer.table(..)...` again.
 
@@ -120,10 +120,11 @@ These are the main steps it takes:
 - Populate a `Buffer` with one or more rows of data
 - Send the buffer using `sender.flush()`(`Sender::flush`)
 
-In this case, the designated timestamp will be the one at execution time.
+In this case, we call `at_now()`, letting the server assign the timestamp to the
+row.
 
-Let's see now an example with timestamps, custom timeout, basic auth, and error
-control.
+Let's see now an example with explicit timestamps, custom timeout, basic auth,
+and error control.
 
 ```cpp
 #include <questdb/ingress/line_sender.hpp>
@@ -183,14 +184,20 @@ int main()
 }
 ```
 
-As you can see, both events now are using the same timestamp. We recommended
-using the original event timestamps when ingesting data into QuestDB. Using the
-current timestamp will hinder the ability to deduplicate rows which is
+Now, both events use the same timestamp. We recommend using the event's
+original timestamp when ingesting data into QuestDB. Using ingestion-time
+timestamps precludes the ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ### Array Insertion
 
-Currently, the C++ interface supports `std::array` for data, while the C interface offers a lower-level and more flexible option:
+The sender uses an `std::array` to insert an array of any dimensionality. It
+contains the elements laid out flat in row-major order, while the separate
+vectors `shape` and `strides` describe its higher-dimensional structure. Please
+refer to the [Concepts section on n-dimensional arrays](/docs/concept/array),
+where this is explained in more detail.
+
+In this example, we insert a 3D array of `double` values:
 
 ```cpp
 #include <questdb/ingress/line_sender.hpp>
@@ -211,7 +218,7 @@ int main()
         const auto book_col = "order_book"_cn;
         size_t rank = 3;
         std::vector<uintptr_t> shape{2, 3, 2};
-        std::vector<intptr_t> strides{48, 16, 8};
+        std::vector<intptr_t> strides{6, 2, 1};
         std::array<double, 12> arr_data = {
             48123.5,
             2.4,
@@ -229,7 +236,7 @@ int main()
         questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
         buffer.table(table_name)
             .symbol(symbol_col, "BTC-USD"_utf8)
-            .column<true>(book_col, 3, shape, strides, arr_data)
+            .column<false>(book_col, 3, shape, strides, arr_data)
             .at(questdb::ingress::timestamp_nanos::now());
         sender.flush(buffer);
         return true;
@@ -242,7 +249,9 @@ int main()
 }
 ```
 
-If your strides match the element size, call `column<false>(book_col, 3, shape, strides, arr_data)` (note the false generic parameter).
+In the example, we provide the strides in terms of the number of elements. You
+can also provide them in terms of bytes, by using `<false>` for the template
+argument, like this: `column<false>(book_col, 3, shape, strides, arr_data)`.
 
 ## C
 
@@ -337,7 +346,7 @@ int main() {
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error)) goto error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto error;
-    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &error)) goto error;
+    if (!line_sender_buffer_at_now(buffer, &error)) goto error;
 
 
     // Flush the buffer to QuestDB
@@ -374,7 +383,8 @@ error:
 
 ```
 
-In this case, the designated timestamp will be the one at execution time.
+In this case, we call `line_sender_buffer_at_now()`, letting the server assign
+the timestamp to the row.
 
 Let's see now an example with timestamps, custom timeout, basic auth, error
 control, and transactional awareness.
@@ -475,12 +485,21 @@ error:
 
 ```
 
-As you can see, both events use the same timestamp. We recommended using the
-original event timestamps when ingesting data into QuestDB. Using the current
-timestamp hinder the ability to deduplicate rows which is
+Now, both events use the same timestamp. We recommend using the event's
+original timestamp when ingesting data into QuestDB. Using ingestion-time
+timestamps precludes the ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ### Array Insertion
+
+The sender uses a plain 1-dimensional C array to insert an array of any
+dimensionality. It contains the elements laid out flat in row-major order, while
+the separate arrays `shape` and `strides` describe its higher-dimensional
+structure. Please refer to the
+[Concepts section on n-dimensional arrays](/docs/concept/array), where this is
+explained in more detail.
+
+In this example, we insert a 3D array of `double` values:
 
 ```c
 int main()
@@ -523,7 +542,7 @@ int main()
 
     size_t array_rank = 3;
     uintptr_t array_shape[] = {2, 3, 2};
-    intptr_t array_strides[] = {48, 16, 8};
+    intptr_t array_strides[] = {6, 2, 1};
 
     double array_data[] = {
         48123.5,
@@ -539,7 +558,7 @@ int main()
         48121.5,
         4.3};
 
-    if (!line_sender_buffer_column_f64_arr_byte_strides(
+    if (!line_sender_buffer_column_f64_arr_elem_strides(
             buffer,
             book_col,
             array_rank,
@@ -571,7 +590,8 @@ on_error:;
 }
 ```
 
-If your strides match the element size, call `line_sender_buffer_column_f64_arr_elem_strides`.
+If you want to provide strides in terms of bytes, call
+`line_sender_buffer_column_f64_arr_byte_strides` instead.
 
 ## Other Considerations for both C and C++
 
@@ -599,34 +619,31 @@ won't get access to the data in the buffer until you explicitly call
 `sender.flush` or `line_sender_flush`. This may lead to a pitfall where you drop
 a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the Rust client does not supports
-auto-flushing via configuration.
-
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
-`buffer.size()` or `line_sender_buffer_size(..)`.
+`buffer.size()` or `line_sender_buffer_size(...)`.
 
 The default `flush()` method clears the buffer after sending its data. If you
 want to preserve its contents (for example, to send the same data to multiple
-QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
+QuestDB instances), call `sender.flush_and_keep(&buffer)` or
+`line_sender_flush_and_keep(...)` instead.
 
 ### Transactional flush
 
-As described in the
+As described in
 [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
 To ensure in advance that a flush will not affect more than one table, call
-`buffer.transactional()` or `line_sender_buffer_transactional(buffer)` as we
-demonstrated on the examples in this document.
-
-This call will return false if the flush wouldn't be data-transactional.
+`buffer.transactional()` or `line_sender_buffer_transactional(buffer)`, as shown
+in the examples above. This call will return false if the flush wouldn't be
+data-transactional.
 
 ### Protocol Version
 
 To enhance data ingestion performance, QuestDB introduced an upgrade to the
-text-based InfluxDB Line Protocol which encodes arrays and f64 values in binary
-form. Arrays are supported only in this upgraded protocol version.
+text-based InfluxDB Line Protocol which encodes arrays and `double` values in
+binary form. Arrays are supported only in this upgraded protocol version.
 
 You can select the protocol version with the `protocol_version` setting in the
 configuration string.
@@ -649,7 +666,7 @@ Please refer to the [ILP overview](/docs/reference/api/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 
-With data flowing into QuestDB, now it's time to for analysis.
+With data flowing into QuestDB, now it's time for analysis.
 
 To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
