@@ -218,7 +218,7 @@ int main()
         const auto book_col = "order_book"_cn;
         size_t rank = 3;
         std::vector<uintptr_t> shape{2, 3, 2};
-        std::vector<intptr_t> strides{6, 2, 1};
+        std::vector<intptr_t> strides{48, 16, 8};
         std::array<double, 12> arr_data = {
             48123.5,
             2.4,
@@ -236,7 +236,7 @@ int main()
         questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
         buffer.table(table_name)
             .symbol(symbol_col, "BTC-USD"_utf8)
-            .column<false>(book_col, 3, shape, strides, arr_data)
+            .column<true>(book_col, 3, shape, strides, arr_data)
             .at(questdb::ingress::timestamp_nanos::now());
         sender.flush(buffer);
         return true;
@@ -249,9 +249,9 @@ int main()
 }
 ```
 
-In the example, we provide the strides in terms of the number of elements. You
-can also provide them in terms of bytes, by using `<false>` for the template
-argument, like this: `column<false>(book_col, 3, shape, strides, arr_data)`.
+In the example, we provide the strides in terms of bytes. You can also provide
+them in terms of elements, by using `<false>` for the template argument, like
+this: `column<false>(book_col, 3, shape, strides, arr_data)`.
 
 ## C
 
@@ -542,7 +542,7 @@ int main()
 
     size_t array_rank = 3;
     uintptr_t array_shape[] = {2, 3, 2};
-    intptr_t array_strides[] = {6, 2, 1};
+    intptr_t array_strides[] = {48, 16, 8};
 
     double array_data[] = {
         48123.5,
@@ -558,7 +558,7 @@ int main()
         48121.5,
         4.3};
 
-    if (!line_sender_buffer_column_f64_arr_elem_strides(
+    if (!line_sender_buffer_column_f64_arr_byte_strides(
             buffer,
             book_col,
             array_rank,
@@ -590,8 +590,8 @@ on_error:;
 }
 ```
 
-If you want to provide strides in terms of bytes, call
-`line_sender_buffer_column_f64_arr_byte_strides` instead.
+If you want to provide strides in terms of elements instead of bytes, call
+`line_sender_buffer_column_f64_arr_elem_strides` instead.
 
 ## Other Considerations for both C and C++
 
