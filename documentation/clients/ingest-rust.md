@@ -257,9 +257,6 @@ won't get access to the data in the buffer until you explicitly call
 `sender.flush(&mut buffer)` or a variant. This may lead to a pitfall where you
 drop a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the rust client does not supports
-auto-flushing via configuration.
-
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
 `buffer.len()`.
@@ -270,7 +267,7 @@ QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 
 ## Transactional flush
 
-As described at the
+As described in
 [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
@@ -311,8 +308,8 @@ For more details about the HTTP and TCP transports, please refer to the
 ## Protocol Version
 
 To enhance data ingestion performance, QuestDB introduced an upgrade to the
-text-based InfluxDB Line Protocol which encodes arrays and f64 values in binary
-form. Arrays are supported only in this upgraded protocol version.
+text-based InfluxDB Line Protocol which encodes arrays and `f64` values in
+binary form. Arrays are supported only in this upgraded protocol version.
 
 You can select the protocol version with the `protocol_version` setting in the
 configuration string.
@@ -362,7 +359,7 @@ and column auto-creation.
 Explore the full capabilities of the Rust client via the
 [Crate API page](https://docs.rs/questdb-rs/latest/questdb/).
 
-With data flowing into QuestDB, now it's time to for analysis.
+With data flowing into QuestDB, now it's time for analysis.
 
 To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).
