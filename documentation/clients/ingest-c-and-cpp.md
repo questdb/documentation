@@ -249,9 +249,9 @@ int main()
 }
 ```
 
-In the example, we provide the strides in terms of bytes. You can also provide
-them in terms of elements, by using `<false>` for the template argument, like
-this: `column<false>(book_col, 3, shape, strides, arr_data)`.
+Here we provided the strides in terms of bytes. You can also provide them in
+terms of elements, by using `<false>` for the template argument, like this:
+`column<false>(book_col, 3, shape, strides, arr_data)`.
 
 ## C
 
