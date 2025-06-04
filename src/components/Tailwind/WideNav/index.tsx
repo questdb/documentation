@@ -9,7 +9,7 @@ import {
 import {
   Bars3Icon,
   PlayCircleIcon,
-  RocketLaunchIcon,
+  ArrowTrendingUpIcon,
   PresentationChartLineIcon,
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline"
@@ -50,7 +50,7 @@ const features = [
     description:
       "Explore QuestDB use cases across Capital Markets.",
     href: "/market-data/",
-    icon: RocketLaunchIcon,
+    icon: ArrowTrendingUpIcon,
   },
   {
     name: "Live Crypto Price Charts",
