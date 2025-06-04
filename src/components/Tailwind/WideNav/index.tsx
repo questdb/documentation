@@ -22,7 +22,6 @@ import { usePluginData } from "@docusaurus/useGlobalData"
 
 import InfluxSVG from "../../../../static/images/logos/influxdb.svg"
 import TimescaleSVG from "../../../../static/images/logos/timescale.svg"
-import MongoDBSVG from "../../../../static/images/logos/mongodb.svg"
 
 import styles from "./styles.module.css"
 
@@ -54,11 +53,10 @@ const features = [
     icon: RocketLaunchIcon,
   },
   {
-    name: "vs. MongoDB",
-    description:
-      "Can MongoDB keep up with a specialized time-series database? Read our comparison.",
-    href: "/blog/mongodb-time-series-benchmark-review/",
-    svg: MongoDBSVG,
+    name: "Live Crypto Price Charts",
+    description: "Tick-by-tick data ingested into QuestDB: Trade Blotter · OHLC · VWAP · RSI · Bollinger Bands",
+    href: "/dashboards/crypto/",
+    svg: PresentationChartLineIcon,
   },
   {
     name: "vs. InfluxDB",
@@ -86,11 +84,6 @@ const callsToAction = [
     name: "Download QuestDB",
     href: "/download/",
     icon: ArrowDownTrayIcon,
-  },
-  {
-    name: "View real-time crypto dashboards",
-    href: "/dashboards/crypto/",
-    icon: PresentationChartLineIcon,
   },
 ]
 
@@ -235,7 +228,7 @@ export default function WideNav() {
                   ))}
                 </div>
                 <div className="mx-auto px-6 lg:px-8 pb-4">
-                <div className="grid grid-cols-3 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg group-hover:bg-gray-700">
+                <div className="grid grid-cols-2 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg group-hover:bg-gray-700">
                     {callsToAction.map((item) => (
                       <a
                         key={item.name}
