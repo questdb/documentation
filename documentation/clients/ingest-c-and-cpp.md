@@ -65,7 +65,6 @@ Here is an example of how to configure and use the client for data ingestion:
 
 auto sender = questdb::ingress::line_sender::from_conf(
     "http::addr=localhost:9000;");
-
 ```
 
 You can also pass the connection configuration via the `QDB_CLIENT_CONF`
@@ -250,14 +249,14 @@ int main()
 ```
 
 Here we provided the strides in terms of bytes. You can also provide them in
-terms of elements, by using `<false>` for the template argument, like this:
-`column<false>(book_col, 3, shape, strides, arr_data)`.
+terms of whole elements, by using `<false>` for the template argument, like
+this: `column<false>(book_col, 3, shape, strides, arr_data)`.
 
 ## C
 
 :::note
 
-This sectioni s for the QuestDB C client.
+This section is for the QuestDB C client.
 
 Skip to the bottom of this page for information relating to both the C and C++
 clients.
@@ -304,7 +303,6 @@ Then you use it like this:
 #include <questdb/ingress/line_sender.h>
 ...
 line_sender *sender = line_sender_from_env(&error);
-
 ```
 
 ### Basic data insertion
@@ -380,7 +378,6 @@ error:
         return 1;
     }
 }
-
 ```
 
 In this case, we call `line_sender_buffer_at_now()`, letting the server assign
@@ -482,7 +479,6 @@ error:
         return 1;
     }
 }
-
 ```
 
 Now, both events use the same timestamp. We recommend using the event's
@@ -590,8 +586,8 @@ on_error:;
 }
 ```
 
-If you want to provide strides in terms of elements instead of bytes, call
-`line_sender_buffer_column_f64_arr_elem_strides` instead.
+You can also specify strides in terms of whole elements instead of bytes, by
+calling `line_sender_buffer_column_f64_arr_elem_strides` instead.
 
 ## Other Considerations for both C and C++
 
