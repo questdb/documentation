@@ -86,9 +86,9 @@ Add QuestDB as a dependency in your project's build configuration file.
 
 The code below creates a client instance configured to use HTTP transport to
 connect to a QuestDB server running on localhost, port 9000. It then sends two
-rows, each containing one symbol and two floating-point values. The client
-requests the server to assign a timestamp to each row based on the server's
-wall-clock time.
+rows, each containing one symbol and two floating-point values. The client asks
+the server to assign a timestamp to each row based on the server's wall-clock
+time.
 
 <RemoteRepoExample name="ilp-http" lang="java" header={false} />
 
@@ -108,7 +108,7 @@ can be one of these:
 - `tcps` — ILP/TCP with TLS encryption
 
 The key `addr` sets the hostname and port of the QuestDB server. Port defaults
-to 9000 for HTTP(s) transports and 9009 for TCP(s) transports.
+to 9000 for HTTP(S) and 9009 for TCP(S).
 
 The minimum configuration includes the transport and the address. For a complete
 list of options, refer to the [Configuration Options](#configuration-options)
@@ -352,8 +352,9 @@ There are two ways to assign a designated timestamp to a row:
          .atNow();
    ```
 
-We recommended to use User-assigned timestamps when ingesting data into QuestDB.
-Server-assigned timestamps prevent the ability to deduplicate rows, which is
+We recommend using the event's original timestamp when ingesting data into
+QuestDB. Using ingestion-time timestamps precludes the ability to deduplicate
+rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::note
