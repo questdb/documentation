@@ -238,8 +238,13 @@ joinOverview
 innerLeftJoin
   ::= ( 'INNER' | 'LEFT' )? 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( ( column operator anotherColumn ) ( 'AND' ( column operator anotherColumn ) )* | '(' column ( ',' column )* ')' ) )?
 
-aAsofLtSpliceJoin
-  ::= ( 'ASOF' | 'LT' | 'SPLICE' ) 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )?
+AsofLtSpliceJoin
+  ::= 'ASOF' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?
+    | ( 'LT' | 'SPLICE' ) 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )?
+
+AsofJoin
+  ::= 'ASOF' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?
+
 
 crossJoin
   ::= 'CROSS' 'JOIN' ( table | '(' sub-query ')' )

@@ -33,7 +33,8 @@ High-level overview:
   ![Flow chart showing the syntax of the INNER, LEFT JOIN keyword](/images/docs/diagrams/InnerLeftJoin.svg)
 
   - `ASOF`, `LT`, and `SPLICE` `JOIN` has optional `ON` clause allowing only the
-    `=` predicate:
+    `=` predicate. 
+  - `ASOF` additionally allows an optional `TOLERANCE` clause:
 
   ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
 
