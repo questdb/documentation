@@ -6,7 +6,7 @@ description: Configure and understand QuestDB logging and metrics, including log
 import { ConfigTable } from "@theme/ConfigTable"
 import httpMinimalConfig from "./_http-minimal.config.json"
 
-This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus. 
+This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus.
 
 - [Logging](/docs/operations/logging-metrics/#logging)
 - [Metrics](/docs/operations/logging-metrics/#metrics)
@@ -48,10 +48,10 @@ QuestDB provides the following types of log information:
 For more information, see the
 [QuestDB source code](https://github.com/questdb/questdb/blob/master/core/src/main/java/io/questdb/log/LogLevel.java).
 
-
 ### Example log messages
 
 Advisory:
+
 ```
 2023-02-24T14:59:45.076113Z A server-main Config:
 2023-02-24T14:59:45.076130Z A server-main  - http.enabled : true
@@ -60,23 +60,27 @@ Advisory:
 ```
 
 Critical:
+
 ```
 2022-08-08T11:15:13.040767Z C i.q.c.p.WriterPool could not open [table=`sys.text_import_log`, thread=1, ex=could not open read-write [file=/opt/homebrew/var/questdb/db/sys.text_import_log/_todo_], errno=13]
 ```
 
 Error:
+
 ```
 2023-02-24T14:59:45.059012Z I i.q.c.t.t.InputFormatConfiguration loading input format config [resource=/text_loader.json]
 2023-03-20T08:38:17.076744Z E i.q.c.l.u.AbstractLineProtoUdpReceiver could not set receive buffer size [fd=140, size=8388608, errno=55]
 ```
 
 Info:
+
 ```
 2020-04-15T16:42:32.879970Z I i.q.c.TableReader new transaction [txn=2, transientRowCount=1, fixedRowCount=1, maxTimestamp=1585755801000000, attempts=0]
 2020-04-15T16:42:32.880051Z I i.q.g.FunctionParser call to_timestamp('2020-05-01:15:43:21','yyyy-MM-dd:HH:mm:ss') -> to_timestamp(Ss)
 ```
 
 Debug:
+
 ```
 2023-03-31T11:47:05.723715Z D i.q.g.FunctionParser call cast(investmentMill,INT) -> cast(Li)
 2023-03-31T11:47:05.723729Z D i.q.g.FunctionParser call rnd_symbol(4,4,4,2) -> rnd_symbol(iiii)
@@ -206,10 +210,10 @@ The following configuration options can be set in your `server.conf`:
 
 On systems with
 [8 Cores and less](/docs/operations/capacity-planning/#cpu-cores), contention
-for threads might increase the latency of health check service responses. If you use 
-a load balancer thinks the QuestDB service is dead with nothing apparent in the
-QuestDB logs, you may need to configure a dedicated thread pool for the health
-check service. To do so, increase `http.min.worker.count` to `1`.
+for threads might increase the latency of health check service responses. If you
+use a load balancer, and it thinks the QuestDB service is dead with nothing
+apparent in the QuestDB logs, you may need to configure a dedicated thread pool
+for the health check service. To do so, increase `http.min.worker.count` to `1`.
 
 :::
 
