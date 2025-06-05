@@ -10,42 +10,39 @@ import { ILPClientsTable } from "@theme/ILPClientsTable"
 QuestDB offers a Rust client designed for high-performance data ingestion. These
 are some of the highlights:
 
-- **Creates tables automatically**: no need to define your schema up-front.
+- **Creates tables automatically**: no need to define your schema up-front
 - **Concurrent schema changes**: seamlessly handle multiple data streams that
   modify the table schema on the fly
-- **Optimized batching**: buffer the data and send many rows in one go.
+- **Optimized batching**: buffer the data and send many rows in one go
 - **Health checks and feedback**: built-in health monitoring ensures the health
-  of your system.
+  of your system
 
 <ILPClientsTable language="Rust" />
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Rust library](/docs/pgwire/rust/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible Rust library](/docs/pgwire/rust/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
 
-
-## Requirements
-
-- Requires Rust 1.40 or later.
-- Assumes your QuestDB server is already running. If you don't have a QuestDB
-  server yet, refer to [the general quick start](/docs/quick-start/).
+If you don't have a QuestDB server yet, follow the
+[Quick Start](/docs/quick-start/) section to set it up.
 
 ## Add the client crate to your project
 
-Add the QuestDB client to your project using the command line:
+QuestDB clients requires Rust 1.40 or later. Add its crate to your project using
+the command line:
 
 ```bash
 cargo add questdb-rs
 ```
 
-## Authentication
+## Authenticate
 
-This is how you'd set up the client to authenticate using the HTTP Basic
-authentication:
+This is how you authenticate using the HTTP Basic authentication:
 
 ```rust
 let mut sender = Sender::from_conf(
@@ -66,13 +63,12 @@ Then you use it like this:
 let mut sender = Sender::from_env()?;
 ```
 
-When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
-info.
+When using QuestDB Enterprise, you can authenticate via a REST token. Please
+check the [RBAC docs](/docs/operations/rbac/#authentication) for more info.
 
-## Basic insert
+## Insert data
 
-Basic insertion (no-auth):
+This snippet connects to QuestDB and inserts one row of data:
 
 ```rust
 use questdb::{
@@ -147,8 +143,96 @@ fn main() -> Result<()> {
 }
 ```
 
-Using the current timestamp hinder the ability to deduplicate rows which is
+:::warning
+
+Avoid using `at_now()` instead of `at(some_timestamp)`. This removes the ability
+to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+
+:::
+
+## Ingest arrays
+
+The `Sender::column_arr` method supports efficient ingestion of N-dimensional
+arrays using several convenient types:
+
+- native Rust arrays and slices (up to 3-dimensional)
+- native Rust vectors (up to 3-dimensional)
+- arrays from the [ndarray](https://docs.rs/ndarray) crate
+
+:::note
+
+You must use protocol version 2 to ingest arrays. HTTP transport will
+automatically enable it as long as you're connecting to an up-to-date QuestDB
+server (version 8.4.0 or later), but with TCP you must explicitly specify it in
+the configuration string: `protocol_version=2;` See [below](#protocol-version)
+for more details on protocol versions.
+
+:::
+
+### 1. Ingest a 1D Rust array
+
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+
+    buffer
+        .table("x")?
+        .symbol("device_id", "sensor")?
+        .column_arr("measurements", [1.0f64, 2.0, 3.0, 4.0])?;
+    buffer.send()?;
+    Ok(())
+}
+```
+
+### 2. Ingest a 2D Rust vector
+
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+
+    // 2D vector
+    let matrix_data = vec![
+        vec![1.1, 2.2, 3.3],
+        vec![4.4, 5.5, 6.6]
+    ];
+
+    buffer
+        .table("matrix_data")?
+        .column_arr("values", &matrix_data)?;
+
+    buffer.send()?;
+    Ok(())
+}
+```
+
+### 3. Ingest an array from [ndarray](https://docs.rs/ndarray)
+
+```rust
+use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+use ndarray::arr3;
+
+fn main() -> Result<()> {
+    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    let mut buffer = sender.new_buffer();
+    let tensor = arr3(&[
+        [[1.0], [2.0]],
+        [[3.0], [4.0]],
+        [[5.0], [6.0]]
+    ]);
+    buffer
+        .table("x")?
+        .column_arr("tensor_data", &tensor.view())?;  // Efficient view ingestion
+    buffer.send()?;
+    Ok(())
+}
+
+```
 
 ## Configuration options
 
@@ -173,9 +257,6 @@ won't get access to the data in the buffer until you explicitly call
 `sender.flush(&mut buffer)` or a variant. This may lead to a pitfall where you
 drop a buffer that still has some data in it, resulting in permanent data loss.
 
-Unlike other official QuestDB clients, the rust client does not supports
-auto-flushing via configuration.
-
 A common technique is to flush periodically on a timer and/or once the buffer
 exceeds a certain size. You can check the buffer's size by calling
 `buffer.len()`.
@@ -186,7 +267,7 @@ QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 
 ## Transactional flush
 
-As described at the
+As described in
 [ILP overview](/docs/reference/api/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
@@ -224,6 +305,27 @@ You can inspect the sender's error state by calling `sender.must_close()`.
 For more details about the HTTP and TCP transports, please refer to the
 [ILP overview](/docs/reference/api/ilp/overview#transport-selection).
 
+## Protocol Version
+
+To enhance data ingestion performance, QuestDB introduced an upgrade to the
+text-based InfluxDB Line Protocol which encodes arrays and `f64` values in
+binary form. Arrays are supported only in this upgraded protocol version.
+
+You can select the protocol version with the `protocol_version` setting in the
+configuration string.
+
+HTTP transport automatically negotiates the protocol version by default. In order
+to avoid the slight latency cost at connection time, you can explicitly configure
+the protocol version by setting `protocol_version=2|1;`.
+
+TCP transport does not negotiate the protocol version and uses version 1 by
+default. You must explicitly set `protocol_version=2;` in order to ingest
+arrays, as in this example:
+
+```text
+tcp::addr=localhost:9000;protocol_version=2;
+```
+
 ## Crate features
 
 The QuestDB client crate supports some optional features, mostly related to
@@ -245,6 +347,8 @@ These features are opt-in:
   certificates store.
 - `insecure-skip-verify`: Allows skipping server certificate validation in TLS
   (this compromises security).
+- `ndarray`: Enables ingestion of arrays from the
+  [ndarray](https://docs.rs/ndarray) crate.
 
 ## Next steps
 
@@ -255,7 +359,7 @@ and column auto-creation.
 Explore the full capabilities of the Rust client via the
 [Crate API page](https://docs.rs/questdb-rs/latest/questdb/).
 
-With data flowing into QuestDB, now it's time to for analysis.
+With data flowing into QuestDB, now it's time for analysis.
 
 To learn _The Way_ of QuestDB SQL, see the
 [Query & SQL Overview](/docs/reference/sql/overview/).

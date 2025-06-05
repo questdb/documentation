@@ -254,46 +254,46 @@ module.exports = {
               type: "category",
               label: "CREATE",
               items: [
-                  "reference/sql/create-table",
-                  {
-                    id: "reference/sql/acl/create-group",
-                    type: "doc",
-                    customProps: { tag: "Enterprise" },
-                  },
-                  "reference/sql/create-mat-view",
-                  {
-                    id: "reference/sql/acl/create-service-account",
-                    type: "doc",
-                    customProps: { tag: "Enterprise" },
-                  },
-                  {
-                    id: "reference/sql/acl/create-user",
-                    type: "doc",
-                    customProps: { tag: "Enterprise" },
-                  }
+                "reference/sql/create-table",
+                {
+                  id: "reference/sql/acl/create-group",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                "reference/sql/create-mat-view",
+                {
+                  id: "reference/sql/acl/create-service-account",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                {
+                  id: "reference/sql/acl/create-user",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                }
               ]
             },
             {
               type: "category",
               label: "DROP",
               items: [
-                      "reference/sql/drop",
-                      {
-                        id: "reference/sql/acl/drop-group",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
-                      "reference/sql/drop-mat-view",
-                      {
-                        id: "reference/sql/acl/drop-service-account",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
-                      {
-                        id: "reference/sql/acl/drop-user",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
+                "reference/sql/drop",
+                {
+                  id: "reference/sql/acl/drop-group",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                "reference/sql/drop-mat-view",
+                {
+                  id: "reference/sql/acl/drop-service-account",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                {
+                  id: "reference/sql/acl/drop-user",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
               ]
             },
             "reference/sql/explain",
@@ -306,16 +306,16 @@ module.exports = {
               type: "category",
               label: "GRANT",
               items: [
-                      {
-                        id: "reference/sql/acl/grant",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
-                      {
-                        id: "reference/sql/acl/grant-assume-service-account",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
+                {
+                  id: "reference/sql/acl/grant",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                {
+                  id: "reference/sql/acl/grant-assume-service-account",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
               ]
             },
             "reference/sql/insert",
@@ -331,16 +331,16 @@ module.exports = {
               type: "category",
               label: "REVOKE",
               items: [
-                      {
-                        id: "reference/sql/acl/revoke",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
-                      {
-                        id: "reference/sql/acl/revoke-assume-service-account",
-                        type: "doc",
-                        customProps: { tag: "Enterprise" },
-                      },
+                {
+                  id: "reference/sql/acl/revoke",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
+                {
+                  id: "reference/sql/acl/revoke-assume-service-account",
+                  type: "doc",
+                  customProps: { tag: "Enterprise" },
+                },
               ]
             },
             {
@@ -378,6 +378,7 @@ module.exports = {
           label: "Functions",
           items: [
             "reference/function/aggregation",
+            "reference/function/array",
             "reference/function/binary",
             "reference/function/boolean",
             "reference/function/conditional",
@@ -522,6 +523,7 @@ module.exports = {
         "concept/deduplication",
         "concept/designated-timestamp",
         "concept/geohashes",
+        "concept/array",
         "concept/indexes",
         "concept/interval-scan",
         "concept/jit-compiler",

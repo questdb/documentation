@@ -204,6 +204,102 @@ public class QuestDBParameterizedQuery {
 }
 ```
 
+### Inserting Arrays
+QuestDB, via the PostgreSQL wire protocol, supports array data types, including multidimensional arrays.
+
+:::tip
+Inserting large amounts of data using the JDBC driver can be inefficient. For high-throughput ingestion, consider using
+QuestDB's [Java ILP client](/docs/clients/java_ilp/) or the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/).
+:::
+
+When you need to insert multiple rows containing array data, such as a series of order book snapshots,
+JDBC Batch API offers a more performant way to do so compared to inserting row by row with `execute()`.
+The optimal batch size can vary based on your specific use case, but a common practice is to batch
+inserts of 100 to 1000 rows at a time. This reduces the number of round trips to the database and can significantly
+improve performance, especially when dealing with large datasets.
+
+```java
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.TimeZone;
+
+public class ArrayInsert {
+
+    public static void main(String[] args) {
+        String url = "jdbc:postgresql://127.0.0.1:8812/qdb";
+        String user = "admin";
+        String password = "quest";
+
+        try (Connection conn = DriverManager.getConnection(url, user, password)) {
+            try (Statement stmt = conn.createStatement()) {
+                String createTableSQL = """
+                    CREATE TABLE IF NOT EXISTS l3_order_book
+                    (
+                        bid DOUBLE PRECISION[][],
+                        ask DOUBLE PRECISION[][],
+                        ts TIMESTAMP
+                    ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                    """;
+                stmt.execute(createTableSQL);
+                System.out.println("Table 'l3_order_book' is ready.");
+            }
+
+            java.util.Calendar utcCalendar = Calendar.getInstance();
+            utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            Instant baseTimestamp = Instant.now();
+            String insertSQL = "INSERT INTO l3_order_book (bid, ask, ts) VALUES (?, ?, ?)";
+            try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
+                // Add first row to batch
+                Double[][] bids1 = {{68500.50, 0.5}, {68500.00, 1.2}, {68499.50, 0.3}};
+                Double[][] asks1 = {{68501.00, 0.8}, {68501.50, 0.4}, {68502.00, 1.1}};
+                Timestamp ts1 = Timestamp.from(baseTimestamp.plus(1, ChronoUnit.SECONDS));
+                pstmt.setObject(1, bids1);
+                pstmt.setObject(2, asks1);
+                pstmt.setTimestamp(3, ts1, utcCalendar);
+                pstmt.addBatch();
+
+                // Add second row to batch
+                Double[][] bids2 = {{68502.10, 0.3}, {68501.80, 0.9}, {68501.20, 1.5}};
+                Double[][] asks2 = {{68502.50, 1.1}, {68503.00, 0.6}, {68503.50, 0.2}};
+                Timestamp ts2 = Timestamp.from(baseTimestamp.plus(2, ChronoUnit.SECONDS));
+                pstmt.setObject(1, bids2);
+                pstmt.setObject(2, asks2);
+                pstmt.setTimestamp(3, ts2, utcCalendar);
+                pstmt.addBatch();
+
+                // Add third row to batch
+                Double[][] bids3 = {{68490.60, 2.5}, {68489.00, 3.2}};
+                Double[][] asks3 = {{68491.20, 1.8}, {68492.80, 0.7}};
+                Timestamp ts3 = Timestamp.from(baseTimestamp.plus(3, ChronoUnit.SECONDS));
+                pstmt.setObject(1, bids3);
+                pstmt.setObject(2, asks3);
+                pstmt.setTimestamp(3, ts3, utcCalendar);
+                pstmt.addBatch();
+
+                // Execute the batch
+                int[] updateCounts = pstmt.executeBatch();
+
+                int totalInserted = Arrays.stream(updateCounts).sum();
+                System.out.printf("Successfully inserted %d L3 order book snapshots using batch insert.%n", totalInserted);
+            }
+        } catch (SQLException e) {
+            System.err.println("Database error occurred.");
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+
 ### Connection Pooling with HikariCP
 
 Connection pooling is highly recommended for production applications to efficiently manage database connections:
