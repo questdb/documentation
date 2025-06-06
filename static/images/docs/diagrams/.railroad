@@ -239,8 +239,8 @@ innerLeftJoin
   ::= ( 'INNER' | 'LEFT' )? 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( ( column operator anotherColumn ) ( 'AND' ( column operator anotherColumn ) )* | '(' column ( ',' column )* ')' ) )?
 
 AsofLtSpliceJoin
-  ::= 'ASOF' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?
-    | ( 'LT' | 'SPLICE' ) 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )?
+  ::= ( 'ASOF' | 'LT' ) 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?
+    | 'SPLICE' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )?
 
 AsofJoin
   ::= 'ASOF' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?

@@ -332,7 +332,7 @@ Result:
 
 ### TOLERANCE clause
 
-The `TOLERANCE` clause enhances ASOF JOIN by limiting how far back in time the join should look for a match in the right
+The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in time the join should look for a match in the right
 table. The `TOLERANCE` parameter accepts a time interval value (e.g., 2s, 100ms, 1d).
 
 When specified, a record from the left table t1 at t1.ts will only be joined with a record from the right table t2 at
