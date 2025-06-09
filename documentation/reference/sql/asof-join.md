@@ -327,29 +327,85 @@ Result:
 
 </div>
 
-### Timestamp considerations
+### How ASOF JOIN Uses Timestamps
 
-`ASOF` join can be performed only on tables or result sets that are ordered by
-time. When a table is created with a
-[designated timestamp](/docs/concept/designated-timestamp/) the order of records
-is enforced and the timestamp column name is in the table metadata. `ASOF` join
-uses this timestamp column from metadata.
+`ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to meet this requirement is to use a
+[designated timestamp](/docs/concept/designated-timestamp/), which is set when you create a table. 
+This not only enforces the chronological order of your data but also tells QuestDB which column to use for time-series
+operations automatically.
 
-:::caution
+#### The Default Behavior: Implicit Timestamp Propagation
 
-`ASOF` join requires that the tables or subqueries have designated timestamps. This means
-they have an ascending order timestamp column, which may need to be specified with `timestamp(ts)`. See below!
+By default, an `ASOF JOIN` will always use the designated timestamp of the tables involved.
 
-:::
+This behavior is so fundamental that it extends to subqueries in a unique way: even if you do not explicitly SELECT the
+designated timestamp column in a subquery, QuestDB implicitly propagates it. The join is performed correctly under the
+hood using this hidden timestamp, which is then omitted from the final result set.
 
-In case tables do not have a designated timestamp column, but data is in
-chronological order, timestamp columns can be specified at runtime:
+This makes most `ASOF JOIN` queries simple and intuitive.
 
-```questdb-sql
+```questdb-sql title="ASOF JOIN with designated timestamp"
+-- The 'trades' table has 'trade_ts' as its designated timestamp.
+-- Even though 'trade_ts' is not selected in the subquery,
+-- it is used implicitly for the ASOF JOIN.
+WITH trades_subset AS (
+  SELECT symbol, price, amount FROM trades
+)
 SELECT *
-FROM (a timestamp(ts))
-ASOF JOIN (b timestamp (ts));
+FROM trades_subset ASOF JOIN quotes ON (symbol);
 ```
+
+#### The Standard Override Method: Using ORDER BY
+
+The easiest and safest way to join on a different timestamp column is to use an `ORDER BY ... ASC` clause in your subquery.
+
+When you sort a subquery by a `TIMESTAMP` column, QuestDB makes that column the new designated timestamp for the subquery's results. The subsequent `ASOF JOIN` will automatically detect and use this new timestamp.
+
+Example: Joining on `ingestion_time` instead of the default `trade_ts`
+
+```questdb-sql title="ASOF JOIN with custom timestamp"
+WITH trades_ordered_by_ingestion AS (
+  SELECT symbol, price, ingestion_time
+  FROM trades
+  WHERE symbol = 'QDB'
+  -- This ORDER BY clause tells QuestDB to use 'ingestion_time'
+  -- as the new designated timestamp for this subquery.
+  ORDER BY ingestion_time ASC
+)
+-- No extra syntax is needed here. The ASOF JOIN automatically uses
+-- the new designated timestamp from the subquery.
+SELECT *
+FROM trades_ordered_by_ingestion
+ASOF JOIN quotes ON (symbol);
+```
+
+#### Using the timestamp() Syntax
+
+The `timestamp()` syntax is an expert-level hint for the query engine. It should only be used to manually assign a
+timestamp to a dataset that does not have one, without forcing a sort.
+
+You should only use this when you can guarantee that your data is already sorted by that timestamp column. Using
+`timestamp()` incorrectly on unsorted data will lead to incorrect join results.
+
+The primary use case is performance optimization on a table that has no designated timestamp in its schema, but where
+you know the data is physically stored in chronological order. Using the `timestamp()` hint avoids a costly ORDER BY
+operation.
+
+```questdb-sql title="ASOF JOIN with timestamp()"
+-- Use this ONLY IF 'my_unsorted_table' has NO designated timestamp,
+-- but you can guarantee its data is already physically ordered by 'event_time'.
+
+SELECT *
+FROM (my_unsorted_table timestamp(event_time))
+ASOF JOIN another_table ON (symbol);
+```
+
+To summarize:
+
+1. By default, the table's designated timestamp is used.
+2. To join on a different column, the standard method is to `ORDER BY` that column in a subquery.
+3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a table with no designated timestamp, if and
+   only if you are certain the data is already sorted.
 
 ### SQL Performance Hints for ASOF JOIN
 
