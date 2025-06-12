@@ -359,6 +359,7 @@ module.exports = {
                 "reference/sql/latest-on",
                 "reference/sql/limit",
                 "reference/sql/order-by",
+                "reference/sql/pivot",
                 "reference/sql/over",
                 "reference/sql/sample-by",
                 "reference/sql/where",
