@@ -316,7 +316,7 @@ PIVOT (
 
 ### PIVOT with GROUP BY
 
-So far, we have shown how you can `PIVOT` the result of a `GROUP BY` query and turn the rows into columns.
+We have shown how you can `PIVOT` the result of a `GROUP BY` query and turn the rows into columns.
 
 You may also want to pivot only a few fields to columns, and continue grouping by others. You can use an additional `GROUP BY` expression for this:
 
