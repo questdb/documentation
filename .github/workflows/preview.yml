@@ -47,6 +47,7 @@ jobs:
           ls -la build
           netlify deploy \
             --dir=build \
+            --no-build \
             --auth=$NETLIFY_AUTH_TOKEN \
             --site=$NETLIFY_SITE_ID \
             --alias=preview-${{ github.event.pull_request.number }} \
