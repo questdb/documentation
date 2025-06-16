@@ -50,7 +50,7 @@ updates **atomically**. Updates to a table are applied in the context of a table
 transaction which is either committed or rolled back in an atomic operation.
 Queries that are concurrent with table updates are consistent in the sense that
 they will return data either as it was before or after the table transaction was
-committed — no intermediate uncommitted data will be shown in a query result.
+committed — no intermediate uncommitted data will be shown in a query result .
 
 To guarantee **atomicity**, each table maintains a `last_committed_record_count`
 in a separate file. By convention, any table reader will never read more records
