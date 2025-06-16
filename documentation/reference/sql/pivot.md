@@ -332,7 +332,7 @@ You may also want to pivot only a few fields to columns, and continue grouping b
 | side | BTC-USD            | ETH-USD            |
 | ---- | ------------------ | ------------------ |
 | sell | 39267.645000000004 | 2615.54            |
-| buy  | null               | 2615.4085714285716 |
+| buy  | null               | 2615.4085714285715 |
 
 You can add as many additional `GROUP BY` expressions as needed.
 
