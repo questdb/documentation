@@ -6,11 +6,9 @@ description: IPv4 operators
 
 This document outlines the IPv4 data type operators.
 
-They are useful when dealing with IP addresses.
-
 The IP addresses can be in the range of `0.0.0.1` - `255.255.255.255`.
 
-The address: `0.0.0.0` is interpreted as null.
+The address: `0.0.0.0` is interpreted as `NULL`.
 
 The following operators support `string` type arguments to permit the passing of
 netmasks:
@@ -22,7 +20,7 @@ netmasks:
 - [rnd_ipv4(string, int)](/docs/reference/function/random-value-generator/#rnd_ipv4string-int)
 - [netmask()](/docs/reference/operators/ipv4/#return-netmask---netmaskstring)
 
-## `<` Lesser than
+## `<` Less than
 
 Takes two IPv4 arguments.
 
@@ -36,7 +34,7 @@ Use case: testing to see if one IP address is less than another.
 ipv4 '33.1.8.43' < ipv4 '200.6.38.9' -> T
 ```
 
-## `<=` Lesser than or equal
+## `<=` Less than or equal
 
 Takes two IPv4 arguments.
 
