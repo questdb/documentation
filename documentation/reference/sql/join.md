@@ -33,7 +33,8 @@ High-level overview:
   ![Flow chart showing the syntax of the INNER, LEFT JOIN keyword](/images/docs/diagrams/InnerLeftJoin.svg)
 
   - `ASOF`, `LT`, and `SPLICE` `JOIN` has optional `ON` clause allowing only the
-    `=` predicate:
+    `=` predicate. 
+  - `ASOF` and `LT` join additionally allows an optional `TOLERANCE` clause:
 
   ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
 
@@ -311,7 +312,7 @@ WHERE t.timestamp < t2.timestamp
 
 ## LT JOIN
 
-Similar to `ASOF JOIN`, `LT JOIN` joins two different time-series measured. For
+Similar to [`ASOF JOIN`](/docs/reference/sql/asof-join/), `LT JOIN` joins two different time-series measured. For
 each row in the first time-series, the `LT JOIN` takes from the second
 time-series a timestamp that meets both of the following criteria:
 
@@ -393,6 +394,42 @@ order to get preceding values for every row.
 
 The `ON` clause can also be used in combination with `LT JOIN` to join both by
 timestamp and column values.
+
+### TOLERANCE clause
+The `TOLERANCE` clause enhances LT JOIN by limiting how far back in time the join should look for a match in the right
+table. The `TOLERANCE` parameter accepts a time interval value (e.g., 2s, 100ms, 1d).
+
+When specified, a record from the left table t1 at t1.ts will only be joined with a record from the right table t2 at
+t2.ts if both conditions are met: `t2.ts < t1.ts` and `t1.ts - t2.ts <= tolerance_value`
+
+This ensures that the matched record from the right table is not only the latest one on or before t1.ts, but also within
+the specified time window.
+
+```questdb-sql title="LT JOIN with a TOLERANCE parameter"
+SELECT ...
+FROM table1
+LT JOIN table2 TOLERANCE 10s
+[WHERE ...]
+```
+
+The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100ms' (100 milliseconds),
+'2m' ( 2 minutes), '3h' (3 hours), or '1d' (1 day).
+
+#### Supported Units for interval_literal
+The `TOLERANCE` interval literal supports the following time unit qualifiers:
+- U: Microseconds
+- T: Milliseconds
+- s: Seconds
+- m: Minutes
+- h: Hours
+- d: Days
+- w: Weeks
+
+For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
+'1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
+units for the `TOLERANCE` clause.
+
+See [`ASOF JOIN documentation`](/docs/reference/sql/asof-join#tolerance-clause) for more examples with the `TOLERANCE` clause.
 
 ## SPLICE JOIN
 
