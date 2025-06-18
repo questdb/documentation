@@ -380,10 +380,12 @@ The built-in admin has all permissions granted by default. Its access cannot be
 modified. It is root.
 
 After startup we can use the built-in admin to create new users, service
-accounts and groups. We can also grant permissions to them. It is recommended
-that the built-in admin is disabled in the configuration files after users and
-groups are setup.
+accounts and groups with different set of permissions.
 
+It is recommended that one or more database administrators are created by
+granting `ALL` or the `DATABASE ADMIN` permission to them.
+After the database administrators are setup, the built-in admin should be
+disabled in the configuration files.
 The following property key is used to enable/disable the built-in admin in
 server.conf:
 
@@ -441,6 +443,7 @@ select * from all_permissions();
 | SELECT                    | Database &#124; Table &#124; Column | Allows selecting/reading table or column data.                                                                                                                            |
 | SET TABLE PARAM           | Database &#124; Table               | Allows setting table parameters via ALTER TABLE SET PARAM command.                                                                                                        |
 | SET TABLE TYPE            | Database &#124; Table               | Allows changing table type via ALTER TABLE SET TYPE command.                                                                                                              |
+| SETTINGS                  | Database                            | Allows changing database instance properties (name, colour and description) via the Web Console.                                                                          |
 | SNAPSHOT                  | Database                            | Allows preparing database snapshot.                                                                                                                                       |
 | SQL ENGINE ADMIN          | Database                            | Allows the listing of currently running queries, and cancelling them via CANCEL QUERY command.                                                                            |
 | SYSTEM ADMIN              | Database                            | Allows the execution of various system related functions, such as reload_tls(), dump_memory_usage(), dump_thread_stacks(), flush_query_cache(), hydrate_table_metadata(). |
@@ -485,9 +488,15 @@ select * from all_permissions();
 
 Currently only the `ALL` permission group supported.
 
-| permission | level                               | description                                                                                |
-|------------|-------------------------------------|--------------------------------------------------------------------------------------------|
-| ALL        | Database &#124; Table &#124; Column | All permissions on all levels, it does not include permissions to assume service accounts. |
+| permission | level                               | description                                                                                                                                                                 |
+|------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ALL        | Database &#124; Table &#124; Column | All permissions on any (database, table or column) level. It does not include permissions added to QuestDB's permission system in the future or to assume service accounts. |
+
+#### Special permissions
+
+| permission     | level    | description                                                                                                                                                                                                                                                  |
+|----------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| DATABASE ADMIN | Database | All permissions, including any permissions introduced in QuestDB in the future. It also grants permission to assume any service account present in the database. When granted with grant options, the user essentially gets the power of the built-in admin. |
 
 Note the values in the `level` column.
 
