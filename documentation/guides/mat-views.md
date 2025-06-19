@@ -207,6 +207,23 @@ Refer to the following
 [documentation page](/docs/reference/sql/create-mat-view/#period-materialized-views)
 to learn more on period materialized views.
 
+## Initial refresh
+
+As soon as a materialized view is created an asynchronous refresh is started. In
+situations when this is not desirable, `DEFERRED` keyword can be specified along
+with the refresh strategy:
+
+```questdb-sql title="Deferred manual refresh"
+CREATE MATERIALIZED VIEW trades_daily_prices
+REFRESH MANUAL DEFERRED AS
+...
+```
+
+The `DEFERRED` keyword can be specified for any refresh strategy. Refer to the
+following
+[documentation page](/docs/reference/sql/create-mat-view/#initial-refresh) to
+learn more on the keyword.
+
 #### SAMPLE BY
 
 Materialized views are populated using `SAMPLE BY` or time-based `GROUP BY`

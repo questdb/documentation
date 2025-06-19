@@ -364,7 +364,7 @@ createMatViewDef
   ::= 'CREATE' 'MATERIALIZED' 'VIEW' ('IF' 'NOT' 'EXISTS')? viewName
   ('WITH BASE' baseTableName)?
   (
-    'REFRESH' ('IMMEDIATE' | 'MANUAL' | ('EVERY' interval ('START' timestamp)? ('TIME' 'ZONE' timezone)?) )?
+    'REFRESH' ((('IMMEDIATE' | 'MANUAL') ('DEFERRED')?) | ('EVERY' interval ('DEFERRED')? ('START' timestamp)? ('TIME' 'ZONE' timezone)?) )?
     ('PERIOD' '(' 'LENGTH' length ('TIME' 'ZONE' timezone)? ('DELAY' delay)? ')')
   )?
   'AS'
@@ -397,7 +397,7 @@ alterMatViewSetRefreshLimit
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' 'LIMIT' n ('HOURS' | 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS')
 
 alterMatViewSetRefreshStart
-::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' ( ('START' timestamp)? 'EVERY' interval )
+::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'SET' 'REFRESH' (('START' timestamp)? 'EVERY' interval)
 
 refreshMatView
   ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('INTERVAL' 'FROM' fromTimestamp 'TO' toTimestamp))

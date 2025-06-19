@@ -190,6 +190,37 @@ The only way to refresh data on such a materialized view is to run
 `REFRESH` statement will refresh incrementally all recently completed periods,
 as well as all time intervals touched by the recent write transactions.
 
+## Initial refresh
+
+As soon as a materialized view is created an asynchronous refresh is started. In
+situations when this is not desirable, `DEFERRED` keyword can be specified along
+with the refresh strategy:
+
+```questdb-sql title="Deferred manual refresh"
+CREATE MATERIALIZED VIEW trades_hourly_prices
+REFRESH MANUAL DEFERRED AS
+...
+```
+
+In the above example, the view has manual refresh strategy and it does not
+refresh after creation. It will only refresh when you run the
+[`REFRESH` SQL](/docs/reference/sql/refresh-mat-view/) explicitly.
+
+The `DEFERRED` keyword can be also specified for `IMMEDIATE` and timer-based
+refresh strategies. Here is an example:
+
+```questdb-sql title="Deferred timer refresh"
+CREATE MATERIALIZED VIEW trades_hourly_prices
+REFRESH EVERY 1h DEFERRED START '2026-01-01T00:00:00' AS
+...
+```
+
+In such cases, the view will be refreshed only when the corresponding event
+occurs:
+
+- After the next base table transaction in case of `IMMEDIATE` refresh strategy.
+- At the next trigger time in case of timer-based refresh strategy.
+
 ## Base table
 
 Materialized views require that the base table is specified, so that the last
