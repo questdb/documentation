@@ -383,7 +383,7 @@ FROM trades_ordered_by_ingestion
 ASOF JOIN quotes ON (symbol);
 ```
 
-#### Using the timestamp() Syntax
+#### Using the timestamp() syntax
 
 The `timestamp()` syntax is an expert-level hint for the query engine. It should only be used to manually assign a
 timestamp to a dataset that does not have one, without forcing a sort.
