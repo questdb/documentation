@@ -327,14 +327,14 @@ Result:
 
 </div>
 
-### How ASOF JOIN Uses Timestamps
+### How ASOF JOIN uses timestamps
 
 `ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to meet this requirement is to use a
 [designated timestamp](/docs/concept/designated-timestamp/), which is set when you create a table. 
 This not only enforces the chronological order of your data but also tells QuestDB which column to use for time-series
 operations automatically.
 
-#### The Default Behavior: Implicit Timestamp Propagation
+#### Default behavior
 
 By default, an `ASOF JOIN` will always use the designated timestamp of the tables involved.
 
@@ -355,7 +355,11 @@ SELECT *
 FROM trades_subset ASOF JOIN quotes ON (symbol);
 ```
 
-#### The Standard Override Method: Using ORDER BY
+In more complicated subqueries, the implicit propagation of the designated timestamp may not work QuestDB responses with an error
+`left side of time series join has no timestamp`. In such cases, your subquery should explicitly include the designated
+timestamp column in the `SELECT` clause to ensure it is used for the join.
+
+#### The standard override method: Using ORDER BY
 
 The easiest and safest way to join on a different timestamp column is to use an `ORDER BY ... ASC` clause in your subquery.
 
@@ -407,7 +411,7 @@ To summarize:
 3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a table with no designated timestamp, if and
    only if you are certain the data is already sorted.
 
-### SQL Performance Hints for ASOF JOIN
+### SQL performance hints for ASOF JOIN
 
 QuestDB supports SQL hints that can optimize non-keyed ASOF join performance when filters are applied to the joined table:
 
