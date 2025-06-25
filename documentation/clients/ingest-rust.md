@@ -202,8 +202,6 @@ fn main() -> Result<()> {
             &vec![0.90, 0.55, 0.20])?
         .at(TimestampNanos::now())?;
 
-    eprintln!("Buffer: {:?}", buffer.as_bytes());
-
     sender.flush(&mut buffer)?;
     Ok(())
 }

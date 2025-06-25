@@ -357,6 +357,8 @@ to explicity opt into the newer protocol version 2 that supports sending arrays.
 http::addr=127.0.0.1:9009;protocol_version=2;
 ```
 
+:::
+
 ## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as in:
