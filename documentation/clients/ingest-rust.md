@@ -158,7 +158,12 @@ arrays using several convenient types:
 
 - native Rust arrays and slices (up to 3-dimensional)
 - native Rust vectors (up to 3-dimensional)
-- arrays from the [ndarray](https://docs.rs/ndarray) crate
+- arrays from the [ndarray](https://docs.rs/ndarray) crate, or other types that
+  support the `questdb::ingress::NdArrayView` trait.
+
+In this example, we insert some FX order book data.
+* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
+* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
 
 :::note
 
@@ -170,68 +175,38 @@ for more details on protocol versions.
 
 :::
 
-### 1. Ingest a 1D Rust array
-
 ```rust
-use questdb::{Result, ingress::{Buffer, SenderBuilder}};
-fn main() -> Result<()> {
-    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
-    let mut buffer = sender.new_buffer();
-
-    buffer
-        .table("x")?
-        .symbol("device_id", "sensor")?
-        .column_arr("measurements", [1.0f64, 2.0, 3.0, 4.0])?;
-    buffer.send()?;
-    Ok(())
-}
-```
-
-### 2. Ingest a 2D Rust vector
-
-```rust
-use questdb::{Result, ingress::{Buffer, SenderBuilder}};
+use questdb::{Result, ingress::{SenderBuilder, TimestampNanos}};
+use ndarray::arr2;
 
 fn main() -> Result<()> {
-    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
+    // or `tcp::addr=127.0.0.1:9009;protocol_version=2;`
+    let mut sender = SenderBuilder::from_conf("http::addr=127.0.0.1:9000;")?
+        .build()?;
+
     let mut buffer = sender.new_buffer();
-
-    // 2D vector
-    let matrix_data = vec![
-        vec![1.1, 2.2, 3.3],
-        vec![4.4, 5.5, 6.6]
-    ];
-
     buffer
-        .table("matrix_data")?
-        .column_arr("values", &matrix_data)?;
+        .table("fx_order_book")? 
+        .symbol("symbol", "EUR/USD")?
+        .column_arr("bids", &vec![
+            vec![1.0850, 600000.0],
+            vec![1.0849, 300000.0],
+            vec![1.0848, 150000.0]])?
+        .column_arr("asks", &arr2(&[
+            [1.0853, 500000.0],
+            [1.0854, 250000.0],
+            [1.0855, 125000.0]]).view())?
+        .column_arr("bids_exec_probs",
+            &[0.85, 0.50, 0.25])?
+        .column_arr("asks_exec_probs",
+            &vec![0.90, 0.55, 0.20])?
+        .at(TimestampNanos::now())?;
 
-    buffer.send()?;
+    eprintln!("Buffer: {:?}", buffer.as_bytes());
+
+    sender.flush(&mut buffer)?;
     Ok(())
 }
-```
-
-### 3. Ingest an array from [ndarray](https://docs.rs/ndarray)
-
-```rust
-use questdb::{Result, ingress::{Buffer, SenderBuilder}};
-use ndarray::arr3;
-
-fn main() -> Result<()> {
-    let mut sender = SenderBuilder::new("tcp::addr=localhost:9000")?.build()?;
-    let mut buffer = sender.new_buffer();
-    let tensor = arr3(&[
-        [[1.0], [2.0]],
-        [[3.0], [4.0]],
-        [[5.0], [6.0]]
-    ]);
-    buffer
-        .table("x")?
-        .column_arr("tensor_data", &tensor.view())?;  // Efficient view ingestion
-    buffer.send()?;
-    Ok(())
-}
-
 ```
 
 ## Configuration options

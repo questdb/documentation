@@ -149,7 +149,10 @@ import datetime
 
 def example():
     try:
-        conf = f'http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;'
+        conf = (
+            'http::addr=localhost:9000;'
+            'username=admin;password=quest;'
+            'auto_flush_rows=100;auto_flush_interval=1000;')
         with Sender.from_conf(conf) as sender:
             # Record with provided designated timestamp (using the 'at' param)
             # Notice the designated timestamp is expected in Nanoseconds,
@@ -163,11 +166,10 @@ def example():
                     'side': 'sell'},
                 columns={
                     'price': 2615.54,
-                    'amount': 0.00044,
-                   },
+                    'amount': 0.00044},
                 at=datetime.datetime(
-                        2022, 3, 8, 18, 53, 57, 609765,
-                        tzinfo=datetime.timezone.utc))
+                    2022, 3, 8, 18, 53, 57, 609765,
+                    tzinfo=datetime.timezone.utc))
 
             # You can call `sender.row` multiple times inside the same `with`
             # block. The client will buffer the rows and send them in batches.
@@ -235,26 +237,55 @@ with Sender.from_conf(conf) as sender:
 
 ## Insert numpy.ndarray
 
-- Direct Array Insertion：
+NumPy arrays of `dtype=numpy.float64` may be inserted either row-by-row or as objects inside a dataframe.
+
+:::note
+
+Note that other types such as `list`, `array.array`, `torch.Tensor` and other objects aren't supported directly and must first be converted to NumPy arrays.
+
+:::
+
+In the two examples below, we insert some FX order
+book data.
+* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
+* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
+
+### Direct Array Insertion
 
 ```python
 from questdb.ingress import Sender, TimestampNanos
 import numpy as np
 
-arr1 = np.array([1.2345678901234567, 2.3456789012345678], dtype=np.float64)
-arr2 = np.arange(6, dtype=np.float64).reshape(2, 3)
-arr3 = base[:, ::2]
-
 conf = f'http::addr=localhost:9000;'
 with Sender.from_conf(conf) as sender:
     sender.row(
-        'tango',
-        columns={'arr1': arr1, 'arr2': arr2, 'arr3': arr3},
+        'fx_order_book',
+        symbols={
+            'symbol': 'EUR/USD'
+        },
+        columns={
+            'bids': np.array(
+                [
+                    [1.0850, 600000],
+                    [1.0849, 300000],
+                    [1.0848, 150000]
+                ],
+                dtype=np.float64
+            ),
+            'asks': np.array(
+                [
+                    [1.0853, 500000],
+                    [1.0854, 250000],
+                    [1.0855, 125000]
+                ],
+                dtype=np.float64
+            )
+        },
         at=TimestampNanos.now())
     sender.flush()
 ```
 
-- DataFrame Insertion
+### DataFrame Insertion
 
 ```python
 import pandas as pd
@@ -262,18 +293,73 @@ from questdb.ingress import Sender
 import numpy as np
 
 df = pd.DataFrame({
-    'array': [np.array([1.0], np.float64), np.array([2.0], np.float64)]
-    'timestamp': pd.to_datetime(['2022-03-08T18:03:57.609765Z', '2022-03-08T18:03:57.710419Z'])})
+    'symbol': [
+        'EUR/USD',
+        'GBP/USD'
+    ]
+    'bids': [
+        np.array(
+            [
+                [1.0850, 600000],
+                [1.0849, 300000],
+                [1.0848, 150000]
+            ],
+            dtype=np.float64
+        ),
+        np.array(
+            [
+                [1.3200, 550000],
+                [1.3198, 275000],
+                [1.3196, 130000]
+            ],
+            dtype=np.float64
+        )
+    ],
+    'asks': [
+        np.array(
+            [
+                [1.0853, 500000],
+                [1.0854, 250000],
+                [1.0855, 125000]
+            ],
+            dtype=np.float64
+        ),
+        np.array(
+            [
+                [1.3203, 480000],
+                [1.3205, 240000],
+                [1.3207, 120000]
+            ],
+            dtype=np.float64
+        )
+    ],
+    'timestamp': pd.to_datetime([
+        '2022-03-08T18:03:57.609765Z',
+        '2022-03-08T18:03:57.710419Z'
+    ])
+})
 
-conf = f'http::addr=localhost:9000;'
+# or 'tcp::addr=localhost:9009;protocol_version=2;'
+conf = 'http::addr=localhost:9000;'
 with Sender.from_conf(conf) as sender:
-    sender.dataframe(df, table_name='tango', at='timestamp')
+    sender.dataframe(
+        df,
+        table_name='fx_order_book',
+        at='timestamp')
+```
+
+:::warning
+
+The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
+to explicity opt into the newer protocol version 2 that supports sending arrays.
+
+```
+http::addr=127.0.0.1:9009;protocol_version=2;
 ```
 
 ## Configuration options
 
-The minimal configuration string needs to have the protocol, host, and port, as
-in:
+The minimal configuration string needs to have the protocol, host, and port, as in:
 
 ```
 http::addr=localhost:9000;

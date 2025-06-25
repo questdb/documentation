@@ -76,7 +76,7 @@ export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;
 
 Then you use it like this:
 
-```c
+```cpp
 auto sender = questdb::ingress::line_sender::from_env();
 ```
 
@@ -88,7 +88,7 @@ info.
 
 Basic insertion (no-auth):
 
-```c
+```cpp
 // main.cpp
 #include <questdb/ingress/line_sender.hpp>
 
@@ -104,7 +104,7 @@ int main()
     .symbol("side","sell")
     .column("price", 2615.54)
     .column("amount", 0.00044)
-    .at_now());
+    .at(questdb::ingress::timestamp_nanos::now());
 
     // To insert more records, call `buffer.table(..)...` again.
 
@@ -119,8 +119,7 @@ These are the main steps it takes:
 - Populate a `Buffer` with one or more rows of data
 - Send the buffer using `sender.flush()`(`Sender::flush`)
 
-In this case, we call `at_now()`, letting the server assign the timestamp to the
-row.
+In this case, we call `at()`, with the current timestamp.
 
 Let's see now an example with explicit timestamps, custom timeout, basic auth,
 and error control.
@@ -168,7 +167,7 @@ int main()
             return 1;
         }
 
-        // Flush the buffer of the sender, sending the data to QuestDB
+        // Flush and clear the buffer, sending the data to QuestDB
         sender.flush(buffer);
 
         // Close the connection after all rows ingested
@@ -190,53 +189,80 @@ timestamps precludes the ability to deduplicate rows, which is
 
 ### Array Insertion
 
-The sender uses an `std::array` to insert an array of any dimensionality. It
-contains the elements laid out flat in row-major order, while the separate
-vectors `shape` and `strides` describe its higher-dimensional structure. Please
-refer to the [Concepts section on n-dimensional arrays](/docs/concept/array),
+QuestDB can accept N-dimensional arrays. For now these are limited to the
+`double` element type. The easiest way is to insert an `std::array`, but the
+database can also support `std::vector`, `std::span` (C++20) and additional
+custom array types via a [customization point](https://github.com/questdb/c-questdb-client/blob/main/examples/line_sender_cpp_example_array_custom.cpp).
+
+The customization point can be used to integrate your own (or third party)
+n-dimensional array types by providing `shape` and, optionally if not row-major,
+`strides`.
+
+Please refer to the [Concepts section on n-dimensional arrays](/docs/concept/array),
 where this is explained in more detail.
 
-In this example, we insert a 3D array of `double` values:
+In this example, we insert some FX order book data.
+* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
+* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
 
 ```cpp
 #include <questdb/ingress/line_sender.hpp>
 #include <iostream>
 #include <vector>
+#include <array>
 
 using namespace std::literals::string_view_literals;
 using namespace questdb::ingress::literals;
+
+struct tensor {
+    std::vector<double> data;
+    std::vector<uintptr_t> shape;
+};
+
+// Customization point for the QuestDB array API (discovered via ADL lookup)
+inline auto to_array_view_state_impl(const tensor& t)
+{
+    return questdb::ingress::array::row_major_view<double>{
+        t.shape.size(), // rank
+        t.shape.data(), // shape
+        t.data.data(), t.data.size() // array data
+    };
+}
 
 int main()
 {
     try
     {
         auto sender = questdb::ingress::line_sender::from_conf(
-            "tcp::addr=127.0.0.1:9000;protocol_version=2;");
-        const auto table_name = "cpp_market_orders_byte_strides"_tn;
-        const auto symbol_col = "symbol"_cn;
-        const auto book_col = "order_book"_cn;
-        size_t rank = 3;
-        std::vector<uintptr_t> shape{2, 3, 2};
-        std::vector<intptr_t> strides{48, 16, 8};
-        std::array<double, 12> arr_data = {
-            48123.5,
-            2.4,
-            48124.0,
-            1.8,
-            48124.5,
-            0.9,
-            48122.5,
-            3.1,
-            48122.0,
-            2.7,
-            48121.5,
-            4.3};
+            "http::addr=127.0.0.1:9000;");
 
         questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
-        buffer.table(table_name)
-            .symbol(symbol_col, "BTC-USD"_utf8)
-            .column<true>(book_col, 3, shape, strides, arr_data)
+
+        buffer
+            .table("fx_order_book"_tn)
+            .symbol("symbol"_cn, "EUR/USD"_utf8)
+            .column("bids"_cn, tensor{
+                {
+                    1.0850, 600000,
+                    1.0849, 300000,
+                    1.0848, 150000
+                },
+                {3, 2}
+            })
+            .column("asks"_cn, tensor{
+                {
+                    1.0853, 500000,
+                    1.0854, 250000,
+                    1.0855, 125000
+                },
+                {3, 2}
+            })
+            .column("bids_exec_probs"_cn, std::array<double, 3>{
+                0.85, 0.50, 0.25})
+            .column("asks_exec_probs"_cn, std::vector<double>{
+                0.90, 0.55, 0.20})
             .at(questdb::ingress::timestamp_nanos::now());
+
         sender.flush(buffer);
         return true;
     }
@@ -248,9 +274,19 @@ int main()
 }
 ```
 
-Here we provided the strides in terms of bytes. You can also provide them in
-terms of whole elements, by using `<false>` for the template argument, like
-this: `column<false>(book_col, 3, shape, strides, arr_data)`.
+If your type also supports strides, use the
+`questdb::ingress::array::strided_view` instead.
+
+:::warning
+
+The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
+to explicity opt into the newer protocol version 2 that supports sending arrays.
+
+```
+http::addr=127.0.0.1:9009;protocol_version=2;
+```
+
+:::
 
 ## C
 
@@ -339,13 +375,22 @@ int main() {
     }
 
     // Add data to buffer for ETH-USD trade
-    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto error;
-    if (!line_sender_buffer_at_now(buffer, &error)) goto error;
-
+    if (!line_sender_buffer_table(buffer,
+        QDB_TABLE_NAME_LITERAL("trades"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto error;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+        goto on_error;
 
     // Flush the buffer to QuestDB
     if (!line_sender_flush(sender, buffer, &error)) {
@@ -380,8 +425,9 @@ error:
 }
 ```
 
-In this case, we call `line_sender_buffer_at_now()`, letting the server assign
-the timestamp to the row.
+In this case, we call `line_sender_buffer_at_nanos()` and pass the current
+timestamp. The value returned by `line_sender_now_nanos()` is nanoseconds
+from unix epoch (UTC).
 
 Let's see now an example with timestamps, custom timeout, basic auth, error
 control, and transactional awareness.
@@ -424,20 +470,43 @@ int main() {
     int64_t nanos = line_sender_now_nanos();
 
     // Add data to buffer for ETH-USD trade
-    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto error;
-    if (!line_sender_buffer_at_nanos(buffer, nanos, &error)) goto error;
+    if (!line_sender_buffer_table(buffer,
+        QDB_TABLE_NAME_LITERAL("trades"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error))
+        goto error;
+    if (!line_sender_buffer_at_nanos(buffer, nanos, &error))
+        goto error;
 
     // Add data to buffer for BTC-USD trade
-    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("BTC-USD"), &error)) goto error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 39269.98, &error)) goto error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.001, &error)) goto error;
-    if (!line_sender_buffer_at_nanos(buffer, nanos, &error)) goto error;
+    if (!line_sender_buffer_table(buffer,
+        QDB_TABLE_NAME_LITERAL("trades"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("symbol"),
+        QDB_UTF8_LITERAL("BTC-USD"), &error))
+        goto error;
+    if (!line_sender_buffer_symbol(buffer,
+        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("price"), 39269.98, &error))
+        goto error;
+    if (!line_sender_buffer_column_f64(buffer,
+        QDB_COLUMN_NAME_LITERAL("amount"), 0.001, &error))
+        goto error;
+    if (!line_sender_buffer_at_nanos(buffer, nanos, &error))
+        goto error;
 
     // If we detect multiple tables within the same buffer, we abort to avoid potential
     // inconsistency issues. Read below in this page for transaction details
@@ -489,26 +558,27 @@ timestamps precludes the ability to deduplicate rows, which is
 ### Array Insertion
 
 The sender uses a plain 1-dimensional C array to insert an array of any
-dimensionality. It contains the elements laid out flat in row-major order, while
-the separate arrays `shape` and `strides` describe its higher-dimensional
-structure. Please refer to the
-[Concepts section on n-dimensional arrays](/docs/concept/array), where this is
-explained in more detail.
+dimensionality. It contains the elements laid out flat in row-major order.
+The shape describes the rank and dimensions of the array.
 
-In this example, we insert a 3D array of `double` values:
+In this example,  we insert arrays of `double` values for some FX order book data.
+* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
+* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
 
 ```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <questdb/ingress/line_sender.h>
+
 int main()
 {
     line_sender_error* err = NULL;
     line_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
-    char* conf_str = concat("tcp::addr=", host, ":", port, ";protocol_version=2;");
-    if (!conf_str)
-    {
-        fprintf(stderr, "Could not concatenate configuration string.\n");
-        return false;
-    }
+
+    // or "tcp::addr=127.0.0.1:9009;protocol_version=2;"
+    const char* conf_str = "http::addr=127.0.0.1:9000;";
 
     line_sender_utf8 conf_str_utf8 = {0, NULL};
     if (!line_sender_utf8_init(
@@ -519,52 +589,60 @@ int main()
     if (!sender)
         goto on_error;
 
-    free(conf_str);
-    conf_str = NULL;
-
     buffer = line_sender_buffer_new_for_sender(sender);
     line_sender_buffer_reserve(buffer, 64 * 1024);
 
-    line_sender_table_name table_name = QDB_TABLE_NAME_LITERAL("market_orders_byte_strides");
+    line_sender_table_name table_name = QDB_TABLE_NAME_LITERAL("fx_order_book");
     line_sender_column_name symbol_col = QDB_COLUMN_NAME_LITERAL("symbol");
-    line_sender_column_name book_col = QDB_COLUMN_NAME_LITERAL("order_book");
+    line_sender_column_name bids_col = QDB_COLUMN_NAME_LITERAL("bids");
+    line_sender_column_name asks_col = QDB_COLUMN_NAME_LITERAL("asks");
 
     if (!line_sender_buffer_table(buffer, table_name, &err))
         goto on_error;
 
-    line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("BTC-USD");
+    line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("EUR/USD");
     if (!line_sender_buffer_symbol(buffer, symbol_col, symbol_val, &err))
         goto on_error;
 
-    size_t array_rank = 3;
-    uintptr_t array_shape[] = {2, 3, 2};
-    intptr_t array_strides[] = {48, 16, 8};
+    // bids: 3 rows (levels), 2 columns (price, volume)
+    uintptr_t bids_rank = 2;
+    uintptr_t bids_shape[] = {3, 2};
+    double bids_data[] = {
+        1.0850, 600000,
+        1.0849, 300000,
+        1.0848, 150000
+    };
 
-    double array_data[] = {
-        48123.5,
-        2.4,
-        48124.0,
-        1.8,
-        48124.5,
-        0.9,
-        48122.5,
-        3.1,
-        48122.0,
-        2.7,
-        48121.5,
-        4.3};
-
-    if (!line_sender_buffer_column_f64_arr_byte_strides(
+    if (!line_sender_buffer_column_f64_arr_c_major(
             buffer,
-            book_col,
-            array_rank,
-            array_shape,
-            array_strides,
-            (const uint8_t*)array_data,
-            sizeof(array_data),
+            bids_col,
+            bids_rank,
+            bids_shape,
+            (const uint8_t*)bids_data,
+            sizeof(bids_data),
             &err))
         goto on_error;
 
+    // asks: 3 rows (levels), 2 columns (price, volume)
+    uintptr_t asks_rank = 2;
+    uintptr_t asks_shape[] = {3, 2};
+    double asks_data[] = {
+        1.0853, 500000,
+        1.0854, 250000,
+        1.0855, 125000
+    };
+
+    if (!line_sender_buffer_column_f64_arr_c_major(
+            buffer,
+            asks_col,
+            asks_rank,
+            asks_shape,
+            (const uint8_t*)asks_data,
+            sizeof(asks_data),
+            &err))
+        goto on_error;
+
+    // Timestamp, leave as-is (similar to your example)
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
         goto on_error;
 
@@ -572,22 +650,26 @@ int main()
         goto on_error;
 
     line_sender_close(sender);
-    return true;
+    return 0;
 
 on_error:;
     size_t err_len = 0;
     const char* err_msg = line_sender_error_msg(err, &err_len);
     fprintf(stderr, "Error: %.*s\n", (int)err_len, err_msg);
-    free(conf_str);
     line_sender_error_free(err);
     line_sender_buffer_free(buffer);
     line_sender_close(sender);
-    return false;
+    return 1;
 }
 ```
 
-You can also specify strides in terms of whole elements instead of bytes, by
-calling `line_sender_buffer_column_f64_arr_elem_strides` instead.
+If you need to specify strides, you can do this via either the 
+`line_sender_buffer_column_f64_arr_byte_strides` or the
+`line_sender_buffer_column_f64_arr_elem_strides` functions.
+
+Please refer to the
+[Concepts section on n-dimensional arrays](/docs/concept/array), where this is
+explained in more detail.
 
 ## Other Considerations for both C and C++
 
