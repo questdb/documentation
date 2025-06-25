@@ -296,7 +296,7 @@ default. You must explicitly set `protocol_version=2;` in order to ingest
 arrays, as in this example:
 
 ```text
-tcp::addr=localhost:9000;protocol_version=2;
+tcp::addr=localhost:9009;protocol_version=2;
 ```
 
 ## Crate features
