@@ -100,8 +100,8 @@ TCP authentication can be configured using JWK tokens:
 using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
 ```
 
-The connection string can also be built programatically. See
-[Configuration](#configuration) for details.
+The connection options can also be built programatically. See
+[Ways to create the client](#ways-to-create-the-client) for details.
 
 ## Basic insert
 
@@ -232,6 +232,20 @@ There are three ways to create a client instance:
        .GetSection("QuestDB")
        .Get<SenderOptions>();
    ```
+
+## Configuration options
+
+The easiest way to configure the `Sender` is the configuration string. The
+general structure is:
+```plain
+<transport>::addr=host:port;param1=val1;param2=val2;...
+```
+`transport` can be `http`, `https`, `tcp`, or `tcps`. Go to the client's
+[crate documentation](https://docs.rs/questdb-rs/latest/questdb/ingress) for the
+full details on configuration.
+Alternatively, for breakdown of available params, see the
+[Configuration string](/docs/configuration-string/) page.
+
 
 ## Preparing Data
 
