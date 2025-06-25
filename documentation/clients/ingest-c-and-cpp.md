@@ -99,12 +99,12 @@ int main()
 
     questdb::ingress::line_sender_buffer buffer;
     buffer
-    .table("trades")
-    .symbol("symbol","ETH-USD")
-    .symbol("side","sell")
-    .column("price", 2615.54)
-    .column("amount", 0.00044)
-    .at(questdb::ingress::timestamp_nanos::now());
+        .table("trades")
+        .symbol("symbol","ETH-USD")
+        .symbol("side","sell")
+        .column("price", 2615.54)
+        .column("amount", 0.00044)
+        .at(questdb::ingress::timestamp_nanos::now());
 
     // To insert more records, call `buffer.table(..)...` again.
 
@@ -277,7 +277,7 @@ int main()
 If your type also supports strides, use the
 `questdb::ingress::array::strided_view` instead.
 
-:::warning
+:::note
 
 The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
 to explicity opt into the newer protocol version 2 that supports sending arrays.

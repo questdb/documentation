@@ -143,7 +143,7 @@ fn main() -> Result<()> {
 }
 ```
 
-:::warning
+:::note
 
 Avoid using `at_now()` instead of `at(some_timestamp)`. This removes the ability
 to deduplicate rows, which is

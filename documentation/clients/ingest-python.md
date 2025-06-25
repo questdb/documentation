@@ -348,7 +348,7 @@ with Sender.from_conf(conf) as sender:
         at='timestamp')
 ```
 
-:::warning
+:::note
 
 The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
 to explicity opt into the newer protocol version 2 that supports sending arrays.
