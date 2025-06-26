@@ -106,7 +106,7 @@ efficiency and therefore value.
 Write blazing-fast queries and create real-time
 [Grafana](/docs/third-party-tools/grafana/) via familiar SQL:
 
-```questdb-sql title='Navigate time with SQL' demo
+```questdb-sql title='Navigate time with SQL' demo execute
 SELECT
     timestamp, symbol,
     first(price) AS open,
@@ -115,7 +115,8 @@ SELECT
     max(price),
     sum(amount) AS volume
 FROM trades
-WHERE  timestamp > dateadd('d', -1, now())
+WHERE timestamp > dateadd('d', -1, now())
+    AND symbol = 'BTC-USD'
 SAMPLE BY 15m;
 ```
 
