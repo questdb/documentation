@@ -12,18 +12,21 @@ calculations. For more information on this type of data, see the
 ### within
 
 `within(geohash, ...)` - evaluates if a comma-separated list of geohashes are
-equal to or within another geohash:
+equal to or within another geohash.
 
-- The `within` operator can only be used in `LATEST ON` queries and all symbol
-  columns within the query **must be indexed**.
+By default, the operator follows normal syntax rules, and `WHERE` is executed before `LATEST ON`. The filter is
+compatible with parallel execution in most cases.
 
-- Only **geohash literals** (`#ezzn5kxb`) are supported as opposed to geohashes
-  passed as strings (`'ezzn5kxb'`).
+:::note
 
-- Filtering happens logically after `LATEST ON`.
+In QuestDB 8.3.2, the `within` implementation was upgraded, and now supports general `WHERE` filtering.
 
-- Apart from the `within` operator, only simple filters on the designated
-  timestamp are allowed in the `WHERE` clause.
+The prior implementation executed `LATEST ON` before `WHERE`, only supported geohashed constants, and all involved symbol 
+columns had to be indexed. However, it is highly optimised for that specific execution and uses SIMD instructions.
+
+To re-enable this implementation, you must set `query.within.latest.by.optimisation.enabled=true` in server.conf.
+
+:::
 
 #### Arguments
 
@@ -35,6 +38,20 @@ equal to or within another geohash:
   the geohashes passed as arguments
 
 #### Examples
+
+```questdb-sql title="example geohash filter" demo
+(
+SELECT pickup_datetime, 
+       make_geohash(pickup_latitude, 
+                    pickup_longitude, 
+                    60) pickup_geohash
+FROM trips
+LIMIT 5
+)
+WHERE pickup_geohash WITHIN (#dr5ru);
+```
+
+
 
 Given a table with the following contents:
 
