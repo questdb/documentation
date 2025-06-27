@@ -15,7 +15,7 @@ Getting an OK response means the QuestDB process is up and running. This method
 provides no further information.
 
 If you allocate 8 vCPUs/cores or less to QuestDB, the HTTP server thread may not
-be able to get enough CPU time to respodn in a timely manner. Your load balancer
+be able to get enough CPU time to respond in a timely manner. Your load balancer
 may flag the instance as dead. In such a case, create an isolated thread pool
 just for the health check service (the `min` HTTP server), by setting this
 configuration option:
@@ -60,7 +60,7 @@ Both of these numbers are continuously growing as the data is ingested. When
 they are equal, all WAL data has been applied to the tables. While data is being
 actively ingested, the second counter will lag behind the first one. A steady
 difference between them is a sign of healthy rate of WAL application, the
-database keeping up with the demand. However, if the difference continously
+database keeping up with the demand. However, if the difference continuously
 rises, this indicates that either a table has become suspended and WAL can't be
 applied to it, or QuestDB is not able to keep up with the ingestion rate. All of
 the data is still safely stored, but a growing portion of it is not yet visible
