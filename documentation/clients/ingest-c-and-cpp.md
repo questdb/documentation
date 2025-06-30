@@ -283,7 +283,7 @@ The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
 to explicity opt into the newer protocol version 2 that supports sending arrays.
 
 ```
-http::addr=127.0.0.1:9009;protocol_version=2;
+tcp::addr=127.0.0.1:9009;protocol_version=2;
 ```
 
 :::
