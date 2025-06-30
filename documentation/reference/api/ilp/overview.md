@@ -146,6 +146,7 @@ tcp::addr=localhost:9009;protocol_version=2
 ```
 
 You need protocol version 2 in order to ingest n-dimensional arrays.
+It is available from QuestDB version 9.0.0.
 
 #### HTTP Parameters
 

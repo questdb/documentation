@@ -299,6 +299,9 @@ public class ArrayInsert {
 }
 ```
 
+:::note
+Arrays are supported from QuestDB version 9.0.0.
+:::
 
 ### Connection Pooling with HikariCP
 

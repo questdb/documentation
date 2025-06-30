@@ -240,8 +240,14 @@ with Sender.from_conf(conf) as sender:
 NumPy arrays of `dtype=numpy.float64` may be inserted either row-by-row or as objects inside a dataframe.
 
 :::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
 
-Note that other types such as `list`, `array.array`, `torch.Tensor` and other objects aren't supported directly and must first be converted to NumPy arrays.
+:::note
+
+Other types such as `list`, `array.array`, `torch.Tensor` and other objects
+aren't supported directly and must first be converted to NumPy arrays.
 
 :::
 
@@ -349,7 +355,6 @@ with Sender.from_conf(conf) as sender:
 ```
 
 :::note
-
 The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
 to explicity opt into the newer protocol version 2 that supports sending arrays.
 
@@ -357,6 +362,8 @@ to explicity opt into the newer protocol version 2 that supports sending arrays.
 tcp::addr=127.0.0.1:9009;protocol_version=2;
 ```
 
+Protocol Version 2 along with its support for arrays is available from QuestDB
+version 9.0.0.
 :::
 
 ## Configuration options

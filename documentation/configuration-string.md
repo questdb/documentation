@@ -21,11 +21,11 @@ These are the common configuration options.
 
 Valid options are:
 
-| Value  | Behavior                                                                                                            |
-| ------ | ------------------------------------------------------------------------------------------------------------------- |
-| `1`    | - plain-text serialization <br /> - compatible with InfluxDB servers <br /> - no array type support                 |
-| `2`    | - binary encoding for f64 <br /> - full support for array                                                           |
-| `auto` | - **HTTP/HTTPS**: negotiates the best version with the server <br /> - **TCP/TCPS**: no negotiation, uses version 1 |
+| Value  | Behavior                                                                                                            | QuestDB Version |
+| ------ | ------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `1`    | - plain-text serialization <br /> - compatible with InfluxDB servers <br /> - no array type support                 | all             |
+| `2`    | - binary encoding for f64 <br /> - full support for array                                                           | >=9.0.0         |
+| `auto` | - **HTTP/HTTPS**: negotiates the best version with the server <br /> - **TCP/TCPS**: no negotiation, uses version 1 |                 |
 
 ### HTTP transport authentication
 

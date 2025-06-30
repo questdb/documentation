@@ -97,7 +97,7 @@ using var sender = Sender.New("http::addr=localhost:9000;username=admin;token=<t
 TCP authentication can be configured using JWK tokens:
 
 ```csharp
-using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
+using var sender = Sender.New("tcp::addr=localhost:9009;username=admin;token=<token>");
 ```
 
 The connection options can also be built programatically. See

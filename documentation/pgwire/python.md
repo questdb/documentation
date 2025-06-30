@@ -360,6 +360,10 @@ QuestDB, via the PostgreSQL wire protocol, supports [array data types](/docs/con
 arrays. asyncpg makes working with these arrays straightforward by automatically converting Python lists (or lists of lists
 for multidimensional arrays) into the appropriate PostgreSQL array format and vice-versa when fetching data.
 
+:::note
+Arrays are supported from QuestDB version 9.0.0.
+:::
+
 :::caution asyncpg & QuestDB Arrays: Manual Setup Needed
 Using array types with asyncpg against QuestDB requires manual type registration.
 

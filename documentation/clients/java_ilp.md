@@ -203,6 +203,7 @@ For arrays of higher dimensionality, use the `DoubleArray` class. Here's a basic
 example for a 3D array:
 
 ```java
+// or "tcp::addr=localhost:9009;protocol_version=2;"
 try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
      DoubleArray ary = new DoubleArray(3, 3, 3);
 ) {
@@ -220,6 +221,11 @@ try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
 The `ary.append(value)` method allows you to populate the array in the row-major
 order, without having to compute every coordinate individually. You can also use
 `ary.set(value, coords...)` to set a value at specific coordinates.
+
+:::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
 
 ## Flush the buffer
 
@@ -366,23 +372,24 @@ timestamp).
 
 ## Protocol Version
 
-To enhance data ingestion performance, QuestDB introduced an upgrade to the
-text-based InfluxDB Line Protocol which encodes arrays and f64 values in binary
-form. Arrays are supported only in this upgraded protocol version.
+To enhance data ingestion performance, QuestDB _version 9.0.0_ introduced an
+upgraded version "2" to the text-based InfluxDB Line Protocol which encodes
+arrays and f64 values in binary form. Arrays are supported only in this upgraded
+protocol version.
 
 You can select the protocol version with the `protocol_version` setting in the
 configuration string.
 
-HTTP transport automatically negotiates the protocol version by default. In order
-to avoid the slight latency cost at connection time, you can explicitly configure
-the protocol version by setting `protocol_version=2|1;`.
+HTTP transport automatically negotiates the protocol version by default.
+In order to avoid the slight latency cost at connection time, you can explicitly
+configure the protocol version by setting `protocol_version=2|1;`.
 
 TCP transport does not negotiate the protocol version and uses version 1 by
 default. You must explicitly set `protocol_version=2;` in order to ingest
 arrays, as in this example:
 
 ```text
-tcp::addr=localhost:9000;protocol_version=2;
+tcp::addr=localhost:9009;protocol_version=2;
 ```
 
 ## Configuration options

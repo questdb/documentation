@@ -201,6 +201,11 @@ n-dimensional array types by providing `shape` and, optionally if not row-major,
 Please refer to the [Concepts section on n-dimensional arrays](/docs/concept/array),
 where this is explained in more detail.
 
+:::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
+
 In this example, we insert some FX order book data.
 * `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
 * `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
@@ -278,7 +283,6 @@ If your type also supports strides, use the
 `questdb::ingress::array::strided_view` instead.
 
 :::note
-
 The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
 to explicity opt into the newer protocol version 2 that supports sending arrays.
 
@@ -286,6 +290,8 @@ to explicity opt into the newer protocol version 2 that supports sending arrays.
 tcp::addr=127.0.0.1:9009;protocol_version=2;
 ```
 
+Protocol Version 2 along with its support for arrays is available from QuestDB
+version 9.0.0.
 :::
 
 ## C
@@ -561,6 +567,11 @@ The sender uses a plain 1-dimensional C array to insert an array of any
 dimensionality. It contains the elements laid out flat in row-major order.
 The shape describes the rank and dimensions of the array.
 
+:::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
+
 In this example,  we insert arrays of `double` values for some FX order book data.
 * `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
 * `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
@@ -737,6 +748,9 @@ arrays, as in this example:
 ```text
 tcp::addr=localhost:9009;protocol_version=2;
 ```
+
+Protocol Version 2 along with its support for arrays is available from QuestDB
+version 9.0.0.
 
 ## Next Steps
 

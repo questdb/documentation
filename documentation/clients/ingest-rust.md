@@ -161,6 +161,11 @@ arrays using several convenient types:
 - arrays from the [ndarray](https://docs.rs/ndarray) crate, or other types that
   support the `questdb::ingress::NdArrayView` trait.
 
+:::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
+
 In this example, we insert some FX order book data.
 * `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
 * `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
@@ -169,7 +174,7 @@ In this example, we insert some FX order book data.
 
 You must use protocol version 2 to ingest arrays. HTTP transport will
 automatically enable it as long as you're connecting to an up-to-date QuestDB
-server (version 8.4.0 or later), but with TCP you must explicitly specify it in
+server (version 9.0.0 or later), but with TCP you must explicitly specify it in
 the configuration string: `protocol_version=2;` See [below](#protocol-version)
 for more details on protocol versions.
 
@@ -298,6 +303,9 @@ arrays, as in this example:
 ```text
 tcp::addr=localhost:9009;protocol_version=2;
 ```
+
+Protocol Version 2 along with its support for arrays is available from QuestDB
+version 9.0.0.
 
 ## Crate features
 
