@@ -57,6 +57,10 @@
   text-decoration: underline;
 }
 
+.navbar__items:not(.release-dropdown) {
+  display: flex;
+}
+
 .dropdown__link {
   font-size: 1rem;
   text-decoration: none;

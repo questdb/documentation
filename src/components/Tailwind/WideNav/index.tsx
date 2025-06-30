@@ -22,6 +22,7 @@ import { usePluginData } from "@docusaurus/useGlobalData"
 
 import InfluxSVG from "../../../../static/images/logos/influxdb.svg"
 import TimescaleSVG from "../../../../static/images/logos/timescale.svg"
+import KXSVG from "../../../../static/images/logos/kx.svg"
 
 import styles from "./styles.module.css"
 
@@ -44,7 +45,7 @@ const navLinks = [
   },
 ]
 
-const features = [
+const productFeatures = [
   {
     name: "Capital Markets",
     description:
@@ -56,7 +57,29 @@ const features = [
     name: "Live Crypto Price Charts",
     description: "Tick-by-tick data ingested into QuestDB: Trade Blotter · OHLC · VWAP · RSI · Bollinger Bands",
     href: "/dashboards/crypto/",
-    svg: PresentationChartLineIcon,
+    icon: PresentationChartLineIcon,
+  },
+  {
+    name: "Explore Live Demo",
+    description: "Query real-time data in an interactive QuestDB sandbox.",
+    href: "https://demo.questdb.io/",
+    icon: PlayCircleIcon,
+  },
+  {
+    name: "Download QuestDB",
+    description: "Get started with QuestDB by downloading the latest version.",
+    href: "/download/",
+    icon: ArrowDownTrayIcon,
+  },
+]
+
+const compareFeatures = [
+  {
+    name: "vs. kdb+",
+    description:
+      "Compare QuestDB with kdb+ for high-performance time-series data processing and analytics.",
+    href: "/compare/questdb-vs-kdb",
+    icon: KXSVG,
   },
   {
     name: "vs. InfluxDB",
@@ -74,55 +97,67 @@ const features = [
   },
 ]
 
-const callsToAction = [
-  {
-    name: "Explore live demo",
-    href: "https://demo.questdb.io/",
-    icon: PlayCircleIcon,
-  },
-  {
-    name: "Download QuestDB",
-    href: "/download/",
-    icon: ArrowDownTrayIcon,
-  },
-]
-
 export default function WideNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { release } = usePluginData("fetch-latest-release") as {
     release: Release
   }
 
-  const popoverButtonRef = useRef<HTMLButtonElement>(null)
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const productPopoverButtonRef = useRef<HTMLButtonElement>(null)
+  const comparePopoverButtonRef = useRef<HTMLButtonElement>(null)
+  const [isProductPopoverOpen, setIsProductPopoverOpen] = useState(false)
+  const [isComparePopoverOpen, setIsComparePopoverOpen] = useState(false)
+  const productTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const compareTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Hover and Focus Handlers
-  const handleMouseEnter = () => {
-    clearTimeout(timeoutRef.current!)
-    setIsPopoverOpen(true)
+  const handleProductMouseEnter = () => {
+    clearTimeout(productTimeoutRef.current!)
+    setIsProductPopoverOpen(true)
   }
 
-  const handleMouseLeave = () => {
-    timeoutRef.current = setTimeout(() => {
-      setIsPopoverOpen(false)
+  const handleProductMouseLeave = () => {
+    productTimeoutRef.current = setTimeout(() => {
+      setIsProductPopoverOpen(false)
     }, 250)
   }
 
-  const handleFocus = () => {
-    clearTimeout(timeoutRef.current!)
-    setIsPopoverOpen(true)
+  const handleProductFocus = () => {
+    clearTimeout(productTimeoutRef.current!)
+    setIsProductPopoverOpen(true)
   }
 
-  const handleBlur = (e: React.FocusEvent) => {
+  const handleProductBlur = (e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsPopoverOpen(false)
+      setIsProductPopoverOpen(false)
+    }
+  }
+
+  const handleCompareMouseEnter = () => {
+    clearTimeout(compareTimeoutRef.current!)
+    setIsComparePopoverOpen(true)
+  }
+
+  const handleCompareMouseLeave = () => {
+    compareTimeoutRef.current = setTimeout(() => {
+      setIsComparePopoverOpen(false)
+    }, 250)
+  }
+
+  const handleCompareFocus = () => {
+    clearTimeout(compareTimeoutRef.current!)
+    setIsComparePopoverOpen(true)
+  }
+
+  const handleCompareBlur = (e: React.FocusEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsComparePopoverOpen(false)
     }
   }
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
-      setIsPopoverOpen(false)
+      setIsProductPopoverOpen(false)
+      setIsComparePopoverOpen(false)
     }
   }, [])
 
@@ -138,9 +173,9 @@ export default function WideNav() {
     <header className="fixed top-0 left-0 right-0 z-[99] bg-white dark:bg-[rgb(33,34,44)] shadow-md">
       <nav
         aria-label="Global"
-        className="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8 border-b border-gray-300"
+        className="mx-auto flex max-w-[90rem] items-center justify-between p-6 lg:px-8 border-b border-gray-300"
       >
-        <div className="flex lg:flex-1">
+        <div className="flex lg:flex-1 items-center">
           <a className={styles.brand} href="/">
             QuestDB
           </a>
@@ -158,26 +193,26 @@ export default function WideNav() {
         <PopoverGroup className="hidden lg:flex lg:gap-x-9 xl:gap-x-12 lg:items-center">
           <Popover>
             <PopoverButton
-              ref={popoverButtonRef}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
+              ref={productPopoverButtonRef}
+              onMouseEnter={handleProductMouseEnter}
+              onMouseLeave={handleProductMouseLeave}
+              onFocus={handleProductFocus}
+              onBlur={handleProductBlur}
               onClick={(e) => {
                 e.preventDefault()
-                setIsPopoverOpen(!isPopoverOpen)
+                setIsProductPopoverOpen(!isProductPopoverOpen)
               }}
-              className="border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
+              className="p-0 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
             >
               Product
               <ChevronDownIcon
                 aria-hidden="true"
-                className={`h-5 w-5 ${isPopoverOpen ? "rotate-180" : ""}`}
+                className={`h-5 w-5 ${isProductPopoverOpen ? "rotate-180" : ""}`}
               />
             </PopoverButton>
 
             <Transition
-              show={isPopoverOpen}
+              show={isProductPopoverOpen}
               enter="transition ease-out duration-200"
               enterFrom="opacity-0 translate-y-1"
               enterTo="opacity-100 translate-y-0"
@@ -186,31 +221,24 @@ export default function WideNav() {
               leaveTo="opacity-0 translate-y-1"
             >
               <PopoverPanel
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+                onMouseEnter={handleProductMouseEnter}
+                onMouseLeave={handleProductMouseLeave}
+                onFocus={handleProductFocus}
+                onBlur={handleProductBlur}
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[90rem] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
                 <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
-                  {features.map((item) => (
+                  {productFeatures.map((item) => (
                     <div
                       key={item.name}
                       className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-700 cursor-pointer"
                     >
                       <div className="relative">
                         <div className="flex h-11 w-11 items-center justify-center rounded-lg">
-                          {item.svg ? (
-                            <item.svg
-                              aria-hidden="true"
-                              className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary"
-                            />
-                          ) : (
-                            <item.icon
-                              aria-hidden="true"
-                              className="h-6 w-6 text-gray-300 group-hover:text-primary"
-                            />
-                          )}
+                          <item.icon
+                            aria-hidden="true"
+                            className="h-6 w-6 text-gray-300 group-hover:text-primary"
+                          />
                         </div>
                         <a
                           href={item.href}
@@ -227,22 +255,81 @@ export default function WideNav() {
                     </div>
                   ))}
                 </div>
-                <div className="mx-auto px-6 lg:px-8 pb-4">
-                <div className="grid grid-cols-2 divide-x divide-gray-900/5 border-solid border-[1px] border-primary rounded-lg group-hover:bg-gray-700">
-                    {callsToAction.map((item) => (
-                      <a
-                        key={item.name}
-                        href={item.href}
-                        className="flex items-center justify-center gap-x-2.5 p-4 text-sm font-semibold leading-6 text-white hover:bg-gray-700 rounded-lg hover:no-underline group hover:text-primary transition duration-200"
-                      >
-                        <item.icon
-                          aria-hidden="true"
-                          className="h-5 w-5 flex-none text-gray-400 group-hover:text-primary"
-                        />
-                        {item.name}
-                      </a>
-                    ))}
-                  </div>
+              </PopoverPanel>
+            </Transition>
+          </Popover>
+          <Popover>
+            <PopoverButton
+              ref={comparePopoverButtonRef}
+              onMouseEnter={handleCompareMouseEnter}
+              onMouseLeave={handleCompareMouseLeave}
+              onFocus={handleCompareFocus}
+              onBlur={handleCompareBlur}
+              onClick={(e) => {
+                e.preventDefault()
+                setIsComparePopoverOpen(!isComparePopoverOpen)
+              }}
+              className="p-0 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
+            >
+              Compare
+              <ChevronDownIcon
+                aria-hidden="true"
+                className={`h-5 w-5 ${isComparePopoverOpen ? "rotate-180" : ""}`}
+              />
+            </PopoverButton>
+
+            <Transition
+              show={isComparePopoverOpen}
+              enter="transition ease-out duration-200"
+              enterFrom="opacity-0 translate-y-1"
+              enterTo="opacity-100 translate-y-0"
+              leave="transition ease-in duration-150"
+              leaveFrom="opacity-100 translate-y-0"
+              leaveTo="opacity-0 translate-y-1"
+            >
+              <PopoverPanel
+                onMouseEnter={handleCompareMouseEnter}
+                onMouseLeave={handleCompareMouseLeave}
+                onFocus={handleCompareFocus}
+                onBlur={handleCompareBlur}
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[90rem] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+              >
+                <div className="mx-auto grid grid-cols-3 gap-x-4 px-3 pt-4 pb-4 lg:px-4 xl:gap-x-8">
+                  {compareFeatures.map((item) => (
+                    <div
+                      key={item.name}
+                      className="group relative rounded-lg p-3 text-sm leading-6 hover:bg-gray-700 cursor-pointer"
+                    >
+                      <div className="relative">
+                        <div
+                          className="relative flex h-11 w-11 items-center justify-center rounded-lg bg-[rgb(38,40,51)] group-hover:bg-gray-700"
+                        >
+                          {item.icon ? (
+                            <item.icon
+                              aria-hidden="true"
+                              className="h-6 w-6 text-gray-300 group-hover:text-primary group-hover:fill-primary"
+                            />
+                          ) : (
+                            <item.svg
+                              aria-hidden="true"
+                              className="h-6 w-6 fill-current text-gray-300 group-hover:text-primary group-hover:fill-primary"
+                            />
+                          )}
+                        </div>
+                        <a
+                          href={item.href}
+                          className="mt-6 block font-semibold text-white hover:no-underline group-hover:text-primary"
+                        >
+                          {item.name}
+                          <span className="absolute inset-0" />
+                        </a>
+                        <p className="mt-1 text-gray-300">
+                          {item.description}
+                        </p>
+                      </div>
+                      <div className="absolute inset-0 rounded-lg bg-inherit transition-transform duration-200 ease-in-out group-hover:scale-[1.03] cursor-pointer -z-10" />
+                    </div>
+                  ))}
                 </div>
               </PopoverPanel>
             </Transition>
@@ -256,12 +343,12 @@ export default function WideNav() {
               {link.name}
             </a>
           ))}
-          <div className="navbar__items navbar__items--right">
+          <div className="navbar__items navbar__items--right release-dropdown hidden xl:flex">
             <div className="navbar__item dropdown dropdown--hoverable dropdown--left">
               <a
                 href={`https://github.com/questdb/questdb/releases/tag/${release.name}`}
                 aria-label="GitHub repository"
-                className="navbar__item navbar__link header-github-link font-semibold font-sans"
+                className="navbar__item navbar__link header-github-link font-semibold font-sans font-normal"
               >
                 {release.name}
               </a>
@@ -283,12 +370,13 @@ export default function WideNav() {
         </PopoverGroup>
 
         <div className="hidden lg:flex lg:flex-1 lg:justify-end">
-          <MainCTA className={styles.navbarCTA} />
+          <MainCTA />
         </div>
         <MobileNav
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
-          features={features}
+          productFeatures={productFeatures}
+          compareFeatures={compareFeatures}
           navLinks={navLinks}
         />
       </nav>
