@@ -156,21 +156,19 @@ SELECT dot_product(
 
 ## flatten
 
-`flatten(array, dim)` removes the dimension `dim` from the array, flattening it
-into the next dimension. All elements are still available because the next
-dimension's length gets multiplied by the removed dimension's length.
+`flatten(array)` flattens all the array's elements into a 1D array, in row-major
+order.
 
 #### Parameters
 
 - `array` — the array
-- `dim` — the dimension (1-based) to flatten. Cannot be the last dimension.
 
 #### Example
 
-Flatten a 2D array into a 1D array.
+Flatten a 2D array.
 
 ```questdb-sql
-SELECT flatten(ARRAY[[1, 2], [3, 4]], 1);
+SELECT flatten(ARRAY[[1, 2], [3, 4]]);
 ```
 
 |      flatten      |
