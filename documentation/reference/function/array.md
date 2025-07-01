@@ -9,6 +9,105 @@ list of all functions that may take an array parameter. For example, financial
 functions are listed in [their own section](/docs/reference/function/finance/), whether or
 not they can take an array parameter.
 
+## array_avg
+
+`array_avg(array)` returns the average of all the array elements.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```
+
+| array_avg |
+| --------- |
+| 1.5       |
+
+## array_count
+
+`array_count(array)` returns the number of finite elements in the array. The
+`NaN` and infinity values are not included in the count.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT
+  array_count(ARRAY[ [1.0, null], [null, 2.0] ]) c1,
+  array_count(ARRAY[ [0.0/0.0, 1.0/0.0], [-1.0/0.0, 0.0/0.0] ]) c2;
+```
+
+| c1 |  c2 |
+| ---| --- |
+| 2  |  0  |
+
+## array_cum_sum
+
+`array_cum_sum(array)` returns a 1D array of the cumulative sums over the array,
+traversing it in row-major order. The input array can have any dimensionality.
+The returned 1D array has the same number of elements as the input array.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```
+
+|      array_cum_sum     |
+| ---------------------- |
+| ARRAY[1.0,2.0,4.0,6.0] |
+
+## array_position
+
+`array_position(array, elem)` returns the position of `elem` inside the 1D `array`. If
+`elem` doesn't appear in `array`, it returns `NULL`.
+
+#### Parameters
+
+- `array` — the 1D array
+- `elem` — the element to look for
+
+#### Examples
+
+```questdb-sql
+SELECT
+  array_position(ARRAY[1.0, 2.0], 1.0) p1,
+  array_position(ARRAY[1.0, 2.0], 3.0) p2;
+```
+
+| p1 | p2   |
+| -- | ---- |
+| 1  | NULL |
+
+## array_sum
+
+`array_sum(array)` returns the sum of all the array elements.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```
+
+| array_sum |
+| --------- |
+| 6.0       |
+
 ## dim_length
 
 `dim_length(array, dim)` returns the length of the n-dimensional array along
@@ -31,6 +130,30 @@ SELECT dim_length(ARRAY[42, 42], 1);
 | ------------ |
 |       2      |
 
+## dot_product
+
+`dot_product(left_array, right_array)` returns the dot-product of the two
+arrays, which must be of the same shape. The result is equal to
+`array_sum(left_array * right_array)`.
+
+#### Parameters
+
+- `left_array` — the left array
+- `right_array` — the right array
+
+#### Example
+
+```questdb-sql
+SELECT dot_product(
+  ARRAY[ [3.0, 4.0], [2.0, 5.0] ],
+  ARRAY[ [3.0, 4.0], [2.0, 5.0] ]
+);
+```
+
+| dot_product |
+| ----------- |
+| 54.0        |
+
 ## flatten
 
 `flatten(array, dim)` removes the dimension `dim` from the array, flattening it
@@ -50,9 +173,34 @@ Flatten a 2D array into a 1D array.
 SELECT flatten(ARRAY[[1, 2], [3, 4]], 1);
 ```
 
-|       flatten       |
-| ------------------- |
-|  [1.0,2.0,3.0,4.0]  |
+|      flatten      |
+| ----------------- |
+| [1.0,2.0,3.0,4.0] |
+
+## insertion_point
+
+Finds the insertion point of the supplied value into a sorted 1D array. The
+array can be sorted ascending or descending, and the function auto-detects this.
+
+#### Parameters
+
+- `array` — the 1D array
+- `value` — the value whose insertion point to look for
+- `ahead_of_equal` (optional, default `false`) — when true (false), returns the
+  insertion point before (after) any elements equal to `value`
+
+#### Examples
+
+```questdb-sql
+SELECT
+  insertion_point(ARRAY[1.0, 2.0, 3.0], 2.5) i1,
+  insertion_point(ARRAY[1.0, 2.0, 3.0], 2.0) i2,
+  insertion_point(ARRAY[1.0, 2.0, 3.0], 2.0, true) i3;
+```
+
+| i1 | i2 | i3 |
+| -- | -- | -- |
+| 3  | 3  | 2  |
 
 ## matmul
 
@@ -108,6 +256,47 @@ SELECT matmul(ARRAY[[1, 2], [3, 4]], ARRAY[[2, 3], [2, 3]]);
 |          matmul           |
 | ------------------------- |
 |  [[6.0,9.0],[14.0,21.0]]  |
+
+## shift
+
+`shift(array, distance, [fill_value])` shifts the elements in the `array`'s last
+(deepest) dimension by `distance`. The distance can be positive (right shift) or
+negative (left shift). More formally, it moves elements from position `i` to
+`i + distance`, dropping elements whose resulting position is outside the array.
+It fills the holes created by shifting with `fill_value`, whose default for a
+`DOUBLE` array is `NaN`.
+
+#### Parameters
+
+- `array` — the array
+- `distance` — the shift distance
+— `fill_value` — the value to place in empty slots after shifting
+
+#### Example
+
+```questdb-sql
+SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], 1);
+```
+
+|            shift           |
+| -------------------------- |
+| ARRAY[[NaN,1.0],[NaN,3.0]] |
+
+```questdb-sql
+SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1);
+```
+
+|            shift           |
+| -------------------------- |
+| ARRAY[[2.0,NaN],[4.0,NaN]] |
+
+```questdb-sql
+SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1, 10.0);
+```
+
+|             shift            |
+| ---------------------------- |
+| ARRAY[[2.0,10.0],[4.0,10.0]] |
 
 ## transpose
 
