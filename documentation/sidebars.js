@@ -508,6 +508,11 @@ module.exports = {
         "guides/replication-tuning",
         "reference/api/java-embedded",
         "guides/modifying-data",
+        {
+          label: "Order book analytics",
+          type: "link",
+          href: "guides/order-book"
+        },
         "web-console",
         {
           label: "Blog tutorials 🔗",
@@ -547,21 +552,21 @@ module.exports = {
       ],
     },
     {
-        label: "Architecture",
-        type: "category",
-        items: [
-          "guides/architecture/overview",
-          "guides/architecture/storage-engine",
-          "guides/architecture/memory-management",
-          "guides/architecture/query-engine",
-          "guides/architecture/time-series-optimizations",
-          "guides/architecture/data-ingestion-engine",
-          "guides/architecture/networking-layer",
-          "guides/architecture/replication-layer",
-          "guides/architecture/security",
-          "guides/architecture/observability",
-          "guides/architecture/web-console"
-        ]
+      label: "Architecture",
+      type: "category",
+      items: [
+        "guides/architecture/overview",
+        "guides/architecture/storage-engine",
+        "guides/architecture/memory-management",
+        "guides/architecture/query-engine",
+        "guides/architecture/time-series-optimizations",
+        "guides/architecture/data-ingestion-engine",
+        "guides/architecture/networking-layer",
+        "guides/architecture/replication-layer",
+        "guides/architecture/security",
+        "guides/architecture/observability",
+        "guides/architecture/web-console"
+      ]
     },
     {
       label: "Third-party Tools",
