@@ -509,9 +509,9 @@ module.exports = {
         "reference/api/java-embedded",
         "guides/modifying-data",
         {
+          id: "guides/order-book",
           label: "Order book analytics",
-          type: "link",
-          href: "guides/order-book"
+          type: "doc"
         },
         "web-console",
         {
