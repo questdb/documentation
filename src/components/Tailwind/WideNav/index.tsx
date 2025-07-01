@@ -113,6 +113,10 @@ export default function WideNav() {
   const handleProductMouseEnter = () => {
     clearTimeout(productTimeoutRef.current!)
     setIsProductPopoverOpen(true)
+    setIsComparePopoverOpen(false)
+    if (compareTimeoutRef.current) {
+      clearTimeout(compareTimeoutRef.current)
+    }
   }
 
   const handleProductMouseLeave = () => {
@@ -135,6 +139,10 @@ export default function WideNav() {
   const handleCompareMouseEnter = () => {
     clearTimeout(compareTimeoutRef.current!)
     setIsComparePopoverOpen(true)
+    setIsProductPopoverOpen(false)
+    if (productTimeoutRef.current) {
+      clearTimeout(productTimeoutRef.current)
+    }
   }
 
   const handleCompareMouseLeave = () => {
@@ -173,14 +181,14 @@ export default function WideNav() {
     <header className="fixed top-0 left-0 right-0 z-[99] bg-white dark:bg-[rgb(33,34,44)] shadow-md">
       <nav
         aria-label="Global"
-        className="mx-auto flex max-w-[90rem] items-center justify-between p-6 lg:px-8 border-b border-gray-300"
+        className="mx-auto flex max-w-[90rem] items-center justify-between px-6 lg:px-8 border-b border-gray-300"
       >
-        <div className="flex lg:flex-1 items-center">
+        <div className="flex lg:flex-1 items-center py-6">
           <a className={styles.brand} href="/">
             QuestDB
           </a>
         </div>
-        <div className="flex lg:hidden">
+        <div className="flex lg:hidden py-6">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -202,7 +210,7 @@ export default function WideNav() {
                 e.preventDefault()
                 setIsProductPopoverOpen(!isProductPopoverOpen)
               }}
-              className="p-0 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
+              className="px-0 py-6 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-black dark:text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
             >
               Product
               <ChevronDownIcon
@@ -213,10 +221,10 @@ export default function WideNav() {
 
             <Transition
               show={isProductPopoverOpen}
-              enter="transition ease-out duration-200"
+              enter="transition ease-out duration-100"
               enterFrom="opacity-0 translate-y-1"
               enterTo="opacity-100 translate-y-0"
-              leave="transition ease-in duration-150"
+              leave="transition ease-in duration-100"
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
@@ -269,7 +277,7 @@ export default function WideNav() {
                 e.preventDefault()
                 setIsComparePopoverOpen(!isComparePopoverOpen)
               }}
-              className="p-0 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
+              className="px-0 py-6 border-none bg-transparent hover:underline flex items-center gap-x-1 font-semibold text-base font-sans leading-6 text-white whitespace-nowrap hover:cursor-pointer focus:outline-none"
             >
               Compare
               <ChevronDownIcon
@@ -280,10 +288,10 @@ export default function WideNav() {
 
             <Transition
               show={isComparePopoverOpen}
-              enter="transition ease-out duration-200"
+              enter="transition ease-out duration-100"
               enterFrom="opacity-0 translate-y-1"
               enterTo="opacity-100 translate-y-0"
-              leave="transition ease-in duration-150"
+              leave="transition ease-in duration-100"
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
@@ -369,7 +377,7 @@ export default function WideNav() {
           <SearchBar />
         </PopoverGroup>
 
-        <div className="hidden lg:flex lg:flex-1 lg:justify-end">
+        <div className="hidden lg:flex lg:flex-1 lg:justify-end py-6">
           <MainCTA />
         </div>
         <MobileNav
