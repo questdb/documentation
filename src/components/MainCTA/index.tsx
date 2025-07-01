@@ -24,7 +24,7 @@ export const MainCTA = ({ className }: Props) => {
 
   return (
     <Button
-      className={clsx(styles.ctaButton, styles.getQuestdb, className)}
+      className={clsx(styles.ctaButton, className)}
       size="xsmall"
       variant="secondary"
       to={url}
