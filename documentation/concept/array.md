@@ -103,6 +103,21 @@ QuestDB always stores arrays in vanilla form. If you transform an array's shape
 and then store it to the database, QuestDB will physically rearrange the
 elements, and store the new array in vanilla shape.
 
+## Array and NULL/Nan/Infinity values
+
+QuestDB does not support `NULL` values in arrays. In a scalar `DOUBLE` column,
+if the value is `NaN`, it is treated as `NULL` in calculations. However, when it
+appears inside an array, it is treated as such, and not `NULL`. If it appears in
+an array and you take it out using the array access expression, the resulting
+scalar value will again be treated as `NULL`, however whole-array operations
+like `array_sum` will treat it according to its floating-point number semantics.
+
+QuestDB currently has an inconsistency in treating floating-point infinities.
+They are sometimes treated as `NULL`, and sometimes not. Infinity values
+currently produce unspecified behavior as scalar `DOUBLE` values, but inside an
+array, while performing whole-array operations, they are consistently treated as
+infinity.
+
 ## The ARRAY literal
 
 You can create an array from scalar values using the `ARRAY[...]` syntax, as
