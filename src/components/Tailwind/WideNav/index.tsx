@@ -233,7 +233,7 @@ export default function WideNav() {
                 onMouseLeave={handleProductMouseLeave}
                 onFocus={handleProductFocus}
                 onBlur={handleProductBlur}
-                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[90rem] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[var(--ifm-container-width)] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
                 <div className="mx-auto grid grid-cols-4 gap-x-4 px-3 pt-4 pb-4 lg:px-8 xl:gap-x-8">
                   {productFeatures.map((item) => (
@@ -300,7 +300,7 @@ export default function WideNav() {
                 onMouseLeave={handleCompareMouseLeave}
                 onFocus={handleCompareFocus}
                 onBlur={handleCompareBlur}
-                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[90rem] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
+                className="absolute w-[80%] xl:w-[70%] 2xl:w-[60%] max-w-[var(--ifm-container-width)] top-full !left-1/2 -translate-x-1/2 z-10 bg-[rgba(38,40,51,0.98)] shadow-lg ring-1 ring-gray-900/5 dark:ring-gray-500/5 transition data-[closed]:-translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in border-solid border-[1px] border-[#ffffff1a] rounded-lg"
               >
                 <div className="mx-auto grid grid-cols-3 gap-x-4 px-3 pt-4 pb-4 lg:px-4 xl:gap-x-8">
                   {compareFeatures.map((item) => (
