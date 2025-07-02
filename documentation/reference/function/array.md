@@ -180,6 +180,13 @@ SELECT flatten(ARRAY[[1, 2], [3, 4]]);
 Finds the insertion point of the supplied value into a sorted 1D array. The
 array can be sorted ascending or descending, and the function auto-detects this.
 
+:::warning
+
+The array must be sorted, but this function doesn't enforce it. It runs a binary
+search for the value, and the behavior with an unsorted array is unspecified.
+
+:::
+
 #### Parameters
 
 - `array` — the 1D array
