@@ -21,7 +21,7 @@ CREATE TABLE order_book (
 ### What is the bid-ask spread at any moment?
 
 ```questdb-sql
-SELECT ts, asks[1][1] - bids[1][1] spread FROM order_book;
+SELECT ts, spread(bids[1][1], asks[1][1]) FROM order_book;
 ```
 
 #### Sample data and result
