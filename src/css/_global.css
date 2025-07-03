@@ -265,13 +265,6 @@ html[data-theme="dark"] .DocSearch {
   padding-bottom: var(--docsearch-spacing);
 }
 
-@media (max-width: 1250px) {
-  .DocSearch .DocSearch-Button-Placeholder,
-  .DocSearch .DocSearch-Button-Keys {
-    display: none;
-  }
-}
-
 /* animation style for react-transition-group elements */
 .transition-node-enter {
   opacity: 0;
