@@ -45,7 +45,7 @@ SELECT ts, array_sum(
 ) volume FROM order_book;
 ```
 
-In a complex query like this, you can use `DECLARE` for better legibility:
+In a dense query like this, you can use `DECLARE` for better legibility:
 
 ```questdb-sql
 DECLARE
