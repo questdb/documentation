@@ -191,6 +191,13 @@ SELECT arr[1, 3, 2] elem FROM tango;
 This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
 coordinates are 1-based!
 
+:::tip
+
+The syntax `arr[1, 3, 2]` is interchangeable with `arr[1][3][2]`. The performance of
+both styles is the same.
+
+:::
+
 #### Example: select an out-of-range element from the array
 
 ```questdb-sql
@@ -235,9 +242,6 @@ SELECT arr[1, 3] subarr FROM tango;
 
 This selected the first 2D-subarray in `arr`, and then the 3rd 1D-subarray in
 it.
-
-You can also write `arr[1][3]`. Semantically, this is two operations, like this:
-`(arr[1]) [3]`. However, the performance of all three expressions is the same.
 
 ### Range selector - slicing
 
