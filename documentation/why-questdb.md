@@ -58,6 +58,8 @@ Greatest hits include:
   multiple series within a table
 - [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
   a series based on proximity; no extra indices required
+- [Materialized Views](/docs/guides/mat-views/) for pre-computing and automatically
+  refreshing complex query results to optimize performance
 
 ## Benefits of QuestDB {#benefits}
 
