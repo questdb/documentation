@@ -20,6 +20,38 @@ considerations.
 The following section describes the underlying aspects to consider when
 formulating queries.
 
+### Materialized views
+
+[Materialized views](/docs/guides/mat-views/) are a powerful feature for optimizing query performance, especially for
+complex aggregate queries. They pre-compute and store query results, providing significant performance improvements for
+frequently executed queries.
+
+Consider using materialized views when:
+
+- You have complex aggregate queries with `SAMPLE BY`, `GROUP BY`, or window functions that are executed frequently
+- Query latency is critical and you can accept slightly stale data
+- You need to optimize dashboard queries or reporting workloads
+
+Example of creating a materialized view for a common aggregate query:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW hourly_metrics AS
+SELECT
+    timestamp_floor('h', timestamp) as hour,
+    symbol,
+    avg(price) as avg_price,
+    sum(volume) as total_volume,
+    count() as trade_count
+FROM trades
+SAMPLE BY 1h;
+```
+
+This view automatically updates as new rows are added to the `trades` table. Queries to `hourly_metrics` are fast because
+they access these pre-computed results instead of scanning the full trades table.
+
+For more details on implementing and managing materialized views, see
+the [materialized views guide](/docs/guides/mat-views/).
+
 ### Row serialization
 
 Row serialization and deserialization has a cost on both client and server. The
