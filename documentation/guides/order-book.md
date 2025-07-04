@@ -45,6 +45,22 @@ SELECT ts, array_sum(
 ) volume FROM order_book;
 ```
 
+In a complex query like this, you can use `DECLARE` for better legibility:
+
+```questdb-sql
+DECLARE
+    @prices := asks[1],
+    @volumes := asks[2],
+    @best_price := @prices[1],
+    @multiplier := 1.01,
+    @target_price := @multiplier *  @best_price,
+    @relevant_volume_levels := @volumes[1:insertion_point(@prices, @target_price)]
+SELECT asks,
+     ts,
+     array_sum(@relevant_volume_levels) total_volume
+FROM order_book;
+```
+
 #### Sample data and result
 
 ```questdb-sql
