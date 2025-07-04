@@ -192,12 +192,12 @@ permissions and are less likely to be affected by day-to-day user management.
 The process is:
 
 1. Create a service account and grant it permissions.
-2. Generate a **REST token** for the account.
+2. Generate a **REST token** for the service account.
 3. Use this token in your client's connection string.
 
 ### Step 1: Create the Service Account
 
-First, run the following SQL in the web console. This creates a service account named ingest_http and grants it the
+First, run the following SQL in the web console. This creates a service account named `ingest_http` and grants it the
 necessary permissions to use HTTP endpoints and manage data.
 
 ```questdb-sql title="Web Console - Setup a service account"
@@ -211,9 +211,9 @@ GRANT ADD COLUMN, INSERT ON ALL TABLES TO ingest_ilp;
 -- GRANT ADD COLUMN, INSERT ON table1, table2 TO ingest_ilp;
 ```
 
-### Step 2: Generate the Authentication Token
+### Step 2: Generate an Authentication Token
 
-Next, generate a token for the service account. This token acts as a password, so you must store it securely.
+Next, generate a REST API token for the service account. This token acts as a password, so you must store it securely.
 
 ```questdb-sql title="Web Console - Generate a token for the ingest client"
 ALTER SERVICE ACCOUNT ingest_ilp CREATE TOKEN TYPE REST WITH TTL '3000d' REFRESH;
@@ -283,9 +283,9 @@ GRANT ADD COLUMN, INSERT ON ALL TABLES TO kafka;
 -- GRANT ADD COLUMN, INSERT ON table1, table2 TO ingest_ilp;
 ```
 
-### **Step 2: Generate the Authentication Token**
+### **Step 2: Generate an Authentication Token**
 
-Next, generate a token for the `kafka` service account. This token is a secret credential and should be treated like a
+Next, generate a REST API token for the `kafka` service account. This token is a secret credential and should be treated like a
 password.
 
 ```questdb-sql title="Web Console - Generate a token for the service account"
