@@ -469,6 +469,7 @@ module.exports = {
           ]
         },
         "operations/logging-metrics",
+        "operations/monitoring-alerting",
         "operations/data-retention",
         "operations/design-for-performance",
         "operations/updating-data",
