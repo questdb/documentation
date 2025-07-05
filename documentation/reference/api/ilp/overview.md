@@ -96,10 +96,8 @@ strings combine a set of key/value pairs.
 
 The standard configuration string pattern is:
 
-```
-
+```text
 schema::key1=value1;key2=value2;key3=value3;
-
 ```
 
 It is made up of the following parts:
@@ -109,6 +107,12 @@ It is made up of the following parts:
   below
 - **Key=Value**: Each key-value pair sets a specific parameter for the client
 - **Terminating semicolon**: A semicolon must follow the last key-value pair
+
+Basic example:
+
+```text
+http::addr=localhost:9000;
+```
 
 ### Client parameters
 
@@ -133,6 +137,16 @@ Exposing these values may expose your database to bad actors.
 - **schema**: Specifies the transport method, with support for: `http`, `https`,
   `tcp` & `tcps`
 - **addr**: The address and port of the QuestDB server, as in `localhost:9000`.
+- **protocol_version**: QuestDB has evolved its protocol beyond the basic ILP.
+  HTTP client autodetects the highest protocol version it can use, but TCP
+  doesn't and defaults to 1. This is how you specify protocol version 2 (latest):
+
+```text
+tcp::addr=localhost:9009;protocol_version=2
+```
+
+You need protocol version 2 in order to ingest n-dimensional arrays.
+It is available from QuestDB version 9.0.0.
 
 #### HTTP Parameters
 
@@ -277,11 +291,11 @@ and demonstrate the configuration keys and core configuration options.
 Once a client has been selected and configured, resume from your language client
 documentation.
 
-##### TCP token authentication setup
+### TCP token authentication setup
 
 Create `d`, `x` & `y` tokens for client usage.
 
-##### Prerequisites
+#### Prerequisites
 
 - `jose`: C-language implementation of Javascript Object Signing and Encryption.
   Generates tokens.
@@ -319,7 +333,7 @@ apt install jq
 
 </Tabs>
 
-##### Server configuration
+#### Server configuration
 
 Next, create an authentication file.
 
@@ -348,7 +362,7 @@ Once created, reference it in the server [configuration](/docs/configuration/):
 line.tcp.auth.db.path=conf/auth.txt
 ```
 
-##### Client keys
+#### Client keys
 
 For the server configuration above, the corresponding JSON Web Key must be
 stored on the clients' side.

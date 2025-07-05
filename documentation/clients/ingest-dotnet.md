@@ -29,12 +29,12 @@ perform basic insert operations.
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible .NET library](/docs/pgwire/c-sharp/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible .NET library](/docs/pgwire/c-sharp/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
-
 
 ## Requirements
 
@@ -59,7 +59,7 @@ dotnet add package net-questdb-client
 `Sender` is single-threaded, and uses a single connection to the database.
 
 If you want to send in parallel, you can use multiple senders and standard async
-tasking.
+tasks.
 
 :::
 
@@ -97,11 +97,11 @@ using var sender = Sender.New("http::addr=localhost:9000;username=admin;token=<t
 TCP authentication can be configured using JWK tokens:
 
 ```csharp
-using var sender = Sender.New("tcp::addr=localhost:9000;username=admin;token=<token>");
+using var sender = Sender.New("tcp::addr=localhost:9009;username=admin;token=<token>");
 ```
 
-The connection string can also be built programatically. See
-[Configuration](#configuration) for details.
+The connection options can also be built programatically. See
+[Ways to create the client](#ways-to-create-the-client) for details.
 
 ## Basic insert
 
@@ -127,8 +127,8 @@ await sender.Table("trades")
 await sender.SendAsync();
 ```
 
-In this case, the designated timestamp will be the one at execution time. Let's
-see now an example with timestamps, custom auto-flushing, basic auth, and error
+In this case, we asked the server to assign the timestamp to each row. Let's see
+now an example with timestamps, custom auto-flushing, basic auth, and error
 reporting.
 
 ```csharp
@@ -140,7 +140,9 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        using var sender = Sender.New("http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;");
+        using var sender = Sender.New(
+          "http::addr=localhost:9000;username=admin;password=quest;auto_flush_rows=100;auto_flush_interval=1000;"
+        );
 
         var now = DateTime.UtcNow;
         try
@@ -171,73 +173,86 @@ class Program
 }
 ```
 
-As you can see, both events use the same timestamp. We recommended using the
-original event timestamps when ingesting data into QuestDB. Using the current
-timestamp hinder the ability to deduplicate rows which is
+Now, both events use the same timestamp. We recommend using the event's
+original timestamp when ingesting data into QuestDB. Using ingestion-time
+timestamps precludes the ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
-## Configuration
+## Ways to create the client
 
-Construct new Senders via the `Sender` factory.
+There are three ways to create a client instance:
 
-It is mandatory to provide the `addr` config, as this defines the transport
-protocol and the server location.
+1. **From a configuration string.** This is the most common way to create a
+   client instance. It describes the entire client configuration in a single
+   string. See [Configuration options](#configuration-options) for all available
+   options. It allows sharing the same configuration across clients in different
+   languages.
 
-By default, the HTTP protocol uses `9000`, the same as the other HTTP endpoints.
-Optionally, TCP uses `9009`.
+   ```csharp
+   using var sender = Sender.New("http::addr=localhost:9000;");
+   ```
 
-### With a configuration string
+2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
+   is used to set the configuration string. Moving configuration parameters to
+   an environment variable allows you to avoid hard-coding sensitive information
+   such as tokens and password in your code.
 
-It is recommended, where possible, to initialise the sender using a
-[configuration string](/docs/configuration-string/).
+   If you want to initialise some properties programmatically after the initial
+   config string, you can use `Configure` and `Build`.
 
-Configuration strings provide a convenient shorthand for defining client
-properties, and are validated during construction of the `Sender`.
+   ```bash
+   export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
+   ```
 
-```csharp
-using var sender = Sender.New("http::addr=localhost:9000;");
+   ```csharp
+   (Sender.Configure("http::addr=localhost:9000;") with { auto_flush = AutoFlushType.off }).Build()
+   ```
+
+3. **From SenderOptions.**
+
+   ```csharp
+   await using var sender = Sender.New(new SenderOptions());
+   ```
+
+   This way you can bind options from configuration:
+
+   ```json
+   {
+     "QuestDB": {
+       "addr": "localhost:9000",
+       "tls_verify": "unsafe_off;"
+     }
+   }
+   ```
+
+   ```csharp
+   var options = new ConfigurationBuilder()
+       .AddJsonFile("config.json")
+       .Build()
+       .GetSection("QuestDB")
+       .Get<SenderOptions>();
+   ```
+
+## Configuration options
+
+The easiest way to configure the `Sender` is the configuration string. The
+general structure is:
+```plain
+<transport>::addr=host:port;param1=val1;param2=val2;...
 ```
+`transport` can be `http`, `https`, `tcp`, or `tcps`. Go to the client's
+[crate documentation](https://docs.rs/questdb-rs/latest/questdb/ingress) for the
+full details on configuration.
+Alternatively, for breakdown of available params, see the
+[Configuration string](/docs/configuration-string/) page.
 
-If you want to initialise some properties programmatically after the initial
-config string, you can use `Configure` and `Build`.
-
-```csharp
-(Sender.Configure("http::addr=localhost:9000;") with { auto_flush = AutoFlushType.off }).Build()
-```
-
-### From options
-
-The sender API also supports construction from `SenderOptions`.
-
-```csharp
-await using var sender = Sender.New(new SenderOptions());
-```
-
-You might use this when binding options from configuration:
-
-```json
-{
-  "QuestDB": {
-    "addr": "localhost:9000",
-    "tls_verify": "unsafe_off;"
-  }
-}
-```
-
-```csharp
-var options = new ConfigurationBuilder()
-    .AddJsonFile("config.json")
-    .Build()
-    .GetSection("QuestDB")
-    .Get<SenderOptions>();
-```
 
 ## Preparing Data
 
-Senders use an internal buffer to convert input values into an ILP-compatible
-UTF-8 byte-string.
+The Sender uses an internal buffer to convert input values into an
+ILP-compatible UTF-8 byte-string.
 
-This buffer can be controlled using the `init_buf_size` and `max_buf_size`
+You can control buffer sizing with the `init_buf_size` and `max_buf_size`
 parameters.
 
 Here is how to build a buffer of rows ready to be sent to QuestDB.
@@ -245,7 +260,7 @@ Here is how to build a buffer of rows ready to be sent to QuestDB.
 :::warning
 
 The senders are **not** thread safe, since they manage an internal buffer. If
-you wish to send data in parallel, you should construct multiple senders and use
+you wish to send data in parallel, construct multiple senders and use
 non-blocking I/O to submit to QuestDB.
 
 :::
@@ -281,25 +296,25 @@ The table name must always be called before other builder functions.
 ### Add symbols
 
 A [symbol](/docs/concept/symbol/) is a dictionary-encoded string, used to
-efficiently store commonly repeated data. This is frequently used for
-identifiers, and symbol columns can have
-[secondary indexes](/docs/concept/indexes/) defined upon them.
+efficiently store commonly repeated data. We recommend using this type for
+identifiers, because you can create a
+[secondary index](/docs/concept/indexes/) for a symbol column.
 
-Symbols can be added using calls to `Symbol`, which expects a symbol column
-name, and string value.
+Add symbols by calling `Symbol()`, which expects a symbol column
+name, and a string value.
 
 ```csharp
 sender.Symbol("foo", "bah");
 ```
 
-All symbol columns must be defined before any other column definition.
+You must specify all symbol columns first, before any other columns.
 
 ### Add other columns
 
-A number of data types can be submitted to QuestDB via ILP, including string /
+There are several data types you can send to QuestDB via ILP, including string /
 long / double / DateTime / DateTimeOffset.
 
-These can be written using the `Column` functions.
+Provide these by calling `Column()`.
 
 ```csharp
 sender.Column("baz", 102);
@@ -307,18 +322,20 @@ sender.Column("baz", 102);
 
 ### Finish the row
 
-A row is completed by defining the designated timestamp value:
+Completed a row by specifying the designated timestamp:
 
 ```csharp
 sender.At(DateTime.UtcNow);
 ```
 
-Generation of the timestamp can be offloaded to the server, using `AtNow`.
+You can also let the server assign the timestamp, by calling `AtNow()` instead.
 
 :::caution
 
-Using a server generated timestamp via AtNow/AtNowAsync is not compatible with
-QuestDB's deduplication feature, and should be avoided where possible.
+We recommend using the event's original timestamp when ingesting data into
+QuestDB. Using ingestion-time timestamps precludes the ability to deduplicate
+rows, which is
+[important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::
 
@@ -329,16 +346,15 @@ database automatically, or manually.
 
 ### Auto-flushing
 
-When the `At` functions are called, the auto-flushing parameters are checked to
-see if it is appropriate to flush the buffer. If an auto-flush is triggered,
-data will be sent to QuestDB.
+When you call one of the `At` functions, the row is complete. The sender checks
+the auto-flushing parameters to see if it should flush the buffer to the server.
 
 ```csharp
 sender.At(new DateTime(0,0,1));
 ```
 
-To avoid blocking the calling thread, one can use the Async overloads of the
-`At`. functions e.g `AtAsync`.
+To avoid blocking the calling thread, use the Async overloads of the `At`, such
+as `AtAsync`.
 
 ```csharp
 await sender.AtNowAsync();
@@ -352,54 +368,52 @@ using var sender = Sender.New("http::addr=localhost:9000;auto_flush=off;"); // o
 
 #### Flush by rows
 
-Users can specify a threshold of rows to flush. This is effectively a submission
-batch size by number of rows.
+You can specify the number of rows that will trigger an auto-flush, creating a
+batch insert operation of that size.
 
 ```csharp
 using var sender = Sender.New("http::addr=localhost:9000;auto_flush=on;auto_flush_rows=5000;");
 ```
 
-By default, HTTP senders will send after `75,000` rows, and TCP after `600`
+By default, the HTTP sender auto-flushes after 75,000 rows, and TCP after 600
 rows.
 
 :::tip
 
 `auto_flush_rows` and `auto_flush_interval` are both enabled by default. If you
-wish to only auto-flush based on one of these properties, you can disable the
-other using `off` or `-1`.
+wish to only auto-flush based on one of these properties, disable the other
+using `off` or `-1`.
 
 :::
 
 #### Flush by interval
 
-Specify a time interval between batches. This is the elapsed time from the last
-flush, and is checked when the `At` functions are called.
+You can specify the time interval between auto-flushes. The sender checks it
+every time you call an `At` function.
 
 ```csharp
 using var sender = Sender.New("http::addr=localhost:9000;auto_flush=on;auto_flush_interval=5000;");
 ```
 
-By default, `auto_flush_interval` is set to `1000` ms.
+By default, `auto_flush_interval` is 1000 ms.
 
 #### Flush by bytes
 
-Specify a buffer length after which to flush, effectively a batch size in UTF-8
-bytes. This should be set according to `init_buf_size` $\lt$ `auto_flush_bytes`
-$\leq$ `max_buf_size`.
+As an additional option, disabled by default, you can specify the batch size in
+terms of bytes instead of rows. You should ensure that `init_buf_size`
+$\lt$ `auto_flush_bytes` $\leq$ `max_buf_size`.
 
-This can be useful if a user has variety in their row sizes and wants to limit
-the request sizes.
+This can be useful if you have large variation in row sizes and want to limit
+the request sizes. By default, this is disabled, but set to `100 KiB`.
 
 ```csharp
 using var sender = Sender.New("http::addr=localhost:9000;auto_flush=on;auto_flush_bytes=65536;");
 ```
 
-By default, this is disabled, but set to `100 KiB`.
-
 ### Explicit flushing
 
-Manually flush the buffer using `Send`. and `SendAsync`. This will send any
-outstanding data to the QuestDB server.
+You can also manually flush the buffer at any time by calling `Send` or
+`SendAsync`. This will send any outstanding data to the QuestDB server.
 
 ```csharp
 using var sender = Sender.New("http::addr=localhost:9000;auto_flush=off;");
@@ -409,8 +423,10 @@ await sender.SendAsync(); // send non-blocking
 sender.Send(); // send synchronously
 ```
 
-It is recommended to always end your submission code with a manual flush. This
-will ensure that all data has been sent before disposing of the Sender.
+You should always perform an explicit flush before closing the sender. The HTTP
+sender normally retries the requests in case of errors, but won't do that while
+auto-flushing before closing. Flushing explicitly ensures that the client
+applies the same effort to send all the remaining data.
 
 ## Transactions
 
@@ -478,7 +494,8 @@ Add data to a transaction in the usual way, but without calling `Table` between
 rows.
 
 ```csharp
-sender.Symbol("bah", "baz").Column("num", 123).At(DateTime.UtcNow); // adds a symbol, integer column, and ends with current timestamp
+// add a symbol, integer column, and end with current timestamp
+sender.Symbol("bah", "baz").Column("num", 123).At(DateTime.UtcNow);
 ```
 
 ### Closing a transaction
@@ -498,7 +515,7 @@ server.
 sender.Rollback();
 ```
 
-## Misc.
+## Misc
 
 ### Cancelling rows
 
@@ -581,7 +598,6 @@ using var sender =
     Sender.New(
         "tcps::addr=localhost:9009;tls_verify=unsafe_off;username=admin;token=NgdiOWDoQNUP18WOnb1xkkEG5TzPYMda5SiUOvT1K0U=;");
 // See: /docs/reference/api/ilp/authenticate
-
 ```
 
 ## Next Steps
