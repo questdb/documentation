@@ -201,6 +201,34 @@ With your values, skip to the
 [Setup database replication](/docs/operations/replication/#setup-database-replication)
 section.
 
+### Google GCP GCS
+
+First, create a new Google Cloud Storage (GCS) bucket, most likely with `Public access: Not public`.
+
+Then create a new service account, and give it read-write permissions for the bucket. The simplest
+role is `Storage Admin`, but you may set up more granular permissions as needed.
+
+Create a new private key for this user and download it in `JSON` format. Then encode this key as `Base64`.
+
+If you are on Linux, you can `cat` the file and pass it to `base64`:
+
+```
+cat <key>.json | base64
+```
+
+Then construct the connection string:
+
+```
+replication.object.store=gcs::bucket=<bucket name here>;root=/;credential=<base64 encoded key>;
+```
+
+If you do not want to put the credentials directly in the connection string, you can swap the `credential`
+key for `credential_path`, and give it a path to the key-file.
+
+With your values, continue to the
+[Setup database replication](/docs/operations/replication/#setup-database-replication)
+section.
+
 ## Setup database replication
 
 Set the following changes in their respective `server.conf` files:
