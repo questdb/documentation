@@ -401,17 +401,3 @@ refreshMatView
 
 dropMatView
   ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName  
-
-
-pivot
-::= ( ( '(' selectQuery ')' ) | tableName )
-    'PIVOT'
-    '(' aggregateFunc ( 'AS' alias )?
-    ( ',' aggregateFunc ( 'AS' alias )? )*
-    'FOR'
-    pivotColumn 'IN' '(' ( ( constant ( 'AS' alias )? )+ | selectDistinctQuery ) ')'
-    ( pivotColumn 'IN' '(' ( ( constant ( 'AS' alias )? )+ | selectDistinctQuery ) ')'  )*
-    ('GROUP' 'BY' groupByExpr ( ',' groupByExpr )* )?
-    ('ORDER' 'BY' orderByExpr ( ',' orderByExpr )* )?
-    ('LIMIT' limitExpr)?
-    ')'
