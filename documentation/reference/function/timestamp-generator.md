@@ -10,6 +10,7 @@ create data for testing. Pseudo-random steps can be achieved by providing a
 `step` argument. A `seed` value may be provided to a random function if the
 randomly-generated `step` should be deterministic.
 
+
 ## timestamp_sequence
 
 - `timestamp_sequence(startTimestamp, step)` generates a sequence of `timestamp`
@@ -64,3 +65,95 @@ FROM long_sequence(5);
 | 3   | 2019-10-17T00:00:00.600000Z |
 | 4   | 2019-10-17T00:00:00.900000Z |
 | 5   | 2019-10-17T00:00:01.300000Z |
+
+
+## generate_series
+
+Rather than generating a fixed number of timestamps, you can instead generate timestamps in a range, 
+using `generate_series`.
+
+The step can be provided in either microseconds, or in a period string, similar to `SAMPLE BY`.
+
+The `start` and `end` values are interchangeable, and a negative `step` value can be used to 
+obtain the series in reverse order.
+
+The series is inclusive on both ends.
+
+**Arguments:**
+
+There are two timestamp-generating variants of `generate_series`:
+
+`generate_series(start, end, step_period)` - generate a series of timestamps between `start` and `end`
+in periodic steps.
+`generate_series(start, end, step_micros)` - generates a series of timestamps between `start` and `end`,
+in microsecond steps.
+
+
+**Return value:**
+
+Return value type is `timestamp`.
+
+**Examples:**
+
+```questdb-sql title="fwd series with period" demo
+generate_series('2025-01-01', '2025-02-01', '5d');
+```
+
+| generate_series             |
+| --------------------------- |
+| 2025-01-01T00:00:00.000000Z |
+| 2025-01-06T00:00:00.000000Z |
+| 2025-01-11T00:00:00.000000Z |
+| 2025-01-16T00:00:00.000000Z |
+| 2025-01-21T00:00:00.000000Z |
+| 2025-01-26T00:00:00.000000Z |
+| 2025-01-31T00:00:00.000000Z |
+
+```questdb-sql title="bwd series with period" demo
+generate_series('2025-01-01', '2025-02-01', '-5d');
+```
+
+| generate_series             |
+| --------------------------- |
+| 2025-02-01T00:00:00.000000Z |
+| 2025-01-27T00:00:00.000000Z |
+| 2025-01-22T00:00:00.000000Z |
+| 2025-01-17T00:00:00.000000Z |
+| 2025-01-12T00:00:00.000000Z |
+| 2025-01-07T00:00:00.000000Z |
+| 2025-01-02T00:00:00.000000Z |
+
+```questdb-sql title="fwd series with micro step demo
+generate_series(
+	'2025-01-01T00:00:00Z'::timestamp, 
+	'2025-01-01T00:05:00Z'::timestamp, 
+	60_000_000
+);
+```
+
+| generate_series             |
+| --------------------------- |
+| 2025-01-01T00:00:00.000000Z |
+| 2025-01-01T00:01:00.000000Z |
+| 2025-01-01T00:02:00.000000Z |
+| 2025-01-01T00:03:00.000000Z |
+| 2025-01-01T00:04:00.000000Z |
+| 2025-01-01T00:05:00.000000Z |
+
+
+```questdb-sql title="vwd series with micro step demo
+generate_series(
+	'2025-01-01T00:00:00Z'::timestamp, 
+	'2025-01-01T00:05:00Z'::timestamp, 
+	-60_000_000
+);
+```
+
+| generate_series             |
+| --------------------------- |
+| 2025-01-01T00:05:00.000000Z |
+| 2025-01-01T00:04:00.000000Z |
+| 2025-01-01T00:03:00.000000Z |
+| 2025-01-01T00:02:00.000000Z |
+| 2025-01-01T00:01:00.000000Z |
+| 2025-01-01T00:00:00.000000Z |
