@@ -31,6 +31,9 @@ libraries interpreting these timestamps in their local timezone by default, pote
 data representation. Our language-specific guides provide detailed examples on how to configure your client to correctly
 interpret these timestamps as UTC.
 
+We realize the current behavior is not ideal and we are actively working on improving it. In the meantime, we
+recommend that you set the timezone in your client library to UTC to ensure consistent handling of timestamps.
+
 ### PGWire vs. SQL Semantics
 
 While QuestDB supports the PGWire protocol for communication, its SQL dialect and feature
