@@ -219,7 +219,7 @@ DECLARE
   @top_ask_volume := asks[2, 1]
 SELECT * FROM (
   SELECT
-    timestamp timestamp,
+    timestamp,
     lag(@top_bid_volume) OVER () prev_bid_vol,
     @top_bid_volume curr_bid_vol,
     lag(@top_ask_volume) OVER () prev_ask_vol,
