@@ -33,6 +33,7 @@ QuestDB supports the following random generation functions:
 - [rnd_bin](#rnd_bin)
 - [rnd_uuid4](#rnd_uuid4)
 - [rnd_ipv4](#rnd_ipv4)
+- [rnd_double_array](#rnd_double_array)
 
 ## Usage
 
@@ -652,4 +653,45 @@ Returns an IPv4 address within specified range.
 rnd_ipv4('22.43.200.9/16', 0)
 /* Return address between 22.43.0.0 - 22.43.255.25 */
 22.43.200.12
+```
+
+## rnd_double_array()
+
+Generates a `DOUBLE` array with random elements. There are two main forms:
+
+1. `rnd_double_array(nDims, [ nanRate, [ maxDimLength ] ])` — generates an array with
+   the specified dimensionality and random dimension lengths, as well as random
+   elements. `nanRate` and `maxDimLength` are optional parameters. The default
+   `nanRate` is zero and the default `maxDimLength` is 16.
+
+2. `rnd_double_array(nDims, nanRate, 0, dim1Len, dim2Len, dim3Len, ...)` —
+   generates an array of fixed size with random elements. Note the dummy argument 0,
+   its is needed to disambiguate from other forms.
+
+**Examples:**
+
+Generate a 2-dimensional array with 50% NaNs and max dimension length 2:
+
+```questdb-sql
+SELECT rnd_double_array(2, 2, 2);
+```
+
+```text
+[
+  [NaN, 0.45738551710910846],
+  [0.7702337472360304, NaN]
+]
+```
+
+Generate a random 2x5 array with no NaNs:
+
+```questdb-sql
+SELECT rnd_double_array(2, 0, 0, 2, 5);
+```
+
+```text
+[
+  [0.316129098879942,  0.8662158040337894, 0.8642568676265672,  0.6470407728977403, 0.4740048603478647],
+  [0.2928431722534959, 0.4269209916086062, 0.08520276767101154, 0.5371988206397026, 0.5786689751730609]
+]
 ```

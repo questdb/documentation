@@ -573,10 +573,25 @@ ALIGN TO CALENDAR;
 | 2021-05-31T00:00:00.000000Z | 1000.5 |
 | 2021-06-01T00:00:00.000000Z | 8007.2 |
 
+## Performance optimization
+
+For frequently executed `SAMPLE BY` queries, consider using [materialized views](/docs/guides/mat-views/) to pre-compute aggregates. This can significantly improve query performance, especially for complex sampling operations on large datasets.
+
+```questdb-sql
+CREATE MATERIALIZED VIEW hourly_metrics AS
+SELECT 
+    timestamp_floor('h', ts) as hour,
+    symbol,
+    avg(price) as avg_price,
+    sum(volume) as total_volume
+FROM trades
+SAMPLE BY 1h;
+```
+
 ## See also
 
 This section includes links to additional information such as tutorials:
 
+- [Materialized Views Guide](/docs/guides/mat-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)
-
 - [Three SQL Keywords for Finding Missing Data](/blog/three-sql-keywords-for-finding-missing-data/)
