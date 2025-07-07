@@ -5,58 +5,67 @@ description:
   This document describes available hints and when to use them.
 ---
 
-QuestDB's query optimizer automatically selects execution plans for SQL queries based on heuristics. The default
-execution strategy should be the fastest for most datasets. You may use hints to select a specific execution strategy
-which may (or may not) outperform the default strategy. SQL hints influence the execution strategy of queries without
-changing their semantics.
+QuestDB's query optimizer automatically selects execution plans for SQL queries based on heuristics. While the default
+execution strategy should be the fastest for most scenarios, you can use hints to select a specific strategy that may
+better suit your data's characteristics. SQL hints influence the execution strategy of queries without changing their
+semantics.
 
 ## Hint Syntax
 
 In QuestDB, SQL hints are specified as SQL block comments with a plus sign after the opening comment marker. Hints must
-be placed immediately after the SELECT keyword:
+be placed immediately after the `SELECT` keyword:
 
 ```questdb-sql title="SQL hint syntax"
 SELECT /*+ HINT_NAME(parameter1 parameter2) */ columns FROM table;
 ```
 
-Hints are entirely optional and designed to be a safe optimization mechanism:
+Hints are designed to be a safe optimization mechanism:
 
-- The database will use default optimization strategies when no hints are provided
-- Syntax errors inside a hint block won't fail the entire SQL query
-- The database safely ignores unknown hints
-- Only block comment hints (`/*+ HINT */`) are supported, not line comment hints (`--+ HINT`)
+- The database uses default optimization strategies when no hints are provided.
+- Syntax errors inside a hint block won't fail the entire SQL query.
+- The database safely ignores unknown hints.
+- Only block comment hints (`/*+ HINT */`) are supported, not line comment hints (`--+ HINT`).
 
-## Available Hints
+-----
 
-### USE_ASOF_BINARY_SEARCH
+## Binary Search Optimizations and Hints
 
-The `USE_ASOF_BINARY_SEARCH` hint enables a specialized binary search optimization for
-non-keyed [ASOF joins](/reference/sql/asof-join/) when filtering is applied to the joined table. This hint requires two
-parameters that specify the table aliases participating in the join.
+Since version 9.0, QuestDB's optimizer defaults to using a binary search-based strategy for **`ASOF JOIN`** and
+**`LT JOIN`** (Less Than Join) queries that have a filter on the right-hand side (the joined or lookup table). This
+approach is generally faster as it avoids a full table scan.
 
-```questdb-sql title="Optimizing ASOF join with binary search"
-SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
+However, for some specific data distributions and filter conditions, the previous strategy of performing a parallel full
+table scan can be more performant. For these cases, QuestDB provides hints to *avoid* the default binary search.
+
+### AVOID\_ASOF\_BINARY\_SEARCH and AVOID\_LT\_BINARY\_SEARCH
+
+These hints instruct the optimizer to revert to the pre-9.0 execution strategy for `ASOF JOIN` and `LT JOIN` queries,
+respectively. This older strategy involves performing a full parallel scan on the joined table to apply filters *before*
+executing the join.
+
+- `AVOID_ASOF_BINARY_SEARCH(left_table_alias right_table_alias)`: Use for **`ASOF JOIN`** queries.
+- `AVOID_LT_BINARY_SEARCH(table_alias)`: Use for **`LT JOIN`** queries.
+
+<!-- end list -->
+
+```questdb-sql title="Avoiding binary search for an ASOF join"
+SELECT /*+ AVOID_ASOF_BINARY_SEARCH(orders md) */
   orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
   SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'VALID' --filter on the joined table
+  WHERE state = 'INVALID' -- Highly selective filter
 ) md;
 ```
 
 #### How it works
 
-By default (without this hint), QuestDB processes ASOF joins by:
+The **default strategy (binary search)** works as follows:
 
-1. Applying filters to the joined table in parallel
-2. Joining the filtered results to the main table
-
-With the `USE_ASOF_BINARY_SEARCH` hint, QuestDB changes the execution strategy:
-
-1. For each record in the main table, it uses [binary search](https://en.wikipedia.org/wiki/Binary_search) to locate
-   a record with a matching timestamp in the joined table
-2. Starting from this located timestamp match, it then iterates backward through rows in the joined table, in a single
-   thread, until finding a row that matches the filter condition
+1. For each record in the main table, it uses a binary search to quickly locate a record with a matching timestamp in
+   the joined table.
+2. Starting from this located timestamp, it then iterates backward through rows in the joined table, in a single thread,
+   evaluating the filter condition until a match is found.
 
 <Screenshot
 alt="Diagram showing execution of the USE_ASOF_BINARY_SEARCH hint"
@@ -65,36 +74,39 @@ src="images/docs/concepts/asof-join-binary-search-strategy.svg"
 width={745}
 />
 
-#### When to use
+The **hinted strategy (`AVOID_..._BINARY_SEARCH`)** forces this plan:
 
-This optimization is particularly beneficial when:
+1. Apply the filter to the *entire* joined table in parallel.
+2. Join the filtered (and now much smaller) result set to the main table.
 
-- The joined table is significantly larger than the main table
-- The filter on the joined table has low selectivity (meaning it doesn't eliminate many rows)
-- The joined table data is likely to be "cold" (not cached in memory)
+#### When to use the AVOID hints
 
-When joined table data is cold, the default strategy must read all rows from disk to evaluate the filter. This becomes
-especially expensive on slower I/O systems like EBS (Elastic Block Storage). The binary search approach significantly
-reduces I/O operations by reading only the specific portions of data needed for each join operation.
+You should only need these hints in a specific scenario: when the filter on your joined table is **highly selective**.
 
-However, when a filter is highly selective (eliminates most rows), the binary search strategy may be less efficient.
-This happens because after finding a timestamp match, the strategy must iterate backward in a single thread, evaluating
-the filter condition at each step until it finds a matching row. With highly selective filters, this sequential search
-may need to examine many rows before finding a match.
+A filter is considered highly selective if it eliminates a very large percentage of rows (e.g., more than 95%). In this
+situation, the hinted strategy can be faster because:
 
-As a rule of thumb, the binary search strategy tends to outperform the default strategy when the filter eliminates less
-than 5% of rows from the joined table. However, optimal performance also depends on other factors such as the ratio
-between main and joined table sizes, available hardware resources, disk I/O performance, and data distribution.
+- The parallel pre-filtering step rapidly reduces the joined table to a very small size.
+- The subsequent join operation is then very fast.
 
-In contrast, the default strategy processes and filters the joined table in parallel, which can be much faster for
-highly selective filters despite requiring an initial full table scan.
+Conversely, the default binary search can be slower with highly selective filters because its single-threaded backward
+scan may have to check many rows before finding one that satisfies the filter condition.
 
-#### Execution Plan Observation
-You can verify how QuestDB executes your query by examining its execution plan
-with the [`EXPLAIN` statement](/reference/sql/explain/):
+For most other cases, especially with filters that have low selectivity or when the joined table data is not in
+memory ("cold"), the default binary search is significantly faster as it minimizes I/O operations.
 
-```questdb-sql title="Observing execution plan with USE_ASOF_BINARY_SEARCH"
-EXPLAIN SELECT /*+ USE_ASOF_BINARY_SEARCH(orders md) */ 
+-----
+
+### Execution Plan Observation
+
+You can verify how QuestDB executes your query by examining its execution plan with the `EXPLAIN` statement.
+
+#### Default Execution Plan (Binary Search)
+
+Without any hints, a filtered `ASOF JOIN` will use the binary search strategy.
+
+```questdb-sql title="Observing the default execution plan"
+EXPLAIN SELECT
   orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
@@ -103,18 +115,20 @@ ASOF JOIN (
 ) md;
 ```
 
-When the hint is applied successfully, the execution plan will show a Filtered AsOf Join Fast Scan operator,
-confirming that the binary search strategy is being used:
+The execution plan will show a `Filtered AsOf Join Fast Scan` operator, confirming the binary search strategy is being
+used.
 
 <Screenshot
-alt="Screen capture of the EXPLAIN output for USE_ASOF_BINARY_SEARCH"
+alt="Screen capture of the EXPLAIN output showing the default Filtered AsOf Join Fast Scan"
 src="images/docs/concepts/filtered-asof-plan-example.png"
 />
 
-For comparison, here's what happens without the hint:
+#### Hinted Execution Plan (Full Scan)
 
-```questdb-sql title="Observing execution plan without USE_ASOF_BINARY_SEARCH"
-EXPLAIN SELECT 
+When you use the `AVOID_ASOF_BINARY_SEARCH` hint, the plan changes.
+
+```questdb-sql title="Observing execution plan with the AVOID hint"
+EXPLAIN SELECT /*+ AVOID_ASOF_BINARY_SEARCH(orders md) */
   orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
@@ -123,12 +137,10 @@ ASOF JOIN (
 ) md;
 ```
 
-The execution plan will show:
-
-- A standard `AsOf Join` operator instead of `Filtered AsOf Join Fast Scan`
-- A separate filtering step that processes the joined table in parallel first
+The execution plan will now show a standard `AsOf Join` operator and a separate, preceding filtering step on the joined
+table.
 
 <Screenshot
-alt="Screen capture of the EXPLAIN output for default ASOF join"
+alt="Screen capture of the EXPLAIN output for the hinted ASOF join, showing a separate filter"
 src="images/docs/concepts/default-asof-plan-example.png"
 />
