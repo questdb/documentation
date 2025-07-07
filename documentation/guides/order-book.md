@@ -109,15 +109,6 @@ SELECT
 FROM market_data WHERE symbol='EURUSD';
 ```
 
-```questdb-sql
-SELECT
-  timestamp,
-  array_cum_sum(asks[2]) cum_volumes,
-  insertion_point(cum_volumes, 30.0, true) target_level,
-  asks[1, target_level] price
-FROM market_data WHERE symbol='EURUSD';
-```
-
 #### Sample data and result
 
 ```questdb-sql
