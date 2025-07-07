@@ -159,8 +159,8 @@ DECLARE
   @ask_volumes := asks[2]
 SELECT
   timestamp,
-  array_sum(bid_volumes[1:4]) bid_vol,
-  array_sum(ask_volumes[1:4]) ask_vol,
+  array_sum(@bid_volumes[1:4]) bid_vol,
+  array_sum(@ask_volumes[1:4]) ask_vol,
   bid_vol / ask_vol ratio
 FROM market_data WHERE symbol='EURUSD';
 ```
