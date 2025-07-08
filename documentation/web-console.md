@@ -31,11 +31,6 @@ running locally, this will be [http://localhost:9000](http://localhost:9000).
 
 The Web Console is organized into the following main sections that work together to provide a complete workflow:
 
-### Schema Explorer
-
-The **Schema Explorer** is the navigation hub for exploring tables and materialized views. It provides detailed information about each database object including columns with data types, storage configuration (partitioning and WAL status), and for materialized views, their base tables.
-
-[Learn more about Schema Explorer →](/docs/web-console/schema-explorer)
 
 ### Code Editor
 
@@ -49,17 +44,27 @@ The **Metrics View** provides real-time monitoring and telemetry capabilities fo
 
 [Learn more about Metrics View →](/docs/web-console/metrics-view)
 
-### Query Log
 
-The **Query Log** monitors query execution status and performance metrics, providing real-time feedback and maintaining a history of recent operations. It shows execution times, row counts, and detailed error information to help optimize your queries.
+### Schema Explorer
 
-[Learn more about Query Log →](/docs/web-console/query-log)
+The **Schema Explorer** is the navigation hub for exploring tables and materialized views. It provides detailed information about each database object including columns with data types, storage configuration (partitioning and WAL status), and for materialized views, their base tables.
+
+[Learn more about Schema Explorer →](/docs/web-console/schema-explorer)
+
 
 ### Result Grid
 
 The **Result Grid** displays your query results in an interactive table format with features for data navigation, export, and visualization.
 
 [Learn more about Result Grid →](/docs/web-console/result-grid)
+
+
+### Query Log
+
+The **Query Log** monitors query execution status and performance metrics, providing real-time feedback and maintaining a history of recent operations. It shows execution times, row counts, and detailed error information to help optimize your queries.
+
+[Learn more about Query Log →](/docs/web-console/query-log)
+
 
 ### Import CSV
 
