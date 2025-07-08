@@ -18,7 +18,7 @@ CREATE TABLE market_data (
 ### What is the bid-ask spread at any moment?
 
 ```questdb-sql
-SELECT timestamp, spread(bids[1][1], asks[1][1])
+SELECT timestamp, spread(bids[1][1], asks[1][1]) spread
 FROM market_data WHERE symbol='EURUSD';
 ```
 
