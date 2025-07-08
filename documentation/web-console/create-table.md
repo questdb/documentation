@@ -9,9 +9,9 @@ The Web Console provides an interactive interface for creating new tables throug
 
 <Screenshot
   alt="Screenshot of the create table tab"
-  small
   src="images/docs/console/create-table-tab.webp"
-  width={300}
+  width={634}
+  height={400}
 />
 
 The Create table tab allows you to define the table structure, partition settings, WAL configuration, and add columns using an intuitive UI.
@@ -19,7 +19,6 @@ The Create table tab allows you to define the table structure, partition setting
 <Screenshot
   alt="Screenshot of the create table panel"
   height={495}
-  small
   src="images/docs/console/create-table.webp"
   width={455}
 />

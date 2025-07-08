@@ -25,7 +25,6 @@ running locally, this will be [http://localhost:9000](http://localhost:9000).
 <Screenshot
   alt="Preview of the different sections in the Web Console"
   height={375}
-  small
   src="images/docs/console/layout.webp"
   width={800}
 />

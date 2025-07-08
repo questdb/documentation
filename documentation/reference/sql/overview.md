@@ -434,4 +434,4 @@ And to learn about some of our favourite, most powerful syntax:
 Looking for visuals?
 
 - Explore [Grafana](/docs/third-party-tools/grafana/)
-- Jump quickly into the [Web Console](/docs/web-console/#web-console)
+- Jump quickly into the [Web Console](/docs/web-console/)
