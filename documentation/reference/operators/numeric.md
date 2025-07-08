@@ -4,6 +4,11 @@ sidebar_label: Numeric
 description: Numeric operators
 ---
 
+These operations work for any numeric types. Also, addition and multiplication
+work for N-dimensional arrays. The result will be an array where each element is
+the result of applying the operation to the elements at the same coordinates in
+the operand arrays.
+
 ## `*` Multiply
 
 `*` is a binary operation to multiply two numbers together.

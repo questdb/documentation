@@ -1,10 +1,20 @@
 .ctaButton {
-  margin-left: 10px;
-  font-size: var(--font-size-small);
-  padding: 0 2rem;
-}
-
-.getQuestdb {
   background: var(--palette-pink);
   color: #ffffff;
+  padding: 0 1rem;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.ctaButton:hover {
+  background: var(--palette-pink-darker);
+  color: #fff;
+}
+
+@media (min-width: 1100px) {
+  .ctaButton {
+    margin-left: 0.75rem;
+    min-width: 140px;
+    padding: 0 2rem;
+  }
 }

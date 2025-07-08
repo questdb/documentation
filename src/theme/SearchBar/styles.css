@@ -12,3 +12,19 @@
 .DocSearch-Container {
   z-index: calc(var(--ifm-z-index-fixed) + 1);
 }
+
+@media (min-width: 998px) { /* lg */
+  .DocSearch-Button {
+    gap: 1rem;
+  }
+}
+
+.DocSearch-Button-Placeholder {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .DocSearch-Button-Keys {
+    display: none;
+  }
+}
