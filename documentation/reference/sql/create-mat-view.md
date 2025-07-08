@@ -221,6 +221,10 @@ occurs:
 - After the next base table transaction in case of `IMMEDIATE` refresh strategy.
 - At the next trigger time in case of timer-based refresh strategy.
 
+Once a materialized view is created, its refresh strategy can be changed any time
+with the [`ALTER SET REFRESH`](/docs/reference/sql/alter-mat-view-set-refresh/)
+command.
+
 ## Base table
 
 Materialized views require that the base table is specified, so that the last

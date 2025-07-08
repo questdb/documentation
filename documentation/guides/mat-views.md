@@ -186,6 +186,9 @@ that to refresh the view, you need to run the
 timer-based refresh the view is refreshed periodically, at the specified
 interval.
 
+The refresh strategy of an existing view can be changed any time with the
+[`ALTER SET REFRESH`](/docs/reference/sql/alter-mat-view-set-refresh/) command.
+
 ## Period materialized views
 
 In certain use cases, like storing trading day information, the data becomes
