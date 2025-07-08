@@ -250,7 +250,7 @@ For each level, calculate the deviation from the mid price (midpoint between
 best bid and best ask), and weight it by the volume at that level. This shows us
 whether there's stronger buying or selling interest.
 
-```questdb-sql
+```questdb-sql demo
 DECLARE
   @bid_prices := bids[1],
   @bid_volumes := bids[2],
