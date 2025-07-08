@@ -216,7 +216,8 @@ snapshot — potential order withdrawal ahead of adverse movement.
 ```questdb-sql
 DECLARE
   @top_bid_volume := bids[2, 1],
-  @top_ask_volume := asks[2, 1]
+  @top_ask_volume := asks[2, 1],
+  @drop_ratio := 1.5
 SELECT * FROM (
   SELECT
     timestamp,
@@ -225,7 +226,7 @@ SELECT * FROM (
     lag(@top_ask_volume) OVER () prev_ask_vol,
     @top_ask_volume curr_ask_vol
   FROM market_data WHERE symbol='EURUSD')
-WHERE prev_bid_vol > curr_bid_vol * 1.5 OR prev_ask_vol > curr_ask_vol * 1.5;
+WHERE prev_bid_vol > curr_bid_vol * @drop_ratio OR prev_ask_vol > curr_ask_vol * @drop_ratio;
 ```
 
 #### Sample data and result
