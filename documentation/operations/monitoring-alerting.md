@@ -77,7 +77,3 @@ query and the time it took. You can query this table to find slow queries.
 
 Read more on query tracing on the
 [Concepts page](/docs/concept/query-tracing/).
-
-## Detect potential causes of performance issues
-
-... mention interesting Prometheus metrics ...
