@@ -70,7 +70,7 @@ and simplest way, apply queries via the [Web Console](/docs/web-console/).
 
 <Screenshot
   alt="A shot of the Web Console, showing auto complete and a colourful returned table."
-  src="images/pages/getQuestdb/console.webp"
+  src="images/docs/console/overview.webp"
   title="Click to zoom"
 />
 
