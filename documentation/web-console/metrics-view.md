@@ -134,6 +134,10 @@ aspects to observe:
 - Any unusually small transactions that could be batched
 - Consistency of batch sizes across time periods
 
+:::info
+Metrics View displays key metrics for quick monitoring in the Web Console. For comprehensive metrics and advanced monitoring capabilities, see [Prometheus monitoring and alerting](/docs/third-party-tools/prometheus/).
+:::
+
 ## Best Practices
 
 - Limit the number of active widgets to maintain performance

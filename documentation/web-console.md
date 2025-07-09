@@ -72,11 +72,14 @@ The **Import CSV** interface allows you to upload and import CSV files into Ques
 
 [Learn more about Import CSV →](/docs/web-console/import-csv)
 
-### Create Table
 
-The **Create Table** interface provides an interactive way to create new tables through an intuitive UI. You can define table structure, configure partition settings, enable WAL, and add columns with their data types and properties without writing SQL code.
+### Right Sidebar
 
-[Learn more about Create Table →](/docs/web-console/create-table)
+The **Right Sidebar** provides quick access to essential tools and information:
+- **Help**: Access quick links and contact options through a convenient help menu
+- **QuestDB News**: Stay up-to-date with the latest QuestDB announcements and updates
+- **Create Table**: Build new tables visually using an intuitive interface. Define table structure, configure partitioning, enable WAL, and add columns with their data types—all without writing SQL code. [Learn more about Create Table →](/docs/web-console/create-table)
+
 
 ### Instance Naming
 
