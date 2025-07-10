@@ -73,8 +73,8 @@ Many nullable types reserve a value that marks them `NULL`:
 
 | Type Name        | Null value                                                           | Description                                                                              |
 | ---------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `float`          | `NaN`                                                                | As defined by IEEE 754 (`java.lang.Float.NaN`).                                          |
-| `double`         | `NaN`                                                                | As defined by IEEE 754 (`java.lang.Double.NaN`).                                         |
+| `float`          | `NaN`, `+Infinity`, `-Infinity`                                      | As defined by IEEE 754 (`java.lang.Float.NaN` etc.)                                      |
+| `double`         | `NaN`, `+Infinity`, `-Infinity`                                      | As defined by IEEE 754 (`java.lang.Double.NaN`, etc.)                                    |
 | `long256`        | `0x8000000000000000800000000000000080000000000000008000000000000000` | The value equals four consecutive `long` null literals.                                  |
 | `long`           | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
 | `date`           | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
