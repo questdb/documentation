@@ -87,6 +87,7 @@ CREATE TABLE marketing_campaign_metrics (
 :::tip
 
 When using table prefixes for multi-tenancy:
+
 - Use consistent naming conventions (e.g., always `<tenant>_<table>`)
 - Consider using uppercase for tenant identifiers to improve readability
 - Document your naming convention in your team's schema design guidelines
@@ -112,9 +113,11 @@ The easiest way to create a schema is through the **[Web Console](/docs/web-cons
 
 When using the **[Influx Line Protocol](/docs/reference/api/ilp/overview/) (ILP)**, QuestDB automatically creates tables and columns based on incoming data. This is useful for users migrating from InfluxDB or using tools like **InfluxDB client libraries or Telegraf**, as they can send data directly to QuestDB without pre-defining schemas. However, this comes with limitations:
 
-- QuestDB applies **default settings** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
-- Users **cannot modify [partitioning](/docs/concept/partitions/) or [symbol capacity](/docs/concept/symbol/#usage-of-symbols) later**, so they should create tables explicitly beforehand.
-- Auto-creation can be [disabled via configuration](/docs/configuration/#influxdb-line-protocol-ilp).
+- QuestDB applies the **default settings** to auto-created tables and columns (e.g., partitioning, symbol capacity, and data types).
+- You **cannot modify [partitioning](/docs/concept/partitions/) or [symbol capacity](/docs/concept/symbol/#usage-of-symbols) later**.
+- You cannot auto-create the `IPv4` data type. Sending an IP address as a string will create a `VARCHAR` column.
+
+You can disable column auto-creation [via configuration](/docs/configuration/#influxdb-line-protocol-ilp).
 
 ## The designated timestamp and partitioning strategy
 
@@ -215,7 +218,6 @@ For changes, the typical workaround is:
 2. [Copy data](/reference/sql/update/) from the old column into the new one.
 3. Drop the old column and rename the new one.
 4. **If changes affect table-wide properties** (e.g., partitioning, timestamp column, or WAL settings), create a new table with the required properties, [insert data from the old table](/reference/sql/insert/#inserting-query-results), drop the old table, and rename the new table.
-
 
 ## Examples of schema translations from other databases
 

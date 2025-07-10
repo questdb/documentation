@@ -184,91 +184,73 @@ List the full list of applied permissions with `all_permissions()`.
 
 ## 4. Ingest data, InfluxDB Line Protocol
 
-Perform data ingestion through a service account or an interactive user. Service
-accounts are recommended over users, as they apply a cleaner set of access
-permissions, and are less likely to be affected by day-to-day user management
-operations.
+The recommended method for high-throughput ingestion is InfluxDB Line Protocol (ILP) over HTTP.
 
-First, set up the service account. Then, use it to create a token which is
-associated with the service account. This token is then provided to your
-InfluxDB client to form a secure, access-controlled connection.
+We recommend using a service account for programmatic ingestion. Service accounts apply a cleaner set of access
+permissions and are less likely to be affected by day-to-day user management.
 
-A service account is "an account for a service". This is in contrast to an
-account for a user. When service accounts are created, we assume that they
-belong to an organization and not an individual. Your sensors, apps or cars may
-use service accounts. Sam, the plucky analyst, may have an interactive user.
+The process is:
 
-The recommended ingestion method is via the InfluxDB Line Protocol (ILP).
+1. Create a service account and grant it permissions.
+2. Generate a **REST token** for the service account.
+3. Use this token in your client's connection string.
 
-To setup a service account:
+### Step 1: Create the Service Account
+
+First, run the following SQL in the web console. This creates a service account named `ingest_http` and grants it the
+necessary permissions to use HTTP endpoints and manage data.
 
 ```questdb-sql title="Web Console - Setup a service account"
-CREATE SERVICE ACCOUNT ingest;
-GRANT ilp, create table TO ingest;
-GRANT add column, insert ON all tables TO ingest;
---  OR
-GRANT add column, insert ON table1, table2 TO ingest;
+CREATE SERVICE ACCOUNT ingest_ilp;
+-- Grant permission to create tables and use HTTP endpoints
+GRANT HTTP, CREATE TABLE TO ingest_ilp;
+-- Grant permission to add columns and insert data
+GRANT ADD COLUMN, INSERT ON ALL TABLES TO ingest_ilp;
+
+-- OR, for more granular control:
+-- GRANT ADD COLUMN, INSERT ON table1, table2 TO ingest_ilp;
 ```
 
-This creates a service account called `ingest`, which:
+### Step 2: Generate an Authentication Token
 
-- Can create a table
-- Add table columns
-- Insert to all tables OR insert to specific tables
+Next, generate a REST API token for the service account. This token acts as a password, so you must store it securely.
 
-The account exists, and that means that a client of some kind can connect to
-QuestDB via that account. Next, create a token to create a secure link between
-the client and the account:
-
-```questdb-sql title="Web Console - Generate a token for ingest client"
-ALTER SERVICE ACCOUNT ingest CREATE TOKEN TYPE JWK;
+```questdb-sql title="Web Console - Generate a token for the ingest client"
+ALTER SERVICE ACCOUNT ingest_ilp CREATE TOKEN TYPE REST WITH TTL '3000d' REFRESH;
 ```
 
-This creates a token comprised of three parts:
+This command returns a token. **Copy it immediately**, as it's shown only once.
 
-- public_key_x
-- public_key_y
-- private_key
+| name       | token                                          | expires_at                  | refresh |
+|------------|------------------------------------------------|-----------------------------|---------|
+| ingest_ilp | qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY | 2033-09-19T15:32:51.628453Z | true    |
 
-| name   | public_key_x                               | public_key_y                               | private_key                                 |
-| ------ | ------------------------------------------ | ------------------------------------------ | ------------------------------------------- |
-| ingest | gxVbx90=MtYMmIEek2L5jFa5e9qTIvxI2TKSfI3GVE | kEUZjIfU9=S6w6uR=j130v003YgB3NBpYcVswvvacs | kom7j38LG44HcPfO92oZ4558e6KoeTHn6H5rA8vK3PQ |
+### Step 3: Use the Token in Your Client
 
-Now, this private key is then added to the client.
+You can now use this token to authenticate your application. The following Java example shows how to use the client
+library by configuring it from a connection string. This is the recommended approach.
 
-This provides authenticated access to QuestDB for the "ingest" user.
-
-For example, if you are leveraging Java and our recommended InfluxDB Line Protocol over HTTP client:
-
-```java
-Java client example:
-
+```java title="Java - Ingesting data via ILP"
 import io.questdb.client.Sender;
 import java.time.temporal.ChronoUnit;
 
-public class ILPMain {
+public class Ingest {
     public static void main(String[] args) {
-        try (Sender sender = Sender.builder(Sender.Transport.HTTP)
-                .address("localhost:9000")
-                .enableTls()
-                .enableAuth("ingest")
-                .authToken("kom7j38LG44HcPfO92oZ4558e6KoeTHn6H5rA8vK3PQ")
-                .build()) {
-
+        try (Sender sender = Sender.fromConfig("https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;")) {
             sender.table("ilptest");
             sender.symbol("sym1", "symval1")
-                  .doubleColumn("double1", 100.0)
-                  .at(System.currentTimeMillis(), ChronoUnit.MILLIS);
+                    .doubleColumn("double1", 100.0)
+                    .at(System.currentTimeMillis(), ChronoUnit.MILLIS);
         }
     }
 }
 ```
 
-Please note that the private key is not stored in the database.
-
-There is **no way to get your private key back** at a later time!
-
-Once generated, safely store it.
+:::note A Note on TLS
+The `https::` prefix in the connection string tells the client to connect using TLS. By default, the client will verify
+the server's certificate. For local testing with self-signed certificates, you can disable this validation by adding
+`tls.verify=insecure;` to the configuration string. **This is not recommended for production.**
+:::
 
 Connecting a client to ILP is a common path.
 
@@ -276,60 +258,78 @@ However, you may use something like [Kafka](/docs/third-party-tools/kafka).
 
 ## 5. Ingest data, Kafka Connect (optional)
 
-_If you're not applying Kafka, skip to step 6._
+_If you're not using Kafka, you can skip to section 6._
 
-The
-[Kafka Connect](https://docs.confluent.io/platform/current/connect/index.html)
-connector can be thought of as a specialized ILP client.
+The official **QuestDB Kafka Connect sink** forwards messages from Kafka topics directly to your database using ILP protocol.
+The setup process is straightforward:
 
-Thus the steps are similar to ILP ingestion:
+1. Create a dedicated service account in QuestDB.
+2. Generate an authentication token for the account.
+3. Configure the Kafka sink connector with your QuestDB address and the token.
 
-1. Create a Kafka service account and assign permissions
-1. Configure the connector to use the service account
+### **Step 1: Create the Service Account**
 
-```questdb-sql title="Web Console - Create a service account and grant required permissions"
+In the QuestDB web console, create a service account named `kafka` and grant it the permissions required to connect and
+write data.
+
+```questdb-sql title="Web Console - Create a Kafka service account"
 CREATE SERVICE ACCOUNT kafka;
-GRANT ilp, create table TO kafka;
-GRANT add column, insert ON all tables TO kafka;
-    OR
-GRANT add column, insert ON table1, table2 to kafka;
+
+-- Grant permissions to use HTTP, create tables, add new columns and insert data
+GRANT HTTP, CREATE TABLE TO kafka;
+GRANT ADD COLUMN, INSERT ON ALL TABLES TO kafka;
+
+-- OR, for more granular control:
+-- GRANT ADD COLUMN, INSERT ON table1, table2 TO ingest_ilp;
 ```
+
+### **Step 2: Generate an Authentication Token**
+
+Next, generate a REST API token for the `kafka` service account. This token is a secret credential and should be treated like a
+password.
 
 ```questdb-sql title="Web Console - Generate a token for the service account"
-ALTER SERVICE ACCOUNT kafka CREATE TOKEN TYPE JWK;
+-- Creates a token that is valid for 1 year (365 days)
+ALTER SERVICE ACCOUNT kafka CREATE TOKEN TYPE REST WITH TTL '365d';
 ```
 
-The token SQL returns a multi-part token, as before:
+The command returns a token. **Copy it immediately**, as it will not be shown again.
 
-| name  | public_key_x                              | public_key_y                                | private_key                                   |
-| ----- | ----------------------------------------- | ------------------------------------------- | --------------------------------------------- |
-| kafka | uE3MxG5_PMTor0V40LIBNTaUv-xh0dMPRN83nsQUI | 73wq8nx02Pj6W6yt53VxFT9K-TnopdM0s0UeeBxTgb0 | tDNC3DJ_L_QYIZRu_L4S4YTZYZXbjr7JX_bxFYdHhhhQU |
-
-Remember, the private key cannot be retrieved.
+| name  | token                                            | expires\_at                   |
+|-------|--------------------------------------------------|-------------------------------|
+| kafka | `qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY` | `2026-07-03T18:05:00.000000Z` |
 
 Save the private key in a secure location!
 
-Next, configure the username, token and TLS settings inside of Kafka:
+### **Step 3: Configure the Kafka Connect Sink**
 
-```bash title="Kafka Connect - Configuring the QuestDB Kafka connector"
-username=kafka
-token=[the private key saved in the previous step]
-tls=true
+Create a configuration file for the QuestDB sink connector. In the `client.conf.string` property, provide your QuestDB
+server address and paste the token you just generated.
 
-# If QuestDB server does not use trusted certificates
-# then you have to disable TLS validation
-# This is recommended for testing purposes only,
-# In production, use a QuestDB server certificate trusted
-# by your Kafka Connect installation
-tls.validation.mode=insecure
+```properties title="questdb-sink.properties"
+# --- Connector Identity ---
+name=QuestDBSinkConnector
+connector.class=io.questdb.kafka.QuestDBSinkConnector
+tasks.max=1
 
-# Rest of the Kafka config
-host=localhost
-topics=example-topics
-table=example-table
+# --- Source Kafka Topic ---
+topics=your_kafka_topic
+
+# --- QuestDB Connection ---
+# Use https:: if your QuestDB server has TLS enabled.
+# Replace the placeholder with the token you generated.
+client.conf.string=https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY;
+
+# --- Optional: Data Mapping ---
+# Use a field from the Kafka message key or value as a QuestDB symbol.
+# symbol.columns=device_id
 ```
 
-Can't connect? Check within your server logs.
+Once you deploy this configuration, the connector will start sending data from your Kafka topic to QuestDB. If you
+encounter any issues, check the logs for both your Kafka Connect worker and your QuestDB server for more details.
+
+See the [QuestDB Kafka Connector documentation](/docs/third-party-tools/kafka/#questdb-kafka-connect-connector) for more details
+on the configuration options and how to set up the connector.
 
 ## 6. Query data, PostgreSQL query
 

@@ -23,7 +23,7 @@ datasets where an exact count is not required. Thus consider it the higher
 cardinality alternative to
 [`count_distinct`](/docs/reference/function/aggregation/#count_distinct).
 
-### Parameters
+#### Parameters
 
 - `column_name`: The name of the column for which to estimate the count of
   distinct values.
@@ -33,11 +33,11 @@ cardinality alternative to
   accurate estimate, but consumes more memory. Defaults to 1 (lower accuracy,
   high efficiency).
 
-### Return value
+#### Return value
 
 Return value type is `long`.
 
-### Examples
+#### Examples
 
 _Please note that exact example values will vary as they are approximations
 derived from the HyperLogLog algorithm._
@@ -103,7 +103,7 @@ SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP B
 value for the given non-negative column and percentile using the
 [HdrHistogram](http://hdrhistogram.org/) algorithm.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric non-negative value.
 - `percentile` is a `double` value between 0.0 and 1.0, inclusive.
@@ -119,11 +119,11 @@ value for the given non-negative column and percentile using the
   1 second (or better) up to 1,000 seconds. At its maximum tracked value (1
   hour), it would still maintain a resolution of 3.6 seconds (or better).
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Approximate percentile"
 SELECT approx_percentile(latency, 0.99) FROM request_logs;
@@ -139,16 +139,16 @@ SELECT approx_percentile(latency, 0.99) FROM request_logs;
 
 The function will throw an error if any negative values are encountered in the input. All input values must be non-negative.
 
-### Arguments
+#### Parameters
 
 - `value` is any non-negative numeric value.
 - `precision` (optional) is an `int` value between 0 and 5, inclusive. This is the number of significant decimal digits to which the histogram will maintain value resolution and separation. Higher precision leads to more accurate results with increased memory usage. Defaults to 1 (lower accuracy, high efficiency).
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Calculate approximate median price by symbol" demo
 SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
@@ -173,15 +173,15 @@ SELECT symbol, approx_median(price, 3) FROM trades GROUP BY symbol;
 `avg(value)` calculates simple average of values ignoring missing data (e.g
 `null` values).
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Average transaction amount"
 SELECT avg(amount) FROM transactions;
@@ -216,16 +216,16 @@ each set differs from the average of its set. This calculation is based on
 
 - If there's no clear pattern, the function will return a value close to 0.
 
-### Arguments
+#### Parameters
 
 - `arg0` is any numeric value representing the first variable
 - `arg1` is any numeric value representing the second variable
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Correlation between price and quantity"
 SELECT corr(price, quantity) FROM transactions;
@@ -251,7 +251,7 @@ SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_ty
   data.
 - `count(column_name)` - counts the number of non-null values in a given column.
 
-### Arguments
+#### Parameters
 
 - `count()` does not require arguments.
 - `count(column_name)` - supports the following data types:
@@ -270,11 +270,11 @@ SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_ty
   - `string`
   - `symbol`
 
-### Return value
+#### Return value
 
 Return value type is `long`.
 
-### Examples
+#### Examples
 
 Count of rows in the `transactions` table:
 
@@ -332,11 +332,11 @@ SELECT payment_type, count(amount) FROM transactions;
 `count_distinct(column_name)` - counts distinct non-`null` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
 
-### Return value
+#### Return value
 
 Return value type is `long`.
 
-### Examples
+#### Examples
 
 - Count of distinct sides in the transactions table. Side column can either be
   `BUY` or `SELL` or `null`.
@@ -379,16 +379,16 @@ measure of the overall trend.
 - The closer the result is to zero, the less relationship there is between the
   two sets of numbers.
 
-### Arguments
+#### Parameters
 
 - `arg0` is any numeric value representing the first variable
 - `arg1` is any numeric value representing the second variable.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Population covariance between price and quantity"
 SELECT covar_pop(price, quantity) FROM transactions;
@@ -423,16 +423,16 @@ average in each set.
 - The closer the result is to zero, the less relationship there is between the
   two sets of numbers.
 
-### Arguments
+#### Parameters
 
 - `arg0` is any numeric value representing the first variable.
 - `arg1` is any numeric value representing the second variable.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Sample covariance between price and quantity"
 SELECT covar_samp(price, quantity) FROM transactions;
@@ -467,11 +467,11 @@ last row is always the one with the highest (latest) timestamp. For a table
 without a designated timestamp column, `first` returns the first row and `last`
 returns the last inserted row, regardless of any timestamp column.
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 Given a table `sensors`, which has a designated timestamp column:
 
@@ -544,11 +544,11 @@ row with the lowest timestamp (oldest). For a table without a designated
 timestamp column, `first_not_null` returns the first non-null row, regardless of
 any timestamp column.
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 Given a table `sensors`, which has a designated timestamp column:
 
@@ -601,11 +601,11 @@ row with the highest timestamp (most recent). For a table without a designated
 timestamp column, `last_not_null` returns the last non-null row, regardless of
 any timestamp column.
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 Given a table `sensors`, which has a designated timestamp column:
 
@@ -650,17 +650,17 @@ SELECT last_not_null(device_id) FROM sensors_unordered;
 `haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
 series of latitude and longitude points.
 
-### Arguments
+#### Parameters
 
 - `lat` is the latitude expressed as degrees in decimal format (`double`)
 - `lon` is the longitude expressed as degrees in decimal format (`double`)
 - `ts` is the `timestamp` for the data point
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
 SELECT car_id, haversine_dist_deg(lat, lon, k)
@@ -675,15 +675,15 @@ are added using the
 [Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
 This is only beneficial for floating-point values such as `float` or `double`.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT ksum(a)
@@ -699,15 +699,15 @@ FROM (SELECT rnd_double() a FROM long_sequence(100));
 `max(value)` - returns the highest value ignoring missing data (e.g `null`
 values).
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric or string value
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Highest transaction amount"
 SELECT max(amount) FROM transactions;
@@ -732,15 +732,15 @@ SELECT payment_type, max(amount) FROM transactions;
 `min(value)` - returns the lowest value ignoring missing data (e.g `null`
 values).
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric or string value
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Lowest transaction amount"
 SELECT min(amount) FROM transactions;
@@ -767,15 +767,15 @@ are added using the
 [Neumaier sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm#Further_enhancements).
 This is only beneficial for floating-point values such as `float` or `double`.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT nsum(a)
@@ -797,15 +797,15 @@ values are spread out over a wider range.
 
 `stddev` is an alias for `stddev_samp`.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT stddev_samp(x)
@@ -824,15 +824,15 @@ variation or dispersion of a set of values. A low standard deviation indicates
 that the values tend to be close to the mean of the set, while a high standard
 deviation indicates that the values are spread out over a wider range.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT stddev_pop(x)
@@ -848,16 +848,16 @@ FROM (SELECT x FROM long_sequence(100));
 `string_agg(value, delimiter)` - Concatenates the given string values into a
 single string with the delimiter used as a value separator.
 
-### Arguments
+#### Parameters
 
 - `value` is a `varchar` value.
 - `delimiter` is a `char` value.
 
-### Return value
+#### Return value
 
 Return value type is `varchar`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT string_agg(x::varchar, ',')
@@ -881,17 +881,17 @@ values.
 
 - Does not support `ORDER BY`.
 
-### Arguments
+#### Parameters
 
 - `value`: A varchar or string column containing the values to be aggregated.
 - `delimiter`: A char value used to separate the distinct values in the
   concatenated string.
 
-### Return value
+#### Return value
 
 Return value type is `string`.
 
-### Examples
+#### Examples
 
 Suppose we want to find all the distinct sky cover types observed in the weather
 tablein our public demo:
@@ -934,15 +934,15 @@ GROUP BY windDir;
 
 `sum(value)` - adds values ignoring missing data (e.g `null` values).
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is the same as the type of the argument.
 
-### Examples
+#### Examples
 
 ```questdb-sql title="Sum all quantities in the transactions table"
 SELECT sum(quantity) FROM transactions;
@@ -961,7 +961,7 @@ SELECT item, sum(quantity) FROM transactions;
 | apple  | 53    |
 | orange | 47    |
 
-### Overflow
+#### Overflow
 
 `sum` does not perform overflow check. To avoid overflow, you can cast the
 argument to wider type.
@@ -980,15 +980,15 @@ the values are spread out over a wider range.
 
 `variance()` is an alias for `var_samp`.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT var_samp(x)
@@ -1007,15 +1007,15 @@ set of values. A low variance indicates that the values tend to be very close to
 the mean, while a high variance indicates that the values are spread out over a
 wider range.
 
-### Arguments
+#### Parameters
 
 - `value` is any numeric value.
 
-### Return value
+#### Return value
 
 Return value type is `double`.
 
-### Examples
+#### Examples
 
 ```questdb-sql
 SELECT var_pop(x)
