@@ -70,7 +70,7 @@ Checkout our quick start guides for the following:
 
 For GUI-driven CSV upload which leverages the
 [built-in REST HTTP API](/docs/reference/api/rest/), use the
-[Import tab](/docs/web-console/#import) in the [Web Console](/docs/web-console/):
+[Import CSV tab](/docs/web-console/import-csv) in the [Web Console](/docs/web-console/):
 
 <Screenshot
   alt="Screenshot of the UI for import"

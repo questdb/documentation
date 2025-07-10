@@ -11,7 +11,7 @@ There are three methods for CSV Import:
 
 1. [Import CSV via COPY SQL](#import-csv-via-copy-sql)
 2. [Import CSV via REST](#import-csv-via-rest)
-3. [Import CSV via Web Console](/docs/web-console/#import) (in Web Console docs)
+3. [Import CSV via Web Console](/docs/web-console/import-csv)
 
 ## Import CSV via COPY SQL
 
