@@ -278,7 +278,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' aler
 To run QuestDB and point it towards Alertmanager for alerting, first create a
 file `./conf/log.conf` with the following contents. `172.17.0.2` in this case is
 the IP address of the docker container for alertmanager that was discovered by
-running the `docker inspect ` command above.
+running the `docker inspect` command above.
 
 ```ini title="./conf/log.conf"
 # Which writers to enable
