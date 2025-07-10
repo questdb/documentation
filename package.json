@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "cross-env docusaurus start --port 3001",
-    "prebuild": "docusaurus clear && node ./scripts/cleanup-guidelines",
+    "prebuild": "docusaurus clear && node ./scripts/generate-llms-files.js",
     "build": "cross-env NO_UPDATE_NOTIFIER=true USE_SIMPLE_CSS_MINIFIER=true PWA_SW_CUSTOM= docusaurus build",
     "deploy": "docusaurus deploy",
     "serve": "docusaurus serve",
@@ -27,6 +27,7 @@
     "dotenv": "^16.4.5",
     "framer-motion": "^10.18.0",
     "gray-matter": "4.0.3",
+    "js-yaml": "^4.1.0",
     "prism-react-renderer": "2.4.0",
     "react": "^19.0.0",
     "react-calendly": "4.3.1",

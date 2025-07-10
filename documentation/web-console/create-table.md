@@ -1,6 +1,6 @@
 ---
 title: Create Table
-description: Create a new table using QuestDB Web Console
+description: Create a new table using QuestDB Web Console user interface
 ---
 
 import Screenshot from "@theme/Screenshot"
