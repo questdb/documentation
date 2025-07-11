@@ -11,7 +11,8 @@ not they can take an array parameter.
 
 ## array_avg
 
-`array_avg(array)` returns the average of all the array elements.
+`array_avg(array)` returns the average of all the array elements. `NULL` elements
+don't contribute to either count or sum.
 
 #### Parameter
 
@@ -29,8 +30,8 @@ SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 
 ## array_count
 
-`array_count(array)` returns the number of finite elements in the array. The
-`NaN` and infinity values are not included in the count.
+`array_count(array)` returns the number of finite elements in the array. `NULL`
+elements do not contribute to the count.
 
 #### Parameter
 
@@ -52,7 +53,8 @@ SELECT
 
 `array_cum_sum(array)` returns a 1D array of the cumulative sums over the array,
 traversing it in row-major order. The input array can have any dimensionality.
-The returned 1D array has the same number of elements as the input array.
+The returned 1D array has the same number of elements as the input array. `NULL`
+elements behave as if they were zero.
 
 #### Parameter
 
@@ -71,7 +73,8 @@ SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 ## array_position
 
 `array_position(array, elem)` returns the position of `elem` inside the 1D `array`. If
-`elem` doesn't appear in `array`, it returns `NULL`.
+`elem` doesn't appear in `array`, it returns `NULL`. If `elem` is `NULL`, it returns the
+position of the first `NULL` element, if any.
 
 #### Parameters
 
@@ -92,7 +95,8 @@ SELECT
 
 ## array_sum
 
-`array_sum(array)` returns the sum of all the array elements.
+`array_sum(array)` returns the sum of all the array elements. `NULL` elements
+behave as if they were zero.
 
 #### Parameter
 
@@ -182,8 +186,9 @@ array can be sorted ascending or descending, and the function auto-detects this.
 
 :::warning
 
-The array must be sorted, but this function doesn't enforce it. It runs a binary
-search for the value, and the behavior with an unsorted array is unspecified.
+The array must be sorted, and must not contain `NULL`s, but this function
+doesn't enforce it. It runs a binary search for the value, and the behavior with
+an unsorted array is unspecified.
 
 :::
 
@@ -221,9 +226,14 @@ and the second one "column".
 The resulting matrix has the same number of rows as `left_matrix` and the same
 number of columns as `right_matrix`. The value at every (row, column) position
 in the result is equal to the sum of products of matching elements in the
-corresponding row of `left_matrix` and column of `right_matrix`:
+corresponding row of `left_matrix` and column of `right_matrix`. In a formula,
+with C = A x B:
 
-`result[row, col] := sum_over_i(left_matrix[row, i] * right_matrix[i, col])`
+$$
+
+C_{jk} = \sum_{i=1}^{n} A_{ji} B_{ik}
+
+$$
 
 #### Parameters
 
@@ -268,8 +278,8 @@ SELECT matmul(ARRAY[[1, 2], [3, 4]], ARRAY[[2, 3], [2, 3]]);
 (deepest) dimension by `distance`. The distance can be positive (right shift) or
 negative (left shift). More formally, it moves elements from position `i` to
 `i + distance`, dropping elements whose resulting position is outside the array.
-It fills the holes created by shifting with `fill_value`, whose default for a
-`DOUBLE` array is `NaN`.
+It fills the holes created by shifting with `fill_value`, the default being
+`NULL`.
 
 #### Parameters
 
@@ -285,7 +295,7 @@ SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], 1);
 
 |            shift           |
 | -------------------------- |
-| ARRAY[[NaN,1.0],[NaN,3.0]] |
+| ARRAY[[null,1.0],[null,3.0]] |
 
 ```questdb-sql
 SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1);
@@ -293,7 +303,7 @@ SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1);
 
 |            shift           |
 | -------------------------- |
-| ARRAY[[2.0,NaN],[4.0,NaN]] |
+| ARRAY[[2.0,null],[4.0,null]] |
 
 ```questdb-sql
 SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1, 10.0);
