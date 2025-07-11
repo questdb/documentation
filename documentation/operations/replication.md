@@ -78,7 +78,7 @@ cost-effective WAL file storage. For further information, see the
 section.
 
 After that,
-[create a Blob Container](https://learn.microsoft.com/en-us/azure/storage/blobs/quickstart-storage-explorer)to
+[create a Blob Container](https://learn.microsoft.com/en-us/azure/storage/blobs/quickstart-storage-explorer) to
 be the root of your replicated data blobs.
 
 It will will soon be referenced in the `BLOB_CONTAINER` variable.
@@ -133,8 +133,8 @@ For appropriate balance, be sure to:
 - Disable blob versioning
 
 Finally,
-[set up bucket lifecycle configuration policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)to
-clean up WAL files after a period of time. There are considerations to ensure
+[set up bucket lifecycle configuration policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)
+to clean up WAL files after a period of time. There are considerations to ensure
 that the storage of the WAL files remains cost-effective. For deeper background,
 see the
 [object storage expiration policy](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
