@@ -470,6 +470,7 @@ module.exports = {
           ]
         },
         "operations/logging-metrics",
+        "operations/monitoring-alerting",
         "operations/data-retention",
         "operations/design-for-performance",
         "operations/updating-data",
@@ -513,7 +514,21 @@ module.exports = {
           label: "Order book analytics",
           type: "doc"
         },
-        "web-console",
+        {
+          type: "category",
+          label: "Web Console",
+          collapsed: true,
+          items: [
+              "web-console",
+              "web-console/code-editor",
+              "web-console/metrics-view",
+              "web-console/schema-explorer",
+              "web-console/result-grid",
+              "web-console/query-log",
+              "web-console/import-csv",
+              "web-console/create-table",
+            ],
+        },
         {
           label: "Blog tutorials 🔗",
           type: "link",
