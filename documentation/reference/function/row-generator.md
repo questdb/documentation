@@ -6,8 +6,9 @@ description: Row generator function reference documentation.
 
 ## generate_series
 
-Use `generate_series` to generate a pseudo-table with an arithmetic series in
-a single column.
+Use `generate_series` to generate a pseudo-table with an arithmetic series in a
+single column. You can call it in isolation (`generate_series()`), or as part of
+a select (`SELECT * FROM generate_series()`).
 
 This function can generate a `LONG` or `DOUBLE` series. There is also a
 `TIMESTAMP` generating version, which can be found
@@ -19,10 +20,6 @@ The `start` and `end` values are interchangeable, and you can use a negative
 The series is inclusive on both ends.
 
 The step argument is optional, and defaults to 1.
-
-As a pseudo-table, the function can be called in isolation
-(`generate_series()`), or as part of a select
-(`SELECT * FROM generate_series()`).
 
 **Arguments:**
 
@@ -39,7 +36,7 @@ the type of the arguments.
 
 **Examples:**
 
-```questdb-sql title="fwd long generation" demo
+```questdb-sql title="ascending LONG series" demo
 generate_series(-3, 3, 1);
 -- or
 generate_series(-3, 3);
@@ -55,7 +52,7 @@ generate_series(-3, 3);
 | 2               |
 | 3               |
 
-```questdb-sql title="bwd long generation" demo
+```questdb-sql title="descending LONG series" demo
 generate_series(3, -3, -1);
 ```
 
@@ -69,7 +66,7 @@ generate_series(3, -3, -1);
 | -2              |
 | -3              |
 
-```questdb-sql title="fwd double generation" demo
+```questdb-sql title="ascending DOUBLE series" demo
 generate_series(-3d, 3d, 1d);
 -- or
 generate_series(-3d, 3d);
@@ -85,7 +82,7 @@ generate_series(-3d, 3d);
 | 2.0             |
 | 3.0             |
 
-```questdb-sql title="bwd double generation" demo
+```questdb-sql title="descending DOUBLE series" demo
 generate_series(-3d, 3d, -1d);
 ```
 
@@ -101,40 +98,20 @@ generate_series(-3d, 3d, -1d);
 
 ## long_sequence
 
-Use `long_sequence()` as a row generator to create table data for testing. Basic
-usage of this function involves providing the number of rows to generate. You
-can achieve deterministic pseudo-random behavior by providing the random seed
-values.
+Use `long_sequence()` as a row generator to create table data for testing. The
+function deals with two concerns:
 
-- `long_sequence(num_rows)` - generates rows with a random seed
-- `long_sequence(num_rows, seed1, seed2)` - generates rows deterministically
+- generates a pseudo-table with an ascending series of LONG numbers starting at
+  1
+- serves as the provider of pseudo-randomness to all the
+   [random value functions](/docs/reference/function/random-value-generator/)
 
-This function is commonly used in combination with
-[random generator functions](/docs/reference/function/random-value-generator/)
-to produce mock data.
+Basic usage of this function involves providing the number of rows to generate.
+You can achieve deterministic pseudo-random behavior by providing the random
+seed values.
 
-**Arguments:**
-
--`num_rows` is a `long` representing the number of rows to generate.
--`seed1` and `seed2` are `long` representing the two parts of a `long128` seed.
-
-### Row generation
-
-Use `long_sequence()` to generate very large datasets for testing e.g. billions
-of rows.
-
-`long_sequence(num_rows)` is used to:
-
-- Generate a number of rows defined by `num_rows`.
-- Generate a column `x:long` of monotonically increasing long integers starting
-  from 1, which can be accessed for queries.
-
-### Random number seed
-
-When using `long_sequence` in combination with
-[random generators](/docs/reference/function/random-value-generator/), these
-values are usually generated at random. You can pass a random generator seed in
-order to produce deterministic results.
+- `long_sequence(num_rows)` — generates rows with a random seed
+- `long_sequence(num_rows, seed1, seed2)` — generates rows deterministically
 
 :::tip
 
@@ -145,9 +122,14 @@ functions.
 
 :::
 
+**Arguments:**
+
+- `num_rows` — `long` representing the number of rows to generate
+- `seed1` and `seed2` — `long` numbers that combine into a `long128` seed
+
 **Examples:**
 
-```questdb-sql title="Generating multiple rows"
+```questdb-sql title="Generate multiple rows"
 SELECT x, rnd_double()
 FROM long_sequence(5);
 ```
@@ -160,7 +142,7 @@ FROM long_sequence(5);
 | 4   | 0.9130602021 |
 | 5   | 0.718276777  |
 
-```questdb-sql title="Accessing row_number using the x column"
+```questdb-sql title="Access row_number using the x column"
 SELECT x, x*x
 FROM long_sequence(5);
 ```
@@ -173,7 +155,7 @@ FROM long_sequence(5);
 | 4   | 16   |
 | 5   | 25   |
 
-```questdb-sql title="Using with a seed"
+```questdb-sql title="Use with a fixed random seed"
 SELECT rnd_double()
 FROM long_sequence(2,128349234,4327897);
 ```
