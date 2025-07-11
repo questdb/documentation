@@ -55,10 +55,10 @@ As data grows in size, the performance of certain queries can degrade.
 Materialized views store the result of a `SAMPLE BY` or time-based `GROUP BY`
 query on disk, and keep it automatically up to date.
 
-The refresh of a materialized view is `INCREMENTAL` and very efficient, and
-using materialized views can offer 100x or higher query speedups. If you require
-the lowest latency queries, for example, for charts and dashboards, use
-materialized views!
+The refresh of a materialized view is incremental and very efficient, and using
+materialized views can offer 100x or higher query speedups. If you require the
+lowest latency queries, for example, for charts and dashboards, use materialized
+views!
 
 For a better understanding of what materialized views are for, read the
 [introduction to materialized views](/docs/concept/mat-views/) documentation.
@@ -106,7 +106,7 @@ If you are unfamiliar with the OHLC concept, please see our
 
 ```questdb-sql title="trades_OHLC_15m DDL"
 CREATE MATERIALIZED VIEW 'trades_OHLC_15m'
-WITH BASE 'trades' REFRESH INCREMENTAL AS
+WITH BASE 'trades' REFRESH IMMEDIATE AS
 SELECT
     timestamp, symbol,
     first(price) AS open,
@@ -124,9 +124,9 @@ In this example:
 2. The base table is `trades`
    - This is the data source, and will trigger incremental refresh when new data
      is written.
-3. The refresh strategy is `INCREMENTAL`
-   - The data is automatically refreshed and incrementally written; efficient,
-     fast, low maintenance.
+3. The refresh strategy is `IMMEDIATE`
+   - The data is automatically refreshed and incrementally written after a base
+     table transaction occurs; efficient, fast, low maintenance.
 4. The `SAMPLE BY` query contains two key column (`timestamp`, `symbol`) and
    five aggregates (`first`, `max`, `min`, `last`, `price`) calculated in `15m`
    time buckets.
@@ -172,12 +172,60 @@ will not trigger any sort of refresh.
 
 #### Refresh strategies
 
-Currently, only `INCREMENTAL` refresh is supported. This strategy incrementally
-updates the view when new data is inserted into the base table. This means that
-only new data is written to the view, so there is minimal write overhead.
+The `IMMEDIATE` refresh strategy incrementally updates the view when new data is
+inserted into the base table. This means that only new data is written to the
+view, so there is minimal write overhead.
 
 Upon creation, or when the view is invalidated, a full refresh will occur, which
 rebuilds the view from scratch.
+
+Other than `IMMEDIATE` refresh, QuestDB supports `MANUAL` and timer
+(`EVERY <interval>`) strategies for materialized views. Manual strategy means
+that to refresh the view, you need to run the
+[`REFRESH` SQL](/docs/reference/sql/refresh-mat-view/) explicitly. In case of
+timer-based refresh the view is refreshed periodically, at the specified
+interval.
+
+The refresh strategy of an existing view can be changed any time with the
+[`ALTER SET REFRESH`](/docs/reference/sql/alter-mat-view-set-refresh/) command.
+
+## Period materialized views
+
+In certain use cases, like storing trading day information, the data becomes
+available at fixed time intervals. In this case, `PERIOD` variant of
+materialized views can be used:
+
+```questdb-sql title="Period materialized view"
+CREATE MATERIALIZED VIEW trades_daily_prices
+REFRESH PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1d;
+```
+
+Refer to the following
+[documentation page](/docs/reference/sql/create-mat-view/#period-materialized-views)
+to learn more on period materialized views.
+
+## Initial refresh
+
+As soon as a materialized view is created an asynchronous refresh is started. In
+situations when this is not desirable, `DEFERRED` keyword can be specified along
+with the refresh strategy:
+
+```questdb-sql title="Deferred manual refresh"
+CREATE MATERIALIZED VIEW trades_daily_prices
+REFRESH MANUAL DEFERRED AS
+...
+```
+
+The `DEFERRED` keyword can be specified for any refresh strategy. Refer to the
+following
+[documentation page](/docs/reference/sql/create-mat-view/#initial-refresh) to
+learn more on the keyword.
 
 #### SAMPLE BY
 
@@ -357,7 +405,7 @@ useful.
 ## Limitations
 
 - Not all `SAMPLE BY` syntax is supported, for example, `FILL`.
-- `INCREMENTAL` refresh is only triggered by inserts into the `base` table, not
+- `IMMEDIATE` refresh is only triggered by inserts into the `base` table, not
   join tables.
 
 ## LATEST ON materialized views
@@ -554,15 +602,6 @@ storage engine as regular tables, benefiting from QuestDB's columnar storage and
 partitioning capabilities.
 
 ### Refresh mechanism
-
-:::note
-
-Currently, QuestDB only supports **incremental refresh** for materialized views.
-
-Future releases will include additional refresh types, such as time-interval and
-manual refreshes.
-
-:::
 
 Unlike regular views, which recompute their results at query time, materialized
 views in QuestDB are incrementally refreshed as new data is added to the base
