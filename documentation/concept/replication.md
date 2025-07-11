@@ -87,8 +87,8 @@ timeline
     Currently  : AWS S3
                : Azure Blob Store
                : NFS Filesystem
+               : Google Cloud Storage
     Next-up    : HDFS
-    Later on   : Google Cloud Storage
 ```
 
 Something missing? Want to see it sooner? [Contact us](/enterprise/contact)!
@@ -108,6 +108,12 @@ is:
 
 An example of a replication object store configuration using NFS is:
 `replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;`
+
+An example of a replication object store configuration using GCS is:
+
+`replication.object.store=gcs::bucket=<bucket name here>;root=/;credential=<base64 encoded key>;`
+
+For `GCS`, you can also use `credential_path` to set a key-file location.
 
 See the [Replication setup guide](/docs/operations/replication) for direct
 examples.

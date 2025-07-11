@@ -78,7 +78,7 @@ cost-effective WAL file storage. For further information, see the
 section.
 
 After that,
-[create a Blob Container ](https://learn.microsoft.com/en-us/azure/storage/blobs/quickstart-storage-explorer)to
+[create a Blob Container](https://learn.microsoft.com/en-us/azure/storage/blobs/quickstart-storage-explorer) to
 be the root of your replicated data blobs.
 
 It will will soon be referenced in the `BLOB_CONTAINER` variable.
@@ -133,8 +133,8 @@ For appropriate balance, be sure to:
 - Disable blob versioning
 
 Finally,
-[set up bucket lifecycle configuration policy ](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)to
-clean up WAL files after a period of time. There are considerations to ensure
+[set up bucket lifecycle configuration policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)
+to clean up WAL files after a period of time. There are considerations to ensure
 that the storage of the WAL files remains cost-effective. For deeper background,
 see the
 [object storage expiration policy](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
@@ -198,6 +198,38 @@ change accordingly on the **primary** and any **replicas** to match your local
 configuration.
 
 With your values, skip to the
+[Setup database replication](/docs/operations/replication/#setup-database-replication)
+section.
+
+### Google GCP GCS
+
+First, create a new Google Cloud Storage (GCS) bucket, most likely with
+`Public access: Not public`.
+
+Then create a new service account, and give it read-write permissions for the
+bucket. The simplest role is `Storage Admin`, but you may set up more granular
+permissions as needed.
+
+Create a new private key for this user and download it in `JSON` format. Then
+encode this key as `Base64`.
+
+If you are on Linux, you can `cat` the file and pass it to `base64`:
+
+```
+cat <key>.json | base64
+```
+
+Then construct the connection string:
+
+```
+replication.object.store=gcs::bucket=<bucket name here>;root=/;credential=<base64 encoded key>;
+```
+
+If you do not want to put the credentials directly in the connection string, you
+can swap the `credential` key for `credential_path`, and give it a path to the
+key-file.
+
+With your values, continue to the
 [Setup database replication](/docs/operations/replication/#setup-database-replication)
 section.
 
@@ -340,36 +372,42 @@ In general, we can group them into a small matrix:
 | primary | restart primary | promote replica, create new replica |
 | replica | restart replica | destroy and recreate replica        |
 
-To successfully recover from serious failures, we strongly advise that operators: 
+To successfully recover from serious failures, we strongly advise that operators:
 
-* Follow best practices
-* **Regularly back up data**
+- Follow best practices
+- **Regularly back up data**
 
 ### Network partitions
 
-Temporary network partitions introduce delays between when data is written to the primary, and when it becomes available
-for read in the replica. A temporary network partition is not necessarily a problem.
+Temporary network partitions introduce delays between when data is written to
+the primary, and when it becomes available for read in the replica. A temporary
+network partition is not necessarily a problem.
 
-For example, data can be ingested into the primary when the object-store is not available. In this case, the replicas will contain stale data,
-and then catch-up when the primary reconnects and successfully uploads to the object store.
+For example, data can be ingested into the primary when the object-store is not
+available. In this case, the replicas will contain stale data, and then catch-up
+when the primary reconnects and successfully uploads to the object store.
 
-Permanent network partitions are not recoverable, and the [emergency primary migration](#emergency-primary-migration) flow should be followed.
+Permanent network partitions are not recoverable, and the
+[emergency primary migration](#emergency-primary-migration) flow should be
+followed.
 
 ### Instance crashes
 
-An instance crash may be recoverable or unrecoverable, depending on the specific cause of the crash.
-If the instance crashes during ingestion, then it is possible for transactions to be corrupted.
-This will lead to a table suspension on restart. 
+An instance crash may be recoverable or unrecoverable, depending on the specific
+cause of the crash. If the instance crashes during ingestion, then it is
+possible for transactions to be corrupted. This will lead to a table suspension
+on restart.
 
 To recover in this case, you can skip the transaction,
 and reload any missing data.
 
-In the event that the corruption is severe, or confidence in the underlying instance is removed, you should follow the
+In the event that the corruption is severe, or confidence in the underlying
+instance is removed, you should follow the
 [emergency primary migration](#emergency-primary-migration) flow.
 
 ### Disk or block storage failure
 
-Disk failures can present in several forms, which may be difficult to detect. 
+Disk failures can present in several forms, which may be difficult to detect.
 
 Look for the following symptoms:
 
@@ -383,27 +421,30 @@ Look for the following symptoms:
     - This is usually caused by writes to disk partially or completely failing
     - This can also be caused by running out of disk space
 
-As with an instance crash, the consequences can be far-reaching and not immediately clear in all cases.
+As with an instance crash, the consequences can be far-reaching and not
+immediately clear in all cases.
 
-To migrate to a new disk, follow the [emergency primary migration](#emergency-primary-migration) flow. When you create a new replica, you
-can populate it with the latest snapshot you have taken, and then recover the rest using replicated WALs in the object
-store.
-
+To migrate to a new disk, follow the
+[emergency primary migration](#emergency-primary-migration) flow. When you
+create a new replica, you can populate it with the latest snapshot you have
+taken, and then recover the rest using replicated WALs in the object store.
 
 ### Flows
 
 #### Planned primary migration
 
-Use this flow when you want to change your primary to another instance, but the primary has not failed.
+Use this flow when you want to change your primary to another instance, but the
+primary has not failed.
 
-The database can be started in a mode which disallows further ingestion, but allows replication. With this method, you can ensure that all outstanding data has been replicated before you start ingesting into a new primary instance.
+The database can be started in a mode which disallows further ingestion, but
+allows replication. With this method, you can ensure that all outstanding data
+has been replicated before you start ingesting into a new primary instance.
 
 - Ensure primary instance is still capable of replicating data  to the object store
 - Stop primary instance
 - Restart primary instance with `replication.role=primary-catchup-uploads`
 - Wait for the instance to complete its uploads and exit with `code 0`
 - Then follow the [emergency primary migration](#emergency-primary-migration) flow
-
 
 #### Emergency primary migration
 
@@ -413,50 +454,66 @@ Use this flow when you wish to discard a failed primary instance and move to a n
 - Stop the replica instance
 - Set `replication.role=primary` on the replica
 - Ensure other primary-related settings are configured appropriately
-    - for example, snapshotting policies
-- Create an empty `_migrate_primary` file in your database installation directory (i.e. the parent of `conf` and `db`)
+  - for example, snapshotting policies
+- Create an empty `_migrate_primary` file in your database installation
+  directory (i.e. the parent of `conf` and `db`)
 - Start the replica instance, which is now the new primary
 - Create a new replica instance to replace the promoted replica
 
 :::warning
 
-Any data committed to the primary, but not yet replicated, will be lost. If the primary has not
-completely failed, you can follow the [planned primary migration](#planned-primary-migration) flow
-to ensure that all remaining data has been replicated before switching primary.
+Any data committed to the primary, but not yet replicated, will be lost. If the
+primary has not completely failed, you can follow the
+[planned primary migration](#planned-primary-migration) flow to ensure that all
+remaining data has been replicated before switching primary.
 
 :::
 
 #### When could migration fail?
 
-Two primaries started within the same `replication.primary.keepalive.interval=10s` may still break. 
+Two primaries started within the same
+`replication.primary.keepalive.interval=10s` may still break.
 
-It is important not to migrate the primary without stopping the first primary, if it is still within this interval.
+It is important not to migrate the primary without stopping the first primary,
+if it is still within this interval.
 
 This config can be set in the range of 1 to 300 seconds.
 
 #### Point-in-time recovery
 
-Create a QuestDB instance matching a specific historical point in time. 
+Create a QuestDB instance matching a specific historical point in time.
 
-This is builds a new instance based on a recently recovered snapshot and WAL data in the object store.
+This is builds a new instance based on a recently recovered snapshot and WAL
+data in the object store.
 
-It can also be used if you wish to remove the latest transactions from the database, or if you encounter corrupted
-transactions (though replicating a corrupt transaction has never been observed).
+It can also be used if you wish to remove the latest transactions from the
+database, or if you encounter corrupted transactions (though replicating a
+corrupt transaction has never been observed).
 
 **Flow**
 
-- (Recommended) Locate a recent primary instance snapshot that predates your intended recovery timestamp.
-    - A snapshot taken from **after** your intended recovery timestamp will not work. 
-- Create the new primary instance, ideally from a snapshot, and ensure it is not running.
+- (Recommended) Locate a recent primary instance snapshot that predates your
+  intended recovery timestamp.
+  - A snapshot taken from **after** your intended recovery timestamp will not work.
+- Create the new primary instance, ideally from a snapshot, and ensure it is not
+  running.
 - Touch a `_recover_point_in_time` file.
-- Inside this file, add a `replication.object.store` setting pointing to the object store you wish to load transactions from.
-- Also add a `replication.recovery.timestamp` setting with the UTC time to which you would like to recover.
-    - The format is `YYYY-MM-DDThh:mm:ss.mmmZ`.
-- (Optional) Configure replication settings in `server.conf` pointing at a **new** object store location.
-  - You can either configure this instance as a standalone (non-replicated) instance, or
-  - Configure it as a new primary by setting `replication.role=primary`. In this case, the `replication.object.store` **must** point to a fresh, empty location.
-- If you have created the new primary using a snapshot, touch a `_restore` file to trigger the snapshot recovery process.
-    - More details can be found in the [backup and restore](/documentation/operations/backup.md) documentation.
+- Inside this file, add a `replication.object.store` setting pointing to the
+  object store you wish to load transactions from.
+- Also add a `replication.recovery.timestamp` setting with the UTC time to which
+  you would like to recover.
+  - The format is `YYYY-MM-DDThh:mm:ss.mmmZ`.
+- (Optional) Configure replication settings in `server.conf` pointing at a
+  **new** object store location.
+  - You can either configure this instance as a standalone (non-replicated)
+    instance, or
+  - Configure it as a new primary by setting `replication.role=primary`. In this
+    case, the `replication.object.store` **must** point to a fresh, empty
+    location.
+- If you have created the new primary using a snapshot, touch a `_restore` file
+  to trigger the snapshot recovery process.
+  - More details can be found in the
+    [backup and restore](/documentation/operations/backup.md) documentation.
 - Start new primary instance.
 
 ## Multi-primary ingestion
@@ -464,5 +521,5 @@ transactions (though replicating a corrupt transaction has never been observed).
 [QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
 multiple primaries can write to the same database.
 
-See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/) page for
-more information.
+See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/)
+page for more information.
