@@ -7,12 +7,12 @@ description: Row generator function reference documentation.
 ## generate_series
 
 Use `generate_series` to generate a pseudo-table with an arithmetic series in a
-single column. You can call it in isolation (`generate_series()`), or as part of
-a select (`SELECT * FROM generate_series()`).
+single column. You can call it in isolation (`generate_series(...)`), or as part of
+a SELECT statement (`SELECT * FROM generate_series(...)`).
 
 This function can generate a `LONG` or `DOUBLE` series. There is also a
-`TIMESTAMP` generating version, which can be found
-[here](/documentation/reference/function/timestamp-generator.md)
+[variant](/docs/reference/function/timestamp-generator#generate_series)
+that generates a `TIMESTAMP` series.
 
 The `start` and `end` values are interchangeable, and you can use a negative
 `step` value to obtain a descending arithmetic series.
@@ -36,7 +36,7 @@ the type of the arguments.
 
 **Examples:**
 
-```questdb-sql title="ascending LONG series" demo
+```questdb-sql title="Ascending LONG series" demo
 generate_series(-3, 3, 1);
 -- or
 generate_series(-3, 3);
@@ -52,7 +52,7 @@ generate_series(-3, 3);
 | 2               |
 | 3               |
 
-```questdb-sql title="descending LONG series" demo
+```questdb-sql title="Descending LONG series" demo
 generate_series(3, -3, -1);
 ```
 
@@ -66,7 +66,7 @@ generate_series(3, -3, -1);
 | -2              |
 | -3              |
 
-```questdb-sql title="ascending DOUBLE series" demo
+```questdb-sql title="Ascending DOUBLE series" demo
 generate_series(-3d, 3d, 1d);
 -- or
 generate_series(-3d, 3d);
@@ -82,7 +82,7 @@ generate_series(-3d, 3d);
 | 2.0             |
 | 3.0             |
 
-```questdb-sql title="descending DOUBLE series" demo
+```questdb-sql title="Descending DOUBLE series" demo
 generate_series(-3d, 3d, -1d);
 ```
 

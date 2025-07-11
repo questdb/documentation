@@ -4,35 +4,33 @@ sidebar_label: Timestamp generator
 description: Timestamp generator function reference documentation.
 ---
 
-The `timestamp_sequence()` function may be used as a timestamp generator to
-create data for testing. Pseudo-random steps can be achieved by providing a
-[random function](/docs/reference/function/random-value-generator/) to the
-`step` argument. A `seed` value may be provided to a random function if the
-randomly-generated `step` should be deterministic.
-
-
 ## timestamp_sequence
+
+This function acts similarly to
+[`rnd_*`](/docs/reference/function/random-value-generator/) functions. It
+generates a single timestamp value (not a pseudo-table), but when used in
+combination with the `long_sequence()` pseudo-table function, its output forms a
+series of timestamps that monotonically increase.
 
 - `timestamp_sequence(startTimestamp, step)` generates a sequence of `timestamp`
   starting at `startTimestamp`, and incrementing by a `step` set as a `long`
-  value in microseconds. This `step` can be either;
+  value in microseconds. The `step` can be either;
 
-  - a static value, in which case the growth will be monotonic, or
-
-  - a randomized value, in which case the growth will be randomized. This is
-    done using
-    [random value generator functions](/docs/reference/function/random-value-generator/).
+  - a fixed value, resulting in a steadily-growing timestamp series
+  - a random function invocation, such as
+    [rnd_short()](/docs/reference/function/random-value-generator#rnd_short),
+    resulting in a timestamp series that grows in random steps
 
 **Arguments:**
 
-- `startTimestamp`: is a `timestamp` representing the starting (i.e lowest)
-  generated timestamp in the sequence.
-- `step`: is a `long` representing the interval between 2 consecutive generated
-  timestamps in `microseconds`.
+- `startTimestamp` — the starting (i.e lowest) generated timestamp in the
+  sequence
+- `step` — the interval (in microseconds) between 2 consecutive generated
+  timestamps
 
 **Return value:**
 
-Return value type is `timestamp`.
+The type of the return value is `TIMESTAMP`.
 
 **Examples:**
 
@@ -66,16 +64,20 @@ FROM long_sequence(5);
 | 4   | 2019-10-17T00:00:00.900000Z |
 | 5   | 2019-10-17T00:00:01.300000Z |
 
-
 ## generate_series
 
-Rather than generating a fixed number of timestamps, you can instead generate timestamps in a range, 
-using `generate_series`.
+This function generates a pseudo-table containing an arithmetic series of
+timestamps. Use it when you don't need a given number of rows, but a given time
+period defined by start, and, and step.
 
-The step can be provided in either microseconds, or in a period string, similar to `SAMPLE BY`.
+You can call it in isolation (`generate_series(...)`), or as part of a SELECT
+statement (`SELECT * FROM generate_series(...)`).
 
-The `start` and `end` values are interchangeable, and a negative `step` value can be used to 
-obtain the series in reverse order.
+Provide the time step either in microseconds, or in a period string, similar to
+`SAMPLE BY`.
+
+The `start` and `end` values are interchangeable; use a negative time step value
+to obtain the series in reverse order.
 
 The series is inclusive on both ends.
 
@@ -83,19 +85,18 @@ The series is inclusive on both ends.
 
 There are two timestamp-generating variants of `generate_series`:
 
-`generate_series(start, end, step_period)` - generate a series of timestamps between `start` and `end`
-in periodic steps.
-`generate_series(start, end, step_micros)` - generates a series of timestamps between `start` and `end`,
-in microsecond steps.
-
+- `generate_series(start, end, step_period)` - generate a series of timestamps
+  between `start` and `end`, in periodic steps
+- `generate_series(start, end, step_micros)` - generates a series of timestamps
+  between `start` and `end`, in microsecond steps
 
 **Return value:**
 
-Return value type is `timestamp`.
+The type of the return value is `TIMESTAMP`.
 
 **Examples:**
 
-```questdb-sql title="fwd series with period" demo
+```questdb-sql title="Ascending series using a period" demo
 generate_series('2025-01-01', '2025-02-01', '5d');
 ```
 
@@ -109,7 +110,7 @@ generate_series('2025-01-01', '2025-02-01', '5d');
 | 2025-01-26T00:00:00.000000Z |
 | 2025-01-31T00:00:00.000000Z |
 
-```questdb-sql title="bwd series with period" demo
+```questdb-sql title="Descending series using a period" demo
 generate_series('2025-01-01', '2025-02-01', '-5d');
 ```
 
@@ -123,11 +124,11 @@ generate_series('2025-01-01', '2025-02-01', '-5d');
 | 2025-01-07T00:00:00.000000Z |
 | 2025-01-02T00:00:00.000000Z |
 
-```questdb-sql title="fwd series with micro step demo
+```questdb-sql title="Ascending series using microseconds" demo
 generate_series(
-	'2025-01-01T00:00:00Z'::timestamp, 
-	'2025-01-01T00:05:00Z'::timestamp, 
-	60_000_000
+ '2025-01-01T00:00:00Z'::timestamp,
+ '2025-01-01T00:05:00Z'::timestamp,
+ 60_000_000
 );
 ```
 
@@ -140,12 +141,11 @@ generate_series(
 | 2025-01-01T00:04:00.000000Z |
 | 2025-01-01T00:05:00.000000Z |
 
-
-```questdb-sql title="vwd series with micro step demo
+```questdb-sql title="Descending series using microseconds" demo
 generate_series(
-	'2025-01-01T00:00:00Z'::timestamp, 
-	'2025-01-01T00:05:00Z'::timestamp, 
-	-60_000_000
+ '2025-01-01T00:00:00Z'::timestamp,
+ '2025-01-01T00:05:00Z'::timestamp,
+ -60_000_000
 );
 ```
 
