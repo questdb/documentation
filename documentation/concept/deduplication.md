@@ -1,6 +1,6 @@
 ---
 title: Data Deduplication
-sidebar_label: Data deduplication
+sidebar_label: Data Deduplication
 description: What is built-in storage deduplication and why it can be useful.
 ---
 
@@ -19,7 +19,7 @@ Deduplication can only be enabled for
 ## Practical considerations
 
 Deduplication in QuestDB makes table inserts
-[idempotent](https://en.wikipedia.org/wiki/Idempotence). The primary use case is
+[idempotent](https://en.wikipedia.org/wiki/Idempotence). The primary use case is[deduplication.md](..%2Fguides%2Fdeduplication.md)
 to allow for re-sending data within a given time range without creating
 duplicates.
 
@@ -61,7 +61,9 @@ DEDUP UPSERT keys(timestamp, symbol, price)
 ORDER BY timestamp, symbol, price
 ```
 
-This is the natural order of data returned in plain queries, without any grouping, filtering or ordering. The SQL standard does not guarantee the ordering of result sets without explicit `ORDER BY` clauses.
+This is the natural order of data returned in plain queries, without any grouping, filtering or ordering. 
+
+The SQL standard does not guarantee the ordering of result sets without explicit `ORDER BY` clauses.
 
 :::
 
