@@ -30,7 +30,7 @@ Hints are designed to be a safe optimization mechanism:
 
 ## Binary Search Optimizations and Hints
 
-Since version 9.0, QuestDB's optimizer defaults to using a binary search-based strategy for **`ASOF JOIN`** and
+Since QuestDB 9.0.0, QuestDB's optimizer defaults to using a binary search-based strategy for **`ASOF JOIN`** and
 **`LT JOIN`** (Less Than Join) queries that have a filter on the right-hand side (the joined or lookup table). This
 approach is generally faster as it avoids a full table scan.
 
