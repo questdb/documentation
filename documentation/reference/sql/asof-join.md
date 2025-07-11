@@ -34,14 +34,14 @@ Visualized, a JOIN operation looks like this:
   for more information.
 
 - `joinClause` `ASOF JOIN` with an optional `ON` clause which allows only the
-  `=` predicate:
+  `=` predicate and an optional `TOLERANCE` clause:
 
-  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
+  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofJoin.svg)
 
 - `whereClause` - see the [WHERE](/docs/reference/sql/where/) reference docs for
   more information.
 
-In addition, the following are items of import:
+In addition, the following are items of importance:
 
 - Columns from joined tables are combined in a single row.
 
@@ -67,6 +67,9 @@ logic: for each row in the first time-series,
 1. consider all timestamps in the second time-series **earlier or equal to**
 the first one
 2. choose **the latest** such timestamp
+3. If the optional `TOLERANCE` clause is specified, an additional condition applies: 
+   the chosen record from t2 must satisfy `t1.ts - t2.ts <= tolerance_value`. If no record
+   from t2 meets this condition (along with `t2.ts <= t1.ts`), then the row from t1 will not have a match.
 
 ### Example
 
@@ -151,7 +154,7 @@ Let's use an example with two tables:
 We want to join each trade event to the relevant order book snapshot. All
 we have to write is
 
-```questdb-sql title="A basic ASOF JOIN example" demo
+```questdb-sql title="A basic ASOF JOIN example"
 trades ASOF JOIN order_book
 ```
 
@@ -411,21 +414,76 @@ To summarize:
 3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a table with no designated timestamp, if and
    only if you are certain the data is already sorted.
 
-### SQL performance hints for ASOF JOIN
+### TOLERANCE clause
 
-QuestDB supports SQL hints that can optimize non-keyed ASOF join performance when filters are applied to the joined table:
+The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in time the join should look for a match in the right
+table. The `TOLERANCE` parameter accepts a time interval value (e.g., `2s`, `100ms`, `1d`).
 
-```questdb-sql title="ASOF JOIN with optimization hint"
-SELECT /*+ USE_ASOF_BINARY_SEARCH(trades order_book) */ *
-FROM trades 
-ASOF JOIN (
-  SELECT * FROM order_book 
-  WHERE state = 'VALID'
-) order_book;
+When specified, a record from the left table t1 at t1.ts will only be joined with a record from the right table t2 at
+t2.ts if both conditions are met: `t2.ts <= t1.ts` and `t1.ts - t2.ts <= tolerance_value`
+
+This ensures that the matched record from the right table is not only the latest one on or before t1.ts, but also within
+the specified time window.
+
+```questdb-sql title="ASOF JOIN with a TOLERANCE parameter"
+SELECT ...
+FROM table1
+ASOF JOIN table2 TOLERANCE 10s
+[WHERE ...]
 ```
 
-For more information on when and how to use these optimization hints, see the [SQL Hints](/concept/sql-optimizer-hints/)
-documentation.
+TOLERANCE also works together with the ON clause:
+```questdb-sql title="ASOF JOIN with keys and a TOLERANCE parameter"
+SELECT ...
+FROM table1
+ASOF JOIN table2 ON (key_column) TOLERANCE 1m
+[WHERE ...]
+```
+
+The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100ms' (100 milliseconds), '2m' (
+2 minutes), '3h' (3 hours), or '1d' (1 day).
+
+
+#### Example using TOLERANCE:
+
+Consider the `trades` and `order_book` tables from the previous examples. If we want to join trades to order book snapshots
+that occurred no more than 1 second before the trade:
+
+```questdb-sql title="TOLERANCE example"
+SELECT t.timestamp, t.price, t.size, ob.timestamp AS ob_ts, ob.bid_price, ob.bid_size
+FROM trades t
+ASOF JOIN order_book ob TOLERANCE 1s;
+```
+
+Let's analyze a specific trade: trades at `08:00:01.146931`.
+Without `TOLERANCE`, it joins with `order_book` at `08:00:01`. The time difference is 0.146931s.
+If we set `TOLERANCE` '100ms', this trade would not find a match, because 0.146931s (146.931ms) is greater than 100ms. The
+previous `order_book` entry at `08:00:00` would be even further away (1.146931s).
+
+Another trade: trades at `08:00:00.007140`.
+Without `TOLERANCE`, it joins with order_book at `08:00:00`. The time difference is 0.007140s (7.14ms).
+If we set `TOLERANCE` '5ms', this trade would not find a match because 7.14ms > 5ms.
+
+#### Supported Units for interval_literal
+The `TOLERANCE` interval literal supports the following time unit qualifiers:
+- U: Microseconds
+- T: Milliseconds
+- s: Seconds
+- m: Minutes
+- h: Hours
+- d: Days
+- w: Weeks
+
+For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
+'1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
+units for the `TOLERANCE` clause.
+
+#### Performance impact of TOLERANCE
+
+Specifying `TOLERANCE` can also improve performance. `ASOF JOIN` execution plans often scan backward in time on the right
+table to find a matching entry for each left-table row. `TOLERANCE` allows these scans to terminate early - once a
+right-table record is older than the left-table record by more than the specified tolerance - thus avoiding unnecessary
+processing of more distant records.
 
 ## SPLICE JOIN
 
