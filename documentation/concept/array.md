@@ -92,12 +92,18 @@ an array whose shape hasn't been transformed (that is, it matches the physical
 arrangement of elements) is a _vanilla_ array, and this has consequences for
 performance. A vanilla array can be processed by optimized bulk operations that
 go over the entire block of memory, disregarding the shape and strides, whereas
-for any other array we have to step through all the coordinates one by one and
+for most other arrays we have to step through all the coordinates one by one and
 calculate the position of each element.
 
-So, while performing a shape transformation is cheap on its own, whole-array
-operations on transformed arrays, such as equality checks, adding/multiplying
-two arrays, etc., are expected to be faster on vanilla arrays.
+There's a special case where the array is transformed just so that the new array
+can be found in vanilla shape within the memory block of the original array (a
+contiguous sub-array). Such a transformed array is also considered vanilla.
+Major examples are slicing the array at the top (leftmost) dimension, and taking
+a sub-array at the top dimension.
+
+While performing a shape transformation is cheap on its own, whole-array
+operations, such as equality checks, adding/multiplying two arrays, etc., are
+expected to be faster on vanilla arrays.
 
 QuestDB always stores arrays in vanilla form. If you transform an array's shape
 and then store it to the database, QuestDB will physically rearrange the
@@ -129,6 +135,12 @@ SELECT ARRAY[arr, brr] FROM tango;
 |       array_2d        |
 | --------------------- |
 | [[1.0,2.0],[3.0,4.0]] |
+
+## Array functions
+
+Functions that operate on arrays are documented on a
+[dedicated page](/docs/reference/function/array). There are also some
+[financial functions](/docs/reference/function/finance#l2price) that operate on arrays.
 
 ## Array access syntax
 
