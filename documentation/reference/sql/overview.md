@@ -70,7 +70,7 @@ and simplest way, apply queries via the [Web Console](/docs/web-console/).
 
 <Screenshot
   alt="A shot of the Web Console, showing auto complete and a colourful returned table."
-  src="images/pages/getQuestdb/console.webp"
+  src="images/docs/console/overview.webp"
   title="Click to zoom"
 />
 
@@ -434,4 +434,4 @@ And to learn about some of our favourite, most powerful syntax:
 Looking for visuals?
 
 - Explore [Grafana](/docs/third-party-tools/grafana/)
-- Jump quickly into the [Web Console](/docs/web-console/#web-console)
+- Jump quickly into the [Web Console](/docs/web-console/)

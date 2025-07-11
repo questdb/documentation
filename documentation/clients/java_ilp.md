@@ -39,25 +39,26 @@ The client provides the following benefits:
 
 :::info
 
-This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
+This page focuses on our high-performance ingestion client, which is optimized
+for **writing** data to QuestDB. For retrieving data, we recommend using a
+[PostgreSQL-compatible Java library](/docs/pgwire/java/) or our
 [HTTP query endpoint](/docs/reference/sql/overview/#rest-http-api).
 
 :::
 
-
 ## Compatible JDKs
 
-The client relies on some JDK internal libraries, which certain specialised JDK offerings may not support.
+The client relies on some JDK internal libraries, which certain specialised JDK
+offerings may not support.
 
 Here is a list of known incompatible JDKs:
 
 - Azul Zing 17
-    - A fix is in progress. You can use Azul Zulu 17 in the meantime. 
+  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
 
 ## Quick start
 
-Add a QuestDB as a dependency in your project's build configuration file.
+Add QuestDB as a dependency in your project's build configuration file.
 
 <Tabs defaultValue="maven" values={[ { label: "Maven", value: "maven" },
 { label: "Gradle", value: "gradle" }, ]}
@@ -68,7 +69,7 @@ Add a QuestDB as a dependency in your project's build configuration file.
       renderText={(release) => (
         <CodeBlock className="language-xml">
           {`<dependency>
-  <groupId>org.questdb</groupId> 
+  <groupId>org.questdb</groupId>
   <artifactId>questdb</artifactId>
   <version>${release.name}</version>
 </dependency>`}
@@ -83,48 +84,49 @@ Add a QuestDB as a dependency in your project's build configuration file.
           {`compile group: 'org.questdb', name: 'questdb', version: '${release.name}'`}
 </CodeBlock> )} /> </TabItem> </Tabs>
 
-The code below creates an instance of a client configured to use HTTP transport
-to connect to a QuestDB server running on localhost on port 9000. It then sends
-two rows, each containing one symbol and two floating-point values. The client
-requests the server to assign a timestamp to each row based on the server's
-wall-clock time.
+The code below creates a client instance configured to use HTTP transport to
+connect to a QuestDB server running on localhost, port 9000. It then sends two
+rows, each containing one symbol and two floating-point values. The client asks
+the server to assign a timestamp to each row based on the server's wall-clock
+time.
 
 <RemoteRepoExample name="ilp-http" lang="java" header={false} />
 
-The configuration for the client is specified using a configuration string. This
-string follows the format:
+Configure the client using a configuration string. It follows this general
+format:
 
-```
+```text
 <protocol>::<key>=<value>;<key>=<value>;...;
 ```
 
-The valid transport protocols are:
+[Transport protocol](/docs/reference/api/ilp/overview/#transport-selection)
+can be one of these:
 
-- `http`: ILP/HTTP
-- `https`: ILP/HTTP with TLS encryption
-- `tcp`: ILP/TCP
-- `tcps`: ILP/TCP with TLS encryption
+- `http` — ILP/HTTP
+- `https` — ILP/HTTP with TLS encryption
+- `tcp` — ILP/TCP
+- `tcps` — ILP/TCP with TLS encryption
 
-A [transport protocol](/docs/reference/api/ilp/overview/#transport-selection)
-and the key `addr=host:port` are required. The key `addr` defines the hostname
-and port of the QuestDB server. If the port is not specified, it defaults to
-9000 for HTTP(s) transports and 9009 for TCP(s) transports. For a complete list
-of options, refer to the [Configuration Options](#configuration-options)
+The key `addr` sets the hostname and port of the QuestDB server. Port defaults
+to 9000 for HTTP(S) and 9009 for TCP(S).
+
+The minimum configuration includes the transport and the address. For a complete
+list of options, refer to the [Configuration Options](#configuration-options)
 section.
 
-## Example with TLS and Authentication enabled
+## Authenticate and encrypt
 
-This sample configures a client to use HTTP transport with TLS enabled for a
+This sample configures the client to use HTTP transport with TLS enabled for a
 connection to a QuestDB server. It also instructs the client to authenticate
 using HTTP Basic Authentication.
 
-When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/operations/rbac/#authentication) for more
-info.
+When using QuestDB Enterprise, you can authenticate using a REST bearer token as
+well. Please check the [RBAC docs](/docs/operations/rbac/#authentication) for
+more info.
 
 <RemoteRepoExample name="ilp-http-auth" lang="java" header={false} />
 
-## Client instantiation
+## Ways to create the client
 
 There are three ways to create a client instance:
 
@@ -133,24 +135,30 @@ There are three ways to create a client instance:
    string. See [Configuration options](#configuration-options) for all available
    options. It allows sharing the same configuration across clients in different
    languages.
+
    ```java
    try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;")) {
        // ...
    }
    ```
+
 2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
    is used to set the configuration string. Moving configuration parameters to
    an environment variable allows you to avoid hard-coding sensitive information
    such as tokens and password in your code.
+
    ```bash
    export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
    ```
+
    ```java
    try (Sender sender = Sender.fromEnv()) {
        // ...
    }
    ```
+
 3. **Using the Java builder API.** This provides type-safe configuration.
+
    ```java
    try (Sender sender = Sender.builder(Sender.Transport.HTTP)
            .address("localhost:9000")
@@ -173,29 +181,65 @@ There are three ways to create a client instance:
    - `longColumn(CharSequence, long)`
    - `doubleColumn(CharSequence, double)`
    - `boolColumn(CharSequence, boolean)`
+   - `arrayColumn()` -- several variants, see below
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
 
-5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit) ` or `atNow()` to
+5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
    set a designated timestamp.
 6. Optionally: You can use `flush()` to send locally buffered data into a
    server.
 7. Go to the step no. 2 to start a new row.
 8. Use `close()` to dispose the Sender after you no longer need it.
 
-## Flushing
+## Ingest arrays
 
-Client accumulates data into an internal buffer. Flushing the buffer sends the
-data to the server over the network and clears the buffer.
+To ingest a 1D or 2D array, simply construct a Java array of the appropriate
+type (`double[]`, `double[][]`) and supply it to the `arrayColumn()` method. In
+order to avoid GC overheads, create the array instance once, and then populate
+it with the data of each row.
 
-Flushing can be done explicitly or automatically.
-
-### Explicit flushing
-
-An explicit flush can be done by calling the `flush()` method.
+For arrays of higher dimensionality, use the `DoubleArray` class. Here's a basic
+example for a 3D array:
 
 ```java
- try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;")) {
+// or "tcp::addr=localhost:9009;protocol_version=2;"
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
+     DoubleArray ary = new DoubleArray(3, 3, 3);
+) {
+    for (int i = 0; i < ROW_COUNT; i++) {
+        for (int value = 0; value < 3 * 3 * 3; value++) {
+            ary.append(value);
+        }
+        sender.table("tango")
+              .doubleArray("array", ary)
+              .at(getTimestamp(), ChronoUnit.MICROS);
+    }
+}
+```
+
+The `ary.append(value)` method allows you to populate the array in the row-major
+order, without having to compute every coordinate individually. You can also use
+`ary.set(value, coords...)` to set a value at specific coordinates.
+
+:::note
+Arrays are supported from QuestDB version 9.0.0, and require updated
+client libraries.
+:::
+
+## Flush the buffer
+
+The client accumulates the data into an internal buffer and doesn't immediately
+send it to the server. It can flush the buffer to the server either
+automatically or on explicit request.
+
+### Flush explicitly
+
+You can configure the client to not use automatic flushing, and issue explicit
+flush requests by calling `sender.flush()`:
+
+```java
+ try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush=off")) {
     sender.table("trades")
           .symbol("symbol", "ETH-USD")
           .symbol("side", "sell")
@@ -212,64 +256,67 @@ An explicit flush can be done by calling the `flush()` method.
 }
 ```
 
-### Automatic flushing
+:::note
 
-To avoid accumulating very large buffers, the client will - by default - flush
-the buffer automatically.
+Calling `sender.flush()` will flush the buffer even with auto-flushing enabled,
+but this isn't a typical way to use the client.
 
-HTTP auto-flushing is triggered when appending a row to the internal buffer and
-the buffer either:
+:::
 
-- Reaches 75,000 rows
-- Hasn't been flushed for 1 second.
+### Flush automatically
 
-Both parameters control batching and can be customized. Larger batches can
-improve throughput, but can increase lag between data ingestion and visibility
-in a target table. Smaller batches can reduce this lag, but can also reduce
-throughput.
+By default, the client automatically flushes the buffer according to a simple
+policy. With HTTP, it will automatically flush at the time you append a new
+row, if either of these has become true:
 
-A configuration string example that auto-flushes every 10 rows or every 10
-seconds, whichever comes first:
+- reached 75,000 rows
+- hasn't been flushed for 1 second
+
+Both parameters can be customized in order to achieve a good tradeoff between
+throughput (large batches) and latency (small batches).
+
+This configuration string will cause the client to auto-flush every 10 rows or
+every 10 seconds, whichever comes first:
 
 `http::addr=localhost:9000;auto_flush_rows=10;auto_flush_interval=10000;`
 
-An example with auto-flushing disabled:
+With TCP, the client flushes its internal buffer whenever it gets full.
 
-`http::addr=localhost:9000;auto_flush=off;`
-
-TCP auto-flushing is triggered when appending a row to the internal sender
-buffer and the buffer is full.
-
-Auto-flushing is also triggered when the client is being closed. Be aware that
-retrying of failed requests is disabled when flushing on close.
+The client will also flush automatically when it is being closed and there's
+still some data in the buffer. However, **if the network operation fails at this
+time, the client won't retry it.** Always explicitly flush the buffer before
+closing the client.
 
 ## Error handling
 
-The HTTP transport supports automatic retries for failed requests deemed
-recoverable. Recoverable errors include network errors, some server errors, and
-timeouts, while non-recoverable errors encompass invalid data, authentication
-errors, and other client-side errors.
+HTTP automatically retries failed, recoverable requests: network errors, some
+server errors, and timeouts. Non-recoverable errors include invalid data,
+authentication errors, and other client-side errors.
 
-Retrying is particularly beneficial during network issues or when the server is
-temporarily unavailable. The retrying behavior can be configured through the
+Retrying is especially useful during transient network issues or when the server
+goes offline for a short period. Configure the retrying behavior through the
 `retry_timeout` configuration option or via the builder API with
-`retryTimeoutMillis(long timeoutMillis)`. The client continues to retry
-recoverable errors until they either succeed or the specified timeout is
-reached. Upon reaching the timeout, the client ceases retry attempts and throws
-`LineSenderException`.
+`retryTimeoutMillis(long timeoutMillis)`. The client continues to retry after
+recoverable errors until it either succeeds or the specified timeout expires. If
+it hits the timeout without success, the client throws a `LineSenderException`.
 
-When utilizing the HTTP transport, the client can be reused after receiving an
-error. Conversely, a client using TCP transport should be discarded after an
-error, necessitating the creation of a new client.
+The client won't retry requests while it's being closed and attempting to flush
+the data left over in the buffer.
 
-Retrying is disabled for failed requests when executing a flush upon closure.
+ The TCP transport has no mechanism to notify the client it encountered an
+ error; instead it just disconnects. When the client detects this, it throws a
+ `LineSenderException` and becomes unusable.
 
-The TCP transport lacks support for error propagation from the server. In such
-cases, the server merely closes the connection upon encountering an error, which
-manifests as a `LineSenderException` on the client side. Consequently, the
-client receives no additional error information from the server. This limitation
-significantly contributes to the preference for HTTP transport over TCP
-transport.
+## Recover after a client-side error
+
+With HTTP transport, the client always prepares a full row in RAM before trying
+to send it. It also remains usable after an exception has occurred. This allows
+you to cancel sending a row, for example due to a validation error, and go on
+with the next row.
+
+With TCP transport, you don't have this option. If you get an exception, you
+can't continue with the same client instance, and don't have insight into which
+rows were accepted by the server.
 
 ## Designated timestamp considerations
 
@@ -278,7 +325,7 @@ important when ingesting data into QuestDB.
 
 There are two ways to assign a designated timestamp to a row:
 
-1. User-assigned timestamp: The client assigns a specific timestamp to the row.
+1. User-assigned timestamp: the client assigns a specific timestamp to the row.
 
    ```java
    java.time.Instant timestamp = Instant.now(); // or any other timestamp
@@ -298,8 +345,10 @@ There are two ways to assign a designated timestamp to a row:
    high-throughput scenarios where instantiating an `Instant` object for each
    row is not feasible due to performance considerations.
 
-2. Server-assigned timestamp: The server automatically assigns a timestamp to
-   the row based on the server's wall-clock time. Example:
+2. Server-assigned timestamp: the server automatically assigns a timestamp to
+   the row based on the server's wall-clock time at the time of ingesting the
+   row. Example:
+
    ```java
    sender.table("trades")
          .symbol("symbol", "ETH-USD")
@@ -309,16 +358,39 @@ There are two ways to assign a designated timestamp to a row:
          .atNow();
    ```
 
-We recommended to use User-assigned timestamps when ingesting data into QuestDB.
-Using Server-assigned hinder the ability to deduplicate rows which is
+We recommend using the event's original timestamp when ingesting data into
+QuestDB. Using ingestion-time timestamps precludes the ability to deduplicate
+rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::note
 
-QuestDB works best when rows are ingested in chronological order. This means
-rows with older timestamps are ingested before rows with newer timestamps.
+QuestDB works best when you send data in chronological order (sorted by
+timestamp).
 
 :::
+
+## Protocol Version
+
+To enhance data ingestion performance, QuestDB _version 9.0.0_ introduced an
+upgraded version "2" to the text-based InfluxDB Line Protocol which encodes
+arrays and f64 values in binary form. Arrays are supported only in this upgraded
+protocol version.
+
+You can select the protocol version with the `protocol_version` setting in the
+configuration string.
+
+HTTP transport automatically negotiates the protocol version by default.
+In order to avoid the slight latency cost at connection time, you can explicitly
+configure the protocol version by setting `protocol_version=2|1;`.
+
+TCP transport does not negotiate the protocol version and uses version 1 by
+default. You must explicitly set `protocol_version=2;` in order to ingest
+arrays, as in this example:
+
+```text
+tcp::addr=localhost:9009;protocol_version=2;
+```
 
 ## Configuration options
 

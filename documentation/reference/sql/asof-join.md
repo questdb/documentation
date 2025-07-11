@@ -330,6 +330,90 @@ Result:
 
 </div>
 
+### How ASOF JOIN uses timestamps
+
+`ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to meet this requirement is to use a
+[designated timestamp](/docs/concept/designated-timestamp/), which is set when you create a table. 
+This not only enforces the chronological order of your data but also tells QuestDB which column to use for time-series
+operations automatically.
+
+#### Default behavior
+
+By default, an `ASOF JOIN` will always use the designated timestamp of the tables involved.
+
+This behavior is so fundamental that it extends to subqueries in a unique way: even if you do not explicitly SELECT the
+designated timestamp column in a subquery, QuestDB implicitly propagates it. The join is performed correctly under the
+hood using this hidden timestamp, which is then omitted from the final result set.
+
+This makes most `ASOF JOIN` queries simple and intuitive.
+
+```questdb-sql title="ASOF JOIN with designated timestamp"
+-- The 'trades' table has 'trade_ts' as its designated timestamp.
+-- Even though 'trade_ts' is not selected in the subquery,
+-- it is used implicitly for the ASOF JOIN.
+WITH trades_subset AS (
+  SELECT symbol, price, amount FROM trades
+)
+SELECT *
+FROM trades_subset ASOF JOIN quotes ON (symbol);
+```
+
+In more complicated subqueries, the implicit propagation of the designated timestamp may not work QuestDB responses with an error
+`left side of time series join has no timestamp`. In such cases, your subquery should explicitly include the designated
+timestamp column in the `SELECT` clause to ensure it is used for the join.
+
+#### The standard override method: Using ORDER BY
+
+The easiest and safest way to join on a different timestamp column is to use an `ORDER BY ... ASC` clause in your subquery.
+
+When you sort a subquery by a `TIMESTAMP` column, QuestDB makes that column the new designated timestamp for the subquery's results. The subsequent `ASOF JOIN` will automatically detect and use this new timestamp.
+
+Example: Joining on `ingestion_time` instead of the default `trade_ts`
+
+```questdb-sql title="ASOF JOIN with custom timestamp"
+WITH trades_ordered_by_ingestion AS (
+  SELECT symbol, price, ingestion_time
+  FROM trades
+  WHERE symbol = 'QDB'
+  -- This ORDER BY clause tells QuestDB to use 'ingestion_time'
+  -- as the new designated timestamp for this subquery.
+  ORDER BY ingestion_time ASC
+)
+-- No extra syntax is needed here. The ASOF JOIN automatically uses
+-- the new designated timestamp from the subquery.
+SELECT *
+FROM trades_ordered_by_ingestion
+ASOF JOIN quotes ON (symbol);
+```
+
+#### Using the timestamp() syntax
+
+The `timestamp()` syntax is an expert-level hint for the query engine. It should only be used to manually assign a
+timestamp to a dataset that does not have one, without forcing a sort.
+
+You should only use this when you can guarantee that your data is already sorted by that timestamp column. Using
+`timestamp()` incorrectly on unsorted data will lead to incorrect join results.
+
+The primary use case is performance optimization on a table that has no designated timestamp in its schema, but where
+you know the data is physically stored in chronological order. Using the `timestamp()` hint avoids a costly ORDER BY
+operation.
+
+```questdb-sql title="ASOF JOIN with timestamp()"
+-- Use this ONLY IF 'my_unsorted_table' has NO designated timestamp,
+-- but you can guarantee its data is already physically ordered by 'event_time'.
+
+SELECT *
+FROM (my_unsorted_table timestamp(event_time))
+ASOF JOIN another_table ON (symbol);
+```
+
+To summarize:
+
+1. By default, the table's designated timestamp is used.
+2. To join on a different column, the standard method is to `ORDER BY` that column in a subquery.
+3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a table with no designated timestamp, if and
+   only if you are certain the data is already sorted.
+
 ### TOLERANCE clause
 
 The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in time the join should look for a match in the right
@@ -357,7 +441,7 @@ ASOF JOIN table2 ON (key_column) TOLERANCE 1m
 ```
 
 The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100ms' (100 milliseconds), '2m' (
-2 minutes), '3h' (3 hours), or '1d' (1 day). 
+2 minutes), '3h' (3 hours), or '1d' (1 day).
 
 
 #### Example using TOLERANCE:
@@ -390,7 +474,7 @@ The `TOLERANCE` interval literal supports the following time unit qualifiers:
 - d: Days
 - w: Weeks
 
-For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes, 
+For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
 '1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
 units for the `TOLERANCE` clause.
 
@@ -400,46 +484,6 @@ Specifying `TOLERANCE` can also improve performance. `ASOF JOIN` execution plans
 table to find a matching entry for each left-table row. `TOLERANCE` allows these scans to terminate early - once a
 right-table record is older than the left-table record by more than the specified tolerance - thus avoiding unnecessary
 processing of more distant records.
-
-### Timestamp considerations
-
-`ASOF` join can be performed only on tables or result sets that are ordered by
-time. When a table is created with a
-[designated timestamp](/docs/concept/designated-timestamp/) the order of records
-is enforced and the timestamp column name is in the table metadata. `ASOF` join
-uses this timestamp column from metadata.
-
-:::caution
-
-`ASOF` join requires that the tables or subqueries have designated timestamps. This means
-they have an ascending order timestamp column, which may need to be specified with `timestamp(ts)`. See below!
-
-:::
-
-In case tables do not have a designated timestamp column, but data is in
-chronological order, timestamp columns can be specified at runtime:
-
-```questdb-sql
-SELECT *
-FROM (a timestamp(ts))
-ASOF JOIN (b timestamp (ts));
-```
-
-### SQL Performance Hints for ASOF JOIN
-
-QuestDB supports SQL hints that can optimize non-keyed ASOF join performance when filters are applied to the joined table:
-
-```questdb-sql title="ASOF JOIN with optimization hint"
-SELECT /*+ USE_ASOF_BINARY_SEARCH(trades order_book) */ *
-FROM trades 
-ASOF JOIN (
-  SELECT * FROM order_book 
-  WHERE state = 'VALID'
-) order_book;
-```
-
-For more information on when and how to use these optimization hints, see the [SQL Hints](/concept/sql-optimizer-hints/)
-documentation.
 
 ## SPLICE JOIN
 
