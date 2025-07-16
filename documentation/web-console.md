@@ -2,7 +2,7 @@
 title: Web Console Overview
 sidebar_label: Overview
 description: Learn how to use the QuestDB Web Console. Launch queries, create
-  visualizations and more. Includes pictures and examples.
+  visualizations and more. Includes pictures and examples with links to the main components.
 ---
 
 import Screenshot from "@theme/Screenshot"
