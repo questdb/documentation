@@ -14,7 +14,7 @@ import {
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline"
 import { ChevronDownIcon } from "@heroicons/react/20/solid"
-import SearchBar from "@theme/SearchBar"
+import SearchBar from "../../../theme/SearchBar"
 import MobileNav from "./MobileNav"
 import { MainCTA } from "../../../components/MainCTA"
 import { Release } from "../../../utils"

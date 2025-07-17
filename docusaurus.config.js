@@ -34,6 +34,23 @@ const config = {
       crossorigin: "anonymous",
     },
   ],
+  scripts: [
+    {
+      src: "https://widget.kapa.ai/kapa-widget.bundle.js",
+      async: true,
+      defer: true,
+      "data-website-id": "752e7a80-c213-4acd-b6c3-c3747fbe4ba6",
+      "data-project-name": "QuestDB",
+      "data-search-mode-enabled": "true",
+      "data-modal-open-on-command-k": "true",
+      "data-modal-command-k-search-mode-default": "true",
+      "data-project-color": "#21222c",
+      "data-project-logo": "/docs/images/favicon.webp",
+      "data-button-border": "1px solid #d9688b",
+      "data-modal-example-questions": "How do I create a table?,What is designated timestamp?,How do I insert data?",
+      "data-modal-disclaimer": "This AI assistant has access to QuestDB documentation and can help with time series database questions.",
+    },
+  ],
   markdown: {
     mermaid: true,
   },
@@ -121,13 +138,6 @@ const config = {
       ],
       theme: require("./src/internals/prism-github"),
       darkTheme: require("./src/internals/prism-dracula"),
-    },
-    algolia: {
-      appId: process.env.ALGOLIA_APP_ID || 'placeholder-app-id',
-      apiKey: process.env.ALGOLIA_API_KEY || 'placeholder-api-key',
-      indexName: "questdb",
-      searchPagePath: false,
-      contextualSearch: false,
     },
   },
   presets: [

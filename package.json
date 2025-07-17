@@ -14,7 +14,6 @@
   "dependencies": {
     "@docusaurus/faster": "^3.7.0",
     "@docusaurus/theme-mermaid": "^3.7.0",
-    "@docusaurus/theme-search-algolia": "^3.7.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "2.2.0",
     "@mdx-js/react": "3.1.0",
