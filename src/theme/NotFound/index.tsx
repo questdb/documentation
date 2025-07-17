@@ -1,7 +1,6 @@
-import React from "react"
 import Layout from "../Layout"
 import { Section } from "../../components/Section"
-import SearchBar from "@theme/SearchBar"
+import SearchBar from "../SearchBar"
 import Link from "@docusaurus/Link"
 import styles from "./styles.module.css"
 

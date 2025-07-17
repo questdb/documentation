@@ -7,7 +7,7 @@ import {
 } from "@headlessui/react"
 import { XMarkIcon, ChevronDownIcon } from "@heroicons/react/20/solid"
 import { useNavbarSecondaryMenu } from "@docusaurus/theme-common/internal"
-import SearchBar from "@theme/SearchBar"
+import SearchBar from "../../../../theme/SearchBar"
 
 type NavLink = {
   name: string
