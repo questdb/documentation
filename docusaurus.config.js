@@ -43,6 +43,7 @@ const config = {
       "data-project-name": "QuestDB",
       "data-project-color": "#21222c",
       "data-project-logo": "/docs/images/favicon.webp",
+      "data-bot-protection-mechanism": "hcaptcha",
       
       // Modal styling
       "data-modal-header-bg-color": "#21222c",
