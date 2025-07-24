@@ -34,6 +34,98 @@ const config = {
       crossorigin: "anonymous",
     },
   ],
+  scripts: [
+    {
+      src: "https://widget.kapa.ai/kapa-widget.bundle.js",
+      async: true,
+      defer: true,
+      "data-website-id": "752e7a80-c213-4acd-b6c3-c3747fbe4ba6",
+      "data-project-name": "QuestDB",
+      "data-project-color": "#21222c",
+      "data-project-logo": "/docs/images/favicon.webp",
+      "data-bot-protection-mechanism": "hcaptcha",
+      
+      // Modal styling
+      "data-modal-header-bg-color": "#21222c",
+      "data-modal-body-bg-color": "#262833",
+      "data-modal-border-radius": "8px",
+      "data-modal-overlay-bg-color": "rgba(33, 34, 44, 0.8)",
+      "data-modal-header-border-bottom": "1px solid #404153",
+
+      // Conversation
+      "data-question-text-color": "#ffffff",
+      "data-answer-text-color": "#ffffff",
+
+      // Source Links
+      "data-source-link-primary-heading-text-color": "#ffffff",
+      "data-source-link-secondary-heading-text-color": "#9ca3af",
+      "data-source-link-bg-color": "#262833",
+      "data-source-link-hover-bg-color": "#404153",
+      "data-source-link-border": "1px solid #404153",
+      
+      // Button styling
+      "data-button-border": "1px solid #c94f74",
+      "data-button-border-radius": "8px",
+      "data-button-text-color": "#ffffff",
+      
+      // Input field styling
+      "data-query-input-text-color": "#000000",
+      "data-query-input-placeholder-text-color": "#666666",
+      "data-query-input-border-color": "#404153",
+      "data-query-input-focus-border-color": "#c94f74",
+      "data-submit-query-button-bg-color": "#c94f74",
+      
+      // Modal title and text
+      "data-modal-title-color": "#ffffff",
+      "data-modal-disclaimer-bg-color": "#1e1f2b",
+      "data-modal-disclaimer-text-color": "#9ca3af",
+      
+      // Hyperlinks
+      "data-hyperlink-color": "#c94f74",
+      
+      // Feedback buttons
+      "data-answer-feedback-button-bg-color": "transparent",
+      "data-answer-feedback-button-border": "1px solid #404153",
+      "data-answer-feedback-button-text-color": "#9ca3af",
+      "data-answer-feedback-button-hover-bg-color": "#404153",
+      "data-answer-feedback-button-active-bg-color": "#404153",
+      "data-answer-feedback-button-active-text-color": "#ffffff",
+      "data-answer-feedback-button-border-radius": "4px",
+      
+      // Copy button
+      "data-answer-copy-button-bg-color": "transparent",
+      "data-answer-copy-button-border": "1px solid #404153",
+      "data-answer-copy-button-text-color": "#9ca3af",
+      "data-answer-copy-button-hover-bg-color": "#404153",
+      "data-answer-copy-button-border-radius": "4px",
+      
+      // Clear thread button
+      "data-thread-clear-button-bg-color": "transparent",
+      "data-thread-clear-button-border": "1px solid #404153",
+      "data-thread-clear-button-text-color": "#9ca3af",
+      "data-thread-clear-button-hover-bg-color": "#404153",
+      "data-thread-clear-button-border-radius": "4px",
+      
+      // Example question buttons
+      "data-example-question-button-bg-color": "#1e1f2b",
+      "data-example-question-button-border": "1px solid #404153",
+      "data-example-question-button-text-color": "#ffffff",
+      "data-example-question-button-hover-bg-color": "#404153",
+      "data-example-question-button-border-radius": "6px",
+      "data-example-question-button-box-shadow": "0 1px 3px rgba(0, 0, 0, 0.3)",
+      
+      // Search mode styling
+      "data-search-result-hover-bg-color": "#404153",
+      "data-search-result-primary-text-color": "#ffffff",
+      "data-search-result-secondary-text-color": "#9ca3af",
+      "data-search-ask-ai-cta-text-color": "#c94f74",
+      "data-search-ask-ai-cta-hover-bg-color": "#404153",
+      
+      // Additional customization
+      "data-modal-example-questions": "How do I create a table?,What is designated timestamp?",
+      "data-modal-disclaimer": "This AI assistant has access to QuestDB documentation and can help with time series database questions.",
+    },
+  ],
   markdown: {
     mermaid: true,
   },
