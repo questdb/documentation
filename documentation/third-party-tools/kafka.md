@@ -568,7 +568,7 @@ table=example_table
 [...]
 ```
 
-The table options supports simple templating. You can use the following
+The `table` option supports simple templating. You can use the following
 variables in the table name: `${topic}`, `${key}`, `${partition}`. The connector will replace
 these variables with the actual topic name, key value, and partition number from the Kafka message.
 
