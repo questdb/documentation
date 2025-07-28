@@ -29,7 +29,7 @@ Reads a parquet file as a table.
 With this function, query a Parquet file located at the QuestDB copy root directory. Both relative and absolute file
 paths are supported.
 
-```questdb-sql title="read_parquet example"
+```questdb-sql title="read_parquet example" execute
 SELECT
   *
 FROM
