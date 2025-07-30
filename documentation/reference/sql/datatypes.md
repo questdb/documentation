@@ -4,8 +4,6 @@ sidebar_label: Data types
 description: Data types reference documentation.
 ---
 
-The type system is derived from Java types.
-
 | Type Name         | Storage bits    | Nullable | Description                                                                                                                                                                                                                     |
 |-------------------|-----------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `boolean`         | `1`             | No       | Boolean `true` or `false`.                                                                                                                                                                                                      |
@@ -28,6 +26,12 @@ The type system is derived from Java types.
 | `geohash(<size>)` | `8`-`64`        | Yes      | Geohash with precision specified as a number followed by `b` for bits, `c` for chars. See [the geohashes documentation](/docs/concept/geohashes/) for details on use and storage.                                               |
 | `array`           | See description | Yes      | Header: 20 + 4 \* `nDims` bytes. Payload: dense array of values. Example: `DOUBLE[3][4]`: header 28 bytes, payload 3\*4\*8 = 96 bytes.                                                                                          |
 | `interval`        | `128`           | Yes      | Pair of timestamps representing a time interval. Not a persisted type: you can use it in expressions, but can't have a database column of this type.                                                                            |
+
+## N-dimensional array
+
+In addition to the scalar types above, QuestDB also supports
+[N-dimensional arrays](/docs/concept/array), currently only for the `DOUBLE`
+type.
 
 ## VARCHAR and STRING considerations
 
