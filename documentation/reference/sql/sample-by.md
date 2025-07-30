@@ -353,7 +353,7 @@ Gives the following result:
 In this case, the timestamps are floored to the nearest UTC day, and grouped. The counts correspond
 to the number of entries occurring within each UTC day.
 
-This is particularly useful for summarising data for charting purposes; see the [candlestick chart](https://dashboard.demo.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6) from the example [crypto dashboard](https://questdb.com/dashboards/crypto/).
+This is particularly useful for summarising data for charting purposes; see the [candlestick chart](https://dashboard.questdb.io/d-solo/fb13b4ab-b1c9-4a54-a920-b60c5fb0363f/public-dashboard-questdb-io-use-cases-crypto?orgId=1&refresh=750ms&panelId=6) from the example [crypto dashboard](https://questdb.com/dashboards/crypto/).
 
 ### TIME ZONE
 

@@ -287,9 +287,9 @@ Example: Consider the following Kafka message:
 
 The connector will create a table with the following columns:
 
-| firstname <sub>string</sub> | lastname <sub>string</sub> | age <sub>long</sub> | address_street <sub>string</sub> | address_city <sub>string</sub> |
-| --------------------------- | -------------------------- | ------------------- | -------------------------------- | ------------------------------ |
-| John                        | Doe                        | 30                  | Main Street                      | New York                       |
+| firstname <sub>varchar</sub> | lastname <sub>varchar</sub> | age <sub>long</sub> | address_street <sub>varchar</sub> | address_city <sub>varchar</sub> |
+|------------------------------|-----------------------------|---------------------|-----------------------------------|---------------------------------|
+| John                         | Doe                         | 30                  | Main Street                       | New York                        |
 
 ### Client configuration string
 
@@ -568,9 +568,10 @@ table=example_table
 [...]
 ```
 
-The `table` options supports simple templating. You can use the following
-variables in the table name: `${topic}`, `${key}`. The connector will replace
-these variables with the actual topic name and key value from the Kafka message.
+The `table` option supports simple templating. You can use the following
+variables in the table name: `${topic}`, `${key}`, `${partition}`. The connector will replace
+these variables with the actual topic name, key value, and partition number from the Kafka message.
+
 
 Example:
 
@@ -579,14 +580,15 @@ name=questdb-sink
 connector.class=io.questdb.kafka.QuestDBSinkConnector
 client.conf.string=http::addr=localhost:9000;
 topics=example-topic
-table=from_kafka_${topic}_${key}_suffix
+table=from_kafka_${topic}_${key}_${partition}_suffix
 
 [...]
 ```
 
 The placeholder `${key}` will be replaced with the actual key value from the
 Kafka message. If the key is not present in the message, the placeholder will be
-replaced with the string `null`.
+replaced with the string `null`. The placeholder `${partition}` will be replaced
+with the Kafka partition number from which the message originates.
 
 #### Table schema
 
