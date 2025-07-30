@@ -11,12 +11,12 @@ N-dimensional arrays are still in Beta phase. The only supported element type is
 
 :::
 
-QuestDB version 9.0.0 onwards supports the N-dimensional array type.
+As of version 9, QuestDB supports the N-dimensional array type.
 
 Its design matches that of the `NDArray` type in NumPy, which has become the
-de-facto standard for handling N-dimensional data.
-In order to effectively use arrays in QuestDB, it may help to understand the
-basic design principles behind it.
+de-facto standard for handling N-dimensional data. In order to effectively use
+arrays in QuestDB, it may help to understand the basic design principles behind
+it.
 
 The physical layout of the N-dimensional array is a single memory block with
 values arranged (by default) in _row-major_ order, where the coordinates
@@ -35,6 +35,10 @@ dimension.
 Unlike NumPy, QuestDB expresses strides as element jumps, not byte
 count jumps. Strides are used to perform a number of operations (such as
 transpose, slicing, etc) without the need to copy the array data itself.
+
+Also unlike NumPy, QuestDB's `DOUBLE[]` allows `NULL` elements, with the same
+semantics as plain `DOUBLE` values: all non-finite floating point values (`NaN`,
+`Infinity`, `-Infinity`) are seen as `NULL`.
 
 Here's a visual example of a 3-dimensional array of type `DOUBLE[2][3][2]`:
 
