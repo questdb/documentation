@@ -1,12 +1,13 @@
 ---
 title: N-Dimensional array
 sidebar_label: N-Dim array
-description: Explains the technical design and syntax to use N-dimensional arrays.
+description:
+  Explains the technical design and syntax to use N-dimensional arrays.
 ---
 
 :::note
 
-N-dimensional arrays are still in Beta phase. The only supported element type is
+N-dimensional arrays are in beta. The current supported element type is
 `DOUBLE`.
 
 :::
@@ -19,22 +20,22 @@ arrays in QuestDB, it may help to understand the basic design principles behind
 it.
 
 The physical layout of the N-dimensional array is a single memory block with
-values arranged (by default) in _row-major_ order, where the coordinates
-of the adjacent elements differ in the rightmost coordinate first (much like
-the adjacent numbers differ in the rightmost digit first: 41, 42, 43, etc.)
+values arranged (by default) in _row-major_ order, where the coordinates of the
+adjacent elements differ in the rightmost coordinate first (much like the
+adjacent numbers differ in the rightmost digit first: 41, 42, 43, etc.)
 
 Separately, there are two lists of integers that describe this block of values,
 and give it its N-dimensional appearance: _shape_ and _strides_. Both have
 length equal to the number of dimensions.
 
 - the numbers in _shape_ tell the length along each dimension -- the range of
-values you can use as a coordinate for that dimension
+  values you can use as a coordinate for that dimension
 - the numbers in _strides_ tell how far apart are adjacent elements along that
-dimension.
+  dimension.
 
-Unlike NumPy, QuestDB expresses strides as element jumps, not byte
-count jumps. Strides are used to perform a number of operations (such as
-transpose, slicing, etc) without the need to copy the array data itself.
+Unlike NumPy, QuestDB expresses strides as element jumps, not byte count jumps.
+Strides are used to perform a number of operations (such as transpose, slicing,
+etc) without the need to copy the array data itself.
 
 Also unlike NumPy, QuestDB's `DOUBLE[]` allows `NULL` elements, with the same
 semantics as plain `DOUBLE` values: all non-finite floating point values (`NaN`,
@@ -72,9 +73,9 @@ the array values:
    expression.
 
 2. _Take a sub-array_: constrain the coordinate at a given dimension to just one
-   choice, and then eliminate that dimension from the array. Example:
-   `array[2]` has the shape `DOUBLE[3, 2]` and consists of the second subarray
-   in the 1st dimension.
+   choice, and then eliminate that dimension from the array. Example: `array[2]`
+   has the shape `DOUBLE[3, 2]` and consists of the second subarray in the 1st
+   dimension.
 
 3. _Flatten_: remove a dimension from the array, flattening it into the
    next-finer dimension. Example: flattening `dim 2` gives us an array shape
@@ -94,9 +95,12 @@ store _strides_: they can be calculated from the shape. Strides become relevant
 once you perform one of the mentioned array shape transformations. We say that
 an array whose shape hasn't been transformed (that is, it matches the physical
 arrangement of elements) is a _vanilla_ array, and this has consequences for
-performance. A vanilla array can be processed by optimized bulk operations that
-go over the entire block of memory, disregarding the shape and strides, whereas
-for most other arrays we have to step through all the coordinates one by one and
+performance.
+
+A “vanilla” array is just a plain, contiguous N‑D array in row‑major order. A
+vanilla array can be processed by optimized bulk operations that go over the
+entire block of memory, disregarding the shape and strides, whereas for most
+other arrays we have to step through all the coordinates one by one and
 calculate the position of each element.
 
 There's a special case where the array is transformed just so that the new array
@@ -115,8 +119,8 @@ elements, and store the new array in vanilla shape.
 
 ## The ARRAY literal
 
-You can create an array from scalar values using the `ARRAY[...]` syntax, as
-in this example:
+You can create an array from scalar values using the `ARRAY[...]` syntax, as in
+this example:
 
 ```questdb-sql
 CREATE TABLE tango AS (SELECT ARRAY[
@@ -136,7 +140,7 @@ CREATE TABLE tango AS (SELECT ARRAY[1, 2] arr, ARRAY[3, 4] brr FROM long_sequenc
 SELECT ARRAY[arr, brr] FROM tango;
 ```
 
-|       array_2d        |
+| array_2d              |
 | --------------------- |
 | [[1.0,2.0],[3.0,4.0]] |
 
@@ -144,12 +148,13 @@ SELECT ARRAY[arr, brr] FROM tango;
 
 Functions that operate on arrays are documented on a
 [dedicated page](/docs/reference/function/array). There are also some
-[financial functions](/docs/reference/function/finance#l2price) that operate on arrays.
+[financial functions](/docs/reference/function/finance#l2price) that operate on
+arrays.
 
 ## Array access syntax
 
-We model our N-dimensional array access syntax on Python's `NDArray`, except that
-we inherit 1-based indexing from SQL. This is the syntax:
+We model our N-dimensional array access syntax on Python's `NDArray`, except
+that we inherit 1-based indexing from SQL. This is the syntax:
 
 ```questdb-sql
 arr[<dim1-selector>, <dim2-selector>, ...]
@@ -189,13 +194,13 @@ SELECT arr[1, 3, 2] elem FROM tango;
 | ---- |
 | 8.0  |
 
-This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that the
-coordinates are 1-based!
+This selected the `DOUBLE` number at the coordinates (1, 3, 2). Remember that
+the coordinates are 1-based!
 
 :::tip
 
-The syntax `arr[1, 3, 2]` is interchangeable with `arr[1][3][2]`. The performance of
-both styles is the same.
+The syntax `arr[1, 3, 2]` is interchangeable with `arr[1][3][2]`. The
+performance of both styles is the same.
 
 :::
 
@@ -215,7 +220,7 @@ SELECT arr[1, 3, 4] elem FROM tango;
 SELECT arr[1] subarr FROM tango;
 ```
 
-|                   subarr                    |
+| subarr                                      |
 | ------------------------------------------- |
 | [[1.0,2.0,3.0],[4.0,5.0,6.0],[7.0,8.0,9.0]] |
 
@@ -237,7 +242,7 @@ SELECT arr[4] subarr FROM tango;
 SELECT arr[1, 3] subarr FROM tango;
 ```
 
-|    subarr     |
+| subarr        |
 | ------------- |
 | [7.0,8.0,9.0] |
 
@@ -260,9 +265,9 @@ to the end of the array in the corresponding dimension. The lower bound is
 mandatory, due to syntax conflict with variable placeholders such as `:a` or
 `:2`.
 
-If the upper bound of the range exceeds the array's length, the result
-is the same as if the upper bound was left out — the result extends to the
-end of the array along that dimension.
+If the upper bound of the range exceeds the array's length, the result is the
+same as if the upper bound was left out — the result extends to the end of the
+array along that dimension.
 
 #### Example: select a slice of `arr` by constraining the first dimension
 
@@ -270,7 +275,7 @@ end of the array along that dimension.
 SELECT arr[2:3] slice FROM tango;
 ```
 
-|                         slice                          |
+| slice                                                  |
 | ------------------------------------------------------ |
 | [[[10.0,11.0,12.0],[13.0,14.0,15.0],[16.0,17.0,18.0]]] |
 
@@ -283,9 +288,9 @@ This returned a `DOUBLE[1][3][3]`, containing just the second sub-array of
 SELECT arr[2:] slice FROM tango;
 ```
 
-|                          slice                            |
-| --------------------------------------------------------- |
-|  [[[10.0,11.0,12.0],[13.0,14.0,15.0],[16.0,17.0,18.0]],<br />[[19.0,20.0,21.0],[22.0,23.0,24.0],[25.0,26.0,27.0]]]  |
+| slice                                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------- |
+| [[[10.0,11.0,12.0],[13.0,14.0,15.0],[16.0,17.0,18.0]],<br />[[19.0,20.0,21.0],[22.0,23.0,24.0],[25.0,26.0,27.0]]] |
 
 This returned a `DOUBLE[2][3][3]` and contains everything except the first
 sub-array along the first dimension.
@@ -296,9 +301,9 @@ sub-array along the first dimension.
 SELECT arr[2:3, 3:4] slice FROM tango;
 ```
 
-|          slice         |
-| ---------------------- |
-|  [[[16.0,17.0,18.0]]]  |
+| slice                |
+| -------------------- |
+| [[[16.0,17.0,18.0]]] |
 
 Note that the returned array is still 3D.
 
@@ -308,9 +313,9 @@ Note that the returned array is still 3D.
 SELECT arr[2:100, 3:100] slice FROM tango;
 ```
 
-|                   slice                   |
-| ----------------------------------------- |
-|  [[[16.0,17.0,18.0]],[[25.0,26.0,27.0]]]  |
+| slice                                   |
+| --------------------------------------- |
+| [[[16.0,17.0,18.0]],[[25.0,26.0,27.0]]] |
 
 The result is the same same as if using `arr[2:, 3:]`.
 
@@ -324,9 +329,9 @@ You can use both types of selectors within the same bracket expression.
 SELECT arr[1, 2:4] subarr FROM tango;
 ```
 
-|             subarr              |
-| ------------------------------- |
-|  [[4.0,5.0,6.0],[7.0,8.0,9.0]]  |
+| subarr                        |
+| ----------------------------- |
+| [[4.0,5.0,6.0],[7.0,8.0,9.0]] |
 
 This returned a `DOUBLE[2][3]`. The top dimension is gone because the first
 selector took out a sub-array and not a one-element slice.
@@ -337,10 +342,10 @@ selector took out a sub-array and not a one-element slice.
 SELECT arr[1:, 3, 2] subarr FROM tango;
 ```
 
-|      subarr       |
-| ----------------- |
-|  [8.0,17.0,26.0]  |
+| subarr          |
+| --------------- |
+| [8.0,17.0,26.0] |
 
-This left the top dimension unconstrained, then took the 3rd sub-array in
-each of the top-level sub-arrays, and then selected just the 2nd element in each
-of them.
+This left the top dimension unconstrained, then took the 3rd sub-array in each
+of the top-level sub-arrays, and then selected just the 2nd element in each of
+them.
