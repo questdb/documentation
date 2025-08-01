@@ -3,7 +3,11 @@ title: Monitoring and alerting
 description: Shows you how to set up to monitor your database for potential issues, and how to raise alerts
 ---
 
-There are many variables to consider when monitoring an active production database. This document is designed to be a helpful starting point. We plan to expand this guide to be more helpful. If you have any recommendations, feel free to [create an issue](https://github.com/questdb/documentation/issues) or a PR on GitHub. 
+There are many variables to consider when monitoring an active production
+database. This document is designed to be a helpful starting point. We plan to
+expand this guide to be more helpful. If you have any recommendations, feel free
+to [create an issue](https://github.com/questdb/documentation/issues) or a PR on
+GitHub.
 
 ## Basic health check
 
