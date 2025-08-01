@@ -241,11 +241,14 @@ The following metrics are available:
 | `questdb_wal_apply_rows_per_second`               | gauge   | Rate of rows applied per second during WAL apply.                                                                                                                                                           |
 | `questdb_wal_apply_written_rows_total`            | counter | Total number of rows written during WAL apply.                                                                                                                                                              |
 | `questdb_wal_written_rows_total`                  | counter | Total number of rows written to WAL.                                                                                                                                                                        |
+| `questdb_wal_seq_txn`                             | gauge   | Sum of all committed transaction sequence numbers. Used in conjunction with `questdb_wal_writer_txn`.                                                                                                       |
+| `questdb_wal_writer_txn`                          | gauge   | Sum of all transaction sequence numbers applied to tables. With no pending transactions in the WAL, equal to `questdb_wal_seq_txn`. When steadily growing, indicates QuestDB is unable to keep up with writes. |
 | `questdb_workers_job_start_micros_max`            | gauge   | Maximum time taken to start a worker job in microseconds.                                                                                                                                                   |
 | `questdb_workers_job_start_micros_min`            | gauge   | Minimum time taken to start a worker job in microseconds.                                                                                                                                                   |
 
-All of the above metrics are volatile, i.e. they're collected since the current
-database start.
+Most of the above metrics are volatile, i.e. they're collected since the current
+database start. The exception are `questdb_wal_seq_txn` and
+`questdb_wal_writer_txn`, because transaction sequence numbers are persistent.
 
 ## Configuring Prometheus Alertmanager
 
