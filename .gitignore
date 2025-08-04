@@ -25,6 +25,7 @@ plugins/*/compiled
 snippets/db
 snippets/package-lock.json
 snippets/yarn.lock
+CLAUDE.md
 
 npm-debug.log*
 yarn-debug.log*
