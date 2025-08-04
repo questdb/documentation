@@ -13,6 +13,10 @@ application used to visualize data and enable [time-series data analysis](/gloss
 QuestDB is available within Grafana via the
 [official QuestDB plugin](https://grafana.com/grafana/plugins/questdb-questdb-datasource/).
 
+:::warning
+QuestDB can also be used with the PostgreSQL Grafana plugin, but the configuration options are different in that case. The QuestDB official plugin is strongly recommended instead.
+:::
+
 For a walk-through style guide, see our
 [blog post](/blog/time-series-monitoring-dashboard-grafana-questdb/).
 
@@ -63,19 +67,22 @@ questdb/questdb:latest
 3. Search for QuestDB and click **Install**.
 4. Once the QuestDB data source for Grafana is finished installing, click on the
    blue **Add new data source** button where the **Install** button used to be.
-   Configure it with the following settings:
+5. Enter the connection settings.
+   1. Notice that `Server Address` is the host address without the port. Some common values are `host.docker.internal` when using Docker on the same host, `localhost` when running standalone Grafana on the same host, or the QuestDB instance IP address when running Grafana remotely.
+   2. The port, which defaults to `8812` is passed as a separate parameter.
+   3. For QuestDB Open Source, TLS/SSL mode should be `disable`. This can be left empty for QuestDB Enterprise.
 
 ```
-Server address:host.docker.internal
+Server address: host.docker.internal
 Server port: 8812
-Username:user
-Password:quest
-TLS/SSL mode:disable
+Username: user
+Password: quest
+TLS/SSL mode: disable
 ```
 
-5. Toggle the **Query Builder** to **SQL Editor** by clicking the button.
+6. Toggle the **Query Builder** to **SQL Editor** by clicking the button.
 
-6. Write SQL queries!
+7. Write SQL queries!
 
 <Screenshot
     alt="Screenshot of a blank panel after being created"
