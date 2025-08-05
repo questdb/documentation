@@ -193,6 +193,7 @@ const config = {
       logo: {
         alt: "QuestDB Logo",
         src: "/images/favicon.webp",
+        href: "https://questdb.com/",
       },
       items: [
         {
