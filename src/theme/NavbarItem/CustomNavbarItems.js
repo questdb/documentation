@@ -91,7 +91,7 @@ export default function CustomNavbarItems() {
               {starCount || "..."}
             </span>
             <ChevronDownIcon
-              style={{ width: "16px", height: "16px", color: "#9ca3af" }}
+              style={{ width: "12px", height: "12px", color: "#9ca3af" }}
             />
           </span>
         </Link>
