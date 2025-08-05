@@ -361,6 +361,7 @@ html[data-theme="dark"] .DocSearch {
 .header-github-link {
   background: url("/images/navbar/github.svg") 0 center / 20px 20px no-repeat;
   padding-left: 28px !important;
+  min-width: 100px;
 }
 
 

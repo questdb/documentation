@@ -197,13 +197,7 @@ const config = {
       },
       items: [
         {
-          href: "https://questdb.com/enterprise/",
-          label: "⚡️ QuestDB Enterprise",
-          position: "right",
-          className: "navbar__enterprise-link",
-        },
-        {
-          type: "custom-version-dropdown",
+          type: "custom-navbar-items",
           position: "right",
         },
         {
