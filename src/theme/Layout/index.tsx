@@ -5,9 +5,10 @@ import useBaseUrl from "@docusaurus/useBaseUrl"
 import { useLocation } from "@docusaurus/router"
 
 import Footer from "@theme/Footer"
+import Navbar from "@theme/Navbar"
+import ReleaseDropdown from "../../components/ReleaseDropdown"
 
 import LayoutProviders from "@theme/Layout/Provider"
-import WideNav from "../../components/Tailwind/WideNav"
 import { ensureTrailingSlash } from "../../utils"
 
 export type Props = {
@@ -83,7 +84,7 @@ const Layout = ({
           content="YltecND1MYGrcsaQnM7LGSYNdsMDyhEplsq5L_xn-pQ"
         />
       </Head>
-      <WideNav />
+      <Navbar />
       <div className={wrapperClassName}>{children}</div>
       <Footer />
     </LayoutProviders>

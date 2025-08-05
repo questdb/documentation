@@ -81,6 +81,7 @@
   --ifm-menu-link-sublist-icon: url("/images/infima/arrow.svg");
   --ifm-navbar-background-color: var(--palette-charade);
   --ifm-navbar-shadow: 0 1px 0 0 var(--palette-white-10);
+  --ifm-navbar-height: 60px;
   --ifm-pre-background: var(--palette-midnight);
   --ifm-table-cell-padding: 0.15rem 1rem;
   --ifm-toc-border-color: var(--palette-white-10);
@@ -139,7 +140,7 @@
 
   --z-index-dialog: 101;
 
-  --ifm-navbar-height: 85px;
+  --ifm-navbar-height: 60px;
 }
 
 html[data-theme="dark"] {
@@ -239,7 +240,6 @@ html[data-theme="dark"] .DocSearch {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: var(--ifm-navbar-height);
 }
 
 /**
@@ -311,4 +311,55 @@ html[data-theme="dark"] .DocSearch {
 .table-alternate th:nth-child(even),
 .table-alternate td:nth-child(even) {
   background: var(--color-even);
+}
+
+/* Restore default Docusaurus navbar sticky positioning */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  background: var(--ifm-navbar-background-color, #21222c);
+}
+
+/* Add padding only on larger viewports */
+@media (min-width: 768px) {
+  .navbar {
+    padding-left: 2rem;
+    padding-right: 4rem;
+  }
+}
+
+.navbar__brand {
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--palette-white) !important;
+}
+
+.navbar__item {
+  color: var(--palette-white) !important;
+  font-weight: 500;
+}
+
+.navbar__link {
+  color: var(--palette-white) !important;
+}
+
+.navbar__link:hover {
+  color: var(--palette-pink) !important;
+  text-decoration: none;
+}
+
+.navbar__toggle {
+  color: var(--palette-white) !important;
+}
+
+/* GitHub link styling */
+.header-github-link {
+  background: url("/images/navbar/github.svg") 0 center / 20px 20px no-repeat;
+  padding-left: 28px !important;
+}
+
+.header-github-link:hover {
+  background-image: url("/images/navbar/github.svg");
+  opacity: 0.8;
 }
