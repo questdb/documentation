@@ -26,6 +26,12 @@ const config = {
   onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
   onBrokenAnchors: isPreviews ? "warn" : "throw",
   trailingSlash: true,
+  future: {
+    experimental_faster: {
+      rspackBundler: true,
+      rspackPersistentCache: true,
+    },
+  },
   stylesheets: [
     {
       href: "https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css",
