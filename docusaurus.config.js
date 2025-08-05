@@ -156,8 +156,7 @@ const config = {
     require.resolve("./plugins/fetch-latest-release/index"),
     require.resolve("./plugins/fetch-repo/index"),
     require.resolve("./plugins/remote-repo-example/index"),
-    require.resolve("./plugins/optimize/index"),
-    require.resolve("./plugins/manifest/index"),
+
     require.resolve("./plugins/tailwind/index"),
     [
       "@docusaurus/plugin-pwa",
@@ -196,6 +195,11 @@ const config = {
         src: "/images/favicon.webp",
       },
       items: [
+        {
+          to: "/enterprise/",
+          label: "⚡️ QuestDB Enterprise",
+          position: "right",
+        },
         {
           type: "html",
           position: "right",
