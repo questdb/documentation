@@ -330,9 +330,13 @@ html[data-theme="dark"] .DocSearch {
 }
 
 .navbar__brand {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1.5rem;
   color: var(--palette-white) !important;
+}
+
+.navbar__title {
+  font-weight: 700 !important;
 }
 
 .navbar__item {
@@ -362,4 +366,9 @@ html[data-theme="dark"] .DocSearch {
 .header-github-link:hover {
   background-image: url("/images/navbar/github.svg");
   opacity: 0.8;
+}
+
+/* Enterprise link styling */
+.navbar__enterprise-link {
+  font-weight: 600 !important;
 }

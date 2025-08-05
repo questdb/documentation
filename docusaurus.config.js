@@ -200,6 +200,7 @@ const config = {
           to: "/enterprise/",
           label: "⚡️ QuestDB Enterprise",
           position: "right",
+          className: "navbar__enterprise-link",
         },
         {
           type: "html",
