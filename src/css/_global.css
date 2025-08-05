@@ -349,7 +349,7 @@ html[data-theme="dark"] .DocSearch {
 }
 
 .navbar__link:hover {
-  color: var(--palette-pink) !important;
+  color: var(--ifm-color-primary-lighter) !important;
   text-decoration: none;
 }
 
@@ -363,12 +363,16 @@ html[data-theme="dark"] .DocSearch {
   padding-left: 28px !important;
 }
 
-.header-github-link:hover {
-  background-image: url("/images/navbar/github.svg");
-  opacity: 0.8;
-}
 
 /* Enterprise link styling */
 .navbar__enterprise-link {
   font-weight: 600 !important;
+}
+
+.navbar__enterprise-link:hover {
+  color: var(--ifm-color-primary-lighter) !important;
+}
+
+.navbar__enterprise-link > svg {
+  display: none;
 }

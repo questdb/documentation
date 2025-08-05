@@ -6,7 +6,6 @@ import { useLocation } from "@docusaurus/router"
 
 import Footer from "@theme/Footer"
 import Navbar from "@theme/Navbar"
-import ReleaseDropdown from "../../components/ReleaseDropdown"
 
 import LayoutProviders from "@theme/Layout/Provider"
 import { ensureTrailingSlash } from "../../utils"

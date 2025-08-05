@@ -189,24 +189,22 @@ const config = {
 
   themeConfig: {
     navbar: {
-      title: "QuestDB",
+      title: "",
       logo: {
         alt: "QuestDB Logo",
-        src: "/images/favicon.webp",
+        src: "/images/questdb-logo-themed.svg",
         href: "https://questdb.com/",
       },
       items: [
         {
-          to: "/enterprise/",
+          href: "https://questdb.com/enterprise/",
           label: "⚡️ QuestDB Enterprise",
           position: "right",
           className: "navbar__enterprise-link",
         },
         {
-          type: "html",
+          type: "custom-version-dropdown",
           position: "right",
-          value:
-            '<div class="navbar__item dropdown dropdown--hoverable dropdown--left"><a href="https://github.com/questdb/questdb/releases/latest" aria-label="GitHub repository" class="navbar__item navbar__link header-github-link font-semibold font-sans font-normal" id="release-version">latest</a><ul class="dropdown__menu"><li><a href="/release-notes/" class="dropdown__link font-semibold">Release Notes</a></li><li><a href="https://github.com/orgs/questdb/projects/1/views/5" class="dropdown__link font-semibold" rel="noreferrer" target="_blank">Roadmap</a></li></ul></div><script>fetch("https://github-api.questdb.io/github/latest").then(r=>r.json()).then(data=>{document.getElementById("release-version").textContent=data.name;document.getElementById("release-version").href=`https://github.com/questdb/questdb/releases/tag/${data.name}`;}).catch(()=>{});</script>',
         },
         {
           type: "search",
