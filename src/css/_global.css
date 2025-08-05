@@ -364,7 +364,6 @@ html[data-theme="dark"] .DocSearch {
   min-width: 100px;
 }
 
-
 /* Enterprise link styling */
 .navbar__enterprise-link {
   font-weight: 600 !important;
@@ -376,4 +375,9 @@ html[data-theme="dark"] .DocSearch {
 
 .navbar__enterprise-link > svg {
   display: none;
+}
+
+/* Hide Docusaurus chevron for custom GitHub link */
+.custom-github-link::after {
+  display: none !important;
 }
