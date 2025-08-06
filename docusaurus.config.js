@@ -193,7 +193,7 @@ const config = {
       logo: {
         alt: "QuestDB Logo",
         src: "/images/questdb-logo-navbar.svg",
-        href: "/",
+        href: "https://questdb.com/",
       },
       items: [
         {
