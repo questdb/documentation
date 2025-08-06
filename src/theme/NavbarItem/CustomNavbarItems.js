@@ -1,36 +1,22 @@
 import Link from "@docusaurus/Link"
-import React, { useEffect, useState } from "react"
-import { getStarCount } from "../../utils/star-count"
+import React from "react"
+import { usePluginData } from "@docusaurus/useGlobalData"
 import { ChevronDownIcon, StarIcon } from "@heroicons/react/24/outline"
 
 export default function CustomNavbarItems() {
-  const [version, setVersion] = useState("latest")
-  const [starCount, setStarCount] = useState(null)
+  const { release } = usePluginData("fetch-latest-release")
+  const { repo } = usePluginData("fetch-repo")
 
-  useEffect(() => {
-    fetch("https://github-api.questdb.io/github/latest")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.name) {
-          setVersion(data.name)
-        }
-      })
-      .catch(() => {
-        // Fallback to "latest"
-      })
-  }, [])
+  // Format star count similar to the original implementation
+  const formatStarCount = (count) => {
+    if (!count) return null
+    return count >= 1000
+      ? `${(count / 1000).toFixed(1)}k`
+      : count.toLocaleString()
+  }
 
-  useEffect(() => {
-    getStarCount()
-      .then((result) => {
-        if (result) {
-          setStarCount(result.formatted)
-        }
-      })
-      .catch(() => {
-        // Fallback - star count will remain null
-      })
-  }, [])
+  const version = release?.name || "latest"
+  const starCount = formatStarCount(repo?.stargazers_count)
 
   const versionUrl = `https://github.com/questdb/questdb/releases/tag/${version}`
 
