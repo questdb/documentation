@@ -611,6 +611,18 @@ module.exports = {
           ],
         },
         {
+          label: "AI and LLMs",
+          type: "category",
+          collapsed: false,
+          items: [
+            "third-party-tools/ai-llms-overview",
+            "third-party-tools/anthropic-claude",
+            "third-party-tools/openai-chatgpt",
+            "third-party-tools/mistral",
+            "third-party-tools/google-gemini",
+          ],
+        },
+        {
           label: "Other tools",
           type: "category",
           collapsed: false,
