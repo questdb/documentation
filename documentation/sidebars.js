@@ -20,11 +20,6 @@ module.exports = {
       customProps: { tag: "Popular" },
     },
     {
-      id: "guides/influxdb-migration",
-      type: "doc",
-      customProps: { tag: "Popular" },
-    },
-    {
       type: "category",
       label: "Ingestion Reference",
       items: [
@@ -170,7 +165,7 @@ module.exports = {
               type: "doc",
               label: "R",
             },
-          ]
+          ],
         },
         "reference/sql/datatypes",
         "concept/sql-execution-order",
@@ -270,8 +265,8 @@ module.exports = {
                   id: "reference/sql/acl/create-user",
                   type: "doc",
                   customProps: { tag: "Enterprise" },
-                }
-              ]
+                },
+              ],
             },
             {
               type: "category",
@@ -294,7 +289,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
-              ]
+              ],
             },
             "reference/sql/explain",
             {
@@ -316,7 +311,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
-              ]
+              ],
             },
             "reference/sql/insert",
             "reference/sql/refresh-mat-view",
@@ -341,7 +336,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
-              ]
+              ],
             },
             {
               type: "category",
@@ -467,7 +462,7 @@ module.exports = {
               id: "operations/tls",
               customProps: { tag: "Enterprise" },
             },
-          ]
+          ],
         },
         "operations/logging-metrics",
         "operations/monitoring-alerting",
@@ -512,22 +507,27 @@ module.exports = {
         {
           id: "guides/order-book",
           label: "Order book analytics",
-          type: "doc"
+          type: "doc",
+        },
+        {
+          id: "guides/influxdb-migration",
+          type: "doc",
+          customProps: { tag: "Popular" },
         },
         {
           type: "category",
           label: "Web Console",
           collapsed: true,
           items: [
-              "web-console",
-              "web-console/code-editor",
-              "web-console/metrics-view",
-              "web-console/schema-explorer",
-              "web-console/result-grid",
-              "web-console/query-log",
-              "web-console/import-csv",
-              "web-console/create-table",
-            ],
+            "web-console",
+            "web-console/code-editor",
+            "web-console/metrics-view",
+            "web-console/schema-explorer",
+            "web-console/result-grid",
+            "web-console/query-log",
+            "web-console/import-csv",
+            "web-console/create-table",
+          ],
         },
         {
           label: "Blog tutorials 🔗",
@@ -580,8 +580,8 @@ module.exports = {
         "guides/architecture/replication-layer",
         "guides/architecture/security",
         "guides/architecture/observability",
-        "guides/architecture/web-console"
-      ]
+        "guides/architecture/web-console",
+      ],
     },
     {
       label: "Third-party Tools",
