@@ -348,20 +348,23 @@ html[data-theme="dark"] .DocSearch {
   color: var(--palette-white) !important;
 }
 
-.navbar__link:hover {
-  color: var(--ifm-color-primary-lighter) !important;
-  text-decoration: none;
+.header-github-link {
+  border: 2px solid transparent;
+}
+
+.header-github-link:hover {
+  background-color: #141725;
+  border: 2px solid #d9688b;
+  transition: all var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+  border-radius: 5px;
+}
+
+.header-github-link:hover .navbar__version-link {
+  text-decoration: underline;
 }
 
 .navbar__toggle {
   color: var(--palette-white) !important;
-}
-
-/* GitHub link styling */
-.header-github-link {
-  background: url("/images/navbar/github.svg") 0 center / 20px 20px no-repeat;
-  padding-left: 28px !important;
-  min-width: 100px;
 }
 
 /* Enterprise link styling */
