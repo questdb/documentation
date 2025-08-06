@@ -355,12 +355,18 @@ html[data-theme="dark"] .DocSearch {
 .header-github-link:hover {
   background-color: #141725;
   border: 2px solid #d9688b;
-  transition: all var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+  transition: all var(--ifm-transition-fast)
+    var(--ifm-transition-timing-default);
   border-radius: 5px;
 }
 
 .header-github-link:hover .navbar__version-link {
   text-decoration: underline;
+  color: inherit;
+}
+
+.header-github-link:hover {
+  color: inherit !important;
 }
 
 .navbar__toggle {
@@ -383,4 +389,25 @@ html[data-theme="dark"] .DocSearch {
 /* Hide Docusaurus chevron for custom GitHub link */
 .custom-github-link::after {
   display: none !important;
+}
+
+/* Dropdown link styling */
+.dropdown__link {
+  border-radius: 0.25rem;
+  color: var(--ifm-dropdown-link-color);
+  display: block;
+  font-size: 0.875rem;
+  margin-top: 0.2rem;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color var(--ifm-transition-fast)
+    var(--ifm-transition-timing-default);
+}
+
+.dropdown__link--active,
+.dropdown__link:hover {
+  background-color: var(--ifm-dropdown-hover-background-color);
+  color: var(--ifm-color-primary) !important;
+  text-decoration: underline;
 }
