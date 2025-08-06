@@ -411,3 +411,8 @@ html[data-theme="dark"] .DocSearch {
   color: var(--ifm-color-primary) !important;
   text-decoration: underline;
 }
+
+/* Hide the "Docs" nav item on desktop */
+.navbar__item.mobile-only {
+  display: none;
+}

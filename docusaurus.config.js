@@ -197,6 +197,55 @@ const config = {
       },
       items: [
         {
+          to: "https://questdb.com/",
+          label: "Return to QuestDB.com",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "docs",
+          position: "left",
+          label: "Documentation",
+          className: "mobile-only",
+        },
+        {
+          to: "/blog/tutorials/",
+          label: "Tutorials",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "/blog/",
+          label: "Blog",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "/enterprise/",
+          label: "Enterprise",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://slack.questdb.com/",
+          label: "Public Slack",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://community.questdb.com/",
+          label: "Discourse Community",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://github.com/questdb/questdb/",
+          label: "View QuestDB Repo",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
           type: "custom-navbar-items",
           position: "right",
         },
