@@ -210,7 +210,7 @@ const config = {
           className: "mobile-only",
         },
         {
-          to: "https://questdb.com//blog/tutorials/",
+          to: "https://questdb.com/blog/?tag=tutorial",
           label: "Tutorials",
           position: "left",
           className: "mobile-only",
