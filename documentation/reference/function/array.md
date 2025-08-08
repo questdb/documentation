@@ -70,6 +70,46 @@ SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | ---------------------- |
 | ARRAY[1.0,2.0,4.0,6.0] |
 
+## array_max
+
+`array_max(array)` returns the maximum value from all the array elements. `NULL`
+elements and non-finite values (NaN, Infinity) are ignored. If the array
+contains no finite values, the function returns `NULL`.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_max(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
+```
+
+| array_max |
+| --------- |
+| 5.0       |
+
+## array_min
+
+`array_min(array)` returns the minimum value from all the array elements. `NULL`
+elements and non-finite values (NaN, Infinity) are ignored. If the array
+contains no finite values, the function returns `NULL`.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_min(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
+```
+
+| array_min |
+| --------- |
+| 1.0       |
+
 ## array_position
 
 `array_position(array, elem)` returns the position of `elem` inside the 1D `array`. If
@@ -111,6 +151,71 @@ SELECT array_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | array_sum |
 | --------- |
 | 6.0       |
+
+## array_stddev
+
+`array_stddev(array)` returns the sample standard deviation of all the array
+elements. This is an alias for `array_stddev_samp()`. `NULL` elements and
+non-finite values (NaN, Infinity) are ignored. If the array contains fewer than
+2 finite values, the function returns `NULL`.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_stddev(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
+```
+
+| array_stddev |
+| ------------ |
+| 1.29099445   |
+
+## array_stddev_pop
+
+`array_stddev_pop(array)` returns the population standard deviation of all the
+array elements. `NULL` elements and non-finite values (NaN, Infinity) are
+ignored. The population standard deviation uses N in the denominator of the
+standard deviation formula. If the array contains no finite values, the function
+returns `NULL`.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_stddev_pop(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
+```
+
+| array_stddev_pop |
+| ---------------- |
+| 1.11803399       |
+
+## array_stddev_samp
+
+`array_stddev_samp(array)` returns the sample standard deviation of all the
+array elements. `NULL` elements and non-finite values (NaN, Infinity) are
+ignored. The sample standard deviation uses N-1 in the denominator of the
+standard deviation formula. If the array contains fewer than 2 finite values,
+the function returns `NULL`.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_stddev_samp(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
+```
+
+| array_stddev_samp |
+| ----------------- |
+| 1.29099445        |
 
 ## dim_length
 
