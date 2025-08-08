@@ -8,23 +8,30 @@ const path = require("path")
 
 dotenv.config()
 
-const isPreviews = process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
+const isPreviews =
+  process.env.NETLIFY && process.env.CONTEXT === "deploy-preview"
 
 const config = {
   title: "QuestDB",
   tagline: "QuestDB is the fastest open source time series database",
   url: `https://${customFields.domain}`,
-  baseUrl: '/docs/',
+  baseUrl: "/docs/",
   baseUrlIssueBanner: false,
   favicon: "/images/favicon.webp",
   organizationName: "QuestDB",
-  staticDirectories: ['static'],
+  staticDirectories: ["static"],
   projectName: "questdb",
   customFields,
   onBrokenLinks: isPreviews ? "warn" : "throw",
   onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
   onBrokenAnchors: isPreviews ? "warn" : "throw",
   trailingSlash: true,
+  future: {
+    experimental_faster: {
+      rspackBundler: true,
+      rspackPersistentCache: true,
+    },
+  },
   stylesheets: [
     {
       href: "https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css",
@@ -44,7 +51,7 @@ const config = {
       "data-project-color": "#21222c",
       "data-project-logo": "/docs/images/favicon.webp",
       "data-bot-protection-mechanism": "hcaptcha",
-      
+
       // Modal styling
       "data-modal-header-bg-color": "#21222c",
       "data-modal-body-bg-color": "#262833",
@@ -62,27 +69,27 @@ const config = {
       "data-source-link-bg-color": "#262833",
       "data-source-link-hover-bg-color": "#404153",
       "data-source-link-border": "1px solid #404153",
-      
+
       // Button styling
       "data-button-border": "1px solid #c94f74",
       "data-button-border-radius": "8px",
       "data-button-text-color": "#ffffff",
-      
+
       // Input field styling
       "data-query-input-text-color": "#000000",
       "data-query-input-placeholder-text-color": "#666666",
       "data-query-input-border-color": "#404153",
       "data-query-input-focus-border-color": "#c94f74",
       "data-submit-query-button-bg-color": "#c94f74",
-      
+
       // Modal title and text
       "data-modal-title-color": "#ffffff",
       "data-modal-disclaimer-bg-color": "#1e1f2b",
       "data-modal-disclaimer-text-color": "#9ca3af",
-      
+
       // Hyperlinks
       "data-hyperlink-color": "#c94f74",
-      
+
       // Feedback buttons
       "data-answer-feedback-button-bg-color": "transparent",
       "data-answer-feedback-button-border": "1px solid #404153",
@@ -91,21 +98,21 @@ const config = {
       "data-answer-feedback-button-active-bg-color": "#404153",
       "data-answer-feedback-button-active-text-color": "#ffffff",
       "data-answer-feedback-button-border-radius": "4px",
-      
+
       // Copy button
       "data-answer-copy-button-bg-color": "transparent",
       "data-answer-copy-button-border": "1px solid #404153",
       "data-answer-copy-button-text-color": "#9ca3af",
       "data-answer-copy-button-hover-bg-color": "#404153",
       "data-answer-copy-button-border-radius": "4px",
-      
+
       // Clear thread button
       "data-thread-clear-button-bg-color": "transparent",
       "data-thread-clear-button-border": "1px solid #404153",
       "data-thread-clear-button-text-color": "#9ca3af",
       "data-thread-clear-button-hover-bg-color": "#404153",
       "data-thread-clear-button-border-radius": "4px",
-      
+
       // Example question buttons
       "data-example-question-button-bg-color": "#1e1f2b",
       "data-example-question-button-border": "1px solid #404153",
@@ -113,17 +120,19 @@ const config = {
       "data-example-question-button-hover-bg-color": "#404153",
       "data-example-question-button-border-radius": "6px",
       "data-example-question-button-box-shadow": "0 1px 3px rgba(0, 0, 0, 0.3)",
-      
+
       // Search mode styling
       "data-search-result-hover-bg-color": "#404153",
       "data-search-result-primary-text-color": "#ffffff",
       "data-search-result-secondary-text-color": "#9ca3af",
       "data-search-ask-ai-cta-text-color": "#c94f74",
       "data-search-ask-ai-cta-hover-bg-color": "#404153",
-      
+
       // Additional customization
-      "data-modal-example-questions": "How do I create a table?,What is designated timestamp?",
-      "data-modal-disclaimer": "This AI assistant has access to QuestDB documentation and can help with time series database questions.",
+      "data-modal-example-questions":
+        "How do I create a table?,What is designated timestamp?",
+      "data-modal-disclaimer":
+        "This AI assistant has access to QuestDB documentation and can help with time series database questions.",
     },
   ],
   markdown: {
@@ -147,8 +156,7 @@ const config = {
     require.resolve("./plugins/fetch-latest-release/index"),
     require.resolve("./plugins/fetch-repo/index"),
     require.resolve("./plugins/remote-repo-example/index"),
-    require.resolve("./plugins/optimize/index"),
-    require.resolve("./plugins/manifest/index"),
+
     require.resolve("./plugins/tailwind/index"),
     [
       "@docusaurus/plugin-pwa",
@@ -180,6 +188,74 @@ const config = {
   ].filter(Boolean),
 
   themeConfig: {
+    navbar: {
+      title: "",
+      logo: {
+        alt: "QuestDB Logo",
+        src: "/images/questdb-logo-navbar.svg",
+        href: "https://questdb.com/",
+      },
+      items: [
+        {
+          to: "https://questdb.com/",
+          label: "Return to QuestDB.com",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "docs",
+          position: "left",
+          label: "Documentation",
+          className: "mobile-only",
+        },
+        {
+          to: "https://questdb.com/blog/?tag=tutorial",
+          label: "Tutorials",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://questdb.com//blog/",
+          label: "Blog",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://questdb.com/enterprise/",
+          label: "Enterprise",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://slack.questdb.com/",
+          label: "Public Slack",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://community.questdb.com/",
+          label: "Discourse Community",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          to: "https://github.com/questdb/questdb/",
+          label: "View QuestDB Repo",
+          position: "left",
+          className: "mobile-only",
+        },
+        {
+          type: "custom-navbar-items",
+          position: "right",
+        },
+        {
+          type: "search",
+          position: "right",
+        },
+      ],
+      hideOnScroll: false,
+    },
     announcementBar: {
       id: "release_week",
       backgroundColor: "#fafbfc",
@@ -215,8 +291,8 @@ const config = {
       darkTheme: require("./src/internals/prism-dracula"),
     },
     algolia: {
-      appId: process.env.ALGOLIA_APP_ID || 'placeholder-app-id',
-      apiKey: process.env.ALGOLIA_API_KEY || 'placeholder-api-key',
+      appId: process.env.ALGOLIA_APP_ID || "placeholder-app-id",
+      apiKey: process.env.ALGOLIA_API_KEY || "placeholder-api-key",
       indexName: "questdb",
       searchPagePath: false,
       contextualSearch: false,
@@ -226,7 +302,6 @@ const config = {
     [
       "@docusaurus/preset-classic",
       {
-
         blog: false,
         docs: {
           include: ["**/*!(.partial).{md,mdx}"],
