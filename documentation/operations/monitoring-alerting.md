@@ -3,7 +3,11 @@ title: Monitoring and alerting
 description: Shows you how to set up to monitor your database for potential issues, and how to raise alerts
 ---
 
-There are many variables to consider when monitoring an active production database. This document is designed to be a helpful starting point. We plan to expand this guide to be more helpful. If you have any recommendations, feel free to [create an issue](https://github.com/questdb/documentation/issues) or a PR on GitHub. 
+There are many variables to consider when monitoring an active production
+database. This document is designed to be a helpful starting point. We plan to
+expand this guide to be more helpful. If you have any recommendations, feel free
+to [create an issue](https://github.com/questdb/documentation/issues) or a PR on
+GitHub.
 
 ## Basic health check
 
@@ -55,8 +59,8 @@ take longer if the data is out of order, or touches different time partitions.
 You can monitor the overall performance of this process of applying the WAL
 data to tables. QuestDB exposes two Prometheus counters for this:
 
-1. `questdb_wal_apply_seq_txn_total`: sum of all committed transaction sequence numbers
-2. `questdb_wal_apply_writer_txn_total`: sum of all transaction sequence numbers applied to tables
+1. `questdb_wal_apply_seq_txn`: sum of all committed transaction sequence numbers
+2. `questdb_wal_apply_writer_txn`: sum of all transaction sequence numbers applied to tables
 
 Both of these numbers are continuously growing as the data is ingested. When
 they are equal, all WAL data has been applied to the tables. While data is being
