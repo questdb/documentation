@@ -20,7 +20,7 @@ with operational simplicity.
 Given its effiency, QuestDB **reduces operational costs**, all while overcoming
 ingestion bottlenecks.
 
-As a result, QuestDB amplifies intensive **time-series**, **capital market**,
+As a result, QuestDB amplifies intensive **time-series**, **capital markets**,
 and **heavy industry** use cases.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
