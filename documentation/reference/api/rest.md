@@ -20,7 +20,8 @@ off-the-shelf HTTP clients. It provides a simple way to interact with QuestDB
 and is compatible with most programming languages. API functions are fully keyed
 on the URL and they use query parameters as their arguments.
 
-The Web Console[Web Console](/docs/web-console/) is the official Web client relying on the REST API.
+The Web Console[Web Console](/docs/web-console/) is the official Web client
+relying on the REST API.
 
 **Available methods**
 
@@ -112,8 +113,8 @@ The `/exec` entrypoint takes a SQL query and returns results as JSON.
 
 We can use this for quick SQL inserts too, but note that there's no support for
 parameterized queries that are necessary to avoid SQL injection issues. Prefer
-[InfluxDB Line Protocol](/docs/configuration/#influxdb-line-protocol-ilp) if
-you need high-performance inserts.
+[InfluxDB Line Protocol](/docs/configuration/#influxdb-line-protocol-ilp) if you
+need high-performance inserts.
 
 <Tabs defaultValue="curl" values={[
 { label: "cURL", value: "curl" },
@@ -157,8 +158,7 @@ non-representative of the rest of the data, automatic imports can yield errors.
 If the data follows a uniform pattern, the number of lines which are analyzed
 for schema detection can be reduced to improve performance during uploads using
 the `http.text.analysis.max.lines` key. Usage of this setting is described in
-the [HTTP server configuration](/docs/configuration/#http-server)
-documentation.
+the [HTTP server configuration](/docs/configuration/#http-server) documentation.
 
 :::
 
@@ -181,6 +181,14 @@ Content-Type with following optional URL parameters which must be URL encoded:
 | `skipLev`            | No       | `false`          | `true` or `false`. Skip “Line Extra Values”, when set to true, the parser will ignore those extra values rather than ignoring entire line. An extra value is something in addition to what is defined by the header.                                             |
 | `timestamp`          | No       |                  | Name of the column that will be used as a [designated timestamp](/docs/concept/designated-timestamp/).                                                                                                                                                           |
 | `create`             | No       | `true`           | `true` or `false`. When set to `false`, QuestDB will not automatically create a table '`name`' if one does not exist, and will return an error instead.                                                                                                          |
+
+:::tip
+
+If you experience large latencies when importing big CSV files with out-of-order
+timestamps, try increasing `maxUncommittedRows` parameter from the default
+`500,000` value.
+
+:::
 
 ```shell title="Example usage"
 curl -F data=@weather.csv \
@@ -653,7 +661,8 @@ A HTTP status code of `400` is returned with the following response body:
 :::note
 
 Role-based Access Control (RBAC) is available in
-[QuestDB Enterprise](/enterprise/). See the next paragraph for authentication in QuestDB Open Source.
+[QuestDB Enterprise](/enterprise/). See the next paragraph for authentication in
+QuestDB Open Source.
 
 :::
 
@@ -687,10 +696,11 @@ learn more on how to generate a REST API token.
 
 ## Authentication in QuestDB open source
 
-QuestDB Open Source supports HTTP basic authentication. To enable it, set the configuration
-options `http.user` and `http.password` in `server.conf`.
+QuestDB Open Source supports HTTP basic authentication. To enable it, set the
+configuration options `http.user` and `http.password` in `server.conf`.
 
-The following example shows how to enable HTTP basic authentication in QuestDB open source:
+The following example shows how to enable HTTP basic authentication in QuestDB
+open source:
 
 ```shell
 http.user=my_user
