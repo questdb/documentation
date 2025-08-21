@@ -20,13 +20,15 @@ for more examples of how the units are used to parse inputs.
 | Unit   | Date or Time Component                                                                                         | Presentation       | Examples                              |
 | ------ | -------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
 | `G`    | Era designator                                                                                                 | Text               | AD                                    |
-| `y`    | `y` single digit or greedy year, depending on the input digit number                                           | Year               | 1996; 96; 999; 3                      |
+| `y`    | `y` single digit or greedy year, depending on the number of digits in input                                    | Year               | 1996; 96; 999; 3                      |
 | `yy`   | Two digit year of the current century                                                                          | Year               | 96 (interpreted as 2096)              |
 | `yyy`  | Three-digit year                                                                                               | Year               | 999                                   |
 | `yyyy` | Four-digit year                                                                                                | Year               | 1996                                  |
-| `M`    | Month in year                                                                                                  | Month              | July; Jul; 07                         |
-| `w`    | Week in year                                                                                                   | Number             | 27                                    |
-| `ww`   | ISO week of year                                                                                               | Number             | 2                                     |
+| `M`    | Month in year, numeric, greedy                                                                                 | Month              | 7; 07; 007; etc.                      |
+| `MM`   | Month in year, two-digit                                                                                       | Month              | 07                                    |
+| `MMM`  | Month in year, name                                                                                            | Month              | Jul; July                             |
+| `w`    | Week in year                                                                                                   | Number             | 2                                     |
+| `ww`   | ISO week of year (two-digit)                                                                                   | Number             | 02                                    |
 | `D`    | Day in year                                                                                                    | Number             | 189                                   |
 | `d`    | Day in month                                                                                                   | Number             | 10                                    |
 | `F`    | Day of week in month                                                                                           | Number             | 2                                     |
@@ -39,20 +41,20 @@ for more examples of how the units are used to parse inputs.
 | `h`    | Hour in am/pm (1-12)                                                                                           | Number             | 12                                    |
 | `m`    | Minute in hour                                                                                                 | Number             | 30                                    |
 | `s`    | Second in minute                                                                                               | Number             | 55                                    |
-| `SSS`  | 3-digit millisecond                                                                                            | Number             | 978                                   |
-| `S`    | Millisecond up to 3 digits: `S` parses 1 digit when followed by another `unit`. Otherwise, it parses 3 digits. | Number             | 900                                   |
+| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)                                             | Number             | 978                                   |
+| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 900                                   |
+| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)                                             | Number             | 456                                   |
+| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 456                                   |
+| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)                                      | Number             | 123456                                |
+| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)                                       | Number             | 900                                   |
+| `N+`   | Microsecond up to 9 digits (see explanation below for fraction-of-second)                                      | Number             | 123456789                             |
 | `z`    | Time zone                                                                                                      | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
 | `Z`    | Time zone                                                                                                      | RFC 822 time zone  | -0800                                 |
 | `x`    | Time zone                                                                                                      | ISO 8601 time zone | -08; -0800; -08:00                    |
-| `UUU`  | 3-digit microsecond                                                                                            | Number             | 698                                   |
-| `U`    | Microsecond up to 3 digits: `U` parses 1 digit when followed by another `unit`. Otherwise, it parses 3 digits. | Number             | 600                                   |
-| `U+`   | 6-digit microsecond                                                                                            | Number             | 600                                   |
-| `N`    | Nanosecond. QuestDB provides microsecond resolution so the parsed nanosecond will be truncated.                | Number             | N/A (truncated)                       |
-| `N+`   | 9-digit nanosecond. QuestDB provides microsecond resolution so the parsed nanosecond will be truncated.        | Number             | N/A (truncated)                       |
 
 ### Examples for greedy year format `y`
 
-The interpretation of `y` depends on the input digit number:
+The interpretation of `y` depends on the number of digits in the input text:
 
 - If the input year is a two-digit number, the output timestamp assumes the
   current century.
@@ -64,6 +66,22 @@ The interpretation of `y` depends on the input digit number:
 | `05-03`    | `2005-03-01T00:00:00.000000Z`        | Greedily parsing the number assuming current century |
 | `005-03`   | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
 | `0005-03`  | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
+
+### Examples for fractions of a second
+
+In a basic example, `y-M-dTHH:mm:ss.S` specifies to parse 1, 2, or 3 decimals.
+Here are more examples, showing just the last part starting with the `.`:
+
+| format       | number of decimals | example input | parsed fraction of second |
+| ------------ | ------------------ | ------------- | ------------------------- |
+| `.S`         | 1-3                | `.12`         | 12 milliseconds           |
+| `.SSS`       | 3                  | `.123`        | 123 milliseconds          |
+| `.SSSU`      | 4-6                | `.1234`       | 123,400 microseconds      |
+| `.SSSUUU`    | 6                  | `.123456`     | 123,456 microseconds      |
+| `.U+`        | 1-6                | `.12345`      | 123,450 microseconds      |
+| `.SSSUUUN`   | 7-9                | `.1234567`    | 123,456,700 nanoseconds   |
+| `.SSSUUUNNN` | 9                  | `.123456789`  | 123,456,789 nanoseconds   |
+| `.N+`        | 1-9                | `.12`         | 120,000,000 nanoseconds   |
 
 ## Timestamp to Date conversion
 
