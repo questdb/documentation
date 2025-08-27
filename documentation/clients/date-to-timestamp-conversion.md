@@ -63,7 +63,7 @@ package main
 import (
     "fmt"
     "time"
-    "github.com/questdb/go-questdb-client/v3"
+    "github.com/questdb/go-questdb-client/v4"
 )
 
 func main() {

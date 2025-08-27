@@ -59,7 +59,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/v4"
 )
 
 func main() {
@@ -94,7 +94,7 @@ package main
 
 import (
        "context"
-       qdb "github.com/questdb/go-questdb-client/v3"
+       qdb "github.com/questdb/go-questdb-client/v4"
 )
 
 
@@ -119,7 +119,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/v4"
 )
 
 func main() {
@@ -157,7 +157,7 @@ package main
 
 import (
 	"context"
-	"github.com/questdb/go-questdb-client/v3"
+	"github.com/questdb/go-questdb-client/v4"
 	"time"
 )
 
