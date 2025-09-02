@@ -20,14 +20,6 @@ Removing an [index](/docs/concept/indexes/) is an atomic, non-blocking, and non-
 the operation is completed, the SQL engine stops using the index for SQL
 executions, and all its associated files are deleted.
 
-Readers of the table might be
-using the index in transaction A. In the meantime, a writer creates transaction
-B containing the new version of the column, minus the index (metadata is set to
-not have index, and index files are not copied across to the newer version).
-When the readers are finished, QuestDB automatically deletes all the files
-pertaining to the version of the column in transaction A (QuestDB uses hardlinks
-internally to avoid an actual copy operation of the data files, as they do not
-change at all).
 
 ## Example
 

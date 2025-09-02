@@ -36,7 +36,7 @@ To delete an index:
 
 Index creates a table of row locations for each distinct value for the target
 [symbol](/docs/concept/symbol/). Once the index is created, inserting data into
-the table or view will update the index. Lookups on indexed values will be performed in
+the table (or materialized view) will update the index. Lookups on indexed values will be performed in
 the index table directly which will provide the memory locations of the items,
 thus avoiding unnecessary table scans.
 
@@ -89,7 +89,7 @@ Consider the following query applied to the above table
   value and the locations where these symbols can be found. As a result, there
   is a small cost of storage associated with indexing a symbol field.
 
-- **Ingestion performance**: Each new entry in the table or view will trigger an entry
+- **Ingestion performance**: Each new entry in the table or materialized view will trigger an entry
   in the Index table. This means that any write will now require two write
   operations, and therefore take twice as long.
 
