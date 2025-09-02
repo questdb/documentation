@@ -77,7 +77,7 @@ declare
 alterTableAddColumn
   ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
 
-dropGroup 
+dropGroup
   ::= 'DROP' 'GROUP' ('IF' 'EXISTS')? groupName
 
 dropServiceAccount
@@ -273,7 +273,7 @@ addIndex
   ::= 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
 
 dropIndex
-  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
+  ::= 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
 
 noCacheColumn
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
@@ -288,7 +288,7 @@ alterColumnType
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
 
 alterTableSymbolCapacity
-  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity  
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity
 
 dropPartition
   ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
@@ -392,6 +392,9 @@ createMatViewCompactDef
 alterMatView
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName
 
+alterMatViewAddIndex
+  ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX' ('CAPACITY' capacity)?
+
 alterMatViewSymbolCapacity
   ::= 'ALTER' 'MATERIALIZED' 'VIEW' viewName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity
 
@@ -410,4 +413,4 @@ refreshMatView
   ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('INTERVAL' 'FROM' fromTimestamp 'TO' toTimestamp))
 
 dropMatView
-  ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName  
+  ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName

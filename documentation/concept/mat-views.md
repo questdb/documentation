@@ -25,7 +25,7 @@ Let's say that your application is ingesting vast amounts of time series data.
 Soon your QuestDB instance will grow from gigabytes to terabytes.
 
 ```questdb-sql title="trades ddl"
-CREATE TABLE 'trades' ( 
+CREATE TABLE 'trades' (
 	symbol SYMBOL,
 	side SYMBOL,
 	price DOUBLE,
@@ -121,8 +121,20 @@ but does not yet support all query types.
     materialized view
   - [`REFRESH MATERIALIZED VIEW`](/docs/reference/sql/refresh-mat-view/):
     Manually refresh a materialized view
+  - [`ALTER MATERIALIZED VIEW ADD INDEX`](/docs/reference/sql/alter-mat-view-alter-column-add-index/):
+    Adds an index to a materialized view
+  - [`ALTER MATERIALIZED VIEW DROP INDEX`](/docs/reference/sql/alter-mat-view-alter-column-drop-index/):
+    Removes an index from a materialized view
   - [`ALTER MATERIALIZED VIEW RESUME WAL`](/docs/reference/sql/alter-mat-view-resume-wal/):
     Resume WAL for a materialized view
+  - [`ALTER MATERIALIZED VIEW SET REFRESH`](/docs/reference/sql/alter-mat-view-set-refresh/):
+    Changes a materialized view's refresh strategy and parameters
+  - [`ALTER MATERIALIZED VIEW SET REFRESH LIMIT`](/docs/reference/sql/alter-mat-view-set-refresh-limit/):
+    Sets the time limit for incremental refresh on a materialized view
+  - [`ALTER MATERIALIZED VIEW SET TTL`](/docs/reference/sql/alter-mat-view-set-ttl/):
+    Sets the time-to-live (TTL) period on a materialized view
+  - [`ALTER MATERIALIZED VIEW SYMBOL CAPACITY`](/docs/reference/sql/alter-mat-view-change-symbol-capacity/):
+    Changes the capacity of an existing SYMBOL column in a materialized view
 
 - **Configuration**
   - [Materialized views configs](/docs/configuration/#materialized-views):

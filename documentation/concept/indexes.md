@@ -10,7 +10,8 @@ An index stores the row locations for each value of the target column in order
 to provide faster read access. It allows you to bypass full table scans by
 directly accessing the relevant rows during queries with `WHERE` conditions.
 
-Indexing is available for [symbol](/docs/concept/symbol/) columns. Index support
+Indexing is available for [symbol](/docs/concept/symbol/) columns in both tables
+and [materialized views](/docs/concept/mat-views). Index support
 for other types will be added over time.
 
 ## Index creation and deletion
@@ -21,17 +22,21 @@ The following are ways to index a `symbol` column:
   [CREATE TABLE](/docs/reference/sql/create-table/#column-indexes)
 - Using
   [ALTER TABLE ALTER COLUMN ADD INDEX](/docs/reference/sql/alter-table-alter-column-add-index/)
-  to index an existing `symbol` column
+  to index an existing `symbol` column in a table.
+- Using
+  [ALTER MATERIALIZED VIEW ALTER COLUMN ADD INDEX](/docs/reference/sql/alter-mat-view-alter-column-add-index/)
+  to index an existing `symbol` column in a materialized view.
 
 To delete an index:
 
-- [ALTER TABLE ALTER COLUMN DROP INDEX](/docs/reference/sql/alter-table-alter-column-drop-index/)
+- From a table: [ALTER TABLE ALTER COLUMN DROP INDEX](/docs/reference/sql/alter-table-alter-column-drop-index/)
+- From a materialized view: [ALTER MATERIALIZED VIEW ALTER COLUMN DROP INDEX](/docs/reference/sql/alter-mat-view-alter-column-drop-index/)
 
 ## How indexes work
 
 Index creates a table of row locations for each distinct value for the target
 [symbol](/docs/concept/symbol/). Once the index is created, inserting data into
-the table will update the index. Lookups on indexed values will be performed in
+the table or view will update the index. Lookups on indexed values will be performed in
 the index table directly which will provide the memory locations of the items,
 thus avoiding unnecessary table scans.
 
@@ -84,7 +89,7 @@ Consider the following query applied to the above table
   value and the locations where these symbols can be found. As a result, there
   is a small cost of storage associated with indexing a symbol field.
 
-- **Ingestion performance**: Each new entry in the table will trigger an entry
+- **Ingestion performance**: Each new entry in the table or view will trigger an entry
   in the Index table. This means that any write will now require two write
   operations, and therefore take twice as long.
 

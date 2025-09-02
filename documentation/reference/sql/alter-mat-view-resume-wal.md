@@ -1,6 +1,6 @@
 ---
 title: ALTER MATERIALIZED VIEW RESUME WAL
-sidebar_label: ALTER MATERIALIZED VIEW
+sidebar_label: RESUME WAL
 description:
   Documentation for the ALTER MATERIALIZED VIEW RESUME WAL SQL keyword in
   QuestDB.

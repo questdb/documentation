@@ -184,13 +184,21 @@ module.exports = {
               items: [
                 {
                   type: "category",
-                  label: "ALTER COLUMN",
+                  label: "ALTER COLUMN (TABLE)",
                   items: [
                     "reference/sql/alter-table-alter-column-add-index",
                     "reference/sql/alter-table-alter-column-cache",
                     "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-column-type",
                     "reference/sql/alter-table-change-symbol-capacity",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER COLUMN (VIEW)",
+                  items: [
+                    "reference/sql/alter-mat-view-alter-column-add-index",
+                    "reference/sql/alter-mat-view-alter-column-drop-index",
                   ],
                 },
                 {
