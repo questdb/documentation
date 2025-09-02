@@ -6,11 +6,6 @@ description: DROP INDEX SQL keyword. Table reference documentation.
 
 Removes an existing [index](/docs/concept/indexes/) from a column of type [symbol](/docs/concept/symbol/).
 
-:::note
-
-[Backup your database](/docs/operations/backup/) to avoid unintended data loss.
-
-:::
 
 ## Syntax
 ![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
