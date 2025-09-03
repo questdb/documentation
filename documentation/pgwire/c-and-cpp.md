@@ -24,8 +24,6 @@ PGWire is best for **querying**.
 :::
 
 
-
-
 ## Connection Parameters
 
 All C/C++ PostgreSQL clients use the same parameters:
@@ -36,8 +34,6 @@ All C/C++ PostgreSQL clients use the same parameters:
 - **Password**: (default: `quest`)
 - **Database**: (default: `qdb`)
 
-
----
 
 ## C with libpq
 
@@ -58,7 +54,7 @@ static void die(PGconn *conn, const char *msg) {
 
 int main(void) {
   const char *conninfo =
-    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest ";
+    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest";
 
   PGconn *conn = PQconnectdb(conninfo);
   if (PQstatus(conn) != CONNECTION_OK) die(conn, "Connection failed");
@@ -72,6 +68,12 @@ int main(void) {
   PQfinish(conn);
   return 0;
 }
+```
+
+You can compile with
+
+```sh
+cc -O2 -Wall c_pgwire_basic.c -o c_pgwire_basic $(pkg-config --cflags --libs libpq)
 ```
 
 ### Querying Data
@@ -90,7 +92,7 @@ static void die(PGconn *conn, const char *msg) {
 
 int main(void) {
   PGconn *conn = PQconnectdb(
-    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest ");
+    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest");
 
   if (PQstatus(conn) != CONNECTION_OK) die(conn, "Connection failed");
 
@@ -128,7 +130,7 @@ static void die(PGconn *conn, const char *msg) {
 
 int main(void) {
   PGconn *conn = PQconnectdb(
-    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest ");
+    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest");
 
   if (PQstatus(conn) != CONNECTION_OK) die(conn, "Connection failed");
 
@@ -193,7 +195,7 @@ static void die(PGconn *conn, const char *msg) {
 
 int main(void) {
   PGconn *conn = PQconnectdb(
-    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest ");
+    "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest");
 
   if (PQstatus(conn) != CONNECTION_OK) die(conn, "Connection failed");
 
@@ -248,7 +250,7 @@ int main(void) {
 int main() {
   try {
     std::string conninfo =
-      "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest ";
+      "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest";
 
     pqxx::connection c{conninfo};
     if (!c.is_open()) {
@@ -272,10 +274,16 @@ int main() {
 }
 ```
 
+You can compile with
+
+```sh
+c++ -std=c++17 -O2 cpp_pqxx_basic.cpp -o cpp_pqxx_basic $(pkg-config --cflags --libs libpqxx)
+```
+
 ### Prepared Statements
 
 ```cpp
-// cpp_pqxx_prepared.cpp (fixed)
+// cpp_pqxx_prepared.cpp
 #include <pqxx/pqxx>
 #include <iostream>
 #include <ctime>
@@ -338,7 +346,7 @@ int main() {
 int main() {
   try {
     pqxx::connection c{
-      "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest "
+      "host=127.0.0.1 port=8812 dbname=qdb user=admin password=quest"
     };
     pqxx::work tx{c};
 
@@ -370,7 +378,18 @@ int main() {
 }
 ```
 
----
+## Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+See our blog post for background and the companion repository for a minimal example:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
 
 ## Known Limitations with QuestDB
 

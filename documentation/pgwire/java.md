@@ -2,7 +2,7 @@
 title: Java PGWire Guide
 description:
   Java clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Java for querying data. 
+  protocol with Java for querying data.
 ---
 
 QuestDB is tested with the following Java clients:
@@ -1213,6 +1213,19 @@ LATEST ON is an efficient way to get the most recent values:
 SELECT *
 FROM trades LATEST ON timestamp PARTITIONED BY symbol
 ```
+
+## Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+See our blog post for background and the companion repository for a minimal example:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
 
 ## Troubleshooting
 

@@ -2,7 +2,7 @@
 title: JavaScript PGWire Guide
 description:
   JavaScript clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with JavaScript for querying data. 
+  protocol with JavaScript for querying data.
 ---
 
 QuestDB is tested with the following JavaScript clients:
@@ -134,7 +134,7 @@ queryData()
 ```
 
 :::note
-    **Note**: The `pg` client uses the system timezone by default. QuestDB always sends timestamp in UTC. 
+    **Note**: The `pg` client uses the system timezone by default. QuestDB always sends timestamp in UTC.
     To set the timezone to UTC, you can set the `TZ` environment variable before running your script.
     This is important for time-series data to ensure consistent timestamps.
 :::
@@ -349,7 +349,7 @@ app.get('/api/stats', async (req, res) => {
 
     try {
         const result = await pool.query(`
-      SELECT 
+      SELECT
         symbol,
         COUNT(*) as trade_count,
         AVG(price) as avg_price,
@@ -501,10 +501,10 @@ async function parameterizedQuery() {
 
         // Parameters are automatically sanitized
         const trades = await sql`
-      SELECT * FROM trades 
-      WHERE symbol = ${symbol} 
-        AND ts >= ${startDate} 
-      ORDER BY ts DESC 
+      SELECT * FROM trades
+      WHERE symbol = ${symbol}
+        AND ts >= ${startDate}
+      ORDER BY ts DESC
       LIMIT 10
     `
 
@@ -602,15 +602,15 @@ app.get('/api/trades', async (req, res) => {
 
         if (symbol) {
             trades = await sql`
-        SELECT * FROM trades 
-        WHERE symbol = ${symbol} 
-        ORDER BY ts DESC 
+        SELECT * FROM trades
+        WHERE symbol = ${symbol}
+        ORDER BY ts DESC
         LIMIT ${limit}
       `
         } else {
             trades = await sql`
-        SELECT * FROM trades 
-        ORDER BY ts DESC 
+        SELECT * FROM trades
+        ORDER BY ts DESC
         LIMIT ${limit}
       `
         }
@@ -628,7 +628,7 @@ app.get('/api/stats', async (req, res) => {
 
     try {
         const stats = await sql`
-      SELECT 
+      SELECT
         symbol,
         COUNT(*) as trade_count,
         AVG(price) as avg_price,
@@ -692,7 +692,7 @@ async function sampleByQuery() {
         await client.connect()
 
         const result = await client.query(`
-      SELECT 
+      SELECT
         ts,
         symbol,
         avg(price) as avg_price,
@@ -703,7 +703,7 @@ async function sampleByQuery() {
       SAMPLE BY 1h
     `)
         console.log(`Got ${result.rows.length} hourly samples`)
-    
+
         for (const row of result.rows) {
             console.log(`${row.ts} - ${row.symbol}: Avg: ${row.avg_price}, Range: ${row.min_price} - ${row.max_price}`)
         }
@@ -756,6 +756,18 @@ async function latestByQuery() {
 latestByQuery()
 ```
 
+## Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+See our blog post for background and the companion repository for a minimal example:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
 
 ## Troubleshooting
 
@@ -774,15 +786,15 @@ For query-related errors:
 
 1. Verify that the table you're querying exists
 2. Check the syntax of your SQL query
-3. Ensure that you're using the correct data types for parameters, this can be tricky with JavaScript where 
-   all numbers are floats. You may need to cast them explicitly in your SQL query. 
+3. Ensure that you're using the correct data types for parameters, this can be tricky with JavaScript where
+   all numbers are floats. You may need to cast them explicitly in your SQL query.
 
 ## Conclusion
 
 QuestDB's support for the PostgreSQL Wire Protocol allows you to use standard JavaScript PostgreSQL clients for querying
 time-series data. Both `pg` and `postgres` clients offer good performance and features for working with QuestDB.
 
-We recommend the `pg` client for querying. 
+We recommend the `pg` client for querying.
 For data ingestion, consider QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum
 throughput.
 
