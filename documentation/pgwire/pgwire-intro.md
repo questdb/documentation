@@ -58,3 +58,16 @@ The PostgreSQL wire protocol has different implementations and options. When you
 client library allows, prefer the Extended Query Protocol over the Simple Query Protocol. Additionally, for optimal
 performance and type fidelity, choose clients that support BINARY encoding for data transfer over TEXT encoding
 whenever possible. The specifics of how to configure this will vary by client library.
+
+
+### Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Many client libraries allow specifying **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is unavilable. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+For background and code samples in multiple languages, see:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Examples: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)

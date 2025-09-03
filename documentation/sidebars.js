@@ -165,6 +165,11 @@ module.exports = {
               type: "doc",
               label: "R",
             },
+            {
+              id: "pgwire/c-and-cpp",
+              type: "doc",
+              label: "C/C++",
+            },
           ],
         },
         "reference/sql/datatypes",

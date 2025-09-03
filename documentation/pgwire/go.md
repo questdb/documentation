@@ -2,7 +2,7 @@
 title: Go PGWire Guide
 description:
   Go clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Go for querying data. 
+  protocol with Go for querying data.
 ---
 
 QuestDB is tested with the following Go client:
@@ -87,23 +87,23 @@ import (
 func main() {
 	// Connection string
 	connString := "postgres://admin:quest@localhost:8812/qdb"
-	
+
 	// Create a context
 	ctx := context.Background()
-	
+
 	// Connect to QuestDB
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	// Verify connection
 	err = conn.Ping(ctx)
 	if err != nil {
 		log.Fatalf("Unable to ping database: %v", err)
 	}
-	
+
 	fmt.Println("Successfully connected to QuestDB!")
 }
 ```
@@ -166,24 +166,24 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	rows, err := conn.Query(ctx, "SELECT * FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		// Create a map to hold the row data
 		values, err := rows.Values()
 		if err != nil {
 			log.Fatalf("Error scanning row: %v", err)
 		}
-		
+
 		// Print the row data
 		fmt.Println(values)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
 	}
@@ -221,14 +221,14 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	// Execute a query
 	rows, err := conn.Query(ctx, "SELECT ts, symbol, price, amount FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
-	
+
 	// Collect results
 	var trades []Trade
 	for rows.Next() {
@@ -238,12 +238,12 @@ func main() {
 		}
 		trades = append(trades, t)
 	}
-	
+
 	// Check for errors from iterating over rows
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
 	}
-	
+
 	// Print trades
 	for _, t := range trades {
 		fmt.Printf("Timestamp: %s, Symbol: %s, Price: %.2f, Amount: %.6f\n",
@@ -412,14 +412,14 @@ func main() {
 
 	// SAMPLE BY query (time-based downsampling)
 	sampleByQuery := `
-		SELECT 
-			ts, 
-			symbol, 
-			avg(price) as avg_price, 
-			min(price) as min_price, 
-			max(price) as max_price 
-		FROM trades 
-		WHERE ts >= dateadd('d', -7, now()) 
+		SELECT
+			ts,
+			symbol,
+			avg(price) as avg_price,
+			min(price) as min_price,
+			max(price) as max_price
+		FROM trades
+		WHERE ts >= dateadd('d', -7, now())
 		SAMPLE BY 1h
 	`
 
@@ -519,10 +519,10 @@ func (c *QuestDBClient) Close() {
 // GetRecentTrades fetches recent trades for a given symbol
 func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limit int) ([]Trade, error) {
 	query := `
-		SELECT ts, symbol, price, amount 
-		FROM trades 
-		WHERE symbol = $1 
-		ORDER BY ts DESC 
+		SELECT ts, symbol, price, amount
+		FROM trades
+		WHERE symbol = $1
+		ORDER BY ts DESC
 		LIMIT $2
 	`
 
@@ -551,14 +551,14 @@ func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limi
 // GetSampledData fetches downsampled price data
 func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days int) ([]PriceSample, error) {
 	query := `
-		SELECT 
-			ts, 
-			symbol, 
-			avg(price) as avg_price, 
-			min(price) as min_price, 
-			max(price) as max_price 
-		FROM trades 
-		WHERE symbol = $1 AND ts >= dateadd('d', $2, now()) 
+		SELECT
+			ts,
+			symbol,
+			avg(price) as avg_price,
+			min(price) as min_price,
+			max(price) as max_price
+		FROM trades
+		WHERE symbol = $1 AND ts >= dateadd('d', $2, now())
 		SAMPLE BY 1h
 	`
 
@@ -841,6 +841,19 @@ LATEST ON is an efficient way to get the most recent values:
 SELECT *
 FROM trades LATEST ON timestamp PARTITION BY symbol
 ```
+
+## Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+See our blog post for background and the companion repository for a minimal example:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
 
 ## Troubleshooting
 
