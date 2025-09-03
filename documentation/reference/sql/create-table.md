@@ -369,6 +369,15 @@ CREATE TABLE trades (
 ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
+:::warning
+
+- The **index capacity** and
+  [**symbol capacity**](/docs/concept/symbol/#usage-of-symbols) are different
+  settings.
+- The index capacity value should not be changed, unless a user is aware of all
+  the implications.
+:::
+
 See the [Index concept](/docs/concept/indexes/#how-indexes-work) for more
 information about indexes.
 

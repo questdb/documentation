@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="893" height="123">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon>
+         <rect x="31" y="3" width="62" height="32" rx="10"></rect>
+         <rect x="29" y="1" width="62" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="39" y="21">ALTER</text>
+         <rect x="113" y="3" width="122" height="32" rx="10"></rect>
+         <rect x="111" y="1" width="122" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="121" y="21">MATERIALIZED</text>
+         <rect x="255" y="3" width="58" height="32" rx="10"></rect>
+         <rect x="253" y="1" width="58" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="263" y="21">VIEW</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#viewName" xlink:title="viewName">
+            <rect x="333" y="3" width="84" height="32"></rect>
+            <rect x="331" y="1" width="84" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="341" y="21">viewName</text></a><rect x="437" y="3" width="62" height="32" rx="10"></rect>
+         <rect x="435" y="1" width="62" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="445" y="21">ALTER</text>
+         <rect x="519" y="3" width="78" height="32" rx="10"></rect>
+         <rect x="517" y="1" width="78" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="527" y="21">COLUMN</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#columnName" xlink:title="columnName">
+            <rect x="617" y="3" width="102" height="32"></rect>
+            <rect x="615" y="1" width="102" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="625" y="21">columnName</text></a><rect x="739" y="3" width="48" height="32" rx="10"></rect>
+         <rect x="737" y="1" width="48" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="747" y="21">ADD</text>
+         <rect x="807" y="3" width="64" height="32" rx="10"></rect>
+         <rect x="805" y="1" width="64" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="815" y="21">INDEX</text>
+         <rect x="665" y="89" width="88" height="32" rx="10"></rect>
+         <rect x="663" y="87" width="88" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="673" y="107">CAPACITY</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#capacity" xlink:title="capacity">
+            <rect x="773" y="89" width="72" height="32"></rect>
+            <rect x="771" y="87" width="72" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="781" y="107">capacity</text></a><path class="line" d="m17 17 h2 m0 0 h10 m62 0 h10 m0 0 h10 m122 0 h10 m0 0 h10 m58 0 h10 m0 0 h10 m84 0 h10 m0 0 h10 m62 0 h10 m0 0 h10 m78 0 h10 m0 0 h10 m102 0 h10 m0 0 h10 m48 0 h10 m0 0 h10 m64 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-270 54 l2 0 m2 0 l2 0 m2 0 l2 0 m22 0 h10 m0 0 h190 m-220 0 h20 m200 0 h20 m-240 0 q10 0 10 10 m220 0 q0 -10 10 -10 m-230 10 v12 m220 0 v-12 m-220 12 q0 10 10 10 m200 0 q10 0 10 -10 m-210 10 h10 m88 0 h10 m0 0 h10 m72 0 h10 m23 -32 h-3"></path>
+         <polygon points="883 71 891 67 891 75"></polygon>
+         <polygon points="883 71 875 67 875 75"></polygon>
+</svg>

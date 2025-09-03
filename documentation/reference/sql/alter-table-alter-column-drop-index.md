@@ -1,20 +1,15 @@
 ---
 title: ALTER TABLE COLUMN DROP INDEX
 sidebar_label: DROP INDEX
-description: DROP INDEX SQL keyword reference documentation.
+description: DROP INDEX SQL keyword. Table reference documentation.
 ---
 
-Removes an existing index from a column of type [symbol](/docs/concept/symbol/).
+Removes an existing [index](/docs/concept/indexes/) from a column of type [symbol](/docs/concept/symbol/).
 
-:::note
-
-[Backup your database](/docs/operations/backup/) to avoid unintended data loss.
-
-:::
 
 ## Syntax
-
-![Flow chart showing the syntax of the ALTER TABLE with DROP INDEX keyword](/images/docs/diagrams/alterTableDropIndex.svg)
+![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
+![Flow chart showing the syntax of the ALTER TABLE with DROP INDEX keyword](/images/docs/diagrams/dropIndex.svg)
 
 Removing an index is an atomic, non-blocking, and non-waiting operation. Once
 the operation is completed, the SQL engine stops using the index for SQL

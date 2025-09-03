@@ -1,7 +1,7 @@
 ---
 title: ALTER TABLE COLUMN ADD INDEX
 sidebar_label: ADD INDEX
-description: ADD INDEX SQL keyword reference documentation.
+description: ADD INDEX SQL keyword. Table reference documentation.
 ---
 
 Indexes an existing [`symbol`](/docs/concept/symbol/) column.

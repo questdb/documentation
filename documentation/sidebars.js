@@ -184,13 +184,21 @@ module.exports = {
               items: [
                 {
                   type: "category",
-                  label: "ALTER COLUMN",
+                  label: "ALTER COLUMN (TABLE)",
                   items: [
                     "reference/sql/alter-table-alter-column-add-index",
                     "reference/sql/alter-table-alter-column-cache",
-                    "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-column-type",
+                    "reference/sql/alter-table-alter-column-drop-index",
                     "reference/sql/alter-table-change-symbol-capacity",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER COLUMN (VIEW)",
+                  items: [
+                    "reference/sql/alter-mat-view-alter-column-add-index",
+                    "reference/sql/alter-mat-view-alter-column-drop-index",
                   ],
                 },
                 {
@@ -205,29 +213,29 @@ module.exports = {
                     "reference/sql/alter-table-add-column",
                     "reference/sql/alter-table-attach-partition",
                     "reference/sql/alter-table-change-column-type",
-                    "reference/sql/alter-table-change-symbol-capacity",
-                    "reference/sql/alter-table-detach-partition",
+                    "reference/sql/alter-table-enable-deduplication",
                     "reference/sql/alter-table-disable-deduplication",
+                    "reference/sql/alter-table-detach-partition",
                     "reference/sql/alter-table-drop-column",
                     "reference/sql/alter-table-drop-partition",
-                    "reference/sql/alter-table-enable-deduplication",
                     "reference/sql/alter-table-rename-column",
                     "reference/sql/alter-table-resume-wal",
                     "reference/sql/alter-table-set-param",
-                    "reference/sql/alter-table-set-type",
                     "reference/sql/alter-table-set-ttl",
+                    "reference/sql/alter-table-set-type",
                     "reference/sql/alter-table-squash-partitions",
+                    "reference/sql/alter-table-change-symbol-capacity",
                   ],
                 },
                 {
                   type: "category",
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
-                    "reference/sql/alter-mat-view-change-symbol-capacity",
-                    "reference/sql/alter-mat-view-set-refresh-limit",
-                    "reference/sql/alter-mat-view-set-refresh",
-                    "reference/sql/alter-mat-view-set-ttl",
                     "reference/sql/alter-mat-view-resume-wal",
+                    "reference/sql/alter-mat-view-set-refresh",
+                    "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-ttl",
+                    "reference/sql/alter-mat-view-change-symbol-capacity",
                   ],
                 },
                 {
@@ -249,7 +257,6 @@ module.exports = {
               type: "category",
               label: "CREATE",
               items: [
-                "reference/sql/create-table",
                 {
                   id: "reference/sql/acl/create-group",
                   type: "doc",
@@ -261,6 +268,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
+                "reference/sql/create-table",
                 {
                   id: "reference/sql/acl/create-user",
                   type: "doc",
@@ -272,7 +280,6 @@ module.exports = {
               type: "category",
               label: "DROP",
               items: [
-                "reference/sql/drop",
                 {
                   id: "reference/sql/acl/drop-group",
                   type: "doc",
@@ -284,6 +291,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
+                "reference/sql/drop",
                 {
                   id: "reference/sql/acl/drop-user",
                   type: "doc",
@@ -291,12 +299,12 @@ module.exports = {
                 },
               ],
             },
-            "reference/sql/explain",
             {
               id: "reference/sql/acl/exit-service-account",
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            "reference/sql/explain",
             {
               type: "category",
               label: "GRANT",
@@ -316,12 +324,12 @@ module.exports = {
             "reference/sql/insert",
             "reference/sql/refresh-mat-view",
             "reference/sql/reindex",
-            "reference/sql/rename",
             {
               id: "reference/sql/acl/remove-user",
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            "reference/sql/rename",
             {
               type: "category",
               label: "REVOKE",
