@@ -389,7 +389,8 @@ For example, the Python client would be configured as outlined in the
 
 When sending data to a table that does not exist, the server will create the
 table automatically. This also applies to columns that do not exist. The server
-will use the first row of data to determine the column types.
+will use the first row of data to determine the column types.  Please note that table
+and column names must follow the QuestDB [naming rules](/docs/reference/sql/create-table/#table-name).
 
 If the table already exists, the server will validate that the columns match the
 existing table. If the columns do not match, the server will return a
