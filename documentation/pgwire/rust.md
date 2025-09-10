@@ -2,7 +2,7 @@
 title: Rust PGWire Guide
 description:
   Rust clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Rust for querying data. 
+  protocol with Rust for querying data.
 ---
 
 QuestDB is tested with the following Rust client:
@@ -93,7 +93,7 @@ use tokio_postgres::{NoTls, Error};
 async fn main() -> Result<(), Error> {
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     // Spawn a background task that keeps the connection alive for its entire lifetime
     // This task will terminate only when the connection closes
     tokio::spawn(async move {
@@ -101,14 +101,14 @@ async fn main() -> Result<(), Error> {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     // Use the client to execute a simple query
     let rows = client.query("SELECT version()", &[]).await?;
-    
+
     // Print the version
     let version: &str = rows[0].get(0);
     println!("QuestDB version: {}", version);
-    
+
     Ok(())
 }
 ```
@@ -128,24 +128,24 @@ async fn main() -> Result<(), Error> {
         .user("admin")
         .password("quest")
         .dbname("qdb");
-    
+
     // Connect to QuestDB
     let (client, connection) = config.connect(NoTls).await?;
-    
+
     // Spawn the connection handling task
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     // Execute a query
     let rows = client.query("SELECT version()", &[]).await?;
-    
+
     // Print the version
     let version: &str = rows[0].get(0);
     println!("QuestDB version: {}", version);
-    
+
     Ok(())
 }
 ```
@@ -235,7 +235,7 @@ async fn main() -> Result<(), Error> {
 ```
 
 Note: When binding parameters related to timestamps you must use `chrono::NaiveDateTime` to
-represent the timestamp in UTC. 
+represent the timestamp in UTC.
 
 ### Prepared Statements
 
@@ -579,6 +579,19 @@ LATEST ON is an efficient way to get the most recent values:
 SELECT * FROM trades
 LATEST ON timestamp PARTITION BY symbol;
 ```
+
+## Highly-Available Reads with QuestDB Enterprise
+
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
+succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+See our blog post for background and the companion repository for a minimal example:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
 
 ## Troubleshooting
 
