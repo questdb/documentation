@@ -134,7 +134,7 @@ Exporting via REST API is a synchronous process. For larger queries you might
 prefer to use the `COPY` method below
 :::
 
-Once exported, you can just use it from anywhere, including DuckDB. If you wanted
+Once exported, you can just use it from anywhere, including DuckDB, Pandas, or Polars. If you wanted
 to point DuckDB to the example file exported in the previous example, you could
 start DuckDB and execute:
 
@@ -150,9 +150,18 @@ can use the `COPY` command from the web console, from any pgwire-compliant clien
 or using the [`exec` endpoint](/docs/reference/api/rest/#exec---execute-queries) of the REST API.
 
 
+You can export a query:
+
+```
+    COPY (select * from market_data limit 3) TO 'market_data_parquet_table' WITH FORMAT PARQUET;
+```
+
+Or you can export a whole table:
+
 ```
     COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET;
 ```
+
 
 The output files (one per partition) will be under `$QUESTDB_ROOT_FOLDER/export/$TO_TABLE_NAME/`.
 
