@@ -8,21 +8,11 @@ description:
   COPY SQL or REST.
 ---
 
-:::warning
-At the moment, converting to Parquet, using any of the mechanisms described in this page, is work-in-progress and
-not recommended for production.
-
-We recommend extra caution and, especially in the case of in-place conversion, take a snapshot before starting any
-data conversion.
-
-Please read the list of caveats in the [in-place](#in-place-conversion) section to understand the risks.
-:::
-
 There are three ways of converting or exporting data to Parquet:
 
-* [In-place conversion](#in-place-conversion)
 * [Export query as file via REST](#export-query-as-file-via-rest)
 * [Export query as files via COPY](#export-query-as-files-via-copy)
+* [In-place conversion](#in-place-conversion)
 
 ## Data Compression
 
@@ -39,68 +29,6 @@ You can configure compression in `server.conf` with:
 ```
 
 You can override these defaults when [exporting via COPY](#export-query-as-files-via-copy).
-
-
-## In-place conversion
-
-In this case, the partition(s) remain under QuestDB's control, and data can still be queried as if it were in native
-format.
-
-:::note
-It is recommended to use QuestDB 9.0.1 or higher, as some features, like arrays on Parquet partitions, were not
-supported in previous versions.
-:::
-
-At its current state, in-place conversion of native partitions into Parquet has the following limitations:
-
-* We have been testing Parquet support for months, and we haven't experienced data corruption or data loss, but this is
-not guaranteed. It is strongly advised to back up first.
-* We have seen cases in which querying Parquet partitions leads to a database crash. This can happen if metadata in the
-table is different from metadata in the Parquet partitions, but it could also happen in other cases.
-* While converting data, writes to the partitions remain blocked.
-* After a partition has been converted to Parquet, it will not register any changes you send to that partition,
-including respecting any applicable TTL, unless you convert back to native.
-* Schema changes are not supported.
-* Some parallel queries are still not optimized for Parquet.
-* There is no compression by default (but it can be [enabled via config](#data-compression) values)
-
-For the reasons above, we recommend not using in-place conversion in production yet, unless you test extensively with
-the shape of the data and queries you will be running, and take frequent snapshots.
-
-All those caveats should disappear in the next few months, when we will announce it is ready for production.
-
-### Basics of In-place conversion
-
-Converting partitions from native format to Parquet, or from Parquet into native format, is done via `ALTER TABLE`. You
-need to pass a filter specifying the partitions to convert. The filter can be either a `WHERE` or a `LIST`, in the same
-way it is used for the [`DETACH` command](/docs/reference/sql/alter-table-detach-partition/).
-
-:::tip
-The active (most recent) partition will never be converted into Parquet, even if it matches the filter.
-:::
-
-Conversion is asynchronous, and can take a while to finish, depending on the number of partitions, on the partition size,
-on the compression being used, and on disk performance and general load of the server.
-
-To monitor how the conversion is going, you can issue a [`SHOW PARTITIONS`](/docs/reference/sql/show/#show-partitions)
-command. Partitions in the Parquet format will have the `isParquet` column set to `true` and will show the size on the
-`parquetFileSize` column.
-
-
-### Converting from Native Format into Parquet
-
-```
-ALTER TABLE trades CONVERT PARTITION TO PARQUET WHERE timestamp < '2025-08-31';
-```
-
-From this moment on, any changes sent to the affected partitions will be discarded.
-
-
-### Converting from Parquet into Native Format
-
-```
-ALTER TABLE trades CONVERT PARTITION TO NATIVE WHERE timestamp < '2025-08-31';
-```
 
 
 ## Export queries as files
@@ -184,3 +112,73 @@ However, you can override the compression individually for each export. For exam
 ```
 COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET COMPRESSION_CODEC LZ4_RAW;
 ```
+
+
+## In-place conversion
+
+:::warning
+At the moment, converting to Parquet in-place is work-in-progress and
+not recommended for production. We recommend caution and taking a snapshot before starting any
+in-place data conversion.
+:::
+
+
+When using in-place conversion, the partition(s) remain under QuestDB's control, and data can still be queried as if it
+were in native format.
+
+:::note
+It is recommended to use QuestDB 9.0.1 or higher, as some features, like arrays on Parquet partitions, were not
+supported in previous versions.
+:::
+
+At its current state, in-place conversion of native partitions into Parquet has the following limitations:
+
+* We have been testing Parquet support for months, and we haven't experienced data corruption or data loss, but this is
+not guaranteed. It is strongly advised to back up first.
+* We have seen cases in which querying Parquet partitions leads to a database crash. This can happen if metadata in the
+table is different from metadata in the Parquet partitions, but it could also happen in other cases.
+* While converting data, writes to the partitions remain blocked.
+* After a partition has been converted to Parquet, it will not register any changes you send to that partition,
+including respecting any applicable TTL, unless you convert back to native.
+* Schema changes are not supported.
+* Some parallel queries are still not optimized for Parquet.
+* There is no compression by default (but it can be [enabled via config](#data-compression) values)
+
+For the reasons above, we recommend not using in-place conversion in production yet, unless you test extensively with
+the shape of the data and queries you will be running, and take frequent snapshots.
+
+All those caveats should disappear in the next few months, when we will announce it is ready for production.
+
+### Basics of In-place conversion
+
+Converting partitions from native format to Parquet, or from Parquet into native format, is done via `ALTER TABLE`. You
+need to pass a filter specifying the partitions to convert. The filter can be either a `WHERE` or a `LIST`, in the same
+way it is used for the [`DETACH` command](/docs/reference/sql/alter-table-detach-partition/).
+
+:::tip
+The active (most recent) partition will never be converted into Parquet, even if it matches the filter.
+:::
+
+Conversion is asynchronous, and can take a while to finish, depending on the number of partitions, on the partition size,
+on the compression being used, and on disk performance and general load of the server.
+
+To monitor how the conversion is going, you can issue a [`SHOW PARTITIONS`](/docs/reference/sql/show/#show-partitions)
+command. Partitions in the Parquet format will have the `isParquet` column set to `true` and will show the size on the
+`parquetFileSize` column.
+
+
+### Converting from Native Format into Parquet
+
+```
+ALTER TABLE trades CONVERT PARTITION TO PARQUET WHERE timestamp < '2025-08-31';
+```
+
+From this moment on, any changes sent to the affected partitions will be discarded.
+
+
+### Converting from Parquet into Native Format
+
+```
+ALTER TABLE trades CONVERT PARTITION TO NATIVE WHERE timestamp < '2025-08-31';
+```
+
