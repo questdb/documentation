@@ -22,10 +22,10 @@ over QuestDB’s native format is its built-in compression.
 You can configure compression in `server.conf` with:
 
 ```
-       # zstd
-        cairo.partition.encoder.parquet.compression.codec=6
-        # level is from 1 to 22, 1 is fastest
-        cairo.partition.encoder.parquet.compression.level=10
+# zstd
+cairo.partition.encoder.parquet.compression.codec=6
+# level is from 1 to 22, 1 is fastest
+cairo.partition.encoder.parquet.compression.level=10
 ```
 
 You can override these defaults when [exporting via COPY](#export-query-as-files-via-copy).
@@ -93,12 +93,19 @@ Or you can export a whole table:
 
 The output files (one per partition) will be under `$QUESTDB_ROOT_FOLDER/export/$TO_TABLE_NAME/`.
 
-The `COPY` command will return immediately, but the export happens in the background.
+The `COPY` command will return immediately, but the export happens in the background. The command will return an export
+id string:
+
+| id               |
+| ---------------- |
+| 45ba24e5ba338099 |
+
 If you want to monitor the export process, you can issue a call like this:
 
 ```
 SELECT * FROM 'sys.copy_export_log' WHERE id = '45ba24e5ba338099';
 ```
+
 
 While it is running, export can be cancelled with:
 
