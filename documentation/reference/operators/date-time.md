@@ -208,10 +208,9 @@ If we adjust the interval to be not in range, we get no result:
 
 ```questdb-sql title="Check if timestamp is in interval failure" demo
 SELECT true as is_in_interval FROM trades
-WHERE '2022-05-17T00:00:00Z'::timestamp IN interval('2022', '2023')
+WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2022', '2023')
 LIMIT -1;
 ```
 
 | is_in_interval |
 | -------------- |
-|                |
