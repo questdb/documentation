@@ -57,9 +57,9 @@ We recommend partitioning tables to benefit from the following advantages:
   partitions.
 - Separating data files physically. This makes it easy to implement file
   retention policies or extract certain intervals.
-- Enables out-of-order indexing. From QuestDB 7.2, heavily out-of-order commits
-  can [split the partitions](#splitting-and-squashing-time-partitions) into
-  parts to reduce
+- Enables out-of-order indexing. Heavily out-of-order commits can
+  [split the partitions](#splitting-and-squashing-time-partitions) into parts to
+  reduce
   [write amplification](/docs/operations/capacity-planning/#write-amplification).
 
 ## Checking time partition information
@@ -76,10 +76,11 @@ information of a table:
 
 ## Splitting and squashing time partitions
 
-From QuestDB 7.2, heavily out-of-order commits can split the partitions into
-parts to reduce write amplification. When data is merged into an existing
-partition as a result of an out-of-order insert, the partition will be split
-into two parts: the prefix sub-partition and the suffix sub-partition.
+Heavily out-of-order commits, i.e. commits that contain newer and older
+timestamps, can split the partitions into parts to reduce write amplification.
+When data is merged into an existing partition as a result of an out-of-order
+insert, the partition will be split into two parts: the prefix sub-partition and
+the suffix sub-partition.
 
 A partition split happens when both of the following are true:
 
@@ -122,8 +123,7 @@ CREATE TABLE x AS (
     - x j,
     rnd_str(5, 16, 2) as str,
     timestamp_sequence('2023-02-04T00', 60 * 1000L) ts
-  FROM
-    long_sequence(60 * 23 * 2 * 1000)
+  FROM long_sequence(60 * 23 * 2 * 1000)
 ) timestamp (ts) PARTITION BY DAY WAL;
 ```
 
@@ -139,11 +139,7 @@ SHOW PARTITIONS FROM x;
 Inserting an out-of-order row:
 
 ```questdb-sql
-INSERT INTO
-  x(ts)
-VALUES
-  ('2023-02-05T21');
-
+INSERT INTO x (ts) VALUES ('2023-02-05T21');
 
 SHOW PARTITIONS FROM x;
 ```
