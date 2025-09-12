@@ -509,6 +509,7 @@ module.exports = {
           type: "doc",
           customProps: { tag: "Enterprise" },
         },
+        "guides/export-parquet",
         "guides/replication-tuning",
         "reference/api/java-embedded",
         "guides/modifying-data",
