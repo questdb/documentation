@@ -214,4 +214,4 @@ LIMIT -1;
 
 | is_in_interval |
 | -------------- |
-|                |
+| true           |
