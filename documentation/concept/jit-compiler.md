@@ -22,9 +22,8 @@ our plans for improving it in future.
 
 The types of queries that are eligible for performance improvements via JIT
 compilation are those which contain `WHERE` clauses. Here are some examples
-which are supported based on the `cpu-only` data set from the
-[Time Series Benchmark Suite](https://github.com/timescale/tsbs/blob/master/docs/questdb.md)
-use case:
+you can execute on the [QuestDB Public Demo Datasets](https://demo.questdb.io):
+
 
 ```questdb-sql title="basic filtering in WHERE clauses with JIT" demo
 -- basic filtering in WHERE clauses
