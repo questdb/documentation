@@ -26,14 +26,17 @@ which are supported based on the `cpu-only` data set from the
 [Time Series Benchmark Suite](https://github.com/timescale/tsbs/blob/master/docs/questdb.md)
 use case:
 
-```questdb-sql
+```questdb-sql title="basic filtering in WHERE clauses with JIT" demo
 -- basic filtering in WHERE clauses
-SELECT count(), max(usage_user) FROM cpu WHERE usage_user > 75;
+SELECT count(), max(bid_price) FROM core_price
+WHERE
+timestamp in today() AND bid_price > 1 AND Symbol = 'EURUSD';
+```
 
+```questdb-sql title="Filtering and aggregating with JIT" demo
 -- sub-queries
-SELECT * FROM cpu
-WHERE usage_user > 75
-AND (region = 'us-west-1' OR region = 'us-east-1');
+EXPLAIN SELECT symbol, count(), max(bid_price) FROM core_price
+WHERE timestamp in today() AND bid_price > 1;
 ```
 
 ## JIT compiler usage
