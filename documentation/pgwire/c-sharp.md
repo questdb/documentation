@@ -773,7 +773,7 @@ SELECT timestamp,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
@@ -784,7 +784,7 @@ LATEST ON is an efficient way to get the most recent values:
 SELECT *
 FROM trades
 WHERE timestamp IN today()
-LATEST ON timestamp PARTITION BY symbol
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ## Troubleshooting
