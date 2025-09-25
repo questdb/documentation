@@ -2,7 +2,7 @@
 title: .NET PGWire Guide
 description:
   .NET/C# clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with C# for querying data. 
+  protocol with C# for querying data.
 ---
 
 QuestDB is tested with the following C# client:
@@ -95,19 +95,19 @@ namespace QuestDBExample
     class Program
     {
         static async Task Main(string[] args)
-        {   
+        {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             // Connection string with required ServerCompatibilityMode=NoTypeLoading
-            string connectionString = 
+            string connectionString =
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
-                
+
                 Console.WriteLine("Connected to QuestDB successfully!");
-                
+
                 await connection.CloseAsync();
             }
             catch (Exception ex)
@@ -140,20 +140,20 @@ namespace QuestDBExample
         static async Task Main(string[] args)
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-            string connectionString = 
+            string connectionString =
                "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                "ServerCompatibilityMode=NoTypeLoading;";
-            
+
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
-                
-                string sql = "SELECT symbol, price, amount, ts FROM trades LIMIT 10";
+
+                string sql = "SELECT symbol, price, amount, timestamp FROM trades LIMIT 10";
                 await using var command = new NpgsqlCommand(sql, connection);
-                
+
                 await using var reader = await command.ExecuteReaderAsync();
-                
+
                 var columns = new string[reader.FieldCount];
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
@@ -161,16 +161,16 @@ namespace QuestDBExample
                     Console.Write($"{columns[i]}\t");
                 }
                 Console.WriteLine();
-                
+
                 while (await reader.ReadAsync())
                 {
-                    
+
                     var symbol = reader.GetString(0);
                     var price = reader.GetDouble(1);
                     var amount = reader.GetDouble(2);
                     // Get the DateTime and specify it as UTC since we know QuestDB timestamps are in UTC
                     DateTime dateTime = DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc);
-                    
+
                     Console.Write($"{symbol}\t{price}\t{amount}\t{dateTime}\t\n");
                 }
             }
@@ -198,40 +198,40 @@ namespace QuestDBExample
         static async Task Main(string[] args)
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-            string connectionString = 
+            string connectionString =
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
-            
+
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
-                
+
                 string symbol = "BTC-USD";
                 DateTime startTime = DateTime.UtcNow.AddDays(-7000); // 7 days ago
-                
+
                 string sql = @"
-                    SELECT * 
-                    FROM trades 
-                    WHERE symbol = @symbol AND ts >= @startTime 
-                    ORDER BY ts DESC 
+                    SELECT *
+                    FROM trades
+                    WHERE symbol = @symbol AND timestamp >= @startTime
+                    ORDER BY timestamp DESC
                     LIMIT 10";
-                
+
                 await using var command = new NpgsqlCommand(sql, connection);
-                
+
                 command.Parameters.AddWithValue("@symbol", symbol);
                 command.Parameters.AddWithValue("@startTime", startTime);
-                
+
                 await using var reader = await command.ExecuteReaderAsync();
-                
+
                 while (await reader.ReadAsync())
                 {
-                    DateTime timestamp = (DateTime)reader["ts"];
+                    DateTime timestamp = (DateTime)reader["timestamp"];
                     timestamp = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
-                    
+
                     string tradingSymbol = reader["symbol"].ToString();
                     double price = reader.GetDouble(reader.GetOrdinal("price"));
-                    
+
                     Console.WriteLine($"Timestamp: {timestamp}, Symbol: {tradingSymbol}, Price: {price:F2}");
                 }
             }
@@ -259,11 +259,11 @@ namespace QuestDBExample
         static async Task Main(string[] args)
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-            string connectionString = 
+            string connectionString =
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;" +
                 "Maximum Pool Size=20;Minimum Pool Size=1;Connection Lifetime=15;";
-            
+
             try
             {
                 // Simulate multiple concurrent connections
@@ -275,19 +275,19 @@ namespace QuestDBExample
                     {
                         await using var connection = new NpgsqlConnection(connectionString);
                         await connection.OpenAsync();
-                        
+
                         Console.WriteLine($"Connection {connectionId} opened");
-                        
+
                         // Simulate some work
                         await Task.Delay(1000);
-                        
+
                         await using var cmd = new NpgsqlCommand("SELECT 1", connection);
                         int result = (int)await cmd.ExecuteScalarAsync();
-                        
+
                         Console.WriteLine($"Connection {connectionId} executed query with result: {result}");
                     });
                 }
-                
+
                 await Task.WhenAll(tasks);
                 Console.WriteLine("All connections have been processed");
             }
@@ -314,55 +314,55 @@ namespace QuestDBExample
         static async Task Main(string[] args)
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-            string connectionString = 
+            string connectionString =
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
-            
+
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
-                
+
                 // SAMPLE BY query (time-based downsampling)
                 string sampleByQuery = @"
-                    SELECT 
-                        ts, 
-                        symbol, 
-                        avg(price) as avg_price, 
-                        min(price) as min_price, 
-                        max(price) as max_price 
-                    FROM trades 
-                    WHERE ts >= dateadd('d', -7000, now()) 
+                    SELECT
+                        timestamp,
+                        symbol,
+                        avg(price) as avg_price,
+                        min(price) as min_price,
+                        max(price) as max_price
+                    FROM trades
+                    WHERE timestamp >= dateadd('d', -7000, now())
                     SAMPLE BY 1h";
-                
+
                 Console.WriteLine("Executing SAMPLE BY query...");
                 await using (var cmd1 = new NpgsqlCommand(sampleByQuery, connection))
                 {
                     await using var reader = await cmd1.ExecuteReaderAsync();
-                    
+
                     while (await reader.ReadAsync())
                     {
-                        Console.WriteLine($"Time: {reader["ts"]}, " +
+                        Console.WriteLine($"Time: {reader["timestamp"]}, " +
                                          $"Symbol: {reader["symbol"]}, " +
                                          $"Avg Price: {reader.GetDouble(reader.GetOrdinal("avg_price")):F2}, " +
                                          $"Range: {reader.GetDouble(reader.GetOrdinal("min_price")):F2} - " +
                                          $"{reader.GetDouble(reader.GetOrdinal("max_price")):F2}");
                     }
                 }
-                
+
                 // LATEST ON query (last value per group)
-                string latestByQuery = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
-                
+                string latestByQuery = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
+
                 Console.WriteLine("\nExecuting LATEST ON query...");
                 await using (var cmd2 = new NpgsqlCommand(latestByQuery, connection))
                 {
                     await using var reader = await cmd2.ExecuteReaderAsync();
-                    
+
                     while (await reader.ReadAsync())
                     {
                         Console.WriteLine($"Symbol: {reader["symbol"]}, " +
                                          $"Latest Price: {reader.GetDouble(reader.GetOrdinal("price")):F2} " +
-                                         $"at {reader["ts"]}");
+                                         $"at {reader["timestamp"]}");
                     }
                 }
             }
@@ -392,40 +392,40 @@ namespace QuestDBAspNetCoreExample
         public double Price { get; set; }
         public double Amount { get; set; }
     }
-    
+
     public class QuestDBService
     {
         private readonly string _connectionString;
-        
+
         public QuestDBService(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("QuestDB");
         }
-        
+
         public async Task<IEnumerable<Trade>> GetRecentTradesAsync(string symbol = null, int limit = 10)
         {
             var trades = new List<Trade>();
-            
+
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
-            
+
             string sql;
             NpgsqlCommand command;
-            
+
             if (string.IsNullOrEmpty(symbol))
             {
-                sql = "SELECT ts, symbol, price, amount FROM trades ORDER BY ts DESC LIMIT @limit";
+                sql = "SELECT timestamp, symbol, price, amount FROM trades ORDER BY timestamp DESC LIMIT @limit";
                 command = new NpgsqlCommand(sql, connection);
                 command.Parameters.AddWithValue("@limit", limit);
             }
             else
             {
-                sql = "SELECT ts, symbol, price, amount FROM trades WHERE symbol = @symbol ORDER BY ts DESC LIMIT @limit";
+                sql = "SELECT timestamp, symbol, price, amount FROM trades WHERE symbol = @symbol ORDER BY timestamp DESC LIMIT @limit";
                 command = new NpgsqlCommand(sql, connection);
                 command.Parameters.AddWithValue("@symbol", symbol);
                 command.Parameters.AddWithValue("@limit", limit);
             }
-            
+
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -437,44 +437,44 @@ namespace QuestDBAspNetCoreExample
                     Amount = reader.GetDouble(3)
                 });
             }
-            
+
             return trades;
         }
-        
+
         public async Task<IEnumerable<Trade>> GetLatestTradesAsync()
         {
             var trades = new List<Trade>();
-            
+
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
-            
-            string sql = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+
+            string sql = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
             await using var command = new NpgsqlCommand(sql, connection);
-            
+
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
                 trades.Add(new Trade
                 {
-                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("ts")), DateTimeKind.Utc),
+                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("timestamp")), DateTimeKind.Utc),
                     Symbol = reader.GetString(reader.GetOrdinal("symbol")),
                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                     Amount = reader.GetDouble(reader.GetOrdinal("amount"))
                 });
             }
-            
+
             return trades;
         }
-        
+
         public async Task<IEnumerable<dynamic>> GetTradeStatsAsync(int days = 7)
         {
             var stats = new List<dynamic>();
-            
+
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
-            
+
             string sql = @"
-                SELECT 
+                SELECT
                     symbol,
                     count(*) as trade_count,
                     avg(price) as avg_price,
@@ -482,13 +482,13 @@ namespace QuestDBAspNetCoreExample
                     max(price) as max_price,
                     sum(amount) as total_volume
                 FROM trades
-                WHERE ts >= dateadd('d', @days, now())
+                WHERE timestamp >= dateadd('d', @days, now())
                 GROUP BY symbol
                 ORDER BY total_volume DESC";
-                
+
             await using var command = new NpgsqlCommand(sql, connection);
             command.Parameters.AddWithValue("@days", -days);
-            
+
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -502,28 +502,28 @@ namespace QuestDBAspNetCoreExample
                     TotalVolume = reader.GetDouble(5)
                 });
             }
-            
+
             return stats;
         }
     }
-    
+
     public class Startup
     {
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
         }
-        
+
         public IConfiguration Configuration { get; }
-        
+
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<QuestDBService>();
-            
+
             services.AddControllers();
             services.AddSwaggerGen();
         }
-        
+
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
@@ -532,7 +532,7 @@ namespace QuestDBAspNetCoreExample
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-            
+
             app.UseRouting();
             app.UseEndpoints(endpoints =>
             {
@@ -540,32 +540,32 @@ namespace QuestDBAspNetCoreExample
             });
         }
     }
-    
+
     [ApiController]
     [Route("api/[controller]")]
     public class TradesController : ControllerBase
     {
         private readonly QuestDBService _questDBService;
-        
+
         public TradesController(QuestDBService questDBService)
         {
             _questDBService = questDBService;
         }
-        
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Trade>>> GetRecentTrades([FromQuery] string symbol = null, [FromQuery] int limit = 10)
         {
             var trades = await _questDBService.GetRecentTradesAsync(symbol, limit);
             return Ok(trades);
         }
-        
+
         [HttpGet("latest")]
         public async Task<ActionResult<IEnumerable<Trade>>> GetLatestTrades()
         {
             var trades = await _questDBService.GetLatestTradesAsync();
             return Ok(trades);
         }
-        
+
         [HttpGet("stats")]
         public async Task<ActionResult> GetTradeStats([FromQuery] int days = 7)
         {
@@ -573,7 +573,7 @@ namespace QuestDBAspNetCoreExample
             return Ok(stats);
         }
     }
-    
+
     public class Program
     {
         public static void Main(string[] args)
@@ -581,7 +581,7 @@ namespace QuestDBAspNetCoreExample
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             CreateHostBuilder(args).Build().Run();
         }
-        
+
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
@@ -656,26 +656,26 @@ namespace QuestDBDapperExample
         public double MinPrice { get; set; }
         public double MaxPrice { get; set; }
     }
-    
+
     class Program
     {
         static async Task Main(string[] args)
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-            string connectionString = 
+            string connectionString =
                 "Host=localhost;Port=8812;Username=admin;Password=quest;Database=qdb;" +
                 "ServerCompatibilityMode=NoTypeLoading;";
-            
+
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
-                
+
                 // Basic query with Dapper
                 var trades = await connection.QueryAsync<Trade>(
-                    "SELECT ts AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
+                    "SELECT timestamp AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
                     "FROM trades LIMIT 10");
-                
+
                 Console.WriteLine($"Retrieved {trades.Count()} trades:");
                 foreach (var trade in trades)
                 {
@@ -684,19 +684,19 @@ namespace QuestDBDapperExample
                                      $"Price: {trade.Price:F2}, " +
                                      $"Amount: {trade.Amount:F4}");
                 }
-                
+
                 // Parameterized query
                 string symbol = "BTC-USD";
                 DateTime startTime = DateTime.UtcNow.AddDays(-7000);
-                
+
                 var filteredTrades = await connection.QueryAsync<Trade>(
-                    "SELECT ts AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
+                    "SELECT timestamp AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
                     "FROM trades " +
-                    "WHERE symbol = @Symbol AND ts >= @StartTime " +
-                    "ORDER BY ts DESC " +
+                    "WHERE symbol = @Symbol AND timestamp >= @StartTime " +
+                    "ORDER BY timestamp DESC " +
                     "LIMIT 10",
                     new { Symbol = symbol, StartTime = startTime });
-                
+
                 Console.WriteLine($"\nRetrieved {filteredTrades.Count()} filtered trades for {symbol}:");
                 foreach (var trade in filteredTrades)
                 {
@@ -704,19 +704,19 @@ namespace QuestDBDapperExample
                                      $"Price: {trade.Price:F2}, " +
                                      $"Amount: {trade.Amount:F4}");
                 }
-                
+
                 // Time-series query with SAMPLE BY
                 var timeSeriesData = await connection.QueryAsync<TimeSeriesPoint>(
                     "SELECT " +
-                    "   ts AS Timestamp, " +
+                    "   timestamp AS Timestamp, " +
                     "   symbol AS Symbol, " +
                     "   avg(price) AS AvgPrice, " +
                     "   min(price) AS MinPrice, " +
                     "   max(price) AS MaxPrice " +
                     "FROM trades " +
-                    "WHERE ts >= dateadd('d', -10000, now()) " +
+                    "WHERE timestamp >= dateadd('d', -10000, now()) " +
                     "SAMPLE BY 1h");
-                
+
                 Console.WriteLine($"\nRetrieved {timeSeriesData.Count()} time series points:");
                 foreach (var point in timeSeriesData)
                 {
@@ -766,23 +766,25 @@ QuestDB provides specialized time-series functions that can be used with Npgsql:
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol
 ```
 
 ## Troubleshooting
