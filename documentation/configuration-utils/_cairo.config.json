@@ -239,10 +239,6 @@
     "default": "64",
     "description": "Size of AnalyticColumn pool in SqlParser."
   },
-  "cairo.sql.create.table.model.pool.capacity": {
-    "default": "16",
-    "description": "Size of CreateTableModel pool in SqlParser."
-  },
   "cairo.sql.create.table.model.batch.size": {
     "default": "1000000",
     "description": "Batch size for non-atomic CREATE AS SELECT statements."
