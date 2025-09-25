@@ -303,10 +303,6 @@
     "default": "8",
     "description": "Sets the max memory pages for storing bind variable values for JIT compiled filter."
   },
-  "cairo.sql.jit.rows.threshold": {
-    "default": "1M",
-    "description": "Sets minimum number of rows to shrink filtered rows memory after query execution."
-  },
   "cairo.sql.jit.page.address.cache.threshold": {
     "default": "1M",
     "description": "Sets minimum cache size to shrink page address cache after query execution."
