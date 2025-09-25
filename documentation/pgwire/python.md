@@ -2,7 +2,7 @@
 title: Python PGWire Guide
 description:
   Python clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Python for querying data. 
+  protocol with Python for querying data.
 ---
 
 QuestDB is tested with the following Python clients:
@@ -231,11 +231,11 @@ async def connection_pool_example():
         min_size=5,
         max_size=20
     )
-    
+
     async with pool.acquire() as conn:
         result = await conn.fetch("SELECT * FROM trades LIMIT 10")
         print(f"Fetched {len(result)} rows")
-    
+
     await pool.close()
 
 # Set the timezone to UTC
@@ -264,12 +264,12 @@ async def parameterized_query():
         password='quest',
         database='qdb'
     )
-    
+
     end_time = datetime.now()
     start_time = end_time - timedelta(days=7)
-    
+
     rows = await conn.fetch("""
-        SELECT 
+        SELECT
             symbol,
             avg(price) as avg_price,
             min(price) as min_price,
@@ -278,11 +278,11 @@ async def parameterized_query():
         WHERE ts >= $1 AND ts <= $2
         GROUP BY symbol
     """, start_time, end_time)
-    
+
     print(f"Found {len(rows)} symbols")
     for row in rows:
         print(f"Symbol: {row['symbol']}, Avg Price: {row['avg_price']:.2f}")
-    
+
     await conn.close()
 
 # Set the timezone to UTC
@@ -397,7 +397,7 @@ async def batch_insert_l3_order_book_arrays():
 
     # Workaround for asyncpg using introspection to determine array types.
     # The introspection query uses a construct that is not supported by QuestDB.
-    # This is a temporary workaround before this PR or its equivalent is merged to asyncpg: 
+    # This is a temporary workaround before this PR or its equivalent is merged to asyncpg:
     # https://github.com/MagicStack/asyncpg/pull/1260
     arrays = [{
         'oid': 1022,
@@ -709,7 +709,7 @@ offers a more performant way to do so compared to inserting row by row with exec
 
 :::tip
 For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/)
-instead of PGWire. PGWire should primarily be used for querying data in QuestDB. 
+instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
 
 If you cannot use ILP for some reason, you should prefer [asyncpg](#inserting-arrays) over psycopg3 for performance
 reasons. We found that asyncpg is significantly faster than psycopg3 when inserting batches of data including arrays.
@@ -897,13 +897,13 @@ conn.autocommit = True
 try:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM trades LIMIT 10")
-        
+
         rows = cur.fetchall()
         print(f"Fetched {len(rows)} rows")
-        
+
         for row in rows:
             print(f"Timestamp: {row[0]}, Symbol: {row[1]}, Price: {row[2]}")
-        
+
         # Fetch one row at a time
         cur.execute("SELECT * FROM trades LIMIT 5")
         print("\nFetching one row at a time:")
@@ -911,7 +911,7 @@ try:
         while row:
             print(row)
             row = cur.fetchone()
-        
+
         # Fetch many rows at a time
         cur.execute("SELECT * FROM trades LIMIT 100")
         print("\nFetching 10 rows at a time:")
@@ -1140,25 +1140,29 @@ For optimal query performance with QuestDB:
 
 QuestDB provides specialized time-series functions that work with all PGWire clients:
 
-```
-# Example time-series query patterns
+### SAMPLE BY Queries
 
-# 1. Sample by query (works with all clients)
-"""
-SELECT 
-    ts,
-    avg(price) as avg_value
+SAMPLE BY is used for time-based downsampling:
+
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
+       symbol,
+       avg(price) as avg_price,
+       min(price) as min_price,
+       max(price) as max_price
 FROM trades
-WHERE timestamp >= '2020-01-01'
-SAMPLE BY 1h;
-"""
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
+```
 
-# 2. Latest on query (efficient way to get most recent values)
-"""
-SELECT * FROM trades
+### LATEST ON Queries
+
+LATEST ON is an efficient way to get the most recent values:
+
+```questdb-sql title="LATEST Rows Per Symbol" demo
+SELECT *
+FROM trades
+WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
-"""
-
 ```
 
 ## Conclusion
