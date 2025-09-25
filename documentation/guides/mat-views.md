@@ -339,7 +339,7 @@ This takes several seconds to execute.
 Yet if we query the materialized view instead:
 
 ```questdb-sql title="OHLC materialized view unbounded" demo
-trades_OHLC_15m;
+SELECT * FROM trades_OHLC_15m;
 ```
 
 This returns in milliseconds, since the database only has to respond with data,
@@ -379,7 +379,7 @@ Calculating the OHLC for a single day takes only `15ms`.
 We can get the same data using the materialized view:
 
 ```questdb-sql title="OHLC materialized view for yesterday" demo
-trades_OHLC_15m
+SELECT * FROM trades_OHLC_15m
 WHERE timestamp IN yesterday()
 ORDER BY timestamp, symbol;
 ```
@@ -426,7 +426,7 @@ data, just to find the `B` entry.
 But materialized views offer a solution to this performance issue too!
 
 ```questdb-sql title="LATEST ON on demo trades" demo
-trades LATEST ON timestamp PARTITION BY symbol;
+SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol;
 ```
 
 | symbol    | side | price      | amount | timestamp                   |
@@ -475,7 +475,7 @@ If we were to take a `LATEST ON` query for a single day, we would therefore
 expect up to `84` rows (`42` buys, `42` sells):
 
 ```questdb-sql title="yesterday() LATEST ON" demo
-(trades WHERE timestamp IN yesterday())
+(SELECT * FROM trades WHERE timestamp IN yesterday())
 LATEST ON timestamp PARTITION BY symbol, side
 ORDER BY symbol, side, timestamp;
 ```
@@ -562,7 +562,7 @@ SAMPLE BY 1d;
 You can try this view out on our demo:
 
 ```questdb-sql title="trades_latest_1d" demo
-trades_latest_1d;
+SELECT * FROM trades_latest_1d;
 ```
 
 Then, you can query this 'per-day LATEST ON' view to quickly calculate the
@@ -624,7 +624,7 @@ data.
 
 You can monitor refresh status using the `materialized_views()` system function:
 
-```questdb-sql title="Listing all materialized views"
+```questdb-sql title="Listing all materialized views" demo
 SELECT
   view_name,
   last_refresh_start_timestamp,
@@ -648,7 +648,7 @@ fully up-to-date.
 
 If a materialized view becomes invalid, you can check its status:
 
-```questdb-sql title="Checking view status"
+```questdb-sql title="Checking view status" demo
 SELECT
   view_name,
   base_table_name,
