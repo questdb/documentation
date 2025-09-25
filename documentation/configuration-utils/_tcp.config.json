@@ -64,10 +64,6 @@
     "default": "32768",
     "description": "Maximum size of any measurement."
   },
-  "line.tcp.writer.queue.size": {
-    "default": "128",
-    "description": "Size of the queue between network I/O and writer jobs. Each queue entry represents a measurement."
-  },
   "line.tcp.writer.worker.count": {
     "default": "",
     "description": "Number of dedicated I/O worker threads assigned to write data to tables. When `0`, the writer jobs will use the shared pool."
