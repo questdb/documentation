@@ -49,7 +49,7 @@ symbols by one hour buckets.
 ```questdb-sql title="SAMPLE BY one month buckets" demo
 SELECT timestamp, symbol, sum(price) FROM trades
 WHERE timestamp in today()
-SAMPLE BY 1h
+SAMPLE BY 1h;
 ```
 
 
@@ -109,5 +109,5 @@ smaller, more readable query, without unnecessary repetitive aggregations.
   SELECT symbol, side, sum(price) as total_price
   FROM trades WHERE timestamp IN today()
 )
-WHERE total_price > 10_000_000;;
+WHERE total_price > 10_000_000;
 ```
