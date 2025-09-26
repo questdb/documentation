@@ -116,7 +116,7 @@ detached.
 
 For example, Let's consider the following table `x`:
 
-```questdb-sql
+```questdb-sql title="Create Demo Table"
 CREATE TABLE x AS (
   SELECT
     cast(x as int) i,
@@ -127,7 +127,7 @@ CREATE TABLE x AS (
 ) timestamp (ts) PARTITION BY DAY WAL;
 ```
 
-```questdb-sql
+```questdb-sql title="Show Partitions from Demo Table"
 SHOW PARTITIONS FROM x;
 ```
 
@@ -138,7 +138,7 @@ SHOW PARTITIONS FROM x;
 
 Inserting an out-of-order row:
 
-```questdb-sql
+```questdb-sql title="Insert Demo Rows"
 INSERT INTO x (ts) VALUES ('2023-02-05T21');
 
 SHOW PARTITIONS FROM x;
@@ -152,7 +152,7 @@ SHOW PARTITIONS FROM x;
 
 To merge the new partition part back to the main partition for downgrading:
 
-```questdb-sql
+```questdb-sql title="Squash Partitions"
 ALTER TABLE x SQUASH PARTITIONS;
 
 SHOW PARTITIONS FROM x;
