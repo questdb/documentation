@@ -239,10 +239,6 @@
     "default": "64",
     "description": "Size of AnalyticColumn pool in SqlParser."
   },
-  "cairo.sql.create.table.model.pool.capacity": {
-    "default": "16",
-    "description": "Size of CreateTableModel pool in SqlParser."
-  },
   "cairo.sql.create.table.model.batch.size": {
     "default": "1000000",
     "description": "Batch size for non-atomic CREATE AS SELECT statements."
@@ -303,10 +299,6 @@
     "default": "8",
     "description": "Sets the max memory pages for storing bind variable values for JIT compiled filter."
   },
-  "cairo.sql.jit.rows.threshold": {
-    "default": "1M",
-    "description": "Sets minimum number of rows to shrink filtered rows memory after query execution."
-  },
   "cairo.sql.jit.page.address.cache.threshold": {
     "default": "1M",
     "description": "Sets minimum cache size to shrink page address cache after query execution."
@@ -314,10 +306,6 @@
   "cairo.sql.jit.ir.memory.page.size": {
     "default": "8K",
     "description": "Sets the memory page size for storing IR for JIT compilation."
-  },
-  "cairo.sql.jit.ir.max.pages": {
-    "default": "8",
-    "description": "Sets max memory pages for storing IR for JIT compilation."
   },
   "cairo.sql.page.frame.min.rows": {
     "default": "1000",
