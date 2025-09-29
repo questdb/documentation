@@ -40,8 +40,8 @@ FROM long_sequence(3);
 
 ## ceil / ceiling
 
-`ceil(value)` or `ceiling()` returns the smallest integer greater than, or equal
-to, a specified numeric expression.
+`ceil(value)` or `ceiling(value)` returns the smallest integer greater than, or
+equal to, a specified numeric expression.
 
 **Arguments:**
 
@@ -63,7 +63,7 @@ SELECT ceil(15.75) as RoundedUp;
 
 ## exp
 
-`exp()` returns the exponential value of a specified numeric expression.
+`exp(value)` returns the exponential value of a specified numeric expression.
 
 **Arguments:**
 
@@ -85,8 +85,8 @@ SELECT exp(2) as Exponent;
 
 ## floor
 
-`floor()` returns the largest integer less than or equal to a specified numeric
-expression.
+`floor(value)` returns the largest integer less than or equal to a specified
+numeric expression.
 
 **Arguments:**
 
@@ -102,14 +102,13 @@ Return value type is `double`.
 SELECT floor(15.75) as RoundedDown;
 ```
 
-| RoundedUp |
-| --------- |
-| 15        |
-
+| RoundedDown |
+| ----------- |
+| 15          |
 
 ## greatest
 
-`greatest(args...)` returns the largest entry in a series of numbers. 
+`greatest(args...)` returns the largest entry in a series of numbers.
 
 `null` will be returned only if all of the arguments are `null`.
 
@@ -128,15 +127,12 @@ SELECT greatest(11, 3, 8, 15)
 ```
 
 | greatest |
-|----------|
+| -------- |
 | 15       |
-
-
 
 ## least
 
 `least(args...)` returns the smallest entry in a series of numbers.
-
 
 `null` will be returned only if all of the arguments are `null`.
 
@@ -155,9 +151,8 @@ SELECT least(11, 3, 8, 15)
 ```
 
 | least |
-|-------|
+| ----- |
 | 3     |
-
 
 ## ln
 
@@ -181,7 +176,6 @@ SELECT ln(4.123)
 | -------------- |
 | 1.416581053724 |
 
-
 ## log
 
 `log(value)` return the base 10 logarithm of a given number.
@@ -200,14 +194,13 @@ Return value type is `double`.
 SELECT log(100)
 ```
 
-| log          |
-| ------------ |
-|            2 |
+| log |
+| --- |
+| 2   |
 
-:::note
-Some databases use `LOG` to refer to the natural logarithm and `LOG10` for the base 10 logarithm. QuestDB follows PostgreSQL conventions and uses `LOG` for base 10 and `LN` for natural logarithm.
-:::
-
+:::note Some databases use `LOG` to refer to the natural logarithm and `LOG10`
+for the base 10 logarithm. QuestDB follows PostgreSQL conventions and uses `LOG`
+for base 10 and `LN` for natural logarithm. :::
 
 ## power
 
@@ -315,12 +308,12 @@ FROM dbl;
 | 0.069361448  | 0        | 0        | 0       | 0       | 0.06    |
 | 4.003627053  | 0        | 0        | 4       | 4       | 4       |
 | 86.91359825  | 0        | 80       | 86      | 86.9    | 86.91   |
-| 376.3807766  | 400      | 370      | 376     | 376.3   | 376.38  |
+| 376.3807766  | 300      | 370      | 376     | 376.3   | 376.38  |
 
 ## round_half_even
 
 `round_half_even(value, scale)` - returns the **closest** value in the specified
-scale. It uses the "half up" tie-breaking method when the value is exactly
+scale. It uses the "half even" tie-breaking method when the value is exactly
 halfway between the `round_up` and `round_down` values.
 
 **Arguments:**
@@ -413,8 +406,9 @@ FROM dbl;
 ## sign
 
 `sign(value)` returns sign of the argument, that is:
+
 - -1 for negative value
--  0 for zero
+- 0 for zero
 - +1 for positive value
 
 **Arguments:**
@@ -432,7 +426,7 @@ SELECT x-3 arg, sign(x-3) from long_sequence(5)
 ```
 
 | arg | sign |
-|-----|------|
+| --- | ---- |
 | -2  | -1   |
 | -1  | -1   |
 | 0   | 0    |
@@ -482,6 +476,6 @@ Return value type is `double`.
 SELECT sqrt(4000.32)
 ```
 
-| log              |
+| sqrt             |
 | ---------------- |
 | 63.2480829749013 |
