@@ -42,13 +42,14 @@ One of the most common queries for time series data is the `SAMPLE BY` query.
 This query is used to aggregate data into time-window buckets. Here's an example
 that can analyze trade volumes by the minute, broken down by symbol.
 
-```questdb-sql title="SAMPLE BY query"
+```questdb-sql title="SAMPLE BY query" demo
 SELECT
   timestamp,
   symbol,
   side,
   sum(price * amount) AS notional
 FROM trades
+WHERE timestamp IN today()
 SAMPLE BY 1m;
 ```
 
@@ -73,23 +74,26 @@ without the impact of a full table scan of the base table.
 To create a materialize view, surround your `SAMPLE BY` or time-based `GROUP BY`
 query with a [`CREATE MATERIALIZED VIEW`](/docs/reference/sql/create-mat-view) statement.
 
-```questdb-sql title="trades_notional_1m ddl"
-CREATE MATERIALIZED VIEW 'trades_notional_1m' AS
-SELECT
-  timestamp,
-  symbol,
-  side,
-  sum(price * amount) AS notional
-FROM trades
-SAMPLE BY 1m;
+```questdb-sql title="trades_OHLC_15m ddl"
+CREATE MATERIALIZED VIEW 'trades_OHLC_15m' AS (
+   SELECT
+    timestamp, symbol,
+      first(price) AS open,
+      max(price) as high,
+      min(price) as low,
+      last(price) AS close,
+      sum(amount) AS volume
+ FROM trades
+ SAMPLE BY 15m
+) PARTITION BY DAY;
 ```
 
 Querying a materialized view can be up to hundreds of times faster than
 executing the same query on the base table.
 
-```questdb-sql title="querying a materialized view"
+```questdb-sql title="querying a materialized view" demo
 SELECT *
-FROM trades_notional_1m;
+FROM trades_OHLC_15m;
 ```
 
 ## Roadmap and limitations

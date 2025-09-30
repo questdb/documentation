@@ -54,7 +54,7 @@ the [EXPLAIN](/docs/reference/sql/explain/) command.
 For example, consider the `trades` table with a `timestamp` designated
 timestamp. The following query:
 
-```questdb-sql
+```questdb-sql title="SELECT a full day interval" demo
 EXPLAIN
 SELECT * FROM trades
 WHERE timestamp IN '2023-01-20';
@@ -78,15 +78,19 @@ The following three queries all produce the same **Interval Scan** plan because
 they all specify the same time range for the `timestamp` column, just in
 different ways:
 
-```questdb-sql
+```questdb-sql title="Different ways of getting the data for an interval: using IN" demo
 EXPLAIN
 SELECT * FROM trades
 WHERE timestamp IN '2023-01-20';
+```
 
+```questdb-sql title="Different ways of getting the data for an interval: using BETWEEN" demo
 EXPLAIN
 SELECT * FROM trades
 WHERE timestamp between '2023-01-20T00:00:00.000000Z' and '2023-01-20T23:59:59.999999Z';
+```
 
+```questdb-sql title="Different ways of getting the data for an interval: using Operators" demo
 EXPLAIN
 SELECT * FROM trades
 WHERE timestamp >= '2023-01-20T00:00:00.000000Z' and timestamp <= '2023-01-20T23:59:59.999999Z';
@@ -104,7 +108,7 @@ The **Interval Scan** plan looks like this:
 If need to scan more than one interval, you can use the
 [timestamp IN operator](/docs/reference/operators/date-time):
 
-```questdb-sql
+```questdb-sql title="Scanning more than one interval with the IN operator" demo
 EXPLAIN
 SELECT * FROM trades
 WHERE timestamp IN '2023-01-01;1d;1y;2';
