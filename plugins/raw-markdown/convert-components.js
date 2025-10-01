@@ -229,6 +229,68 @@ function convertInterpolateReleaseData(content, releaseVersion) {
 }
 
 /**
+ * Converts railroad diagram SVG references to raw railroad syntax
+ * Example: ![alt](/images/docs/diagrams/refreshMatView.svg) -> railroad syntax code block
+ */
+function convertRailroadDiagrams(content, docsPath) {
+  // Load the .railroad file once
+  const railroadPath = path.join(docsPath, '../static/images/docs/diagrams/.railroad')
+
+  if (!fs.existsSync(railroadPath)) {
+    console.warn('[convert-components] Railroad file not found:', railroadPath)
+    return content
+  }
+
+  const railroadContent = fs.readFileSync(railroadPath, 'utf8')
+
+  // Parse railroad definitions into a map
+  const railroadMap = new Map()
+  const lines = railroadContent.split('\n')
+  let currentName = null
+  let currentDef = []
+
+  for (const line of lines) {
+    // Check if line is a definition name (doesn't start with whitespace and isn't empty/comment)
+    if (line && !line.startsWith(' ') && !line.startsWith('#') && !line.startsWith('\t')) {
+      // Save previous definition if exists
+      if (currentName && currentDef.length > 0) {
+        railroadMap.set(currentName, currentDef.join('\n'))
+      }
+      // Start new definition
+      currentName = line.trim()
+      currentDef = []
+    } else if (currentName && line.trim()) {
+      // Add to current definition
+      currentDef.push(line)
+    } else if (currentName && !line.trim() && currentDef.length > 0) {
+      // Empty line marks end of definition
+      railroadMap.set(currentName, currentDef.join('\n'))
+      currentName = null
+      currentDef = []
+    }
+  }
+
+  // Save last definition
+  if (currentName && currentDef.length > 0) {
+    railroadMap.set(currentName, currentDef.join('\n'))
+  }
+
+  // Replace SVG references with railroad syntax
+  const diagramRegex = /!\[([^\]]*)\]\(\/images\/docs\/diagrams\/([^)]+)\.svg\)/g
+
+  return content.replace(diagramRegex, (match, altText, diagramName) => {
+    const definition = railroadMap.get(diagramName)
+
+    if (definition) {
+      return `\n\n\`\`\`\n${definition}\n\`\`\`\n\n`
+    }
+
+    // If not found, remove the image reference
+    return '\n\n'
+  })
+}
+
+/**
  * Main function to convert all components in content
  */
 async function convertAllComponents(content, docsPath) {
@@ -244,6 +306,7 @@ async function convertAllComponents(content, docsPath) {
   processed = convertCodeBlock(processed)
   processed = convertTabs(processed)
   processed = convertConfigTable(processed, docsPath)
+  processed = convertRailroadDiagrams(processed, docsPath)
 
   return processed
 }
