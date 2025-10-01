@@ -589,6 +589,50 @@ If you want to re-read metadata for all user tables, simply use an asterisk:
 SELECT hydrate_table_metadata('*');
 ```
 
+## copy_export_log
+
+`copy_export_log()` or `sys.copy_export_log` returns the export log for `COPY TO` operations.
+
+**Arguments:**
+
+- `copy_export_log()` does not require arguments.
+
+**Return value:**
+
+Returns metadata on `COPY TO` export operations for the last three days, including columns such as:
+
+- `ts` - timestamp of the log event
+- `id` - export identifier that can be used to track export progress
+- `table` - source table name (or 'query' for subquery exports)
+- `destination` - destination directory path for the export
+- `format` - export format (currently only 'PARQUET')
+- `status` - event status: 'started', 'finished', 'failed', or 'cancelled'
+- `message` - error message when status is 'failed'
+- `rows_exported` - total number of exported rows (shown in final log row)
+- `partition` - partition name for partitioned exports (null for non-partitioned)
+
+**Examples:**
+
+```questdb-sql
+SELECT * FROM copy_export_log();
+```
+
+| ts                          | id               | table  | destination   | format  | status   | message | rows_exported | partition  |
+| --------------------------- | ---------------- | ------ | ------------- | ------- | -------- | ------- | ------------- | ---------- |
+| 2024-10-01T14:23:15.123456Z | 7f3a9c2e1b456789 | trades | trades_export | PARQUET | started  |         | 0             | null       |
+| 2024-10-01T14:25:42.987654Z | 7f3a9c2e1b456789 | trades | trades_export | PARQUET | finished |         | 1000000       | null       |
+
+```questdb-sql title="Track specific export"
+SELECT * FROM copy_export_log() WHERE id = '7f3a9c2e1b456789';
+```
+
+```questdb-sql title="View recent failed exports"
+SELECT ts, table, destination, message
+FROM copy_export_log()
+WHERE status = 'failed'
+ORDER BY ts DESC;
+```
+
 ## flush_query_cache()
 
 `flush_query_cache' invalidates cached query execution plans.

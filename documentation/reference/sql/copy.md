@@ -23,6 +23,13 @@ following impact:
 
 ## Description
 
+The `COPY` command has two modes of operation:
+
+1. **Import mode**: `COPY table_name FROM 'file.csv'` - Copies data from a delimited text file into QuestDB
+2. **Export mode**: `COPY table_name TO 'output_directory'` or `COPY (query) TO 'output_directory'` - Exports table or query results to Parquet format
+
+### Import Mode
+
 Copies tables from a delimited text file saved in the defined root directory
 into QuestDB. `COPY` has the following import modes:
 
@@ -55,6 +62,22 @@ request(s) will be rejected.
 
 `COPY '<id>' CANCEL` cancels the copying operation defined by the import `id`,
 while an import is taking place.
+
+### Export Mode
+
+Exports data from a table or query result set to Parquet format. The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
+
+**Key features:**
+
+- Export entire tables or query results
+- Configurable Parquet export options (compression, row group size, etc.)
+- Non-blocking exports - writes continue during export
+- Supports partitioned exports matching table partitioning
+- Configurable size limits
+
+**Export directory:**
+
+The export destination is relative to `cairo.sql.copy.root` (defaults to `root_directory/export`). You can configure this through the [configuration settings](/docs/configuration/).
 
 ### Root directory
 
@@ -90,10 +113,13 @@ the `/Users` tree and set the root directory accordingly.
 
 :::
 
-### Log table
+### Log tables
 
-`COPY` generates a log table,`sys.text_import_log`, tracking `COPY` operation
-for the last three days with the following information:
+`COPY` generates log tables tracking operations:
+
+#### Import log: `sys.text_import_log`
+
+Tracks `COPY FROM` (import) operations for the last three days with the following information:
 
 | Column name   | Data type | Notes                                                                         |
 | ------------- | --------- | ----------------------------------------------------------------------------- |
@@ -130,7 +156,29 @@ Log table row retention is configurable through
 `COPY` returns `id` value from `sys.text_import_log` to track the import
 progress.
 
+#### Export log: `sys.copy_export_log`
+
+Tracks `COPY TO` (export) operations for the last three days with the following information:
+
+| Column name   | Data type | Notes                                                                         |
+| ------------- | --------- | ----------------------------------------------------------------------------- |
+| ts            | timestamp | The log event timestamp                                                       |
+| id            | string    | Export id                                                                     |
+| table         | symbol    | Source table name (or 'query' for subquery exports)                          |
+| destination   | symbol    | The destination directory path                                                |
+| format        | symbol    | Export format (currently only 'PARQUET')                                      |
+| status        | symbol    | The event status: started, finished, failed, cancelled                        |
+| message       | string    | The error message when status is failed                                       |
+| rows_exported | long      | The total number of exported rows (shown in final log row)                    |
+| partition     | symbol    | Partition name for partitioned exports (null for non-partitioned)             |
+
+Log table row retention is configurable through `cairo.sql.copy.log.retention.days` setting, and is three days by default.
+
+`COPY TO` returns an `id` value from `sys.copy_export_log` to track the export progress.
+
 ## Options
+
+### Import Options (COPY FROM)
 
 - `HEADER true/false`: When `true`, QuestDB automatically assumes the first row
   is a header. Otherwise, schema recognition is used to determine whether the
@@ -150,7 +198,24 @@ progress.
   - `ABORT`: Abort whole import on first error, and restore the pre-import table
     status
 
+### Export Options (COPY TO)
+
+All export options are specified using the `WITH` clause after the `TO` destination path.
+
+- `FORMAT PARQUET`: Specifies Parquet as the export format (currently the only supported format). Default: `PARQUET`.
+- `PARTITION_BY <unit>`: Partition the export by time unit. Valid values: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`. Default: matches the source table's partitioning, or `NONE` for queries.
+- `SIZE_LIMIT <size>`: Maximum size for export files. Supports units like `10MB`, `1GB`, etc. When exceeded, a new file is created. Default: unlimited.
+- `COMPRESSION_CODEC <codec>`: Parquet compression algorithm. Valid values: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`. Default: `ZSTD`.
+- `COMPRESSION_LEVEL <n>`: Compression level (codec-specific). Higher values mean better compression but slower speed. Default: varies by codec.
+- `ROW_GROUP_SIZE <n>`: Number of rows per Parquet row group. Larger values improve compression but increase memory usage. Default: `100000`.
+- `DATA_PAGE_SIZE <n>`: Size of data pages within row groups in bytes. Default: `1048576` (1MB).
+- `STATISTICS_ENABLED true/false`: Enable Parquet column statistics for better query performance. Default: `true`.
+- `PARQUET_VERSION <n>`: Parquet format version. Valid values: `1` (v1.0) or `2` (v2.0). Default: `2`.
+- `RAW_ARRAY_ENCODING true/false`: Use raw encoding for arrays (more efficient for numeric arrays). Default: `true`.
+
 ## Examples
+
+### Import Examples
 
 For more details on parallel import, please also see
 [Importing data in bulk via CSV](/docs/guides/import-csv/#import-csv-via-copy-sql).
@@ -194,3 +259,115 @@ SELECT * FROM 'sys.text_import_log' WHERE id = '55ca24e5ba328050' LIMIT -1;
 | ts                          | id               | table   | file        | phase | status    | message                                                    | rows_handled | rows_imported | errors |
 | :-------------------------- | ---------------- | ------- | ----------- | ----- | --------- | ---------------------------------------------------------- | ------------ | ------------- | ------ |
 | 2022-08-03T14:04:42.268502Z | 55ca24e5ba328050 | weather | weather.csv | null  | cancelled | import cancelled [phase=partition_import, msg=`Cancelled`] | 0            | 0             | 0      |
+
+### Export Examples
+
+#### Export entire table to Parquet
+
+Export a complete table to Parquet format:
+
+```questdb-sql title="Export table to Parquet"
+COPY trades TO 'trades_export' WITH FORMAT PARQUET;
+```
+
+Returns an export ID:
+
+| id               |
+| ---------------- |
+| 7f3a9c2e1b456789 |
+
+Track export progress:
+
+```questdb-sql
+SELECT * FROM sys.copy_export_log WHERE id = '7f3a9c2e1b456789';
+```
+
+#### Export query results to Parquet
+
+Export the results of a query:
+
+```questdb-sql title="Export filtered data"
+COPY (SELECT * FROM trades WHERE timestamp IN today() AND symbol = 'BTC-USD')
+TO 'btc_today'
+WITH FORMAT PARQUET;
+```
+
+#### Export with partitioning
+
+Export data partitioned by day:
+
+```questdb-sql title="Export with daily partitions"
+COPY trades TO 'trades_daily'
+WITH FORMAT PARQUET
+PARTITION BY DAY;
+```
+
+This creates separate Parquet files for each day's data in subdirectories named by date.
+
+#### Export with custom Parquet options
+
+Configure compression, row group size, and other Parquet settings:
+
+```questdb-sql title="Export with custom compression"
+COPY trades TO 'trades_compressed'
+WITH
+    FORMAT PARQUET
+    COMPRESSION_CODEC ZSTD
+    COMPRESSION_LEVEL 9
+    ROW_GROUP_SIZE 1000000
+    DATA_PAGE_SIZE 2097152;
+```
+
+#### Export with size limits
+
+Limit export file size to create multiple files:
+
+```questdb-sql title="Export with 1GB file size limit"
+COPY trades TO 'trades_chunked'
+WITH
+    FORMAT PARQUET
+    SIZE_LIMIT 1GB;
+```
+
+When the export exceeds 1GB, QuestDB creates multiple numbered files: `trades_chunked_0.parquet`, `trades_chunked_1.parquet`, etc.
+
+#### Export aggregated data
+
+Export aggregated results for analysis:
+
+```questdb-sql title="Export OHLCV data"
+COPY (
+    SELECT
+        timestamp,
+        symbol,
+        first(price) AS open,
+        max(price) AS high,
+        min(price) AS low,
+        last(price) AS close,
+        sum(amount) AS volume
+    FROM trades
+    WHERE timestamp > dateadd('d', -7, now())
+    SAMPLE BY 1h
+)
+TO 'ohlcv_7d'
+WITH FORMAT PARQUET;
+```
+
+#### Monitor export status
+
+Check all recent exports:
+
+```questdb-sql title="View export history"
+SELECT ts, table, destination, status, rows_exported
+FROM sys.copy_export_log
+WHERE ts > dateadd('d', -1, now())
+ORDER BY ts DESC;
+```
+
+Sample output:
+
+| ts                          | table  | destination      | status   | rows_exported |
+| --------------------------- | ------ | ---------------- | -------- | ------------- |
+| 2024-10-01T14:23:15.123456Z | trades | trades_export    | finished | 1000000       |
+| 2024-10-01T13:45:22.654321Z | query  | btc_today        | finished | 45672         |
+| 2024-10-01T12:30:11.987654Z | trades | trades_daily     | finished | 1000000       |

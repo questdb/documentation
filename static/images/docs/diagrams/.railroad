@@ -138,7 +138,11 @@ case
   ::= 'CASE' ('WHEN' condition 'THEN' value)* ( | 'ELSE' value ) 'END'
 
 copy
-  ::= 'COPY' (id 'CANCEL' | tableName 'FROM' fileName (| 'WITH' (| 'HEADER' (true|false) |'TIMESTAMP' columnName | 'DELIMITER' delimiter | 'FORMAT' format | |'PARTITION BY' ('NONE'|'YEAR'|'MONTH'|'DAY'|'HOUR') | 'ON ERROR' ('SKIP_ROW'|'SKIP_COLUMN'|'ABORT')) ))
+  ::= 'COPY' (
+    id 'CANCEL'
+    | tableName 'FROM' fileName ('WITH' ('HEADER' (true|false) | 'TIMESTAMP' columnName | 'DELIMITER' delimiter | 'FORMAT' format | 'PARTITION BY' ('NONE'|'YEAR'|'MONTH'|'DAY'|'HOUR') | 'ON ERROR' ('SKIP_ROW'|'SKIP_COLUMN'|'ABORT')))?
+    | (tableName | '(' selectQuery ')') 'TO' destinationPath ('WITH' ('FORMAT' 'PARQUET' | 'PARTITION BY' ('NONE'|'HOUR'|'DAY'|'WEEK'|'MONTH'|'YEAR') | 'SIZE_LIMIT' sizeValue | 'COMPRESSION_CODEC' ('UNCOMPRESSED'|'SNAPPY'|'GZIP'|'LZ4'|'ZSTD'|'LZ4_RAW') | 'COMPRESSION_LEVEL' number | 'ROW_GROUP_SIZE' number | 'DATA_PAGE_SIZE' number | 'STATISTICS_ENABLED' (true|false) | 'PARQUET_VERSION' ('1'|'2') | 'RAW_ARRAY_ENCODING' (true|false)))?
+  )
 
 createTableTimestamp
   ::= 'CREATE' someCreateTableStatement 'timestamp' '(' columnName ')'
