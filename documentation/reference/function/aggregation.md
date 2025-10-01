@@ -7,6 +7,32 @@ description: Aggregate functions reference documentation.
 This page describes the available functions to assist with performing aggregate
 calculations.
 
+
+:::note 
+
+QuestDB does not using aggregate functions as arguments to other functions. For example, this is not allowed:
+
+```questdb-sql
+SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
+```
+
+You can work around this limitation by using CTEs or subqueries:
+
+```questdb-sql
+-- CTE
+WITH minmax AS (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades     
+)
+SELECT datediff('d', min_date, max_date) FROM minmax;
+
+-- Subquery
+SELECT datediff('d', min_date, max_date) FROM (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades    
+);
+```
+
+:::
+
 ## approx_count_distinct
 
 `approx_count_distinct(column_name, precision)` - estimates the number of

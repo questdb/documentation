@@ -162,7 +162,6 @@ sudo systemctl disable --now apt-daily.timer
 sudo systemctl disable --now unattended-upgrades.service
 ```
 
-
 You can check the status of the timers using:
 
 ```bash
