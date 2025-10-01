@@ -7,6 +7,36 @@ description: Aggregate functions reference documentation.
 This page describes the available functions to assist with performing aggregate
 calculations.
 
+
+:::note 
+
+QuestDB does not support using aggregate functions as arguments to other functions. For example, this is not allowed:
+
+```questdb-sql
+SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
+```
+
+Running it will result in the following error:
+
+`Aggregate function cannot be passed as an argument`
+
+You can work around this limitation by using CTEs or subqueries:
+
+```questdb-sql
+-- CTE
+WITH minmax AS (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades     
+)
+SELECT datediff('d', min_date, max_date) FROM minmax;
+
+-- Subquery
+SELECT datediff('d', min_date, max_date) FROM (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades    
+);
+```
+
+:::
+
 ## approx_count_distinct
 
 `approx_count_distinct(column_name, precision)` - estimates the number of
@@ -785,6 +815,49 @@ FROM (SELECT rnd_double() a FROM long_sequence(100));
 | nsum             |
 | :--------------- |
 | 49.5442334742831 |
+
+## mode
+
+`mode(value)` - calculates the mode (most frequent) value out of a particular dataset. 
+
+For `mode(B)`, if there are an equal number of `true` and `false` values, `true` will be returned as a tie-breaker.
+
+For other modes, if there are equal mode values, the returned value will be whichever the code identifies first.
+
+To make the result deterministic, you must enforce an underlying sort order.
+
+#### Parameters
+
+- `value` - one of (LONG, DOUBLE, BOOLEAN, STRING, VARCHAR, SYMBOL)
+
+#### Return value
+
+Return value type is the same as the type of the input `value`.
+
+
+#### Examples
+
+With this dataset:
+
+| symbol    | value |
+|-----------|-------|
+| A         | alpha |
+| A         | alpha |
+| A         | alpha |
+| A         | omega |
+| B         | beta  |
+| B         | beta  |
+| B         | gamma |
+
+```questdb-sql
+SELECT symbol, mode(value) as mode FROM dataset;
+```
+
+| symbol | mode  |
+|--------|-------|
+| A      | alpha |
+| B      | beta  |
+
 
 ## stddev / stddev_samp
 

@@ -295,6 +295,10 @@
     "default": "false",
     "description": "Sets debug flag for JIT compilation. When enabled, assembly will be printed into `stdout`."
   },
+  "cairo.sql.jit.max.in.list.size.threshold": {
+    "default": "10",
+    "description": "Controls whether or not JIT compilation will be used for a query that uses the IN predicate. If the IN list is longer than this threshold, JIT compilation will be cancelled."
+  },
   "cairo.sql.jit.bind.vars.memory.page.size": {
     "default": "4K",
     "description": "Sets the memory page size for storing bind variable values for JIT compiled filter."
