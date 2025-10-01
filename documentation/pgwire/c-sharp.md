@@ -149,7 +149,8 @@ namespace QuestDBExample
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
 
-                string sql = "SELECT symbol, price, amount, ts FROM trades LIMIT 10";
+
+                string sql = "SELECT symbol, price, amount, timestamp FROM trades LIMIT 10";
                 await using var command = new NpgsqlCommand(sql, connection);
 
                 await using var reader = await command.ExecuteReaderAsync();
@@ -213,8 +214,8 @@ namespace QuestDBExample
                 string sql = @"
                     SELECT *
                     FROM trades
-                    WHERE symbol = @symbol AND ts >= @startTime
-                    ORDER BY ts DESC
+                    WHERE symbol = @symbol AND timestamp >= @startTime
+                    ORDER BY timestamp DESC
                     LIMIT 10";
 
                 await using var command = new NpgsqlCommand(sql, connection);
@@ -226,7 +227,7 @@ namespace QuestDBExample
 
                 while (await reader.ReadAsync())
                 {
-                    DateTime timestamp = (DateTime)reader["ts"];
+                    DateTime timestamp = (DateTime)reader["timestamp"];
                     timestamp = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
 
                     string tradingSymbol = reader["symbol"].ToString();
@@ -326,13 +327,13 @@ namespace QuestDBExample
                 // SAMPLE BY query (time-based downsampling)
                 string sampleByQuery = @"
                     SELECT
-                        ts,
+                        timestamp,
                         symbol,
                         avg(price) as avg_price,
                         min(price) as min_price,
                         max(price) as max_price
                     FROM trades
-                    WHERE ts >= dateadd('d', -7000, now())
+                    WHERE timestamp >= dateadd('d', -7000, now())
                     SAMPLE BY 1h";
 
                 Console.WriteLine("Executing SAMPLE BY query...");
@@ -342,7 +343,7 @@ namespace QuestDBExample
 
                     while (await reader.ReadAsync())
                     {
-                        Console.WriteLine($"Time: {reader["ts"]}, " +
+                        Console.WriteLine($"Time: {reader["timestamp"]}, " +
                                          $"Symbol: {reader["symbol"]}, " +
                                          $"Avg Price: {reader.GetDouble(reader.GetOrdinal("avg_price")):F2}, " +
                                          $"Range: {reader.GetDouble(reader.GetOrdinal("min_price")):F2} - " +
@@ -351,8 +352,7 @@ namespace QuestDBExample
                 }
 
                 // LATEST ON query (last value per group)
-                string latestByQuery = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
-
+                string latestByQuery = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
                 Console.WriteLine("\nExecuting LATEST ON query...");
                 await using (var cmd2 = new NpgsqlCommand(latestByQuery, connection))
                 {
@@ -362,7 +362,7 @@ namespace QuestDBExample
                     {
                         Console.WriteLine($"Symbol: {reader["symbol"]}, " +
                                          $"Latest Price: {reader.GetDouble(reader.GetOrdinal("price")):F2} " +
-                                         $"at {reader["ts"]}");
+                                         $"at {reader["timestamp"]}");
                     }
                 }
             }
@@ -414,13 +414,13 @@ namespace QuestDBAspNetCoreExample
 
             if (string.IsNullOrEmpty(symbol))
             {
-                sql = "SELECT ts, symbol, price, amount FROM trades ORDER BY ts DESC LIMIT @limit";
+                sql = "SELECT timestamp, symbol, price, amount FROM trades ORDER BY timestamp DESC LIMIT @limit";
                 command = new NpgsqlCommand(sql, connection);
                 command.Parameters.AddWithValue("@limit", limit);
             }
             else
             {
-                sql = "SELECT ts, symbol, price, amount FROM trades WHERE symbol = @symbol ORDER BY ts DESC LIMIT @limit";
+                sql = "SELECT timestamp, symbol, price, amount FROM trades WHERE symbol = @symbol ORDER BY timestamp DESC LIMIT @limit";
                 command = new NpgsqlCommand(sql, connection);
                 command.Parameters.AddWithValue("@symbol", symbol);
                 command.Parameters.AddWithValue("@limit", limit);
@@ -448,7 +448,7 @@ namespace QuestDBAspNetCoreExample
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
 
-            string sql = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+            string sql = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
             await using var command = new NpgsqlCommand(sql, connection);
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -456,7 +456,7 @@ namespace QuestDBAspNetCoreExample
             {
                 trades.Add(new Trade
                 {
-                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("ts")), DateTimeKind.Utc),
+                    Timestamp = DateTime.SpecifyKind(reader.GetDateTime(reader.GetOrdinal("timestamp")), DateTimeKind.Utc),
                     Symbol = reader.GetString(reader.GetOrdinal("symbol")),
                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                     Amount = reader.GetDouble(reader.GetOrdinal("amount"))
@@ -482,7 +482,7 @@ namespace QuestDBAspNetCoreExample
                     max(price) as max_price,
                     sum(amount) as total_volume
                 FROM trades
-                WHERE ts >= dateadd('d', @days, now())
+                WHERE timestamp >= dateadd('d', @days, now())
                 GROUP BY symbol
                 ORDER BY total_volume DESC";
 
@@ -673,7 +673,7 @@ namespace QuestDBDapperExample
 
                 // Basic query with Dapper
                 var trades = await connection.QueryAsync<Trade>(
-                    "SELECT ts AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
+                    "SELECT timestamp AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
                     "FROM trades LIMIT 10");
 
                 Console.WriteLine($"Retrieved {trades.Count()} trades:");
@@ -690,10 +690,10 @@ namespace QuestDBDapperExample
                 DateTime startTime = DateTime.UtcNow.AddDays(-7000);
 
                 var filteredTrades = await connection.QueryAsync<Trade>(
-                    "SELECT ts AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
+                    "SELECT timestamp AS Timestamp, symbol AS Symbol, price AS Price, amount AS Amount " +
                     "FROM trades " +
-                    "WHERE symbol = @Symbol AND ts >= @StartTime " +
-                    "ORDER BY ts DESC " +
+                    "WHERE symbol = @Symbol AND timestamp >= @StartTime " +
+                    "ORDER BY timestamp DESC " +
                     "LIMIT 10",
                     new { Symbol = symbol, StartTime = startTime });
 
@@ -708,13 +708,13 @@ namespace QuestDBDapperExample
                 // Time-series query with SAMPLE BY
                 var timeSeriesData = await connection.QueryAsync<TimeSeriesPoint>(
                     "SELECT " +
-                    "   ts AS Timestamp, " +
+                    "   timestamp AS Timestamp, " +
                     "   symbol AS Symbol, " +
                     "   avg(price) AS AvgPrice, " +
                     "   min(price) AS MinPrice, " +
                     "   max(price) AS MaxPrice " +
                     "FROM trades " +
-                    "WHERE ts >= dateadd('d', -10000, now()) " +
+                    "WHERE timestamp >= dateadd('d', -10000, now()) " +
                     "SAMPLE BY 1h");
 
                 Console.WriteLine($"\nRetrieved {timeSeriesData.Count()} time series points:");
@@ -766,23 +766,25 @@ QuestDB provides specialized time-series functions that can be used with Npgsql:
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
 

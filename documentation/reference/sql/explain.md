@@ -25,7 +25,7 @@ In a plan such as:
 | Async JIT Filter                                                           |
 | &nbsp;&nbsp;filter: 100 `<` l                                              |
 | &nbsp;&nbsp;workers: 1                                                     |
-| &nbsp;&nbsp;&nbsp;&nbsp;DataFrame                                          |
+| &nbsp;&nbsp;&nbsp;&nbsp;PageFrame                                          |
 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Row forward scan           |
 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Frame forward scan on: tab |
 
@@ -33,7 +33,7 @@ there are:
 
 - 4 nodes:
   - Async JIT Filter
-  - DataFrame
+  - PageFrame
   - Row forward scan
   - Frame forward scan
 - 2 properties (both belong to Async JIT Filter node):
@@ -61,7 +61,7 @@ The following list contains some plan node types:
 - `Count` - returns the count of records in subnode.
 - `Cursor-order scan` - scans table records using row ids taken from an index,
   in index order - first all row ids linked to index value A, then B, etc.
-- `DataFrame` - full or partial table scan. It contains two children:
+- `PageFrame` - full or partial table scan. It contains two children:
   - row cursor - which iterates over rows inside a frame (e.g.
     `Row forward scan`).
   - frame cursor - which iterates over table partitions or partition chunks
@@ -95,7 +95,7 @@ Other node types should be easy to link to SQL and database concepts, e.g.
 
 Many nodes, especially join and sort, have 'light' and 'heavy' variants, e.g.
 `Hash Join Light` and `Hash Join`. The former is used when child node(s) support
-efficient random access lookups (e.g. `DataFrame`) so storing row id in the
+efficient random access lookups (e.g. `PageFrame`) so storing row id in the
 buffer is enough; otherwise, the whole record needs to be copied and the 'heavy'
 factory is used.
 
@@ -118,15 +118,15 @@ CREATE TABLE trades (
 
 The following query highlight the plan for `ORDER BY` for the table:
 
-```questdb-sql
-EXPLAIN SELECT * FROM trades ORDER BY ts DESC;
+```questdb-sql title="Explain Order By" demo
+EXPLAIN SELECT * FROM trades ORDER BY timestamp DESC;
 ```
 
-| QUERY PLAN                                             |
-| ------------------------------------------------------ |
-| DataFrame                                              |
-| &nbsp;&nbsp;&nbsp;&nbsp;Row backward scan              |
-| &nbsp;&nbsp;&nbsp;&nbsp;Frame backward scan on: trades |
+```text
+PageFrame
+    Row backward scan
+    Frame backward scan on: trades
+```
 
 The plan shows that no sort is required and the result is produced by scanning
 the table backward. The scanning direction is possible because the data in the
@@ -134,21 +134,21 @@ the table backward. The scanning direction is possible because the data in the
 
 Now, let's check the plan for `trades` with a simple filter:
 
-```questdb-sql
+```questdb-sql title="Explain Simple Filter" demo
 EXPLAIN SELECT * FROM trades WHERE amount > 100.0;
 ```
 
-| QUERY PLAN                                                                    |
-| ----------------------------------------------------------------------------- |
-| Async JIT Filter                                                              |
-| &nbsp;&nbsp;filter: 100.0 `<` amount                                          |
-| &nbsp;&nbsp;workers: 1                                                        |
-| &nbsp;&nbsp;&nbsp;&nbsp;DataFrame                                             |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Row forward scan              |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Frame forward scan on: trades |
+```text
+Async JIT Filter workers: 47
+  filter: 100.0<amount [pre-touch]
+    PageFrame
+        Row forward scan
+        Frame forward scan on: trades
+```
+
 
 In this example, the plan shows that the `trades` table undergoes a full scan
-(`DataFrame` and subnodes) and the data is processed by the parallelized
+(`PageFrame` and subnodes) and the data is processed by the parallelized
 JIT-compiled filter.
 
 ### Using `EXPLAIN` for the plan for `CREATE` and `INSERT`
@@ -157,7 +157,7 @@ Apart from `SELECT`, `EXPLAIN` also works on `CREATE` and `INSERT` statements.
 Single-row inserts are straightforward. The examples in this section show the
 plan for more complicated `CREATE` and `INSERT` queries.
 
-```questdb-sql
+```questdb-sql title="Explain Create Table" demo
 EXPLAIN CREATE TABLE trades AS
 (
   SELECT
@@ -170,19 +170,19 @@ EXPLAIN CREATE TABLE trades AS
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-| QUERY PLAN                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------- |
-| Create table: trades                                                                                                             |
-| &nbsp;&nbsp;&nbsp;&nbsp;VirtualRecord                                                                                            |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;functions: [rnd_symbol([a,b]),rnd_symbol([Buy,Sell]),rnd_double(),rnd_double(),x::timestamp] |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long_sequence count: 10                                                          |
+```text
+Create table: trades
+    VirtualRecord
+      functions: [rnd_symbol([a,b]),rnd_symbol([Buy,Sell]),memoize(rnd_double()),memoize(rnd_double()),x::timestamp]
+        long_sequence count: 10
+```
 
 The plan above shows that the data is fetched from a `long_sequence` cursor,
 with random data generating functions called in `VirtualRecord`.
 
 The same applies to the following query:
 
-```questdb-sql
+```questdb-sql title="Explain Insert Into"
 EXPLAIN INSERT INTO trades
   SELECT
     rnd_symbol('a', 'b') symbol,
@@ -193,12 +193,12 @@ EXPLAIN INSERT INTO trades
   FROM long_sequence(10);
 ```
 
-| QUERY PLAN                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------- |
-| Insert into table: trades                                                                                                        |
-| &nbsp;&nbsp;&nbsp;&nbsp;VirtualRecord                                                                                            |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;functions: [rnd_symbol([a,b]),rnd_symbol([Buy,Sell]),rnd_double(),rnd_double(),x::timestamp] |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long_sequence count: 10                                                          |
+```text
+Insert into table: trades
+    VirtualRecord
+      functions: [rnd_symbol([a,b]),rnd_symbol([Buy,Sell]),memoize(rnd_double()),memoize(rnd_double()),x::timestamp]
+        long_sequence count: 10
+```
 
 Of course, statements could be much more complex than that. Consider the
 following `UPDATE` query:
@@ -207,22 +207,22 @@ following `UPDATE` query:
 EXPLAIN UPDATE trades SET amount = 0 WHERE timestamp IN '2022-11-11';
 ```
 
-| QUERY PLAN                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Update table: trades                                                                                                                       |
-| &nbsp;&nbsp;&nbsp;&nbsp;VirtualRecord                                                                                                      |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;functions: [0]                                                                                         |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DataFrame                                                                                  |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Row forward scan                                                   |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Interval forward scan on: trades                                   |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intervals: [static=[1668124800000000,1668211199999999] |
+```text
+Update table: trades
+  VirtualRecord
+    functions: [0]
+      PageFrame
+        Row forward scan
+        Interval forward scan on: trades
+          intervals: [static=[1668124800000000,1668211199999999]
+```
 
 The important bit here is `Interval forward scan`. It means that the table is
 forward scanned only between points designated by the
 `timestamp IN '2022-11-11'` predicate, that is between
 `2022-11-11 00:00:00,000000` and `2022-11-11 23:59:59,999999` (shown as raw
 epoch micro values in the plan above). `VirtualRecord` is only used to pass 0
-constant for each row coming from `DataFrame`.
+constant for each row coming from `PageFrame`.
 
 ## Limitations:
 
@@ -244,7 +244,7 @@ Under the hood, the plan nodes are called `Factories`. Most plan nodes can be
 mapped to implementation by adding the `RecordCursorFactory` or
 `FrameCursorFactory` suffix, e.g.
 
-- `DataFrame` -> `DataFrameRecordCursorFactory`
+- `PageFrame` -> `PageFrameRecordCursorFactory`
 - `Async JIT Filter` -> `AsyncJitFilteredRecordCursorFactory`
 - `SampleByFillNoneNotKeyed` -> `SampleByFillNoneNotKeyedRecordCursorFactory`
   while some are a bit harder to identify, e.g.

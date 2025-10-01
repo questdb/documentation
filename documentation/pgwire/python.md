@@ -129,13 +129,13 @@ async def query_with_asyncpg():
     rows = await conn.fetch("""
                             SELECT *
                             FROM trades
-                            WHERE ts >= $1
-                            ORDER BY ts DESC LIMIT 10
+                            WHERE timestamp >= $1
+                            ORDER BY timestamp DESC LIMIT 10
                             """, datetime.now() - timedelta(days=1))
 
     print(f"Fetched {len(rows)} rows")
     for row in rows:
-        print(f"Timestamp: {row['ts']}, Symbol: {row['symbol']}, Price: {row['price']}")
+        print(f"Timestamp: {row['timestamp']}, Symbol: {row['symbol']}, Price: {row['price']}")
 
     # Fetch a single row
     single_row = await conn.fetchrow("""
@@ -184,7 +184,7 @@ async def stream_with_cursor():
         cursor = await conn.cursor("""
                                    SELECT *
                                    FROM trades
-                                   ORDER BY ts
+                                   ORDER BY timestamp
                                    """)
 
         batch_size = 100
@@ -275,7 +275,7 @@ async def parameterized_query():
             min(price) as min_price,
             max(price) as max_price
         FROM trades
-        WHERE ts >= $1 AND ts <= $2
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY symbol
     """, start_time, end_time)
 
@@ -323,12 +323,12 @@ async def execute_many_market_data_example():
 
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS trades (
-            ts TIMESTAMP,
+            timestamp TIMESTAMP,
             symbol SYMBOL,
             price DOUBLE,
             volume LONG,
             exchange SYMBOL
-        ) timestamp(ts) PARTITION BY DAY;
+        ) timestamp(timestamp) PARTITION BY DAY;
     """)
 
     base_timestamp = datetime.now()
@@ -342,7 +342,7 @@ async def execute_many_market_data_example():
     ]
 
     await conn.executemany("""
-        INSERT INTO trades (ts, symbol, price, volume, exchange)
+        INSERT INTO trades (timestamp, symbol, price, volume, exchange)
         VALUES ($1, $2, $3, $4, $5)
     """, trades_data)
     print(f"Successfully inserted {len(trades_data)} trade records using executemany.")
@@ -419,8 +419,8 @@ async def batch_insert_l3_order_book_arrays():
                        (
                            bid DOUBLE [][],
                            ask DOUBLE [][],
-                           ts TIMESTAMP
-                       ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                           timestamp TIMESTAMP
+                       ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
                        """)
 
     # Prepare a list of L3 order book snapshots for batch insertion
@@ -450,7 +450,7 @@ async def batch_insert_l3_order_book_arrays():
     # Insert the snapshots into the database in a single batch
     await conn.executemany(
         """
-        INSERT INTO l3_order_book (bid, ask, ts)
+        INSERT INTO l3_order_book (bid, ask, timestamp)
         VALUES ($1, $2, $3)
         """,
         snapshots_to_insert  # List of tuples, each tuple is a row
@@ -555,9 +555,9 @@ with psycopg.connect(
         cur.execute("""
                     SELECT *
                     FROM trades
-                    WHERE ts >= %s
-                      AND ts <= %s
-                    ORDER BY ts DESC LIMIT 10
+                    WHERE timestamp >= %s
+                      AND timestamp <= %s
+                    ORDER BY timestamp DESC LIMIT 10
                     """, (start_time, end_time))
 
         rows = cur.fetchall()
@@ -660,8 +660,8 @@ with psycopg.connect(
                            min(price) as min_price,
                            max(price) as max_price
                     FROM trades
-                    WHERE ts >= %s
-                      AND ts <= %s
+                    WHERE timestamp >= %s
+                      AND timestamp <= %s
                     GROUP BY symbol
                     """, (start_time, end_time))
 
@@ -733,8 +733,8 @@ async def batch_insert_l3_order_book_arrays():
                               (
                                   bid DOUBLE [][],
                                   ask DOUBLE [][],
-                                  ts TIMESTAMP
-                              ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                                  timestamp TIMESTAMP
+                              ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
                               """)
             print("Table 'l3_order_book' is ready.")
 
@@ -765,7 +765,7 @@ async def batch_insert_l3_order_book_arrays():
             # Insert the snapshots into the database in a single batch
             await cur.executemany(
                 """
-                INSERT INTO l3_order_book (bid, ask, ts)
+                INSERT INTO l3_order_book (bid, ask, timestamp)
                 VALUES (%b, %b, %b)
                 """,
                 snapshots_to_insert
@@ -1026,8 +1026,8 @@ try:
                            min(price) as min_price,
                            max(price) as max_price
                     FROM trades
-                    WHERE ts >= %s
-                      AND ts <= %s
+                    WHERE timestamp >= %s
+                      AND timestamp <= %s
                     GROUP BY symbol
                     """, (start_time, end_time))
 
@@ -1101,9 +1101,9 @@ with engine.connect() as conn:
     query = """
             SELECT * \
             FROM trades
-            WHERE ts >= %s \
-              AND ts <= %s
-            ORDER BY ts \
+            WHERE timestamp >= %s \
+              AND timestamp <= %s
+            ORDER BY timestamp \
             """
 
     # Execute the query directly into a pandas DataFrame
@@ -1140,25 +1140,29 @@ For optimal query performance with QuestDB:
 
 QuestDB provides specialized time-series functions that work with all PGWire clients:
 
-```
-# Example time-series query patterns
+### SAMPLE BY Queries
 
-# 1. Sample by query (works with all clients)
-"""
-SELECT
-    ts,
-    avg(price) as avg_value
+SAMPLE BY is used for time-based downsampling:
+
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
+       symbol,
+       avg(price) as avg_price,
+       min(price) as min_price,
+       max(price) as max_price
 FROM trades
-WHERE timestamp >= '2020-01-01'
-SAMPLE BY 1h;
-"""
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
+```
 
-# 2. Latest on query (efficient way to get most recent values)
-"""
-SELECT * FROM trades
+### LATEST ON Queries
+
+LATEST ON is an efficient way to get the most recent values:
+
+```questdb-sql title="LATEST Rows Per Symbol" demo
+SELECT *
+FROM trades
+WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
-"""
-
 ```
 
 ## Highly-Available Reads with QuestDB Enterprise

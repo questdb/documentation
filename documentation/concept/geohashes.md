@@ -171,9 +171,13 @@ higher precision:
 
 ```questdb-sql
 -- The following cast is valid:
-CAST(#123 as geohash(1c))
+CAST(
+     #123
+     AS geohash(1c))
 -- Invalid (low-to-high precision):
-CAST(#123 as geohash(4c))
+CAST(
+     #123
+     AS geohash(4c))
 ```
 
 ### make_geohash() function
@@ -183,7 +187,7 @@ Need to create a geohash? Use `make_geohash()`
 Returns a geohash equivalent of latitude and longitude, with precision specified
 in bits.
 
-```sql title=make_geohash(lat,long,bits)
+```questdb-sql title="make_geohash(lat,long,bits)" demo
 SELECT make_geohash(142.89124148, -12.90604153, 40)
 ```
 
@@ -263,7 +267,9 @@ We can check if the last-known location of a device is a specific geohash with
 the following query which will return an exact match based on geohash:
 
 ```questdb-sql
-SELECT * FROM geo_data WHERE g8c = #u33dr01d LATEST ON ts PARTITION BY device_id
+SELECT * FROM geo_data
+WHERE g8c = #u33dr01d
+LATEST ON ts PARTITION BY device_id
 ```
 
 | ts                          | device_id | g1c | g8c      |

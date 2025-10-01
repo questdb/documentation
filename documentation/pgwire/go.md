@@ -208,7 +208,7 @@ import (
 
 // Trade represents a row in the trades table
 type Trade struct {
-	Timestamp time.Time `db:"ts"`
+	Timestamp time.Time `db:"timestamp"`
 	Symbol    string    `db:"symbol"`
 	Price     float64   `db:"price"`
 	Amount    float64   `db:"amount"`
@@ -223,7 +223,7 @@ func main() {
 	defer conn.Close(ctx)
 
 	// Execute a query
-	rows, err := conn.Query(ctx, "SELECT ts, symbol, price, amount FROM trades LIMIT 10")
+	rows, err := conn.Query(ctx, "SELECT timestamp, symbol, price, amount FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
@@ -280,7 +280,7 @@ func main() {
 	startTime := time.Now().Add(-7 * 24 * time.Hour) // 7 days ago
 
 	rows, err := conn.Query(ctx,
-		"SELECT ts, symbol, price, amount FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10",
+		"SELECT timestamp, symbol, price, amount FROM trades WHERE symbol = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 10",
 		symbol, startTime)
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
@@ -354,7 +354,7 @@ func main() {
 			defer wg.Done()
 
 			rows, err := pool.Query(ctx,
-				"SELECT ts, price FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT 5",
+				"SELECT timestamp, price FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 5",
 				sym)
 			if err != nil {
 				log.Printf("Query failed for symbol %s: %v", sym, err)
@@ -413,13 +413,13 @@ func main() {
 	// SAMPLE BY query (time-based downsampling)
 	sampleByQuery := `
 		SELECT
-			ts,
+			timestamp,
 			symbol,
 			avg(price) as avg_price,
 			min(price) as min_price,
 			max(price) as max_price
 		FROM trades
-		WHERE ts >= dateadd('d', -7, now())
+		WHERE timestamp >= dateadd('d', -7, now())
 		SAMPLE BY 1h
 	`
 
@@ -443,7 +443,7 @@ func main() {
 
 	// LATEST ON query (last value per group)
 	fmt.Println("\nExecuting LATEST ON query...")
-	latestByQuery := "SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol"
+	latestByQuery := "SELECT timestamp, symbol, price, amount FROM trades LATEST ON timestamp PARTITION BY symbol"
 
 	rows, err = conn.Query(ctx, latestByQuery)
 	if err != nil {
@@ -519,10 +519,10 @@ func (c *QuestDBClient) Close() {
 // GetRecentTrades fetches recent trades for a given symbol
 func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limit int) ([]Trade, error) {
 	query := `
-		SELECT ts, symbol, price, amount
+		SELECT timestamp, symbol, price, amount
 		FROM trades
 		WHERE symbol = $1
-		ORDER BY ts DESC
+		ORDER BY timestamp DESC
 		LIMIT $2
 	`
 
@@ -552,13 +552,13 @@ func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limi
 func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days int) ([]PriceSample, error) {
 	query := `
 		SELECT
-			ts,
+			timestamp,
 			symbol,
 			avg(price) as avg_price,
 			min(price) as min_price,
 			max(price) as max_price
 		FROM trades
-		WHERE symbol = $1 AND ts >= dateadd('d', $2, now())
+		WHERE symbol = $1 AND timestamp >= dateadd('d', $2, now())
 		SAMPLE BY 1h
 	`
 
@@ -586,7 +586,7 @@ func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days 
 
 // GetLatestPrices fetches the latest price for each symbol
 func (c *QuestDBClient) GetLatestPrices(ctx context.Context) ([]Trade, error) {
-	query := `SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol`
+	query := `SELECT timestamp, symbol, price, amount FROM trades LATEST ON timestamp PARTITION BY symbol`
 
 	rows, err := c.pool.Query(ctx, query)
 	if err != nil {
@@ -823,23 +823,25 @@ QuestDB provides specialized time-series functions that can be used with pgx:
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ## Highly-Available Reads with QuestDB Enterprise

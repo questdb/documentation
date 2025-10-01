@@ -44,13 +44,13 @@ timestamps, the cost of deduplication is negligible.
 
 :::note
 
-The on-disk ordering of rows with duplicate timestamps differs when deduplication is enabled. 
+The on-disk ordering of rows with duplicate timestamps differs when deduplication is enabled.
 
 - Without deduplication:
     - the insertion order of each row will be preserved for rows with the same timestamp
 - With deduplication:
     - the rows will be stored in order sorted by the `DEDUP UPSERT` keys, with the same timestamp
-  
+
 For example:
 
 ```questdb-sql
@@ -89,7 +89,7 @@ criteria are set by defining a column list in the `UPSERT KEYS` clause in the
 
 `UPSERT KEYS` can be changed at any time. It can contain one or more columns.
 
-Please be aware that the [designated Timestamp](/docs/concept/designated-timestamp) 
+Please be aware that the [designated Timestamp](/docs/concept/designated-timestamp)
 column must always be included in the `UPSERT KEYS` list.
 
 
@@ -97,7 +97,7 @@ column must always be included in the `UPSERT KEYS` list.
 
 The easiest way to explain the usage of `UPSERT KEYS` is through an example:
 
-```sql
+```questdb-sql
 CREATE TABLE TICKER_PRICE (
     ts TIMESTAMP,
     ticker SYMBOL,
@@ -113,7 +113,7 @@ price/day combination is sent twice, only the last price is saved.
 
 The following inserts demonstrate the deduplication behavior:
 
-```sql
+```questdb-sql
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 78.56); -- row 1
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 78.34); -- row 2
 
@@ -128,7 +128,7 @@ row 3.
 
 As a result, the table contains only two rows:
 
-```sql
+```questdb-sql
 SELECT * FROM TICKER_PRICE;
 ```
 
@@ -143,20 +143,20 @@ inserts is maintained.
 
 Deduplication can be disabled using the DEDUP DISABLE SQL statement:
 
-```sql
+```questdb-sql
 ALTER TABLE TICKER_PRICE DEDUP DISABLE
 ```
 
 This reverts the table to behave as usual, allowing the following inserts:
 
-```sql
+```questdb-sql
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 84.59); -- row 1
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'AAPL', 105.21); -- row 2
 ```
 
 These inserts add two more rows to the TICKER_PRICE table:
 
-```sql
+```questdb-sql
 SELECT * FROM TICKER_PRICE;
 ```
 
@@ -169,7 +169,7 @@ SELECT * FROM TICKER_PRICE;
 
 Deduplication can be enabled again at any time:
 
-```sql
+```questdb-sql
 ALTER TABLE TICKER_PRICE DEDUP ENABLE UPSERT KEYS(ts, ticker)
 ```
 
@@ -185,7 +185,7 @@ Enabling deduplication does not change the number of rows in the table. After
 enabling deduplication, the following inserts demonstrate the deduplication
 behavior:
 
-```sql
+```questdb-sql
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 98.02); -- row 1
 INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 91.16); -- row 2
 ```
@@ -193,7 +193,7 @@ INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 91.16); -- row 2
 After these inserts, all rows with `ts='2023-07-14'` and `ticker='QQQ'` are
 replaced, first by row 1 and then by row 2, and the price is set to **91.16**:
 
-```sql
+```questdb-sql
 SELECT * FROM TICKER_PRICE;
 ```
 
@@ -210,13 +210,13 @@ It is possible to utilize metadata
 [tables](/docs/reference/function/meta#tables) query to verify whether
 deduplication is enabled for a specific table:
 
-```sql
+```questdb-sql
 SELECT dedup FROM tables() WHERE table_name = '<the table name>'
 ```
 
 The function [table_columns](/docs/reference/function/meta#table_columns) can be
 used to identify which columns are configured as deduplication UPSERT KEYS:
 
-```sql
+```questdb-sql
 SELECT `column`, upsertKey from table_columns('<the table name>')
 ```

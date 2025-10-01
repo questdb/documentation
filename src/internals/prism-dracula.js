@@ -62,13 +62,20 @@ const theme = {
       },
     },
     {
-      types: ["keyword", "variable", "operator"],
+      types: ["variable"],
+      style: {
+        color: color.draculaPurple,
+        fontStyle: "italic",
+      },
+    },
+    {
+      types: ["keyword", "operator"],
       style: {
         color: color.draculaPink,
       },
     },
     {
-      types: ["number"],
+      types: ["number", "time-unit", "hex-integer", "integer", "floating-point-number"],
       style: {
         color: color.draculaGreen,
       },
@@ -86,12 +93,43 @@ const theme = {
       },
     },
     {
-      types: ["variable"],
+      types: ['questdb-keyword'],
       style: {
-        color: color.draculaPurple,
-        fontStyle: "italic",
+        color: color.draculaPink,
       },
     },
+    {
+      types: ['questdb-function'],
+      style: {
+        color: color.draculaCyan,
+      },
+    },
+    {
+      types: ['questdb-datatype'],
+      style: {
+        color: color.draculaCyan,
+        fontStyle: 'italic',
+      },
+    },
+    {
+      types: ['questdb-constant'],
+      style: {
+        color: color.draculaPurple,
+      },
+    },
+    {
+      types: ["sql-variable"],
+      style: {
+        color: color.draculaPurple,
+        fontStyle: "italic"
+      }
+    },
+    {
+      types: ['array'],
+      style: {
+        color: color.draculaPink,
+      },
+    }
   ],
 }
 
