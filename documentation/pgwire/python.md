@@ -5,6 +5,13 @@ description:
   protocol with Python for querying data.
 ---
 
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
+
 QuestDB is tested with the following Python clients:
 
 - [asyncpg](#asyncpg)
@@ -1114,7 +1121,7 @@ with engine.connect() as conn:
     print(f"Sample data:\n{df.head()}")
 ```
 
-### Known Limitations with QuestDB
+### Known Limitations of Psycopg2 with QuestDB
 
 - psycopg2 is generally slower than asyncpg and psycopg3
 
@@ -1165,18 +1172,16 @@ WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-## Highly-Available Reads with QuestDB Enterprise
 
-QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
-Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
-succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
-another host, and retry the read.
+<HighlyAvailableReads />
 
-See our blog post for background and the companion repository for a minimal example:
+<KnownLimitations />
 
-- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
-- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+## Troubleshooting
 
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
 ## Conclusion
 

@@ -5,6 +5,13 @@ description:
   protocol with Go for querying data.
 ---
 
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
+
 QuestDB is tested with the following Go client:
 
 - [pgx](https://github.com/jackc/pgx) - A pure Go PostgreSQL driver and toolkit
@@ -844,38 +851,16 @@ WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-## Highly-Available Reads with QuestDB Enterprise
+<HighlyAvailableReads />
 
-QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
-Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
-succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
-another host, and retry the read.
-
-See our blog post for background and the companion repository for a minimal example:
-
-- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
-- Example: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
-
+<KnownLimitations />
 
 ## Troubleshooting
 
-### Connection Issues
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
-If you have trouble connecting to QuestDB:
-
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible.
-2. Check that the connection parameters (host, port, user, password) are correct.
-3. Make sure your network allows connections to the QuestDB server.
-4. Check if the QuestDB server logs show any connection errors.
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists.
-2. Check the syntax of your SQL query.
-3. Ensure that you're using the correct data types for parameters.
-4. Look for any unsupported PostgreSQL features that might be causing issues.
 
 ## Conclusion
 

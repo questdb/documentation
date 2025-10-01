@@ -1,0 +1,5 @@
+## PGWire Known Limitations with QuestDB
+
+- Some PostgreSQL-specific features (complex transaction semantics, exotic data types, certain metadata calls) may not be fully supported.
+- Cursors/scrollable result sets and some ORM expectations may behave differently than in PostgreSQL.
+- Prefer **querying** via PGWire and **ingestion** via ILP for best throughput.
