@@ -279,6 +279,8 @@ Validation rules:
 `\u0002`, `\u0003`, `\u0004`, `\u0005`, `\u0006`, `\u0007`, `\u0008`, `\t`, `\u000B`, `\u000c`, `\r`, `\n`,
 `\u000e`, `\u000f`, `\u007f`, `0xfeff` (UTF-8 BOM).
 
+Some clients may have trouble parsing table names that contain unusual characters, even if those names are valid in
+QuestDB. For best results, we recommend using only alphanumeric characters along with `-`, `_`, or `.`.
 
 In addition, table names are case insensitive: `example`, `exAmPlE`, `EXAMplE`
 and `EXAMPLE` are all treated the same. Table names containing spaces or period
@@ -307,6 +309,9 @@ Validation rules:
 	-	Other disallowed characters: `?`, `.`, `,`, `'`, `"`, `\`, `/`, `:`, `)`, `(`, `+`, `-`, `*`, `%`, `~`,
   `\u0000`, `\u0001`, `\u0002`, `\u0003`, `\u0004`, `\u0005`, `\u0006`, `\u0007`, `\u0008`, `\t`, `\u000B`,
   `\u000c`, `\n`, `\r`, `\u000e`, `\u000f`, `\u007f`, `0xfeff` (UTF-8 BOM).
+
+Some clients may have trouble parsing column names that contain unusual characters, even if those names are valid in
+QuestDB. For best results, we recommend using only alphanumeric characters along with `-`, or `_`.
 
 ## Type definition
 
