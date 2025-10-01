@@ -23,8 +23,8 @@ export default async (request: Request, context: Context) => {
     const url = new URL(request.url);
     const pathname = url.pathname.trim();
     const normalizedPath = pathname.endsWith('/') ? pathname : pathname + '/';
-    const mdPath = normalizedPath === '/docs/'
-      ? '/docs/index.md'
+    const mdPath = normalizedPath === '/'
+      ? '/index.md'
       : `${normalizedPath}index.md`;
 
     const mdUrl = new URL(mdPath, url.origin);
@@ -33,9 +33,9 @@ export default async (request: Request, context: Context) => {
 };
 
 export const config = {
-  path: "/docs/*",
+  path: "/*",
   method: "GET",
-  excludedPath: ["/docs/*.md", "/docs/assets/*", "/assets/*", "/docs/*.mdx", "/docs/*.css", "/docs/*.js", "/docs/*.png", "/docs/*.jpg", "/docs/*.jpeg", "/docs/*.gif", "/docs/*.svg", "/docs/*.ico", "/docs/*.webp", "/docs/*.woff", "/docs/*.woff2", "/docs/*.ttf", "/docs/*.eot", "/docs/*.otf", "/docs/*.ico", "/docs/*.webp", "/docs/*.woff", "/docs/*.woff2", "/docs/*.ttf", "/docs/*.eot", "/docs/*.otf", "/docs/*.webmanifest"],
+  excludedPath: ["/*.md", "/assets/*", "/images/*", "/fonts/*", "/*.mdx", "/*.css", "/*.js", "/*.png", "/*.jpg", "/*.jpeg", "/*.gif", "/*.svg", "/*.ico", "/*.webp", "/*.woff", "/*.woff2", "/*.ttf", "/*.eot", "/*.otf", "/*.ico", "/*.webp", "/*.woff", "/*.woff2", "/*.ttf", "/*.eot", "/*.otf", "/*.webmanifest"],
   headers: {
     "Accept": "(text/markdown|text/plain)"
   }
