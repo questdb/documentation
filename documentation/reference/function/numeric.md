@@ -49,7 +49,7 @@ equal to, a specified numeric expression.
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
@@ -94,7 +94,7 @@ numeric expression.
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
@@ -114,11 +114,11 @@ SELECT floor(15.75) as RoundedDown;
 
 **Arguments:**
 
-- `args...` is a variable-size list of `long` or `double` values.
+- `args...` is a variable-size list of `long`, `double` or `decimal` values.
 
 **Return value:**
 
-Return value type is `double` or `long`.
+Return value type is `double`, `long` or `decimal`.
 
 **Examples:**
 
@@ -138,11 +138,11 @@ SELECT greatest(11, 3, 8, 15)
 
 **Arguments:**
 
-- `args...` is a variable-size list of `long` or `double` values.
+- `args...` is a variable-size list of `long`, `double` or `decimal` values.
 
 **Return value:**
 
-Return value type is `double` or `long`.
+Return value type is `double`, `long` or `decimal`.
 
 **Examples:**
 
@@ -198,9 +198,13 @@ SELECT log(100)
 | --- |
 | 2   |
 
-:::note Some databases use `LOG` to refer to the natural logarithm and `LOG10`
-for the base 10 logarithm. QuestDB follows PostgreSQL conventions and uses `LOG`
-for base 10 and `LN` for natural logarithm. :::
+:::note
+
+Some databases use `LOG` to refer to the natural logarithm and `LOG10` for the
+base 10 logarithm. QuestDB follows PostgreSQL conventions and uses `LOG` for
+base 10 and `LN` for natural logarithm.
+
+:::
 
 ## power
 
@@ -244,7 +248,7 @@ the `round_up` and `round_down` values.
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
@@ -284,7 +288,7 @@ FROM dbl;
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
@@ -326,7 +330,7 @@ halfway between the `round_up` and `round_down` values.
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
@@ -377,7 +381,7 @@ FROM dbl;
 
 **Return value:**
 
-Return value type is `double`.
+Returns `double`, or `decimal` if the operand is `decimal`.
 
 **Examples:**
 
