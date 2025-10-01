@@ -271,6 +271,15 @@ Internally the table name is used as a directory name on the file system. It can
 contain both ASCII and Unicode characters. The table name **must be unique** and
 an error is returned if a table already exists with the requested name.
 
+Validation rules:
+- Length: subject to filesystem limits (typically ≤255).
+- Spaces: **not** allowed at the start or end.
+- Period `.`: only a **single** dot is allowed **not** at the start or end and **not** next to another dot.
+- Disallowed characters: `?`, `,`, `'`, `"`, `\`, `/`, `:`, `)`, `(`, `+`, `*`, `%`, `~`, `\u0000`, `\u0001`,
+`\u0002`, `\u0003`, `\u0004`, `\u0005`, `\u0006`, `\u0007`, `\u0008`, `\t`, `\u000B`, `\u000c`, `\r`, `\n`,
+`\u000e`, `\u000f`, `\u007f`, `0xfeff` (UTF-8 BOM).
+
+
 In addition, table names are case insensitive: `example`, `exAmPlE`, `EXAMplE`
 and `EXAMPLE` are all treated the same. Table names containing spaces or period
 `.` character must be enclosed in **double quotes**, for example:
@@ -290,6 +299,14 @@ Tables may have up to **2,147,483,647** columns. Column names are also case
 insensitive. For example: `example`, `exAmPlE`, `EXAMplE` and `EXAMPLE` are all
 treated the same. However, column names **must be** unique within each table and
 **must not contain** a period `.` character.
+
+Validation rules:
+  - Length: subject to filesystem limits (typically ≤255).
+	-	Period `.` : not allowed.
+	-	Hyphen `-`: not allowed.
+	-	Other disallowed characters: `?`, `.`, `,`, `'`, `"`, `\`, `/`, `:`, `)`, `(`, `+`, `-`, `*`, `%`, `~`,
+  `\u0000`, `\u0001`, `\u0002`, `\u0003`, `\u0004`, `\u0005`, `\u0006`, `\u0007`, `\u0008`, `\t`, `\u000B`,
+  `\u000c`, `\n`, `\r`, `\u000e`, `\u000f`, `\u007f`, `0xfeff` (UTF-8 BOM).
 
 ## Type definition
 

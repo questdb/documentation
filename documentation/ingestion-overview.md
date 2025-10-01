@@ -48,7 +48,8 @@ trades,symbol=BTC-USD,side=sell price=39269.98,amount=0.001 1646762637710419000\
 trades,symbol=ETH-USD,side=buy price=2615.4,amount=0.002 1646762637764098000\n
 ```
 
-Once inside of QuestDB, it's yours to manipulate and query via extended SQL.
+Once inside of QuestDB, it's yours to manipulate and query via extended SQL. Please note that table and column names
+must follow the QuestDB [naming rules](/docs/reference/sql/create-table/#table-name).
 
 ## Message brokers and queues
 
