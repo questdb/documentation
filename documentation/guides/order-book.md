@@ -4,7 +4,7 @@ In the following examples, we'll use the table schema below. The order book is
 stored in a 2D array with two rows: the top row are the prices, and the bottom
 row are the volumes at each price point.
 
-```questdb-sql
+```questdb-sql title="Create Table with Arrays"
 CREATE TABLE market_data (
   timestamp TIMESTAMP,
   symbol SYMBOL,
@@ -17,14 +17,15 @@ CREATE TABLE market_data (
 
 ### What is the bid-ask spread at any moment?
 
-```questdb-sql
+```questdb-sql title="Bid-Ask Spread" demo
 SELECT timestamp, spread(bids[1][1], asks[1][1]) spread
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
 
-```questdb-sql
+```questdb-sql title="Inserting Rows with Arrays"
 INSERT INTO market_data VALUES
   ('2025-07-01T12:00:00Z', 'EURUSD', ARRAY[ [9.3, 9.2], [0, 0] ], ARRAY[ [10.1, 10.2], [0, 0] ]),
   ('2025-07-01T12:00:01Z', 'EURUSD', ARRAY[ [9.7, 9.4], [0, 0] ], ARRAY[ [10.3, 10.5], [0, 0] ]);
@@ -37,7 +38,7 @@ INSERT INTO market_data VALUES
 
 ### How much volume is available within 1% of the best price?
 
-```questdb-sql
+```questdb-sql title="Volume Available within 1%" demo
 DECLARE
     @prices := asks[1],
     @volumes := asks[2],
@@ -46,7 +47,8 @@ DECLARE
     @target_price := @multiplier *  @best_price,
     @relevant_volume_levels := @volumes[1:insertion_point(@prices, @target_price)]
 SELECT timestamp, array_sum(@relevant_volume_levels) total_volume
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
@@ -69,7 +71,7 @@ INSERT INTO market_data VALUES
 Find the order book level at which the price passes a threshold, and then sum
 the sizes up to that level.
 
-```questdb-sql
+```questdb-sql title="Sum Volumes Starting at Price Threshold" demo
 DECLARE
   @prices := asks[1],
   @volumes := asks[2],
@@ -78,7 +80,8 @@ DECLARE
   @target_price := @best_price + @price_delta,
   @relevant_volumes := @volumes[1:insertion_point(@prices, @target_price)]
 SELECT timestamp, array_sum(@relevant_volumes) volume
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
@@ -96,7 +99,7 @@ INSERT INTO market_data VALUES
 
 ### What price level will a buy order for the given volume reach?
 
-```questdb-sql
+```questdb-sql title="Price Level for Order with Given Volume" demo
 DECLARE
   @prices := asks[1],
   @volumes := asks[2],
@@ -106,7 +109,8 @@ SELECT
   array_cum_sum(@volumes) cum_volumes,
   insertion_point(cum_volumes, @target_volume, true) target_level,
   @prices[target_level] price
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
@@ -132,10 +136,11 @@ book?
 This indicates pressure in one direction (e.g. buyers heavily outweighing
 sellers at the top of the book).
 
-```questdb-sql
+```questdb-sql title="Bid/Ask Ratio" demo
 SELECT
   timestamp, bids[2, 1] / asks[2, 1] imbalance
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
@@ -153,7 +158,7 @@ INSERT INTO market_data VALUES
 
 ### Cumulative imbalance (Top 3 Levels)
 
-```questdb-sql
+```questdb-sql title="Cumulative Imbalance - Top 3 Levels" demo
 DECLARE
   @bid_volumes := bids[2],
   @ask_volumes := asks[2]
@@ -162,7 +167,8 @@ SELECT
   array_sum(@bid_volumes[1:4]) bid_vol,
   array_sum(@ask_volumes[1:4]) ask_vol,
   bid_vol / ask_vol ratio
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result
@@ -183,7 +189,7 @@ INSERT INTO market_data VALUES
 Detect where the order book thins out rapidly after the first two levels. This
 signals lack of depth (fading) or fake orders (stuffing).
 
-```questdb-sql
+```questdb-sql title="Volume Dropoff" demo
 DECLARE
   @volumes := asks[2],
   @dropoff_ratio := 3.0
@@ -192,7 +198,8 @@ SELECT * FROM (
     timestamp,
     array_avg(@volumes[1:3]) top,
     array_avg(@volumes[3:6]) deep
-  FROM market_data WHERE symbol='EURUSD')
+  FROM market_data
+  WHERE timestamp > dateadd('h',-1,now()) )
 WHERE top > @dropoff_ratio * deep;
 ```
 
@@ -213,7 +220,7 @@ INSERT INTO market_data VALUES
 Look for cases where the top bid/ask volume dropped compared to the prior
 snapshot — potential order withdrawal ahead of adverse movement.
 
-```questdb-sql
+```questdb-sql title="Sudden Drop" demo
 DECLARE
   @top_bid_volume := bids[2, 1],
   @top_ask_volume := asks[2, 1],
@@ -225,8 +232,9 @@ SELECT * FROM (
     @top_bid_volume curr_bid_vol,
     lag(@top_ask_volume) OVER () prev_ask_vol,
     @top_ask_volume curr_ask_vol
-  FROM market_data WHERE symbol='EURUSD')
-WHERE prev_bid_vol > curr_bid_vol * @drop_ratio OR prev_ask_vol > curr_ask_vol * @drop_ratio;
+  FROM market_data WHERE timestamp > dateadd('h',-1,now()) AND symbol='EURUSD' )
+WHERE prev_bid_vol > curr_bid_vol * @drop_ratio OR prev_ask_vol > curr_ask_vol * @drop_ratio
+LIMIT 10;
 ```
 
 #### Sample data and result
@@ -250,7 +258,7 @@ For each level, calculate the deviation from the mid price (midpoint between
 best bid and best ask), and weight it by the volume at that level. This shows us
 whether there's stronger buying or selling interest.
 
-```questdb-sql demo
+```questdb-sql title="Price-weighted volume imbalance" demo
 DECLARE
   @bid_prices := bids[1],
   @bid_volumes := bids[2],
@@ -263,7 +271,8 @@ SELECT
   round((@best_bid_price + @best_ask_price) / 2, 2) mid_price,
   (mid_price - @bid_prices) * @bid_volumes weighted_bid_pressure,
   (@ask_prices - mid_price) * @ask_volumes weighted_ask_pressure
-FROM market_data WHERE symbol='EURUSD';
+FROM market_data WHERE timestamp IN today() AND symbol='EURUSD'
+LIMIT -10;
 ```
 
 #### Sample data and result

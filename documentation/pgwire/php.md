@@ -2,7 +2,7 @@
 title: PHP PGWire Guide
 description:
   PHP clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with PHP for querying data. 
+  protocol with PHP for querying data.
 ---
 
 QuestDB is tested with the following PHP client:
@@ -89,10 +89,10 @@ $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
 try {
     // Create a PDO instance
     $pdo = new PDO($dsn, $user, $password);
-    
+
     // Configure PDO to throw exceptions on error
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     echo "Connected successfully to QuestDB!";
 } catch (PDOException $e) {
     echo "Connection failed: " . $e->getMessage();
@@ -118,18 +118,18 @@ try {
     // Create a PDO instance
     $pdo = new PDO($dsn, $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     // Execute a simple query
     $query = "SELECT * FROM trades LIMIT 10";
     $statement = $pdo->query($query);
-    
+
     // Fetch all rows as associative arrays
     $results = $statement->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Display the results
     echo "<h2>Recent Trades</h2>";
     echo "<table border='1'>";
-    
+
     // Display column headers
     if (!empty($results)) {
         echo "<tr>";
@@ -138,7 +138,7 @@ try {
         }
         echo "</tr>";
     }
-    
+
     // Display data rows
     foreach ($results as $row) {
         echo "<tr>";
@@ -147,9 +147,9 @@ try {
         }
         echo "</tr>";
     }
-    
+
     echo "</table>";
-    
+
 } catch (PDOException $e) {
     echo "Error: " . $e->getMessage();
 }
@@ -177,29 +177,29 @@ try {
     // Create a PDO instance
     $pdo = new PDO($dsn, $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     // Parameters
     $symbol = 'BTC-USD';
     $startTime = date('Y-m-d H:i:s', strtotime('-7 days')); // 7 days ago
-    
+
     // Prepare a statement
-    $query = "SELECT * FROM trades WHERE symbol = :symbol AND ts >= :start_time ORDER BY ts DESC LIMIT 10";
+    $query = "SELECT * FROM trades WHERE symbol = :symbol AND timestamp >= :start_time ORDER BY timestamp DESC LIMIT 10";
     $statement = $pdo->prepare($query);
-    
+
     // Bind parameters
     $statement->bindParam(':symbol', $symbol, PDO::PARAM_STR);
     $statement->bindParam(':start_time', $startTime, PDO::PARAM_STR);
-    
+
     // Execute the statement
     $statement->execute();
-    
+
     // Fetch all rows
     $results = $statement->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Display the results
     echo "<h2>Recent $symbol Trades</h2>";
     echo "<table border='1'>";
-    
+
     // Display column headers
     if (!empty($results)) {
         echo "<tr>";
@@ -208,7 +208,7 @@ try {
         }
         echo "</tr>";
     }
-    
+
     // Display data rows
     foreach ($results as $row) {
         echo "<tr>";
@@ -217,9 +217,9 @@ try {
         }
         echo "</tr>";
     }
-    
+
     echo "</table>";
-    
+
 } catch (PDOException $e) {
     echo "Error: " . $e->getMessage();
 }
@@ -236,21 +236,21 @@ try {
     // Create a PDO instance
     $pdo = new PDO($dsn, $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     // Parameters
     $symbol = 'BTC-USD';
     $startTime = date('Y-m-d H:i:s', strtotime('-7 days')); // 7 days ago
-    
+
     // Prepare a statement with positional parameters
-    $query = "SELECT * FROM trades WHERE symbol = ? AND ts >= ? ORDER BY ts DESC LIMIT 10";
+    $query = "SELECT * FROM trades WHERE symbol = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 10";
     $statement = $pdo->prepare($query);
-    
+
     // Execute with parameters
     $statement->execute([$symbol, $startTime]);
-    
+
     // Fetch and display results...
     // ... (as shown in the previous example)
-    
+
 } catch (PDOException $e) {
     echo "Error: " . $e->getMessage();
 }
@@ -269,33 +269,33 @@ try {
     // Create a PDO instance
     $pdo = new PDO($dsn, $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
+
     // Execute a query
     $statement = $pdo->query("SELECT * FROM trades LIMIT 10");
-    
+
     // Method 1: Fetch all rows at once as associative arrays
     $allResults = $statement->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Method 2: Fetch all rows at once as objects
     $statement = $pdo->query("SELECT * FROM trades LIMIT 10");
     $allObjectResults = $statement->fetchAll(PDO::FETCH_OBJ);
-    
+
     // Method 3: Fetch rows one at a time
     $statement = $pdo->query("SELECT * FROM trades LIMIT 10");
     while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
         // Process each row individually
         echo "Symbol: " . htmlspecialchars($row['symbol']) . ", Price: " . htmlspecialchars($row['price']) . "<br>";
     }
-    
+
     // Method 4: Fetch a single column
     $statement = $pdo->query("SELECT symbol FROM trades LIMIT 5");
     $symbols = $statement->fetchAll(PDO::FETCH_COLUMN, 0); // 0 is the column index
-    
+
     // Method 5: Fetch a single value
     $statement = $pdo->query("SELECT COUNT(*) FROM trades");
     $count = $statement->fetchColumn();
     echo "Total trades: " . $count;
-    
+
 } catch (PDOException $e) {
     echo "Error: " . $e->getMessage();
 }
@@ -326,14 +326,14 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_PERSISTENT => true, // Enable persistent connections
     ];
-    
+
     $pdo = new PDO($dsn, $user, $password, $options);
-    
+
     // Now use $pdo for your database operations
     $statement = $pdo->query("SELECT version()");
     $version = $statement->fetchColumn();
     echo "QuestDB version: " . htmlspecialchars($version);
-    
+
 } catch (PDOException $e) {
     echo "Error: " . $e->getMessage();
 }
@@ -374,23 +374,25 @@ QuestDB provides specialized time-series functions that can be used with PDO:
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
 ## Troubleshooting

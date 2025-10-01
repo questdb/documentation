@@ -75,8 +75,9 @@ many queries, you only need to aggregate the latest partition's data, and then
 you can use already aggregated results for historical data.
 
 Throughout this document, we will use the [demo](https://demo.questdb.com/)
-`trades` table. This is a table containing crypto trading data, with over 1.6
-billion rows.
+`trades` table. This is a table containing crypto trading data, with over 2
+billion rows in total, growing at about 76 million rows per month, or 1+ billion
+rows per year.
 
 ```questdb-sql title="trades ddl"
 CREATE TABLE 'trades' (
@@ -320,7 +321,7 @@ trades_OHLC_15m WHERE timestamp IN today();
 
 ### How much faster is it?
 
-Let's run the OHLC query without using the view, against our `trades` table:
+Let's run the OHLC query without using the view, against our `trades` table for the past six months:
 
 ```questdb-sql title="the OHLC query" demo
 SELECT
@@ -331,24 +332,25 @@ SELECT
     last(price) AS close,
     sum(amount) AS volume
 FROM trades
+WHERE timestamp > dateadd('M', -6, now())
 SAMPLE BY 15m;
 ```
 
-This takes several seconds to execute.
+This takes a few seconds to execute, as it scans and aggregates over half a billion rows.
 
 Yet if we query the materialized view instead:
 
 ```questdb-sql title="OHLC materialized view unbounded" demo
-trades_OHLC_15m;
+SELECT * FROM trades_OHLC_15m
+WHERE timestamp > dateadd('M', -6, now())
 ```
 
-This returns in milliseconds, since the database only has to respond with data,
+This returns in a couple of milliseconds, since the database only has to respond with data,
 and not calculate anything - that has all been done efficiently, ahead of time.
 
 ### What about for fewer rows?
 
-Let's try this calculation again, but just for one day instead of the entire 1.6
-billion rows.
+Let's try this calculation again, but just for one day instead of six months worth of rows.
 
 ```questdb-sql title="OHLC query for yesterday" demo
 SELECT
@@ -361,7 +363,7 @@ SELECT
 FROM trades
 WHERE timestamp IN yesterday()
 SAMPLE BY 15m
-ORDER BY timestamp, symbol;
+ORDER BY timestamp;
 ```
 
 | timestamp                   | symbol    | open   | high   | low     | close  | volume             |
@@ -374,14 +376,14 @@ ORDER BY timestamp, symbol;
 | 2025-03-30T00:00:00.000000Z | BTC-USD   | 82650  | 82750  | 82563.6 | 82747  | 25.493136499999    |
 | ...                         | ...       | ...    | ...    | ...     | ...    | ...                |
 
-Calculating the OHLC for a single day takes only `15ms`.
+Calculating the OHLC for a single day takes only `16ms`.
 
 We can get the same data using the materialized view:
 
 ```questdb-sql title="OHLC materialized view for yesterday" demo
-trades_OHLC_15m
+SELECT * FROM trades_OHLC_15m
 WHERE timestamp IN yesterday()
-ORDER BY timestamp, symbol;
+ORDER BY timestamp;
 ```
 
 | timestamp                   | symbol    | open   | high   | low     | close  | volume             |
@@ -426,18 +428,24 @@ data, just to find the `B` entry.
 But materialized views offer a solution to this performance issue too!
 
 ```questdb-sql title="LATEST ON on demo trades" demo
-trades LATEST ON timestamp PARTITION BY symbol;
+SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| symbol    | side | price      | amount | timestamp                   |
-| --------- | ---- | ---------- | ------ | --------------------------- |
-| XLM-BTC   | sell | 0.00000163 | 541    | 2024-08-21T16:56:15.038557Z |
-| AVAX-BTC  | sell | 0.00039044 | 10.125 | 2024-08-21T18:00:24.549949Z |
-| MATIC-BTC | sell | 0.0000088  | 622.6  | 2024-08-21T18:01:21.607212Z |
-| ADA-BTC   | buy  | 0.00000621 | 127.32 | 2024-08-21T18:05:37.852092Z |
-| ...       | ...  | ...        | ...    | ...                         |
+| symbol     | side | price      | amount   | timestamp                   |
+| ---------- | ---- | ---------- | -------- | --------------------------- |
+| XLM-BTC    | sell | 0.00000163 | 541.0    | 2024-08-21T16:56:15.038557Z |
+| AVAX-BTC   | sell | 0.00039044 | 10.125   | 2024-08-21T18:00:24.549949Z |
+| MATIC-BTC  | sell | 0.0000088  | 622.6    | 2024-08-21T18:01:21.607212Z |
+| ADA-BTC    | buy  | 0.00000621 | 127.32   | 2024-08-21T18:05:37.852092Z |
+| DOT-BTC    | buy  | 0.0000774  | 0.01     | 2024-08-21T18:09:22.584461Z |
+| UNI-BTC    | buy  | 0.0001152  | 25.1     | 2024-08-21T18:11:26.751508Z |
+| DOGE-BTC   | sell | 0.00000175 | 706.9    | 2024-08-21T18:12:27.083291Z |
+| MATIC-USDT | sell | 0.3724     | 51.31361 | 2024-09-07T11:09:15.891000Z |
+| MATIC-USD  | sell | 0.3724     | 51.31361 | 2024-09-07T11:09:15.891000Z |
+| ETH-DAI    | sell | 3381.02    | 0.019513 | 2024-12-30T05:30:21.620999Z |
+| ...        | ...  | ...        | ...      | ...                         |
 
-This takes around `2s` to execute. Now, let's see how much data needed to be
+This takes around `3s` to execute. Now, let's see how much data needed to be
 scanned:
 
 ```questdb-sql title="filtering for the time range" demo
@@ -449,22 +457,22 @@ PARTITION BY symbol;
 
 | min                         | max                         |
 | --------------------------- | --------------------------- |
-| 2024-08-21T16:56:15.038557Z | 2025-03-31T12:55:28.193000Z |
+| 2024-08-21T16:56:15.038557Z | 2025-09-26T14:21:25.435000Z |
 
-So the database scanned approximately 7 months of data to serve this query. How
+So the database scanned approximately 13 months of data to serve this query. How
 many rows was that?
 
 ```questdb-sql title="number of rows the LATEST ON scanned" demo
 SELECT count()
 FROM trades
-WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z';
+WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-09-26T14:21:25.435000Z';
 ```
 
-| count     |
-| --------- |
-| 766834703 |
+| count      |
+| ---------- |
+| 1274995213 |
 
-Yes, **~767 million rows**, just to serve the most recent **42 rows**, one for
+Yes, **~1275 million rows**, just to serve the most recent **42 rows**, one for
 each symbol.
 
 Let's fix this using a new materialized view.
@@ -475,7 +483,7 @@ If we were to take a `LATEST ON` query for a single day, we would therefore
 expect up to `84` rows (`42` buys, `42` sells):
 
 ```questdb-sql title="yesterday() LATEST ON" demo
-(trades WHERE timestamp IN yesterday())
+SELECT * FROM trades WHERE timestamp IN yesterday()
 LATEST ON timestamp PARTITION BY symbol, side
 ORDER BY symbol, side, timestamp;
 ```
@@ -496,7 +504,6 @@ ORDER BY symbol, side, timestamp;
 | BTC-USD   | sell | 82397.9 | 0.00001819 | 2025-03-30T23:59:59.796999Z |
 | ...       | ...  | ...     | ...        | ...                         |
 
-This executes in `40ms`.
 
 A similar `GROUP BY` query looks like this:
 
@@ -512,7 +519,6 @@ WHERE timestamp IN yesterday()
 ORDER BY symbol, side, timestamp;
 ```
 
-which executes in `8ms`.
 
 Instead of using the `LATEST ON` syntax, we can use a `SAMPLE BY` equivalent,
 which massively reduces the number of rows we need to query.
@@ -522,7 +528,7 @@ always have the fastest possible `LATEST ON` query.
 
 ### Pre-aggregating the data
 
-We will pre-aggregate the ~767 million rows into just ~15000.
+We will pre-aggregate the ~1275 million rows into just ~24000.
 
 Instead of storing the raw data, we will store one row, per symbol, per side,
 per day of data.
@@ -536,13 +542,13 @@ SELECT timestamp, symbol, side, price, amount, "latest" as timestamp FROM (
            last(amount) AS amount,
            last(timestamp) as latest
     FROM trades
-    WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-03-31T12:55:28.193000Z'
+    WHERE timestamp BETWEEN '2024-08-21T16:56:15.038557Z' AND '2025-09-26T14:21:25.435000Z'
     SAMPLE BY 1d
 ) ORDER BY timestamp;
 ```
 
-This result set comprises just `14595` rows, instead of ~767 million. That's
-51000x fewer rows the database needs to scan to handle the query.
+This result set comprises just `24,625` rows, instead of ~1275 million. That's
+51770x fewer rows the database needs to scan to handle the query.
 
 Here it is as a materialized view:
 
@@ -562,7 +568,7 @@ SAMPLE BY 1d;
 You can try this view out on our demo:
 
 ```questdb-sql title="trades_latest_1d" demo
-trades_latest_1d;
+SELECT * FROM trades_latest_1d;
 ```
 
 Then, you can query this 'per-day LATEST ON' view to quickly calculate the
@@ -573,19 +579,19 @@ SELECT symbol, side, price, amount, "latest" as timestamp FROM (
 	trades_latest_1d
 	LATEST ON timestamp
 	PARTITION BY symbol, side
-) ORDER BY timestamp;
+) ORDER BY timestamp DESC;
 ```
 
 And in just a few milliseconds, we get the result:
 
-| symbol   | side | price   | amount    | timestamp                   |
-| -------- | ---- | ------- | --------- | --------------------------- |
-| ETH-BTC  | sell | 0.02196 | 0.005998  | 2025-03-31T14:24:18.916000Z |
-| DAI-USDT | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
-| DAI-USD  | sell | 1.0006  | 53        | 2025-03-31T14:29:19.392999Z |
-| DAI-USD  | buy  | 1.0007  | 29.785106 | 2025-03-31T14:30:33.394000Z |
-| DAI-USDT | buy  | 1.0007  | 29.785106 | 2025-03-31T14:30:33.394000Z |
-| ...      | ...  | ...     | ...       | ...                         |
+| symbol    | side | price       | amount     | timestamp                   |
+| --------- | ---- | ----------- | ---------- | --------------------------- |
+| SOL-USDT  | buy  | 194.01      | 5.565995   | 2025-09-26T14:36:24.015000Z |
+| SOL-USD   | buy  | 194.01      | 5.565995   | 2025-09-26T14:36:24.015000Z |
+| ETH-USD   | buy  | 3933.18     | 0.01       | 2025-09-26T14:36:24.013999Z |
+| ETH-USDT  | buy  | 3933.18     | 0.01       | 2025-09-26T14:36:24.013999Z |
+| BTC-USDT  | sell | 108977.1    | 0.00001229 | 2025-09-26T14:36:23.879000Z |
+| ...       | ...  | ...         | ...        | ...                         |
 
 Seconds down to milliseconds - **100x, even 1000x faster!**
 
@@ -624,7 +630,7 @@ data.
 
 You can monitor refresh status using the `materialized_views()` system function:
 
-```questdb-sql title="Listing all materialized views"
+```questdb-sql title="Listing all materialized views" demo
 SELECT
   view_name,
   last_refresh_start_timestamp,
@@ -648,7 +654,7 @@ fully up-to-date.
 
 If a materialized view becomes invalid, you can check its status:
 
-```questdb-sql title="Checking view status"
+```questdb-sql title="Checking view status" demo
 SELECT
   view_name,
   base_table_name,

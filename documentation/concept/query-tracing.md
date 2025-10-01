@@ -21,13 +21,13 @@ query.tracing.enabled=true
 You don't need to restart the database server for this property to take effect;
 just run the following query to reload the configuration:
 
-```sql
+```questdb-sql title="reload_config()"
 SELECT reload_config();
 ```
 
 This is an example of what the `_query_trace` table may contain:
 
-```sql
+```questdb-sql title="_query_trace"
 SELECT * from _query_trace;
 ```
 
@@ -40,10 +40,10 @@ SELECT * from _query_trace;
 As a simple performance debugging example, to get the text of all queries that
 took more than 100 ms, run:
 
-```sql
-SELECT 
+```questdb-sql title="_query_trace with filters"
+SELECT
     query_text
-FROM _query_trace 
+FROM _query_trace
 WHERE execution_micros > 100_000
 ORDER BY execution_micros DESC;
 ```
