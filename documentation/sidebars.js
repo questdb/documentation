@@ -622,6 +622,7 @@ module.exports = {
             "third-party-tools/superset",
             "third-party-tools/flink",
             "third-party-tools/spark",
+            "third-party-tools/ignition"
           ],
         },
         {
