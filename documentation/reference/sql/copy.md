@@ -25,10 +25,10 @@ following impact:
 
 The `COPY` command has two modes of operation:
 
-1. **Import mode**: `COPY table_name FROM 'file.csv'` - Copies data from a delimited text file into QuestDB
-2. **Export mode**: `COPY table_name TO 'output_directory'` or `COPY (query) TO 'output_directory'` - Exports table or query results to Parquet format
+1. **Import mode**: `COPY table_name FROM 'file.csv'`, copying data from a delimited text file into QuestDB.
+2. **Export mode**: `COPY table_name TO 'output_directory'` or `COPY (query) TO 'output_directory'`, exporting data to Parquet files.
 
-### Import Mode
+### Import mode (COPY-FROM)
 
 Copies tables from a delimited text file saved in the defined root directory
 into QuestDB. `COPY` has the following import modes:
@@ -55,7 +55,7 @@ into QuestDB. `COPY` has the following import modes:
 
 :::note
 
-`COPY` takes up all the available resources. While one import is running, new
+Parallel `COPY` takes up all the available resources. While one import is running, new
 request(s) will be rejected.
 
 :::
@@ -63,23 +63,7 @@ request(s) will be rejected.
 `COPY '<id>' CANCEL` cancels the copying operation defined by the import `id`,
 while an import is taking place.
 
-### Export Mode
-
-Exports data from a table or query result set to Parquet format. The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
-
-**Key features:**
-
-- Export entire tables or query results
-- Configurable Parquet export options (compression, row group size, etc.)
-- Non-blocking exports - writes continue during export
-- Supports partitioned exports matching table partitioning
-- Configurable size limits
-
-**Export directory:**
-
-The export destination is relative to `cairo.sql.copy.root` (defaults to `root_directory/export`). You can configure this through the [configuration settings](/docs/configuration/).
-
-### Root directory
+### Import root
 
 `COPY` requires a defined root directory where CSV files are saved and copied
 from. A CSV file must be saved to the root directory before starting the `COPY`
@@ -87,7 +71,7 @@ operation. There are two root directories to be defined:
 
 - `cairo.sql.copy.root` is used for storing regular files to be imported. By default,
   it points to the `root_directory/import` directory. This allows you to drop a CSV
-    file into the `import` directory and start the import operation.
+  file into the `import` directory and start the import operation.
 - `cairo.sql.copy.work.root` is used for storing temporary files like indexes or
   temporary partitions. Unless otherwise specified, it points to the
   `root_directory/tmp` directory.
@@ -113,13 +97,9 @@ the `/Users` tree and set the root directory accordingly.
 
 :::
 
-### Log tables
+### Logs
 
-`COPY` generates log tables tracking operations:
-
-#### Import log: `sys.text_import_log`
-
-Tracks `COPY FROM` (import) operations for the last three days with the following information:
+`COPY-FROM` reports its progress through a system table, `sys.text_import_log`. This contains the following information:
 
 | Column name   | Data type | Notes                                                                         |
 | ------------- | --------- | ----------------------------------------------------------------------------- |
@@ -136,49 +116,27 @@ Tracks `COPY FROM` (import) operations for the last three days with the followin
 |               |           | The counters are shown in the final log row for the given import              |
 | errors        | long      | The number of errors for the given phase                                      |
 
-\* Available phases for parallel import are:
 
-- setup
-- boundary_check
-- indexing
-- partition_import
-- symbol_table_merge
-- update_symbol_keys
-- build_symbol_index
-- move_partitions
-- attach_partitions
-- analyze_file_structure
-- cleanup
+**Parallel import phases**
+  - setup
+  - boundary_check
+  - indexing
+  - partition_import
+  - symbol_table_merge
+  - update_symbol_keys
+  - build_symbol_index
+  - move_partitions
+  - attach_partitions
+  - analyze_file_structure
+  - cleanup
 
-Log table row retention is configurable through
-`cairo.sql.copy.log.retention.days` setting, and is three days by default.
+The retention for this table is configured using the `cairo.sql.copy.log.retention.days` setting, and is three days by default.
 
-`COPY` returns `id` value from `sys.text_import_log` to track the import
-progress.
+`COPY` returns an `id` value, which can be correlated with `sys.text_import_log` to track the import progress.
 
-#### Export log: `sys.copy_export_log`
+### Options
 
-Tracks `COPY TO` (export) operations for the last three days with the following information:
-
-| Column name   | Data type | Notes                                                                         |
-| ------------- | --------- | ----------------------------------------------------------------------------- |
-| ts            | timestamp | The log event timestamp                                                       |
-| id            | string    | Export id                                                                     |
-| table         | symbol    | Source table name (or 'query' for subquery exports)                          |
-| destination   | symbol    | The destination directory path                                                |
-| format        | symbol    | Export format (currently only 'PARQUET')                                      |
-| status        | symbol    | The event status: started, finished, failed, cancelled                        |
-| message       | string    | The error message when status is failed                                       |
-| rows_exported | long      | The total number of exported rows (shown in final log row)                    |
-| partition     | symbol    | Partition name for partitioned exports (null for non-partitioned)             |
-
-Log table row retention is configurable through `cairo.sql.copy.log.retention.days` setting, and is three days by default.
-
-`COPY TO` returns an `id` value from `sys.copy_export_log` to track the export progress.
-
-## Options
-
-### Import Options (COPY FROM)
+These options are provided as key-value pairs after the `WITH` keyword.
 
 - `HEADER true/false`: When `true`, QuestDB automatically assumes the first row
   is a header. Otherwise, schema recognition is used to determine whether the
@@ -192,30 +150,13 @@ Log table row retention is configurable through `cairo.sql.copy.log.retention.da
 - `DELIMITER`: Default setting is `,`.
 - `PARTITION BY`: Partition unit.
 - `ON ERROR`: Define responses to data parsing errors. The valid values are:
-  - `SKIP_ROW`: Skip the entire row
-  - `SKIP_COLUMN`: Skip column and use the default value (`null` for nullable
-    types, `false` for boolean, `0` for other non-nullable types)
-  - `ABORT`: Abort whole import on first error, and restore the pre-import table
-    status
+    - `SKIP_ROW`: Skip the entire row
+    - `SKIP_COLUMN`: Skip column and use the default value (`null` for nullable
+      types, `false` for boolean, `0` for other non-nullable types)
+    - `ABORT`: Abort whole import on first error, and restore the pre-import table
+      status
 
-### Export Options (COPY TO)
-
-All export options are specified using the `WITH` clause after the `TO` destination path.
-
-- `FORMAT PARQUET`: Specifies Parquet as the export format (currently the only supported format). Default: `PARQUET`.
-- `PARTITION_BY <unit>`: Partition the export by time unit. Valid values: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`. Default: matches the source table's partitioning, or `NONE` for queries.
-- `SIZE_LIMIT <size>`: Maximum size for export files. Supports units like `10MB`, `1GB`, etc. When exceeded, a new file is created. Default: unlimited.
-- `COMPRESSION_CODEC <codec>`: Parquet compression algorithm. Valid values: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`. Default: `ZSTD`.
-- `COMPRESSION_LEVEL <n>`: Compression level (codec-specific). Higher values mean better compression but slower speed. Default: varies by codec.
-- `ROW_GROUP_SIZE <n>`: Number of rows per Parquet row group. Larger values improve compression but increase memory usage. Default: `100000`.
-- `DATA_PAGE_SIZE <n>`: Size of data pages within row groups in bytes. Default: `1048576` (1MB).
-- `STATISTICS_ENABLED true/false`: Enable Parquet column statistics for better query performance. Default: `true`.
-- `PARQUET_VERSION <n>`: Parquet format version. Valid values: `1` (v1.0) or `2` (v2.0). Default: `2`.
-- `RAW_ARRAY_ENCODING true/false`: Use raw encoding for arrays (more efficient for numeric arrays). Default: `true`.
-
-## Examples
-
-### Import Examples
+### Examples
 
 For more details on parallel import, please also see
 [Importing data in bulk via CSV](/docs/guides/import-csv/#import-csv-via-copy-sql).
@@ -260,7 +201,59 @@ SELECT * FROM 'sys.text_import_log' WHERE id = '55ca24e5ba328050' LIMIT -1;
 | :-------------------------- | ---------------- | ------- | ----------- | ----- | --------- | ---------------------------------------------------------- | ------------ | ------------- | ------ |
 | 2022-08-03T14:04:42.268502Z | 55ca24e5ba328050 | weather | weather.csv | null  | cancelled | import cancelled [phase=partition_import, msg=`Cancelled`] | 0            | 0             | 0      |
 
-### Export Examples
+
+### Export mode (COPY-TO)
+
+Exports data from a table or query result set to Parquet format. The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
+
+**Key features:**
+
+- Export entire tables or query results
+- Configurable Parquet export options (compression, row group size, etc.)
+- Non-blocking exports - writes continue during export
+- Supports partitioned exports matching table partitioning
+- Configurable size limits
+
+### Export root
+
+The export destination is relative to `cairo.sql.copy.export.root` (defaults to `root_directory/export`). You can configure this through the [configuration settings](/docs/configuration/).
+
+### Logs
+
+`COPY-TO` reports its progress through a system table, `sys.copy_export_log`. This contains the following information:
+
+
+| Column name        | Data type | Notes                                                             |
+|--------------------|-----------|-------------------------------------------------------------------|
+| ts                 | timestamp | The log event timestamp                                           |
+| id                 | string    | Export id                                                         |
+| table_name         | symbol    | Source table name (or 'query' for subquery exports)               |
+| export_path        | symbol    | The destination directory path                                    |
+| num_exported_files | int       | The number of files exported                                      |
+| phase              | symbol    | The export execution phase                                        |
+| status             | symbol    | The event status: started, finished, failed, cancelled            |
+| message            | VARCHAR   | Information about the current phase/step                          |
+| errors             | long      | Error code(s)                                                     |
+
+Log table row retention is configurable through `cairo.sql.copy.log.retention.days` setting, and is three days by default.
+
+`COPY TO` returns an `id` value from `sys.copy_export_log` to track the export progress.
+
+### Options
+
+All export options are specified using the `WITH` clause after the `TO` destination path.
+
+- `FORMAT PARQUET`: Specifies Parquet as the export format (currently the only supported format). Default: `PARQUET`.
+- `PARTITION_BY <unit>`: Partition the export by time unit. Valid values: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`. Default: matches the source table's partitioning, or `NONE` for queries.
+- `COMPRESSION_CODEC <codec>`: Parquet compression algorithm. Valid values: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`. Default: `LZ4_RAW`.
+- `COMPRESSION_LEVEL <n>`: Compression level (codec-specific). Higher values mean better compression but slower speed. Default: varies by codec.
+- `ROW_GROUP_SIZE <n>`: Number of rows per Parquet row group. Larger values improve compression but increase memory usage. Default: `100000`.
+- `DATA_PAGE_SIZE <n>`: Size of data pages within row groups in bytes. Default: `1048576` (1MB).
+- `STATISTICS_ENABLED true/false`: Enable Parquet column statistics for better query performance. Default: `true`.
+- `PARQUET_VERSION <n>`: Parquet format version. Valid values: `1` (v1.0) or `2` (v2.0). Default: `2`.
+- `RAW_ARRAY_ENCODING true/false`: Use raw encoding for arrays (compatibility for parquet readers). Default: `true`.
+
+## Examples
 
 #### Export entire table to Parquet
 
@@ -282,6 +275,8 @@ Track export progress:
 SELECT * FROM sys.copy_export_log WHERE id = '7f3a9c2e1b456789';
 ```
 
+This will copy all of the partitions and convert them individually to parquet.
+
 #### Export query results to Parquet
 
 Export the results of a query:
@@ -291,6 +286,8 @@ COPY (SELECT * FROM trades WHERE timestamp IN today() AND symbol = 'BTC-USD')
 TO 'btc_today'
 WITH FORMAT PARQUET;
 ```
+
+This will export the result set to a single parquet file.
 
 #### Export with partitioning
 
@@ -318,18 +315,7 @@ WITH
     DATA_PAGE_SIZE 2097152;
 ```
 
-#### Export with size limits
-
-Limit export file size to create multiple files:
-
-```questdb-sql title="Export with 1GB file size limit"
-COPY trades TO 'trades_chunked'
-WITH
-    FORMAT PARQUET
-    SIZE_LIMIT 1GB;
-```
-
-When the export exceeds 1GB, QuestDB creates multiple numbered files: `trades_chunked_0.parquet`, `trades_chunked_1.parquet`, etc.
+This allows you to tune each export request to your particular needs.
 
 #### Export aggregated data
 

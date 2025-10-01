@@ -590,27 +590,27 @@ returned in a tabular form to be saved and reused as opposed to JSON.
 
 `/exp` is expecting an HTTP GET request with following parameters:
 
-| Parameter              | Required | Description                                                                                                                                                                                                                  |
-| :--------------------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `query`                | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
-| `limit`                | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
-| `nm`                   | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
-| `fmt`                  | No       | Export format. Valid values: `parquet`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                                |
+| Parameter | Required | Description                                                                                                                                                                                                                  |
+|:----------|:---------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `query`   | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
+| `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
+| `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
+| `fmt`     | No       | Export format. Valid values: `parquet`, `csv`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                         |
 
 #### Parquet Export Parameters
 
 When `fmt=parquet`, the following additional parameters are supported:
 
-| Parameter              | Required | Default      | Description                                                                                                     |
-| :--------------------- | :------- | :----------- | :-------------------------------------------------------------------------------------------------------------- |
-| `partition_by`         | No       | `NONE`       | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                             |
-| `compression_codec`    | No       | `ZSTD`       | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, or `LZ4_RAW`.                          |
-| `compression_level`    | No       | Codec-dependent | Compression level (codec-specific). Higher values = better compression but slower.                           |
-| `row_group_size`       | No       | `100000`     | Number of rows per Parquet row group.                                                                           |
-| `data_page_size`       | No       | `1048576`    | Size of data pages in bytes (default 1MB).                                                                      |
-| `statistics_enabled`   | No       | `true`       | Enable Parquet column statistics: `true` or `false`.                                                            |
-| `parquet_version`      | No       | `2`          | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                               |
-| `raw_array_encoding`   | No       | `true`       | Use raw encoding for arrays: `true` or `false`.                                                                 |
+| Parameter            | Required | Default         | Description                                                                                         |
+|:---------------------|:---------|:----------------|:----------------------------------------------------------------------------------------------------|
+| `partition_by`       | No       | `NONE`          | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                  |
+| `compression_codec`  | No       | `LZ4_RAW`       | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`. |
+| `compression_level`  | No       | Codec-dependent | Compression level (codec-specific). Higher values = better compression but slower.                  |
+| `row_group_size`     | No       | `100000`        | Number of rows per Parquet row group.                                                               |
+| `data_page_size`     | No       | `1048576`       | Size of data pages in bytes (default 1MB).                                                          |
+| `statistics_enabled` | No       | `true`          | Enable Parquet column statistics: `true` or `false`.                                                |
+| `parquet_version`    | No       | `2`             | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                   |
+| `raw_array_encoding` | No       | `true`          | Use raw encoding for arrays: `true` or `false`.                                                     |
 
 The parameters must be URL encoded.
 
@@ -673,7 +673,6 @@ curl -G \
   --data-urlencode "query=SELECT symbol, price, amount FROM trades WHERE timestamp > dateadd('h', -1, now())" \
   --data-urlencode "fmt=parquet" \
   --data-urlencode "compression_codec=LZ4_RAW" \
-  --data-urlencode "compression_level=3" \
   http://localhost:9000/exp > recent_trades.parquet
 ```
 
