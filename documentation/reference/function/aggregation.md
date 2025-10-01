@@ -16,6 +16,10 @@ QuestDB does not using aggregate functions as arguments to other functions. For 
 SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
 ```
 
+Running it will result in the following error:
+
+`Aggregate function cannot be passed as an argument`
+
 You can work around this limitation by using CTEs or subqueries:
 
 ```questdb-sql
