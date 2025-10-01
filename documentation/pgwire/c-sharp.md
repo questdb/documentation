@@ -5,6 +5,13 @@ description:
   protocol with C# for querying data.
 ---
 
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
+
 QuestDB is tested with the following C# client:
 
 - [Npgsql](https://www.npgsql.org/)
@@ -148,6 +155,7 @@ namespace QuestDBExample
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
+
 
                 string sql = "SELECT symbol, price, amount, timestamp FROM trades LIMIT 10";
                 await using var command = new NpgsqlCommand(sql, connection);
@@ -352,7 +360,6 @@ namespace QuestDBExample
 
                 // LATEST ON query (last value per group)
                 string latestByQuery = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
-
                 Console.WriteLine("\nExecuting LATEST ON query...");
                 await using (var cmd2 = new NpgsqlCommand(latestByQuery, connection))
                 {
@@ -787,25 +794,16 @@ WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
+
+<HighlyAvailableReads />
+
+<KnownLimitations />
+
 ## Troubleshooting
 
-### Connection Issues
-
-If you have trouble connecting to QuestDB:
-
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible.
-2. Check that the connection parameters (host, port, user, password) are correct.
-3. Ensure that you've included `ServerCompatibilityMode=NoTypeLoading` in your connection string.
-4. Check if the QuestDB server logs show any connection errors.
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists.
-2. Check the syntax of your SQL query.
-3. Ensure that you're using the correct data types for parameters.
-4. Look for any unsupported PostgreSQL features that might be causing issues.
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
 ## Conclusion
 
