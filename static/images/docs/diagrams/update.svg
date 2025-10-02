@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="625" height="81">
+<svg xmlns="http://www.w3.org/2000/svg" width="873" height="199">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
@@ -28,28 +28,48 @@
             polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
         </style>
     </defs>
-    <polygon points="9 61 1 57 1 65"></polygon>
-         <polygon points="17 61 9 57 9 65"></polygon><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#UPDATE" xlink:title="UPDATE">
-            <rect x="31" y="47" width="68" height="32"></rect>
-            <rect x="29" y="45" width="68" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="39" y="65">UPDATE</text></a><rect x="119" y="47" width="92" height="32" rx="10"></rect>
-         <rect x="117" y="45" width="92" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="127" y="65">tableName</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#SET" xlink:title="SET">
-            <rect x="231" y="47" width="42" height="32"></rect>
-            <rect x="229" y="45" width="42" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="239" y="65">SET</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#columnName" xlink:title="columnName">
-            <rect x="313" y="47" width="102" height="32"></rect>
-            <rect x="311" y="45" width="102" height="32" class="nonterminal"></rect>
-            <text class="nonterminal" x="321" y="65">columnName</text></a><rect x="435" y="47" width="30" height="32" rx="10"></rect>
-         <rect x="433" y="45" width="30" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="443" y="65">=</text>
-         <rect x="485" y="47" width="92" height="32" rx="10"></rect>
-         <rect x="483" y="45" width="92" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="493" y="65">expression</text>
-         <rect x="313" y="3" width="24" height="32" rx="10"></rect>
-         <rect x="311" y="1" width="24" height="32" class="terminal" rx="10"></rect>
-         <text class="terminal" x="321" y="21">,</text>
-         <path class="line" d="m17 61 h2 m0 0 h10 m68 0 h10 m0 0 h10 m92 0 h10 m0 0 h10 m42 0 h10 m20 0 h10 m102 0 h10 m0 0 h10 m30 0 h10 m0 0 h10 m92 0 h10 m-304 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m284 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-284 0 h10 m24 0 h10 m0 0 h240 m23 44 h-3"></path>
-         <polygon points="615 61 623 57 623 65"></polygon>
-         <polygon points="615 61 607 57 607 65"></polygon>
+    <polygon points="11 61 3 57 3 65"></polygon>
+         <polygon points="19 61 11 57 11 65"></polygon><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#UPDATE" xlink:title="UPDATE">
+            <rect x="33" y="47" width="68" height="32"></rect>
+            <rect x="31" y="45" width="68" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="41" y="65">UPDATE</text></a><rect x="121" y="47" width="92" height="32" rx="10"></rect>
+         <rect x="119" y="45" width="92" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="129" y="65">tableName</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#SET" xlink:title="SET">
+            <rect x="233" y="47" width="42" height="32"></rect>
+            <rect x="231" y="45" width="42" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="241" y="65">SET</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#columnName" xlink:title="columnName">
+            <rect x="315" y="47" width="102" height="32"></rect>
+            <rect x="313" y="45" width="102" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="323" y="65">columnName</text></a><rect x="437" y="47" width="30" height="32" rx="10"></rect>
+         <rect x="435" y="45" width="30" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="445" y="65">=</text>
+         <rect x="487" y="47" width="92" height="32" rx="10"></rect>
+         <rect x="485" y="45" width="92" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="495" y="65">expression</text>
+         <rect x="315" y="3" width="24" height="32" rx="10"></rect>
+         <rect x="313" y="1" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="323" y="21">,</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#FROM" xlink:title="FROM">
+            <rect x="45" y="133" width="54" height="32"></rect>
+            <rect x="43" y="131" width="54" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="53" y="151">FROM</text></a><rect x="119" y="133" width="92" height="32" rx="10"></rect>
+         <rect x="117" y="131" width="92" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="127" y="151">joinTable1</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#JOIN" xlink:title="JOIN">
+            <rect x="251" y="165" width="48" height="32"></rect>
+            <rect x="249" y="163" width="48" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="259" y="183">JOIN</text></a><rect x="319" y="165" width="92" height="32" rx="10"></rect>
+         <rect x="317" y="163" width="92" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="327" y="183">joinTable2</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#ON" xlink:title="ON">
+            <rect x="431" y="165" width="38" height="32"></rect>
+            <rect x="429" y="163" width="38" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="439" y="183">ON</text></a><rect x="489" y="165" width="118" height="32" rx="10"></rect>
+         <rect x="487" y="163" width="118" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="497" y="183">joinCondition2</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#WHERE" xlink:title="WHERE">
+            <rect x="687" y="133" width="66" height="32"></rect>
+            <rect x="685" y="131" width="66" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="695" y="151">WHERE</text></a><rect x="773" y="133" width="52" height="32" rx="10"></rect>
+         <rect x="771" y="131" width="52" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="781" y="151">filter</text>
+         <path class="line" d="m19 61 h2 m0 0 h10 m68 0 h10 m0 0 h10 m92 0 h10 m0 0 h10 m42 0 h10 m20 0 h10 m102 0 h10 m0 0 h10 m30 0 h10 m0 0 h10 m92 0 h10 m-304 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m284 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-284 0 h10 m24 0 h10 m0 0 h240 m22 44 l2 0 m2 0 l2 0 m2 0 l2 0 m-618 54 l2 0 m2 0 l2 0 m2 0 l2 0 m22 0 h10 m0 0 h592 m-622 0 h20 m602 0 h20 m-642 0 q10 0 10 10 m622 0 q0 -10 10 -10 m-632 10 v12 m622 0 v-12 m-622 12 q0 10 10 10 m602 0 q10 0 10 -10 m-612 10 h10 m54 0 h10 m0 0 h10 m92 0 h10 m20 0 h10 m0 0 h366 m-396 0 h20 m376 0 h20 m-416 0 q10 0 10 10 m396 0 q0 -10 10 -10 m-406 10 v12 m396 0 v-12 m-396 12 q0 10 10 10 m376 0 q10 0 10 -10 m-386 10 h10 m48 0 h10 m0 0 h10 m92 0 h10 m0 0 h10 m38 0 h10 m0 0 h10 m118 0 h10 m60 -64 h10 m0 0 h148 m-178 0 h20 m158 0 h20 m-198 0 q10 0 10 10 m178 0 q0 -10 10 -10 m-188 10 v12 m178 0 v-12 m-178 12 q0 10 10 10 m158 0 q10 0 10 -10 m-168 10 h10 m66 0 h10 m0 0 h10 m52 0 h10 m23 -32 h-3"></path>
+         <polygon points="863 115 871 111 871 119"></polygon>
+         <polygon points="863 115 855 111 855 119"></polygon>
 </svg>

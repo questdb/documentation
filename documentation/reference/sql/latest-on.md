@@ -19,7 +19,7 @@ where:
   column.
 - `columnName` list used in the `PARTITION BY` part of the clause is a list of
   columns of one of the following types: `SYMBOL`, `STRING`, `BOOLEAN`, `SHORT`,
-  `INT`, `LONG`, `LONG256`, `CHAR`.
+  `INT`, `LONG`, `LONG256`, `CHAR`, `DECIMAL`.
 
 ## Description
 

@@ -34,6 +34,7 @@ QuestDB supports the following random generation functions:
 - [rnd_uuid4](#rnd_uuid4)
 - [rnd_ipv4](#rnd_ipv4)
 - [rnd_double_array](#rnd_double_array)
+- [rnd_decimal](#rnd_decimal)
 
 ## Usage
 
@@ -659,14 +660,14 @@ rnd_ipv4('22.43.200.9/16', 0)
 
 Generates a `DOUBLE` array with random elements. There are two main forms:
 
-1. `rnd_double_array(nDims, [ nanRate, [ maxDimLength ] ])` — generates an array with
-   the specified dimensionality and random dimension lengths, as well as random
-   elements. `nanRate` and `maxDimLength` are optional parameters. The default
-   `nanRate` is zero and the default `maxDimLength` is 16.
+1. `rnd_double_array(nDims, [ nanRate, [ maxDimLength ] ])` — generates an array
+   with the specified dimensionality and random dimension lengths, as well as
+   random elements. `nanRate` and `maxDimLength` are optional parameters. The
+   default `nanRate` is zero and the default `maxDimLength` is 16.
 
 2. `rnd_double_array(nDims, nanRate, 0, dim1Len, dim2Len, dim3Len, ...)` —
-   generates an array of fixed size with random elements. Note the dummy argument 0,
-   its is needed to disambiguate from other forms.
+   generates an array of fixed size with random elements. Note the dummy
+   argument 0, its is needed to disambiguate from other forms.
 
 **Examples:**
 
@@ -694,4 +695,33 @@ SELECT rnd_double_array(2, 0, 0, 2, 5);
   [0.316129098879942,  0.8662158040337894, 0.8642568676265672,  0.6470407728977403, 0.4740048603478647],
   [0.2928431722534959, 0.4269209916086062, 0.08520276767101154, 0.5371988206397026, 0.5786689751730609]
 ]
+```
+
+## rnd_decimal
+
+- `rnd_decimal(precision, scale, nanRate)` - generates a random **positive**
+  `decimal` between 0 and the maximum value representable by the given precision
+  and scale.
+
+**Arguments:**
+
+- `nanRate` is an `int` defining the frequency of occurrence of `NaN` values:
+- `0`: No `NaN` will be returned.
+- `1`: Will only return `NaN`.
+- `N > 1`: On average, one in N generated values will be `NaN`.
+
+**Return value:**
+
+Return value type is `decimal`.
+
+**Examples:**
+
+```questdb-sql title="Random decimal"
+SELECT rnd_decimal(8, 2, 0) FROM long_sequence(5);
+SELECT rnd_decimal(8, 2, 4) FROM long_sequence(5);
+```
+
+```
+6618.97 5037.02 7118.16 9024.15 537.05
+null 734.74 787.93 null 789.92
 ```

@@ -319,7 +319,7 @@ When specifying a column, a name and
 [type definition](/docs/reference/sql/datatypes/) must be provided. The `symbol`
 type may have additional optional parameters applied.
 
-![Flow chart showing the syntax of the different column types](/images/docs/diagrams/columnTypeDef.svg)
+![Flow chart showing the syntax of the different column types](/images/docs/diagrams/typeDef.svg)
 
 ### Symbols
 
@@ -397,8 +397,7 @@ CREATE TABLE trades (
   [**symbol capacity**](/docs/concept/symbol/#usage-of-symbols) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
-  the implications.
-:::
+  the implications. :::
 
 See the [Index concept](/docs/concept/indexes/#how-indexes-work) for more
 information about indexes.
