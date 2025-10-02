@@ -26,7 +26,7 @@ description: Data types reference documentation.
 | `geohash(<size>)`               | `8`-`64`        | Yes      | Geohash with precision specified as a number followed by `b` for bits, `c` for chars. See [the geohashes documentation](/docs/concept/geohashes/) for details on use and storage.                                               |
 | `array`                         | See description | Yes      | Header: 20 + 4 \* `nDims` bytes. Payload: dense array of values. Example: `DOUBLE[3][4]`: header 28 bytes, payload 3\*4\*8 = 96 bytes.                                                                                          |
 | `interval`                      | `128`           | Yes      | Pair of timestamps representing a time interval. Not a persisted type: you can use it in expressions, but can't have a database column of this type.                                                                            |
-| `decimal(<precision>, <scale>)` | `8`-`256`       | Yes      | Decimal floating point with user-specified precision and scale                                                                                                                                                                  |
+| `decimal(<precision>, <scale>)` | `8`-`256`       | Yes      | Decimal floating point with user-specified precision and scale.                                                                                                                                                                 |
 
 ## N-dimensional array
 

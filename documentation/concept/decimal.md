@@ -37,6 +37,9 @@ QuestDB implements decimals with the syntax `DECIMAL(precision, scale)`:
 For example, `DECIMAL(10, 2)` can store values from -99,999,999.99 to
 99,999,999.99.
 
+If neither the precision and scale are provided, the type defaults to a
+precision of 18 and a scale of 3.
+
 ### Storage optimization
 
 QuestDB automatically selects the optimal storage size based on precision:
