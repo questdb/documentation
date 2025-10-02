@@ -47,7 +47,7 @@ also handles and resolves out-of-order data writes and enables deduplication. Co
 The active (most recent) partition for each table is always stored in this storage tier for minimum query latency and
 to optimize writes in the event of out-of-order data or when updating sampling intervals in materialized views.
 
-### Tier Three: Parquet, Locally or in Object Storage
+### Tier Three: Parquet, Locally or in an Object Store
 
 Older partitions (any partition other than the most recent one) can be converted to
 [Parquet](/docs/guides/export-parquet) for both interoperability and compression ratio.
