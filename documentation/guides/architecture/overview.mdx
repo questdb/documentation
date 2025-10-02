@@ -4,15 +4,16 @@ slug: questdb-architecture
 description: A deep technical dive into the internal architecture, storage engine, query processing, and native integrations of QuestDB.
 ---
 
-QuestDB offers high-speed ingestion and low-latency analytics on time-series data.
+import ThreeTierChart from '@site/src/components/ThreeTierChart';
 
 
-<Screenshot
-  alt="QuestDB: High-Speed Ingestion, Low Latency analytics"
-  title="QuestDB: High-Speed Ingestion, Low Latency analytics"
-  src="images/guides/questdb-internals/questdb-high-level-architecture.svg"
-  width={1000}
-/>
+
+QuestDB offers high-speed ingestion and low-latency analytics on time-series data. It stores data in a three-tier
+architecture (streaming WAL files, local binary storage, and local or remote storage in Parquet format) to improve
+interoperability and avoid vendor lock-in.
+
+<ThreeTierChart />
+
 
 This document explains QuestDB's internal architecture.
 

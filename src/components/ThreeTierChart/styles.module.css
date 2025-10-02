@@ -1,0 +1,83 @@
+@font-face {
+  font-family: 'GT Standard Mono';
+  src: url('/fonts/GT Standard Mono/GT-Standard-Mono-Standard-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@keyframes driftX12 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes driftX16 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(16px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes driftX18 {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(18px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes driftY8 {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes driftY10 {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes driftY12 {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(12px); }
+  100% { transform: translateY(0); }
+}
+
+.driftX1 { animation: driftX12 12s ease-in-out infinite; animation-delay: .2s; }
+.driftX2 { animation: driftX16 13.5s ease-in-out infinite; animation-delay: .6s; }
+.driftX3 { animation: driftX18 16s ease-in-out infinite; animation-delay: .4s; }
+.driftX4 { animation: driftX12 11s ease-in-out infinite; animation-delay: 1.1s; }
+
+.driftY1 { animation: driftY8 13s ease-in-out infinite; animation-delay: .3s; }
+.driftY2 { animation: driftY10 14.5s ease-in-out infinite; animation-delay: .9s; }
+.driftY3 { animation: driftY12 15.5s ease-in-out infinite; animation-delay: .5s; }
+.driftY4 { animation: driftY8 12s ease-in-out infinite; animation-delay: 1.2s; }
+
+.gridBackground {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    repeating-linear-gradient(
+      to right,
+      rgba(107, 111, 140, 0.18) 0,
+      rgba(107, 111, 140, 0.18) 1px,
+      transparent 1px,
+      transparent 96px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(107, 111, 140, 0.18) 0,
+      rgba(107, 111, 140, 0.18) 1px,
+      transparent 1px,
+      transparent 96px
+    );
+  mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, white, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, white, transparent);
+}
+
+.gridBackgroundDimmed {
+  opacity: 0.2;
+}
+
+.monoText {
+  font-family: 'GT Standard Mono', monospace !important;
+}
