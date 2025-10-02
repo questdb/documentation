@@ -91,32 +91,10 @@ smallest possible type so that no data is lost.
 ## Casting table
 
 The below chart illustrates the explicit and implicit cast available in QuestDB:
+<!-- the image can be regenerated via the script at scripts/generate_type_cast_chart.py -->
 
-| From \ To | String | Boolean | Char  | Byte  | Short | Int   | Long  | Long256 | Float | Double | Decimal | Date  | Timestamp | Symbol | Binary |
-| --------- | ------ | ------- | ----- | ----- | ----- | ----- | ----- | ------- | ----- | ------ | ------- | ----- | --------- | ------ | ------ |
-| String    |        | `E`     | `E*`  | `E`   | `E`   | `I`   | `I`   | `I`     | `I`   | `I`    | `E`     | `I`   | `I`       | `I`    | `N/A`  |
-| Boolean   | `I`    |         | `I`   | `I`   | `I`   | `I`   | `I`   | `I`     | `I`   | `I`    | `N/A`   | `I`   | `I`       | `I`    | `N/A`  |
-| Char      | `I`    | `N/A`   |       | `E*`  | `I`   | `I`   | `I`   | `I`     | `I`   | `I`    | `N/A`   | `I`   | `I`       | `I`    | `N/A`  |
-| Byte      | `I`    | `E*`    | `I`   |       | `I`   | `I`   | `I`   | `I`     | `I`   | `I`    | `I`     | `I`   | `I`       | `I`    | `N/A`  |
-| Short     | `I`    | `E*`    | `E*`  | `I`   |       | `I`   | `I`   | `I`     | `I`   | `I`    | `I`     | `I`   | `I`       | `I`    | `N/A`  |
-| Int       | `E`    | `E*`    | `E*`  | `E*`  | `E*`  |       | `I`   | `I`     | `I*`  | `I`    | `I`     | `I`   | `I`       | `I`    | `N/A`  |
-| Long      | `E`    | `E*`    | `E*`  | `E*`  | `E*`  | `E*`  |       | `I`     | `E*`  | `I*`   | `I`     | `I`   | `I`       | `E`    | `N/A`  |
-| Long256   | `E`    | `E*`    | `E*`  | `E*`  | `E*`  | `E*`  | `E*`  |         | `E*`  | `E*`   | `N/A`   | `E*`  | `E*`      | `E*`   | `N/A`  |
-| Float     | `E`    | `N/A`   | `E*`  | `E*`  | `E*`  | `I*`  | `I*`  | `I*`    |       | `I`    | `E*`    | `I*`  | `I*`      | `I`    | `N/A`  |
-| Double    | `E`    | `N/A`   | `E*`  | `E*`  | `E*`  | `E*`  | `I*`  | `I*`    | `E*`  |        | `E*`    | `I*`  | `I*`      | `E`    | `N/A`  |
-| Decimal   | `E`    | `N/A`   | `N/A` | `E!`  | `E!`  | `E!`  | `E!`  | `N/A`   | `E*`  | `E*`   |         | `N/A` | `N/A`     | `N/A`  | `N/A`  |
-| Date      | `E`    | `E*`    | `E*`  | `E*`  | `E*`  | `E*`  | `I`   | `I`     | `E*`  | `I*`   | `N/A`   |       | `I`       | `E`    | `N/A`  |
-| Timestamp | `E`    | `E*`    | `E*`  | `E*`  | `E*`  | `E*`  | `I`   | `I`     | `E*`  | `I*`   | `N/A`   | `I*`  |           | `E`    | `N/A`  |
-| Symbol    | `I`    | `E`     | `E`   | `E`   | `E`   | `E`   | `I`   | `I`     | `E`   | `I`    | `N/A`   | `I`   | `I`       |        | `N/A`  |
-| Binary    | `N/A`  | `N/A`   | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A`   | `N/A` | `N/A`  | `N/A`   | `N/A` | `N/A`     | `N/A`  | `N/A`  |
+![Table showing the different possibilities the cast function supports, those are defined by an input and output types](/images/docs/castmap.jpg)
 
-#### Legend
-
-- `E`: Explicit cast (using the `cast` function or `::` operator)
-- `I`: Implicit cast
-- `*`: The cast operation might lead to precision loss
-- `!`: The cast operation throws an error when if it would lead to precision
-  loss
 
 ```questdb-sql title="Queries"
 SELECT
