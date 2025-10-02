@@ -87,7 +87,9 @@ module.exports = () => ({
           })
 
           // Convert MDX components to markdown equivalents
-          processedContent = await convertAllComponents(processedContent, docsPath)
+          // Pass both the current file's directory (for imports) and docs root (for railroad)
+          const currentFileDir = path.join(docsPath, path.dirname(relativePath))
+          processedContent = await convertAllComponents(processedContent, currentFileDir, docsPath)
 
           // First handle single-line imports
           processedContent = processedContent.replace(/^import\s+.+\s+from\s+['"].+['"];?\s*$/gm, "")

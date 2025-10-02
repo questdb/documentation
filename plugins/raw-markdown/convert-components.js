@@ -123,32 +123,55 @@ function convertTabs(content) {
  * Reads config JSON and converts to table format
  */
 function convertConfigTable(content, docsPath) {
+  const importMap = new Map()
+  const importRegex = /import\s+(\w+)\s+from\s+["']([^"']+)["']/g
+  let importMatch
+
+  while ((importMatch = importRegex.exec(content)) !== null) {
+    const varName = importMatch[1]
+    const importPath = importMatch[2]
+    const unescapedPath = importPath.replace(/\\_/g, "_")
+    importMap.set(varName, unescapedPath)
+  }
+
   const configTableRegex = /<ConfigTable\s+([^>]*?)\/>/g
 
   return content.replace(configTableRegex, (match, propsString) => {
     const props = parseProps(propsString)
 
-    // ConfigTable typically uses a config prop pointing to JSON data
-    if (props.config) {
+    // ConfigTable typically uses a rows prop pointing to JSON data
+    if (props.rows) {
       try {
-        // Try to resolve and read the config file
-        const configPath = path.join(docsPath, props.config)
-        if (fs.existsSync(configPath)) {
-          const configData = JSON.parse(fs.readFileSync(configPath, "utf8"))
+        // Get the import path for this variable
+        const importPath = importMap.get(props.rows)
+        if (importPath) {
+          // Resolve the path relative to the markdown file's directory
+          const configPath = path.join(docsPath, importPath)
+          if (fs.existsSync(configPath)) {
+            const configData = JSON.parse(fs.readFileSync(configPath, "utf8"))
 
-          // Build table from config data
-          let table = "\n\n| Property | Type | Description |\n|----------|------|-------------|\n"
+            // Build table from config data
+            let table = "\n\n| Property | Type | Description |\n|----------|------|-------------|\n"
 
-          if (Array.isArray(configData)) {
-            for (const item of configData) {
-              const property = item.property || item.name || ""
-              const type = item.type || ""
-              const description = (item.description || "").replace(/\n/g, " ")
-              table += `| ${property} | ${type} | ${description} |\n`
+            if (Array.isArray(configData)) {
+              // Handle array format
+              for (const item of configData) {
+                const property = item.property || item.name || ""
+                const type = item.type || ""
+                const description = (item.description || "").replace(/\n/g, " ")
+                table += `| ${property} | ${type} | ${description} |\n`
+              }
+            } else if (typeof configData === 'object') {
+              // Handle object format where keys are property names
+              for (const [property, config] of Object.entries(configData)) {
+                const type = config.default || config.type || ""
+                const description = (config.description || "").replace(/\n/g, " ")
+                table += `| ${property} | ${type} | ${description} |\n`
+              }
             }
-          }
 
-          return table + "\n"
+            return table + "\n"
+          }
         }
       } catch (e) {
         console.warn("[convert-components] Failed to read ConfigTable config:", e.message)
@@ -241,38 +264,25 @@ function convertRailroadDiagrams(content, docsPath) {
     return content
   }
 
-  const railroadContent = fs.readFileSync(railroadPath, 'utf8')
+  let railroadContent = fs.readFileSync(railroadPath, 'utf8')
 
-  // Parse railroad definitions into a map
   const railroadMap = new Map()
-  const lines = railroadContent.split('\n')
-  let currentName = null
-  let currentDef = []
 
-  for (const line of lines) {
-    // Check if line is a definition name (doesn't start with whitespace and isn't empty/comment)
-    if (line && !line.startsWith(' ') && !line.startsWith('#') && !line.startsWith('\t')) {
-      // Save previous definition if exists
-      if (currentName && currentDef.length > 0) {
-        railroadMap.set(currentName, currentDef.join('\n'))
-      }
-      // Start new definition
-      currentName = line.trim()
-      currentDef = []
-    } else if (currentName && line.trim()) {
-      // Add to current definition
-      currentDef.push(line)
-    } else if (currentName && !line.trim() && currentDef.length > 0) {
-      // Empty line marks end of definition
-      railroadMap.set(currentName, currentDef.join('\n'))
-      currentName = null
-      currentDef = []
-    }
-  }
+  const normalized = railroadContent.replace(/\n{3,}/g, '\n\n')
+  const blocks = normalized.split('\n\n')
+  const definitions = blocks.filter(block => block.includes('::=') && !block.startsWith('#'))
+  for (const definition of definitions) {
+    const lines = definition.split('\n')
 
-  // Save last definition
-  if (currentName && currentDef.length > 0) {
-    railroadMap.set(currentName, currentDef.join('\n'))
+    if (lines.length === 0) continue
+
+    const componentName = lines[0].trim()
+    if (!componentName) continue
+
+    const defLines = lines.slice(1)
+    const defContent = defLines.join('\n')
+
+    railroadMap.set(componentName, defContent)
   }
 
   // Replace SVG references with railroad syntax
@@ -282,7 +292,7 @@ function convertRailroadDiagrams(content, docsPath) {
     const definition = railroadMap.get(diagramName)
 
     if (definition) {
-      return `\n\n\`\`\`\n${definition}\n\`\`\`\n\n`
+      return `\n\n\`\`\`railroad\n${definition}\n\`\`\`\n\n`
     }
 
     // If not found, remove the image reference
@@ -292,8 +302,11 @@ function convertRailroadDiagrams(content, docsPath) {
 
 /**
  * Main function to convert all components in content
+ * @param {string} content - The markdown content
+ * @param {string} currentFileDir - Directory of the current file (for resolving imports)
+ * @param {string} docsRoot - Root documentation directory (for railroad diagrams)
  */
-async function convertAllComponents(content, docsPath) {
+async function convertAllComponents(content, currentFileDir, docsRoot) {
   let processed = content
 
   // Get release version once
@@ -305,8 +318,8 @@ async function convertAllComponents(content, docsPath) {
   processed = convertDocButton(processed)
   processed = convertCodeBlock(processed)
   processed = convertTabs(processed)
-  processed = convertConfigTable(processed, docsPath)
-  processed = convertRailroadDiagrams(processed, docsPath)
+  processed = convertConfigTable(processed, currentFileDir)
+  processed = convertRailroadDiagrams(processed, docsRoot)
 
   return processed
 }
