@@ -6,7 +6,7 @@ description:
   practices for financial and scientific calculations.
 ---
 
-QuestDB provides a `decimal` data type for exact numeric calculations, essential
+QuestDB provides a `decimal` data type for exact numeric calculations, useful
 for financial computations, scientific measurements, and any scenario where
 precision matters. This page explains how to use decimals effectively, including
 syntax, operations, and performance considerations.
@@ -17,15 +17,6 @@ Decimals are fixed-point numbers that maintain exact precision during arithmetic
 operations. Unlike floating-point types (`float` and `double`), decimals avoid
 rounding errors by storing numbers as scaled integers internally. This makes
 them ideal for monetary calculations where accuracy is critical.
-
-### Key characteristics
-
-- **Exact arithmetic**: No rounding errors during addition, subtraction, and
-  multiplication
-- **Fixed precision**: Numbers are stored with a defined number of total digits
-- **Fixed scale**: A specific number of digits after the decimal point
-- **Variable storage**: Automatically optimized from 1 to 32 bytes based on
-  precision
 
 ## Decimal type in QuestDB
 
@@ -40,9 +31,10 @@ For example, `DECIMAL(10, 2)` can store values from -99,999,999.99 to
 If neither the precision and scale are provided, the type defaults to a
 precision of 18 and a scale of 3.
 
-### Storage optimization
+### Storage
 
-QuestDB automatically selects the optimal storage size based on precision:
+QuestDB automatically selects the optimal storage size based on the decimal's
+precision:
 
 | Precision    | Storage Size | Internal Type |
 | ------------ | ------------ | ------------- |
@@ -194,7 +186,8 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 
 - **No implicit conversion from double/float**: Must use explicit `CAST` or
   decimal literals
-- **Integer to decimal**: Safe, no precision loss
+- **Integer to decimal**: Safe, no precision loss, the decimals have a scale of
+  0
 - **Double to decimal**: May lose precision due to floating-point representation
 - **Between decimal types**: Automatic when precision/scale allows
 
@@ -210,16 +203,13 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 
 - **Slower than floating-point**: Typically slower than `double` operations
 - **More storage**: May use more space than `float` for equivalent range
-- **Complex operations**: Division and advanced math functions have overhead
+- **Complex operations**: Division have overhead
 
 ### Performance tips
 
-1. **Use appropriate precision**: Don't over-specify precision beyond your needs
-2. **Keep precision ≤ 18 when possible**: DECIMAL64 operations are faster than
-   DECIMAL128/256
-3. **Pre-calculate when possible**: Store commonly used calculations
-4. **Consider doubles for analysis**: Use decimals for storage, doubles for
-   complex analytics
+- **Use appropriate precision**: Don't over-specify precision beyond your needs
+- **Keep precision ≤ 18 when possible**: DECIMAL64 operations are faster than
+  DECIMAL128/256
 
 ## Common use cases
 
@@ -298,7 +288,7 @@ SAMPLE BY 1h;
 
 ### When to use decimals
 
-✅ **Use decimals for:**
+**Use decimals for:**
 
 - Financial data (prices, amounts, exchange rates)
 - Accounting calculations
@@ -306,7 +296,7 @@ SAMPLE BY 1h;
 - Regulatory compliance scenarios
 - Any calculation where rounding errors are unacceptable
 
-❌ **Avoid decimals for:**
+**Avoid decimals for:**
 
 - Scientific calculations requiring extensive math functions
 - Performance-critical analytics on large datasets
@@ -348,48 +338,3 @@ SAMPLE BY 1h;
    -- Good: Use decimal literal
    SELECT amount + 10.00m FROM prices;
    ```
-
-## Differences from doubles
-
-| Aspect              | Decimal                   | Double                |
-| ------------------- | ------------------------- | --------------------- |
-| **Precision**       | Exact                     | Approximate           |
-| **Rounding errors** | None for basic operations | Can accumulate        |
-| **Performance**     | Slower                    | Faster                |
-| **Storage**         | Variable (1-32 bytes)     | Fixed (8 bytes)       |
-| **Use case**        | Money, exact values       | Scientific, analytics |
-| **Literal syntax**  | Requires 'm' suffix       | Standard notation     |
-
-## Example: Financial reporting
-
-Here's a complete example showing decimals in a financial reporting scenario:
-
-```questdb-sql
--- Create financial tables
-CREATE TABLE account_transactions (
-    account_id SYMBOL,
-    transaction_type SYMBOL,
-    amount DECIMAL(15, 2),
-    balance DECIMAL(15, 2),
-    timestamp TIMESTAMP
-) timestamp(timestamp);
-
--- Insert sample transactions
-INSERT INTO account_transactions VALUES
-    ('ACC001', 'DEPOSIT', 1000.00m, 1000.00m, '2024-01-01'),
-    ('ACC001', 'WITHDRAWAL', 150.50m, 849.50m, '2024-01-02'),
-    ('ACC001', 'INTEREST', 2.12m, 851.62m, '2024-01-03'),
-    ('ACC002', 'DEPOSIT', 5000.00m, 5000.00m, '2024-01-01'),
-    ('ACC002', 'TRANSFER', 500.00m, 4500.00m, '2024-01-02');
-
--- Financial summary with exact calculations
-SELECT
-    account_id,
-    sum(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE 0.00m END) AS total_deposits,
-    sum(CASE WHEN transaction_type = 'WITHDRAWAL' THEN amount ELSE 0.00m END) AS total_withdrawals,
-    last(balance) AS current_balance,
-    count(*) AS transaction_count
-FROM account_transactions
-WHERE timestamp >= '2024-01-01'
-GROUP BY account_id;
-```
