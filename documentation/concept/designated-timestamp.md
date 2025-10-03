@@ -22,8 +22,7 @@ A designated timestamp is elected by using the
 
 :::note
 
-- The native timestamp format used by QuestDB is a Unix timestamp in microsecond
-  resolution. See
+- There are two timestamp resolutions available in QuestDB: microseconds and nanoseconds. See
   [Timestamps in QuestDB](/docs/guides/working-with-timestamps-timezones/#timestamps-in-questdb)
   for more details.
 
@@ -31,7 +30,7 @@ A designated timestamp is elected by using the
 
 ## Properties
 
-- Only a column of type `timestamp` can be elected as a designated timestamp.
+- Only a column of type `timestamp` or `timestamp_ns` can be elected as a designated timestamp.
 - Only one column can be elected for a given table.
 
 ## Checking the designated timestamp settings
