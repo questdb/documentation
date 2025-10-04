@@ -6,6 +6,8 @@ description:
 ---
 
 import Screenshot from "@theme/Screenshot"
+import Tabs from "@theme/Tabs"
+import TabItem from "@theme/TabItem"
 
 QuestDB's first-party clients leverage the InfluxDB Line Protocol (ILP).
 
@@ -74,10 +76,14 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 # Create a new client - note the QuestDB HTTP port (9000)
-# Pass the username and password for basic auth
-# If Enterprise, swap clients to use below username & password string:
-# client = InfluxDBClient(url="http://localhost:9000", username="admin", password="questdb")
-client = InfluxDBClient(url="http://localhost:9000", token="")
+# For QuestDB Open Source with Basic Auth:
+client = InfluxDBClient(url="http://localhost:9000", username="admin", password="quest")
+
+# For QuestDB Open Source without authentication:
+# client = InfluxDBClient(url="http://localhost:9000", token="")
+
+# For QuestDB Enterprise with token authentication:
+# client = InfluxDBClient(url="http://localhost:9000", token="your_bearer_token_here")
 
 # Use blocking write client for writes to desired bucket
 write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -235,6 +241,162 @@ this with a small configuration change:
   drop_original = true
 ```
 
+## Authentication Migration
+
+When migrating from InfluxDB to QuestDB, you'll need to adapt your authentication approach. Here's how to handle different authentication scenarios:
+
+### InfluxDB Token-Based Authentication → QuestDB
+
+**InfluxDB Client Code:**
+```python
+# InfluxDB with token authentication
+client = InfluxDBClient(
+    url="http://localhost:8086",
+    token="your-influxdb-token-here",
+    org="your-org"
+)
+```
+
+**QuestDB Migration Options:**
+
+<Tabs>
+<TabItem value="basic-auth" label="Basic Authentication">
+
+```python
+# QuestDB Open Source with Basic Authentication
+client = InfluxDBClient(
+    url="http://localhost:9000",
+    username="admin",
+    password="quest"
+)
+```
+
+To enable Basic Authentication in QuestDB, configure your `server.conf`:
+
+```ini
+http.user=admin
+http.password=quest
+```
+
+Learn more about [Basic Authentication setup](/docs/operations/basic-auth/).
+
+</TabItem>
+<TabItem value="token-auth" label="Token Authentication (Enterprise)">
+
+```python
+# QuestDB Enterprise with REST API token
+client = InfluxDBClient(
+    url="http://localhost:9000",
+    token="your-questdb-rest-token"
+)
+```
+
+QuestDB Enterprise supports token-based authentication similar to InfluxDB. See [RBAC documentation](/docs/operations/rbac/#authentication) for token generation.
+
+</TabItem>
+<TabItem value="no-auth" label="No Authentication">
+
+```python
+# QuestDB without authentication (development only)
+client = InfluxDBClient(
+    url="http://localhost:9000",
+    token=""  # Empty token for no authentication
+)
+```
+
+</TabItem>
+</Tabs>
+
+### Authentication Configuration Matrix
+
+| InfluxDB Setup | QuestDB Open Source | QuestDB Enterprise |
+|----------------|--------------------|--------------------|
+| Token-based auth | Basic Authentication (`username`/`password`) | REST Token or Basic Auth |
+| Username/Password | Basic Authentication | Basic Auth or RBAC users |
+| No authentication | No authentication | Not recommended |
+
+### Migration Steps
+
+1. **Assess Current InfluxDB Authentication**:
+   ```bash
+   # Check your current InfluxDB configuration
+   influx auth list
+   ```
+
+2. **Choose QuestDB Authentication Method**:
+   - **Development/Testing**: No authentication or Basic Auth
+   - **Production**: Basic Auth (Open Source) or RBAC (Enterprise)
+
+3. **Update Client Configuration**:
+   ```python
+   # Before (InfluxDB)
+   client = InfluxDBClient(
+       url="http://influxdb-server:8086",
+       token="influx-token-abc123",
+       org="my-org"
+   )
+   
+   # After (QuestDB with Basic Auth)
+   client = InfluxDBClient(
+       url="http://questdb-server:9000",
+       username="questdb_user",
+       password="secure_password"
+   )
+   ```
+
+4. **Test Authentication**:
+   ```python
+   # Verify connection works
+   try:
+       write_api = client.write_api(write_options=SYNCHRONOUS)
+       # Test write operation
+       point = Point("test_measurement").field("value", 1)
+       write_api.write(bucket="test_bucket", record=point)
+       print("Authentication successful!")
+   except Exception as e:
+       print(f"Authentication failed: {e}")
+   ```
+
+### Environment Variables Migration
+
+**InfluxDB Environment Variables:**
+```bash
+export INFLUXDB_TOKEN="your-influxdb-token"
+export INFLUXDB_ORG="your-org"
+export INFLUXDB_URL="http://localhost:8086"
+```
+
+**QuestDB Environment Variables:**
+```bash
+# For Basic Authentication
+export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
+
+# Or individual variables
+export QDB_HTTP_USER="admin"
+export QDB_HTTP_PASSWORD="quest"
+export QDB_URL="http://localhost:9000"
+```
+
+### Security Considerations
+
+When migrating authentication:
+
+1. **Use HTTPS**: Always enable TLS in production environments
+   ```ini
+   # server.conf
+   http.security.tls=true
+   ```
+
+2. **Strong Passwords**: Use complex passwords for Basic Authentication
+   ```ini
+   http.user=admin
+   http.password=ComplexP@ssw0rd123!
+   ```
+
+3. **Network Security**: Restrict access using firewalls or VPNs
+
+4. **Regular Rotation**: Implement credential rotation policies
+
 ## Migrating from InfluxDB with Telegraf
 
 Looking for instructions on how to migrate from InfluxDB with Telegraf? 
@@ -242,6 +404,26 @@ Looking for instructions on how to migrate from InfluxDB with Telegraf?
 Check out this [community post](https://community.questdb.com/t/datamigration-from-influxdb-to-questdb-with-telegraf/182).
 
 It will help you read from InfluxDB and write into QuestDB.
+
+### Telegraf Authentication Configuration
+
+Update your Telegraf configuration to work with QuestDB authentication:
+
+```toml
+# telegraf.conf
+[[outputs.influxdb_v2]]
+  urls = ["http://localhost:9000"]
+  # For QuestDB with Basic Auth
+  username = "admin"
+  password = "quest"
+  # Leave token empty for Basic Auth
+  token = ""
+  
+  # For QuestDB Enterprise with token
+  # token = "your-questdb-rest-token"
+  # username = ""
+  # password = ""
+```
 
 
 ## Dig deeper
