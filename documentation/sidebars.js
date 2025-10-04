@@ -459,6 +459,11 @@ module.exports = {
           collapsed: false,
           items: [
             {
+              id: "operations/basic-auth",
+              type: "doc",
+              label: "Basic Authentication",
+            },
+            {
               id: "operations/rbac",
               type: "doc",
               label: "Role-Based Access Control (RBAC)",
