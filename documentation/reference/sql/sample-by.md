@@ -50,6 +50,7 @@ Where the unit for sampled groups may be one of the following:
 | `m`  | minute      |
 | `h`  | hour        |
 | `d`  | day         |
+| `w`  | week        |
 | `M`  | month       |
 | `y`  | year        |
 
