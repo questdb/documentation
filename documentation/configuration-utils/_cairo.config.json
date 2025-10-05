@@ -307,6 +307,10 @@
     "default": "8K",
     "description": "Sets the memory page size for storing IR for JIT compilation."
   },
+  "cairo.sql.jit.ir.memory.max.pages": {
+    "default": "8",
+    "description": "Sets max memory pages for storing IR for JIT compilation."
+  },
   "cairo.sql.page.frame.min.rows": {
     "default": "1000",
     "description": "Sets the minimum number of rows in page frames used in SQL queries."
