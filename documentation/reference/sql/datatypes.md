@@ -19,6 +19,7 @@ description: Data types reference documentation.
 | `long`            | `64`            | Yes      | Signed integer, `-9,223,372,036,854,775,808` to `9,223,372,036,854,775,807`.                                                                                                                                                    |
 | `date`            | `64`            | Yes      | Signed offset in **milliseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `timestamp`       | `64`            | Yes      | Signed offset in **microseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
+| `timestamp_ns`    | `64`            | Yes      | Signed offset in **nanoseconds** from [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time).                                                                                                                                   |
 | `double`          | `64`            | Yes      | Double precision IEEE 754 floating point value.                                                                                                                                                                                 |
 | `uuid`            | `128`           | Yes      | [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) values. See also [the UUID type](#the-uuid-type).                                                                                                           |
 | `binary`          | `64+n*8`        | Yes      | Length-prefixed sequence of bytes whose length is stored as signed 64-bit integer with maximum value of `0x7fffffffffffffffL`.                                                                                                  |
@@ -50,7 +51,8 @@ While the `date` type is available, we highly recommend using the `timestamp`
 instead. The only material advantage of `date` is a wider time range, but
 `timestamp` is adequate in virtually all cases. It has microsecond resolution
 (vs. milliseconds for `date`), and is fully supported by all date/time
-functions, while support for `date` is limited.
+functions, while support for `date` is limited. If nanosecond precision is
+required, we recommend using the `timestamp_ns` data type.
 
 ## Limitations for variable-sized types
 
@@ -83,6 +85,7 @@ Many nullable types reserve a value that marks them `NULL`:
 | `long`           | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
 | `date`           | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
 | `timestamp`      | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
+| `timestamp_ns`   | `0x8000000000000000L`                                                | Minimum possible value a `long` can take, -2^63.                                         |
 | `int`            | `0x80000000`                                                         | Minimum possible value an `int` can take, -2^31.                                         |
 | `uuid`           | `80000000-0000-0000-8000-000000000000`                               | Both 64 highest bits and 64 lowest bits set to -2^63.                                    |
 | `char`           | `0x0000`                                                             | The zero char (`NUL` in ASCII).                                                          |

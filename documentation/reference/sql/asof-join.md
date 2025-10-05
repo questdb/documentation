@@ -354,6 +354,7 @@ The interval_literal must be a valid QuestDB interval string, like '5s' (5 secon
 
 #### Supported Units for interval_literal
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
+- n: Nanoseconds
 - U: Microseconds
 - T: Milliseconds
 - s: Seconds
@@ -362,7 +363,7 @@ The `TOLERANCE` interval literal supports the following time unit qualifiers:
 - d: Days
 - w: Weeks
 
-For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
+For example, '500n' is 500 nanoseconds, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
 '1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
 units for the `TOLERANCE` clause.
 
