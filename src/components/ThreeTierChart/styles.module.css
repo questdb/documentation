@@ -81,13 +81,3 @@
 .monoText {
   font-family: 'GT Standard Mono', monospace !important;
 }
-
-@media (max-width: 1350px) and (min-width: 1021px) {
-  :global(div#architecture.flex) {
-    flex-direction: column !important;
-    justify-content: center !important;
-    margin: 0 auto !important;
-    padding: 0 2rem !important;
-  }
-}
-

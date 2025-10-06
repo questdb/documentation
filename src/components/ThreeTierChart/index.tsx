@@ -3,9 +3,7 @@
 import { CSSProperties, useEffect, useRef, useState, useCallback } from 'react'
 import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline'
 import styles from './styles.module.css'
-// we need the svg with svgx extension, so we can have a rule at docusaurus config
-// for this svg not to be passed through SVGO and lose the IDs for interactivity
-import ChartGrouped from './three-tier-chart-grouped.svgx';
+import ChartGrouped from './three-tier-chart-grouped'
 
 type TextProps = { text: string; className?: string; style?: CSSProperties; variant?: number }
 
@@ -69,7 +67,7 @@ const Background = ({ expandedIndex }: { expandedIndex: number | null }) => {
   return (
     <>
       <div className={`${styles.gridBackground} ${expandedIndex === null ? '' : styles.gridBackgroundDimmed} lg:transition-opacity lg:duration-200 pointer-events-none`} />
-      <svg className={`absolute z-0 inset-0 w-[100vw] left-1/2 -translate-x-1/2 lg:left-0 lg:translate-x-0 lg:w-full h-full ${expandedIndex === null ? 'opacity-100' : 'opacity-30'} lg:transition-opacity lg:duration-200 pointer-events-none`} viewBox="0 0 1200 1000" fill="none" preserveAspectRatio="xMidYMid slice">
+      <svg className={`absolute z-0 inset-0 left-1/2 -translate-x-1/2 w-full h-full ${expandedIndex === null ? 'opacity-100' : 'opacity-30'} transition-opacity duration-200 pointer-events-none`} viewBox="0 0 1200 1000" fill="none" preserveAspectRatio="xMidYMid slice">
         <g opacity="0.64" filter="url(#filter0_f_347_25241)">
           <g clipPath="url(#clip0_347_25241)">
             <mask id="mask0_347_25241" style={{ maskType: "alpha" }} maskUnits="userSpaceOnUse" x="104" y="104" width="1039" height="593">
@@ -109,7 +107,7 @@ const Background = ({ expandedIndex }: { expandedIndex: number | null }) => {
 
 const InfoBox = ({ title, description, text, index, expandedIndex, setExpandedIndex, className }: { title: string; description: string; text: string; index: number; expandedIndex: number | null; setExpandedIndex: (index: number | null) => void; className?: string }) => {
   return (
-    <div className={`flex flex-col max-w-[300px] max-[1020px]:max-w-[500px] border-solid border border-[#FFFFFF26] bg-[var(--palette-charade)] opacity-100 rounded-[12px] px-3 overflow-hidden lg:transition-all lg:duration-200 ${expandedIndex === index ? 'py-4 max-h-[1000px] bg-code' : 'py-4 max-h-[82px]'} ${className || ''}`}>
+    <div className={`flex flex-col max-w-[500px] border-solid border border-[#FFFFFF26] bg-[var(--palette-charade)] opacity-100 rounded-[12px] px-3 overflow-hidden lg:transition-all lg:duration-200 ${expandedIndex === index ? 'py-4 max-h-[1000px] bg-code' : 'py-4 max-h-[82px]'} ${className || ''}`}>
       <div className="flex gap-4 items-center justify-between">
         <p className="p-0 m-0 w-unset"><b>{title}:</b> {description}</p>
         <button
@@ -117,7 +115,7 @@ const InfoBox = ({ title, description, text, index, expandedIndex, setExpandedIn
           className="min-w-8 min-h-8 flex-0 p-0 flex items-center justify-center bg-transparent rounded-[10px] border-solid border border-[#FFFFFF26] text-[#FFFFFF26] hover:text-gray-400 hover:border-gray-400 lg:transition-all lg:duration-200"
           onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
         >
-          {expandedIndex === index ? <MinusIcon className="w-6 h-6 text-inherit" /> : <PlusIcon className="w-6 h-6 text-inherit" />}
+          {expandedIndex === index ? <MinusIcon data-expander="true" className="w-6 h-6 text-inherit" /> : <PlusIcon data-expander="true" className="w-6 h-6 text-inherit" />}
         </button>
       </div>
       <p className={`p-0 mb-0 lg:transition-all lg:duration-200 ${expandedIndex === index ? 'opacity-100 mt-6' : 'opacity-0 h-0'}`}>{text}</p>
@@ -166,10 +164,10 @@ const Tiers = ({ expandedIndex, setExpandedIndex }: { expandedIndex: number | nu
   }, [expandedIndex])
 
   return (
-    <div className="relative w-[822px] max-[450px]:w-[329px] max-[520px]:w-[411px] max-[650px]:w-[493px]  max-[1279px]:w-[658px] xl:w-[822px]">
-      <div className="relative h-[800px] max-[450px]:h-[320px] max-[520px]:h-[400px] max-[650px]:h-[480px]  max-[1279px]:h-[640px] xl:h-[800px]">
-        <div className="absolute top-0 left-0 h-[800px] origin-top-left max-[450px]:scale-[40%] max-[520px]:scale-[50%] max-[650px]:scale-[60%] max-[1279px]:scale-[80%] xl:scale-100">
-          <ChartGrouped id="three-tier-chart-grouped" style={{ maxWidth: '850px' }} />
+    <div className="relative">
+      <div className="relative">
+        <div className="origin-top-left">
+          <ChartGrouped id="three-tier-chart-grouped" className="w-full h-full" />
         </div>
       </div>
     </div>
@@ -200,7 +198,7 @@ export default function ThreeTierChart({ className }: { className?: string }) {
   return (
     <div className={`relative ${className ?? ''} w-full my-12`}>
       <Background expandedIndex={expandedIndex} />
-      <div id="architecture" className="flex max-[1020px]:flex-col max-[1020px]:items-center flex-row items-start justify-between gap-8 relative z-10">
+      <div id="architecture" className="flex flex-col md:flex-row lg:flex-col xl:flex-row items-center md:items-start lg:items-center xl:items-start justify-between gap-8 relative z-10">
         <Tiers expandedIndex={expandedIndex} setExpandedIndex={setExpandedIndex} />
         <div className="flex flex-col gap-4 items-end items-stretch">
           <InfoBox

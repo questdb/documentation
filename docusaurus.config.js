@@ -186,37 +186,6 @@ const config = {
         ],
       },
     ],
-
-  // we need this, so the svg will not be passed through SVGO and lose the IDs
-  // for interactivity
-   () => ({
-  name: "three-tier-chart-svg",
-  configureWebpack() {
-    return {
-      module: {
-        rules: [
-          {
-            test: /three-tier-chart-grouped\.svgx$/i,
-            include: [
-              path.resolve(__dirname, "src/components/ThreeTierChart/three-tier-chart-grouped.svgx"),
-            ],
-            use: [
-              {
-                loader: require.resolve("@svgr/webpack"),
-                options: {
-                  svgo: false,
-                  svgoConfig: {},
-                },
-              },
-            ],
-            type: "javascript/auto",
-          },
-        ],
-      },
-    }
-  },
-})
-
   ].filter(Boolean),
 
   themeConfig: {
