@@ -1,21 +1,21 @@
 ---
 title: Data Ingestion Engine
 slug: data-ingestion
-description: The QuestDB Data Ingestion Engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments ship to object storage for replication.
+description: The QuestDB Data Ingestion Engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead log (WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments are shipped to object storage for replication.
 ---
 
 
 ## Data ingestion & write path
 
 The QuestDB Data Ingestion Engine supports bulk and streaming ingestion. It writes data to a row-based write-ahead log
-(WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments ship to object storage for replication.
+(WAL) and then converts it into a columnar format. In QuestDB Enterprise, the WAL segments are shipped to object storage for replication.
 
 ### Bulk ingestion
 
 - **CSV ingestion:**
-  QuestDB offers a CSV ingestion endpoint via the [REST API](/docs/reference/api/rest/) and web console.
-   A specialized COPY command uses [io_uring](/blog/2022/09/12/importing-300k-rows-with-io-uring) on
-   fast drives to speed up ingestion.
+  QuestDB offers a CSV ingestion endpoint via the [REST API](/docs/reference/api/rest/) and the web console.
+  A specialized COPY command uses [io_uring](/blog/2022/09/12/importing-300k-rows-with-io-uring) on
+  fast drives to speed up ingestion.
 
 ### Real-time streaming
 
@@ -32,8 +32,7 @@ The QuestDB Data Ingestion Engine supports bulk and streaming ingestion. It writ
   later consolidates into columnar storage.
 
 ```text
-
-Contents of the `db` folder, showing multiple pending WAL files,
+Contents of the `db` folder, showing multiple pending WAL files
 and the binary columnar data.
 
 ├── db
@@ -64,11 +63,11 @@ and the binary columnar data.
 │   │   │       └── ...
 │   │   ├── wal2
 │   │   │   └── 0
-│   │   │   │   ├── _meta
-│   │   │   │   ├── _event
-│   │   │   │   ├── column1.d
-│   │   │   │   ├── column2.d
-│   │   │   │   └── ...
+│   │   │       ├── _meta
+│   │   │       ├── _event
+│   │   │       ├── column1.d
+│   │   │       ├── column2.d
+│   │   │       └── ...
 │   │   │   └── 1
 │   │   │       ├── _meta
 │   │   │       ├── _event
@@ -79,26 +78,31 @@ and the binary columnar data.
 │   │   ├── _meta
 │   │   ├── _txn
 │   │   └── _cv
-
 ```
 
 ### Ingestion via ILP protocol
 
 - **Native ILP integration:**
   QuestDB supports the [Influx Line Protocol](/docs/reference/api/ilp/overview/)
-   (ILP) for high-speed data ingestion.
+  (ILP) for high-speed data ingestion.
 
 - **Extensions to ILP:**
   QuestDB extends ILP to support different timestamp units and the array data type.
+
+- **Binary ILP:**
+  Since Float64 is one of the most common data types used when streaming data, QuestDB extends the
+  ILP protocol to support encoding of Float64 numbers. This extension is available by default in
+  all official QuestDB ILP clients and can be enforced by passing version `v2` when sending
+  raw ILP data with other clients.
 
 - **Minimal parsing overhead:**
   The ILP parser quickly maps incoming data to internal structures.
 
 - **Parallel ingestion:**
-  The ILP path uses off-heap buffers and direct memory management to bypass JVM heap  allocation.
+  The ILP path uses off-heap buffers and direct memory management to bypass JVM heap allocation.
 
 - **Protocol versatility:**
-  In addition to ILP, QuestDB also supports ingestion via [REST](/docs/reference/sql/overview/#rest-http-api)
+  In addition to ILP, QuestDB also supports ingestion via the [REST](/docs/reference/sql/overview/#rest-http-api)
   and [PostgreSQL wire](/docs/reference/sql/overview/#postgresql) protocols.
 
 
@@ -107,4 +111,3 @@ and the binary columnar data.
 - Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
 - [QuestDB GitHub Repository](https://github.com/questdb/questdb)
 - [QuestDB Documentation](/docs)
-
