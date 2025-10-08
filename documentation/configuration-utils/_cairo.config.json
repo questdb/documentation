@@ -470,5 +470,9 @@
   "cairo.file.descriptor.cache.enabled": {
     "default": "true",
     "description": "enables or disables the file-descriptor cache"
+  },
+  "cairo.partition.encoder.parquet.raw.array.encoding.enabled": {
+    "default": "false",
+    "description": "determines whether to export arrays in QuestDB-native binary format (true, less compatible) or Parquet-native format (false, more compatible)."
   }
 }
