@@ -43,6 +43,50 @@
     "default": "1000",
     "description": "Millisecond polling rate of a replica instance to check for the availability of new changes."
   },
+  "replication.primary.sequencer.part.txn.count": {
+    "default": "5000",
+    "description": "Sets the txn chunking size for each compressed batch. Smaller is better for constrained networks (but more costly)."
+  },
+  "replication.primary.checksum=service-dependent": {
+    "default": "service-dependent",
+    "description": "Where a checksum should be calculated for each uploaded artifact. Required for some object stores. Other options: never, always"
+  },
+  "replication.primary.upload.truncated": {
+    "default": "true",
+    "description": "Skip trailing, empty column data inside a WAL column file."
+  },
+  "replication.requests.buffer.size": {
+    "default": "32768",
+    "description": "Buffer size used for object-storage downloads."
+  },
+  "replication.summary.interval": {
+    "default": "1m",
+    "description": "Frequency for printing replication progress summary in the logs."
+  },
+  "replication.metrics.per.table": {
+    "default": "true",
+    "description": "Enable per-table replication metrics on the prometheus metrics endpoint."
+  },
+  "replication.metrics.dropped.table.poll.count": {
+    "default": "10",
+    "description": "How many scrapes of prometheus metrics endpoint before dropped tables will no longer appear."
+  },
+  "replication.requests.max.batch.size.fast": {
+    "default": "64",
+    "description": "Number of parallel requests allowed during the 'fast' process (non-resource constrained)."
+  },
+  "replication.requests.max.batch.size.slow": {
+    "default": "2",
+    "description": "Number of parallel requests allowed during the 'slow' process (error/resource constrained path)."
+  },
+  "replication.requests.base.timeout": {
+    "default": "10s",
+    "description": "Replication upload/download request timeout."
+  },
+  "replication.requests.min.throughput": {
+    "default": "262144",
+    "description": "Expected minimum network speed for replication transfers. Used to expand the timeout and account for network delays."
+  },
   "native.async.io.threads": {
     "default": "cpuCount",
     "description": "The number of async (network) io threads used for replication (and in the future cold storage). The default should be appropriate for most use cases."
