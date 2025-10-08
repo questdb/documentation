@@ -16,6 +16,8 @@ plugins/*/compiled
 .netlify
 .cache-loader
 static/llms.txt
+static/reference-full.md
+static/web-console/*.json
 
 # Misc
 .DS_Store

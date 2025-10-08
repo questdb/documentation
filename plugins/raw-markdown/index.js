@@ -1,13 +1,23 @@
 const fs = require("fs")
 const path = require("path")
 const matter = require("gray-matter")
-const { convertAllComponents } = require("./convert-components")
+const {
+  convertAllComponents,
+  removeImports,
+  processPartialImports,
+  prependFrontmatter,
+  cleanForLLM,
+} = require("./convert-components")
 
 module.exports = () => ({
   name: "raw-markdown",
-  async postBuild({ outDir }) {
+  async postBuild({ outDir, plugins }) {
     const docsPath = path.join(__dirname, "../../documentation")
     const outputBase = outDir
+
+    // Get remote repo example data from plugin
+    const remoteRepoPlugin = plugins.find(p => p.name === 'remote-repo-example')
+    const repoExamples = remoteRepoPlugin?.content || {}
 
     const partialCache = new Map()
     let fileCount = 0
@@ -48,58 +58,22 @@ module.exports = () => ({
           const content = fs.readFileSync(fullPath, "utf8")
           const { data: frontmatter, content: markdownContent } = matter(content)
 
-          let processedContent = ""
+          // Prepend title and description from frontmatter
+          let processedContent = prependFrontmatter(markdownContent, frontmatter, true)
 
-          if (frontmatter.title) {
-            processedContent += `# ${frontmatter.title}\n\n`
-          }
-
-          if (frontmatter.description) {
-            processedContent += `${frontmatter.description}\n\n`
-          }
-
-          processedContent += markdownContent
-
-          // Extract import statements to build a map of component names to partial paths
-          const importMap = new Map()
-          // Match: import ComponentName from "path/to/file.partial.mdx"
-          // Note: \s* allows for no space before 'from' (handles from" without space)
-          const importRegex = /^import\s+(\w+)\s*\n?\s*from\s*['"](.+\.partial\.mdx?)['"];?\s*$/gm
-          let match
-          while ((match = importRegex.exec(processedContent)) !== null) {
-            const componentName = match[1]
-            const partialPath = match[2]
-            importMap.set(componentName, partialPath)
-          }
-
-          // Replace partial component references with their content
-          // Match <ComponentName /> or <ComponentName/>
-          processedContent = processedContent.replace(/<(\w+)\s*\/>/g, (fullMatch, componentName) => {
-            if (importMap.has(componentName)) {
-              const partialPath = importMap.get(componentName)
-              const currentFileDir = path.dirname(relativePath)
-              const partialContent = loadPartial(partialPath, currentFileDir)
-              // Add blank lines before and after the partial content
-              return `\n\n${partialContent}\n\n`
-            }
-            // If not a partial, keep the component reference
-            return fullMatch
-          })
+          // Process partial component imports
+          const currentFileRelativeDir = path.dirname(relativePath)
+          processedContent = processPartialImports(processedContent, loadPartial, currentFileRelativeDir)
 
           // Convert MDX components to markdown equivalents
-          // Pass both the current file's directory (for imports) and docs root (for railroad)
           const currentFileDir = path.join(docsPath, path.dirname(relativePath))
-          processedContent = await convertAllComponents(processedContent, currentFileDir, docsPath)
+          processedContent = await convertAllComponents(processedContent, currentFileDir, docsPath, repoExamples)
 
-          // First handle single-line imports
-          processedContent = processedContent.replace(/^import\s+.+\s+from\s+['"].+['"];?\s*$/gm, "")
-          // Then handle multi-line imports (where line breaks exist)
-          processedContent = processedContent.replace(/^import\s+[\s\S]*?\s+from\s*\n?\s*['"].+['"];?\s*$/gm, "")
+          // Remove import statements
+          processedContent = removeImports(processedContent)
 
-          // Remove multiple consecutive blank lines (leave max 2)
-          processedContent = processedContent.replace(/\n{3,}/g, "\n\n")
-
-          processedContent = processedContent.trim() + "\n"
+          // Clean and normalize
+          processedContent = cleanForLLM(processedContent) + "\n"
 
           let urlPath
 

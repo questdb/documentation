@@ -160,28 +160,6 @@ SELECT * FROM users WHERE age = 23;
 SELECT * FROM users WHERE age != 23;
 ```
 
-<!--
-QuestDB does not support `eq()`. This section is therefore commented out and can be uncommented when we add the functionality.
-### Proximity
-
-Evaluates whether the column value is within a range of the target value. This
-is useful to simulate equality on `double` and `float` values.
-
-![Flow chart showing the syntax of the WHERE clause with an EQ comparison](/images/docs/diagrams/whereEqDoublePrecision.svg)
-
-```questdb-sql title="Equal to 23 with 0.00001 precision"
-SELECT * FROM users WHERE eq(age, 23, 0.00001);
-```
-
-:::tip
-
-When performing multiple equality checks of double values against integer
-constants, it may be preferable to store double values as long integers with a
-scaling factor.
-
-:::
--->
-
 ## Boolean
 
 ![Flow chart showing the syntax of the WHERE clause with a boolean comparison](/images/docs/diagrams/whereBoolean.svg)
