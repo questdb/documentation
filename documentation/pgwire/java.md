@@ -2,8 +2,15 @@
 title: Java PGWire Guide
 description:
   Java clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Java for querying data. 
+  protocol with Java for querying data.
 ---
+
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
 
 QuestDB is tested with the following Java clients:
 
@@ -129,7 +136,7 @@ public class QuestDBQuery {
              Statement stmt = conn.createStatement()) {
             try (ResultSet rs = stmt.executeQuery("SELECT * FROM trades LIMIT 10")) {
                 while (rs.next()) {
-                    Timestamp timestamp = rs.getTimestamp("ts", utcCalendar);
+                    Timestamp timestamp = rs.getTimestamp("timestamp", utcCalendar);
                     String symbol = rs.getString("symbol");
                     double price = rs.getDouble("price");
 
@@ -177,7 +184,7 @@ public class QuestDBParameterizedQuery {
         java.util.Calendar utcCalendar = Calendar.getInstance();
         utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-        String sql = "SELECT * FROM trades WHERE symbol = ? AND ts >= ? ORDER BY ts LIMIT 10";
+        String sql = "SELECT * FROM trades WHERE symbol = ? AND timestamp >= ? ORDER BY timestamp LIMIT 10";
         try (Connection conn = DriverManager.getConnection(url, props);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, "BTC-USD");
@@ -188,7 +195,7 @@ public class QuestDBParameterizedQuery {
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    Timestamp ts = rs.getTimestamp("ts", utcCalendar);
+                    Timestamp ts = rs.getTimestamp("timestamp", utcCalendar);
                     String symbol = rs.getString("symbol");
                     double price = rs.getDouble("price");
 
@@ -245,8 +252,8 @@ public class ArrayInsert {
                     (
                         bid DOUBLE PRECISION[][],
                         ask DOUBLE PRECISION[][],
-                        ts TIMESTAMP
-                    ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+                        timestamp TIMESTAMP
+                    ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
                     """;
                 stmt.execute(createTableSQL);
                 System.out.println("Table 'l3_order_book' is ready.");
@@ -256,7 +263,7 @@ public class ArrayInsert {
             utcCalendar.setTimeZone(TimeZone.getTimeZone("UTC"));
 
             Instant baseTimestamp = Instant.now();
-            String insertSQL = "INSERT INTO l3_order_book (bid, ask, ts) VALUES (?, ?, ?)";
+            String insertSQL = "INSERT INTO l3_order_book (bid, ask, timestamp) VALUES (?, ?, ?)";
             try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
                 // Add first row to batch
                 Double[][] bids1 = {{68500.50, 0.5}, {68500.00, 1.2}, {68499.50, 0.3}};
@@ -416,16 +423,16 @@ public class QuestDBTimeSeries {
 
             // SAMPLE BY query (time-based downsampling)
             String sampleByQuery =
-                    "SELECT ts, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
+                    "SELECT timestamp, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
                             "FROM trades " +
-                            "WHERE ts >= dateadd('d', -7, now()) " +
+                            "WHERE timestamp >= dateadd('d', -7, now()) " +
                             "SAMPLE BY 1h";
 
             System.out.println("Executing SAMPLE BY query...");
             try (ResultSet rs1 = stmt.executeQuery(sampleByQuery)) {
                 while (rs1.next()) {
                     System.out.printf("Time: %s, Symbol: %s, Avg Price: %.2f, Range: %.2f - %.2f%n",
-                            rs1.getTimestamp("ts", utcCalendar),
+                            rs1.getTimestamp("timestamp", utcCalendar),
                             rs1.getString("symbol"),
                             rs1.getDouble("avg_price"),
                             rs1.getDouble("min_price"),
@@ -442,7 +449,7 @@ public class QuestDBTimeSeries {
                     System.out.printf("Symbol: %s, Latest Price: %.2f at %s%n",
                             rs2.getString("symbol"),
                             rs2.getDouble("price"),
-                            rs2.getTimestamp("ts", utcCalendar));
+                            rs2.getTimestamp("timestamp", utcCalendar));
                 }
             }
         } catch (SQLException e) {
@@ -540,7 +547,7 @@ class TradeRowMapper implements RowMapper<Trade> {
 	@Override
 	public Trade mapRow(ResultSet rs, int rowNum) throws SQLException {
 		Trade trade = new Trade();
-		trade.setInstant(rs.getTimestamp("ts").toInstant());
+		trade.setInstant(rs.getTimestamp("timestamp").toInstant());
 		trade.setSymbol(rs.getString("symbol"));
 		trade.setPrice(rs.getDouble("price"));
 		trade.setAmount(rs.getDouble("amount"));
@@ -558,12 +565,12 @@ class TradeRepository {
 	}
 
 	public List<Trade> findRecentTrades(String symbol, int limit) {
-		String sql = "SELECT * FROM trades WHERE symbol = ? ORDER BY ts DESC LIMIT ?";
+		String sql = "SELECT * FROM trades WHERE symbol = ? ORDER BY timestamp DESC LIMIT ?";
 		return jdbcTemplate.query(sql, new TradeRowMapper(), symbol, limit);
 	}
 
 	public List<Trade> findLatestTradesForAllSymbols() {
-		String sql = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+		String sql = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
 		return jdbcTemplate.query(sql, new TradeRowMapper());
 	}
 }
@@ -784,7 +791,7 @@ public class QuestDBR2dbcQuery {
         connectionMono.flatMapMany(connection ->
                 Flux.from(connection.createStatement("SELECT * FROM trades LIMIT 10").execute())
                         .flatMap(result -> result.map((row, metadata) -> {
-                            Instant timestamp = row.get("ts", Instant.class);
+                            Instant timestamp = row.get("timestamp", Instant.class);
                             String symbol = row.get("symbol", String.class);
                             Double price = row.get("price", Double.class);
 
@@ -831,12 +838,12 @@ public class QuestDBR2dbcParameterizedQuery {
 
         connectionMono.flatMapMany(connection ->
                 Flux.from(connection.createStatement(
-                                        "SELECT * FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts LIMIT 10")
+                                        "SELECT * FROM trades WHERE symbol = $1 AND timestamp >= $2 ORDER BY timestamp LIMIT 10")
                                 .bind("$1", symbolParam)
                                 .bind("$2", startTimeParam.toInstant(ZoneOffset.UTC))
                                 .execute())
                         .flatMap(result -> result.map((row, metadata) -> {
-                            Instant timestamp = row.get("ts", Instant.class);
+                            Instant timestamp = row.get("timestamp", Instant.class);
                             String symbol = row.get("symbol", String.class);
                             Double price = row.get("price", Double.class);
 
@@ -951,13 +958,13 @@ public class QuestDBR2dbcTimeSeries {
         System.out.println("Executing SAMPLE BY query...");
         connectionMono.flatMapMany(connection ->
                 Flux.from(connection.createStatement(
-                                        "SELECT ts, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
+                                        "SELECT timestamp, symbol, avg(price) as avg_price, min(price) as min_price, max(price) as max_price " +
                                                 "FROM trades " +
-                                                "WHERE ts >= dateadd('d', -7, now()) " +
+                                                "WHERE timestamp >= dateadd('d', -7, now()) " +
                                                 "SAMPLE BY 1h")
                                 .execute())
                         .flatMap(result -> result.map((row, metadata) -> {
-                            Instant time = row.get("ts", Instant.class);
+                            Instant time = row.get("timestamp", Instant.class);
                             String symbol = row.get("symbol", String.class);
                             Double avgPrice = row.get("avg_price", Double.class);
                             Double minPrice = row.get("min_price", Double.class);
@@ -974,11 +981,11 @@ public class QuestDBR2dbcTimeSeries {
         System.out.println("\nExecuting LATEST ON query...");
         connectionMono = Mono.from(connectionFactory.create());
         connectionMono.flatMapMany(connection ->
-                Flux.from(connection.createStatement("SELECT * FROM trades LATEST ON ts PARTITION BY symbol").execute())
+                Flux.from(connection.createStatement("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol").execute())
                         .flatMap(result -> result.map((row, metadata) -> {
                             String symbol = row.get("symbol", String.class);
                             Double price = row.get("price", Double.class);
-                            Instant timestamp = row.get("ts", Instant.class);
+                            Instant timestamp = row.get("timestamp", Instant.class);
 
                             return String.format("Symbol: %s, Latest Price: %.2f at %s",
                                     symbol, price, timestamp);
@@ -1025,7 +1032,7 @@ public class QuestDBSpringDataR2dbcApplication {
 @Table("trades")
 class Trade {
 	@Id
-	@Column("ts")
+	@Column("timestamp")
 	private Instant timestamp;
 
 	@Column("symbol")
@@ -1083,10 +1090,10 @@ class Trade {
 
 interface TradeRepository extends R2dbcRepository<Trade, String> {
 
-	@Query("SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2")
+	@Query("SELECT * FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT $2")
 	Flux<Trade> findRecentTradesBySymbol(String symbol, int limit);
 
-	@Query("SELECT * FROM trades LATEST ON ts PARTITION BY symbol")
+	@Query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol")
 	Flux<Trade> findLatestTradesForAllSymbols();
 }
 
@@ -1195,44 +1202,36 @@ QuestDB provides specialized time-series functions that work well with Java clie
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITIONED BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
+
+<HighlyAvailableReads />
+
+<KnownLimitations />
 
 ## Troubleshooting
 
-### Connection Issues
-
-If you have trouble connecting to QuestDB:
-
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible
-2. Check that the connection parameters (host, port, user, password) are correct
-3. Make sure your network allows connections to the QuestDB server
-4. Check if the QuestDB server logs show any connection errors
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists
-2. Check the syntax of your SQL query
-3. Ensure that you're using the correct data types for parameters
-4. Look for any unsupported PostgreSQL features that might be causing issues
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
 ## Conclusion
 

@@ -483,7 +483,7 @@ This config can be set in the range of 1 to 300 seconds.
 
 Create a QuestDB instance matching a specific historical point in time.
 
-This is builds a new instance based on a recently recovered snapshot and WAL
+This builds a new instance based on a recently recovered snapshot and WAL
 data in the object store.
 
 It can also be used if you wish to remove the latest transactions from the

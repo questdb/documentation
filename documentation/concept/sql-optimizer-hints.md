@@ -105,42 +105,59 @@ You can verify how QuestDB executes your query by examining its execution plan w
 
 Without any hints, a filtered `ASOF JOIN` will use the binary search strategy.
 
-```questdb-sql title="Observing the default execution plan"
-EXPLAIN SELECT
-  orders.ts, orders.price, md.md_ts, md.bid, md.ask
-FROM orders
-ASOF JOIN (
-  SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'VALID'
-) md;
+```questdb-sql title="Observing the default execution plan" demo
+EXPLAIN SELECT  *
+FROM core_price
+ASOF JOIN market_data
+ON symbol
+WHERE bids[1,1]=107.03 -- Highly selective filter
+;
 ```
 
 The execution plan will show a `Filtered AsOf Join Fast Scan` operator, confirming the binary search strategy is being
 used.
 
-<Screenshot
-alt="Screen capture of the EXPLAIN output showing the default Filtered AsOf Join Fast Scan"
-src="images/docs/concepts/filtered-asof-plan-example.png"
-/>
+```text
+SelectedRecord
+    Filter filter: market_data.bids[1,1]=107.03
+        AsOf Join Fast Scan
+          condition: market_data.symbol=core_price.symbol
+            PageFrame
+                Row forward scan
+                Frame forward scan on: core_price
+            PageFrame
+                Row forward scan
+                Frame forward scan on: market_data
+```
+
 
 #### Hinted Execution Plan (Full Scan)
 
 When you use the `AVOID_ASOF_BINARY_SEARCH` hint, the plan changes.
 
-```questdb-sql title="Observing execution plan with the AVOID hint"
-EXPLAIN SELECT /*+ AVOID_ASOF_BINARY_SEARCH(orders md) */
-  orders.ts, orders.price, md.md_ts, md.bid, md.ask
-FROM orders
-ASOF JOIN (
-  SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'VALID'
-) md;
+```questdb-sql title="Observing execution plan with the AVOID hint" demo
+EXPLAIN SELECT /*+ AVOID_ASOF_BINARY_SEARCH(core_price market_data) */
+  *
+FROM core_price
+ASOF JOIN market_data
+ON symbol
+WHERE bids[1,1]=107.03 -- Highly selective filter
+;
 ```
 
 The execution plan will now show a standard `AsOf Join` operator and a separate, preceding filtering step on the joined
 table.
 
-<Screenshot
-alt="Screen capture of the EXPLAIN output for the hinted ASOF join, showing a separate filter"
-src="images/docs/concepts/default-asof-plan-example.png"
-/>
+```text
+SelectedRecord
+    Filter filter: market_data.bids[1,1]=107.03
+        AsOf Join Light
+          condition: market_data.symbol=core_price.symbol
+            PageFrame
+                Row forward scan
+                Frame forward scan on: core_price
+            PageFrame
+                Row forward scan
+                Frame forward scan on: market_data
+```
+

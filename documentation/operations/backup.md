@@ -140,7 +140,7 @@ While explaining the steps, we'll assume the database root directory is
 
 To enter the checkpoint mode:
 
-```sql
+```questdb-sql title="Creating a Checkpoint"
 CHECKPOINT CREATE
 ```
 
@@ -151,7 +151,7 @@ will fail.
 
 You can double-check at any time that the database is in the checkpoint mode:
 
-```sql
+```questdb-sql title="Checking Checkpoint Status"
 SELECT * FROM checkpoint_status();
 ```
 
@@ -181,7 +181,7 @@ copy operation succeeded or failed!**
 
 With your backup complete, exit checkpoint mode:
 
-```sql
+```questdb-sql title="Releasing a Checkpoint"
 CHECKPOINT RELEASE
 ```
 

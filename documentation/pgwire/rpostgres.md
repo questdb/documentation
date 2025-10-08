@@ -2,8 +2,15 @@
 title: R PGwire Guide
 description:
   R clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with R for querying data. 
+  protocol with R for querying data.
 ---
+
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
 
 QuestDB is tested with the following R client:
 
@@ -82,10 +89,10 @@ con <- dbConnect(
 
 if (dbIsValid(con)) {
   cat("Successfully connected to QuestDB!\n")
-  
+
   version <- dbGetQuery(con, "SELECT version()")
   print(version)
-  
+
   dbDisconnect(con)
 } else {
   cat("Failed to connect to QuestDB.\n")
@@ -146,14 +153,14 @@ symbol <- "BTC-USD"
 limit_rows <- 10
 
 # Method 1: Using parameter substitution (safest approach)
-query <- "SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2"
+query <- "SELECT * FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT $2"
 trades <- dbGetQuery(con, query, params = list(symbol, limit_rows))
 print(trades)
 
 # Method 2: Using glue_sql from glue package (if installed)
 if (requireNamespace("glue", quietly = TRUE)) {
   library(glue)
-  query <- glue_sql("SELECT * FROM trades WHERE symbol = {symbol} ORDER BY ts DESC LIMIT {as.integer(limit_rows)}", 
+  query <- glue_sql("SELECT * FROM trades WHERE symbol = {symbol} ORDER BY timestamp DESC LIMIT {as.integer(limit_rows)}",
                     .con = con)
   trades2 <- dbGetQuery(con, query)
   print(trades2)
@@ -184,21 +191,21 @@ con <- dbConnect(
 # SAMPLE BY query (time-based downsampling)
 cat("Executing SAMPLE BY query...\n")
 sampled_data <- dbGetQuery(con, "
-  SELECT 
-    ts, 
-    symbol, 
-    avg(price) as avg_price, 
-    min(price) as min_price, 
-    max(price) as max_price 
-  FROM trades 
-  WHERE ts >= dateadd('d', -7000, now()) 
+  SELECT
+    timestamp,
+    symbol,
+    avg(price) as avg_price,
+    min(price) as min_price,
+    max(price) as max_price
+  FROM trades
+  WHERE timestamp >= dateadd('d', -7000, now())
   SAMPLE BY 1h
 ")
 print(head(sampled_data))
 
 # LATEST ON query (last value per group)
 cat("\nExecuting LATEST ON query...\n")
-latest_data <- dbGetQuery(con, "SELECT * FROM trades LATEST ON ts PARTITION BY symbol")
+latest_data <- dbGetQuery(con, "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol")
 print(latest_data)
 
 # Close the connection
@@ -227,12 +234,12 @@ con <- dbConnect(
 
 # Fetch hourly sampled price data
 hourly_prices <- dbGetQuery(con, "
-  SELECT 
-    ts, 
-    symbol, 
+  SELECT
+    timestamp,
+    symbol,
     avg(price) as avg_price
-  FROM trades 
-  WHERE ts >= dateadd('d', -30, now()) 
+  FROM trades
+  WHERE timestamp >= dateadd('d', -30, now())
     AND symbol IN ('BTC-USD', 'ETH-USD')
   SAMPLE BY 1h
 ")
@@ -240,8 +247,8 @@ hourly_prices <- dbGetQuery(con, "
 # Process data with dplyr
 processed_data <- hourly_prices %>%
   mutate(
-    date = as_date(ts),
-    hour = hour(ts)
+    date = as_date(timestamp),
+    hour = hour(timestamp)
   ) %>%
   group_by(symbol, date) %>%
   summarize(
@@ -255,7 +262,7 @@ processed_data <- hourly_prices %>%
 print(head(processed_data))
 
 # Create a plot with ggplot2
-p <- ggplot(hourly_prices, aes(x = ts, y = avg_price, color = symbol)) +
+p <- ggplot(hourly_prices, aes(x = timestamp, y = avg_price, color = symbol)) +
   geom_line() +
   labs(
     title = "Cryptocurrency Prices - 30 Day History",
@@ -299,44 +306,36 @@ QuestDB provides specialized time-series functions that can be used with RPostgr
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
+
+<HighlyAvailableReads />
+
+<KnownLimitations />
 
 ## Troubleshooting
 
-### Connection Issues
-
-If you have trouble connecting to QuestDB:
-
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible.
-2. Check that the connection parameters (host, port, user, password) are correct.
-3. Ensure that your R installation has all required packages installed.
-4. Check if the QuestDB server logs show any connection errors.
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists using `dbListTables()`.
-2. Check the syntax of your SQL query.
-3. Ensure that you're using the correct data types for parameters.
-4. Look for any unsupported PostgreSQL features that might be causing issues.
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
 ### Data Type Issues
 

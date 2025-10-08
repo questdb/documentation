@@ -165,6 +165,11 @@ module.exports = {
               type: "doc",
               label: "R",
             },
+            {
+              id: "pgwire/c-and-cpp",
+              type: "doc",
+              label: "C/C++",
+            },
           ],
         },
         "reference/sql/datatypes",
@@ -618,6 +623,7 @@ module.exports = {
             "third-party-tools/superset",
             "third-party-tools/flink",
             "third-party-tools/spark",
+            "third-party-tools/ignition"
           ],
         },
         {

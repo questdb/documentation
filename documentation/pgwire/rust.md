@@ -2,8 +2,15 @@
 title: Rust PGWire Guide
 description:
   Rust clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Rust for querying data. 
+  protocol with Rust for querying data.
 ---
+
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
 
 QuestDB is tested with the following Rust client:
 
@@ -93,7 +100,7 @@ use tokio_postgres::{NoTls, Error};
 async fn main() -> Result<(), Error> {
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
-    
+
     // Spawn a background task that keeps the connection alive for its entire lifetime
     // This task will terminate only when the connection closes
     tokio::spawn(async move {
@@ -101,14 +108,14 @@ async fn main() -> Result<(), Error> {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     // Use the client to execute a simple query
     let rows = client.query("SELECT version()", &[]).await?;
-    
+
     // Print the version
     let version: &str = rows[0].get(0);
     println!("QuestDB version: {}", version);
-    
+
     Ok(())
 }
 ```
@@ -128,24 +135,24 @@ async fn main() -> Result<(), Error> {
         .user("admin")
         .password("quest")
         .dbname("qdb");
-    
+
     // Connect to QuestDB
     let (client, connection) = config.connect(NoTls).await?;
-    
+
     // Spawn the connection handling task
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
-    
+
     // Execute a query
     let rows = client.query("SELECT version()", &[]).await?;
-    
+
     // Print the version
     let version: &str = rows[0].get(0);
     println!("QuestDB version: {}", version);
-    
+
     Ok(())
 }
 ```
@@ -160,7 +167,7 @@ use tokio_postgres::{NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+    let into_utc = |timestamp: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(timestamp, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
 
@@ -174,7 +181,7 @@ async fn main() -> Result<(), Error> {
 
     println!("Recent trades:");
     for row in rows {
-        let timestamp: NaiveDateTime = row.get("ts");
+        let timestamp: NaiveDateTime = row.get("timestamp");
         let timestamp_utc = into_utc(timestamp);
         let symbol: &str = row.get("symbol");
         let price: f64 = row.get("price");
@@ -189,7 +196,7 @@ async fn main() -> Result<(), Error> {
 :::note
 
 Note: Time in QuestDB is always in UTC. When using the `postgres` or `tokio-postgres` crates, the timezone is not sent
-over the wire. As such you need to first extract timestamp fileds as `chrono::NaiveDateTime` (in other words, void of
+over the wire. As such you need to first extract timestamp fields as `chrono::NaiveDateTime` (in other words, void of
 timezone information) and then convert them to `chrono::DateTime<Utc>`.
 
 :::
@@ -204,7 +211,7 @@ use chrono::{Utc, Duration, NaiveDateTime, DateTime};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+    let into_utc = |timestamp: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(timestamp, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
 
@@ -218,13 +225,13 @@ async fn main() -> Result<(), Error> {
     let start_time = Utc::now() - Duration::days(7); // 7 days ago
 
     let rows = client.query(
-        "SELECT * FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10",
+        "SELECT * FROM trades WHERE symbol = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 10",
         &[&symbol, &start_time.naive_utc()], // note the conversion to naive UTC
     ).await?;
 
     println!("Recent {} trades:", symbol);
     for row in rows {
-        let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
+        let timestamp: DateTime<Utc> = into_utc(row.get("timestamp"));
         let price: f64 = row.get("price");
 
         println!("Time: {}, Price: {:.2}", timestamp, price);
@@ -235,7 +242,7 @@ async fn main() -> Result<(), Error> {
 ```
 
 Note: When binding parameters related to timestamps you must use `chrono::NaiveDateTime` to
-represent the timestamp in UTC. 
+represent the timestamp in UTC.
 
 ### Prepared Statements
 
@@ -247,7 +254,7 @@ use tokio_postgres::{NoTls, Error};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+    let into_utc = |timestamp: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(timestamp, Utc);
     let connection_string = "host=localhost port=8812 user=admin password=quest dbname=qdb";
     let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
 
@@ -258,7 +265,7 @@ async fn main() -> Result<(), Error> {
     });
 
     let statement = client.prepare(
-        "SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT $2"
+        "SELECT * FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT $2"
     ).await?;
 
     let symbols = vec!["BTC-USD", "ETH-USD", "SOL-USD"];
@@ -268,7 +275,7 @@ async fn main() -> Result<(), Error> {
 
         println!("\nRecent {} trades:", symbol);
         for row in rows {
-            let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
+            let timestamp: DateTime<Utc> = into_utc(row.get("timestamp"));
             let price: f64 = row.get("price");
 
             println!("Time: {}, Price: {:.2}", timestamp, price);
@@ -299,7 +306,7 @@ struct Trade {
 impl From<Row> for Trade {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: DateTime::from_naive_utc_and_offset(row.get("ts"), Utc),
+            timestamp: DateTime::from_naive_utc_and_offset(row.get("timestamp"), Utc),
             symbol: row.get("symbol"),
             price: row.get("price"),
             amount: row.get("amount"),
@@ -375,10 +382,10 @@ async fn main() -> Result<(), Error> {
         .expect("Failed to create pool");
 
     async fn execute_query(conn: &PooledConnection<'_, PostgresConnectionManager<NoTls>>, symbol: &str) -> Result<(), Error> {
-        let into_utc = |ts: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+        let into_utc = |timestamp: NaiveDateTime| DateTime::<Utc>::from_naive_utc_and_offset(timestamp, Utc);
 
         let rows = conn.query(
-            "SELECT * FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT 5",
+            "SELECT * FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 5",
             &[&symbol],
         ).await?;
 
@@ -389,7 +396,7 @@ async fn main() -> Result<(), Error> {
         // rather than directly printing from each concurrent task.
         println!("\nRecent {} trades:", symbol);
         for row in rows {
-            let timestamp: DateTime<Utc> = into_utc(row.get("ts"));
+            let timestamp: DateTime<Utc> = into_utc(row.get("timestamp"));
             let price: f64 = row.get("price");
 
             println!("Time: {}, Price: {:.2}", timestamp, price);
@@ -455,7 +462,7 @@ fn utc_datetime_from_naive(timestamp: NaiveDateTime) -> DateTime<Utc> {
 impl From<Row> for SampledData {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: utc_datetime_from_naive(row.get("ts")),
+            timestamp: utc_datetime_from_naive(row.get("timestamp")),
             symbol: row.get("symbol"),
             avg_price: row.get("avg_price"),
             min_price: row.get("min_price"),
@@ -467,7 +474,7 @@ impl From<Row> for SampledData {
 impl From<Row> for LatestTrade {
     fn from(row: Row) -> Self {
         Self {
-            timestamp: utc_datetime_from_naive(row.get("ts")),
+            timestamp: utc_datetime_from_naive(row.get("timestamp")),
             symbol: row.get("symbol"),
             price: row.get("price"),
             amount: row.get("amount"),
@@ -490,13 +497,13 @@ async fn main() -> Result<(), Error> {
     println!("Hourly price samples (last 7 days):");
     let sample_by_query = "
         SELECT
-            ts,
+            timestamp,
             symbol,
             avg(price) as avg_price,
             min(price) as min_price,
             max(price) as max_price
         FROM trades
-        WHERE ts >= dateadd('d', -7, now())
+        WHERE timestamp >= dateadd('d', -7, now())
         SAMPLE BY 1h
     ";
 
@@ -514,7 +521,7 @@ async fn main() -> Result<(), Error> {
 
     // LATEST ON query (last value per group)
     println!("\nLatest trades by symbol:");
-    let latest_by_query = "SELECT * FROM trades LATEST ON ts PARTITION BY symbol";
+    let latest_by_query = "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol";
 
     let rows = client.query(latest_by_query, &[]).await?;
     let latest_trades: Vec<LatestTrade> = rows.into_iter()
@@ -562,42 +569,39 @@ QuestDB provides specialized time-series functions that can be used with tokio-p
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT
-   ts,
-   avg(price) as avg_value
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
+       symbol,
+       avg(price) as avg_price,
+       min(price) as min_price,
+       max(price) as max_price
 FROM trades
-WHERE timestamp >= '2020-01-01'
-SAMPLE BY 1h;
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
-SELECT * FROM trades
+```questdb-sql title="LATEST Rows Per Symbol" demo
+SELECT *
+FROM trades
+WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
+<HighlyAvailableReads />
+
+<KnownLimitations />
+
 ## Troubleshooting
 
-### Connection Issues
+<ConnectionIssues />
 
-If you have trouble connecting to QuestDB:
+You might also want to ensure that you're handling the connection object correctly by spawning it on a separate task.
 
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible.
-2. Check that the connection parameters (host, port, user, password) are correct.
-3. Ensure that you're handling the connection object correctly by spawning it on a separate task.
-4. Check if the QuestDB server logs show any connection errors.
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists.
-2. Check the syntax of your SQL query.
-3. Ensure that you're using the correct data types for parameters, especially with timestamp types.
+<QueryErrors />
+<TimestampConfusion />
 
 ### Parameter Binding Issues
 

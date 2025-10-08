@@ -22,21 +22,10 @@ time series analytics.
 the latest entry by timestamp for a given key or combination of keys as part of
 a `SELECT` statement.
 
-```questdb-sql title="LATEST ON customer ID and currency"
-SELECT * FROM balances
-WHERE balance > 800
-LATEST ON ts PARTITION BY customer_id, currency;
-```
-
-### SAMPLE BY
-
-[SAMPLE BY](/docs/reference/sql/select/#sample-by) is used for time-based
-[aggregations](/docs/reference/function/aggregation/) with an efficient syntax.
-The short query below will return the simple average balance from a list of
-accounts by one month buckets.
-
-```questdb-sql title="SAMPLE BY one month buckets"
-SELECT avg(balance) FROM accounts SAMPLE BY 1M
+```questdb-sql title="LATEST ON symbol ID and side" demo
+SELECT * FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol, side;
 ```
 
 ### Timestamp search
@@ -46,9 +35,23 @@ However, QuestDB provides a
 [native notation](/docs/reference/sql/where/#timestamp-and-date) which is faster
 and less verbose.
 
-```questdb-sql title="Results in a given year"
-SELECT * FROM scores WHERE ts IN '2018';
+```questdb-sql title="Results in a given year" demo
+SELECT * FROM trades WHERE timestamp IN '2025';
 ```
+
+### SAMPLE BY
+
+[SAMPLE BY](/docs/reference/sql/select/#sample-by) is used for time-based
+[aggregations](/docs/reference/function/aggregation/) with an efficient syntax.
+The short query below will return the average price from a list of
+symbols by one hour buckets.
+
+```questdb-sql title="SAMPLE BY one month buckets" demo
+SELECT timestamp, symbol, sum(price) FROM trades
+WHERE timestamp in today()
+SAMPLE BY 1h;
+```
+
 
 ## Differences from standard SQL
 
@@ -59,10 +62,10 @@ return the same result as `my_table;`. While adding `SELECT * FROM` makes SQL
 look more complete, there are examples where omitting these keywords makes
 queries a lot easier to read.
 
-```questdb-sql title="Optional use of SELECT * FROM"
-my_table;
+```questdb-sql title="Optional use of SELECT * FROM" demo
+trades;
 -- equivalent to:
-SELECT * FROM my_table;
+SELECT * FROM trades;
 ```
 
 ### GROUP BY is optional
@@ -71,33 +74,40 @@ The `GROUP BY` clause is optional and can be omitted as the QuestDB optimizer
 derives group-by implementation from the `SELECT` clause. In standard SQL, users
 might write a query like the following:
 
-```questdb-sql
-SELECT a, b, c, d, sum(e) FROM tab GROUP BY a, b, c, d;
+```questdb-sql title="Standard SQL GROUP BY" demo
+SELECT symbol, side, sum(price) FROM trades
+WHERE timestamp IN today()
+GROUP BY symbol, side;
 ```
 
 However, enumerating a subset of `SELECT` columns in the `GROUP BY` clause is
 redundant and therefore unnecessary. The same SQL in QuestDB SQL-dialect can be
 written as:
 
-```questdb-sql
-SELECT a, b, c, d, sum(e) FROM tab;
+```questdb-sql title="QuestDB Implicit GROUP BY" demo
+SELECT symbol, side, sum(price) FROM trades
+WHERE timestamp IN today();
 ```
 
 ### Implicit HAVING
 
 Let's look at another more complex example using `HAVING` in standard SQL:
 
-```questdb-sql
-SELECT a, b, c, d, sum(e)
-FROM tab
-GROUP BY a, b, c, d
-HAVING sum(e) > 100;
+```questdb-sql title="Standard SQL GROUP BY/HAVING"
+SELECT symbol, side, sum(price) FROM trades
+WHERE timestamp IN today()
+GROUP BY symbol, side
+HAVING sum(price) > 1000;
 ```
 
 In QuestDB's dialect, featherweight sub-queries come to the rescue to create a
 smaller, more readable query, without unnecessary repetitive aggregations.
 `HAVING` functionality can be obtained implicitly as follows:
 
-```questdb-sql
-(SELECT a, b, c, d, sum(e) s FROM tab) WHERE s > 100;
+```questdb-sql title="QuestDB Implicit HAVING equivalent" demo
+(
+  SELECT symbol, side, sum(price) as total_price
+  FROM trades WHERE timestamp IN today()
+)
+WHERE total_price > 10_000_000;
 ```

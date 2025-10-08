@@ -2,8 +2,15 @@
 title: Go PGWire Guide
 description:
   Go clients for QuestDB PGWire protocol. Learn how to use the PGWire
-  protocol with Go for querying data. 
+  protocol with Go for querying data.
 ---
+
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
 
 QuestDB is tested with the following Go client:
 
@@ -87,23 +94,23 @@ import (
 func main() {
 	// Connection string
 	connString := "postgres://admin:quest@localhost:8812/qdb"
-	
+
 	// Create a context
 	ctx := context.Background()
-	
+
 	// Connect to QuestDB
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	// Verify connection
 	err = conn.Ping(ctx)
 	if err != nil {
 		log.Fatalf("Unable to ping database: %v", err)
 	}
-	
+
 	fmt.Println("Successfully connected to QuestDB!")
 }
 ```
@@ -166,24 +173,24 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	rows, err := conn.Query(ctx, "SELECT * FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		// Create a map to hold the row data
 		values, err := rows.Values()
 		if err != nil {
 			log.Fatalf("Error scanning row: %v", err)
 		}
-		
+
 		// Print the row data
 		fmt.Println(values)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
 	}
@@ -208,7 +215,7 @@ import (
 
 // Trade represents a row in the trades table
 type Trade struct {
-	Timestamp time.Time `db:"ts"`
+	Timestamp time.Time `db:"timestamp"`
 	Symbol    string    `db:"symbol"`
 	Price     float64   `db:"price"`
 	Amount    float64   `db:"amount"`
@@ -221,14 +228,14 @@ func main() {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer conn.Close(ctx)
-	
+
 	// Execute a query
-	rows, err := conn.Query(ctx, "SELECT ts, symbol, price, amount FROM trades LIMIT 10")
+	rows, err := conn.Query(ctx, "SELECT timestamp, symbol, price, amount FROM trades LIMIT 10")
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
-	
+
 	// Collect results
 	var trades []Trade
 	for rows.Next() {
@@ -238,12 +245,12 @@ func main() {
 		}
 		trades = append(trades, t)
 	}
-	
+
 	// Check for errors from iterating over rows
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterating rows: %v", err)
 	}
-	
+
 	// Print trades
 	for _, t := range trades {
 		fmt.Printf("Timestamp: %s, Symbol: %s, Price: %.2f, Amount: %.6f\n",
@@ -280,7 +287,7 @@ func main() {
 	startTime := time.Now().Add(-7 * 24 * time.Hour) // 7 days ago
 
 	rows, err := conn.Query(ctx,
-		"SELECT ts, symbol, price, amount FROM trades WHERE symbol = $1 AND ts >= $2 ORDER BY ts DESC LIMIT 10",
+		"SELECT timestamp, symbol, price, amount FROM trades WHERE symbol = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 10",
 		symbol, startTime)
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
@@ -354,7 +361,7 @@ func main() {
 			defer wg.Done()
 
 			rows, err := pool.Query(ctx,
-				"SELECT ts, price FROM trades WHERE symbol = $1 ORDER BY ts DESC LIMIT 5",
+				"SELECT timestamp, price FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 5",
 				sym)
 			if err != nil {
 				log.Printf("Query failed for symbol %s: %v", sym, err)
@@ -412,14 +419,14 @@ func main() {
 
 	// SAMPLE BY query (time-based downsampling)
 	sampleByQuery := `
-		SELECT 
-			ts, 
-			symbol, 
-			avg(price) as avg_price, 
-			min(price) as min_price, 
-			max(price) as max_price 
-		FROM trades 
-		WHERE ts >= dateadd('d', -7, now()) 
+		SELECT
+			timestamp,
+			symbol,
+			avg(price) as avg_price,
+			min(price) as min_price,
+			max(price) as max_price
+		FROM trades
+		WHERE timestamp >= dateadd('d', -7, now())
 		SAMPLE BY 1h
 	`
 
@@ -443,7 +450,7 @@ func main() {
 
 	// LATEST ON query (last value per group)
 	fmt.Println("\nExecuting LATEST ON query...")
-	latestByQuery := "SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol"
+	latestByQuery := "SELECT timestamp, symbol, price, amount FROM trades LATEST ON timestamp PARTITION BY symbol"
 
 	rows, err = conn.Query(ctx, latestByQuery)
 	if err != nil {
@@ -519,10 +526,10 @@ func (c *QuestDBClient) Close() {
 // GetRecentTrades fetches recent trades for a given symbol
 func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limit int) ([]Trade, error) {
 	query := `
-		SELECT ts, symbol, price, amount 
-		FROM trades 
-		WHERE symbol = $1 
-		ORDER BY ts DESC 
+		SELECT timestamp, symbol, price, amount
+		FROM trades
+		WHERE symbol = $1
+		ORDER BY timestamp DESC
 		LIMIT $2
 	`
 
@@ -551,14 +558,14 @@ func (c *QuestDBClient) GetRecentTrades(ctx context.Context, symbol string, limi
 // GetSampledData fetches downsampled price data
 func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days int) ([]PriceSample, error) {
 	query := `
-		SELECT 
-			ts, 
-			symbol, 
-			avg(price) as avg_price, 
-			min(price) as min_price, 
-			max(price) as max_price 
-		FROM trades 
-		WHERE symbol = $1 AND ts >= dateadd('d', $2, now()) 
+		SELECT
+			timestamp,
+			symbol,
+			avg(price) as avg_price,
+			min(price) as min_price,
+			max(price) as max_price
+		FROM trades
+		WHERE symbol = $1 AND timestamp >= dateadd('d', $2, now())
 		SAMPLE BY 1h
 	`
 
@@ -586,7 +593,7 @@ func (c *QuestDBClient) GetSampledData(ctx context.Context, symbol string, days 
 
 // GetLatestPrices fetches the latest price for each symbol
 func (c *QuestDBClient) GetLatestPrices(ctx context.Context) ([]Trade, error) {
-	query := `SELECT ts, symbol, price, amount FROM trades LATEST ON ts PARTITION BY symbol`
+	query := `SELECT timestamp, symbol, price, amount FROM trades LATEST ON timestamp PARTITION BY symbol`
 
 	rows, err := c.pool.Query(ctx, query)
 	if err != nil {
@@ -823,44 +830,37 @@ QuestDB provides specialized time-series functions that can be used with pgx:
 
 SAMPLE BY is used for time-based downsampling:
 
-```sql
-SELECT ts,
+```questdb-sql title="Sample By 1 Hour" demo
+SELECT timestamp,
        symbol,
        avg(price) as avg_price,
        min(price) as min_price,
        max(price) as max_price
 FROM trades
-WHERE ts >= dateadd('d', -7, now()) SAMPLE BY 1h
+WHERE timestamp >= dateadd('d', -7, now()) SAMPLE BY 1h;
 ```
 
 ### LATEST ON Queries
 
 LATEST ON is an efficient way to get the most recent values:
 
-```sql
+```questdb-sql title="LATEST Rows Per Symbol" demo
 SELECT *
-FROM trades LATEST ON timestamp PARTITION BY symbol
+FROM trades
+WHERE timestamp IN today()
+LATEST ON timestamp PARTITION BY symbol;
 ```
+
+<HighlyAvailableReads />
+
+<KnownLimitations />
 
 ## Troubleshooting
 
-### Connection Issues
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
-If you have trouble connecting to QuestDB:
-
-1. Verify that QuestDB is running and the PGWire port (8812) is accessible.
-2. Check that the connection parameters (host, port, user, password) are correct.
-3. Make sure your network allows connections to the QuestDB server.
-4. Check if the QuestDB server logs show any connection errors.
-
-### Query Errors
-
-For query-related errors:
-
-1. Verify that the table you're querying exists.
-2. Check the syntax of your SQL query.
-3. Ensure that you're using the correct data types for parameters.
-4. Look for any unsupported PostgreSQL features that might be causing issues.
 
 ## Conclusion
 

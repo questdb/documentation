@@ -94,7 +94,7 @@ as the row timestamp. See `cairo.timestamp.locale` and `line.tcp.timestamp`
 
 - The native timestamp format used by QuestDB is a Unix timestamp in microsecond
   resolution; timestamps in nanoseconds will be parsed and truncated to
-  microseconds.
+  microseconds.  When the `timestamp_ns` type is used for the designated column, the timestamp will retain the nanosecond precision.
 
 - For HTTP, precision parameters can added to a request. These include `n` or
   `ns` for nanoseconds, `u` or `us` formicroseconds, `ms` for milliseconds, `s`
