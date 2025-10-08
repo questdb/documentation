@@ -18,6 +18,8 @@ import iamConfig from "./configuration-utils/\_iam.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
 import logConfig from "./configuration-utils/\_log.config.json"
 import matViewConfig from "./configuration-utils/\_mat-view.config.json"
+import configValidationConfig from "./configuration-utils/\_config-validation.config.json"
+import telemetryConfig from "./configuration-utils/\_telemetry.config.json"
 
 This page describes methods for configuring QuestDB server settings.
 
@@ -337,16 +339,7 @@ without causing the database to stop its startup sequence: These are usually
 setting deprecation warnings. Configuration errors can optionally cause the
 database to fail its startup.
 
-<ConfigTable
-  rows={{
-    "config.validation.strict": {
-      default: "false",
-      description:
-        "When enabled, startup fails if there are configuration errors.",
-      reloadable: false,
-    },
-  }}
-/>
+<ConfigTable rows={configValidationConfig} />
 
 _We recommended enabling strict validation._
 
@@ -356,27 +349,7 @@ QuestDB sends anonymous telemetry data with information about usage which helps
 us improve the product over time. We do not collect any personally-identifying
 information, and we do not share any of this data with third parties.
 
-<ConfigTable
-  rows={{
-    "telemetry.enabled": {
-      default: "true",
-      description: "Enable or disable anonymous usage metrics collection.",
-      reloadable: false,
-    },
-    "telemetry.hide.tables": {
-      default: "false",
-      description:
-        "Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view.",
-      reloadable: false,
-    },
-    "telemetry.queue.capacity": {
-      default: "512",
-      description:
-        "Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking.",
-      reloadable: false,
-    },
-  }}
-/>
+<ConfigTable rows={telemetryConfig} />
 
 ## Materialized views
 

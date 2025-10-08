@@ -15,6 +15,7 @@ plugins/*/compiled
 .docusaurus
 .netlify
 .cache-loader
+static/llms.txt
 
 # Misc
 .DS_Store

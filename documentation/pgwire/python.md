@@ -5,6 +5,13 @@ description:
   protocol with Python for querying data.
 ---
 
+import HighlyAvailableReads from "../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../partials/pgwire/_timestamp_confusion.partial.mdx"
+
+
 QuestDB is tested with the following Python clients:
 
 - [asyncpg](#asyncpg)
@@ -1114,7 +1121,7 @@ with engine.connect() as conn:
     print(f"Sample data:\n{df.head()}")
 ```
 
-### Known Limitations with QuestDB
+### Known Limitations of Psycopg2 with QuestDB
 
 - psycopg2 is generally slower than asyncpg and psycopg3
 
@@ -1164,6 +1171,17 @@ FROM trades
 WHERE timestamp IN today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
+
+
+<HighlyAvailableReads />
+
+<KnownLimitations />
+
+## Troubleshooting
+
+<ConnectionIssues />
+<QueryErrors />
+<TimestampConfusion />
 
 ## Conclusion
 
