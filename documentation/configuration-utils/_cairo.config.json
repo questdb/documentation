@@ -466,5 +466,9 @@
   "cairo.system.writer.data.append.page.size": {
     "default": "256k",
     "description": "mmap sliding page size that TableWriter uses to append data for each column specifically for System tables."
+  },
+  "cairo.file.descriptor.cache.enabled": {
+    "default": "true",
+    "description": "enables or disables the file-descriptor cache"
   }
 }
