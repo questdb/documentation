@@ -30,15 +30,16 @@ Types can be converted from one to another using the `cast()` function.
 
 ```questdb-sql title="Queries"
 SELECT
-cast(3L + 2L AS INT),
-cast(1578506142000000 AS TIMESTAMP),
-cast('10.2' AS DOUBLE),
-cast('行' AS INT);
+cast(3L + 2L AS INT) cast1,
+cast(1578506142000000 AS TIMESTAMP) cast2,
+cast(1578506142000000 AS TIMESTAMP_NS) cast3,
+cast('10.2' AS DOUBLE) cast4,
+cast('1' AS INT) cast5;
 ```
 
-| cast | cast1                       | cast2 | cast3 |
-| ---- | --------------------------- | ----- | ----- |
-| 5    | 2020-01-08T17:55:42.000000Z | 10.2  | 34892 |
+| cast1 | cast2                       | cast3                          | cast4 | cast5 |
+| ----- | --------------------------- | ------------------------------ | ----- | ----- |
+| 5     | 2020-01-08T17:55:42.000000Z | 1970-01-19T06:28:26.142000000Z | 10.2  | 1     |
 
 Explicit casting of an expression to a smaller
 [data type](/docs/reference/sql/datatypes/) may result in loss of data when the
