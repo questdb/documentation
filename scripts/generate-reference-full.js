@@ -4,7 +4,7 @@ const yaml = require('js-yaml')
 const {
   convertAllComponents,
   bumpHeadings,
-  cleanForLLM,
+  normalizeNewLines,
   removeImports,
   processPartialImports,
   prependFrontmatter,
@@ -88,7 +88,7 @@ async function extractFrontmatterAndContent(raw, filePath) {
   processedContent = removeImports(processedContent)
 
   // Clean and normalize
-  processedContent = cleanForLLM(processedContent)
+  processedContent = normalizeNewLines(processedContent)
 
   // Bump heading levels for proper hierarchy in combined document
   // H1 (title) becomes H2, H2 becomes H3, etc.

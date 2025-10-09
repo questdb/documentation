@@ -6,7 +6,7 @@ const {
   removeImports,
   processPartialImports,
   prependFrontmatter,
-  cleanForLLM,
+  normalizeNewLines,
 } = require("./convert-components")
 
 module.exports = () => ({
@@ -73,7 +73,7 @@ module.exports = () => ({
           processedContent = removeImports(processedContent)
 
           // Clean and normalize
-          processedContent = cleanForLLM(processedContent) + "\n"
+          processedContent = normalizeNewLines(processedContent) + "\n"
 
           let urlPath
 

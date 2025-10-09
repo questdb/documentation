@@ -22,18 +22,64 @@ function parseProps(propsString) {
 }
 
 /**
- * Converts <Screenshot /> components to bold alt text
- * Example: <Screenshot alt="test" src="..." /> -> **test**
+ *
+ * @param {string} content - The content to search
+ * @param {string} componentName - Name of the component (e.g., "Screenshot")
+ * @returns {Array} Array of match objects with { props, children, fullMatch, index }
+ */
+function matchComponent(content, componentName) {
+  const matches = []
+
+  // Universal regex that matches:
+  // <ComponentName (props with any content including >) (self-closing /> OR open-tag > children </ComponentName>)
+  // Uses [\s\S]*? to match props across newlines (non-greedy to stop at /> or >)
+  const pattern = `<${componentName}([\\s\\S]*?)(?:\\/>|>([\\s\\S]*?)<\\/${componentName}>)`
+  const regex = new RegExp(pattern, 'g')
+
+  let match
+
+  while ((match = regex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      propsString: match[1] ? match[1].trim() : '',
+      props: parseProps(match[1] ? match[1].trim() : ''),
+      children: match[2] || '', // undefined if self-closing
+      index: match.index,
+      isSelfClosing: !match[2] && match[2] !== ''
+    })
+  }
+
+  return matches
+}
+
+/**
+ * Replace component occurrences using the unified matcher
+ *
+ * @param {string} content - The content to process
+ * @param {string} componentName - Name of the component
+ * @param {function} replacer - Function that receives match object and returns replacement string
+ * @returns {string} Processed content
+ */
+function replaceComponent(content, componentName, replacer) {
+  const matches = matchComponent(content, componentName)
+
+  // Replace from end to start to maintain correct indices
+  let result = content
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const match = matches[i]
+    const replacement = replacer(match)
+    result = result.substring(0, match.index) + replacement + result.substring(match.index + match.fullMatch.length)
+  }
+
+  return result
+}
+
+/**
+ * Removes <Screenshot /> components
  */
 function convertScreenshot(content) {
-  const screenshotRegex = /<Screenshot\s+([^>]*?)(?:\/?>|>\s*<\/Screenshot>)/gs
-
-  return content.replace(screenshotRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-    if (props.alt) {
-      return `\n\n**${props.alt}**\n\n`
-    }
-    return "\n\n**[Screenshot]**\n\n"
+  return replaceComponent(content, 'Screenshot', (_) => {
+    return ""
   })
 }
 
@@ -41,12 +87,9 @@ function convertScreenshot(content) {
  * Converts <CodeBlock /> components to markdown code blocks
  */
 function convertCodeBlock(content) {
-  const codeBlockRegex = /<CodeBlock\s+([^>]*?)>([\s\S]*?)<\/CodeBlock>/g
-
-  return content.replace(codeBlockRegex, (match, propsString, children) => {
-    const props = parseProps(propsString)
-    const language = props.language || ""
-    const trimmedCode = children.trim()
+  return replaceComponent(content, 'CodeBlock', (match) => {
+    const language = match.props.language || match.props.className?.replace('language-', '') || ""
+    const trimmedCode = match.children.trim()
     return `\n\n\`\`\`${language}\n${trimmedCode}\n\`\`\`\n\n`
   })
 }
@@ -55,12 +98,14 @@ function convertCodeBlock(content) {
  * Converts <DocButton /> components to markdown links
  */
 function convertDocButton(content) {
-  const docButtonRegex = /<DocButton\s+([^>]*?)>([\s\S]*?)<\/DocButton>/g
-
-  return content.replace(docButtonRegex, (match, propsString, children) => {
-    const props = parseProps(propsString)
-    const href = props.href || props.to || "#"
-    const text = children.trim()
+  return replaceComponent(content, 'DocButton', (match) => {
+    const href = match.props.href || match.props.to || "#"
+    // Strip JSX tags like <>, </>, and other HTML/JSX elements from children
+    const text = match.children
+      .trim()
+      .replace(/<\/?>/g, '') // Remove React fragments <> and </>
+      .replace(/<[^>]+>/g, '') // Remove other HTML/JSX tags
+      .trim()
     return `[${text}](${href})`
   })
 }
@@ -69,13 +114,11 @@ function convertDocButton(content) {
  * Converts <Tabs> and <TabItem> to markdown table
  */
 function convertTabs(content) {
-  const tabsRegex = /<Tabs\s+([\s\S]*?)>([\s\S]*?)<\/Tabs>/g
-
-  return content.replace(tabsRegex, (match, propsString, children) => {
+  return replaceComponent(content, 'Tabs', (match) => {
     // Extract values array from props (can span multiple lines)
-    const valuesMatch = propsString.match(/values=\{(\[[\s\S]*?\])\}/s)
+    const valuesMatch = match.propsString.match(/values=\{(\[[\s\S]*?\])\}/s)
     if (!valuesMatch) {
-      return match // Return original if can't parse
+      return match.fullMatch // Return original if can't parse
     }
 
     let valuesArray
@@ -88,7 +131,7 @@ function convertTabs(content) {
       valuesArray = JSON.parse(valuesStr)
     } catch (e) {
       console.warn("[convert-components] Failed to parse Tabs values:", e.message)
-      return match
+      return match.fullMatch
     }
 
     // Extract TabItem contents
@@ -96,7 +139,7 @@ function convertTabs(content) {
     const tabItemRegex = /<TabItem\s+value=["']([^"']+)["'][^>]*?>([\s\S]*?)<\/TabItem>/g
     let tabMatch
 
-    while ((tabMatch = tabItemRegex.exec(children)) !== null) {
+    while ((tabMatch = tabItemRegex.exec(match.children)) !== null) {
       const value = tabMatch[1]
       const content = tabMatch[2].trim()
       tabItems.push({ value, content })
@@ -134,16 +177,12 @@ function convertConfigTable(content, docsPath) {
     importMap.set(varName, unescapedPath)
   }
 
-  const configTableRegex = /<ConfigTable\s+([^>]*?)\/>/g
-
-  return content.replace(configTableRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-
+  return replaceComponent(content, 'ConfigTable', (match) => {
     // ConfigTable typically uses a rows prop pointing to JSON data
-    if (props.rows) {
+    if (match.props.rows) {
       try {
         // Get the import path for this variable
-        const importPath = importMap.get(props.rows)
+        const importPath = importMap.get(match.props.rows)
         if (importPath) {
           // Resolve the path relative to the markdown file's directory
           const configPath = path.join(docsPath, importPath)
@@ -222,22 +261,25 @@ async function fetchReleaseVersion() {
 }
 
 function convertInterpolateReleaseData(content, releaseVersion) {
-  // Match <InterpolateReleaseData ... /> (self-closing)
-  // Extract what renderText returns and replace {release.name} with version
-  const interpolateRegex = /<InterpolateReleaseData[\s\S]*?\/>/g
+  return replaceComponent(content, 'InterpolateReleaseData', (match) => {
+    // Try two patterns:
+    // 1. Arrow function with implicit return: (release) => (...)
+    // 2. Arrow function with explicit return: (release) => { return (...) }
+    let renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\(([\s\S]*?)\)\s*\}/);
 
-  return content.replace(interpolateRegex, (match) => {
-    // Extract everything inside renderText={(...) => ( ... )}
-    // Match from the opening paren after => to the closing paren before )}
-    const renderTextMatch = match.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\(([\s\S]*?)\)\s*\}/);
+    if (!renderTextMatch) {
+      // Try pattern with { return (...) }
+      renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\{\s*return\s*\(([\s\S]*?)\)\s*\}\s*\}/);
+    }
 
     if (renderTextMatch) {
       // Extract the JSX content being returned
       let extracted = renderTextMatch[1].trim();
 
-      // Replace ${release.name} with the actual version (note the $ before the {)
-      extracted = extracted.replace(/\$\{release\.name\}/g, releaseVersion);
-      extracted = extracted.replace(/\$\{release\.tag_name\}/g, releaseVersion);
+      // Replace template literal placeholders with actual version
+      // Handles both ${release.name} (with $) and {release.name} (without $ inside template literals)
+      extracted = extracted.replace(/\$?\{release\.name\}/g, releaseVersion);
+      extracted = extracted.replace(/\$?\{release\.tag_name\}/g, releaseVersion);
 
       // Remove JSX template literal syntax: {`...`} becomes just the content
       extracted = extracted.replace(/\{`/g, '');
@@ -307,13 +349,9 @@ function convertRailroadDiagrams(content, docsPath) {
  * @param {object} repoExamples - Repository examples data from remote-repo-example plugin
  */
 function convertRemoteRepoExample(content, repoExamples = {}) {
-  // Use [\s\S]*? to match across multiple lines
-  const remoteRepoRegex = /<RemoteRepoExample\s+([\s\S]*?)\/>/g
-
-  return content.replace(remoteRepoRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-    const name = props.name || 'unknown'
-    const lang = props.lang || 'text'
+  return replaceComponent(content, 'RemoteRepoExample', (match) => {
+    const name = match.props.name || 'unknown'
+    const lang = match.props.lang || 'text'
     const id = `${name}/${lang}`
 
     // Get the example from plugin data
@@ -328,7 +366,7 @@ function convertRemoteRepoExample(content, repoExamples = {}) {
     let output = '\n\n'
 
     // Add header if it exists and header prop is not false
-    if (props.header !== 'false' && example.header) {
+    if (match.props.header !== 'false' && example.header) {
       output += `${example.header}\n\n`
     }
 
@@ -383,12 +421,8 @@ const clients = [
   },
 ]
 function convertILPClientsTable(content) {
-  // Use [\s\S]*? to match across multiple lines
-  const ilpClientsRegex = /<ILPClientsTable\s+([\s\S]*?)\/>/g
-
-  return content.replace(ilpClientsRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-    const language = props.language
+  return replaceComponent(content, 'ILPClientsTable', (match) => {
+    const language = match.props.language
 
     // Filter by language if specified
     const filteredClients = language
@@ -573,7 +607,7 @@ function prependFrontmatter(content, frontmatter, includeTitle = true) {
  * @param {string} content - The processed markdown content
  * @returns {string} Cleaned markdown
  */
-function cleanForLLM(content) {
+function normalizeNewLines(content) {
   return content
     .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
     .trim()
@@ -581,15 +615,8 @@ function cleanForLLM(content) {
 
 module.exports = {
   convertAllComponents,
-  convertScreenshot,
-  convertDocButton,
-  convertCodeBlock,
-  convertTabs,
-  convertConfigTable,
-  convertInterpolateReleaseData,
-  fetchReleaseVersion,
   bumpHeadings,
-  cleanForLLM,
+  normalizeNewLines,
   removeImports,
   processPartialImports,
   prependFrontmatter,
