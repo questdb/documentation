@@ -482,20 +482,17 @@ SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY paym
 | card         | 16.8       |
 | null         | 14.1       |
 
-## first/last
+## first
 
 - `first(column_name)` - returns the first value of a column.
-- `last(column_name)` - returns the last value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
 `uuid`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
-then the first row is always the row with the lowest timestamp (oldest) and the
-last row is always the one with the highest (latest) timestamp. For a table
-without a designated timestamp column, `first` returns the first row and `last`
-returns the last inserted row, regardless of any timestamp column.
+then the first row is always the row with the lowest timestamp (oldest). For a table
+without a designated timestamp column, `first` returns the first row regardless of any timestamp column.
 
 #### Return value
 
@@ -521,16 +518,6 @@ SELECT first(device_id) FROM sensors;
 | :--------- |
 | arduino-01 |
 
-The following query returns the latest symbol value for the `device_id` column:
-
-```questdb-sql
-SELECT last(device_id) FROM sensors;
-```
-
-| last       |
-| :--------- |
-| arduino-03 |
-
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
 `sensors_unordered`:
@@ -550,16 +537,6 @@ SELECT first(device_id) FROM sensors_unordered;
 | first      |
 | :--------- |
 | arduino-01 |
-
-The following query returns the last record for the `device_id` column:
-
-```questdb-sql
-SELECT last(device_id) FROM sensors_unordered;
-```
-
-| last       |
-| :--------- |
-| arduino-02 |
 
 ## first_not_null
 
@@ -618,6 +595,114 @@ SELECT first_not_null(device_id) FROM sensors_unordered;
 | :------------- |
 | arduino-03     |
 
+## haversine_dist_deg
+
+`haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
+series of latitude and longitude points.
+
+#### Parameters
+
+- `lat` is the latitude expressed as degrees in decimal format (`double`)
+- `lon` is the longitude expressed as degrees in decimal format (`double`)
+- `ts` is the `timestamp` for the data point
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
+SELECT car_id, haversine_dist_deg(lat, lon, k)
+  FROM table rides
+```
+
+## ksum
+
+`ksum(value)` - adds values ignoring missing data (e.g `null` values). Values
+are added using the
+
+[Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
+This is only beneficial for floating-point values such as `float` or `double`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is the same as the type of the argument.
+
+#### Examples
+
+```questdb-sql
+SELECT ksum(a)
+FROM (SELECT rnd_double() a FROM long_sequence(100));
+```
+
+| ksum              |
+| :---------------- |
+| 52.79143968514029 |
+
+## last
+
+- `last(column_name)` - returns the last value of a column.
+
+Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
+`uuid`.
+
+If a table has a [designated timestamp](/docs/concept/designated-timestamp/), the
+last row is always the one with the highest (latest) timestamp.
+
+For a table without a designated timestamp column, `last`
+returns the last inserted row, regardless of any timestamp column.
+
+#### Return value
+
+Return value type is the same as the type of the argument.
+
+#### Examples
+
+Given a table `sensors`, which has a designated timestamp column:
+
+| device_id  | temperature | ts                          |
+| :--------- | :---------- | :-------------------------- |
+| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
+| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+
+The following query returns the latest symbol value for the `device_id` column:
+
+```questdb-sql
+SELECT last(device_id) FROM sensors;
+```
+
+| last       |
+| :--------- |
+| arduino-03 |
+
+Without selecting a designated timestamp column, the table may be unordered and
+the query may return different result. Given an unordered table
+`sensors_unordered`:
+
+| device_id  | temperature | ts                          |
+| :--------- | :---------- | :-------------------------- |
+| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
+| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+
+The following query returns the last record for the `device_id` column:
+
+```questdb-sql
+SELECT last(device_id) FROM sensors_unordered;
+```
+
+| last       |
+| :--------- |
+| arduino-02 |
+
+
 ## last_not_null
 
 - `last_not_null(column_name)` - returns the last non-null value of a column.
@@ -675,54 +760,8 @@ SELECT last_not_null(device_id) FROM sensors_unordered;
 | :------------ |
 | arduino-02    |
 
-## haversine_dist_deg
 
-`haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
-series of latitude and longitude points.
 
-#### Parameters
-
-- `lat` is the latitude expressed as degrees in decimal format (`double`)
-- `lon` is the longitude expressed as degrees in decimal format (`double`)
-- `ts` is the `timestamp` for the data point
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
-SELECT car_id, haversine_dist_deg(lat, lon, k)
-  FROM table rides
-```
-
-## ksum
-
-`ksum(value)` - adds values ignoring missing data (e.g `null` values). Values
-are added using the
-
-[Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
-This is only beneficial for floating-point values such as `float` or `double`.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is the same as the type of the argument.
-
-#### Examples
-
-```questdb-sql
-SELECT ksum(a)
-FROM (SELECT rnd_double() a FROM long_sequence(100));
-```
-
-| ksum              |
-| :---------------- |
-| 52.79143968514029 |
 
 ## max
 
@@ -790,35 +829,10 @@ SELECT payment_type, min(amount) FROM transactions;
 | card         | 15.3 |
 | null         | 22.2 |
 
-## nsum
-
-`nsum(value)` - adds values ignoring missing data (e.g `null` values). Values
-are added using the
-[Neumaier sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm#Further_enhancements).
-This is only beneficial for floating-point values such as `float` or `double`.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql
-SELECT nsum(a)
-FROM (SELECT rnd_double() a FROM long_sequence(100));
-```
-
-| nsum             |
-| :--------------- |
-| 49.5442334742831 |
 
 ## mode
 
-`mode(value)` - calculates the mode (most frequent) value out of a particular dataset. 
+`mode(value)` - calculates the mode (most frequent) value out of a particular dataset.
 
 For `mode(B)`, if there are an equal number of `true` and `false` values, `true` will be returned as a tie-breaker.
 
@@ -833,7 +847,6 @@ To make the result deterministic, you must enforce an underlying sort order.
 #### Return value
 
 Return value type is the same as the type of the input `value`.
-
 
 #### Examples
 
@@ -876,6 +889,33 @@ ORDER BY symbol ASC;
 | BTC-USD   | sell       |
 | BTC-USDT  | sell       |
 | ...       | ...        |
+
+
+## nsum
+
+`nsum(value)` - adds values ignoring missing data (e.g `null` values). Values
+are added using the
+[Neumaier sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm#Further_enhancements).
+This is only beneficial for floating-point values such as `float` or `double`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql
+SELECT nsum(a)
+FROM (SELECT rnd_double() a FROM long_sequence(100));
+```
+
+| nsum             |
+| :--------------- |
+| 49.5442334742831 |
 
 ## stddev / stddev_samp
 
