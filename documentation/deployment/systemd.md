@@ -141,3 +141,29 @@ is activated or de-activated. You also do not need to apply `sudo` to make
 changes to the services.
 
 Consistent with the examples on this page, we recommend scoped users.
+
+
+## Daily timers
+
+If running QuestDB on a `systemd` based Linux (for example, `Ubuntu`) you may find that, by default, there are a number of daily upgrade timers enabled. 
+
+When executed, these tasks restart `systemd` services, which can cause interruptions to QuestDB. It will appear
+that QuestDB restarted with no errors or apparent trigger.
+
+To resolve it, either:
+
+- Force services to be listed for restart, but not restarted automatically.
+  - Modify `/etc/needrestart/needrestart.conf` to contain `$nrconf{restart} = 'l'`.
+- Disable the auto-upgrade services entirely:
+
+```bash
+sudo systemctl disable --now apt-daily-upgrade.timer
+sudo systemctl disable --now apt-daily.timer
+sudo systemctl disable --now unattended-upgrades.service
+```
+
+You can check the status of the timers using:
+
+```bash
+systemctl list-timers --all | grep apt
+```
