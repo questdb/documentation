@@ -107,11 +107,12 @@ ASOF JOIN (md) ON (symbol);
 
 #### When to use it
 
-This hint can be effective when your symbol is rare, meaning the index is highly selective, rarely appearing in any of
+When your symbol column has a highly selective index i.e. the symbol entry is rare, rarely appearing in any of
 your partitions. 
 
 If the symbol appears frequently, then this hint may cause a slower execution plan than the default.
 
+If no index exists on the column, this hint will be disregarded.
 
 ### `asof_memoized_search(l r)`
 

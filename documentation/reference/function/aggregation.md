@@ -22,7 +22,7 @@ Running it will result in the following error:
 
 You can work around this limitation by using CTEs or subqueries:
 
-```questdb-sql
+```questdb-sql title="aggregates as function args workaround" demo
 -- CTE
 WITH minmax AS (
     SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades     
@@ -858,6 +858,24 @@ SELECT symbol, mode(value) as mode FROM dataset;
 | A      | alpha |
 | B      | beta  |
 
+On demo:
+
+```questdb-sql title="mode() on demo" demo
+SELECT symbol, mode(side) 
+FROM trades
+WHERE timestamp IN today()
+ORDER BY symbol ASC;
+```
+
+| symbol    | mode(side) |
+|-----------|------------|
+| ADA-USD   | buy        |
+| ADA-USDT  | buy        |
+| AVAX-USD  | sell       |
+| AVAX-USDT | sell       |
+| BTC-USD   | sell       |
+| BTC-USDT  | sell       |
+| ...       | ...        |
 
 ## stddev / stddev_samp
 
