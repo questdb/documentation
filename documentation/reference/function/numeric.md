@@ -67,7 +67,7 @@ SELECT ceil(15.75) as RoundedUp;
 
 **Arguments:**
 
-- `value` is any numeric value.
+- `value` is any numeric value, except `decimal`.
 
 **Return value:**
 
@@ -160,7 +160,7 @@ SELECT least(11, 3, 8, 15)
 
 **Arguments:**
 
-- `value` is any numeric value.
+- `value` is any numeric value, except `decimal`.
 
 **Return value:**
 
@@ -182,7 +182,7 @@ SELECT ln(4.123)
 
 **Arguments:**
 
-- `value` is any numeric value.
+- `value` is any numeric value, except `decimal`.
 
 **Return value:**
 
@@ -213,8 +213,8 @@ defined by `exponent`.
 
 **Arguments:**
 
-- `base` is any numeric value.
-- `exponent` is any numeric value.
+- `base` is any numeric value, except `decimal`.
+- `exponent` is any numeric value, except `decimal`.
 
 **Return value:**
 
@@ -468,7 +468,7 @@ SELECT size_pretty(400032);
 
 **Arguments:**
 
-- `value` is any numeric value.
+- `value` is any numeric value, except `decimal`.
 
 **Return value:**
 

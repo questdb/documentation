@@ -74,7 +74,7 @@ Define decimal columns by specifying precision and scale:
 ```questdb-sql
 CREATE TABLE transactions (
     id LONG,
-    amount DECIMAL(15, 2),      -- Up to 999,999,999,999.99
+    amount DECIMAL(14, 2),      -- Up to 999,999,999,999.99
     tax_rate DECIMAL(5, 4),      -- Up to 9.9999 (e.g., 0.0875 for 8.75%)
     quantity DECIMAL(10, 3),     -- Up to 9,999,999.999
     timestamp TIMESTAMP
@@ -191,7 +191,7 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 - **Double to decimal**: May lose precision due to floating-point representation
 - **Between decimal types**: Automatic when precision/scale allows
 
-## Performance considerations
+## Considerations
 
 ### Advantages
 

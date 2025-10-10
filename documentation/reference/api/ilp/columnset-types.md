@@ -79,7 +79,7 @@ type is not `double`:
 ## Decimal
 
 Decimal values, which correspond to QuestDB type `decimal`. The values are
-required to have an `d` suffix. For example:
+required to have a `d` suffix. For example:
 
 ```shell
 trade,ticker=BTCUSD price=30000.50d 1638202821000000000\n
