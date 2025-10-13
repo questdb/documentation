@@ -6,6 +6,13 @@ pagination_prev: null
 pagination_next: null
 ---
 
-import {Redirect} from '@docusaurus/router';
+import Head from '@docusaurus/Head';
 
-<Redirect to="/release-notes/" />
+<Head>
+  {/* immediate hard redirect to the site root */}
+  <meta httpEquiv="refresh" content="0; url=https://questdb.com/release-notes/" />
+  <link rel="canonical" href="https://questdb.com/release-notes/" />
+  <meta name="robots" content="noindex,follow" />
+</Head>
+
+If you are not redirected automatically, <a href="https://questdb.com/release-notes/">click here</a>.
