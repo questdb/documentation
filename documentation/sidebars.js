@@ -653,8 +653,8 @@ module.exports = {
     },
     {
       label: "Release Notes",
-      type: "link",
-      href: "/../release-notes",
+      type: "doc",
+      id: "release-notes-redirect",
     },
   ].filter(Boolean),
 }
