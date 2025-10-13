@@ -21,16 +21,16 @@ import CodeBlock from "@theme/CodeBlock"
 It is recommended to select a server with at least 8gb of RAM, for example the `CPX31`.
 
 
-Hetzner Block Storage Volumes only supports ext4 or xfs so ext4.
+Hetzner Block Storage Volumes only supports ext4 or xfs so we will use ext4 which is supported by questdb.
 
 
 Hetzner does not provide any guarantees on the block storage volume performance, but a simple measurement using `fio` reveals performance in the order of 300MBps and 4700 IOPS with a 64k block size, measured using
-`fio --name=write_throughput --directory=/questdb/fiotest --numjobs=8 --size=10G --time_based --runtime=60s --ramp_time=2s --ioengine=libaio --direct=1 --verify=0 --bs=64k --iodepth=64 --rw=write --group_reporting=1`
+`fio --name=write_throughput --directory=/questdb/fiotest --numjobs=8 --size=10G --time_based --runtime=60s --ramp_time=2s --ioengine=libaio --direct=1 --verify=0 --bs=64k --iodepth=64 --rw=write --group_reporting=1`.
 
 
 ## Creating the Hetzner resources
 
-Create the server and storage volume using the `hcloud` cli. You should pick a desired location near your other services, e.g. `nbg`.
+Create the server and storage volume using the Hetzner `hcloud` cli. You should pick a desired location near your other services, e.g. `nbg`.
 The named `ssh-key` should be created in advance through the hetzner cloud console. During the creation of the server, the public key will be copied to `/root/.ssh/authorized_keys` so that it is possible to login to the server right after creation.
 
 ```
@@ -47,7 +47,7 @@ hcloud server ssh questdb01
 
 
 It is a good idea to put a firewall in front of the server. 
-The following commands will create a `questdb` firewall that applies to the `questdb` label which was attached the created server previously.
+The following commands will create a `questdb` firewall that applies to servers with the `questdb` label which was attached the created server previously.
 `ssh` on port 22 and icmp/echo is allowed as the only rules from anywhere.
 
 ```
@@ -108,14 +108,14 @@ You can also keep it simple - just [download](https://questdb.com/download/) the
 QuestDB is a single self-contained binary and easy to deploy
 
 In the following we will go with a Docker setup.
-You can find guides for installing Docker on Ubuntu on the
+You can find guides for installing Docker on Ubuntu in the
 [official docker documentation](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
 
 
 Now run docker with forwarning of relevant ports and a volume mount to the mounted block storage volume:
 
 ```
-docker run -d --name questdb \
+questdb01$ docker run -d --name questdb \
   --restart unless-stopped \
   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \
   -v "/questdb/qdbroot:/var/lib/questdb" \
@@ -130,12 +130,26 @@ To verify that the QuestDB deployment is operating as expected:
 Copy the External IP of the instance. This can be found by running `ip -4 a s` on the server.
 Navigate to `http://<external_ip>:9000` in a browser.
 
+## Configuring QuestDB
+Now is probably a good time to do some basic questdb configuration. Open `/questdb/qdbroot/conf/server.conf` and set a password:
+
+```
+pg.password=<my_secret_password>
+```
+
+Since the configuration file contains the admin password it is a good idea to restrict the access permissions to the file:
+
+```
+questdb01$ chmod 600 /questdb/qdbroot/conf/server.conf
+```
+
+
 ## Upgrading QuestDB
 
 Stop the questdb docker service
 ```
-docker stop questbdb
-docker rm questdb
+questdb01$ docker stop questbdb
+questdb01$ docker rm questdb
 ```
 
 And then re-run the `docker run ...` from above with a different questdb version.
@@ -151,7 +165,7 @@ And then re-run the `docker run ...` from above with a different questdb version
 ## Backup
 
 A Hetzner Block Storage Volume can only be attached at a single server at a time, so backups must be run directly from the server itself.
-As an example of a on-prem backup, we will use [Borg Backup](https://www.borgbackup.org/).
+As an example of an on-prem backup, we will use [Borg Backup](https://www.borgbackup.org/).
 Hetzner has [Storage Boxes](https://www.hetzner.com/storage/storage-box/) which provide cheap storage and it natively supports Borg Backup which makes the backup run reasonably fast.
 
 ### Create Storage Box
@@ -166,7 +180,7 @@ hcloud storage-box create questdb-backup --type bx11 --name questdb-backup --ssh
 It is a good idea to pick a location that is geographically separated from the server itself.
 
 
-When the storage box it will get a name like: `uXXXXX.your-storagebox.de`, and is accessible with a limited ssh shell on port 23:
+When the storage box is created it will get a name like: `uXXXXX.your-storagebox.de`, and is accessible with a limited ssh shell on port 23:
 
 ```
 ssh -p 23 uXXXXX@uXXXXX.your-storagebox.de
@@ -193,7 +207,7 @@ cat questdb-backup.pub | ssh -p 23 uXXXXX@uXXXXX.your-storagebox.de install-ssh-
 ```
 
 The questdb server should now be able to connect to the backup storage box using the keypair.
-Lets see if the works; ssh to the questdb server and run the following:
+Lets see if it works; ssh to the questdb server and run the following:
 
 ```
 hcloud server ssh questdb01
@@ -204,7 +218,7 @@ It should login to the storagebox without requesting a password.
 
 ### Setting up Borg Backup Repository
 
-It is now time to actually [setup borg backup](https://docs.hetzner.com/storage/storage-box/access/access-ssh-rsync-borg#borgbackup), now that the questdb server and the backup storage box can connect to each other.
+It is now time to actually [setup borg backup](https://docs.hetzner.com/storage/storage-box/access/access-ssh-rsync-borg#borgbackup), now that the questdb server can connect to the backup storage.
 
 From the questdb server run
 ```
@@ -229,7 +243,7 @@ keep_monthly: 12
 keep_yearly: 10
 ```
 
-### Run the first backup
+### Install and configure the postgresql client
 
 QuestDB [needs a checkpoint](https://questdb.com/docs/operations/backup/) to be created and released during backup.
 We therefore need the postgresql-client to be installed on the server:
@@ -238,18 +252,35 @@ We therefore need the postgresql-client to be installed on the server:
 questdb01$ apt install postgresql-client
 ```
 
+We now create an environment file in where we can store the admin password.
+Create a `/root/.psql.env` file on the server with the following:
+```
+PGUSER="admin"
+PGPASSWORD="<my_secret_password>"
+```
+
+Ensure that the file is only readable by root:
+```
+questdb01$ chmod 600 .psql.env
+```
+
 Try and run the client so that it connects to the questdb service:
 
 ```
-questdb01$ psql postgresql://admin:quest@localhost:8812 -c "SELECT 1"
+questdb01$ set -a && source .psql.env && set +a
+questdb01$ psql postgresql://localhost:8812 -c "SELECT 1"
 ```
 
-If this succeeds, then prepare for the first backup by creating a checkpoint, run the backup, and release the checkpoint:
+This should run the `SELECT 1` command successfully and output the result to the terminal.
+
+### Run the first backup
+
+It is now time to run the first backup. The backup sequence is as follows: 1) Create a checkpoint, 2) run the backup, and 3) release the checkpoint:
 
 ```
-questdb01$ psql postgresql://admin:quest@localhost:8812 -c "CHECKPOINT CREATE"
+questdb01$ psql postgresql://localhost:8812 -c "CHECKPOINT CREATE"
 questdb01$ borgmatic --progress --stats -v 2
-questdb01$ psql postgresql://admin:quest@localhost:8812 -c "CHECKPOINT RELEASE"
+questdb01$ psql postgresql://localhost:8812 -c "CHECKPOINT RELEASE"
 ```
 
 If it reports success then we are ready to configure automatic backup.
@@ -257,32 +288,38 @@ If it reports success then we are ready to configure automatic backup.
 ### Setup automatic backup using cron
 
 Create a `/root/.borg.env` on the `questdb01` server with the following:
+
 ```
 BORG_RSH="ssh -p 23 -i ~/.ssh/questdb-backup"
 BORG_PASSPHRASE="<the_questdb_repo_passphrase>"
 ```
 
 Ensure that the file is only readable by root:
+
 ```
-questdb01$ chmod 400 .borg.env
+questdb01$ chmod 600 .borg.env
 ```
 
 Now create a shell script `/root/borg-run.sh` with the following:
-```
+
+```bash
 #!/bin/bash
 
 function finally {
     echo "Releasing checkpoint"
-    psql postgresql://admin:quest@localhost:8812 -c "CHECKPOINT RELEASE"
+    psql postgresql://localhost:8812 -c "CHECKPOINT RELEASE"
 }
 
+set -a
+source /root/.psql.env
 source /root/.borg.env
+set +a
 
 # Create a consistent checkpoint before backup and release it afterwards
 # See https://questdb.com/docs/operations/backup/
 
 echo "Creating checkpoint"
-psql postgresql://admin:quest@localhost:8812 -c "CHECKPOINT CREATE"
+psql postgresql://localhost:8812 -c "CHECKPOINT CREATE"
 
 # Ensure that the checkpoint is released when the script exits
 trap finally EXIT
@@ -291,7 +328,7 @@ echo "Running borgmatic backup"
 borgmatic --progress --stats -v 0 2>&1
 ```
 
-The script first creates a checkpoint, it the runs the backup, and finishes by releasing the checkpoint.
+The script first creates a checkpoint, it then runs the backup, and finishes by releasing the checkpoint.
 Add execution permissions to the script:
 ```
 chmod +x borg-run.sh
