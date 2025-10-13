@@ -87,6 +87,7 @@ FROM
  ```
 
 <div className="blue-table">
+
 | timestamp                   | symbol | best_bid_price |
 | --------------------------- | ------ | -------------- |
 | 2025-09-16T14:00:00.006068Z | USDJPY | 145.67         |

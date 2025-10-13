@@ -58,6 +58,8 @@ const config = {
       "data-modal-border-radius": "8px",
       "data-modal-overlay-bg-color": "rgba(33, 34, 44, 0.8)",
       "data-modal-header-border-bottom": "1px solid #404153",
+      "data-modal-y-offset": "10vh",
+      "data-modal-z-index": "9999",
 
       // Conversation
       "data-question-text-color": "#ffffff",

@@ -28,28 +28,25 @@ Hints are designed to be a safe optimization mechanism:
 
 -----
 
-## Binary Search Optimizations and Hints
+## Time-series JOIN hints
 
 Since QuestDB 9.0.0, QuestDB's optimizer defaults to using a binary search-based strategy for **`ASOF JOIN`** and
 **`LT JOIN`** (Less Than Join) queries that have a filter on the right-hand side (the joined or lookup table). This
 approach is generally faster as it avoids a full table scan.
 
 However, for some specific data distributions and filter conditions, the previous strategy of performing a parallel full
-table scan can be more performant. For these cases, QuestDB provides hints to *avoid* the default binary search.
+table scan can be more performant. For these cases, QuestDB provides hints to modify the default search strategy.
 
-### AVOID\_ASOF\_BINARY\_SEARCH and AVOID\_LT\_BINARY\_SEARCH
+The `asof`-prefixed hints will also apply to `lt` joins.
 
-These hints instruct the optimizer to revert to the pre-9.0 execution strategy for `ASOF JOIN` and `LT JOIN` queries,
+### `asof_linear_search(l r)`
+
+This hint instructs the optimizer to revert to the pre-9.0 execution strategy for `ASOF JOIN` and `LT JOIN` queries,
 respectively. This older strategy involves performing a full parallel scan on the joined table to apply filters *before*
 executing the join.
 
-- `AVOID_ASOF_BINARY_SEARCH(left_table_alias right_table_alias)`: Use for **`ASOF JOIN`** queries.
-- `AVOID_LT_BINARY_SEARCH(table_alias)`: Use for **`LT JOIN`** queries.
-
-<!-- end list -->
-
-```questdb-sql title="Avoiding binary search for an ASOF join"
-SELECT /*+ AVOID_ASOF_BINARY_SEARCH(orders md) */
+```questdb-sql title="Using linear search for an ASOF join"
+SELECT /*+ asof_linear_search(orders md) */
   orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
@@ -68,20 +65,20 @@ The **default strategy (binary search)** works as follows:
    evaluating the filter condition until a match is found.
 
 <Screenshot
-alt="Diagram showing execution of the USE_ASOF_BINARY_SEARCH hint"
+alt="Diagram showing execution of the asof_linear_search hint"
 height={447}
 src="images/docs/concepts/asof-join-binary-search-strategy.svg"
 width={745}
 />
 
-The **hinted strategy (`AVOID_..._BINARY_SEARCH`)** forces this plan:
+The hinted strategy forces this plan:
 
 1. Apply the filter to the *entire* joined table in parallel.
 2. Join the filtered (and now much smaller) result set to the main table.
 
-#### When to use the AVOID hints
+#### When to use it
 
-You should only need these hints in a specific scenario: when the filter on your joined table is **highly selective**.
+You should only need this hint in a specific scenario: when the filter on your joined table is **highly selective**.
 
 A filter is considered highly selective if it eliminates a very large percentage of rows (e.g., more than 95%). In this
 situation, the hinted strategy can be faster because:
@@ -94,6 +91,52 @@ scan may have to check many rows before finding one that satisfies the filter co
 
 For most other cases, especially with filters that have low selectivity or when the joined table data is not in
 memory ("cold"), the default binary search is significantly faster as it minimizes I/O operations.
+
+### `asof_index_search(l r)`
+
+This hint instructs the optimizer to use a symbol's index to skip over any time partitions where the symbol does not appear. 
+
+In partitions where the symbol does appear, there will still be some scanning to locate the matching rows.
+
+```questdb-sql title="Using index search for an ASOF join"
+SELECT /*+ asof_index_search(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
+#### When to use it
+
+When your symbol column has a highly selective index i.e. the symbol entry is rare, rarely appearing in any of
+your partitions. 
+
+If the symbol appears frequently, then this hint may cause a slower execution plan than the default.
+
+If no index exists on the column, this hint will be disregarded.
+
+### `asof_memoized_search(l r)`
+
+This hint instructs the optimizer to memoize (remember) rows it has previously seen, and use this information to avoid 
+repeated re-scanning of data.
+
+Imagine a linear scan. For each symbol, we must scan forward to find the next available row. This symbol could be far away.
+When the matching row is located, we store it, pick the next symbol, and repeat this scan. This causes repeated re-reading of data.
+
+Instead, the query engine will check each row for a matching symbol, recording the locations. Then when the symbol is next
+processed, the memoized rows are checked (look-ahead) and the cursor skips forward.
+
+```questdb-sql title="Using memoized search for an ASOF join"
+SELECT /*+ asof_memoized_search(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
+#### When to use it
+
+If your table has a very skewed symbol distribution, this hint can dramatically speed up the query. A typical skew
+would be a few symbols with very large row counts, and many symbols with very small row counts. This hint works well
+for Zipfian-distributed data.
 
 -----
 
@@ -133,10 +176,10 @@ SelectedRecord
 
 #### Hinted Execution Plan (Full Scan)
 
-When you use the `AVOID_ASOF_BINARY_SEARCH` hint, the plan changes.
+When you use the `asof_linear_search` hint, the plan changes.
 
 ```questdb-sql title="Observing execution plan with the AVOID hint" demo
-EXPLAIN SELECT /*+ AVOID_ASOF_BINARY_SEARCH(core_price market_data) */
+EXPLAIN SELECT /*+ asof_linear_search(core_price market_data) */
   *
 FROM core_price
 ASOF JOIN market_data
@@ -161,3 +204,9 @@ SelectedRecord
                 Frame forward scan on: market_data
 ```
 
+## Deprecated hints
+
+- `avoid_asof_binary_search`
+  - superceded by `asof_linear_search`
+- `avoid_lt_binary_search`
+  - superceded by `asof_linear_search`
