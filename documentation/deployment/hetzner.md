@@ -389,6 +389,7 @@ Storage Box creation via `hcloud` CLI is not yet supported ([tracking issue](htt
 - **Type**: BX11 or higher based on data size requirements
 - **SSH support**: Enable for Borg Backup access
 - **Location**: Choose a different geographic region than your server for disaster recovery
+- **Additional settings**: Enable SSH support and mark the storage box as external reachable
 
 After creation, your Storage Box will have a hostname like `uXXXXX.your-storagebox.de` and is accessible via SSH on port 23:
 
@@ -408,7 +409,7 @@ Create a dedicated SSH key pair for backup operations (no passphrase required fo
 
 ```bash
 # Generate key pair on your local machine
-ssh-keygen -t rsa -b 4096 -f questdb-backup -N ""
+ssh-keygen -f questdb-backup -N ""
 ```
 
 #### Step 2: Deploy Private Key
