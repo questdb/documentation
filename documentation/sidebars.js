@@ -652,5 +652,10 @@ module.exports = {
         "troubleshooting/error-codes",
       ],
     },
+    {
+      label: "Release Notes",
+      type: "doc",
+      id: "release-notes-redirect",
+    },
   ].filter(Boolean),
 }

@@ -102,8 +102,6 @@ Where:
 
 - [`dense_rank()`](/docs/reference/function/window#dense_rank) – Assigns a rank to rows monotonically
 
-- [`first_not_null_value()`](/docs/reference/function/window#first_not_null_value) – Retrieves the first not null value in a window
-
 - [`first_value()`](/docs/reference/function/window#first_value) – Retrieves the first value in a window
 
 - [`lag()`](/docs/reference/function/window#lag) – Accesses data from previous rows
