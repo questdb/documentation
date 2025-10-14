@@ -52,17 +52,17 @@ SHOW TABLES;
 
 ### SHOW COLUMNS
 
-```questdb-sql
-SHOW COLUMNS FROM my_table;
+```questdb-sql title="show columns" demo
+SHOW COLUMNS FROM trades;
+
 ```
-
-| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated |
-| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- |
-| symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      |
-| price  | DOUBLE    | false   | 0                  | false        | 0              | false      |
-| ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       |
-| s      | STRING    | false   | 0                  | false        | 0              | false      |
-
+| column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey |
+| --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- |
+| symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |
+| side      | SYMBOL    | false   | 0                  | true         | 256            | 2               | false      | false     |
+| price     | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |
+| amount    | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |
+| timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |
 
 ### SHOW CREATE TABLE
 

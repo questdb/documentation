@@ -168,6 +168,49 @@ There are three ways to create a client instance:
        // ...
    }
    ```
+   
+## Configuring multiple urls
+
+:::note
+
+This feature requires QuestDB OSS 9.1.0+ or Enterprise 3.0.4+.
+
+:::
+
+The ILP client can be configured with multiple _possible_ endpoints to send your data to. Only one will be sent to at
+any one time.
+
+To configure this feature, simply provide multiple `addr` entries. For example:
+
+
+```java
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;addr=localhost:9999;")) {
+   // ...
+}
+```
+
+On initialisation, if `protocol_version=auto`, the sender will identify the first instance that is writeable. Then it will _stick_ to this instance and write
+any subsequent data to it.
+
+In the event that the instance becomes unavailable for writes, the client will retry the other possible endpoints, and when it finds 
+a new writeable instance, will _stick_ to it instead. This unvailability is characterised by failures to connect or locate the instance, 
+or the instance returning an error code due to it being read-only.
+
+By configuring multiple addresses, you can continue allowing you to continue to capture data if your primary instance
+fails, without having to reconfigure the clients. This backup instance can be hot or cold, and so long as it is assigned a known address, it will be written to as soon as it is started.
+
+Enterprise users can leverage this feature to transparently handle replication failover, without the need to introduce a load-balancer or
+reconfigure clients.
+
+:::tip
+
+You may wish to increase the value of `retry_timeout` if you expect your backup instance to take a large amount of time to become writeable.
+
+For example, when performing a primary migration (Enterprise replication), with default settings, you might want to increase this
+to `30s` or higher.
+
+:::
+
 
 ## General usage pattern
 
@@ -289,6 +332,13 @@ closing the client.
 
 ## Error handling
 
+
+:::note
+
+If you have configured multiple addresses, retries will be run against different instances.
+
+:::
+
 HTTP automatically retries failed, recoverable requests: network errors, some
 server errors, and timeouts. Non-recoverable errors include invalid data,
 authentication errors, and other client-side errors.
@@ -317,6 +367,17 @@ with the next row.
 With TCP transport, you don't have this option. If you get an exception, you
 can't continue with the same client instance, and don't have insight into which
 rows were accepted by the server.
+
+:::caution
+
+Error handling behaviour changed with the release of QuestDB 9.1.0.
+
+Previously, failing all retries would cause the code to except and release the buffered data.
+
+Now the buffer will not be released. If you wish to re-use the same sender with fresh data, you must call the
+new `reset()` function.
+
+:::
 
 ## Designated timestamp considerations
 
