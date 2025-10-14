@@ -85,6 +85,11 @@ function convertScreenshot(content) {
   })
 }
 
+function convertImages(content) {
+  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\.(svg|png|jpg|jpeg|gif|webp)\)/g
+  return content.replace(imageRegex, "")
+}
+
 /**
  * Converts <CodeBlock /> components to markdown code blocks
  */
@@ -458,6 +463,7 @@ async function convertAllComponents(content, currentFileDir, docsRoot, repoExamp
   processed = convertTabs(processed)
   processed = convertConfigTable(processed, currentFileDir)
   processed = convertRailroadDiagrams(processed, docsRoot)
+  processed = convertImages(processed)
 
   return processed
 }
