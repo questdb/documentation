@@ -1,5 +1,7 @@
 const fs = require("fs")
 const path = require("path")
+const clients = require("../../shared/clients.json")
+const ilpClients = require("../../shared/ilp_clients.json")
 
 /**
  * Parses JSX props from a string like: alt="test" height={300} src="..."
@@ -380,54 +382,14 @@ function convertRemoteRepoExample(content, repoExamples = {}) {
 /**
  * Converts <ILPClientsTable /> to markdown list with links
  */
-const clients = [
-  {
-    label: "Python",
-    docsUrl: "https://py-questdb-client.readthedocs.io/en/latest/",
-    sourceUrl: "https://github.com/questdb/py-questdb-client",
-  },
-  {
-    label: "NodeJS",
-    docsUrl: "https://questdb.github.io/nodejs-questdb-client",
-    sourceUrl: "https://github.com/questdb/nodejs-questdb-client",
-  },
-  {
-    label: ".NET",
-    sourceUrl: "https://github.com/questdb/net-questdb-client",
-  },
-  {
-    label: "Java",
-    docsUrl: "/docs/reference/clients/java_ilp/",
-  },
-  {
-    label: "C",
-    docsUrl: "https://github.com/questdb/c-questdb-client/blob/main/doc/C.md",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-  {
-    label: "C++",
-    docsUrl: "https://github.com/questdb/c-questdb-client/blob/main/doc/CPP.md",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-  {
-    label: "Golang",
-    docsUrl: "https://pkg.go.dev/github.com/questdb/go-questdb-client/",
-    sourceUrl: "https://github.com/questdb/go-questdb-client/",
-  },
-  {
-    label: "Rust",
-    docsUrl: "https://docs.rs/crate/questdb-rs/latest",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-]
 function convertILPClientsTable(content) {
   return replaceComponent(content, 'ILPClientsTable', (match) => {
     const language = match.props.language
 
     // Filter by language if specified
     const filteredClients = language
-      ? clients.filter(c => c.label === language)
-      : clients
+      ? ilpClients.filter(c => c.label === language)
+      : ilpClients
 
     // Build markdown list
     let markdown = '\n\n'
@@ -443,6 +405,29 @@ function convertILPClientsTable(content) {
       }
 
       markdown += '\n'
+    }
+
+    return markdown
+  })
+}
+
+function convertClients(content) {
+  return replaceComponent(content, 'Clients', (match) => {
+    const showProtocol = match.props.showProtocol
+    const filteredClients = showProtocol
+      ? clients.filter(c => c.protocol === showProtocol)
+      : clients
+    const protocols = showProtocol ? new Set([showProtocol]) : new Set(filteredClients.map(c => c.protocol))
+
+    let markdown = '\n\n'
+
+    for (const protocol of protocols) {
+      markdown += `**${protocol} Clients**\n\n`
+
+      for (const client of filteredClients.filter(c => c.protocol === protocol)) {
+        markdown += `- [${client.name}](${client.href}): ${client.description}\n`
+      }
+      markdown += '\n\n'
     }
 
     return markdown
@@ -466,6 +451,7 @@ async function convertAllComponents(content, currentFileDir, docsRoot, repoExamp
   processed = convertInterpolateReleaseData(processed, releaseVersion)
   processed = convertRemoteRepoExample(processed, repoExamples)
   processed = convertILPClientsTable(processed)
+  processed = convertClients(processed)
   processed = convertScreenshot(processed)
   processed = convertDocButton(processed)
   processed = convertCodeBlock(processed)
