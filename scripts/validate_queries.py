@@ -1,3 +1,21 @@
+# Execute this script from the documentation root (the default search path is '.'):
+#     python src/validate_queries.py
+#
+# You can specify a different starting path using:
+#     --path <directory>
+#
+# By default, queries execute against localhost:9000.
+# You can use --url to target a different QuestDB instance, for example:
+#     --url https://demo.questdb.io
+#
+# The script executes all QuestDB demo queries found in Markdown files and reports their execution times.
+# Queries taking more than 1 second appear in yellow.
+# Failing queries appear with a red ❌ icon and are summarized at the end.
+#
+# Two files are generated:
+#   • all_queries.sql   → all executed queries
+#   • failed_queries.sql → only the queries that failed
+
 import re
 import requests
 from pathlib import Path
@@ -5,6 +23,7 @@ import sys
 import json
 import argparse
 
+# ---------------- Argument parsing ----------------
 parser = argparse.ArgumentParser(
     description="Execute all QuestDB demo SQL queries found in Markdown files."
 )
@@ -20,13 +39,16 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-
+# ---------------- Configuration ----------------
 QUESTDB_REST_URL = f"{args.url.rstrip('/')}/exec"
 ROOT_DIR = args.path
 ALL_FILE = Path("all_queries.sql")
 FAILED_FILE = Path("failed_queries.sql")
-TIMEOUT = (3, 5)
-MAX_BYTES = 8192
+TIMEOUT = (3, 60)  # (connect timeout, read timeout)
+
+# ANSI color escape codes
+YELLOW = "\033[93m"
+RESET = "\033[0m"
 
 block_re = re.compile(
     r"```questdb-sql[^\n]*title=\"([^\"]+)\"[^\n]*\bdemo\b[^\n]*\n(.*?)```",
@@ -43,42 +65,41 @@ def extract_blocks(root_dir):
                 yield path, title.strip(), sql.strip()
 
 def execute_query(query):
-    """Execute the query via GET, keeping it exactly as-is and parsing 400 bodies."""
+    """Execute the query via GET, reading full response and parsing timings."""
     try:
-        with requests.get(
-            QUESTDB_REST_URL, params={"query": query}, timeout=TIMEOUT, stream=True
-        ) as r:
-            content = b""
-            for chunk in r.iter_content(chunk_size=1024):
-                content += chunk
-                if len(content) > MAX_BYTES:
-                    break
+        r = requests.get(
+            QUESTDB_REST_URL,
+            params={"query": query, "timings": "true"},
+            timeout=TIMEOUT,
+        )
+        text = r.text.strip()
 
-            text = content.decode("utf-8", errors="ignore").strip()
-            if r.status_code != 200:
-                try:
-                    js = json.loads(text)
-                    if "error" in js:
-                        return False, js["error"]
-                except Exception:
-                    pass
-                return False, f"HTTP {r.status_code} {r.reason}: {text or 'No body'}"
-
-            if not text:
-                return True, None
-
+        if r.status_code != 200:
             try:
                 js = json.loads(text)
                 if "error" in js:
-                    return False, js["error"]
-                return True, None
-            except json.JSONDecodeError:
-                return True, None
+                    return False, js["error"], None
+            except Exception:
+                pass
+            return False, f"HTTP {r.status_code} {r.reason}: {text or 'No body'}", None
+
+        if not text:
+            return True, None, None
+
+        try:
+            js = json.loads(text)
+            if "error" in js:
+                return False, js["error"], None
+            exec_time = js.get("timings", {}).get("execute")
+            return True, None, exec_time
+        except json.JSONDecodeError:
+            # Rare: malformed JSON; still treat as success
+            return True, None, None
 
     except requests.Timeout:
-        return False, f"Timeout after {TIMEOUT[1]}s"
+        return False, f"Timeout after {TIMEOUT[1]}s", None
     except Exception as e:
-        return False, str(e)
+        return False, str(e), None
 
 if __name__ == "__main__":
     success = 0
@@ -96,11 +117,23 @@ if __name__ == "__main__":
             print(f"[{i}/{total}] Executing: {file_path}  [{title}]")
             sys.stdout.flush()
 
-            ok, err = execute_query(sql)
+            ok, err, exec_time = execute_query(sql)
             all_out.write(f"-- {file_path}\n--- {title}\n{sql}\n\n")
 
             if ok:
                 success += 1
+                if exec_time is not None:
+                    exec_ms = exec_time / 1_000_000
+                    if exec_ms >= 1000:
+                        # Over 1s: highlight with color or symbol
+                        try:
+                            print(f"   {YELLOW}⚠️  Success (execute: {exec_ms:.3f} ms){RESET}")
+                        except Exception:
+                            print(f"   ⚠️  Success (execute: {exec_ms:.3f} ms)")
+                    else:
+                        print(f"   ✅ Success (execute: {exec_ms:.3f} ms)")
+                else:
+                    print("   ✅ Success")
             else:
                 failed += 1
                 failed_list.append((file_path, title, err))
