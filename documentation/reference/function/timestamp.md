@@ -54,8 +54,8 @@ For example:
 ```questdb-sql title="Timestamp optimization with WHERE clause" demo
 SELECT *
 FROM trades
-WHERE ts > (SELECT min(ts) FROM trades)
-  AND ts < (SELECT max(ts) FROM trades);
+WHERE timestamp > (SELECT min(timestamp) FROM trades)
+  AND timestamp < (SELECT max(timestamp) FROM trades);
 ```
 
 In this case, if `ts` is the designated timestamp column, QuestDB will optimize the query by:
