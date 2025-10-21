@@ -230,6 +230,7 @@ renderText={(release) => (
   --restart unless-stopped \\
   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\
   -v "/questdb/qdbroot:/var/lib/questdb" \\
+  -e JVM_PREPEND="-Xmx12g" \\
   questdb/questdb:${release.name}`}
 </CodeBlock>
 )}
@@ -244,6 +245,16 @@ renderText={(release) => (
 :::tip Port Selection
 You can expose only the ports you need. For example, if you only plan to use PostgreSQL wire protocol, you can use `-p 8812:8812` exclusively.
 :::
+
+**Memory allocation guidelines:**
+
+For production workloads, configure JVM memory allocation based on your server's available RAM.
+In the example command above for a CPX41 (16GB RAM) instance we allocate ~12GB to QuestDB. For other instances consider these memory allocations:
+
+- Leave 25-30% of total RAM for the operating system and other processes
+- For 16GB server: Use `-Xmx12g` 
+- For 32GB server: Use `-Xmx24g`
+- For 64GB server: Use `-Xmx48g`
 
 ### Verification
 
@@ -343,11 +354,12 @@ questdb01$ docker rm questdb
 # Pull the latest image
 questdb01$ docker pull questdb/questdb:${release.name}
 
-# Start with the new version
+# Start with the new version (include memory configuration)
 questdb01$ docker run -d --name questdb \\
   --restart unless-stopped \\
   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\
   -v "/questdb/qdbroot:/var/lib/questdb" \\
+  -e JVM_PREPEND="-Xmx12g" \\
   questdb/questdb:${release.name}`}
 </CodeBlock>
 </>
