@@ -87,6 +87,7 @@ FROM
  ```
 
 <div className="blue-table">
+
 | timestamp                   | symbol | best_bid_price |
 | --------------------------- | ------ | -------------- |
 | 2025-09-16T14:00:00.006068Z | USDJPY | 145.67         |
@@ -263,6 +264,7 @@ This makes most `ASOF JOIN` queries simple and intuitive.
 WITH market_subset AS (
   SELECT symbol,bids
   FROM market_data
+  WHERE timestamp in today()
 )
 SELECT *
 FROM market_subset ASOF JOIN core_price ON (symbol);
@@ -284,6 +286,7 @@ Example: Joining on `ingestion_time` instead of the default `trade_ts`
 WITH trades_ordered_by_ingestion AS (
   SELECT symbol, price, ingestion_time
   FROM trades
+  WHERE timestamp in today()
   -- This ORDER BY clause tells QuestDB to use 'ingestion_time'
   -- as the new designated timestamp for this subquery.
   ORDER BY ingestion_time ASC
@@ -354,6 +357,7 @@ The interval_literal must be a valid QuestDB interval string, like '5s' (5 secon
 
 #### Supported Units for interval_literal
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
+- n: Nanoseconds
 - U: Microseconds
 - T: Milliseconds
 - s: Seconds
@@ -362,7 +366,7 @@ The `TOLERANCE` interval literal supports the following time unit qualifiers:
 - d: Days
 - w: Weeks
 
-For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
+For example, '500n' is 500 nanoseconds, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
 '1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
 units for the `TOLERANCE` clause.
 

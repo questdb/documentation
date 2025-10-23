@@ -102,8 +102,6 @@ Where:
 
 - [`dense_rank()`](/docs/reference/function/window#dense_rank) – Assigns a rank to rows monotonically
 
-- [`first_not_null_value()`](/docs/reference/function/window#first_not_null_value) – Retrieves the first not null value in a window
-
 - [`first_value()`](/docs/reference/function/window#first_value) – Retrieves the first value in a window
 
 - [`lag()`](/docs/reference/function/window#lag) – Accesses data from previous rows
@@ -145,7 +143,9 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS moving_avg
-FROM trades;
+FROM trades
+WHERE timestamp in today()
+LIMIT 100;
 ```
 
 This calculates a moving average of price over the current and three preceding rows for each symbol. For other
@@ -247,9 +247,10 @@ Plural forms of these time units are also accepted (e.g., 'minutes', 'hours').
 ```questdb-sql title="Multiple time intervals example" demo
 SELECT
     timestamp,
-    bid_px_00,
+    bids[1,1] as best_bid,
+    bids[2,1] as volume_l1,
     -- 5-minute average: includes rows from (current_timestamp - 5 minutes) to current_timestamp
-    AVG(bid_px_00) OVER (
+    AVG(best_bid) OVER (
         ORDER BY timestamp
         RANGE BETWEEN '5' MINUTE PRECEDING AND CURRENT ROW
     ) AS avg_5min,
@@ -259,17 +260,17 @@ SELECT
         RANGE BETWEEN '100' MILLISECOND PRECEDING AND CURRENT ROW
     ) AS updates_100ms,
     -- 2-second sum: includes rows from (current_timestamp - 2 seconds) to current_timestamp
-    SUM(bid_sz_00) OVER (
+    SUM(volume_l1) OVER (
         ORDER BY timestamp
         RANGE BETWEEN '2' SECOND PRECEDING AND CURRENT ROW
     ) AS volume_2sec
-FROM AAPL_orderbook
-WHERE bid_px_00 > 0
-LIMIT 10;
+FROM market_data
+WHERE timestamp in today()
+LIMIT 100;
 ```
 
 This query demonstrates different time intervals in action, calculating:
-- 5-minute moving average of best bid price
+- 5-minute moving average of best bid price (in the example table, `bids[1]` contains bid prices and `bids[2]` contains bid sizes)
 - Update frequency in 100ms windows
 - 2-second rolling volume
 
@@ -363,7 +364,9 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
         EXCLUDE CURRENT ROW
     ) AS cumulative_sum_excluding_current
-FROM trades;
+FROM trades
+WHERE timestamp in today()
+LIMIT 100;
 ```
 
 The query calculates a cumulative sum of the price column for each row in the trades table, excluding the current row from the calculation. By using `EXCLUDE CURRENT ROW`, the window frame adjusts to include all rows from the start up to one row before the current row. This demonstrates how the `EXCLUDE CURRENT ROW` option modifies the window frame to exclude the current row, affecting the result of the window function.
@@ -427,7 +430,7 @@ SELECT
     price, avg(price) OVER (ORDER BY timestamp) as moving_avg_price,
     timestamp
 FROM trades
-WHERE timestamp in yesterday()
+WHERE timestamp in today()
 )
 select * from prices_and_avg
 WHERE
@@ -448,7 +451,7 @@ SELECT
     price,
     sum(price) OVER () AS cumulative_sum
 FROM trades;
-WHERE timestamp in yesterday();
+WHERE timestamp in today();
 ```
 
 To compute the _moving average_, we need to specify an `ORDER BY` clause:
@@ -459,7 +462,7 @@ SELECT
     price,
     sum(price) OVER (ORDER BY TIMESTAMP) AS cumulative_sum
 FROM trades
-WHERE timestamp in yesterday();
+WHERE timestamp in today();
 ```
 
 We may also have a case where all the rows for the same partition (symbol) will
@@ -473,7 +476,7 @@ SELECT
     price,
     sum(price) OVER (PARTITION BY symbol ) AS cumulative_sum
 FROM trades
-WHERE timestamp in yesterday();
+WHERE timestamp in today();
 ```
 
 For every row to show the moving average for each symbol, we need to specify both
@@ -485,5 +488,5 @@ SELECT
     price,
     sum(price) OVER (PARTITION BY symbol ORDER BY TIMESTAMP) AS cumulative_sum
 FROM trades
-WHERE timestamp in yesterday();
+WHERE timestamp in today();
 ```

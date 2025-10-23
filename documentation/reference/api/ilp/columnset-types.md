@@ -290,7 +290,7 @@ CREATE TABLE (loc SYMBOL, ts TIMESTAMP) TIMESTAMP(ts) PARTITION BY DAY;
 
 When we send:
 
-```shell title="Sending mixed desginated timestamp values"
+```shell title="Sending mixed designated timestamp values"
 tracking,loc=north ts=2000000000t 1000000000\n
 tracking,loc=south ts=3000000000t\n
 ```

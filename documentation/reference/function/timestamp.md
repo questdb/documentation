@@ -20,11 +20,9 @@ description: Timestamp function reference documentation.
   `tables()` and `table_columns()` functions which are described in the
   [meta functions](/docs/reference/function/meta/) documentation page.
 
-- The native timestamp format used by QuestDB is a Unix timestamp in microsecond
-  resolution. See
+- There are two timestamp resolutions available in QuestDB: microseconds and nanoseconds. See
   [Timestamps in QuestDB](/docs/guides/working-with-timestamps-timezones/#timestamps-in-questdb)
   for more details.
-
 :::
 
 ## Syntax
@@ -49,15 +47,15 @@ assigned.
 
 ## Optimization with WHERE clauses
 
-When filtering on a designated timestamp column in WHERE clauses, QuestDB automatically optimizes the query by applying time-based partition filtering. This optimization also works with subqueries that return timestamp values. 
+When filtering on a designated timestamp column in WHERE clauses, QuestDB automatically optimizes the query by applying time-based partition filtering. This optimization also works with subqueries that return timestamp values.
 
 For example:
 
 ```questdb-sql title="Timestamp optimization with WHERE clause" demo
-SELECT * 
-FROM trades 
-WHERE ts > (SELECT min(ts) FROM trades) 
-  AND ts < (SELECT max(ts) FROM trades);
+SELECT *
+FROM trades
+WHERE timestamp > (SELECT min(timestamp) FROM trades)
+  AND timestamp < (SELECT max(timestamp) FROM trades);
 ```
 
 In this case, if `ts` is the designated timestamp column, QuestDB will optimize the query by:
