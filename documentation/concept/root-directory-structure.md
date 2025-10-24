@@ -94,30 +94,64 @@ organised as follows:
 - If a given column has an [index](/docs/concept/indexes/), then there will also
   be an `index_file`, for example `mycolumn.k`
 
+:::info Table and Column Versioning
+
+QuestDB uses a **copy-on-write** mechanism for data updates, which means that when you update existing data, new versions of column files are created rather than modifying existing ones. This ensures data consistency and allows readers to continue accessing the previous version while updates are in progress.
+
+For more details on how versioning works, see the [Updating data](/docs/operations/updating-data/#column-versions) documentation.
+
+:::
+
 The table also stores metadata in `_meta` files:
 
 ```filestructure
 ├── db
-│   ├── Table
-│   │   │  
-│   │   ├── Partition 1
-│   │   │   ├── _archive
-│   │   │   ├── column1.d
-│   │   │   ├── column2.d
-│   │   │   ├── column2.k
-│   │   │   └── ...
-│   │   ├── Partition 2
-│   │   │   ├── _archive
-│   │   │   ├── column1.d
-│   │   │   ├── column2.d
-│   │   │   ├── column2.k
-│   │   │   └── ...
-│   │   │  
-│   │   ├── _meta
-│   │   ├── _txn
-│   │   └── _cv
-│   └──  table_1.lock
+│   ├── Table
+│   │   │
+│   │   ├── Partition 1
+│   │   │   ├── _archive
+│   │   │   ├── column1.d
+│   │   │   ├── column2.d
+│   │   │   ├── column2.k
+│   │   │   └── ...
+│   │   ├── Partition 2
+│   │   │   ├── _archive
+│   │   │   ├── column1.d
+│   │   │   ├── column2.d
+│   │   │   ├── column2.k
+│   │   │   └── ...
+│   │   │
+│   │   ├── _meta
+│   │   ├── _txn
+│   │   └── _cv
+│   └──  table_1.lock
 ```
+
+:::note Column Versioning in Practice
+
+When data is updated, you may see multiple versions of column files in the directory structure. For example, after updating `column1`, you might see:
+
+```filestructure
+├── Partition 1
+│   ├── column1.d        # Original version
+│   ├── column1.d.1      # New version after update
+│   ├── column2.d        # Unchanged column
+│   └── ...
+```
+
+The `_cv` (column version) metadata file tracks which version of each column is currently active. Older versions are automatically cleaned up by the vacuum process.
+
+:::
+
+### Metadata files
+
+Each table directory contains several metadata files:
+
+| file | description |
+|------|-------------|
+| `_meta` | Table metadata including schema information |
+| `_txn` | Transaction metadata for consistency |
+| `_cv` | Column version metadata - tracks which version of each column is currently active |
 
 If the table is not partitioned, data is stored in a directory called `default`:
 
