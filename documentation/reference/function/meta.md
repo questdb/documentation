@@ -627,15 +627,15 @@ Checking the log:
 SELECT * FROM copy_export_log() WHERE id = '38b2b45f28aa822e';
 ```
 
-| ts                          | id               | table_name | export_path                     | num_exported_files | phase                 | status   | message | errors |
-|-----------------------------|------------------|------------|---------------------------------|--------------------|-----------------------|----------|---------|--------|
-| 2025-10-27T14:07:20.513119Z | 38b2b45f28aa822e | trades     | null                            | null               | wait_to_run           | started  | queued  | 0      |
-| 2025-10-27T14:07:20.541779Z | 38b2b45f28aa822e | trades     | null                            | null               | wait_to_run           | finished | 0       |
-| 2025-10-27T14:07:20.542552Z | 38b2b45f28aa822e | trades     | null                            | null               | converting_partitions | started  | null    | 0      |
-| 2025-10-27T14:07:20.658111Z | 38b2b45f28aa822e | trades     | null                            | null               | converting_partitions | finished | null    | 0      |
-| 2025-10-27T14:07:20.658185Z | 38b2b45f28aa822e | trades     | null                            | null               | move_files            | started  | null    | 0      |
-| 2025-10-27T14:07:20.670200Z | 38b2b45f28aa822e | trades     | null                            | null               | move_files            | finished | null    | 0      |
-| 2025-10-27T14:07:20.670414Z | 38b2b45f28aa822e | trades     | /<snip>/<dbroot>/export/trades/ | 26                 | success               | finished | null    | 0      |
+| ts                          | id               | table_name | export_path              | num_exported_files | phase                 | status   | message | errors |
+|-----------------------------|------------------|------------|--------------------------|--------------------|-----------------------|----------|---------|--------|
+| 2025-10-27T14:07:20.513119Z | 38b2b45f28aa822e | trades     | null                     | null               | wait_to_run           | started  | queued  | 0      |
+| 2025-10-27T14:07:20.541779Z | 38b2b45f28aa822e | trades     | null                     | null               | wait_to_run           | finished | 0       |
+| 2025-10-27T14:07:20.542552Z | 38b2b45f28aa822e | trades     | null                     | null               | converting_partitions | started  | null    | 0      |
+| 2025-10-27T14:07:20.658111Z | 38b2b45f28aa822e | trades     | null                     | null               | converting_partitions | finished | null    | 0      |
+| 2025-10-27T14:07:20.658185Z | 38b2b45f28aa822e | trades     | null                     | null               | move_files            | started  | null    | 0      |
+| 2025-10-27T14:07:20.670200Z | 38b2b45f28aa822e | trades     | null                     | null               | move_files            | finished | null    | 0      |
+| 2025-10-27T14:07:20.670414Z | 38b2b45f28aa822e | trades     | /<dbroot>/export/trades/ | 26                 | success               | finished | null    | 0      |
 
 
 ## flush_query_cache()
