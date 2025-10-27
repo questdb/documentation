@@ -31,6 +31,7 @@ import TabItem from "@theme/TabItem"
   <artifactId>questdb</artifactId>
   <version>${release.name}</version>
 </dependency>
+<!-- and remember to run `mvn clean install` to pull down the dependency! -->
       `}
       </CodeBlock>
     )
@@ -55,59 +56,124 @@ import TabItem from "@theme/TabItem"
 
 </Tabs>
 
-## Writing data
 
-This section provides example codes to write data to WAL and non-WAL tables. See
-[Write Ahead Log](/docs/concept/write-ahead-log) for details about the
-differences between WAL and non-WAL tables.
+## Overview
 
-The following writers are available for data ingestion:
+QuestDB is composed of three major packages:
 
-- `WalWriter` for WAL tables
-- `TableWriter` for non-WAL tables
-- `TableWriterAPI` for both WAL and non-WAL tables as it is an interface for
-  `WalWriter` and `Table Writer`
+- `cairo`, a custom storage engine which handles reading and writing data to disk, underpinning all database operations. 
+The underlying native format is [colummnar](/concept/storage-model), and optimised for time-series workloads.
+- `griffin`, a custom query engine, which provides a rich SQL layer to interact with the data.
+- `cutlass`, a custom network I/O stack, which provides TCP, HTTP, PG Wire, and other endpoints to write and read data.
+
+QuestDB is written for performance, and therefore diverges from more traditional Java projects. Instead, the database uses off-heap memory,
+object pooling, vectorised execution, and other key techniques to ensure that each of these packages is as performant as possible. Some key features
+are written in native code directly, using C/C++/Rust - for example, the JIT compiler for WHERE filters, and Parquet encoding.
+
+When working with QuestDB as an embedded storage engine, it is important to understand this and ensure that any shims or APIs you 
+add in front of the database a similarly performant, or else you will not be able to get the most out of it.
+
+
+### High-level API
+
+
+When using QuestDB as an embedded storage engine, the first class you will interact with is [`CairoEngine`](https://github.com/questdb/questdb/blob/master/core/src/main/java/io/questdb/cairo/CairoEngine.java) class.
+
+`CairoEngine` represents a specific database instance, with a root directory. Only a single engine can own a data directory at any one time.
+
+As the central context, `CairoEngine` becomes the root for your storage and querying operations.
+
+`cairo` is the custom storage engine that handles reading and writing data to disk. `cairo` is combined with `griffin` , our SQL query engine,
+to add rich SQL support on top. `cutlass` is an additional package that handles external API and network I/O.
+
+In order
+
+### Creating tables
+
+There are several ways you can create a table in QuestDB. However, the most straightforward method is to use
+the SQL interface to execute a DDL.
+
+Queries are executed using a `SqlExecutionContext`. This is a context for compiling and running a particular query. 
+
+Therefore, to create a table, we will instruct `CairoEngine` a `CREATE TABLE` statement within a particular `SqlExecutionContext`.
+
+```java title="Creating a table"
+// Create a configuration for the engine.
+final CairoConfiguration configuration = new DefaultCairoConfiguration("/path/to/dbroot");
+
+// Initialise the engine
+try (CairoEngine engine = new CairoEngine(configuration)) {
+    // Create a new query execution context
+    try (SqlExecutionContext executionContext =
+                 new SqlExecutionContextImpl(engine, 1) // single-threaded query execution
+                         .with(AllowAllSecurityContext.INSTANCE, null)) // query can access any table)
+    {
+        // Execute the create table statement
+        engine.execute(
+                "CREATE TABLE 'trades' (" +
+                        "symbol SYMBOL CAPACITY 256 CACHE, " +
+                        "side SYMBOL CAPACITY 256 CACHE, " +
+                        "price DOUBLE, " +
+                        "amount DOUBLE, " +
+                        "timestamp TIMESTAMP" +
+                        ") timestamp(timestamp) PARTITION BY DAY WAL",
+                executionContext
+        );
+    } catch (SqlException e) {
+        throw new RuntimeException(e);
+    }
+}
+```
+
+
+### Writing data
+
+QuestDB supports two main types of tables - WAL ([write-ahead-log](/docs/concept/write-ahead-log)) and non-WAL. Most users should use WAL tables for their time-series data, as WAL brings many benefits, notably concurrent writes from multiple APIs.
+
+Table writing is governed by the [`TableWriterAPI`](https://github.com/questdb/questdb/blob/master/core/src/main/java/io/questdb/cairo/TableWriterAPI.java) interface.
+
+This defines common functionality across both of the `WalWriter` (WAL tables) and `TableWriter` (non-WAL tables) classes.
+
+This API cannot be used to create a table - the table must already exist.
+
+In the prior example, we created a WAL table, so we will now write to it using `WalWriter`.
 
 ### Writing data using `WalWriter`
 
-The `WalWriter` facilitates table writes to WAL tables. To successfully create
-an instance of `WalWriter`, the table must already exist.
+`WalWriter` first writes the data into a write-head-log file. Then, the `ApplyWal2TableJob` will later commit this data
+to the table, making it visible for read.
+
+In a standalone QuestDB deployment, a thread-pool automatically executes `ApplyWal2TableJob`, keeping your tables up to date.
+
+For this example, we will create and execution a job to move the data from the WAL to the table.
+
+
 
 ```java title="Example WalWriter"
-final CairoConfiguration configuration = new DefaultCairoConfiguration("data_dir");
-try (CairoEngine engine = new CairoEngine(configuration)) {
-    final SqlExecutionContext ctx = new SqlExecutionContextImpl(engine, 1)
-            .with(AllowAllSecurityContext.INSTANCE, null);
-    engine.ddl("CREATE TABLE testTable (" +
-            "a int, b byte, c short, d long, e float, g double, h date, " +
-            "i symbol, j string, k boolean, l geohash(8c), ts timestamp" +
-            ") TIMESTAMP(ts) PARTITION BY DAY WAL", ctx);
+// <within prior CairoEngine context>
 
-    // write data into WAL
-    final TableToken tableToken = engine.getTableTokenIfExists("testTable");
-    try (WalWriter writer = engine.getWalWriter(tableToken)) {
-        for (int i = 0; i < 3; i++) {
-            TableWriter.Row row = writer.newRow(Os.currentTimeMicros());
-            row.putInt(0, 123);
-            row.putByte(1, (byte) 1111);
-            row.putShort(2, (short) 222);
-            row.putLong(3, 333);
-            row.putFloat(4, 4.44f);
-            row.putDouble(5, 5.55);
-            row.putDate(6, System.currentTimeMillis());
-            row.putSym(7, "xyz");
-            row.putStr(8, "abc");
-            row.putBool(9, true);
-            row.putGeoHash(10, GeoHashes.fromString("u33dr01d", 0, 8));
-            row.append();
-        }
-        writer.commit();
-    }
+// first, acquire a handle for the table
+final TableToken tableToken = engine.getTableTokenIfExists("trades");
 
-    // apply WAL to the table
-    try (ApplyWal2TableJob walApplyJob = new ApplyWal2TableJob(engine, 1, 1)) {
-        while (walApplyJob.run(0)) ;
+// get a WalWriter from the CairoEngine's object pool
+try (WalWriter writer = engine.getWalWriter(tableToken)) {
+    // append rows to the table
+    for (int i = 0; i < 3; i++) {
+        TableWriter.Row row = writer.newRow(Os.currentTimeMicros());
+        row.putSym(0, "ETH-USD");
+        row.putSym(1, "sell");
+        row.putDouble(2, 2615.54);
+        row.putDouble(3, 0.00044);
+        row.append();
     }
+    // commit the data to the write-ahead-log 
+    writer.commit();
+}
+
+// apply WAL to the table
+try (ApplyWal2TableJob walApplyJob = 
+    new ApplyWal2TableJob(engine, 1)) {
+    while (walApplyJob.run(0)) ;
 }
 ```
 
