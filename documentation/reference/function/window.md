@@ -53,7 +53,8 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS moving_avg
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## count()
@@ -125,52 +126,9 @@ SELECT
         PARTITION BY symbol
         ORDER BY price DESC
     ) AS price_rank
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
-
-## first_not_null_value()
-
-In the context of window functions, `first_not_null_value(value)` returns the first non-null value in the set of rows defined by the window frame.
-
-**Arguments:**
-
-- `value`: Any numeric value.
-
-**Return value:**
-
-- The first non-null occurrence of `value` for the rows in the window frame. Returns `NaN` if no non-null values are found.
-
-**Description**
-
-When used as a window function, `first_not_null_value()` operates on a "window" of rows defined by the `OVER` clause. The rows in this window are determined by the `PARTITION BY`, `ORDER BY`, and frame specification components of the `OVER` clause.
-
-The `first_not_null_value()` function respects the frame clause, meaning it only includes rows within the specified frame in the calculation. The result is a separate value for each row, based on the corresponding window of rows.
-
-Unlike `first_value()`, this function skips null values and returns the first non-null value it encounters in the window frame. This is particularly useful when dealing with sparse data or when you want to ignore null values in your analysis.
-
-Note that the order of rows in the result set is not guaranteed to be the same with each execution of the query. To ensure a consistent order, use an `ORDER BY` clause outside of the `OVER` clause.
-
-**Syntax:**
-
-```questdb-sql title="first_not_null_value() syntax"
-first_not_null_value(value) OVER (window_definition)
-```
-
-**Example:**
-
-```questdb-sql title="first_not_null_value() example" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    first_not_null_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    ) AS first_valid_price
-FROM trades;
-```
-
 
 ## first_value()
 
@@ -215,7 +173,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS first_price
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## max()
@@ -254,7 +213,8 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS highest_price
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## min()
@@ -293,7 +253,8 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS lowest_price
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## lag()
@@ -338,7 +299,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS price_two_rows_back
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 This example:
@@ -394,7 +356,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS last_non_null_price
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 This example:
@@ -445,7 +408,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS price_after_next
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 This example:
@@ -500,7 +464,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY price DESC
     ) AS price_rank
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## row_number()
@@ -548,7 +513,8 @@ SELECT
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS trade_number
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## sum()
@@ -595,7 +561,8 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS cumulative_amount
-FROM trades;
+FROM trades
+WHERE timestamp in today();
 ```
 
 ## Common window function examples
@@ -603,97 +570,73 @@ FROM trades;
 ### Moving average of best bid price
 
 ```questdb-sql title="Calculate 4-row moving average of best bid price" demo
+DECLARE @best_bid := bids[1,1]
 SELECT
     timestamp,
     symbol,
-    bid_px_00 as best_bid,
-    avg(bid_px_00) OVER (
+    @best_bid as best_bid,
+    avg(@best_bid) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS bid_moving_avg
-FROM AAPL_orderbook
-WHERE bid_px_00 > 0;
+FROM market_data
+WHERE timestamp in today();
 ```
 
 This example:
-- Uses the best bid price (`bid_px_00`)
-- Filters out zero/null bids
+- Uses the best bid price (`bids[1,1]`)
 - Calculates average over 4 rows (current + 3 preceding)
-- Groups by symbol (though in this case it's all AAPL)
+- Groups by symbol
 
 ### Cumulative bid size
 
-```questdb-sql title="Calculate cumulative size for top 3 bid levels" demo
+```questdb-sql title="Calculate cumulative size from previous 5 rows" demo
+DECLARE
+  @best_bid := bids[1,1],
+  @volume_l1 := bids[2,1]
 SELECT
-    timestamp,
-    bid_px_00,
-    bid_sz_00,
-    sum(bid_sz_00) OVER (
-        ORDER BY timestamp
-        RANGE BETWEEN '5' SECONDS PRECEDING AND CURRENT ROW
-    ) as bid_volume_1min,
-    bid_sz_00 + bid_sz_01 + bid_sz_02 as total_bid_size
-FROM AAPL_orderbook
-WHERE bid_px_00 > 0
-LIMIT 10;
+    timestamp, symbol,
+    @best_bid as bid_price_l1,
+    @volume_l1 as bid_volume_l1,
+    sum(@volume_l1) OVER (
+        PARTITION BY symbol ORDER BY timestamp
+        ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+    ) as bid_volume_l1_5secs
+FROM market_data
+WHERE timestamp in today();
 ```
 
 This example:
 - Shows best bid price and size
-- Calculates 1-minute rolling volume at best bid
-- Sums size across top 3 price levels
-- Filters out empty bids
+- Partitions BY symbol
+- Calculates 5-row rolling volume at best bid
 
-### Order count analysis
-
-```questdb-sql title="Compare order counts across price levels" demo
-SELECT
-    timestamp,
-    bid_px_00,
-    bid_ct_00 as best_bid_orders,
-    sum(bid_ct_00) OVER (
-        ORDER BY timestamp
-        ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
-    ) as rolling_order_count,
-    bid_ct_00 + bid_ct_01 + bid_ct_02 as total_bid_orders
-FROM AAPL_orderbook
-WHERE bid_px_00 > 0
-LIMIT 10;
-```
-
-This example:
-- Shows best bid price and order count
-- Calculates rolling sum of orders at best bid
-- Sums orders across top 3 price levels
-- Uses ROWS frame for precise control
 
 ### Moving sum of bid volume
 
 ```questdb-sql title="Calculate 1-minute rolling bid volume" demo
+DECLARE
+    @best_bid := bids[1,1],
+    @volume_l1 := bids[2,1]
 SELECT
     timestamp,
-    bid_px_00,
-    bid_sz_00,
-    sum(bid_sz_00) OVER (
+    sum(@volume_l1) OVER (
         ORDER BY timestamp
-        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
-    ) as bid_volume_1min,
-    bid_sz_00 + bid_sz_01 + bid_sz_02 as total_bid_size
-FROM AAPL_orderbook
-WHERE bid_px_00 > 0
-LIMIT 10;
+        RANGE BETWEEN 1 minute PRECEDING AND CURRENT ROW
+    ) as bid_volume_1min
+FROM market_data
+WHERE timestamp IN today() AND symbol='GBPUSD';
 ```
 
 This example:
 - Shows best bid price and size
+- Filters only `GBPUSD` rows seen today
 - Calculates rolling 1-minute volume at best bid
-- Also shows total size across top 3 levels
-- Filters out empty bids
 
-### Order frequency analysis
+### Side frequency analysis
 
-```questdb-sql title="Calculate order updates per minute" demo
+```questdb-sql title="Calculate side updates per minute" demo
 SELECT
     timestamp,
     symbol,
@@ -701,17 +644,22 @@ SELECT
         ORDER BY timestamp
         RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
     ) as updates_per_min,
-    COUNT(CASE WHEN action = 'A' THEN 1 END) OVER (
+    COUNT(CASE WHEN side = 'buy' THEN 1 END) OVER (
         ORDER BY timestamp
         RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
-    ) as new_orders_per_min
-FROM AAPL_orderbook
-LIMIT 10;
+    ) as bids_per_minute,
+    COUNT(CASE WHEN side = 'sell' THEN 1 END) OVER (
+        ORDER BY timestamp
+        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
+    ) as asks_per_minute
+FROM trades
+WHERE timestamp IN today() AND symbol='BTC-USD';
 ```
 
 This example:
 
-- Counts all order book updates in last minute
-- Specifically counts new orders (action = 'A')
-- Uses rolling 1-minute window
-- Shows order book activity patterns
+- Filters only `GBPUSD` rows seen today
+- Counts all trades in last minute (note we could also use the `1 minute PRECEDING` syntax)
+- Specifically counts bids (`side='buy'`) per minute
+- Specifically counts bids (`side='ask'`) per minute
+

@@ -7,6 +7,36 @@ description: Aggregate functions reference documentation.
 This page describes the available functions to assist with performing aggregate
 calculations.
 
+
+:::note
+
+QuestDB does not support using aggregate functions as arguments to other functions. For example, this is not allowed:
+
+```questdb-sql
+SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
+```
+
+Running it will result in the following error:
+
+`Aggregate function cannot be passed as an argument`
+
+You can work around this limitation by using CTEs or subqueries:
+
+```questdb-sql title="aggregates as function args workaround" demo
+-- CTE
+WITH minmax AS (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+)
+SELECT datediff('d', min_date, max_date) FROM minmax;
+
+-- Subquery
+SELECT datediff('d', min_date, max_date) FROM (
+    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+);
+```
+
+:::
+
 ## approx_count_distinct
 
 `approx_count_distinct(column_name, precision)` - estimates the number of
@@ -151,7 +181,9 @@ Return value type is `double`.
 #### Examples
 
 ```questdb-sql title="Calculate approximate median price by symbol" demo
-SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
+SELECT symbol, approx_median(price) FROM trades
+WHERE timestamp in today()
+GROUP BY symbol;
 ```
 
 | symbol  | approx_median |
@@ -160,7 +192,9 @@ SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
 | ETH-USD | 2615.46      |
 
 ```questdb-sql title="Calculate approximate median with higher precision" demo
-SELECT symbol, approx_median(price, 3) FROM trades GROUP BY symbol;
+SELECT symbol, approx_median(price, 3) FROM trades
+WHERE timestamp in today()
+GROUP BY symbol;
 ```
 
 | symbol  | approx_median |
@@ -452,20 +486,17 @@ SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY paym
 | card         | 16.8       |
 | null         | 14.1       |
 
-## first/last
+## first
 
 - `first(column_name)` - returns the first value of a column.
-- `last(column_name)` - returns the last value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
 `uuid`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
-then the first row is always the row with the lowest timestamp (oldest) and the
-last row is always the one with the highest (latest) timestamp. For a table
-without a designated timestamp column, `first` returns the first row and `last`
-returns the last inserted row, regardless of any timestamp column.
+then the first row is always the row with the lowest timestamp (oldest). For a table
+without a designated timestamp column, `first` returns the first row regardless of any timestamp column.
 
 #### Return value
 
@@ -491,16 +522,6 @@ SELECT first(device_id) FROM sensors;
 | :--------- |
 | arduino-01 |
 
-The following query returns the latest symbol value for the `device_id` column:
-
-```questdb-sql
-SELECT last(device_id) FROM sensors;
-```
-
-| last       |
-| :--------- |
-| arduino-03 |
-
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
 `sensors_unordered`:
@@ -520,16 +541,6 @@ SELECT first(device_id) FROM sensors_unordered;
 | first      |
 | :--------- |
 | arduino-01 |
-
-The following query returns the last record for the `device_id` column:
-
-```questdb-sql
-SELECT last(device_id) FROM sensors_unordered;
-```
-
-| last       |
-| :--------- |
-| arduino-02 |
 
 ## first_not_null
 
@@ -588,6 +599,114 @@ SELECT first_not_null(device_id) FROM sensors_unordered;
 | :------------- |
 | arduino-03     |
 
+## haversine_dist_deg
+
+`haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
+series of latitude and longitude points.
+
+#### Parameters
+
+- `lat` is the latitude expressed as degrees in decimal format (`double`)
+- `lon` is the longitude expressed as degrees in decimal format (`double`)
+- `ts` is the `timestamp` for the data point
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
+SELECT car_id, haversine_dist_deg(lat, lon, k)
+  FROM table rides
+```
+
+## ksum
+
+`ksum(value)` - adds values ignoring missing data (e.g `null` values). Values
+are added using the
+
+[Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
+This is only beneficial for floating-point values such as `float` or `double`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is the same as the type of the argument.
+
+#### Examples
+
+```questdb-sql
+SELECT ksum(a)
+FROM (SELECT rnd_double() a FROM long_sequence(100));
+```
+
+| ksum              |
+| :---------------- |
+| 52.79143968514029 |
+
+## last
+
+- `last(column_name)` - returns the last value of a column.
+
+Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
+`uuid`.
+
+If a table has a [designated timestamp](/docs/concept/designated-timestamp/), the
+last row is always the one with the highest (latest) timestamp.
+
+For a table without a designated timestamp column, `last`
+returns the last inserted row, regardless of any timestamp column.
+
+#### Return value
+
+Return value type is the same as the type of the argument.
+
+#### Examples
+
+Given a table `sensors`, which has a designated timestamp column:
+
+| device_id  | temperature | ts                          |
+| :--------- | :---------- | :-------------------------- |
+| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
+| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+
+The following query returns the latest symbol value for the `device_id` column:
+
+```questdb-sql
+SELECT last(device_id) FROM sensors;
+```
+
+| last       |
+| :--------- |
+| arduino-03 |
+
+Without selecting a designated timestamp column, the table may be unordered and
+the query may return different result. Given an unordered table
+`sensors_unordered`:
+
+| device_id  | temperature | ts                          |
+| :--------- | :---------- | :-------------------------- |
+| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
+| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+
+The following query returns the last record for the `device_id` column:
+
+```questdb-sql
+SELECT last(device_id) FROM sensors_unordered;
+```
+
+| last       |
+| :--------- |
+| arduino-02 |
+
+
 ## last_not_null
 
 - `last_not_null(column_name)` - returns the last non-null value of a column.
@@ -645,54 +764,8 @@ SELECT last_not_null(device_id) FROM sensors_unordered;
 | :------------ |
 | arduino-02    |
 
-## haversine_dist_deg
 
-`haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
-series of latitude and longitude points.
 
-#### Parameters
-
-- `lat` is the latitude expressed as degrees in decimal format (`double`)
-- `lon` is the longitude expressed as degrees in decimal format (`double`)
-- `ts` is the `timestamp` for the data point
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
-SELECT car_id, haversine_dist_deg(lat, lon, k)
-  FROM table rides
-```
-
-## ksum
-
-`ksum(value)` - adds values ignoring missing data (e.g `null` values). Values
-are added using the
-
-[Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
-This is only beneficial for floating-point values such as `float` or `double`.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is the same as the type of the argument.
-
-#### Examples
-
-```questdb-sql
-SELECT ksum(a)
-FROM (SELECT rnd_double() a FROM long_sequence(100));
-```
-
-| ksum              |
-| :---------------- |
-| 52.79143968514029 |
 
 ## max
 
@@ -759,6 +832,68 @@ SELECT payment_type, min(amount) FROM transactions;
 | cash         | 12.5 |
 | card         | 15.3 |
 | null         | 22.2 |
+
+
+## mode
+
+`mode(value)` - calculates the mode (most frequent) value out of a particular dataset.
+
+For `mode(B)`, if there are an equal number of `true` and `false` values, `true` will be returned as a tie-breaker.
+
+For other modes, if there are equal mode values, the returned value will be whichever the code identifies first.
+
+To make the result deterministic, you must enforce an underlying sort order.
+
+#### Parameters
+
+- `value` - one of (LONG, DOUBLE, BOOLEAN, STRING, VARCHAR, SYMBOL)
+
+#### Return value
+
+Return value type is the same as the type of the input `value`.
+
+#### Examples
+
+With this dataset:
+
+| symbol    | value |
+|-----------|-------|
+| A         | alpha |
+| A         | alpha |
+| A         | alpha |
+| A         | omega |
+| B         | beta  |
+| B         | beta  |
+| B         | gamma |
+
+```questdb-sql
+SELECT symbol, mode(value) as mode FROM dataset;
+```
+
+| symbol | mode  |
+|--------|-------|
+| A      | alpha |
+| B      | beta  |
+
+On demo:
+
+```questdb-sql title="mode() on demo" demo
+SELECT symbol, mode(side)
+FROM trades
+WHERE timestamp IN today()
+ORDER BY symbol ASC;
+```
+
+| symbol    | mode(side) |
+|-----------|------------|
+| ADA-USD   | buy        |
+| ADA-USDT  | buy        |
+| AVAX-USD  | sell       |
+| AVAX-USDT | sell       |
+| BTC-USD   | sell       |
+| BTC-USDT  | sell       |
+| ...       | ...        |
+
 
 ## nsum
 
@@ -897,38 +1032,38 @@ Suppose we want to find all the distinct sky cover types observed in the weather
 tablein our public demo:
 
 ```questdb-sql title="string_distinct_agg example" demo
-SELECT string_distinct_agg(skyCover, ',') AS distinct_sky_covers
-FROM weather;
+SELECT string_distinct_agg(symbol, ',') AS distinct_symbols
+FROM trades
+WHERE timestamp in today();
 ```
 
-This query will return a single string containing all the distinct skyCover
-values separated by commas. The skyCover column contains values such as OVC
-(Overcast), BKN (Broken clouds), SCT (Scattered clouds), and CLR (Clear skies).
-Even though the skyCover column may have many rows with repeated values,
-`string_distinct_agg` aggregates only the unique non-null values. The result is a
-comma-separated list of all distinct sky cover conditions observed.
+This query will return a single string containing all the distinct symbol
+values separated by commas. Even though the `symbol` column may have many rows with repeated values, `string_distinct_agg` aggregates only the unique non-null values. The result is a
+comma-separated list of all distinct symbols observed.
 
 Result:
 
-| distinct_sky_covers |
-| ------------------- |
-| OVC,BKN,SCT,CLR,OBS |
+| distinct_symbols                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,ADA-USDT,ADA-USD,XLM-USDT,XLM-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
 
 You can also group the aggregation by another column.
 
-To find out which sky cover conditions are observed for each wind direction:
+To find out which symbols are observed for each side:
 
 ```questdb-sql title="string_distinct_agg example with GROUP BY" demo
-SELECT windDir, string_distinct_agg(skyCover, ',') AS distinct_sky_covers
-FROM weather
-GROUP BY windDir;
+SELECT side, string_distinct_agg(symbol, ',') AS distinct_symbols
+FROM trades
+WHERE timestamp in today();
 ```
 
-| windDir | distinct_sky_covers |
-| ------- | ------------------- |
-| 30      | OVC,BKN             |
-| 45      | BKN,SCT             |
-| 60      | OVC,SCT,CLR         |
+| side | distinct_symbols                                                                                                                                                                                            |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| buy  | BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,ADA-USDT,ADA-USD,SOL-USDT,SOL-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,DOT-USDT,DOT-USD,XLM-USDT,XLM-USD,SOL-BTC,AVAX-USDT,AVAX-USD,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
+| sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
+
+
+Note we don't need to add `GROUP BY side` as it is implicit. But you can add it, if you prefer that syntax.
 
 ## sum
 
