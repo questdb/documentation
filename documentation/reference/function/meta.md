@@ -603,35 +603,39 @@ Returns metadata on `COPY TO` export operations for the last three days, includi
 
 - `ts` - timestamp of the log event
 - `id` - export identifier that can be used to track export progress
-- `table` - source table name (or 'query' for subquery exports)
-- `destination` - destination directory path for the export
-- `format` - export format (currently only 'PARQUET')
-- `status` - event status: 'started', 'finished', 'failed', or 'cancelled'
-- `message` - error message when status is 'failed'
-- `rows_exported` - total number of exported rows (shown in final log row)
-- `partition` - partition name for partitioned exports (null for non-partitioned)
+- `table_name` - source table name (or 'query' for subquery exports)
+- `export_path` - destination directory path for the export
+- `phase` - progress markers for each export step
+- `status` - event status for each phase, for example 'started', 'finished'
+- `message` - additional text (important for error rows)
+- `errors` - error number or flag
 
 **Examples:**
 
 ```questdb-sql
-SELECT * FROM copy_export_log();
+COPY trades TO 'trades' WITH FORMAT PARQUET;
 ```
 
-| ts                          | id               | table  | destination   | format  | status   | message | rows_exported | partition  |
-| --------------------------- | ---------------- | ------ | ------------- | ------- | -------- | ------- | ------------- | ---------- |
-| 2024-10-01T14:23:15.123456Z | 7f3a9c2e1b456789 | trades | trades_export | PARQUET | started  |         | 0             | null       |
-| 2024-10-01T14:25:42.987654Z | 7f3a9c2e1b456789 | trades | trades_export | PARQUET | finished |         | 1000000       | null       |
+| id               |
+|------------------| 
+| 38b2b45f28aa822e |
 
-```questdb-sql title="Track specific export"
-SELECT * FROM copy_export_log() WHERE id = '7f3a9c2e1b456789';
+Checking the log:
+
+```questdb-sql
+SELECT * FROM copy_export_log() WHERE id = '38b2b45f28aa822e';
 ```
 
-```questdb-sql title="View recent failed exports"
-SELECT ts, table, destination, message
-FROM copy_export_log()
-WHERE status = 'failed'
-ORDER BY ts DESC;
-```
+| ts                          | id               | table_name | export_path                     | num_exported_files | phase                 | status   | message | errors |
+|-----------------------------|------------------|------------|---------------------------------|--------------------|-----------------------|----------|---------|--------|
+| 2025-10-27T14:07:20.513119Z | 38b2b45f28aa822e | trades     | null                            | null               | wait_to_run           | started  | queued  | 0      |
+| 2025-10-27T14:07:20.541779Z | 38b2b45f28aa822e | trades     | null                            | null               | wait_to_run           | finished | 0       |
+| 2025-10-27T14:07:20.542552Z | 38b2b45f28aa822e | trades     | null                            | null               | converting_partitions | started  | null    | 0      |
+| 2025-10-27T14:07:20.658111Z | 38b2b45f28aa822e | trades     | null                            | null               | converting_partitions | finished | null    | 0      |
+| 2025-10-27T14:07:20.658185Z | 38b2b45f28aa822e | trades     | null                            | null               | move_files            | started  | null    | 0      |
+| 2025-10-27T14:07:20.670200Z | 38b2b45f28aa822e | trades     | null                            | null               | move_files            | finished | null    | 0      |
+| 2025-10-27T14:07:20.670414Z | 38b2b45f28aa822e | trades     | /<snip>/<dbroot>/export/trades/ | 26                 | success               | finished | null    | 0      |
+
 
 ## flush_query_cache()
 
