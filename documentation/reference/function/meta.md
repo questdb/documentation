@@ -589,22 +589,23 @@ If you want to re-read metadata for all user tables, simply use an asterisk:
 SELECT hydrate_table_metadata('*');
 ```
 
-## copy_export_log
+## sys.copy_export_log
 
-`copy_export_log()` or `sys.copy_export_log` returns the export log for `COPY TO` operations.
+`sys.copy_export_log` is a pseudo-table containing the export log for `COPY TO` operations.
 
 **Arguments:**
 
-- `copy_export_log()` does not require arguments.
+- `sys.copy_export_log` does not require arguments.
 
 **Return value:**
 
-Returns metadata on `COPY TO` export operations for the last three days, including columns such as:
+Returns metadata on `COPY TO` export operations for the last three days, including the columns:
 
 - `ts` - timestamp of the log event
 - `id` - export identifier that can be used to track export progress
 - `table_name` - source table name (or 'query' for subquery exports)
 - `export_path` - destination directory path for the export
+- `num_exported_files` - how many output files were written
 - `phase` - progress markers for each export step
 - `status` - event status for each phase, for example 'started', 'finished'
 - `message` - additional text (important for error rows)
