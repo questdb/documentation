@@ -1,0 +1,6 @@
+{
+  "config.validation.strict": {
+    "default": "false",
+    "description": "When enabled, startup fails if there are configuration errors."
+  }
+}

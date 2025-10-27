@@ -116,7 +116,7 @@ export default function CustomNavbarItems() {
         >
           <li>
             <Link
-              to="https://questdb.com/release-notes"
+              to="https://questdb.com/release-notes?ref=docs"
               target="_self"
               className="dropdown__link font-semibold"
             >

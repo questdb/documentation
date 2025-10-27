@@ -1,0 +1,14 @@
+{
+  "telemetry.enabled": {
+    "default": "true",
+    "description": "Enable or disable anonymous usage metrics collection."
+  },
+  "telemetry.hide.tables": {
+    "default": "false",
+    "description": "Hides telemetry tables from `select * from tables()` output. As a result, telemetry tables will not be visible in the Web Console table view."
+  },
+  "telemetry.queue.capacity": {
+    "default": "512",
+    "description": "Capacity of the internal telemetry queue, which is the gateway of all telemetry events. This queue capacity does not require tweaking."
+  }
+}

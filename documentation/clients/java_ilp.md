@@ -206,6 +206,9 @@ reconfigure clients.
 
 You may wish to increase the value of `retry_timeout` if you expect your backup instance to take a large amount of time to become writeable.
 
+For example, when performing a primary migration (Enterprise replication), with default settings, you might want to increase this
+to `30s` or higher.
+
 :::
 
 

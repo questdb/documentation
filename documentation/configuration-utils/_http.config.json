@@ -78,10 +78,6 @@
     "description": "Size of internal buffer allocated for HTTP request headers. The value is rounded up to the nearest power of 2. When HTTP requests contain headers that exceed the buffer size server will disconnect the client with HTTP error in server log.",
     "reloadable": true
   },
-  "http.response.header.buffer.size": {
-    "default": "32K",
-    "description": "Size of the internal response buffer. The value will be rounded up to the nearest power of 2. The buffer size should be large enough to accommodate max size of server response headers."
-  },
   "http.worker.count": {
     "default": "0",
     "description": "Number of threads in private worker pool. When `0`, HTTP server will be using shared worker pool of the server. Values above `0` switch on private pool."

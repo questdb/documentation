@@ -30,7 +30,8 @@ series of timestamps that monotonically increase.
 
 **Return value:**
 
-The type of the return value is `TIMESTAMP`.
+The default type of the return value is `TIMESTAMP`. If a `TIMESTAMP_NS` or a date literal string with nanosecond
+resolution is passed as one of the arguments, the return value will be a `TIMESTAMP_NS`.
 
 **Examples:**
 
@@ -92,7 +93,8 @@ There are two timestamp-generating variants of `generate_series`:
 
 **Return value:**
 
-The type of the return value is `TIMESTAMP`.
+The default type of the return value is `TIMESTAMP`. If a `TIMESTAMP_NS` or a date literal string with nanosecond
+resolution is passed as one of the arguments, the return value will be a `TIMESTAMP_NS`.
 
 **Examples:**
 
@@ -100,7 +102,7 @@ The type of the return value is `TIMESTAMP`.
 generate_series('2025-01-01', '2025-02-01', '5d');
 ```
 
-| generate_series             |
+| generate_series (timestamp) |
 | --------------------------- |
 | 2025-01-01T00:00:00.000000Z |
 | 2025-01-06T00:00:00.000000Z |
@@ -114,7 +116,7 @@ generate_series('2025-01-01', '2025-02-01', '5d');
 generate_series('2025-01-01', '2025-02-01', '-5d');
 ```
 
-| generate_series             |
+| generate_series (timestamp) |
 | --------------------------- |
 | 2025-02-01T00:00:00.000000Z |
 | 2025-01-27T00:00:00.000000Z |
@@ -132,7 +134,7 @@ generate_series(
 );
 ```
 
-| generate_series             |
+| generate_series (timestamp) |
 | --------------------------- |
 | 2025-01-01T00:00:00.000000Z |
 | 2025-01-01T00:01:00.000000Z |
@@ -149,7 +151,7 @@ generate_series(
 );
 ```
 
-| generate_series             |
+| generate_series (timestamp) |
 | --------------------------- |
 | 2025-01-01T00:05:00.000000Z |
 | 2025-01-01T00:04:00.000000Z |
@@ -157,3 +159,31 @@ generate_series(
 | 2025-01-01T00:02:00.000000Z |
 | 2025-01-01T00:01:00.000000Z |
 | 2025-01-01T00:00:00.000000Z |
+
+
+```questdb-sql title="Series using nanosecond timestamp" demo
+generate_series( '2025-01-01', '2025-02-01T00:00:00.000000000Z', '1s');
+```
+
+| generate_series (timestamp_ns) |
+| ------------------------------ |
+| 2025-01-01T00:00:00.000000000Z |
+| 2025-01-06T00:00:00.000000000Z |
+| 2025-01-11T00:00:00.000000000Z |
+| 2025-01-16T00:00:00.000000000Z |
+| 2025-01-21T00:00:00.000000000Z |
+| 2025-01-26T00:00:00.000000000Z |
+| 2025-01-31T00:00:00.000000000Z |
+
+
+
+```questdb-sql title="Series using nanosecond timestamp and nanosecond step" demo
+generate_series( to_timestamp_ns('2025-01-01T00:00:00', 'yyyy-MM-ddTHH:mm:ss'),
+ '2025-01-01T00:00:00.000001', '500n');
+ ```
+
+| generate_series                |
+| ------------------------------ |
+| 2025-01-01T00:00:00.000000000Z |
+| 2025-01-01T00:00:00.000000500Z |
+| 2025-01-01T00:00:00.000001000Z |

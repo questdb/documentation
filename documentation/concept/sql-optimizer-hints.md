@@ -39,7 +39,7 @@ table scan can be more performant. For these cases, QuestDB provides hints to mo
 
 The `asof`-prefixed hints will also apply to `lt` joins.
 
-### asof_linear_search(left_table right_table)
+### `asof_linear_search(l r)`
 
 This hint instructs the optimizer to revert to the pre-9.0 execution strategy for `ASOF JOIN` and `LT JOIN` queries,
 respectively. This older strategy involves performing a full parallel scan on the joined table to apply filters *before*
@@ -92,13 +92,11 @@ scan may have to check many rows before finding one that satisfies the filter co
 For most other cases, especially with filters that have low selectivity or when the joined table data is not in
 memory ("cold"), the default binary search is significantly faster as it minimizes I/O operations.
 
-### `asof_index_search(left_table right_table)`
+### `asof_index_search(l r)`
 
 This hint instructs the optimizer to use a symbol's index to skip over any time partitions where the symbol does not appear. 
 
 In partitions where the symbol does appear, there will still be some scanning to locate the matching rows.
-
-`asof_index_search(left_table_alias right_table_alias)`
 
 ```questdb-sql title="Using index search for an ASOF join"
 SELECT /*+ asof_index_search(orders md) */
@@ -109,13 +107,14 @@ ASOF JOIN (md) ON (symbol);
 
 #### When to use it
 
-This hint can be effective when your symbol is rare, meaning the index is highly selective, rarely appearing in any of
+When your symbol column has a highly selective index i.e. the symbol entry is rare, rarely appearing in any of
 your partitions. 
 
 If the symbol appears frequently, then this hint may cause a slower execution plan than the default.
 
+If no index exists on the column, this hint will be disregarded.
 
-### `asof_memoized_search`
+### `asof_memoized_search(l r)`
 
 This hint instructs the optimizer to memoize (remember) rows it has previously seen, and use this information to avoid 
 repeated re-scanning of data.

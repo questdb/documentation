@@ -20,7 +20,8 @@ permanently deletes all tables, all materialized views, and their contents on di
 ### IF EXISTS
 
 An optional `IF EXISTS` clause may be added directly after the `DROP TABLE`
-keywords to indicate that the selected table should be dropped if it exists.
+keywords to indicate that the selected table should be dropped only if it exists.
+Without `IF EXISTS`, QuestDB will throw an error if the table does not exist.
 
 ## Description
 

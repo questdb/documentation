@@ -353,7 +353,7 @@ show
   )
 
 truncateTable
-  ::= 'TRUNCATE TABLE' tableName ';'
+  ::= 'TRUNCATE TABLE' ('IF' 'EXISTS')? tableName ';'
 
 explain
   ::= 'EXPLAIN' statement
