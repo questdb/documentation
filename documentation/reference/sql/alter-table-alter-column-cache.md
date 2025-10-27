@@ -8,8 +8,7 @@ sidebar_label: CACHE | NOCACHE
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of NOCACHE | CACHE](/images/docs/diagrams/alterTableNoCache.svg)
+![Flow chart showing the syntax of ALTER TABLE ALTER COLUMN NOCACHE | CACHE](/images/docs/diagrams/alterTableNoCache.svg)
 
 - `columnName` is the `symbol` data type.
 - By default, a symbol column is cached.
