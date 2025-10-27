@@ -17,12 +17,6 @@ alterServiceAccount
 addUser
   ::= 'ADD' 'USER' userName TO groupName ( ',' groupName )*
 
-assignServiceAccount
-  ::= 'ASSIGN' 'SERVICE' 'ACCOUNT' serviceAccount 'TO' userOrGroup ( ',' userOrGroup )*
-
-unassignServiceAccount
-    ::= 'UNASSIGN' 'SERVICE' 'ACCOUNT' serviceAccount 'FROM' userOrGroup ( ',' userOrGroup )*
-
 assumeServiceAccount
   ::= 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount
 
@@ -55,6 +49,9 @@ createTableDef
  (tableTargetVolumeDef)?
  ('OWNED' 'BY' ownerName)?
 
+timestamp
+  ::= 'CREATE' someCreateTableStatement 'timestamp' '(' columnName ')'
+
 createTableLike
   ::= 'CREATE' 'TABLE' ( '(' 'LIKE' sourceTableName ')' )? ';'
 
@@ -70,9 +67,11 @@ createServiceAccount
 alterTable
   ::= 'ALTER' 'TABLE' tableName
 
+alterTableAddIndex
+  ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
+
 declare
   ::= 'DECLARE' '@variable' ':=' expression ( ',' '@variable' ':=' expression )* withExpr? selectExpr
-
 
 alterTableAddColumn
   ::= 'ADD' 'COLUMN' ('IF' 'NOT' 'EXISTS')? columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
@@ -92,10 +91,7 @@ dropUser
 castDef
   ::= 'cast' '(' columnRef 'as' typeDef ')'
 
-inlineIndexDef
-  ::= 'INDEX' (indexCapacityDef)?
-
-typeDef
+columnTypeDef
   ::= (
   'boolean' | 'byte' | 'short' | 'char' | 'int' | 'float' |
   ('symbol' (('CAPACITY' distinctValueEstimate) ('CACHE' | 'NOCACHE')?)? inlineIndexDef?) |
@@ -108,7 +104,7 @@ indexDef
 tableTargetVolumeDef
   ::= ','? 'IN' 'VOLUME' "'"? secondaryVolumeAlias "'"?
 
-insertInto
+insert
   ::= 'INSERT' (('ATOMIC')? | ('BATCH' number ('o3MaxLag' numberWithUnit)?) )
   'INTO' tableName ( ( '(' columnName (',' columnName)*) ')')?
   ( 'VALUES' ( ( '(' value ( ',' value)* ')' ) (',' '(' value ( ',' value)* ')' )* ) | 'SELECT' queryDef mainQuery )
@@ -117,19 +113,6 @@ insertInto
 withAsInsert
   ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )?
   'INSERT' (('ATOMIC')? | ('BATCH' number ('o3MaxLag' numberWithUnit)?) ) 'INTO' tableName 'SELECT' queryDef subQueryName ';'
-
-insertCommitLagInto
-  ::= 'INSERT' ('batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ))?
-  'INTO' tableName ( ( '(' columnName (',' columnName)*) ')')?
-  ( 'VALUES' ( ( '(' value ( ',' value)* ')' ) (',' '(' value ( ',' value)* ')' )* ) | 'SELECT' queryDef mainQuery )
-  ';'
-
-withAsInsertCommitLag
-  ::= ( 'WITH' subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )* )?
-  'INSERT' ( 'batch' batchCount 'commitLag' n ( 'us' | 's' | 'm' | 'h' | 'd' ) )? 'INTO' tableName 'SELECT' queryDef subQueryName ';'
-
-backup
-  ::= 'BACKUP' ( 'TABLE' tableName ( ',' tableName )* | 'DATABASE' ) ';'
 
 checkpoint
   ::= 'CHECKPOINT' ( 'CREATE' | 'RELEASE' ) ';'
@@ -140,12 +123,10 @@ case
 copy
   ::= 'COPY' (id 'CANCEL' | tableName 'FROM' fileName (| 'WITH' (| 'HEADER' (true|false) |'TIMESTAMP' columnName | 'DELIMITER' delimiter | 'FORMAT' format | |'PARTITION BY' ('NONE'|'YEAR'|'MONTH'|'DAY'|'HOUR') | 'ON ERROR' ('SKIP_ROW'|'SKIP_COLUMN'|'ABORT')) ))
 
-createTableTimestamp
-  ::= 'CREATE' someCreateTableStatement 'timestamp' '(' columnName ')'
+select
+  ::= ('SELECT' ( (column | expression | function) ('AS' alias | alias)? (',' (column | expression | function) ('AS' alias | alias)? )* ) 'FROM')? ( table | '(' query ')') ('AS' alias | alias)?
 
-createTableWithCommitParams
-  ::= 'WITH' 'maxUncommittedRows' '=' rowCount ',' 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' )
-createTableWithMaxRowParams
+createTableWithMaxRowParam
   ::= 'WITH' 'maxUncommittedRows' '=' rowCount
 
 dynamicTimestamp
@@ -163,11 +144,8 @@ alignToCalTimeZone
 distinct
   ::= 'SELECT' 'DISTINCT' ( columnName (',' columnName)* ) 'FROM' tableName
 
-latestBy
+latestOn
   ::= 'SELECT' ( columnName (',' columnName)* ) 'FROM' tableName 'LATEST' 'ON' '(' columnName ')' 'PARTITION' 'BY' ( columnName (',' columnName)* )
-
-latestByDeprecated
-  ::= 'SELECT' ( columnName (',' columnName)* ) 'FROM' tableName 'LATEST' 'BY' ( columnName (',' columnName)* )
 
 limit
   ::= 'SELECT' someSelectStatement 'LIMIT' ( numberOfRecords | (lowerBound ',' upperBound) ) ';'
@@ -178,44 +156,41 @@ fill
 orderBy
   ::= someSelectQuery 'ORDER' 'BY' ( columnName (ASC | DESC) ? (',' columnName (asc | desc) ?)* )
 
-timestampSearch
-  ::= 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
+where
+  ::= (selectStatement | '(' query ')' ) 'WHERE' boolean_expr
 
-timestampIntervalSearch
-  ::= 'WHERE' timestampColumn 'IN' "'" timestamp ';' multiplier ( s | m | h | d | M | y ) ';' ( occurrence ( s | m | h | d | M | y ) ';' repetition )? "'"
+whereTimestampIntervalSearch
+  ::= 'WHERE' timestampColumn 'IN' "'" timestamp ';' modifier ( s | m | h | d | M | y ) ';' ( interval ( s | m | h | d | M | y ) ';' repetition )? "'"
 
-timestampInSearch
-  ::= 'WHERE' timestampColumn 'IN' '(' "'timestamp1'" ';' "'timestamp2'" ')'
-
-exactStringOrSymbolSearch
+whereExactString
   ::= 'WHERE' column '=' "'" string "'"
 
-regexMatch
+whereStringNotMatch
+  ::= 'WHERE' column '!=' "'" string "'"
+
+whereRegexMatch
+  ::= 'WHERE' column '~' regex
+
+whereRegexNotMatch
   ::= 'WHERE' '~=' '(' column ';' regex ')'
 
-listMatch
+whereListIn
   ::= 'WHERE' 'NOT'? columnName 'in' '(' string (',' string)* ')'
 
 whereNumericValue
   ::= 'WHERE' column ('=' | '!=' | '>' | '>=' | '<' | '<=') value
 
-whereEqDoubleProximityPrecision
-  ::= 'WHERE' 'eq' '(' column ',' value ',' precision  ')'
-
-complexWhere
+whereComplex
   ::= 'WHERE' ('('? ( 'AND' | 'OR' | 'NOT' )? boolean ')'?)*
 
-booleanWhere
+whereBoolean
   ::= 'WHERE' 'NOT'? columnName
 
-timestampExact
+whereTimestampExact
   ::= 'WHERE' column '=' timestamp
 
-timestampPartial
+whereTimestampPartial
   ::= 'WHERE' timestampColumn 'IN' ( 'yyyy' | 'yyyy-MM' | 'YYYY-MM-dd' | 'yyyy-MM-ddThh' | 'yyyy-MM-ddThh:mm' | 'yyyy-MM-ddThh:mm:ss' )
-
-timestampExplicitRange
-  ::= 'WHERE' timestamp 'IN' '(' lower_bound ',' upper_bound ')'
 
 unionExceptIntersect
   ::= query_1 ('UNION' | 'EXCEPT' | 'INTERSECT') 'ALL'? query_2
@@ -226,16 +201,10 @@ renameTable
 cast
   ::= 'CAST' '(' expression 'AS' type ')'
 
-influxLineProtocolOverTCP
-  ::= (user_1 | user_2 | '...') 'TCP requests' network_IO_thread 'write_queue' ((worker_1 'write' (table_1|table_2|'...')) | (worker_2 'write' (table_3|table_4|'...')))
-
-influxLineProtocolOverTCPLoadRebalance
-  ::= Launch_Load_Balancing_Job  ('IF' load_ratio '>' 'max.load.ratio' Rebalance_Load)? ( 'IF' (updates_since_last_rebalance '<' 'n.updates.per.load.balance' | time_since_last_rebalance '<' 'maintenance.job.interval') Launch_Load_Balancing_Job ('IF' load_ratio '>' 'max.load.ratio' Rebalance_Load)?  )*
-
 joinOverview
   ::= selectClause joinStatement ( 'WHERE' whereClause )?
 
-innerLeftJoin
+InnerLeftJoin
   ::= ( 'INNER' | 'LEFT' )? 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( ( column operator anotherColumn ) ( 'AND' ( column operator anotherColumn ) )* | '(' column ( ',' column )* ')' ) )?
 
 AsofLtSpliceJoin
@@ -244,7 +213,6 @@ AsofLtSpliceJoin
 
 AsofJoin
   ::= 'ASOF' 'JOIN' ( table | '(' sub-query ')' ) ( 'ON' ( column '=' anotherColumn ( 'AND' column '=' anotherColumn )* | '(' column ( ',' column )* ')' ) )? ( 'TOLERANCE' interval_literal )?
-
 
 crossJoin
   ::= 'CROSS' 'JOIN' ( table | '(' sub-query ')' )
@@ -257,10 +225,10 @@ revoke
   ::= 'REVOKE' permission ( ',' permission )* ( 'ON' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? ( ',' tableName ( '(' 'columnName' ( ',' columnName )* ')' )? )* )?
   'FROM' entityName
 
-grantAssume
+grantAssumeServiceAccount
   ::= 'GRANT' 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount 'TO' entityName ( 'WITH' 'GRANT' 'OPTION' )?
 
-revokeAssume
+revokeAssumeServiceAccount
   ::= 'REVOKE' 'ASSUME' 'SERVICE' 'ACCOUNT' serviceAccount 'FROM' entityName
 
 groupBy
@@ -269,20 +237,14 @@ groupBy
 with
   ::= 'WITH' ( subQueryName 'AS' '(' subQuery ')' ( ',' subQueryName 'AS' '(' subQuery ')' )*) mainQuery
 
-addIndex
-  ::= 'ALTER' 'COLUMN' columnName 'ADD' 'INDEX'
-
 dropIndex
   ::= 'ALTER' 'COLUMN' columnName 'DROP' 'INDEX'
 
-noCacheColumn
+alterTableNoCache
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName ( 'NOCACHE' | 'CACHE' )
 
-dropColumn
-  ::= 'DROP' 'COLUMN' columnName (',' columnName)* ':'
-
-addColumn
-  ::= 'ADD' 'COLUMN' columnName typeDef (',' columnName typeDef)*  ('OWNED' 'BY' ownerName)?
+alterTableDropColumn
+  ::= 'DROP' 'COLUMN' columnName (',' columnName)* ';'
 
 alterColumnType
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'TYPE' typeDef
@@ -290,7 +252,7 @@ alterColumnType
 alterTableSymbolCapacity
   ::= 'ALTER' 'TABLE' tableName 'ALTER' 'COLUMN' columnName 'SYMBOL' 'CAPACITY' capacity
 
-dropPartition
+alterTableDropPartition
   ::= 'DROP' 'PARTITION' 'LIST' partitionName (',' partitionName)*
 
 removeUser
@@ -299,24 +261,24 @@ removeUser
 reindexTable
   ::= 'REINDEX' 'TABLE' tableName ('COLUMN' columnName)* ('PARTITION' partitionName)* 'LOCK' 'EXCLUSIVE'
 
-renameColumn
+alterTableRenameColumn
   ::= 'RENAME' 'COLUMN' columnName 'TO' newColumnName
 
-attachPartition
+alterTableAttachPartition
   ::= 'ALTER' 'TABLE' tableName 'ATTACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
 
-detachPartition
+alterTableDetachPartition
   ::= 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'LIST' partitionName (',' partitionName)*
    | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn ( '=' | '>' | '<' | '>=' | '<=' ) "'" timestamp "'"
    | 'ALTER' 'TABLE' tableName 'DETACH' 'PARTITION' 'WHERE' timestampColumn 'IN' '(' timestamp (',' timestamp)* ')'
 
-squashPartitions
+alterTableSquashPartitions
   ::= 'SQUASH' 'PARTITIONS' tableName ';'
 
-setParam
+alterTableSetParam
   ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n)
 
-setParamCommitLag
+alterTableSetParamCommitLag
   ::= 'SET' 'PARAM' ( 'maxUncommittedRows' '=' n | 'commitLag' '=' n ( 'us' | 's' | 'm' | 'h' | 'd' ))
 
 vacuumTable
@@ -348,16 +310,14 @@ show
   | 'PARAMETERS'
   )
 
+snapshot
+  ::= 'SNAPSHOT' ('PREPARE' | 'COMPLETE') ';'
+
 truncateTable
   ::= 'TRUNCATE TABLE' ('IF' 'EXISTS')? tableName ';'
 
 explain
   ::= 'EXPLAIN' statement
-
-windowFunction
-  ::= functionName 'OVER' '(' ( 'PARTITION' 'BY' ( columnName? (',' columnName?)* ))?  ('ORDER' 'BY' ( columnName ('ASC' | 'DESC') ? (',' columnName ('ASC' | 'DESC') ?)* ))?  ( ( 'RANGE' | 'ROWS' )
-  ( ( 'UNBOUNDED' 'PRECEDING' | offset 'PRECEDING' | 'CURRENT' 'ROW' ) | 'BETWEEN' ( 'UNBOUNDED' 'PRECEDING' | offset 'PRECEDING' | 'CURRENT' 'ROW' ) AND ( offset 'PRECEDING' | 'CURRENT' 'ROW' ) )?
-  ( 'EXCLUDE' 'CURRENT' 'ROW' | 'EXCLUDE' 'NO' 'OTHERS' )? )? ')'
 
 disableDedup
   ::= 'ALTER' 'TABLE' tableName 'DEDUP' 'DISABLE'

@@ -1,1 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="841" height="70"><defs><style type="text/css">@namespace &quot;http://www.w3.org/2000/svg&quot;;text.terminal{font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif;font-size:12px;fill:#fff;font-weight:700}polygon,rect{fill:none;stroke:none}rect.terminal{fill:none;stroke:#be2f5b}</style></defs><polygon points="9 17 1 13 1 21"/><polygon points="17 17 9 13 9 21"/><rect x="31" y="3" width="58" height="32" rx="10"/><rect x="29" y="1" width="58" height="32" class="terminal" rx="10"/><text class="terminal" x="39" y="21">WITH</text><rect x="109" y="3" width="176" height="32" rx="10"/><rect x="107" y="1" width="176" height="32" class="terminal" rx="10"/><text class="terminal" x="117" y="21">maxUncommittedRows</text><rect x="305" y="3" width="30" height="32" rx="10"/><rect x="303" y="1" width="30" height="32" class="terminal" rx="10"/><text class="terminal" x="313" y="21">=</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#rowCount" xlink:title="rowCount"><rect x="355" y="3" width="80" height="32"/><rect x="353" y="1" width="80" height="32" class="nonterminal" fill="rgba(255,255,255,.1)" stroke="none"/><text class="nonterminal" x="363" y="21" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif" font-size="12" fill="#e289a4" font-weight="400">rowCount</text></a><path xmlns:svg="http://www.w3.org/2000/svg" d="M17 17h2m0 0h10m58 0h10m0 0h10m176 0h10m0 0h10m30 0h10m0 0h10m80 0h10m3 0h-3" fill="none" stroke="#636273"/><polygon points="453 17 461 13 461 21"/><polygon points="453 17 445 13 445 21"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="463" height="37">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon>
+         <rect x="31" y="3" width="58" height="32" rx="10"></rect>
+         <rect x="29" y="1" width="58" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="39" y="21">WITH</text>
+         <rect x="109" y="3" width="176" height="32" rx="10"></rect>
+         <rect x="107" y="1" width="176" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="117" y="21">maxUncommittedRows</text>
+         <rect x="305" y="3" width="30" height="32" rx="10"></rect>
+         <rect x="303" y="1" width="30" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="313" y="21">=</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#rowCount" xlink:title="rowCount">
+            <rect x="355" y="3" width="80" height="32"></rect>
+            <rect x="353" y="1" width="80" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="363" y="21">rowCount</text></a><path class="line" d="m17 17 h2 m0 0 h10 m58 0 h10 m0 0 h10 m176 0 h10 m0 0 h10 m30 0 h10 m0 0 h10 m80 0 h10 m3 0 h-3"></path>
+         <polygon points="453 17 461 13 461 21"></polygon>
+         <polygon points="453 17 445 13 445 21"></polygon>
+</svg>
