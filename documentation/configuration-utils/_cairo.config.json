@@ -468,11 +468,11 @@
     "description": "determines whether to export arrays in QuestDB-native binary format (true, less compatible) or Parquet-native format (false, more compatible)."
   },
   "cairo.partition.encoder.parquet.version": {
-    "default": 1,
+    "default": "1",
     "description": "Output parquet version to use for parquet-encoded partitions. Can be 1 or 2."
   },
   "cairo.partition.encoder.parquet.statistics.enabled": {
-    "default": true,
+    "default": "true",
     "description": "Controls whether or not statistics are included in parquet-encoded partitions."
   },
   "cairo.partition.encoder.parquet.compression.codec": {
