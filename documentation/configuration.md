@@ -240,16 +240,16 @@ Parquet export is also generally impacted by query execution and parquet convers
 If not overridden, the following default setting will be used.
 
 <ConfigTable
-rows={cairoConfig}
-pick={[
-    "cairo.partition.encoder.parquet.raw.array.encoding.enabled",
-    "cairo.partition.encoder.parquet.version,"
-    "cairo.partition.encoder.parquet.statistics.enabled",
-    "cairo.partition.encoder.parquet.compression.codec",
-    "cairo.partition.encoder.parquet.compression.level",
-    "cairo.partition.encoder.parquet.row.group.size",
-    "cairo.partition.encoder.parquet.data.page.size"
-]}
+    rows={cairoConfig}
+    pick={[
+        "cairo.partition.encoder.parquet.raw.array.encoding.enabled",
+        "cairo.partition.encoder.parquet.version",
+        "cairo.partition.encoder.parquet.statistics.enabled",
+        "cairo.partition.encoder.parquet.compression.codec",
+        "cairo.partition.encoder.parquet.compression.level",
+        "cairo.partition.encoder.parquet.row.group.size",
+        "cairo.partition.encoder.parquet.data.page.size"
+    ]}
 />
 
 
