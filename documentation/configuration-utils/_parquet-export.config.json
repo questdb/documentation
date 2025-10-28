@@ -1,0 +1,6 @@
+{
+  "cairo.sql.copy.export.root": {
+    "default": "export",
+    "description": "Root directory for parquet exports via `COPY-TO` SQL This path must not overlap with other directory (e.g. db, conf) of running instance, otherwise export may delete or overwrite existing files. Relative paths are resolved against the server root directory."
+  }
+}

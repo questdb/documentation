@@ -609,17 +609,17 @@ This limitation will be removed in future.
 
 When `fmt=parquet`, the following additional parameters are supported:
 
-| Parameter            | Required | Default   | Description                                                                                         |
-|:---------------------|:---------|:----------|:----------------------------------------------------------------------------------------------------|
-| `partition_by`       | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                  |
-| `compression_codec`  | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`. |
-| `compression_level`  | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                  |
-| `row_group_size`     | No       | `100000`  | Number of rows per Parquet row group.                                                               |
-| `data_page_size`     | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                          |
-| `statistics_enabled` | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                |
-| `parquet_version`    | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                   |
-| `raw_array_encoding` | No       | `true`    | Use raw encoding for arrays: `true` or `false`.                                                     |
-| `rmode`              | No       | `false`   | Set HTTP response mode: `nodelay` or not sent                                                       |
+| Parameter            | Required | Default   | Description                                                                                                        |
+|:---------------------|:---------|:----------|:-------------------------------------------------------------------------------------------------------------------|
+| `partition_by`       | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                                 |
+| `compression_codec`  | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`.                |
+| `compression_level`  | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                                 |
+| `row_group_size`     | No       | `100000`  | Number of rows per Parquet row group.                                                                              |
+| `data_page_size`     | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                                         |
+| `statistics_enabled` | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
+| `parquet_version`    | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
+| `raw_array_encoding` | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
+| `rmode`              | No       | `false`   | Set HTTP response mode: `nodelay` or not sent                                                                      |
 
 The parameters must be URL encoded.
 

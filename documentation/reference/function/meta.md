@@ -601,15 +601,22 @@ SELECT hydrate_table_metadata('*');
 
 Returns metadata on `COPY TO` export operations for the last three days, including the columns:
 
-- `ts` - timestamp of the log event
-- `id` - export identifier that can be used to track export progress
-- `table_name` - source table name (or 'query' for subquery exports)
-- `export_path` - destination directory path for the export
+- `ts` - timestamp of the log event.
+- `id` - export identifier that can be used to track export progress.
+- `table_name` - source table name (or 'query' for subquery exports).
+- `export_path` - destination directory path for the export.
 - `num_exported_files` - how many output files were written
-- `phase` - progress markers for each export step
-- `status` - event status for each phase, for example 'started', 'finished'
-- `message` - additional text (important for error rows)
-- `errors` - error number or flag
+- `phase` - progress markers for each export step. The phases are:
+    - `wait_to_run`: queued for execution.
+    - `populating_temp_table`: building temporary table with materialized query result.
+    - `converting_partitions`: converting temporary table partitions to parquet.
+    - `move_files`: copying converted files to export directory.
+    - `dropping_temp_table`: cleaning up temporary data.
+    - `sending_data`: streaming network response.
+    - `success`: completion of export task.
+- `status` - event status for each phase, for example 'started', 'finished'.
+- `message` - additional text (important for error rows).
+- `errors` - error number or flag.
 
 **Examples:**
 
@@ -624,7 +631,7 @@ COPY trades TO 'trades' WITH FORMAT PARQUET;
 Checking the log:
 
 ```questdb-sql
-SELECT * FROM copy_export_log() WHERE id = '38b2b45f28aa822e';
+SELECT * FROM sys.copy_export_log WHERE id = '38b2b45f28aa822e';
 ```
 
 | ts                          | id               | table_name | export_path                    | num_exported_files | phase                 | status   | message | errors |

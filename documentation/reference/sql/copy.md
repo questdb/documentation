@@ -231,18 +231,26 @@ The export destination is relative to `cairo.sql.copy.export.root` (defaults to 
 `COPY-TO` reports its progress through a system table, `sys.copy_export_log`. This contains the following information:
 
 
-| Column name        | Data type | Notes                                                             |
-|--------------------|-----------|-------------------------------------------------------------------|
-| ts                 | timestamp | The log event timestamp                                           |
-| id                 | string    | Export id                                                         |
-| table_name         | symbol    | Source table name (or 'query' for subquery exports)               |
-| export_path        | symbol    | The destination directory path                                    |
-| num_exported_files | int       | The number of files exported                                      |
-| phase              | symbol    | The export execution phase                                        |
-| status             | symbol    | The event status: started, finished, failed, cancelled            |
-| message            | VARCHAR   | Information about the current phase/step                          |
-| errors             | long      | Error code(s)                                                     |
+| Column name        | Data type | Notes                                                                                                                                               |
+|--------------------|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| ts                 | timestamp | The log event timestamp                                                                                                                             |
+| id                 | string    | Export id                                                                                                                                           |
+| table_name         | symbol    | Source table name (or 'query' for subquery exports)                                                                                                 |
+| export_path        | symbol    | The destination directory path                                                                                                                      |
+| num_exported_files | int       | The number of files exported                                                                                                                        |
+| phase              | symbol    | The export execution phase: none, wait_to_run, populating_temp_table, converting_partitions, move_files, dropping_temp_table, sending_data, success |
+| status             | symbol    | The event status: started, finished, failed, cancelled                                                                                              |
+| message            | VARCHAR   | Information about the current phase/step                                                                                                            |
+| errors             | long      | Error code(s)                                                                                                                                       |
 
+- `wait_to_run`: queued for execution.
+    - `populating_temp_table`: building temporary table with materialized query result.
+    - `converting_partitions`: converting temporary table partitions to parquet.
+    - `move_files`: copying converted files to export directory.
+    - `dropping_temp_table`: cleaning up temporary data.
+    - `sending_data`: streaming network response.
+    - `success`: completion of export task.
+    - 
 Log table row retention is configurable through `cairo.sql.copy.log.retention.days` setting, and is three days by default.
 
 `COPY TO` returns an `id` value from `sys.copy_export_log` to track the export progress.
@@ -283,7 +291,9 @@ Track export progress:
 SELECT * FROM sys.copy_export_log WHERE id = '7f3a9c2e1b456789';
 ```
 
-This will copy all of the partitions and convert them individually to parquet.
+This will copy all of the partitions from `trades`, and convert them individually to parquet.
+
+If partitioning of `NONE` is used, then a single parquet file will be generated instead.
 
 #### Export query results to Parquet
 
@@ -304,7 +314,7 @@ Export data partitioned by day:
 ```questdb-sql title="Export with daily partitions"
 COPY trades TO 'trades_daily'
 WITH FORMAT PARQUET
-PARTITION BY DAY;
+PARTITION_BY DAY;
 ```
 
 This creates separate Parquet files for each day's data in subdirectories named by date.
