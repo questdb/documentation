@@ -466,5 +466,29 @@
   "cairo.partition.encoder.parquet.raw.array.encoding.enabled": {
     "default": "false",
     "description": "determines whether to export arrays in QuestDB-native binary format (true, less compatible) or Parquet-native format (false, more compatible)."
+  },
+  "cairo.partition.encoder.parquet.version": {
+    "default": "1",
+    "description": "Output parquet version to use for parquet-encoded partitions. Can be 1 or 2."
+  },
+  "cairo.partition.encoder.parquet.statistics.enabled": {
+    "default": "true",
+    "description": "Controls whether or not statistics are included in parquet-encoded partitions."
+  },
+  "cairo.partition.encoder.parquet.compression.codec": {
+    "default": "ZSTD",
+    "description": "Sets the default compression codec for parquet-encoded partitions. Alternatives include `LZ4_RAW`, `SNAPPY`."
+  },
+  "cairo.partition.encoder.parquet.compression.level": {
+    "default": "9 (ZSTD), 0 (otherwise)",
+    "description": "Sets the default compression level for parquet-encoded partitions. Dependent on underlying compression codec."
+  },
+  "cairo.partition.encoder.parquet.row.group.size": {
+    "default": "100000",
+    "description": "Sets the default row-group size for parquet-encoded partitions."
+  },
+  "cairo.partition.encoder.parquet.data.page.size": {
+    "default": "1048576",
+    "description": "Sets the default page size for parquet-encoded partitions."
   }
 }

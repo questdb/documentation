@@ -10,6 +10,7 @@ import cairoConfig from "./configuration-utils/\_cairo.config.json"
 import parallelSqlConfig from "./configuration-utils/\_parallel-sql.config.json"
 import walConfig from "./configuration-utils/\_wal.config.json"
 import csvImportConfig from "./configuration-utils/\_csv-import.config.json"
+import parquetExportConfig from "./configuration-utils/\_parquet-export.config.json"
 import postgresConfig from "./configuration-utils/\_postgres.config.json"
 import tcpConfig from "./configuration-utils/\_tcp.config.json"
 import udpConfig from "./configuration-utils/\_udp.config.json"
@@ -168,12 +169,14 @@ applying WAL data to the table storage:
 
 <ConfigTable rows={walConfig} />
 
-### CSV import
+### COPY settings
+
+#### Import 
 
 This section describes configuration settings for using `COPY` to import large
-CSV files.
+CSV files, or export parquet files.
 
-Settings for `COPY`:
+Settings for `COPY FROM` (import):
 
 <ConfigTable
   rows={csvImportConfig}
@@ -188,7 +191,7 @@ Settings for `COPY`:
   ]}
 />
 
-#### CSV import configuration for Docker
+**CSV import configuration for Docker**
 
 For QuestDB instances using Docker:
 
@@ -221,6 +224,28 @@ Where:
 
 It is important that the two path are identical
 (`/var/lib/questdb/questdb_import` in the example).
+
+
+#### Export
+
+<ConfigTable rows={parquetExportConfig} />
+
+Parquet export is also generally impacted by query execution and parquet conversion parameters.
+
+If not overridden, the following default setting will be used.
+
+<ConfigTable
+    rows={cairoConfig}
+    pick={[
+        "cairo.partition.encoder.parquet.raw.array.encoding.enabled",
+        "cairo.partition.encoder.parquet.version",
+        "cairo.partition.encoder.parquet.statistics.enabled",
+        "cairo.partition.encoder.parquet.compression.codec",
+        "cairo.partition.encoder.parquet.compression.level",
+        "cairo.partition.encoder.parquet.row.group.size",
+        "cairo.partition.encoder.parquet.data.page.size"
+    ]}
+/>
 
 ### Parallel SQL execution
 
