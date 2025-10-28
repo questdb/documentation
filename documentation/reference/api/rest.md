@@ -20,8 +20,7 @@ off-the-shelf HTTP clients. It provides a simple way to interact with QuestDB
 and is compatible with most programming languages. API functions are fully keyed
 on the URL and they use query parameters as their arguments.
 
-The Web Console[Web Console](/docs/web-console/) is the official Web client
-relying on the REST API.
+The [Web Console](/docs/web-console/) is the official Web client for QuestDB, that relies on the REST API.
 
 **Available methods**
 
