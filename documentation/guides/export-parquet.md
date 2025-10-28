@@ -64,7 +64,7 @@ to point DuckDB to the example file exported in the previous example, you could
 start DuckDB and execute:
 
 ```
-    select * from read_parquet('~/tmp/exp.parquet');
+select * from read_parquet('~/tmp/exp.parquet');
 ```
 
 ### Export query as files via COPY
@@ -84,13 +84,13 @@ or using the [`exec` endpoint](/docs/reference/api/rest/#exec---execute-queries)
 You can export a query:
 
 ```
-    COPY (select * from market_data limit 3) TO 'market_data_parquet_table' WITH FORMAT PARQUET;
+COPY (select * from market_data limit 3) TO 'market_data_parquet_table' WITH FORMAT PARQUET;
 ```
 
 Or you can export a whole table:
 
 ```
-    COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET;
+COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET;
 ```
 
 
@@ -108,7 +108,6 @@ If you want to monitor the export process, you can issue a call like this:
 ```
 SELECT * FROM 'sys.copy_export_log' WHERE id = '45ba24e5ba338099';
 ```
-
 
 While it is running, export can be cancelled with:
 
