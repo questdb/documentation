@@ -181,7 +181,7 @@ Settings for `COPY FROM` (import):
 <ConfigTable
   rows={csvImportConfig}
   pick={[
-    "cairo.sql.copy.root"
+    "cairo.sql.copy.root",
     "cairo.sql.copy.work.root",
     "cairo.iouring.enabled",
     "cairo.sql.copy.buffer.size",
@@ -228,12 +228,7 @@ It is important that the two path are identical
 
 ### Export
 
-<ConfigTable
-    rows={parquetExportConfig}
-    pick={[
-    "cairo.sql.copy.export.root"
-    ]}
-/>
+<ConfigTable rows={parquetExportConfig} />
 
 Parquet export is also generally impacted by query execution and parquet conversion parameters.
 
