@@ -51,7 +51,7 @@ To export a query as a file, you can use either the `/exp` REST API endpoint or 
 
 :::tip
 
-See also the [/exp documentation](/documentation/reference/api/rest.md).
+See also the [/exp documentation](/docs/reference/api/rest.md).
 
 :::
 
@@ -84,7 +84,7 @@ start DuckDB and execute:
 
 :::tip
 
-See also the [COPY-TO documentation](/documentation/reference/sql/copy.md).
+See also the [COPY-TO documentation](/docs/reference/sql/copy.md).
 
 :::
 
