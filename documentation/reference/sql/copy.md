@@ -317,7 +317,26 @@ WITH FORMAT PARQUET
 PARTITION_BY DAY;
 ```
 
-This creates separate Parquet files for each day's data in subdirectories named by date.
+The underlying table does not already need to be partitioned. Likewise, you can output query results as partitions:
+
+```questdb-sql title=Export queries with partitions
+COPY (
+    SELECT generate_series as date 
+    FROM generate_series('2025-01-01', '2025-02-01', '1d')
+) 
+TO 'dates'
+WITH FORMAT PARQUET
+PARTITION_BY DAY;
+```
+
+This creates separate Parquet files for each day's data in subdirectories named by date. For example:
+
+- export
+  - dates
+    - 2025-01-01.parquet
+    - 2025-01-02.parquet
+    - 2025-01-03.parquet
+    - ...
 
 #### Export with custom Parquet options
 
