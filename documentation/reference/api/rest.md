@@ -599,6 +599,14 @@ returned in a tabular form to be saved and reused as opposed to JSON.
 
 #### Parquet Export Parameters
 
+:::warning
+
+Parquet exports currently require writing interim data to disk, and therefore must be run on **read-write instances only**.
+
+This limitation will be removed in future.
+
+:::
+
 When `fmt=parquet`, the following additional parameters are supported:
 
 | Parameter            | Required | Default   | Description                                                                                         |

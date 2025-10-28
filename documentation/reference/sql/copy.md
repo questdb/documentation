@@ -216,6 +216,14 @@ Exports data from a table or query result set to Parquet format. The export is p
 
 ### Export root
 
+:::warning
+
+Parquet exports currently require writing interim data to disk, and therefore must be run on **read-write instances only**.
+
+This limitation will be removed in future.
+
+:::
+
 The export destination is relative to `cairo.sql.copy.export.root` (defaults to `root_directory/export`). You can configure this through the [configuration settings](/docs/configuration/).
 
 ### Logs
