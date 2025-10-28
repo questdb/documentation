@@ -77,7 +77,7 @@ operation. There are two root directories to be defined:
   `root_directory/tmp` directory.
 
 Use the [configuration keys](/docs/configuration/) to edit these properties in
-[`COPY` configuration settings](/docs/configuration/#csv-import):
+[`COPY` configuration settings](/docs/configuration/#copy-settings):
 
 ```shell title="Example"
 cairo.sql.copy.root=/Users/UserName/Desktop

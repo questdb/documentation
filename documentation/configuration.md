@@ -226,7 +226,7 @@ It is important that the two path are identical
 (`/var/lib/questdb/questdb_import` in the example).
 
 
-### Export
+#### Export
 
 <ConfigTable rows={parquetExportConfig} />
 

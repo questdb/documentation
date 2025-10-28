@@ -12,7 +12,6 @@ There are three ways of converting or exporting data to Parquet:
 
 * [Export query as file via REST](#export-query-as-file-via-rest)
 * [Export query as files via COPY](#export-query-as-files-via-copy)
-    * 
 * [In-place conversion](#in-place-conversion)
 
 ## Data Compression
@@ -34,24 +33,14 @@ You can override these defaults when [exporting via COPY](#export-query-as-files
 
 ## Export queries as files
 
-:::warning
-Exporting as files is right now available on a development branch: [https://github.com/questdb/questdb/pull/6008](https://github.com/questdb/questdb/pull/6008).
-If you want to test this feature, you need to clone and compile the branch.
-
-The code is functional, but it is just lacking fuzzy tests and documentation. We should be able to include this in a
-release soon enough, but for exporting it is safe to just checkout the development branch, compile, and start QuestDB
-pointing to the target jar.
-:::
-
 To export a query as a file, you can use either the `/exp` REST API endpoint or the `COPY` command.
 
 
 ### Export query as file via REST
 
-
 :::tip
 
-See also the [/exp documentation](/docs/reference/api/rest).
+See also the [/exp documentation](/docs/reference/api/rest/#exp---export-data).
 
 :::
 
@@ -77,7 +66,6 @@ start DuckDB and execute:
 ```
     select * from read_parquet('~/tmp/exp.parquet');
 ```
-
 
 ### Export query as files via COPY
 
