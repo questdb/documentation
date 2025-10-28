@@ -28,7 +28,7 @@ The `COPY` command has two modes of operation:
 1. **Import mode**: `COPY table_name FROM 'file.csv'`, copying data from a delimited text file into QuestDB.
 2. **Export mode**: `COPY table_name TO 'output_directory'` or `COPY (query) TO 'output_directory'`, exporting data to Parquet files.
 
-### Import mode (COPY-FROM)
+## Import mode (COPY-FROM)
 
 Copies tables from a delimited text file saved in the defined root directory
 into QuestDB. `COPY` has the following import modes:
@@ -202,7 +202,7 @@ SELECT * FROM 'sys.text_import_log' WHERE id = '55ca24e5ba328050' LIMIT -1;
 | 2022-08-03T14:04:42.268502Z | 55ca24e5ba328050 | weather | weather.csv | null  | cancelled | import cancelled [phase=partition_import, msg=`Cancelled`] | 0            | 0             | 0      |
 
 
-### Export mode (COPY-TO)
+## Export mode (COPY-TO)
 
 Exports data from a table or query result set to Parquet format. The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
 
