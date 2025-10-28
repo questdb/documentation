@@ -589,62 +589,6 @@ If you want to re-read metadata for all user tables, simply use an asterisk:
 SELECT hydrate_table_metadata('*');
 ```
 
-## sys.copy_export_log
-
-`sys.copy_export_log` is a pseudo-table containing the export log for `COPY TO` operations.
-
-**Arguments:**
-
-- `sys.copy_export_log` does not require arguments.
-
-**Return value:**
-
-Returns metadata on `COPY TO` export operations for the last three days, including the columns:
-
-- `ts` - timestamp of the log event.
-- `id` - export identifier that can be used to track export progress.
-- `table_name` - source table name (or 'query' for subquery exports).
-- `export_path` - destination directory path for the export.
-- `num_exported_files` - how many output files were written
-- `phase` - progress markers for each export step. The phases are:
-    - `wait_to_run`: queued for execution.
-    - `populating_temp_table`: building temporary table with materialized query result.
-    - `converting_partitions`: converting temporary table partitions to parquet.
-    - `move_files`: copying converted files to export directory.
-    - `dropping_temp_table`: cleaning up temporary data.
-    - `sending_data`: streaming network response.
-    - `success`: completion of export task.
-- `status` - event status for each phase, for example 'started', 'finished'.
-- `message` - additional text (important for error rows).
-- `errors` - error number or flag.
-
-**Examples:**
-
-```questdb-sql
-COPY trades TO 'trades' WITH FORMAT PARQUET;
-```
-
-| id               |
-|------------------| 
-| 38b2b45f28aa822e |
-
-Checking the log:
-
-```questdb-sql
-SELECT * FROM sys.copy_export_log WHERE id = '38b2b45f28aa822e';
-```
-
-| ts                          | id               | table_name | export_path                    | num_exported_files | phase                 | status   | message | errors |
-|-----------------------------|------------------|------------|--------------------------------|--------------------|-----------------------|----------|---------|--------|
-| 2025-10-27T14:07:20.513119Z | 38b2b45f28aa822e | trades     | null                           | null               | wait_to_run           | started  | queued  | 0      |
-| 2025-10-27T14:07:20.541779Z | 38b2b45f28aa822e | trades     | null                           | null               | wait_to_run           | finished | 0       |
-| 2025-10-27T14:07:20.542552Z | 38b2b45f28aa822e | trades     | null                           | null               | converting_partitions | started  | null    | 0      |
-| 2025-10-27T14:07:20.658111Z | 38b2b45f28aa822e | trades     | null                           | null               | converting_partitions | finished | null    | 0      |
-| 2025-10-27T14:07:20.658185Z | 38b2b45f28aa822e | trades     | null                           | null               | move_files            | started  | null    | 0      |
-| 2025-10-27T14:07:20.670200Z | 38b2b45f28aa822e | trades     | null                           | null               | move_files            | finished | null    | 0      |
-| 2025-10-27T14:07:20.670414Z | 38b2b45f28aa822e | trades     | /&lt;dbroot&gt;/export/trades/ | 26                 | success               | finished | null    | 0      |
-
-
 ## flush_query_cache()
 
 `flush_query_cache' invalidates cached query execution plans.
