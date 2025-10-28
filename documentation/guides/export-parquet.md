@@ -12,6 +12,7 @@ There are three ways of converting or exporting data to Parquet:
 
 * [Export query as file via REST](#export-query-as-file-via-rest)
 * [Export query as files via COPY](#export-query-as-files-via-copy)
+    * 
 * [In-place conversion](#in-place-conversion)
 
 ## Data Compression
@@ -47,6 +48,13 @@ To export a query as a file, you can use either the `/exp` REST API endpoint or 
 
 ### Export query as file via REST
 
+
+:::tip
+
+See also the [/exp documentation](/documentation/reference/api/rest.md).
+
+:::
+
 You can use the same parameters as when doing a [CSV export](/docs/reference/api/rest/#exp---export-data), only passing `parquet` as the `fmt` parameter value.
 
 ```
@@ -72,6 +80,13 @@ start DuckDB and execute:
 
 
 ### Export query as files via COPY
+
+
+:::tip
+
+See also the [COPY-TO documentation](/documentation/reference/sql/copy.md).
+
+:::
 
 If you prefer to export data via SQL, or if you want to export asynchronously, you
 can use the `COPY` command from the web console, from any pgwire-compliant client,
