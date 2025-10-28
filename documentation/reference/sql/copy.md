@@ -243,14 +243,6 @@ The export destination is relative to `cairo.sql.copy.export.root` (defaults to 
 | message            | VARCHAR   | Information about the current phase/step                                                                                                            |
 | errors             | long      | Error code(s)                                                                                                                                       |
 
-- `wait_to_run`: queued for execution.
-    - `populating_temp_table`: building temporary table with materialized query result.
-    - `converting_partitions`: converting temporary table partitions to parquet.
-    - `move_files`: copying converted files to export directory.
-    - `dropping_temp_table`: cleaning up temporary data.
-    - `sending_data`: streaming network response.
-    - `success`: completion of export task.
-    - 
 Log table row retention is configurable through `cairo.sql.copy.log.retention.days` setting, and is three days by default.
 
 `COPY TO` returns an `id` value from `sys.copy_export_log` to track the export progress.

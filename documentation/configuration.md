@@ -247,9 +247,6 @@ If not overridden, the following default setting will be used.
     ]}
 />
 
-
-
-
 ### Parallel SQL execution
 
 This section describes settings that can affect the level of parallelism during
