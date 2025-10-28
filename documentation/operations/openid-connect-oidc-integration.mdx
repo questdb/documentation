@@ -348,11 +348,16 @@ The OAuthenticator documentation also contains
 using different identity providers.
 
 If Jupyter notebooks are used without JupyterHub, one option for OAuth2
-integration is to use the
-[Resource Owner Password Credentials](https://oauth.net/2/grant-types/password)
-flow. It is likely that to enable this flow in your OAuth2 provider will require
-additional setup. The Resource Owner Password Credentials flow is legacy, and
-should be used as a last resort.
+integration is to use the <a href="https://oauth.net/2/grant-types/password" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow.
+It is likely that enabling this flow in your OAuth2 provider will require
+additional setup.
+
+:::caution
+
+The Resource Owner Password Credentials flow is legacy, and should be used as a last resort.
+
+:::
 
 We can use the code below to acquire an access token in our notebook:
 
@@ -578,7 +583,8 @@ with Sender.from_conf(conf) as sender:
 
 ## OIDC for the PGWire endpoint
 
-If ROPC is not an option, we can still authenticate via OIDC on the PGWire endpoint.
+If the <a href="https://oauth.net/2/grant-types/password" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow is not an option, we can still authenticate via OIDC on the PGWire endpoint.
 However, in this case the client's responsibility to source the token required for authentication.
 This method works wherever a Postgres client library is available, including jupyter notebooks.
 
