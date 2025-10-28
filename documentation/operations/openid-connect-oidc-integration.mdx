@@ -576,6 +576,30 @@ with Sender.from_conf(conf) as sender:
     sender.dataframe(df, table_name="foo", at="ts")
 ```
 
+## OIDC for the PGWire endpoint
+
+If ROPC is not an option, we can still authenticate via OIDC on the PGWire endpoint.
+However, in this case the client's responsibility to source the token required for authentication.
+This method works wherever a Postgres client library is available, including jupyter notebooks.
+
+Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
+
+The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option:
+
+```python
+import psycopg as pg
+
+token = "token_requested_from_the_oauth2_provider"
+
+conn_str = f"user=_sso password={token} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute('select current_user()')
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+
 ## User permissions
 
 QuestDB requires additional user information to be able to construct the user's
