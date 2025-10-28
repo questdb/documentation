@@ -619,7 +619,6 @@ When `fmt=parquet`, the following additional parameters are supported:
 | `statistics_enabled` | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
 | `parquet_version`    | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
 | `raw_array_encoding` | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
-| `rmode`              | No       | `false`   | Set HTTP response mode: `nodelay` or not sent                                                                      |
 
 The parameters must be URL encoded.
 
