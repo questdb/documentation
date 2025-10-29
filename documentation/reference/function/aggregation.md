@@ -8,7 +8,7 @@ This page describes the available functions to assist with performing aggregate
 calculations.
 
 
-:::note 
+:::note
 
 QuestDB does not support using aggregate functions as arguments to other functions. For example, this is not allowed:
 
@@ -22,17 +22,19 @@ Running it will result in the following error:
 
 You can work around this limitation by using CTEs or subqueries:
 
-```questdb-sql title="aggregates as function args workaround" demo
+```questdb-sql title="CTE workaround"
 -- CTE
 WITH minmax AS (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades     
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 )
 SELECT datediff('d', min_date, max_date) FROM minmax;
 
 -- Subquery
-SELECT datediff('d', min_date, max_date) FROM (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades    
+SELECT datediff('d', min_date, max_date)
+FROM (
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 );
+
 ```
 
 :::
@@ -181,7 +183,9 @@ Return value type is `double`.
 #### Examples
 
 ```questdb-sql title="Calculate approximate median price by symbol" demo
-SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
+SELECT symbol, approx_median(price) FROM trades
+WHERE timestamp in today()
+GROUP BY symbol;
 ```
 
 | symbol  | approx_median |
@@ -190,7 +194,9 @@ SELECT symbol, approx_median(price) FROM trades GROUP BY symbol;
 | ETH-USD | 2615.46      |
 
 ```questdb-sql title="Calculate approximate median with higher precision" demo
-SELECT symbol, approx_median(price, 3) FROM trades GROUP BY symbol;
+SELECT symbol, approx_median(price, 3) FROM trades
+WHERE timestamp in today()
+GROUP BY symbol;
 ```
 
 | symbol  | approx_median |
@@ -874,7 +880,7 @@ SELECT symbol, mode(value) as mode FROM dataset;
 On demo:
 
 ```questdb-sql title="mode() on demo" demo
-SELECT symbol, mode(side) 
+SELECT symbol, mode(side)
 FROM trades
 WHERE timestamp IN today()
 ORDER BY symbol ASC;
@@ -1028,38 +1034,38 @@ Suppose we want to find all the distinct sky cover types observed in the weather
 tablein our public demo:
 
 ```questdb-sql title="string_distinct_agg example" demo
-SELECT string_distinct_agg(skyCover, ',') AS distinct_sky_covers
-FROM weather;
+SELECT string_distinct_agg(symbol, ',') AS distinct_symbols
+FROM trades
+WHERE timestamp in today();
 ```
 
-This query will return a single string containing all the distinct skyCover
-values separated by commas. The skyCover column contains values such as OVC
-(Overcast), BKN (Broken clouds), SCT (Scattered clouds), and CLR (Clear skies).
-Even though the skyCover column may have many rows with repeated values,
-`string_distinct_agg` aggregates only the unique non-null values. The result is a
-comma-separated list of all distinct sky cover conditions observed.
+This query will return a single string containing all the distinct symbol
+values separated by commas. Even though the `symbol` column may have many rows with repeated values, `string_distinct_agg` aggregates only the unique non-null values. The result is a
+comma-separated list of all distinct symbols observed.
 
 Result:
 
-| distinct_sky_covers |
-| ------------------- |
-| OVC,BKN,SCT,CLR,OBS |
+| distinct_symbols                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,ADA-USDT,ADA-USD,XLM-USDT,XLM-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
 
 You can also group the aggregation by another column.
 
-To find out which sky cover conditions are observed for each wind direction:
+To find out which symbols are observed for each side:
 
 ```questdb-sql title="string_distinct_agg example with GROUP BY" demo
-SELECT windDir, string_distinct_agg(skyCover, ',') AS distinct_sky_covers
-FROM weather
-GROUP BY windDir;
+SELECT side, string_distinct_agg(symbol, ',') AS distinct_symbols
+FROM trades
+WHERE timestamp in today();
 ```
 
-| windDir | distinct_sky_covers |
-| ------- | ------------------- |
-| 30      | OVC,BKN             |
-| 45      | BKN,SCT             |
-| 60      | OVC,SCT,CLR         |
+| side | distinct_symbols                                                                                                                                                                                            |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| buy  | BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,ADA-USDT,ADA-USD,SOL-USDT,SOL-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,DOT-USDT,DOT-USD,XLM-USDT,XLM-USD,SOL-BTC,AVAX-USDT,AVAX-USD,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
+| sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
+
+
+Note we don't need to add `GROUP BY side` as it is implicit. But you can add it, if you prefer that syntax.
 
 ## sum
 

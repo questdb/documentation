@@ -1,0 +1,32 @@
+name: Component Converter Check
+
+on:
+  pull_request:
+    paths:
+      - "src/components/**"
+      - "src/theme/**"
+
+jobs:
+  check-converters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Comment on PR about converter check
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            ## 🤖 Component Converter Reminder
+
+            A component in `src/components/` or `src/theme/` was modified in this pull request.
+
+            We are creating markdown correspondents of every path (e.g. questdb.com/docs/quick-start → questdb.com/docs/quick-start/index.md) for LLM consumption.
+            If the component usage is shadowing useful content, it may need a converter for markdown output in `convert-components.js`.
+
+            ### Quick Check
+            - ✅ **Content component** (code, tables, data) → Add converter if not exists
+            - ❌ **UI/visual component** (styling, buttons, decorative) → No converter needed
+
+            ---
+            💡 *This is a friendly reminder, not a blocker. Ignore if not applicable.*
+          comment_tag: component-converter-check

@@ -264,6 +264,7 @@ This makes most `ASOF JOIN` queries simple and intuitive.
 WITH market_subset AS (
   SELECT symbol,bids
   FROM market_data
+  WHERE timestamp in today()
 )
 SELECT *
 FROM market_subset ASOF JOIN core_price ON (symbol);
@@ -285,6 +286,7 @@ Example: Joining on `ingestion_time` instead of the default `trade_ts`
 WITH trades_ordered_by_ingestion AS (
   SELECT symbol, price, ingestion_time
   FROM trades
+  WHERE timestamp in today()
   -- This ORDER BY clause tells QuestDB to use 'ingestion_time'
   -- as the new designated timestamp for this subquery.
   ORDER BY ingestion_time ASC

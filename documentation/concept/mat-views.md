@@ -93,7 +93,8 @@ executing the same query on the base table.
 
 ```questdb-sql title="querying a materialized view" demo
 SELECT *
-FROM trades_OHLC_15m;
+FROM trades_OHLC_15m
+LIMIT -1000;
 ```
 
 ## Roadmap and limitations

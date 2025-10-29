@@ -319,7 +319,7 @@ When specifying a column, a name and
 [type definition](/docs/reference/sql/datatypes/) must be provided. The `symbol`
 type may have additional optional parameters applied.
 
-![Flow chart showing the syntax of the different column types](/images/docs/diagrams/typeDef.svg)
+![Flow chart showing the syntax of the different column types](/images/docs/diagrams/columnTypeDef.svg)
 
 ### Symbols
 

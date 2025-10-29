@@ -1,4 +1,5 @@
 import useBaseUrl from '@docusaurus/useBaseUrl'
+import ilpClients from '../../../shared/ilp_clients.json'
 import style from "./style.module.css"
 
 type Client = {
@@ -13,55 +14,7 @@ type ILPClientsTableProps = {
   language?: string
 }
 
-const clients: Client[] = [
-  {
-    label: "Python",
-    logoSrc: "/images/logos/python.svg",
-    docsUrl: "https://py-questdb-client.readthedocs.io/en/latest/",
-    sourceUrl: "https://github.com/questdb/py-questdb-client",
-  },
-  {
-    label: "NodeJS",
-    logoSrc: "/images/logos/nodejs-light.svg",
-    lightThemeLogoSrc: "/images/logos/jsIconGreen.svg",
-    docsUrl: "https://questdb.github.io/nodejs-questdb-client",
-    sourceUrl: "https://github.com/questdb/nodejs-questdb-client",
-  },
-  {
-    label: ".NET",
-    logoSrc: "/images/logos/dotnet.svg",
-    sourceUrl: "https://github.com/questdb/net-questdb-client",
-  },
-  {
-    label: "Java",
-    docsUrl: "/docs/reference/clients/java_ilp/",
-    logoSrc: "/images/logos/java.svg",
-  },
-  {
-    label: "C",
-    logoSrc: "/images/logos/c.svg",
-    docsUrl: "https://github.com/questdb/c-questdb-client/blob/main/doc/C.md",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-  {
-    label: "C++",
-    logoSrc: "/images/logos/cplusplus.svg",
-    docsUrl: "https://github.com/questdb/c-questdb-client/blob/main/doc/CPP.md",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-  {
-    label: "Golang",
-    logoSrc: "/images/logos/go.svg",
-    docsUrl: "https://pkg.go.dev/github.com/questdb/go-questdb-client/",
-    sourceUrl: "https://github.com/questdb/go-questdb-client/",
-  },
-  {
-    label: "Rust",
-    logoSrc: "/images/logos/rust.svg",
-    docsUrl: "https://docs.rs/crate/questdb-rs/latest",
-    sourceUrl: "https://github.com/questdb/c-questdb-client",
-  },
-]
+const clients: Client[] = ilpClients as Client[]
 
 // @ts-expect-error TS6133
 const openInNewTab = (url: string) => ({
