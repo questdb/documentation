@@ -212,6 +212,52 @@ fn main() -> Result<()> {
 }
 ```
 
+## Ingest decimals
+
+:::note
+Decimals are available when ILP protocol version 3 is active (QuestDB 9.3.0+). The HTTP sender
+negotiates v3 automatically; with TCP add protocol_version=3; to the configuration string.
+:::
+
+If you already have decimal values as text you can send them directly:
+```rust
+buffer
+    .table("trades")?
+    .column_dec("price", "2615.54")?
+    .at(TimestampNanos::now())?;
+```
+
+For native decimal types, enable the right feature in Cargo.toml:
+
+questdb = { version = "0.6", features = ["rust_decimal"] }
+rust_decimal = "1"
+# or, to work with bigdecimal:
+questdb = { version = "0.6", features = ["bigdecimal"] }
+bigdecimal = "0.4"
+
+With rust_decimal:
+```rust
+use rust_decimal::Decimal;
+let price = Decimal::from_str("2615.54")?;
+buffer
+    .table("trades")?
+    .column_dec("price", &price)?
+    .at(TimestampNanos::now())?;
+```
+
+With bigdecimal:
+```rust
+use bigdecimal::BigDecimal;
+let price = BigDecimal::from_str("2615.54")?;
+buffer
+    .table("trades")?
+    .column_dec("price", &price)?
+    .at(TimestampNanos::now())?;
+```
+
+The client stores Decimal values without rounding, supporting up to 76 decimal places and values as
+large as the source type allows.
+
 ## Configuration options
 
 The easiest way to configure the line sender is the configuration string. The

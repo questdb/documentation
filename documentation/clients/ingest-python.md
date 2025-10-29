@@ -366,6 +366,59 @@ Protocol Version 2 along with its support for arrays is available from QuestDB
 version 9.0.0.
 :::
 
+## Decimal Insertion
+
+:::note
+Decimals are supported from QuestDB version 9.3.0 with protocol version 3, and require updated
+client libraries.
+```
+tcp::addr=127.0.0.1:9009;protocol_version=3;
+```
+:::
+
+- Pandas object columns containing decimal.Decimal instances are converted to ILP’s binary decimal payload. Trailing zeros are preserved, `Decimal('NaN')`, `Decimal('Infinity')`, and `Decimal('-Infinity')` are sent as
+  NULL, and invalid scales raise `IngressError(IngressErrorCode.BadDataFrame)`.
+- Using Arrow-backed decimals avoids Python object overhead and lets you control precision/scale explicitly; the client streams the pre-computed unscaled bytes directly.
+
+```python
+from decimal import Decimal
+import pandas as pd
+import pyarrow as pa
+from questdb.ingress import Sender, TimestampNanos
+
+conf = "http::addr=localhost:9000;protocol_version=3"
+
+with Sender.from_conf(conf) as sender:
+    # Binary decimals via Python’s Decimal (object dtype)
+    df_literals = pd.DataFrame(
+        {
+            "symbol": ["EURUSD", "EURUSD"],
+            "mid": [Decimal("1.234500"), Decimal("-0.010")],
+            "ts": pd.to_datetime(["2024-01-01T12:00:00Z", "2024-01-01T12:00:01Z"]),
+        }
+    )
+    sender.dataframe(df_literals, table_name="fx_quotes", at="ts")
+
+    # Binary decimals via Arrow-backed column (precision 76, scale 10 here)
+    decimal_dtype = pd.ArrowDtype(pa.decimal256(precision=76, scale=10))
+    df_arrow = pd.DataFrame(
+        {
+            "symbol": pd.Categorical(["EURUSD", "EURUSD"]),
+            "mid": pd.Series(
+                [Decimal("1.2000000000"), Decimal("1.1999999999")],
+                dtype=decimal_dtype,
+            ),
+            "ts": pd.to_datetime(["2024-01-01T12:00:02Z", "2024-01-01T12:00:03Z"]),
+        }
+    )
+    sender.dataframe(df_arrow, table_name="fx_quotes", at="ts")
+```
+
+### Resulting ILP rows carry DECIMAL payloads that respect the original scale.
+
+- Limits imposed by QuestDB apply: scale ≤ 76 and a signed mantissa of at most 32 bytes. Values outside those bounds raise IngressError(IngressErrorCode.DecimalError) during serialization.
+- If the column doesn't exists yet, it will be created with a default precision of 18 and scale of 3. To customize those, pre-create the table/column with the desired precision/scale.
+
 ## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as in:
