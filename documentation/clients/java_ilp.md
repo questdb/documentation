@@ -227,6 +227,8 @@ to `30s` or higher.
    - `arrayColumn()` -- several variants, see below
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
+   - `decimalColumn(CharSequence, Decimal256)` or
+     `decimalColumn(CharSequence, CharSequence)` (string literal)
 
 5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
    set a designated timestamp.

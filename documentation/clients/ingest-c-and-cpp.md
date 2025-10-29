@@ -294,6 +294,40 @@ Protocol Version 2 along with its support for arrays is available from QuestDB
 version 9.0.0.
 :::
 
+### Decimal insertion
+
+:::note
+Decimals are supported from QuestDB version 9.3.0, and require updated
+client libraries.
+:::
+
+Decimals can be written either as strings or in the binary ILP format. Import
+the decimal literals (`using namespace questdb::ingress::decimal;`) and send a
+validated UTF-8 string when you want QuestDB to parse the value for you:
+
+```cpp
+buffer.column("price"_cn, "2615.54"_decimal);
+```
+
+When you already have a fixed-point representation, construct a
+`questdb::ingress::decimal::decimal_view` with the column scale (digits to the
+right of the decimal point) and the unscaled value encoded as big-endian two's
+complement bytes. This preserves full precision and lets you reach the protocol
+limits (scale ≤ 76, mantissa ≤ 32 bytes):
+
+```cpp
+const uint8_t price_unscaled[] = {123};      // 12.3 -> scale 1, unscaled 123
+auto price_value = questdb::ingress::decimal::decimal_view(1, price_unscaled);
+buffer.column("price"_cn, price_value);
+```
+
+For custom fixed-point types, provide a `to_decimal_view_state_impl` overload
+that returns a struct exposing `.view()` so the sender can transform it into a
+`decimal_view`.
+
+You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples).
+
+
 ## C
 
 :::note
@@ -681,6 +715,43 @@ If you need to specify strides, you can do this via either the
 Please refer to the
 [Concepts section on n-dimensional arrays](/docs/concept/array), where this is
 explained in more detail.
+
+### Decimal insertion
+
+:::note
+Decimals are supported from QuestDB version 9.3.0, and require updated
+client libraries.
+:::
+
+QuestDB decimal columns can be populated in two ways. The simplest is to send a
+validated UTF-8 decimal string, which the server parses and stores using the
+column's precision:
+
+```c
+line_sender_utf8 price_value = QDB_UTF8_LITERAL("2615.54");
+if (!line_sender_buffer_column_dec_str(buffer, price_name, price_value, &err))
+    goto on_error;
+```
+
+For better performance you can format the unscaled value and send it in
+binary form. Pass the column scale (digits to the right of the decimal point)
+alongside the mantissa encoded as big-endian two's complement bytes. This
+allows you to reach the full range supported by QuestDB (scale ≤ 76, mantissa ≤
+32 bytes) and avoids loss of precision when you already have a fixed-point
+representation:
+
+```c
+// 12.3 -> scale 1, unscaled value 123 (0x7B)
+const uint8_t price_unscaled_value[] = {123};
+if (!line_sender_buffer_column_dec(
+        buffer, price_name, 1, price_unscaled_value, sizeof(price_unscaled_value), &err))
+    goto on_error;
+```
+
+Negative values follow the same rules—encode the unscaled value using two's
+complement with the most significant byte first.
+
+You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples).
 
 ## Other Considerations for both C and C++
 

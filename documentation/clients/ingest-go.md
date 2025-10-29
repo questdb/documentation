@@ -199,6 +199,56 @@ We recommended to use User-assigned timestamps when ingesting data into QuestDB.
 Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+## Decimal insertion
+
+:::note
+Decimals are available when ILP protocol version 3 is active (QuestDB 9.3.0+). The HTTP sender
+negotiates v3 automatically; with TCP add `protocol_version=3;` to the configuration string.
+:::
+
+QuestDB decimal columns accept either validated string literals or pre-scaled binary payloads. The text path keeps things simple and lets the server parse the literal while preserving the scale you send:
+
+```go
+err = sender.
+	Table("quotes").
+	Symbol("ccy_pair", "EURUSD").
+	DecimalColumnString("mid", "1.234500").
+	AtNow(ctx)
+```
+
+`DecimalColumnString` checks the literal (digits, optional sign, decimal point, exponent, `NaN`/`Infinity`) and appends the d suffix that the ILP parser expects, so the value above lands with scale = 6.
+
+For full control or when you already have a fixed-point value, build a `questdb.ScaledDecimal` and use the binary representation. The helpers keep you inside QuestDB’s limits (scale ≤ 76, unscaled payload ≤ 32 bytes) and avoid server-side parsing:
+
+```go
+price := qdb.NewDecimalFromInt64(12345, 2) // 123.45 with scale 2
+commission, err := qdb.NewDecimal(big.NewInt(-750), 4)
+if err != nil {
+	log.Fatal(err)
+}
+
+err = sender.
+	Table("trades").
+	Symbol("symbol", "ETH-USD").
+	DecimalColumnScaled("price", price).
+	DecimalColumnScaled("commission", commission).
+	AtNow(ctx)
+```
+
+If you already hold a two’s complement big-endian mantissa (for example, from another fixed-point library) call `NewScaledDecimal(rawBytes, scale)`, passing nil encodes a NULL and the client skips the field.
+
+The client also understands `github.com/shopspring/decimal` values:
+
+```go
+dec := decimal.NewFromFloat(2615.54)
+err = sender.
+	Table("trades").
+	DecimalColumnShopspring("price", dec).
+	AtNow(ctx)
+```
+
+`DecimalColumnShopspring` converts the coefficient/exponent pair into the same binary payload, so you can reuse existing business logic while still benefiting from precise wire formatting.
+
 ## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as
