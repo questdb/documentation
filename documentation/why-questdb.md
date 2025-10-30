@@ -10,13 +10,9 @@ import Screenshot from "@theme/Screenshot"
 
 This pages provides a brief overview on:
 
-- [Top QuestDB features {#features}](#top-questdb-features-features)
-    - [Massive ingestion handling \& throughput](#massive-ingestion-handling--throughput)
-    - [High performance deduplication \& out-of-order indexing](#high-performance-deduplication--out-of-order-indexing)
-    - [Hardware efficiency](#hardware-efficiency)
-    - [SQL with time series extensions](#sql-with-time-series-extensions)
-- [Benefits of QuestDB {#benefits}](#benefits-of-questdb-benefits)
-- [Where to next? {#next-up}](#where-to-next-next-up)
+- [Top QuestDB features](#features)
+- [Benefits of QuestDB](#benefits)
+- [Where to next?](#next-up)
 - [Support](#support)
 
 <hr />
@@ -80,7 +76,7 @@ QuestDB, on maximal hardware, significantly outperforms peers:
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
   src="images/benchmark/benchmark_all_q1_2024.webp"
   width={650}
-  title="Benchmark results for QuestDB 9.1.0, InfluxDB 2.7.12, ClickHouse 25.10.1.1486, and Timescale 2.22.1"
+  title="Results for QuestDB 9.1.0, Timescale 2.22.1, InfluxDB 2.7.12, and Clickhouse 25.10.1.1486"
 />
 
 However, on less robust hardware the difference is even more pronounced, as seen
