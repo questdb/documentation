@@ -22,17 +22,19 @@ Running it will result in the following error:
 
 You can work around this limitation by using CTEs or subqueries:
 
-```questdb-sql title="aggregates as function args workaround" demo
+```questdb-sql title="CTE workaround"
 -- CTE
 WITH minmax AS (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 )
 SELECT datediff('d', min_date, max_date) FROM minmax;
 
 -- Subquery
-SELECT datediff('d', min_date, max_date) FROM (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+SELECT datediff('d', min_date, max_date)
+FROM (
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 );
+
 ```
 
 :::

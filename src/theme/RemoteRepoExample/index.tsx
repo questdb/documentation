@@ -50,6 +50,7 @@ type Props = {
 ///
 /// The code itself is fetched at build time using the `remote-repo-example`
 /// plugin.
+
 export const RemoteRepoExample = ({
   name,
   lang,

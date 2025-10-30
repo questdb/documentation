@@ -1,183 +1,87 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="903" height="337">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
             .line                 {fill: none; stroke: #636273;}
             .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
-            .thin-line            {stroke: #636273; shape-rendering: crispEdges}
-            .filled               {fill: #636273; stroke: none;}
-            text.terminal         {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #ffffff;
             font-weight: bold;
             }
-            text.nonterminal      {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #e289a4;
             font-weight: normal;
             }
-            text.regexp           {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #00141F;
             font-weight: normal;
             }
             rect, circle, polygon {fill: none; stroke: none;}
-            rect.terminal         {fill: none; stroke: #be2f5b;}
-            rect.nonterminal      {fill: rgba(255,255,255,0.1); stroke: none;}
-            rect.text             {fill: none; stroke: none;}
-            polygon.regexp        {fill: #C7ECFF; stroke: #038cbc;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
         </style>
     </defs>
-    <polygon points="9 61 1 57 1 65"/>
-    <polygon points="17 61 9 57 9 65"/>
-    <rect x="51" y="47" width="58" height="32" rx="10"/>
-    <rect x="49"
-          y="45"
-          width="58"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="59" y="65">WITH</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#subQueryName"
-       xlink:title="subQueryName">
-        <rect x="149" y="47" width="116" height="32"/>
-        <rect x="147" y="45" width="116" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="157" y="65">subQueryName</text>
-    </a>
-    <rect x="285" y="47" width="38" height="32" rx="10"/>
-    <rect x="283"
-          y="45"
-          width="38"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="293" y="65">AS</text>
-    <rect x="343" y="47" width="26" height="32" rx="10"/>
-    <rect x="341"
-          y="45"
-          width="26"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="351" y="65">(</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#subQuery"
-       xlink:title="subQuery">
-        <rect x="389" y="47" width="80" height="32"/>
-        <rect x="387" y="45" width="80" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="397" y="65">subQuery</text>
-    </a>
-    <rect x="489" y="47" width="26" height="32" rx="10"/>
-    <rect x="487"
-          y="45"
-          width="26"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="497" y="65">)</text>
-    <rect x="149" y="3" width="24" height="32" rx="10"/>
-    <rect x="147"
-          y="1"
-          width="24"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="157" y="21">,</text>
-    <rect x="575" y="47" width="70" height="32" rx="10"/>
-    <rect x="573"
-          y="45"
-          width="70"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="583" y="65">INSERT</text>
-    <rect x="45" y="161" width="74" height="32" rx="10"/>
-    <rect x="43"
-          y="159"
-          width="74"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="53" y="179">ATOMIC</text>
-    <rect x="45" y="205" width="66" height="32" rx="10"/>
-    <rect x="43"
-          y="203"
-          width="66"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="53" y="223">BATCH</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#number"
-       xlink:title="number">
-        <rect x="131" y="205" width="68" height="32"/>
-        <rect x="129" y="203" width="68" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="139" y="223">number</text>
-    </a>
-    <rect x="239" y="237" width="88" height="32" rx="10"/>
-    <rect x="237"
-          y="235"
-          width="88"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="247" y="255">o3MaxLag</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#numberWithUnit"
-       xlink:title="numberWithUnit">
-        <rect x="347" y="237" width="122" height="32"/>
-        <rect x="345" y="235" width="122" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="355" y="255">numberWithUnit</text>
-    </a>
-    <rect x="529" y="129" width="56" height="32" rx="10"/>
-    <rect x="527"
-          y="127"
-          width="56"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="537" y="147">INTO</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#tableName"
-       xlink:title="tableName">
-        <rect x="605" y="129" width="88" height="32"/>
-        <rect x="603" y="127" width="88" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="613" y="147">tableName</text>
-    </a>
-    <rect x="713" y="129" width="70" height="32" rx="10"/>
-    <rect x="711"
-          y="127"
-          width="70"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="721" y="147">SELECT</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#queryDef"
-       xlink:title="queryDef">
-        <rect x="803" y="129" width="78" height="32"/>
-        <rect x="801" y="127" width="78" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="811" y="147">queryDef</text>
-    </a>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#subQueryName"
-       xlink:title="subQueryName">
-        <rect x="715" y="303" width="116" height="32"/>
-        <rect x="713" y="301" width="116" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="723" y="321">subQueryName</text>
-    </a>
-    <rect x="851" y="303" width="24" height="32" rx="10"/>
-    <rect x="849"
-          y="301"
-          width="24"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="859" y="321">;</text>
-    <path class="line"
-          d="m17 61 h2 m20 0 h10 m58 0 h10 m20 0 h10 m116 0 h10 m0 0 h10 m38 0 h10 m0 0 h10 m26 0 h10 m0 0 h10 m80 0 h10 m0 0 h10 m26 0 h10 m-406 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m386 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-386 0 h10 m24 0 h10 m0 0 h342 m-504 44 h20 m504 0 h20 m-544 0 q10 0 10 10 m524 0 q0 -10 10 -10 m-534 10 v14 m524 0 v-14 m-524 14 q0 10 10 10 m504 0 q10 0 10 -10 m-514 10 h10 m0 0 h494 m20 -34 h10 m70 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-664 82 l2 0 m2 0 l2 0 m2 0 l2 0 m22 0 h10 m0 0 h454 m-484 0 h20 m464 0 h20 m-504 0 q10 0 10 10 m484 0 q0 -10 10 -10 m-494 10 v12 m484 0 v-12 m-484 12 q0 10 10 10 m464 0 q10 0 10 -10 m-474 10 h10 m74 0 h10 m0 0 h370 m-474 -10 v20 m484 0 v-20 m-484 20 v24 m484 0 v-24 m-484 24 q0 10 10 10 m464 0 q10 0 10 -10 m-474 10 h10 m66 0 h10 m0 0 h10 m68 0 h10 m20 0 h10 m0 0 h240 m-270 0 h20 m250 0 h20 m-290 0 q10 0 10 10 m270 0 q0 -10 10 -10 m-280 10 v12 m270 0 v-12 m-270 12 q0 10 10 10 m250 0 q10 0 10 -10 m-260 10 h10 m88 0 h10 m0 0 h10 m122 0 h10 m40 -108 h10 m56 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m70 0 h10 m0 0 h10 m78 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-210 174 l2 0 m2 0 l2 0 m2 0 l2 0 m2 0 h10 m116 0 h10 m0 0 h10 m24 0 h10 m3 0 h-3"/>
-    <polygon points="893 317 901 313 901 321"/>
-    <polygon points="893 317 885 313 885 321"/>
+    <polygon points="9 61 1 57 1 65"></polygon>
+         <polygon points="17 61 9 57 9 65"></polygon>
+         <rect x="51" y="47" width="58" height="32" rx="10"></rect>
+         <rect x="49" y="45" width="58" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="59" y="65">WITH</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#subQueryName" xlink:title="subQueryName">
+            <rect x="149" y="47" width="116" height="32"></rect>
+            <rect x="147" y="45" width="116" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="157" y="65">subQueryName</text></a><rect x="285" y="47" width="38" height="32" rx="10"></rect>
+         <rect x="283" y="45" width="38" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="293" y="65">AS</text>
+         <rect x="343" y="47" width="26" height="32" rx="10"></rect>
+         <rect x="341" y="45" width="26" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="351" y="65">(</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#subQuery" xlink:title="subQuery">
+            <rect x="389" y="47" width="80" height="32"></rect>
+            <rect x="387" y="45" width="80" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="397" y="65">subQuery</text></a><rect x="489" y="47" width="26" height="32" rx="10"></rect>
+         <rect x="487" y="45" width="26" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="497" y="65">)</text>
+         <rect x="149" y="3" width="24" height="32" rx="10"></rect>
+         <rect x="147" y="1" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="157" y="21">,</text>
+         <rect x="575" y="47" width="70" height="32" rx="10"></rect>
+         <rect x="573" y="45" width="70" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="583" y="65">INSERT</text>
+         <rect x="45" y="161" width="74" height="32" rx="10"></rect>
+         <rect x="43" y="159" width="74" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="53" y="179">ATOMIC</text>
+         <rect x="45" y="205" width="66" height="32" rx="10"></rect>
+         <rect x="43" y="203" width="66" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="53" y="223">BATCH</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#number" xlink:title="number">
+            <rect x="131" y="205" width="68" height="32"></rect>
+            <rect x="129" y="203" width="68" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="139" y="223">number</text></a><rect x="239" y="237" width="88" height="32" rx="10"></rect>
+         <rect x="237" y="235" width="88" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="247" y="255">o3MaxLag</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#numberWithUnit" xlink:title="numberWithUnit">
+            <rect x="347" y="237" width="122" height="32"></rect>
+            <rect x="345" y="235" width="122" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="355" y="255">numberWithUnit</text></a><rect x="529" y="129" width="56" height="32" rx="10"></rect>
+         <rect x="527" y="127" width="56" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="537" y="147">INTO</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#tableName" xlink:title="tableName">
+            <rect x="605" y="129" width="88" height="32"></rect>
+            <rect x="603" y="127" width="88" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="613" y="147">tableName</text></a><rect x="713" y="129" width="70" height="32" rx="10"></rect>
+         <rect x="711" y="127" width="70" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="721" y="147">SELECT</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#queryDef" xlink:title="queryDef">
+            <rect x="803" y="129" width="78" height="32"></rect>
+            <rect x="801" y="127" width="78" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="811" y="147">queryDef</text></a><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#subQueryName" xlink:title="subQueryName">
+            <rect x="715" y="303" width="116" height="32"></rect>
+            <rect x="713" y="301" width="116" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="723" y="321">subQueryName</text></a><rect x="851" y="303" width="24" height="32" rx="10"></rect>
+         <rect x="849" y="301" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="859" y="321">;</text>
+         <path class="line" d="m17 61 h2 m20 0 h10 m58 0 h10 m20 0 h10 m116 0 h10 m0 0 h10 m38 0 h10 m0 0 h10 m26 0 h10 m0 0 h10 m80 0 h10 m0 0 h10 m26 0 h10 m-406 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -24 q0 -10 10 -10 m386 44 l20 0 m-20 0 q10 0 10 -10 l0 -24 q0 -10 -10 -10 m-386 0 h10 m24 0 h10 m0 0 h342 m-504 44 h20 m504 0 h20 m-544 0 q10 0 10 10 m524 0 q0 -10 10 -10 m-534 10 v14 m524 0 v-14 m-524 14 q0 10 10 10 m504 0 q10 0 10 -10 m-514 10 h10 m0 0 h494 m20 -34 h10 m70 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-664 82 l2 0 m2 0 l2 0 m2 0 l2 0 m22 0 h10 m0 0 h454 m-484 0 h20 m464 0 h20 m-504 0 q10 0 10 10 m484 0 q0 -10 10 -10 m-494 10 v12 m484 0 v-12 m-484 12 q0 10 10 10 m464 0 q10 0 10 -10 m-474 10 h10 m74 0 h10 m0 0 h370 m-474 -10 v20 m484 0 v-20 m-484 20 v24 m484 0 v-24 m-484 24 q0 10 10 10 m464 0 q10 0 10 -10 m-474 10 h10 m66 0 h10 m0 0 h10 m68 0 h10 m20 0 h10 m0 0 h240 m-270 0 h20 m250 0 h20 m-290 0 q10 0 10 10 m270 0 q0 -10 10 -10 m-280 10 v12 m270 0 v-12 m-270 12 q0 10 10 10 m250 0 q10 0 10 -10 m-260 10 h10 m88 0 h10 m0 0 h10 m122 0 h10 m40 -108 h10 m56 0 h10 m0 0 h10 m88 0 h10 m0 0 h10 m70 0 h10 m0 0 h10 m78 0 h10 m2 0 l2 0 m2 0 l2 0 m2 0 l2 0 m-210 174 l2 0 m2 0 l2 0 m2 0 l2 0 m2 0 h10 m116 0 h10 m0 0 h10 m24 0 h10 m3 0 h-3"></path>
+         <polygon points="893 317 901 313 901 321"></polygon>
+         <polygon points="893 317 885 313 885 321"></polygon>
 </svg>
