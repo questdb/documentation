@@ -79,18 +79,8 @@ QuestDB, on maximal hardware, significantly outperforms peers:
   title="Results for QuestDB 9.1.0, Timescale 2.22.1, InfluxDB 2.7.12, and Clickhouse 25.10.1.1486"
 />
 
-However, on less robust hardware the difference is even more pronounced, as seen
-in the following benchmark.
-
-Even on hardware as light as a Raspberry Pi 5, QuestDB outperforms competitors
-on stronger hardware:
-
-<Screenshot
-  alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="images/pages/index/min-hardware-comp-graph.webp"
-  width={650}
-  title="QuestDB on an RPi5 outperforming competitors on optimal hardware"
-/>
+On less robust hardware the difference is even more pronounced. As an example, we were
+able to ingest ~270,000 rows per second, using 4 workers, [on a Raspberry Pi](https://questdb.com/blog/raspberry-pi-5-benchmark/).
 
 Beyond performance and efficiency, with a specialized
 [time-series database](/glossary/time-series-database/), you don't need to worry
