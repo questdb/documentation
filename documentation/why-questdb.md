@@ -7,13 +7,15 @@ description:
 
 import { Clients } from '../src/components/Clients'
 import Screenshot from "@theme/Screenshot"
+import TOCInline from '@theme/TOCInline';
 
 This pages provides a brief overview on:
 
-- [Top QuestDB features](#features)
-- [Benefits of QuestDB](#benefits)
-- [Where to next?](#next-up)
-- [Support](#support)
+<TOCInline
+  toc={toc}
+  minHeadingLevel={2}
+  maxHeadingLevel={2}
+/>
 
 <hr />
 

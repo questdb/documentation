@@ -222,6 +222,12 @@ html[data-theme="dark"] .DocSearch {
   z-index: 1;
 }
 
+[class^="tableOfContentsInline"] {
+  .table-of-contents {
+    border-left: none;
+  }
+}
+
 .markdown table code {
   display: inline-block;
   max-width: 25ch;
