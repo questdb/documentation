@@ -95,12 +95,12 @@ ASOF JOIN (
 
 ### `asof_dense(l r)`
 
-This hint enables Dense Scan, an improvement on Linear Scan that avoids the
-pitfall of scanning the whole history in the right-hand table. It uses binary
-search at the beginning, to locate the right-hand row that matches the first
-left-hand row. From then on, it proceeds just like Linear Scan, but, since it
-skipped all the history, also performs a backward scan through history as
-needed, when the forward scan didn't find the join key.
+This hint enables Dense Scan, an improvement on [Linear Scan](#asof_linearl-r)
+that avoids the pitfall of scanning the whole history in the right-hand table.
+It uses binary search at the beginning, to locate the right-hand row that
+matches the first left-hand row. From then on, it proceeds just like Linear
+Scan, but, since it skipped all the history, also performs a backward scan
+through history as needed, when the forward scan didn't find the join key.
 
 When the left-hand rows are densely interleaved with the right-hand rows, Dense
 Scan may be faster than the default due to its lower fixed overhead.
