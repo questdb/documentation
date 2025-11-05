@@ -87,6 +87,25 @@ ASOF JOIN (
 ) md;
 ```
 
+### `asof_dense(l r)`
+
+This hint enables Dense Scan, an improvement on Linear Scan that avoids the
+pitfall of scanning the whole history in the right-hand table. It uses binary
+search at the beginning, to locate the right-hand row that matches the first
+left-hand row. From then on, it proceeds just like Linear Scan, but, since it
+skipped all the history, also performs a backward scan through history as
+needed, when the forward scan didn't find the join key.
+
+When the left-hand rows are densely interleaved with the right-hand rows, Dense
+Scan may be faster than the default due to its lower fixed overhead.
+
+```questdb-sql title="Using Dense Scan for an ASOF join"
+SELECT /*+ asof_dense(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
 ### `asof_memoized(l r)`
 
 This enables Memoized Scan, a variant of the [Fast Scan](#asof_linearl-r). It
