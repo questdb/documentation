@@ -58,24 +58,30 @@ src="images/docs/concepts/asof-join-binary-search-strategy.svg"
 width={745}
 />
 
-Fast Scan's binary search excels when the number of right-hand rows between any
-two left-hand rows is high (in terms of their timestamps). As the algorithm
-advances over the left-hand rows, at every step there are many new right-hand
-rows to consider. Linear scan is bad in this case, because it must scan all
-these rows.
+A significant pitfall of Linear Scan is that it always starts at the top of the
+right-hand table. In a typical scenario, the right-hand table contains the
+complete history, while the left-hand table's rows are more recent. For example,
+one trading day joined on the history of price movements. Linear Scan will have
+to scan the entire history preceding the first left-hand row.
 
-However, in many use cases there is a dense interleaving of left-hand and
-right-hand rows. For example, trades on the left hand, and quotes on the right
-hand. Both happen frequently through the trading day. In this case the lower
-fixed overhead of linear scan may result in better performance.
+Fast Scan's binary search immediately jumps over the entire history, and it also
+excels when the number of right-hand rows between any two left-hand rows is
+high. As the algorithm advances over the left-hand rows, at every step there are
+many new right-hand rows to consider. Linear scan must scan all them, while Fast
+Scan jumps over most.
 
-Another advantage of linear scan is when the right-hand side is a subquery with
-a WHERE clause that is highly selective, passing through a small number of rows.
-QuestDB has parallelized filtering support, but this is disabled with Fast Scan.
+However, Linear Scan is at an advantage when the right-hand side is a subquery
+with a WHERE clause that is highly selective, passing through a small number of
+rows. QuestDB has parallelized filtering support, which cannot be used with Fast
+Scan.
+
+Also, if you don't have the issue of large history and the left-hand rows are
+densely interleaved with the right-hand rows, Linear Scan may be faster due to
+its lower fixed overhead.
 
 By default, QuestDB chooses the Fast Scan due to it graceful performance
-degradation with sparse intearleaving, and allows you to enable the Linear Scan
-using a query hint, as in this example:
+degradation with deep history and sparse intearleaving, and allows you to enable
+the Linear Scan using a query hint, as in this example:
 
 ```questdb-sql title="Using linear search for an ASOF join"
 SELECT /*+ asof_linear(orders md) */
@@ -108,16 +114,19 @@ ASOF JOIN (md) ON (symbol);
 
 ### `asof_memoized(l r)`
 
-This enables Memoized Scan, a variant of the [Fast Scan](#asof_linearl-r). It
-uses the same binary search as the initial step that locates the right-hand row
-with the timestamp matching the left-hand row. When you join on a symbol column,
-as in `left ASOF JOIN right ON (symbol)`, this hint instructs QuestDB to use
-additional RAM to remember where it last saw a symbol in the right-hand table.
-When looking again for a memorized symbol, it will only scan the yet-unseen part
-of the right-hand table, and if it doesn't find the symbol there, it will jump
-directly to the row it memorized earlier.
+This hint enables Memoized Scan, a variant of the [Fast Scan](#asof_linearl-r). It
+uses the same binary search to locate the right-hand row with the timestamp
+matching the left-hand row, but does things differently when scanning backward
+to find a row that maches the join condition.
 
-This hint will help you if many left-hand rows have a symbol that occurs rarely
+It works for queries that join on a symbol column, as in
+`left ASOF JOIN right ON (symbol)`. It uses additional RAM to remember where it
+last saw a symbol in the right-hand table. When looking again for the same
+symbol, it will only scan the yet-unseen part of the right-hand table, and if it
+doesn't find the symbol there, it will jump directly to the row it memorized
+earlier.
+
+This hint will help you if many left-hand rows use a symbol that occurs rarely
 in the right-hand table, so that the same right-hand row matches several
 left-hand rows. It is especially helpful if some symbols occur way in the past,
 because it will search for each such symbol only once.
@@ -131,10 +140,10 @@ ASOF JOIN (md) ON (symbol);
 
 ### `asof_memoized_driveby(l r)`
 
-This hint hint enables the Memoized Scan, just like `asof_memoized(l r)`, but
-with one more mechanism: the _Drive-By cache_. In addition to memorizing the
-previously matched right-hand rows, it remembers the location of _all_ symbols
-it encounters during its backward scan. This pays off when there's a significant
+This hint enables Memoized Scan, just like `asof_memoized(l r)`, but with one
+more mechanism: the _Drive-By cache_. In addition to memorizing the previously
+matched right-hand rows, it remembers the location of _all_ symbols it
+encounters during its backward scan. This pays off when there's a significant
 number of very rare symbols. While the regular Memoized Scan searches for each
 symbol separately, resulting in repeated scans for rare symbols, the Drive-By
 Cache allows it to make just one deep backward scan, and collect all of them.
