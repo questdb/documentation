@@ -284,7 +284,7 @@ with the `EXPLAIN` statement.
 
 #### Default Execution Plan (Binary Search)
 
-Without any hints, a filtered `ASOF JOIN` will use the binary search strategy.
+Without any hints, a filtered `ASOF JOIN` will use the Fast algorithm.
 
 ```questdb-sql title="Observing the default execution plan" demo
 EXPLAIN SELECT  *
@@ -295,13 +295,13 @@ WHERE bids[1,1]=107.03 -- Highly selective filter
 ;
 ```
 
-The execution plan will show a `Filtered AsOf Join Fast Scan` operator,
+The execution plan will show a `Filtered AsOf Join Fast` operator,
 confirming the binary search strategy is being used.
 
 ```text
 SelectedRecord
     Filter filter: market_data.bids[1,1]=107.03
-        AsOf Join Fast Scan
+        AsOf Join Fast
           condition: market_data.symbol=core_price.symbol
             PageFrame
                 Row forward scan
@@ -315,7 +315,7 @@ SelectedRecord
 
 When you use the `asof_linear` hint, the plan changes.
 
-```questdb-sql title="Observing execution plan with the AVOID hint" demo
+```questdb-sql title="Observing execution plan with asof_linear query hint" demo
 EXPLAIN SELECT /*+ asof_linear(core_price market_data) */
   *
 FROM core_price
