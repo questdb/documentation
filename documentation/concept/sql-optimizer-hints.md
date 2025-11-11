@@ -76,7 +76,7 @@ For a quick orientation, here's the decision tree:
 ```mermaid
 graph TD
     A[Start] --> Q1{Huge set of distinct join keys?}
-    Q1 -->|Yes| FAST{Fast}
+    Q1 --> |Yes| FAST{Fast}
     Q1 --> |No| Q2{Left table sparse vs. right?}
     Q2 --> |Yes| Q3{Single-symbol join?}
     Q2 --> |No| Q4{Right table uses highly selective WHERE filter?}
