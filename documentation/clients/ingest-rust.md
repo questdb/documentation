@@ -234,12 +234,13 @@ buffer
 ```
 
 For native decimal types, enable the right feature in Cargo.toml:
-
+```toml
 questdb = { version = "0.6", features = ["rust_decimal"] }
 rust_decimal = "1"
 # or, to work with bigdecimal:
 questdb = { version = "0.6", features = ["bigdecimal"] }
 bigdecimal = "0.4"
+```
 
 With rust_decimal:
 ```rust
