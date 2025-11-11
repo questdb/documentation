@@ -297,8 +297,14 @@ version 9.0.0.
 ### Decimal insertion
 
 :::note
-Decimals are supported from QuestDB version 9.3.0, and require updated
+Decimals are supported from QuestDB version 9.2.0, and require updated
 client libraries.
+:::
+
+:::caution
+Create your decimal columns up front with `DECIMAL(precision, scale)` before ingesting values so
+QuestDB knows the desired precision and scale. See the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) guide for details.
 :::
 
 Decimals can be written either as strings or in the binary ILP format. Import
@@ -719,7 +725,7 @@ explained in more detail.
 ### Decimal insertion
 
 :::note
-Decimals are supported from QuestDB version 9.3.0, and require updated
+Decimals are supported from QuestDB version 9.2.0, and require updated
 client libraries.
 :::
 
