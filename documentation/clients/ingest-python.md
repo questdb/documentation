@@ -369,7 +369,7 @@ version 9.0.0.
 ## Decimal Insertion
 
 :::note
-Decimals are supported from QuestDB version 9.3.0 with protocol version 3, and require updated
+Decimals are supported from QuestDB version 9.2.0 with protocol version 3, and require updated
 client libraries.
 ```
 tcp::addr=127.0.0.1:9009;protocol_version=3;
