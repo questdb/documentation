@@ -39,7 +39,8 @@ and LT) is the way the rows of the left-hand and right-hand tables (as in
 `left ASOF JOIN right`) are aligned on the time axis:
 
 - dense interleaving (similar number of rows per time unit on both sides)
-- sparse left-hand rows (many right-hand rows between each two left-hand rows)
+- sparse left-hand rows (thousands of right-hand rows between consecutive
+  left-hand rows)
 - sparse right-hand rows
 
 The "sparse left-hand rows" is a special case that needs its own algorithm, while
@@ -77,7 +78,7 @@ For a quick orientation, here's the decision tree:
 
 ```mermaid
 graph TD
-    A[Start] --> Q1{Huge set of distinct join keys?}
+    A[Start] --> Q1{Huge set of distinct join keys (millions)?}
     Q1 --> |Yes| FAST{No hint}
     Q1 --> |No| Q2{Left table sparse compared to right?}
     Q2 --> |Yes| Q3{Single-symbol join?}
