@@ -61,14 +61,16 @@ src="images/docs/concepts/asof-join-binary-search-strategy.svg"
 width={745}
 />
 
-There are four algorithms:
+There are five algorithms:
 
 1. Fast
 2. Memoized
-3. Light
-4. Dense
+3. Memoized with Drive-By Caching
+4. Light
+5. Dense
 
-Fast and Memoized use binary search, Light and Dense use linear scan.
+Fast and both of the Memoized algos use binary search, Light and Dense use
+linear scan.
 
 The default algorithm is _Fast_, and you can enable others through query hints.
 For a quick orientation, here's the decision tree:
@@ -76,16 +78,16 @@ For a quick orientation, here's the decision tree:
 ```mermaid
 graph TD
     A[Start] --> Q1{Huge set of distinct join keys?}
-    Q1 --> |Yes| FAST{Fast}
+    Q1 --> |Yes| FAST{No hint}
     Q1 --> |No| Q2{Left table sparse vs. right?}
     Q2 --> |Yes| Q3{Single-symbol join?}
     Q2 --> |No| Q4{Right table uses highly selective WHERE filter?}
     Q3 --> |Yes| Q5{Many extremely rare keys in right table?}
     Q3 --> |No| FAST
-    Q4 --> |Yes| LIGHT{Light}
-    Q4 --> |No| DENSE{Dense}
-    Q5 --> |No| MEMOIZED{Memoized}
-    Q5 --> |Yes| MEMOIZED_DRIVEBY{Memoized with Drive-By Caching}
+    Q4 --> |Yes| LIGHT{asof_linear}
+    Q4 --> |No| DENSE{asof_dense}
+    Q5 --> |No| MEMOIZED{asof_memoized}
+    Q5 --> |Yes| MEMOIZED_DRIVEBY{asof_memoized_driveby}
 ```
 
 ### List of hints
