@@ -35,10 +35,10 @@ Hints are designed to be a safe optimization mechanism:
 ## Temporal JOIN hints
 
 A significant factor in choosing the optimal algorithm for a temporal join (ASOF
-and LT) is the way the rows of the left-hand and right-hand tables are aligned
-on the time axis:
+and LT) is the way the rows of the left-hand and right-hand tables (as in
+`left ASOF JOIN right`) are aligned on the time axis:
 
-- dense interleaving (similar number of rows per time unit)
+- dense interleaving (similar number of rows per time unit on both sides)
 - sparse left-hand rows (many right-hand rows between each two left-hand rows)
 - sparse right-hand rows
 
@@ -55,7 +55,7 @@ QuestDB uses two algorithm families:
    Great for the other cases.
 
 <Screenshot
-alt="Diagram explaining the Fast Scan algorithm"
+alt="Diagram explaining the Fast algorithm"
 height={447}
 src="images/docs/concepts/asof-join-binary-search-strategy.svg"
 width={745}
@@ -71,6 +71,104 @@ There are four algorithms:
 Fast and Memoized use binary search, Light and Dense use linear scan.
 
 The default algorithm is _Fast_, and you can enable others through query hints.
+For a quick orientation, here's the decision tree:
+
+```mermaid
+graph TD
+    A[Start] --> Q1{Huge set of distinct join keys?}
+    Q1 -->|Yes| FAST{Fast}
+    Q1 --> |No| Q2{Left table sparse vs. right?}
+    Q2 --> |Yes| Q3{Single-symbol join?}
+    Q2 --> |No| Q4{Right table uses highly selective WHERE filter?}
+    Q3 --> |Yes| Q5{Many extremely rare keys in right table?}
+    Q3 --> |No| FAST
+    Q4 --> |Yes| LIGHT{Light}
+    Q4 --> |No| DENSE{Dense}
+    Q5 --> |No| MEMOIZED{Memoized}
+    Q5 --> |Yes| MEMOIZED_DRIVEBY{Memoized with Drive-By Caching}
+```
+
+### List of hints
+
+### `asof_dense(l r)`
+
+This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
+available) for the dense interleaving of left-hand/right-hand rows.
+
+```questdb-sql title="Applying the query hint for the Dense algorithm"
+SELECT /*+ asof_dense(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
+### `asof_linear(l r)`
+
+:::info
+
+This hint applies to `LT` joins as well.
+
+:::
+
+This enables the [Light](#light-algo) algorithm, similar to Dense but simpler.
+It has the pitfall of searching through all the history in the RHS table, but is
+more generic and available in some queries where the Dense algo isn't.
+
+Also, the light algo is at an advantage when the right-hand side is a subquery
+with a WHERE clause that is highly selective, passing through a small number of
+rows. QuestDB has parallelized filtering support, which cannot be used with the
+other algorithms.
+
+```questdb-sql title="Applying the query hint for the Light algorithm"
+SELECT /*+ asof_linear(orders md) */
+  orders.ts, orders.price, md.md_ts, md.bid, md.ask
+FROM orders
+ASOF JOIN (
+  SELECT ts as md_ts, bid, ask FROM market_data
+  WHERE state = 'INVALID' -- Highly selective filter
+) md;
+```
+
+### `asof_memoized(l r)`
+
+This hint enables [Memoized](#memoized-algo), a variant of the
+[Fast](#fast-algo) algorithm. It works for queries that join on a symbol column,
+as in `left ASOF JOIN right ON (symbol)`. It uses additional RAM to remember
+where it last saw a symbol in the right-hand table.
+
+This hint will help you if many left-hand rows use a symbol that occurs rarely
+in the right-hand table, so that the same right-hand row matches several
+left-hand rows. It is especially helpful if some symbols occur way in the past,
+because it will search for each such symbol only once.
+
+```questdb-sql title="Appling the query hint for the Memoized algorithm"
+SELECT /*+ asof_memoized(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
+### `asof_memoized_driveby(l r)`
+
+This hint enables the [Memoized](#memoized-algo) algo, just like
+`asof_memoized(l r)`, but with one more mechanism: the _Drive-By cache_. In
+addition to memorizing the previously matched right-hand rows, it remembers the
+location of _all_ symbols it encounters during its backward scan. This pays off
+when there's a significant number of very rare symbols. While the regular
+Memoized Scan searches for each symbol separately, resulting in repeated scans
+for rare symbols, the Drive-By Cache allows it to make just one deep backward
+scan, and collect all of them.
+
+Maintaining the Drive-By Cache requires a hashtable lookup at every step of the
+algorithm, so if it doesn't help finding rare symbols, it will incur an
+additional overhead and reduce query performance.
+
+```questdb-sql title="Applying the query hint for the Memoized algorithm with Drive-By Caching"
+SELECT /*+ asof_memoized_driveby(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
 
 ### Comparing the algorithms on an example
 
@@ -192,88 +290,6 @@ some symbols are extremely rare, a linear scan-based algo may again win.
 The Fast algorithm is the only one that doesn't use any RAM to store the results
 of scanning. It is purely search-based, giving it an additional advantage when
 your symbol set is high-cardinality.
-
-### List of hints
-
-### `asof_dense(l r)`
-
-This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
-available) for the dense interleaving of left-hand/right-hand rows.
-
-```questdb-sql title="Applying the query hint for the Dense algorithm"
-SELECT /*+ asof_dense(orders md) */
-    orders.timestamp, orders.symbol, orders.price
-FROM orders
-ASOF JOIN (md) ON (symbol);
-```
-
-### `asof_linear(l r)`
-
-:::info
-
-This hint applies to `LT` joins as well.
-
-:::
-
-This enables the [Light](#light-algo) algorithm, similar to Dense but simpler.
-It has the pitfall of searching through all the history in the RHS table, but is
-more generic and available in some queries where the Dense algo isn't.
-
-Also, the light algo is at an advantage when the right-hand side is a subquery
-with a WHERE clause that is highly selective, passing through a small number of
-rows. QuestDB has parallelized filtering support, which cannot be used with the
-other algorithms.
-
-```questdb-sql title="Applying the query hint for the Light algorithm"
-SELECT /*+ asof_linear(orders md) */
-  orders.ts, orders.price, md.md_ts, md.bid, md.ask
-FROM orders
-ASOF JOIN (
-  SELECT ts as md_ts, bid, ask FROM market_data
-  WHERE state = 'INVALID' -- Highly selective filter
-) md;
-```
-
-### `asof_memoized(l r)`
-
-This hint enables [Memoized](#memoized-algo), a variant of the
-[Fast](#fast-algo) algorithm. It works for queries that join on a symbol column,
-as in `left ASOF JOIN right ON (symbol)`. It uses additional RAM to remember
-where it last saw a symbol in the right-hand table.
-
-This hint will help you if many left-hand rows use a symbol that occurs rarely
-in the right-hand table, so that the same right-hand row matches several
-left-hand rows. It is especially helpful if some symbols occur way in the past,
-because it will search for each such symbol only once.
-
-```questdb-sql title="Appling the query hint for the Memoized algorithm"
-SELECT /*+ asof_memoized(orders md) */
-    orders.timestamp, orders.symbol, orders.price
-FROM orders
-ASOF JOIN (md) ON (symbol);
-```
-
-### `asof_memoized_driveby(l r)`
-
-This hint enables the [Memoized](#memoized-algo) algo, just like
-`asof_memoized(l r)`, but with one more mechanism: the _Drive-By cache_. In
-addition to memorizing the previously matched right-hand rows, it remembers the
-location of _all_ symbols it encounters during its backward scan. This pays off
-when there's a significant number of very rare symbols. While the regular
-Memoized Scan searches for each symbol separately, resulting in repeated scans
-for rare symbols, the Drive-By Cache allows it to make just one deep backward
-scan, and collect all of them.
-
-Maintaining the Drive-By Cache requires a hashtable lookup at every step of the
-algorithm, so if it doesn't help finding rare symbols, it will incur an
-additional overhead and reduce query performance.
-
-```questdb-sql title="Applying the query hint for the Memoized algorithm with Drive-By Caching"
-SELECT /*+ asof_memoized_driveby(orders md) */
-    orders.timestamp, orders.symbol, orders.price
-FROM orders
-ASOF JOIN (md) ON (symbol);
-```
 
 -----
 
