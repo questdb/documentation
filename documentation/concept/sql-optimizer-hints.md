@@ -174,7 +174,75 @@ FROM orders
 ASOF JOIN (md) ON (symbol);
 ```
 
-### Comparing the algorithms on an example
+-----
+
+### Check the Execution Plan
+
+You can verify how QuestDB executes your query by examining its execution plan
+with the `EXPLAIN` statement.
+
+#### Default Execution Plan (Binary Search)
+
+Without any hints, a filtered `ASOF JOIN` will use the Fast algorithm.
+
+```questdb-sql title="Observing the default execution plan" demo
+EXPLAIN SELECT  *
+FROM core_price
+ASOF JOIN market_data
+ON symbol
+WHERE bids[1,1]=107.03 -- Highly selective filter
+;
+```
+
+The execution plan will show a `Filtered AsOf Join Fast` operator,
+confirming the binary search strategy is being used.
+
+```text
+SelectedRecord
+    Filter filter: market_data.bids[1,1]=107.03
+        AsOf Join Fast
+          condition: market_data.symbol=core_price.symbol
+            PageFrame
+                Row forward scan
+                Frame forward scan on: core_price
+            PageFrame
+                Row forward scan
+                Frame forward scan on: market_data
+```
+
+#### Hinted Execution Plan (Full Scan)
+
+When you use the `asof_linear` hint, the plan changes.
+
+```questdb-sql title="Observing execution plan with asof_linear query hint" demo
+EXPLAIN SELECT /*+ asof_linear(core_price market_data) */
+  *
+FROM core_price
+ASOF JOIN market_data
+ON symbol
+WHERE bids[1,1]=107.03 -- Highly selective filter
+;
+```
+
+The execution plan will now show the `AsOf Join Light` operator and a separate,
+preceding filtering step on the joined table.
+
+```text
+SelectedRecord
+    Filter filter: market_data.bids[1,1]=107.03
+        AsOf Join Light
+          condition: market_data.symbol=core_price.symbol
+            PageFrame
+                Row forward scan
+                Frame forward scan on: core_price
+            PageFrame
+                Row forward scan
+                Frame forward scan on: market_data
+```
+
+-----
+
+### Algorithms compared on an example
 
 Let's use the diagram below to explain the key differences among algorithms. It
 shows two tables, LHS and RHS. LHS rows are only somewhat less densely
@@ -295,71 +363,7 @@ The Fast algorithm is the only one that doesn't use any RAM to store the results
 of scanning. It is purely search-based, giving it an additional advantage when
 your symbol set is high-cardinality.
 
------
-
-### Check the Execution Plan
-
-You can verify how QuestDB executes your query by examining its execution plan
-with the `EXPLAIN` statement.
-
-#### Default Execution Plan (Binary Search)
-
-Without any hints, a filtered `ASOF JOIN` will use the Fast algorithm.
-
-```questdb-sql title="Observing the default execution plan" demo
-EXPLAIN SELECT  *
-FROM core_price
-ASOF JOIN market_data
-ON symbol
-WHERE bids[1,1]=107.03 -- Highly selective filter
-;
-```
-
-The execution plan will show a `Filtered AsOf Join Fast` operator,
-confirming the binary search strategy is being used.
-
-```text
-SelectedRecord
-    Filter filter: market_data.bids[1,1]=107.03
-        AsOf Join Fast
-          condition: market_data.symbol=core_price.symbol
-            PageFrame
-                Row forward scan
-                Frame forward scan on: core_price
-            PageFrame
-                Row forward scan
-                Frame forward scan on: market_data
-```
-
-#### Hinted Execution Plan (Full Scan)
-
-When you use the `asof_linear` hint, the plan changes.
-
-```questdb-sql title="Observing execution plan with asof_linear query hint" demo
-EXPLAIN SELECT /*+ asof_linear(core_price market_data) */
-  *
-FROM core_price
-ASOF JOIN market_data
-ON symbol
-WHERE bids[1,1]=107.03 -- Highly selective filter
-;
-```
-
-The execution plan will now show the `AsOf Join Light` operator and a separate,
-preceding filtering step on the joined table.
-
-```text
-SelectedRecord
-    Filter filter: market_data.bids[1,1]=107.03
-        AsOf Join Light
-          condition: market_data.symbol=core_price.symbol
-            PageFrame
-                Row forward scan
-                Frame forward scan on: core_price
-            PageFrame
-                Row forward scan
-                Frame forward scan on: market_data
-```
+---
 
 ## Deprecated hints
 
