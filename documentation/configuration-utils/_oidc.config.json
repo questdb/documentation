@@ -90,5 +90,9 @@
   "acl.oidc.cache.ttl": {
     "default": 30000,
     "description": "User info cache entry TTL (time to live) in milliseconds, default value is 30 seconds. For improved performance QuestDB caches user info responses for each valid access token, this settings drives how often the access token should be validated and the user info updated."
+  },
+  "acl.oidc.pg.token.as.password.enabled": {
+    "default": "false",
+    "description": "When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2 token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option."
   }
 }
