@@ -223,7 +223,7 @@ CREATE TABLE fx_prices (
     ts TIMESTAMP
 ) timestamp(ts);
 ```
-If you don't specify precision and scale, QuestDB creates a column with a precision of 18 and scale of 3.
+You need to specify the precision and scale, unlike other types, QuestDB requires explicit precision and scale for decimal columns.
 
 decimal values in .NET carry up to 28 fractional digits; the client copies that scale byte-for-byte into
 the ILP frame and emits the 96-bit two’s-complement mantissa expected by QuestDB, so numbers such as
