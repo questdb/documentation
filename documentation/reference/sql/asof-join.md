@@ -403,6 +403,12 @@ right-table record is older than the left-table record by more than the
 specified tolerance - thus avoiding unnecessary processing of more distant
 records.
 
+### Choose the optimal algorithm with an SQL Hint
+
+QuestDB has several different algorithms that fit different queries and data
+distributions. If you query is performing poorly, consult the
+[SQL optimizer hints](/docs/concept/sql-optimizer-hints) page and try out the
+non-default algorithms.
 
 ## SPLICE JOIN
 
