@@ -78,7 +78,7 @@ For a quick orientation, here's the decision tree:
 
 ```mermaid
 graph TD
-    A[Start] --> Q1{Millions of distinct join keys?}
+    A[Start] --> Q1{Billions of distinct join keys?}
     Q1 --> |Yes| FAST{No hint}
     Q1 --> |No| Q2{Left table sparse compared to right?}
     Q2 --> |Yes| Q3{Single-symbol join?}
