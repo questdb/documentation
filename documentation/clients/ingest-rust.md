@@ -215,8 +215,14 @@ fn main() -> Result<()> {
 ## Ingest decimals
 
 :::note
-Decimals are available when ILP protocol version 3 is active (QuestDB 9.3.0+). The HTTP sender
+Decimals are available when ILP protocol version 3 is active (QuestDB 9.2.0+). The HTTP sender
 negotiates v3 automatically; with TCP add protocol_version=3; to the configuration string.
+:::
+
+:::caution
+QuestDB requires the destination decimal columns to be created up front with `DECIMAL(precision, scale)`
+so the server knows the allowed precision and scale. See the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) page for guidance.
 :::
 
 If you already have decimal values as text you can send them directly:

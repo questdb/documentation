@@ -181,10 +181,16 @@ timestamps precludes the ability to deduplicate rows, which is
 ## Ingest decimals
 
 :::note
-Decimals are available in QuestDB 9.3.0+ and require the .NET client to speak ILP protocol version
+Decimals are available in QuestDB 9.2.0+ and require the .NET client to speak ILP protocol version
 3. Use `protocol_version=3` (or leave `protocol_version=auto` when connecting over HTTP so the handshake
 negotiates it for you). Earlier protocol versions throw an IngressError if you call the decimal
 overload.
+:::
+
+:::caution
+Define the destination decimal columns ahead of ingestion with `DECIMAL(precision, scale)` so QuestDB
+knows exactly how many digits to store. The [decimal data type](/docs/concept/decimal/#creating-tables-with-decimals)
+page explains how precision and scale work and includes create-table examples.
 :::
 
 The .NET sender exposes `.Column(string, decimal?)`, which serializes the value with the decimal’s scale

@@ -723,6 +723,12 @@ Decimals are supported from QuestDB version 9.3.0, and require updated
 client libraries.
 :::
 
+:::caution
+Create your decimal columns up front with `DECIMAL(precision, scale)` before ingesting values so
+QuestDB knows the desired precision and scale. See the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) guide for details.
+:::
+
 QuestDB decimal columns can be populated in two ways. The simplest is to send a
 validated UTF-8 decimal string, which the server parses and stores using the
 column's precision:

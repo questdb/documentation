@@ -171,6 +171,12 @@ current timestamp hinder the ability to deduplicate rows which is
 Decimal columns are available with ILP protocol version 3. HTTP/HTTPS connections negotiate this automatically (`protocol_version=auto`), while TCP/TCPS connections must opt in explicitly (for example `tcp::...;protocol_version=3`). Once on v3, you can choose between the textual helper and the binary helper.
 :::
 
+:::caution
+QuestDB does not auto-create decimal columns. Define them ahead of ingestion with
+`DECIMAL(precision, scale)` so the server knows how many digits to store, as explained in the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) guide.
+:::
+
 ### Text literal (preserve scale)
 
 ```typescript

@@ -202,8 +202,15 @@ Using the current timestamp hinder the ability to deduplicate rows which is
 ## Decimal insertion
 
 :::note
-Decimals are available when ILP protocol version 3 is active (QuestDB 9.3.0+). The HTTP sender
+Decimals are available when ILP protocol version 3 is active (QuestDB 9.2.0+). The HTTP sender
 negotiates v3 automatically; with TCP add `protocol_version=3;` to the configuration string.
+:::
+
+:::caution
+Create the target decimal columns ahead of ingestion with an explicit `DECIMAL(precision, scale)`
+definition so QuestDB knows how many digits to keep. See the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) page for details on
+precision and scale.
 :::
 
 QuestDB decimal columns accept either validated string literals or pre-scaled binary payloads. The text path keeps things simple and lets the server parse the literal while preserving the scale you send:

@@ -376,6 +376,13 @@ tcp::addr=127.0.0.1:9009;protocol_version=3;
 ```
 :::
 
+:::caution
+Create the destination decimal columns ahead of time using `DECIMAL(precision, scale)` so QuestDB
+stores the values with the expected precision. The
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) page describes how precision
+and scale work and includes DDL examples.
+:::
+
 - Pandas object columns containing decimal.Decimal instances are converted to ILP’s binary decimal payload. Trailing zeros are preserved, `Decimal('NaN')`, `Decimal('Infinity')`, and `Decimal('-Infinity')` are sent as
   NULL, and invalid scales raise `IngressError(IngressErrorCode.BadDataFrame)`.
 - Using Arrow-backed decimals avoids Python object overhead and lets you control precision/scale explicitly; the client streams the pre-computed unscaled bytes directly.
