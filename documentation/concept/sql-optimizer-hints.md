@@ -34,9 +34,10 @@ Hints are designed to be a safe optimization mechanism:
 
 ## Temporal JOIN hints
 
-A significant factor in choosing the optimal algorithm for a temporal join (ASOF
-and LT) is the way the rows of the left-hand and right-hand tables (as in
-`left ASOF JOIN right`) are aligned on the time axis:
+A significant factor in choosing the optimal algorithm for a
+[temporal join](/docs/reference/sql/asof-join) (ASOF and LT) is the way the rows
+of the left-hand and right-hand tables (as in `left ASOF JOIN right`) are
+aligned on the time axis:
 
 - dense interleaving (similar number of rows per time unit on both sides)
 - sparse left-hand rows (thousands of right-hand rows between consecutive
