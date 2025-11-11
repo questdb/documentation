@@ -79,7 +79,7 @@ For a quick orientation, here's the decision tree:
 graph TD
     A[Start] --> Q1{Huge set of distinct join keys?}
     Q1 --> |Yes| FAST{No hint}
-    Q1 --> |No| Q2{Left table sparse vs. right?}
+    Q1 --> |No| Q2{Left table sparse compared to right?}
     Q2 --> |Yes| Q3{Single-symbol join?}
     Q2 --> |No| Q4{Right table uses highly selective WHERE filter?}
     Q3 --> |Yes| Q5{Many extremely rare keys in right table?}
