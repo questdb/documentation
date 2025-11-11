@@ -197,8 +197,8 @@ your symbol set is high-cardinality.
 
 ### `asof_dense(l r)`
 
-This hint enables the [Dense](#dense-algo) algorithm, the best choice for the
-dense interleaving of left-hand/right-hand rows, when it's available.
+This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
+available) for the dense interleaving of left-hand/right-hand rows.
 
 ```questdb-sql title="Applying the query hint for the Dense algorithm"
 SELECT /*+ asof_dense(orders md) */
