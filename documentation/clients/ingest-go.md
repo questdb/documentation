@@ -219,13 +219,13 @@ QuestDB decimal columns accept either validated string literals or pre-scaled bi
 err = sender.
 	Table("quotes").
 	Symbol("ccy_pair", "EURUSD").
-	DecimalColumnString("mid", "1.234500").
+	DecimalColumnFromString("mid", "1.234500").
 	AtNow(ctx)
 ```
 
-`DecimalColumnString` checks the literal (digits, optional sign, decimal point, exponent, `NaN`/`Infinity`) and appends the d suffix that the ILP parser expects, so the value above lands with scale = 6.
+`DecimalColumnFromString` checks the literal (digits, optional sign, decimal point, exponent, `NaN`/`Infinity`) and appends the d suffix that the ILP parser expects, so the value above lands with scale = 6.
 
-For full control or when you already have a fixed-point value, build a `questdb.ScaledDecimal` and use the binary representation. The helpers keep you inside QuestDB’s limits (scale ≤ 76, unscaled payload ≤ 32 bytes) and avoid server-side parsing:
+For full control or when you already have a fixed-point value, build a `questdb.Decimal` and use the binary representation. The helpers keep you inside QuestDB’s limits (scale ≤ 76, unscaled payload ≤ 32 bytes) and avoid server-side parsing:
 
 ```go
 price := qdb.NewDecimalFromInt64(12345, 2) // 123.45 with scale 2
@@ -237,12 +237,12 @@ if err != nil {
 err = sender.
 	Table("trades").
 	Symbol("symbol", "ETH-USD").
-	DecimalColumnScaled("price", price).
-	DecimalColumnScaled("commission", commission).
+	DecimalColumn("price", price).
+	DecimalColumn("commission", commission).
 	AtNow(ctx)
 ```
 
-If you already hold a two’s complement big-endian mantissa (for example, from another fixed-point library) call `NewScaledDecimal(rawBytes, scale)`, passing nil encodes a NULL and the client skips the field.
+If you already hold a two’s complement big-endian mantissa (for example, from another fixed-point library) call `NewDecimalUnsafe(rawBytes, scale)`, passing nil encodes a NULL and the client skips the field.
 
 The client also understands `github.com/shopspring/decimal` values:
 
