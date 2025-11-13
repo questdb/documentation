@@ -558,6 +558,7 @@ module.exports = {
         "concept/designated-timestamp",
         "concept/geohashes",
         "concept/array",
+        "concept/decimal",
         "concept/indexes",
         "concept/interval-scan",
         "concept/jit-compiler",
