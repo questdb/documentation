@@ -54,12 +54,12 @@ sides, but many optimizations work for other key combinations as well.
 
 We distinguish these two cases:
 
-### 1. Matching is localized
+### 1. Localized matching
 
 In this case, when scanning the right-hand table backward from the timestamp of
 the left-hand row, we find a match much sooner than reaching the timestamp of
 the previous left-hand row. We end up scanning only a small subset of right-hand
-rows. In the diagrom, we show the scanned portions of the right-hand dataset in
+rows. In the diagram, we show the scanned portions of the right-hand dataset in
 red.
 
 The best way to perform this join is to first locate the right-hand row that
@@ -72,7 +72,7 @@ src="images/docs/concepts/asof-join-sparse.svg"
 width={300}
 />
 
-### 2. Matching is distant
+### 2. Distant matching
 
 In this case, the matching row is in the more distant past, earlier than the
 previous left-hand row. Now we must scan almost the entire right-hand dataset.
@@ -240,13 +240,12 @@ SelectedRecord
 ### Algorithms compared on an example
 
 Let's use the diagram below to explain the key differences among algorithms. It
-shows two tables, LHS and RHS. LHS rows are only somewhat less densely
-distributed over time than RHS rows. We show the rows aligned on timestamp, so
-there are gaps in the LHS column. These gaps don't represent any LHS rows, it is
-just the way we visualize the two tables.
+shows two tables, LHS and RHS. We show the rows aligned on timestamp, so there
+are gaps in the LHS column. These gaps don't represent any LHS rows, it is just
+the way we visualize the two tables.
 
-The example assumes a JOIN condition which is the most commonplace: joining on a
-symbol column. We show the values of that column in the table:
+The example assumes a JOIN condition on a symbol column. We show the values of
+that column in the table:
 
 ```text
 row | LHS | RHS
@@ -267,6 +266,9 @@ row | LHS | RHS
 14  |     | C
 15  |   A | B
 ```
+
+Since the match for each LHS row occurs in the RHS table at a time earlier than
+the previous LHS row, the join pattern is "distant matching".
 
 #### Light algo
 
@@ -334,9 +336,9 @@ needed.
 
 #### Discussion
 
-We can see that the Fast and Memoized algos had to touch the most rows.
-Especially, when matching row 15, Fast algo had to scan backward to row 4, and
-Memoized did only slighly better, scanning until row 6.
+As expected for distant matching, the Fast and Memoized algos had to touch the
+most rows. Especially, when matching row 15, Fast algo had to scan backward to
+row 4, and Memoized did only slighly better, scanning until row 6.
 
 Light algo had to initially scan all the history (rows 1 to 6), but from then
 on, it only needed to touch the additional rows that came into scope as the LHS
@@ -345,12 +347,6 @@ timestamp was moving on.
 Dense algo had the same advantage as Light, but it didn't have to scan all the
 history. It scanned only as far back into history as needed to find the most
 recent occurence of a symbol not yet seen in the forward scan.
-
-If the gaps between LHS rows were much wider, you can see that the binary
-search-based algos would have an advantage, as they could skip most of the RHS
-table, and find a matching symbol within a relatively short distance back.
-This assumes the symbols are spread more-or-less evenly in the RHS table. If
-some symbols are extremely rare, a linear scan-based algo may again win.
 
 ### RAM considerations
 
