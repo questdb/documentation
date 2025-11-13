@@ -420,12 +420,12 @@ with Sender.from_conf(conf) as sender:
         }
     )
     sender.dataframe(df_arrow, table_name="fx_quotes", at="ts")
-``` -->
+``` 
 
 ### Resulting ILP rows carry DECIMAL payloads that respect the original scale.
 
 - Limits imposed by QuestDB apply: scale ≤ 76 and a signed mantissa of at most 32 bytes. Values outside those bounds raise IngressError(IngressErrorCode.DecimalError) during serialization.
-- If the column doesn't exists yet, it will be created with a default precision of 18 and scale of 3. To customize those, pre-create the table/column with the desired precision/scale.
+- If the column doesn't exists yet, it will be created with a default precision of 18 and scale of 3. To customize those, pre-create the table/column with the desired precision/scale.-->
 
 ## Configuration options
 
