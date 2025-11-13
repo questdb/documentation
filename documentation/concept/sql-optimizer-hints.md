@@ -35,20 +35,36 @@ Hints are designed to be a safe optimization mechanism:
 ## Temporal JOIN hints
 
 A significant factor in choosing the optimal algorithm for a
-[temporal join](/docs/reference/sql/asof-join) (ASOF and LT) is the way the rows
-of the left-hand dataset are matched to the rows of the right-hand dataset. We
-distinguish these two cases:
+[temporal join](/docs/reference/sql/asof-join) (ASOF and LT) is the pattern in
+which the rows of the left-hand dataset are matched to the rows of the
+right-hand dataset. When there's no additional join condition, only the implied
+matching on timesatmp, the situation is simple: we search for a timestamp in a
+dataset which is already sorted by timestamp. We can use binary search, or
+linear search if the search space is small enough.
+
+When there is an additional JOIN condition, as in
+`left ASOF JOIN right ON (condition)`, the matching row can be anywhere in the
+past from the row that matches by timestamp. For this, we need a more
+sophisticated algorithm.
+
+Our optimized algorithms assume the JOIN condition matches additional columns by
+equality. Basically, we have a join key that must match on both sides. An even
+narrower common case we optimize for is matching on a _symbol column_ on both
+sides, but many optimizations work for other key combinations as well.
+
+We distinguish these two cases:
 
 ### 1. Matching is localized
 
-In this case, we must scan only a small subset of right-hand rows to find a
-match. In the diagrom, we show the scanned portions of the right-hand dahtaset
-in red.
+In this case, when scanning the right-hand table backward from the timestamp of
+the left-hand row, we find a match much sooner than reaching the timestamp of
+the previous left-hand row. We end up scanning only a small subset of right-hand
+rows. In the diagrom, we show the scanned portions of the right-hand dataset in
+red.
 
-The best way to perform this join is to first apply binary search to the
-right-hand table to zero in on the row that matches the left-hand row by
-timestamp (marked with the dotted line), then scan backward to find the row
-satisfying additional join conditions.
+The best way to perform this join is to first locate the right-hand row that
+matches by timestamp (marked with the dotted line), then scan backward to find
+the row satisfying additional join conditions.
 
 <Screenshot
 alt="Diagram showing localized row matching"
@@ -58,12 +74,14 @@ width={300}
 
 ### 2. Matching is distant
 
-In this case, we must scan almost all right-hand rows. If we do a separate scan
-for every left-hand row, we'll end up scanning the same rows many times. In the
-diagram, this shows up as more intensely red regions in the right-hand table.
+In this case, the matching row is in the more distant past, earlier than the
+previous left-hand row. Now we must scan almost the entire right-hand dataset.
+If we do a separate scan for each left-hand row, we'll end up going over the
+same rows many times. In the diagram, this shows up as more intensely red
+regions in the right-hand table.
 
-The best way in this case is to just scan the entire red region of the
-right-hand dataset once, and match up with the left-hand rows as needed.
+The best way in this case is to just scan the entire red region once, collect
+the join keys in a hashtable, and match up with the left-hand rows as needed.
 
 <Screenshot
 alt="Diagram showing distant row matching"
@@ -73,10 +91,10 @@ width={300}
 
 ## ASOF JOIN algorithms
 
-QuestDB implements five algorithms altogether.
+QuestDB implements several algorithms to deal with keyed joins.
 
-1. _Fast_ algorithm is the best for 100% localized row matching
-2. _Dense_ algorithm is the best for 100% distant row matching
+- _Fast_ algorithm is the best for localized row matching
+- _Dense_ algorithm is the best for distant row matching
 
 In a real scenario, you may not have such a clear-cut situation. If your join
 pattern is mostly localized, but with some distant matching, the _Memoized_
