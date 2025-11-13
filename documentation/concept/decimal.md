@@ -72,13 +72,15 @@ convert doubles to decimals to prevent unintended precision loss.
 Define decimal columns by specifying precision and scale:
 
 ```questdb-sql
-CREATE TABLE transactions (
-    id LONG,
-    amount DECIMAL(14, 2),      -- Up to 999,999,999,999.99
-    tax_rate DECIMAL(5, 4),      -- Up to 9.9999 (e.g., 0.0875 for 8.75%)
-    quantity DECIMAL(10, 3),     -- Up to 9,999,999.999
+CREATE TABLE eth_fills (
+    fill_id LONG,
+    venue SYMBOL,
+    fill_size_eth DECIMAL(28, 18),   -- ETH quantity with wei-level precision
+    fill_price_usdc DECIMAL(14, 2),  -- Execution price per ETH in USDC
+    fee_rate DECIMAL(6, 5),          -- Exchange fee rate (e.g., 0.00050 = 5 bps)
+    gas_fee_eth DECIMAL(20, 18),     -- Gas paid in ETH
     timestamp TIMESTAMP
-) timestamp(timestamp);
+) timestamp(timestamp) partition by day;
 ```
 
 ## Working with decimals
@@ -88,19 +90,49 @@ CREATE TABLE transactions (
 Decimal arithmetic maintains precision automatically:
 
 ```questdb-sql
--- Insert transaction data
-INSERT INTO transactions VALUES
-    (1, 99.99m, 0.0875m, 2.500m, now()),
-    (2, 150.00m, 0.0625m, 1.750m, now()),
-    (3, 1250.50m, 0.0875m, 10.000m, now());
+-- Insert ETH fill data
+INSERT INTO eth_fills VALUES
+    (1, 'spot:coinbase', 0.842345678901234567m, 2123.45m, 0.00040m, 0.002300000000000000m, now()),
+    (2, 'perp:binance', 5.250000000000000000m, 2118.10m, 0.00020m, 0.001200000000000000m, now()),
+    (3, 'defi:uniswap', 18.750000000000000000m, 2115.05m, 0.00065m, 0.004500000000000000m, now());
 
 -- Arithmetic operations maintain precision
 SELECT
-    amount,
-    amount * tax_rate AS tax_amount,
-    amount + (amount * tax_rate) AS total,
-    amount * quantity AS extended_amount
-FROM transactions;
+    venue,
+    fill_size_eth,
+    fill_price_usdc,
+    fill_size_eth * fill_price_usdc AS notional_usdc,
+    fill_size_eth * fill_price_usdc * fee_rate AS fee_usdc,
+    gas_fee_eth * fill_price_usdc AS gas_cost_usdc,
+    fill_size_eth - gas_fee_eth AS net_eth_after_gas,
+    fill_size_eth * fill_price_usdc
+        - fill_size_eth * fill_price_usdc * fee_rate
+        - gas_fee_eth * fill_price_usdc AS net_settlement_usdc
+FROM eth_fills;
+
+-- Track ETH transfers with exact gas fees
+CREATE TABLE eth_transfers (
+    tx_hash STRING,  -- High-cardinality identifiers work best as STRING
+    from_addr SYMBOL,
+    to_addr SYMBOL,
+    transfer_value_eth DECIMAL(38, 18),  -- Amount moved (wei precision)
+    gas_fee_eth DECIMAL(38, 18),         -- Gas used * gas price, stored exactly
+    timestamp TIMESTAMP
+) timestamp(timestamp) partition by day;
+
+INSERT INTO eth_transfers VALUES
+    ('0xaaa1', '0xAbC123...', '0xDeF456...', 1.250000000000000000m, 0.002300000000000000m, now()),
+    ('0xaaa2', '0xAbC123...', '0xDeF456...', 0.875432100000000000m, 0.001900000000000000m, now()),
+    ('0xaaa3', '0xAbC123...', '0xDeF456...', 5.000000000000000000m, 0.003250000000000000m, now());
+
+-- Sum transfers and gas between counterparties
+SELECT
+    from_addr,
+    to_addr,
+    sum(transfer_value_eth) AS total_transferred_eth,
+    sum(gas_fee_eth) AS total_gas_eth
+FROM eth_transfers
+WHERE from_addr = '0xAbC123...' AND to_addr = '0xDeF456...'
 ```
 
 ### Precision and scale in operations
@@ -154,14 +186,14 @@ SELECT 10.00m / 3.00m;  -- Result: 3.33 (limited to scale 2)
 Decimals support all standard comparison operators:
 
 ```questdb-sql
--- Find high-value transactions
-SELECT * FROM transactions WHERE amount > 1000.00m;
+-- Find whale-sized ETH fills (>= 10 ETH)
+SELECT * FROM eth_fills WHERE fill_size_eth >= 10.000000000000000000m;
 
--- Find specific tax rates
-SELECT * FROM transactions WHERE tax_rate = 0.0875m;
+-- Find attractive fee tiers
+SELECT * FROM eth_fills WHERE fee_rate <= 0.00025m;
 
--- Range queries
-SELECT * FROM transactions WHERE amount BETWEEN 100.00m AND 500.00m;
+-- Range queries on ETH price
+SELECT * FROM eth_fills WHERE fill_price_usdc BETWEEN 2100.00m AND 2200.00m;
 ```
 
 ## Type casting
@@ -219,7 +251,7 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 -- Portfolio valuation with exact arithmetic
 CREATE TABLE portfolio (
     symbol SYMBOL,
-    shares DECIMAL(12, 4),     -- Fractional shares supported
+    position_size DECIMAL(12, 4),     -- Fractional position sizes (shares, BTC, etc.) supported
     price DECIMAL(10, 2),       -- Stock price
     commission DECIMAL(7, 2),   -- Trading fees
     timestamp TIMESTAMP
@@ -228,11 +260,11 @@ CREATE TABLE portfolio (
 -- Calculate exact portfolio value
 SELECT
     symbol,
-    shares,
+    position_size,
     price,
-    shares * price AS position_value,
-    shares * price - commission AS net_value,
-    sum(shares * price) OVER () AS total_portfolio_value
+    position_size * price AS position_value,
+    position_size * price - commission AS net_value,
+    sum(position_size * price) OVER () AS total_portfolio_value
 FROM portfolio
 WHERE timestamp = now();
 ```
@@ -291,6 +323,7 @@ SAMPLE BY 1h;
 **Use decimals for:**
 
 - Financial data (prices, amounts, exchange rates)
+- Crypto trading data (fractional position sizes, token balances, fees)
 - Accounting calculations
 - Scientific measurements requiring exact precision
 - Regulatory compliance scenarios
