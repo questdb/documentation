@@ -722,7 +722,7 @@ Please refer to the
 [Concepts section on n-dimensional arrays](/docs/concept/array), where this is
 explained in more detail.
 
-### Decimal insertion
+<!-- ### Decimal insertion
 
 :::note
 Decimals are supported from QuestDB version 9.2.0, and require updated
@@ -762,7 +762,7 @@ if (!line_sender_buffer_column_dec(
 Negative values follow the same rules—encode the unscaled value using two's
 complement with the most significant byte first.
 
-You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples).
+You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples). -->
 
 ## Other Considerations for both C and C++
 
