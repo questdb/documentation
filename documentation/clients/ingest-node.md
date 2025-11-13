@@ -177,7 +177,7 @@ QuestDB does not auto-create decimal columns. Define them ahead of ingestion wit
 [decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) guide.
 :::
 
-### Text literal (preserve scale)
+### Text literal (easy to use)
 
 ```typescript
 import { Sender } from "@questdb/nodejs-client";
@@ -196,11 +196,13 @@ async function runDecimalsText() {
   await sender.flush();
   await sender.close();
 }
+```
 
 `decimalColumnText` accepts strings or numbers. String literals go through `validateDecimalText` and are written verbatim with the `d` suffix, so every digit (including trailing zeros or exponent form) is preserved. Passing a number is convenient, but JavaScript’s default formatting will drop insignificant zeros.
 
 ### Binary form (high throughput)
 
+```typescript
 const sender = await Sender.fromConfig(
   "tcp::addr=localhost:9009;protocol_version=3",
 );
@@ -213,6 +215,10 @@ await sender
   .symbol("desk", "ny")
   .decimalColumnUnscaled("notional", notional, scale)
   .atNow();
+
+await sender.flush();
+await sender.close();
+```
 
 `decimalColumnUnscaled` converts `BigInt` inputs into the ILP v3 binary payload. You can also pass an `Int8Array` if you already have a two’s-complement, big-endian byte
 array. The scale must stay between 0 and 76, and payloads wider than 32 bytes are rejected up front. This binary path keeps rows compact, making it the preferred option for high-performance feeds.
