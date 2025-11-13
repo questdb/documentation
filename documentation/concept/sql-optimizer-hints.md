@@ -48,9 +48,9 @@ past from the row that matches by timestamp. For this, we need a more
 sophisticated algorithm.
 
 Our optimized algorithms assume the JOIN condition matches additional columns by
-equality. Basically, we have a join key that must match on both sides. An even
-narrower common case we optimize for is matching on a _symbol column_ on both
-sides, but many optimizations work for other key combinations as well.
+equality. Basically, there's a join key that must match on both sides. An even
+narrower common case we optimize more aggressively for is matching on a _symbol
+column_ on both sides.
 
 We distinguish these two cases:
 
@@ -58,13 +58,13 @@ We distinguish these two cases:
 
 In this case, when scanning the right-hand table backward from the timestamp of
 the left-hand row, we find a match much sooner than reaching the timestamp of
-the previous left-hand row. We end up scanning only a small subset of right-hand
-rows. In the diagram, we show the scanned portions of the right-hand dataset in
-red.
+the previous left-hand row. We end up scanning only a small subset of the
+right-hand rows. In the diagram, we show the scanned portions of the right-hand
+dataset in red.
 
-The best way to perform this join is to first locate the right-hand row that
-matches by timestamp (marked with the dotted line), then scan backward to find
-the row satisfying additional join conditions.
+The best way to perform this join is the straightforward one: first locate the
+right-hand row that matches by timestamp (marked with the dotted line), then
+scan backward to find the row satisfying additional join conditions.
 
 <Screenshot
 alt="Diagram showing localized row matching"
@@ -75,13 +75,13 @@ width={300}
 ### 2. Distant matching
 
 In this case, the matching row is in the more distant past, earlier than the
-previous left-hand row. Now we must scan almost the entire right-hand dataset.
-If we do a separate scan for each left-hand row, we'll end up going over the
-same rows many times. In the diagram, this shows up as more intensely red
-regions in the right-hand table.
+previous left-hand row. The scanning ranges now ovelap, and we end up scanning
+almost the entire right-hand dataset. If we do a separate scan for each
+left-hand row, we'll end up going over the same rows many times. In the diagram,
+this shows up as more intensely red regions in the right-hand table.
 
-The best way in this case is to just scan the entire red region once, collect
-the join keys in a hashtable, and match up with the left-hand rows as needed.
+The best way in this case is to scan the entire red region once, collect the
+join keys in a hashtable, and match up with the left-hand rows as needed.
 
 <Screenshot
 alt="Diagram showing distant row matching"
@@ -107,7 +107,6 @@ be the best. It is the only one that allows QuestDB to use its parallelized
 filtering to quickly identify the filtered subset.
 
 The default algorithm is _Fast_, and you can enable others through query hints.
-For a quick orientation, here's the decision tree:
 
 ### List of hints
 
@@ -132,13 +131,14 @@ This hint applies to `LT` joins as well.
 :::
 
 This enables the [Light](#light-algo) algorithm, similar to Dense but simpler.
-It has the pitfall of searching through all the history in the RHS table, but is
-more generic and available in some queries where the Dense algo isn't.
+It is more generic and selected automatically in queries where the Dense algo
+isn't applicable. Its downside is that it must scan the entire history in
+the RHS table, up to the most recent LHS timestamp.
 
-Particularly, the light algo is at an advantage when the right-hand side is a
-subquery with a WHERE clause that is highly selective, passing through a small
-number of rows. QuestDB has parallelized filtering support, which cannot be used
-with the other algorithms.
+There's a case where the Light algo is at an advantage even when the Dense algo
+is also available: when the right-hand side is a subquery with a WHERE clause
+that is highly selective, passing through a small number of rows. QuestDB has
+parallelized filtering support, which cannot be used with the other algorithms.
 
 ```questdb-sql title="Applying the query hint for the Light algorithm"
 SELECT /*+ asof_linear(orders md) */
@@ -154,13 +154,8 @@ ASOF JOIN (
 
 This hint enables [Memoized](#memoized-algo), a variant of the
 [Fast](#fast-algo) algorithm. It works for queries that join on a symbol column,
-as in `left ASOF JOIN right ON (symbol)`. It uses additional RAM to remember
-where it last saw a symbol in the right-hand table.
-
-This hint will help you if many left-hand rows use a symbol that occurs rarely
-in the right-hand table, so that the same right-hand row matches several
-left-hand rows. It is especially helpful if some symbols occur way in the past,
-because it will search for each such symbol only once.
+as in `left ASOF JOIN right ON (symbol)`. It helps when there's a mix of
+localized and distant matches by reusing the results of earlier backward scans.
 
 ```questdb-sql title="Appling the query hint for the Memoized algorithm"
 SELECT /*+ asof_memoized(orders md) */
