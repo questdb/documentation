@@ -244,7 +244,7 @@ err = sender.
 
 If you already hold a two’s complement big-endian mantissa (for example, from another fixed-point library) call `NewDecimalUnsafe(rawBytes, scale)`, passing nil encodes a NULL and the client skips the field.
 
-The client also understands `github.com/shopspring/decimal` values:
+The client also understands [github.com/shopspring/decimal](https://github.com/shopspring/decimal) values:
 
 ```go
 dec := decimal.NewFromFloat(2615.54)
