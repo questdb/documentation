@@ -36,69 +36,67 @@ Hints are designed to be a safe optimization mechanism:
 
 A significant factor in choosing the optimal algorithm for a
 [temporal join](/docs/reference/sql/asof-join) (ASOF and LT) is the way the rows
-of the left-hand and right-hand tables (as in `left ASOF JOIN right`) are
-aligned on the time axis:
+of the left-hand dataset are matched to the rows of the right-hand dataset. We
+distinguish these two cases:
 
-- dense interleaving (similar number of rows per time unit on both sides)
-- sparse left-hand rows (thousands of right-hand rows between consecutive
-  left-hand rows)
-- sparse right-hand rows
+### 1. Matching is localized
 
-The "sparse left-hand rows" is a special case that needs its own algorithm, while
-the other two are similar from that standpoint.
+In this case, we must scan only a small subset of right-hand rows to find a
+match. In the diagrom, we show the scanned portions of the right-hand dahtaset
+in red.
 
-QuestDB uses two algorithm families:
-
-1. Binary search of the right-hand table to zero in on the row that matches by
-   timestamp, then linear backward search to find the row satisfying additional
-   join conditions. Great for the "sparse left-hand rows" case.
-
-2. Linear scan over the right-hand table until reaching the left-hand timestamp.
-   Great for the other cases.
+The best way to perform this join is to first apply binary search to the
+right-hand table to zero in on the row that matches the left-hand row by
+timestamp (marked with the dotted line), then scan backward to find the row
+satisfying additional join conditions.
 
 <Screenshot
-alt="Diagram explaining the Fast algorithm"
-height={447}
-src="images/docs/concepts/asof-join-binary-search-strategy.svg"
-width={745}
+alt="Diagram showing localized row matching"
+src="images/docs/concepts/asof-join-sparse.svg"
+width={300}
 />
 
-There are five algorithms:
+### 2. Matching is distant
 
-1. Fast
-2. Memoized
-3. Memoized with Drive-By Caching
-4. Light
-5. Dense
+In this case, we must scan almost all right-hand rows. If we do a separate scan
+for every left-hand row, we'll end up scanning the same rows many times. In the
+diagram, this shows up as more intensely red regions in the right-hand table.
 
-Fast and both of the Memoized algos use binary search, Light and Dense use
-linear scan.
+The best way in this case is to just scan the entire red region of the
+right-hand dataset once, and match up with the left-hand rows as needed.
+
+<Screenshot
+alt="Diagram showing distant row matching"
+src="images/docs/concepts/asof-join-dense.svg"
+width={300}
+/>
+
+## ASOF JOIN algorithms
+
+QuestDB implements five algorithms altogether.
+
+1. _Fast_ algorithm is the best for 100% localized row matching
+2. _Dense_ algorithm is the best for 100% distant row matching
+
+In a real scenario, you may not have such a clear-cut situation. If your join
+pattern is mostly localized, but with some distant matching, the _Memoized_
+algorithm may help. It remembers where the previous match was for a given join
+key, and can avoid rescanning to find it.
+
+When you use a WHERE clause on the right-hand dataset, and if it's highly
+selective (passing through a small fraction of rows), the _Light_ algorithm may
+be the best. It is the only one that allows QuestDB to use its parallelized
+filtering to quickly identify the filtered subset.
 
 The default algorithm is _Fast_, and you can enable others through query hints.
 For a quick orientation, here's the decision tree:
-
-```mermaid
-graph TD
-    A[Start] --> Q1{No join key /
-    Billions of distinct join keys?}
-    Q1 --> |Yes| FAST{No hint}
-    Q1 --> |No| Q2{Left table sparse compared to right?}
-    Q2 --> |Yes| Q3{Single-symbol join?}
-    Q2 --> |No| Q4{Right table uses highly selective WHERE filter?}
-    Q3 --> |Yes| Q5{Many extremely rare keys in right table?}
-    Q3 --> |No| FAST
-    Q4 --> |Yes| LIGHT{asof_linear}
-    Q4 --> |No| DENSE{asof_dense}
-    Q5 --> |No| MEMOIZED{asof_memoized}
-    Q5 --> |Yes| MEMOIZED_DRIVEBY{asof_memoized_driveby}
-```
 
 ### List of hints
 
 ### `asof_dense(l r)`
 
 This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
-available) for the dense interleaving of left-hand/right-hand rows.
+available) in a variety of cases.
 
 ```questdb-sql title="Applying the query hint for the Dense algorithm"
 SELECT /*+ asof_dense(orders md) */
@@ -119,10 +117,10 @@ This enables the [Light](#light-algo) algorithm, similar to Dense but simpler.
 It has the pitfall of searching through all the history in the RHS table, but is
 more generic and available in some queries where the Dense algo isn't.
 
-Also, the light algo is at an advantage when the right-hand side is a subquery
-with a WHERE clause that is highly selective, passing through a small number of
-rows. QuestDB has parallelized filtering support, which cannot be used with the
-other algorithms.
+Particularly, the light algo is at an advantage when the right-hand side is a
+subquery with a WHERE clause that is highly selective, passing through a small
+number of rows. QuestDB has parallelized filtering support, which cannot be used
+with the other algorithms.
 
 ```questdb-sql title="Applying the query hint for the Light algorithm"
 SELECT /*+ asof_linear(orders md) */
@@ -148,28 +146,6 @@ because it will search for each such symbol only once.
 
 ```questdb-sql title="Appling the query hint for the Memoized algorithm"
 SELECT /*+ asof_memoized(orders md) */
-    orders.timestamp, orders.symbol, orders.price
-FROM orders
-ASOF JOIN (md) ON (symbol);
-```
-
-### `asof_memoized_driveby(l r)`
-
-This hint enables the [Memoized](#memoized-algo) algo, just like
-`asof_memoized(l r)`, but with one more mechanism: the _Drive-By cache_. In
-addition to memorizing the previously matched right-hand rows, it remembers the
-location of _all_ symbols it encounters during its backward scan. This pays off
-when there's a significant number of very rare symbols. While the regular
-Memoized Scan searches for each symbol separately, resulting in repeated scans
-for rare symbols, the Drive-By Cache allows it to make just one deep backward
-scan, and collect all of them.
-
-Maintaining the Drive-By Cache requires a hashtable lookup at every step of the
-algorithm, so if it doesn't help finding rare symbols, it will incur an
-additional overhead and reduce query performance.
-
-```questdb-sql title="Applying the query hint for the Memoized algorithm with Drive-By Caching"
-SELECT /*+ asof_memoized_driveby(orders md) */
     orders.timestamp, orders.symbol, orders.price
 FROM orders
 ASOF JOIN (md) ON (symbol);
