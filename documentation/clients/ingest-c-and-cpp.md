@@ -294,7 +294,7 @@ Protocol Version 2 along with its support for arrays is available from QuestDB
 version 9.0.0.
 :::
 
-### Decimal insertion
+<!-- ### Decimal insertion
 
 :::note
 Decimals are supported from QuestDB version 9.2.0, and require updated
@@ -332,7 +332,7 @@ that returns a struct exposing `.view()` so the sender can transform it into a
 `decimal_view`.
 
 You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples).
-
+ -->
 
 ## C
 

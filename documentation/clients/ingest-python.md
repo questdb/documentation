@@ -366,7 +366,7 @@ Protocol Version 2 along with its support for arrays is available from QuestDB
 version 9.0.0.
 :::
 
-## Decimal Insertion
+<!-- ## Decimal Insertion
 
 :::note
 Decimals are supported from QuestDB version 9.2.0 with protocol version 3, and require updated
@@ -420,7 +420,7 @@ with Sender.from_conf(conf) as sender:
         }
     )
     sender.dataframe(df_arrow, table_name="fx_quotes", at="ts")
-```
+``` -->
 
 ### Resulting ILP rows carry DECIMAL payloads that respect the original scale.
 

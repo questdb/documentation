@@ -212,7 +212,7 @@ fn main() -> Result<()> {
 }
 ```
 
-## Ingest decimals
+<!-- ## Ingest decimals
 
 :::note
 Decimals are available when ILP protocol version 3 is active (QuestDB 9.2.0+). The HTTP sender
@@ -263,7 +263,7 @@ buffer
 ```
 
 The client stores Decimal values without rounding, supporting up to 76 decimal places and values as
-large as the source type allows.
+large as the source type allows. -->
 
 ## Configuration options
 

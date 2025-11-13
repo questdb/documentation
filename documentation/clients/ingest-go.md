@@ -199,7 +199,7 @@ We recommended to use User-assigned timestamps when ingesting data into QuestDB.
 Using the current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
-## Decimal insertion
+<!-- ## Decimal insertion
 
 :::note
 Decimals are available when ILP protocol version 3 is active (QuestDB 9.2.0+). The HTTP sender
@@ -254,7 +254,7 @@ err = sender.
 	AtNow(ctx)
 ```
 
-`DecimalColumnShopspring` converts the coefficient/exponent pair into the same binary payload, so you can reuse existing business logic while still benefiting from precise wire formatting.
+`DecimalColumnShopspring` converts the coefficient/exponent pair into the same binary payload, so you can reuse existing business logic while still benefiting from precise wire formatting. -->
 
 ## Configuration options
 
