@@ -40,7 +40,7 @@ import Screenshot from "@theme/Screenshot"
 
 | Table Partition | Partition format |
 | --------------- | ---------------- |
-| `HOUR`          | `YYYY-MM-DD-HH`  |
+| `HOUR`          | `YYYY-MM-DDTHH`  |
 | `DAY`           | `YYYY-MM-DD`     |
 | `WEEK`          | `YYYY-Www`       |
 | `MONTH`         | `YYYY-MM`        |
