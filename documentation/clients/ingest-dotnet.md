@@ -178,6 +178,57 @@ original timestamp when ingesting data into QuestDB. Using ingestion-time
 timestamps precludes the ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+<!-- ## Ingest decimals
+
+:::note
+Decimals are available in QuestDB 9.2.0+ and require the .NET client to speak ILP protocol version
+3. Use `protocol_version=3` (or leave `protocol_version=auto` when connecting over HTTP so the handshake
+negotiates it for you). Earlier protocol versions throw an IngressError if you call the decimal
+overload.
+:::
+
+:::caution
+Define the destination decimal columns ahead of ingestion with `DECIMAL(precision, scale)` so QuestDB
+knows exactly how many digits to store. The [decimal data type](/docs/concept/decimal/#creating-tables-with-decimals)
+page explains how precision and scale work and includes create-table examples.
+:::
+
+The .NET sender exposes `.Column(string, decimal?)`, which serializes the value with the decimal’s scale
+and unscaled mantissa as the ILP binary payload, so the server stores it without string parsing or
+culture-specific formatting.
+
+```csharp
+await using var sender = Sender.New(
+    "tcp::addr=localhost:9009;protocol_version=3;auto_flush=off;");
+
+await sender.Table("fx_prices")
+    .Symbol("pair", "EURUSD")
+    .Column("bid", 1.071234m)     // scale 6 preserved
+    .Column("ask", 1.071258m)
+    .Column("notional", 2500000.00m)
+    .Column("fee", (decimal?)null)
+    .AtAsync(DateTime.UtcNow);
+
+await sender.SendAsync();
+```
+
+Create a matching table with the desired precision and scale:
+```sql
+CREATE TABLE fx_prices (
+    pair SYMBOL,
+    bid DECIMAL(18,6),
+    ask DECIMAL(18,6),
+    notional DECIMAL(18,2),
+    fee DECIMAL(18,4),
+    ts TIMESTAMP
+) timestamp(ts);
+```
+You need to specify the precision and scale, unlike other types, QuestDB requires explicit precision and scale for decimal columns.
+
+decimal values in .NET carry up to 28 fractional digits; the client copies that scale byte-for-byte into
+the ILP frame and emits the 96-bit two’s-complement mantissa expected by QuestDB, so numbers such as
+`decimal.MaxValue`, `decimal.MinValue`, and high-scale fractions round-trip exactly. -->
+
 ## Ways to create the client
 
 There are three ways to create a client instance:

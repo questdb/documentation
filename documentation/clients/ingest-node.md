@@ -165,6 +165,64 @@ use the original event timestamps when ingesting data into QuestDB. Using the
 current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
+<!-- ## Decimal insertion
+
+:::note
+Decimal columns are available with ILP protocol version 3. HTTP/HTTPS connections negotiate this automatically (`protocol_version=auto`), while TCP/TCPS connections must opt in explicitly (for example `tcp::...;protocol_version=3`). Once on v3, you can choose between the textual helper and the binary helper.
+:::
+
+:::caution
+QuestDB does not auto-create decimal columns. Define them ahead of ingestion with
+`DECIMAL(precision, scale)` so the server knows how many digits to store, as explained in the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) guide.
+:::
+
+### Text literal (easy to use)
+
+```typescript
+import { Sender } from "@questdb/nodejs-client";
+
+async function runDecimalsText() {
+  const sender = await Sender.fromConfig(
+    "tcp::addr=localhost:9009;protocol_version=3",
+  );
+
+  await sender
+    .table("fx")
+    .symbol("pair", "EURUSD")
+    .decimalColumnText("mid", "1.234500") // keeps trailing zeros
+    .atNow();
+
+  await sender.flush();
+  await sender.close();
+}
+```
+
+`decimalColumnText` accepts strings or numbers. String literals go through `validateDecimalText` and are written verbatim with the `d` suffix, so every digit (including trailing zeros or exponent form) is preserved. Passing a number is convenient, but JavaScript’s default formatting will drop insignificant zeros. -->
+
+### Binary form (high throughput)
+
+```typescript
+const sender = await Sender.fromConfig(
+  "tcp::addr=localhost:9009;protocol_version=3",
+);
+
+const scale = 4;
+const notional = 12345678901234567890n; // represents 1_234_567_890_123_456.7890
+
+await sender
+  .table("positions")
+  .symbol("desk", "ny")
+  .decimalColumnUnscaled("notional", notional, scale)
+  .atNow();
+
+await sender.flush();
+await sender.close();
+```
+
+`decimalColumnUnscaled` converts `BigInt` inputs into the ILP v3 binary payload. You can also pass an `Int8Array` if you already have a two’s-complement, big-endian byte
+array. The scale must stay between 0 and 76, and payloads wider than 32 bytes are rejected up front. This binary path keeps rows compact, making it the preferred option for high-performance feeds.
+
 ## Configuration options
 
 The minimal configuration string needs to have the protocol, host, and port, as

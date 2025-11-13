@@ -2,7 +2,7 @@
 title: InfluxDB Line Protocol Columnset Value Types
 sidebar_label: Columnset value types
 description:
-  Describes all support value types in InfluxDB Line Protocol columnset.
+  Describes all supported value types in InfluxDB Line Protocol columnset.
 ---
 
 This page lists the supported InfluxDB Line Protocol columnset value types and
@@ -11,7 +11,7 @@ details about type casting.
 If a target column does not exist, QuestDB will create a column using the same
 type that the ILP client sends.
 
-Type casts that cause data loss will cause entire line to be rejected.
+Type casts that cause data loss will cause the entire line to be rejected.
 
 ## Integer
 
@@ -34,16 +34,16 @@ The line above will be accepted and `96i` will be cast to `short`.
 
 ### Cast table
 
-The following `cast` operations are supported when existing table column type is
-not `long`:
+The following `cast` operations are supported when the existing table column
+type is not `long`:
 
-|           | `byte` | `short` | `int` | `long`   | `float` | `double` | `date` | `timestamp` |
-| :-------- | :----- | :------ | :---- | :------- | :------ | :------- | :----- | :---------- |
-| `integer` | cast   | cast    | cast  | `native` | cast    | cast     | cast   | cast        |
+|           | `byte` | `short` | `int` | `long`   | `float` | `double` | `date` | `timestamp` | `decimal` |
+| :-------- | :----- | :------ | :---- | :------- | :------ | :------- | :----- | :---------- | :-------- |
+| `integer` | cast   | cast    | cast  | `native` | cast    | cast     | cast   | cast        | cast      |
 
 ## Long256
 
-Custom type, which correspond to QuestDB type `long256`. The values are hex
+Custom type, which corresponds to QuestDB type `long256`. The values are hex
 encoded 256-bit unsigned integer values with `i` suffix. For example:
 
 ```shell
@@ -69,16 +69,44 @@ conventional double value would.
 
 ### Cast table
 
-The following `cast` operations are supported when existing table column type is
-not `double`:
+The following `cast` operations are supported when the existing table column
+type is not `double`:
 
-|         | `float` | `double` |
-| :------ | :------ | :------- |
-| `float` | cast    | `native` |
+|         | `float` | `double` | `decimal` |
+| :------ | :------ | :------- | :-------- |
+| `float` | cast    | `native` | cast      |
+
+## Decimal
+
+Decimal values, which correspond to QuestDB type `decimal`. The values are
+required to have a `d` suffix. For example:
+
+```shell
+trade,ticker=BTCUSD price=30000.50d 1638202821000000000\n
+```
+
+When the column does not exist, it will be created with the `decimal` type using
+the default precision of 18 and scale of 3. To specify custom precision and
+scale, create the table upfront:
+
+```questdb-sql
+CREATE TABLE trade (ticker SYMBOL, price DECIMAL(18, 2));
+```
+
+The line above will be accepted and `30000.50` will be stored as `decimal`.
+
+### Cast table
+
+The following `cast` operations are supported when the existing table column
+type is not `decimal`:
+
+|           | `decimal` | `float` | `double` |
+| :-------- | :-------- | :------ | :------- |
+| `decimal` | `native`  | cast    | cast     |
 
 ## Boolean
 
-These value correspond to QuestDB type `boolean`. In InfluxDB Line Protocol
+These values correspond to QuestDB type `boolean`. In InfluxDB Line Protocol
 `boolean` values can be represented in any of the following ways:
 
 | Actual value | Single char lowercase | Single char uppercase | Full lowercase | Full camelcase | Full uppercase |
@@ -94,8 +122,8 @@ sensors,location=south warning=false\n
 
 ### Cast table
 
-The following `cast` operations are supported when existing table column type is
-not `boolean`:
+The following `cast` operations are supported when the existing table column
+type is not `boolean`:
 
 |           | `boolean` | `byte` | `short` | `int` | `float` | `long` | `double` |
 | :-------- | :-------- | :----- | :------ | :---- | :------ | :----- | :------- |
@@ -105,7 +133,7 @@ When cast to numeric type, boolean `true` is `1` and `false` is `0`
 
 ## String
 
-These value correspond to QuestDB type `varchar`. They must be enclosed in
+These values correspond to QuestDB type `varchar`. They must be enclosed in
 quotes. The following characters in values must be escaped with a `\`: `"`,
 `\n`, `\r` and `\`. For example:
 
@@ -127,17 +155,17 @@ String values must be UTF-8 encoded before sending.
 
 ### Cast table
 
-The following `cast` operations are supported when existing table column type is
-not `varchar`:
+The following `cast` operations are supported when the existing table column
+type is not `varchar`:
 
-|          | `varchar` | `char` | `string` | `geohash` | `symbol` | `uuid` |
-|:---------|:----------|:-------|:---------|:----------|:---------|--------|
-| `string` | `native`  | cast   | cast     | cast      | cast     | cast   |
+|          | `varchar` | `char` | `string` | `geohash` | `symbol` | `uuid` | `decimal` |
+| :------- | :-------- | :----- | :------- | :-------- | :------- | ------ | :-------- |
+| `string` | `native`  | cast   | cast     | cast      | cast     | cast   | cast      |
 
 ### Cast to CHAR
 
 String value can be cast to `char` type if its length is less than 2 characters.
-The following example are valid lines:
+The following examples are valid lines:
 
 ```shell
 trade,ticker=BTCUSD status="A" 1638202821000000000\n
@@ -151,8 +179,8 @@ The result:
 | 1638202821000000000 | BTCUSD | A      |
 | 1638202821000000001 | BTCUSD | `null` |
 
-Casting strings with 2 or more characters to `char` will cause entire line to be
-rejected.
+Casting strings with 2 or more characters to `char` will cause the entire line
+to be rejected.
 
 ### Cast to GEOHASH
 
@@ -271,9 +299,42 @@ The `uuid` column is populated with `uuid` values:
 
 When the `string` value is not a valid UUID, the entire line will be rejected.
 
+### Cast to DECIMAL
+
+String values can be cast to the `decimal` type when all the following are true:
+
+- The destination column exists.
+- The destination column type is `decimal`.
+- The `string` values are valid IEEE-754 decimal values.
+
+```questdb-sql
+CREATE TABLE trade (
+    ticker SYMBOL,
+    price DECIMAL(18, 2),
+    timestamp TIMESTAMP
+) TIMESTAMP(timestamp) PARTITION BY HOUR;
+```
+
+Send messages including decimal values as `string`:
+
+```shell
+trade,ticker="BTCUSD" price="30000.50" 1638202821000000000\n
+trade,ticker="BTCUSD" price="29999.99" 1638402821000000000\n
+```
+
+The `price` column is populated with `decimal` values:
+
+| timestamp                   | ticker | price    |
+| :-------------------------- | :----- | :------- |
+| 2021-11-29T16:20:21.000000Z | BTCUSD | 30000.50 |
+| 2021-12-01T23:53:41.000000Z | BTCUSD | 29999.99 |
+
+When the `string` value is not a valid IEEE-754 decimal value, the entire line
+will be rejected.
+
 ## Timestamp
 
-These value correspond to QuestDB type `timestamp`. Timestamp values are epoch
+These values correspond to QuestDB type `timestamp`. Timestamp values are epoch
 `microseconds` suffixed with `t`. In this example we're populating
 _non-designated_ timestamp field `ts1`:
 
@@ -295,7 +356,7 @@ tracking,loc=north ts=2000000000t 1000000000\n
 tracking,loc=south ts=3000000000t\n
 ```
 
-The result in `columnset` value always wins:
+The `columnset` value always wins:
 
 | loc   | ts         |
 | :---- | :--------- |
