@@ -393,7 +393,8 @@ import pandas as pd
 import pyarrow as pa
 from questdb.ingress import Sender, TimestampNanos
 
-conf = "http::addr=localhost:9000;protocol_version=3"
+# or 'tcp::addr=localhost:9009;protocol_version=3;'
+conf = "http::addr=localhost:9000;"
 
 with Sender.from_conf(conf) as sender:
     # Binary decimals via Python’s Decimal (object dtype)
