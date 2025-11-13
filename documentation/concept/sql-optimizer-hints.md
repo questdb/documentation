@@ -113,7 +113,7 @@ The default algorithm is _Fast_, and you can enable others through query hints.
 ### `asof_dense(l r)`
 
 This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
-available) in a variety of cases.
+available) for the case of distant row matching.
 
 ```questdb-sql title="Applying the query hint for the Dense algorithm"
 SELECT /*+ asof_dense(orders md) */
