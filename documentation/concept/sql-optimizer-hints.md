@@ -303,11 +303,6 @@ way, scanning backward to row 4. But when it encounters the same symbol A in row
 15, it scans backward only until reaching row 6, and then directly uses the
 remembered result of the previous scan, and matches up with row 4.
 
-With Drive-By caching enabled, Memoized algo will memorize not just the symbol
-it's looking for, but also any other symbol. However, it can only memorize it on
-the first encounter. This is valuable for rare symbols that occur deep in the
-past, but otherwise it just introduces more overhead.
-
 #### Dense algo
 
 The Dense algo starts like the Fast algo, performing a binary search to zero in
