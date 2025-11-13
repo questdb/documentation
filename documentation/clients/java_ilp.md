@@ -231,6 +231,8 @@ to `30s` or higher.
      `decimalColumn(CharSequence, CharSequence)` (string literal)
 
 :::caution
+Decimal values require QuestDB version 9.2.0 or later.
+
 Create decimal columns ahead of time with `DECIMAL(precision, scale)` so QuestDB can ingest the values
 with the expected precision. See the
 [decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) page for a refresher on
