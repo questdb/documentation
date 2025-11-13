@@ -95,7 +95,7 @@ columnTypeDef
   ::= (
   'boolean' | 'byte' | 'short' | 'char' | 'int' | 'float' |
   ('symbol' (('CAPACITY' distinctValueEstimate) ('CACHE' | 'NOCACHE')?)? inlineIndexDef?) |
-  'varchar' | 'string' | 'long' | 'date' | 'timestamp' | 'double' | 'binary' | 'long256' | 'geohash(<size>)'
+  'varchar' | 'string' | 'long' | 'date' | 'timestamp' | 'double' | 'binary' | 'long256' | 'geohash(<size>)' | 'decimal(<precision>, <scale>)'
   )
 
 indexDef
