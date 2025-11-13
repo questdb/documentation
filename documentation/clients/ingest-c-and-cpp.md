@@ -740,8 +740,7 @@ validated UTF-8 decimal string, which the server parses and stores using the
 column's precision:
 
 ```c
-line_sender_utf8 price_value = QDB_UTF8_LITERAL("2615.54");
-if (!line_sender_buffer_column_dec_str(buffer, price_name, price_value, &err))
+if (!line_sender_buffer_column_dec_str(buffer, price_name, "2615.54", strlen("2615.54"), &err))
     goto on_error;
 ```
 
