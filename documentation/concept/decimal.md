@@ -221,7 +221,7 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 
 ## Common use cases
 
-### Financial calculations
+### Portfolio reporting
 
 ```questdb-sql
 -- Portfolio valuation with exact arithmetic
