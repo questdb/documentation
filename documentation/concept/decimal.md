@@ -109,30 +109,6 @@ SELECT
         - fill_size_eth * fill_price_usdc * fee_rate
         - gas_fee_eth * fill_price_usdc AS net_settlement_usdc
 FROM eth_fills;
-
--- Track ETH transfers with exact gas fees
-CREATE TABLE eth_transfers (
-    tx_hash STRING,  -- High-cardinality identifiers work best as STRING
-    from_addr SYMBOL,
-    to_addr SYMBOL,
-    transfer_value_eth DECIMAL(38, 18),  -- Amount moved (wei precision)
-    gas_fee_eth DECIMAL(38, 18),         -- Gas used * gas price, stored exactly
-    timestamp TIMESTAMP
-) timestamp(timestamp) partition by day;
-
-INSERT INTO eth_transfers VALUES
-    ('0xaaa1', '0xAbC123...', '0xDeF456...', 1.250000000000000000m, 0.002300000000000000m, now()),
-    ('0xaaa2', '0xAbC123...', '0xDeF456...', 0.875432100000000000m, 0.001900000000000000m, now()),
-    ('0xaaa3', '0xAbC123...', '0xDeF456...', 5.000000000000000000m, 0.003250000000000000m, now());
-
--- Sum transfers and gas between counterparties
-SELECT
-    from_addr,
-    to_addr,
-    sum(transfer_value_eth) AS total_transferred_eth,
-    sum(gas_fee_eth) AS total_gas_eth
-FROM eth_transfers
-WHERE from_addr = '0xAbC123...' AND to_addr = '0xDeF456...'
 ```
 
 ### Precision and scale in operations
