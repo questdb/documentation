@@ -137,7 +137,7 @@ In the context of window functions, `first_value(value)` calculates the first
 
 **Arguments:**
 
-- `value`: Any numeric value.
+- `value`: Any numeric value except decimal.
 
 **Return value:**
 
@@ -183,7 +183,7 @@ In the context of window functions, `max(value)` calculates the maximum value wi
 
 **Arguments:**
 
-- `value`: Any numeric value.
+- `value`: Any numeric value except decimal.
 
 **Return value:**
 
@@ -223,7 +223,7 @@ In the context of window functions, `min(value)` calculates the minimum value wi
 
 **Arguments:**
 
-- `value`: Any numeric value.
+- `value`: Any numeric value except decimal.
 
 **Return value:**
 
@@ -524,7 +524,7 @@ in the set of rows defined by the window frame. Also known as "cumulative sum".
 
 **Arguments:**
 
-- `value`: Any numeric value.
+- `value`: Any numeric value except decimal.
 
 **Return value:**
 
