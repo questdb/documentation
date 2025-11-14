@@ -165,10 +165,12 @@ use the original event timestamps when ingesting data into QuestDB. Using the
 current timestamp hinder the ability to deduplicate rows which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
-<!-- ## Decimal insertion
+## Decimal insertion
 
 :::note
-Decimal columns are available with ILP protocol version 3. HTTP/HTTPS connections negotiate this automatically (`protocol_version=auto`), while TCP/TCPS connections must opt in explicitly (for example `tcp::...;protocol_version=3`). Once on v3, you can choose between the textual helper and the binary helper.
+Decimal columns are available with ILP protocol version 3 (QuestDB v9.2.0+ and NodeJS client v4.2.0+).
+
+HTTP/HTTPS connections negotiate this automatically (`protocol_version=auto`), while TCP/TCPS connections must opt in explicitly (for example `tcp::...;protocol_version=3`). Once on v3, you can choose between the textual helper and the binary helper.
 :::
 
 :::caution
@@ -198,7 +200,7 @@ async function runDecimalsText() {
 }
 ```
 
-`decimalColumnText` accepts strings or numbers. String literals go through `validateDecimalText` and are written verbatim with the `d` suffix, so every digit (including trailing zeros or exponent form) is preserved. Passing a number is convenient, but JavaScript’s default formatting will drop insignificant zeros. -->
+`decimalColumnText` accepts strings or numbers. String literals go through `validateDecimalText` and are written verbatim with the `d` suffix, so every digit (including trailing zeros or exponent form) is preserved. Passing a number is convenient, but JavaScript’s default formatting will drop insignificant zeros.
 
 ### Binary form (high throughput)
 
