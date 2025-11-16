@@ -66,14 +66,14 @@ QuestDB can also be run on AWS Graviton (ARM) instances, which have a strong pri
 
 For example, `r8g` instances are cheaper than `r6i` instances, and will offer superior performance for most Java-centric code.
 Queries which rely on the `JIT` compiler (native WHERE filters) or vectorisation optimisations will potentially run slower.
-Ingest speed is generally unaffacted.
+Ingestion speed is generally unaffected.
 
 Therefore, if your use case is ingestion-centric, or your queries do not heavily leverage SIMD/JIT, `r8g` instances
 may offer better performance and better value overall.
 
 ### Storage Optimised Instances (Enterprise)
 
-AWS offer storage-optimised instances (e.g. `i7i`, which include locally-attached NVMe devices. Workloads which
+AWS offer storage-optimised instances (e.g. `i7i`), which include locally-attached NVMe devices. Workloads which
 are disk-limited (for example, heavy out-of-order writes) will benefit significantly from the faster storage.
 
 However, it is not recommended to use locally-attached NVMe on QuestDB OSS, as instance termination or failure
@@ -109,7 +109,7 @@ category. To launch a QuestDB instance:
 An information panel displays the ID of the QuestDB instance with launch
 configuration details and hints for locating the instance in the EC2 console.
 
-The default user is `admin` and password is `quest` to log in to the webconsole.
+The default user is `admin` and password is `quest` to log in to the Web Console.
 
 ## QuestDB configuration
 
