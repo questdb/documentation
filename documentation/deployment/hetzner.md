@@ -690,4 +690,4 @@ questdb01$ borg list ssh://uXXXXX@uXXXXX.your-storagebox.de:23/./questdb01 | tai
 - Verify backup integrity with `borg check` monthly
 :::
 
-Your QuestDB instance on Hetzner Cloud is now fully configured with automated backups. For additional operational guidance, see the [Operations](/docs/operations/) documentation.
+Your QuestDB instance on Hetzner Cloud is now fully configured with automated backups.
