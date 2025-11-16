@@ -60,9 +60,15 @@ the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to conf
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `zfs` with `lz4` compression.
 
+:::note
+
+If the above instance types are not available in your region, then simply downgrade to an earlier version i.e. `8 -> 7 -> 6`.
+
+:::
+
 ### AWS Graviton
 
-QuestDB can also be run on AWS Graviton (ARM) instances, which have a strong price-to-performance ratio.
+QuestDB can also be deployed on AWS Graviton (ARM) instances, which have a strong price-to-performance ratio.
 
 For example, `r8g` instances are cheaper than `r6i` instances, and will offer superior performance for most Java-centric code.
 Queries which rely on the `JIT` compiler (native WHERE filters) or vectorisation optimisations will potentially run slower.
@@ -73,12 +79,12 @@ may offer better performance and better value overall.
 
 ### Storage Optimised Instances (Enterprise)
 
-AWS offer storage-optimised instances (e.g. `i7i`), which include locally-attached NVMe devices. Workloads which
+AWS offers storage-optimised instances (e.g. `i7i`), which include locally-attached NVMe devices. Workloads which
 are disk-limited (for example, heavy out-of-order writes) will benefit significantly from the faster storage.
 
 However, it is not recommended to use locally-attached NVMe on QuestDB OSS, as instance termination or failure
 will lead to data loss. QuestDB Enterprise replicates data eagerly to object storage (`S3`), preserving
-data in the event of an instance failure.
+data in the event of an instance failure, and can therefore can safely leverage the faster disks.
 
 ## Launching QuestDB on EC2
 
