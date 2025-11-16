@@ -17,8 +17,8 @@ import CodeBlock from "@theme/CodeBlock"
 
 ### Elastic Compute Cloud (EC2) with Elastic Block Storage (EBS)
 
-We recommend starting with `M6` instances, with an upgrade to
-`R6` instances if extra RAM is needed. You can use either `i` (Intel) or `a` (AMD) instsance. 
+We recommend starting with `M8` instances, with an upgrade to
+`R8` instances if extra RAM is needed. You can use either `i` (Intel) or `a` (AMD) instances. 
 
 These should be deployed with an `x86_64` Linux distribution, such as Ubuntu.
 
@@ -32,7 +32,7 @@ you have tested your workload.
 
 QuestDB **does not** support `EFS` for its primary storage. Do not use it instead of `EBS`.
 
-You may be able to use it as an object store, but we would recommend using `S3` instead, as a simpler, 
+You can use it as object store, but we would recommend using `S3` instead, as a simpler, 
 and cheaper, alternative.
 
 ### Simple Storage Service (S3)
@@ -44,7 +44,7 @@ the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to conf
 
 ### Minimum specification
 
-- **Instance**: `m6i.xlarge` or `m6a.xlarge` `(4 vCPUs, 16 GiB RAM)`
+- **Instance**: `m8i.xlarge` or `m8a.xlarge` `(4 vCPUs, 16 GiB RAM)`
 - **Storage**
     - **OS disk**: `gp3 (30 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
     - **Data disk**: `gp3 (100 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
@@ -53,12 +53,32 @@ the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to conf
 
 ### Better specification
 
-- **Instance**: `r6i.2xlarge` or `r6a.2xlarge` `(8 vCPUs, 64 GiB RAM)`
+- **Instance**: `r8i.2xlarge` or `r8a.2xlarge` `(8 vCPUs, 64 GiB RAM)`
 - **Storage**
     - **OS disk**: `gp3 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
     - **Data disk**: `gp3 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
 - **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
 - **File System**: `zfs` with `lz4` compression.
+
+### AWS Graviton
+
+QuestDB can also be run on AWS Graviton (ARM) instances, which have a strong price-to-performance ratio.
+
+For example, `r8g` instances are cheaper than `r6i` instances, and will offer superior performance for most Java-centric code.
+Queries which rely on the `JIT` compiler (native WHERE filters) or vectorisation optimisations will potentially run slower.
+Ingest speed is generally unaffacted.
+
+Therefore, if your use case is ingestion-centric, or your queries do not heavily leverage SIMD/JIT, `r8g` instances
+may offer better performance and better value overall.
+
+### Storage Optimised Instances (Enterprise)
+
+AWS offer storage-optimised instances (e.g. `i7i`, which include locally-attached NVMe devices. Workloads which
+are disk-limited (for example, heavy out-of-order writes) will benefit significantly from the faster storage.
+
+However, it is not recommended to use locally-attached NVMe on QuestDB OSS, as instance termination or failure
+will lead to data loss. QuestDB Enterprise replicates data eagerly to object storage (`S3`), preserving
+data in the event of an instance failure.
 
 ## Launching QuestDB on EC2
 
