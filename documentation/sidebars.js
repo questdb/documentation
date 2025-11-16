@@ -439,6 +439,7 @@ module.exports = {
         "deployment/azure",
         "deployment/gcp",
         "deployment/digital-ocean",
+        "deployment/hetzner"
       ],
     },
     {
