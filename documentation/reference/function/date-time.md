@@ -116,7 +116,6 @@ reference.
 
 ---
 
-# Function Reference
 
 ## date_trunc
 

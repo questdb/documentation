@@ -14,7 +14,7 @@ write should be performed on the selected table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the REINDEX keyword](/images/docs/diagrams/reindex.svg)
+![Flow chart showing the syntax of the REINDEX keyword](/images/docs/diagrams/reindexTable.svg)
 
 ## Options
 

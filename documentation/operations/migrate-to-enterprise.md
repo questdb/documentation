@@ -53,7 +53,7 @@ architecture. You should always opt for the latest version of the Enterprise
 edition.
 
 :::tip
-You may consult the [release notes](https://questdb.com/release-notes/?type=enterprise)
+You may consult the [release notes](https://questdb.com/release-notes/?ref=docs&type=enterprise)
 to consult the latest changes and features.
 :::
 

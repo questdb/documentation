@@ -227,6 +227,17 @@ to `30s` or higher.
    - `arrayColumn()` -- several variants, see below
    - `timestampColumn(CharSequence, Instant)`, or
      `timestampColumn(CharSequence, long, ChronoUnit)`
+   - `decimalColumn(CharSequence, Decimal256)` or
+     `decimalColumn(CharSequence, CharSequence)` (string literal)
+
+:::caution
+Decimal values require QuestDB version 9.2.0 or later.
+
+Create decimal columns ahead of time with `DECIMAL(precision, scale)` so QuestDB can ingest the values
+with the expected precision. See the
+[decimal data type](/docs/concept/decimal/#creating-tables-with-decimals) page for a refresher on
+precision and scale.
+:::
 
 5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
    set a designated timestamp.

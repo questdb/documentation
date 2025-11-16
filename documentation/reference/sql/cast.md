@@ -89,9 +89,13 @@ Implicit casting also prevents data loss.
 When an operation involves multiple types, the resulting type will be the
 smallest possible type so that no data is lost.
 
+## Casting table
+
 The below chart illustrates the explicit and implicit cast available in QuestDB:
+<!-- the image can be regenerated via the script at scripts/generate_type_cast_chart.py -->
 
 ![Table showing the different possibilities the cast function supports, those are defined by an input and output types](/images/docs/castmap.jpg)
+
 
 ```questdb-sql title="Queries"
 SELECT

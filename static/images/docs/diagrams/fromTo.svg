@@ -1,90 +1,53 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="713" height="113">
     <defs>
         <style type="text/css">
             @namespace "http://www.w3.org/2000/svg";
             .line                 {fill: none; stroke: #636273;}
             .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
-            .thin-line            {stroke: #636273; shape-rendering: crispEdges}
-            .filled               {fill: #636273; stroke: none;}
-            text.terminal         {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #ffffff;
             font-weight: bold;
             }
-            text.nonterminal      {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #e289a4;
             font-weight: normal;
             }
-            text.regexp           {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
             font-size: 12px;
             fill: #00141F;
             font-weight: normal;
             }
             rect, circle, polygon {fill: none; stroke: none;}
-            rect.terminal         {fill: none; stroke: #be2f5b;}
-            rect.nonterminal      {fill: rgba(255,255,255,0.1); stroke: none;}
-            rect.text             {fill: none; stroke: none;}
-            polygon.regexp        {fill: #C7ECFF; stroke: #038cbc;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
         </style>
     </defs>
-    <polygon points="9 17 1 13 1 21"/>
-    <polygon points="17 17 9 13 9 21"/>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#someSampleBySelectQuery..."
-       xlink:title="someSampleBySelectQuery...">
-        <rect x="31" y="3" width="206" height="32"/>
-        <rect x="29" y="1" width="206" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="39" y="21">someSampleBySelectQuery...</text>
-    </a>
-    <rect x="277" y="3" width="60" height="32" rx="10"/>
-    <rect x="275"
-          y="1"
-          width="60"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="285" y="21">FROM</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#lowerBound"
-       xlink:title="lowerBound">
-        <rect x="357" y="3" width="94" height="32"/>
-        <rect x="355" y="1" width="94" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="365" y="21">lowerBound</text>
-    </a>
-    <rect x="491" y="35" width="38" height="32" rx="10"/>
-    <rect x="489"
-          y="33"
-          width="38"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="499" y="53">TO</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#upperBound"
-       xlink:title="upperBound">
-        <rect x="549" y="35" width="96" height="32"/>
-        <rect x="547" y="33" width="96" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="557" y="53">upperBound</text>
-    </a>
-    <rect x="277" y="79" width="38" height="32" rx="10"/>
-    <rect x="275"
-          y="77"
-          width="38"
-          height="32"
-          class="terminal"
-          rx="10"/>
-    <text class="terminal" x="285" y="97">TO</text>
-    <a xmlns:xlink="http://www.w3.org/1999/xlink"
-       xlink:href="#upperBound"
-       xlink:title="upperBound">
-        <rect x="335" y="79" width="96" height="32"/>
-        <rect x="333" y="77" width="96" height="32" class="nonterminal"/>
-        <text class="nonterminal" x="343" y="97">upperBound</text>
-    </a>
-    <path class="line"
-          d="m17 17 h2 m0 0 h10 m206 0 h10 m20 0 h10 m60 0 h10 m0 0 h10 m94 0 h10 m20 0 h10 m0 0 h164 m-194 0 h20 m174 0 h20 m-214 0 q10 0 10 10 m194 0 q0 -10 10 -10 m-204 10 v12 m194 0 v-12 m-194 12 q0 10 10 10 m174 0 q10 0 10 -10 m-184 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m-408 -32 h20 m408 0 h20 m-448 0 q10 0 10 10 m428 0 q0 -10 10 -10 m-438 10 v56 m428 0 v-56 m-428 56 q0 10 10 10 m408 0 q10 0 10 -10 m-418 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m0 0 h234 m23 -76 h-3"/>
-    <polygon points="703 17 711 13 711 21"/>
-    <polygon points="703 17 695 13 695 21"/>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#someSampleBySelectQuery..." xlink:title="someSampleBySelectQuery...">
+            <rect x="31" y="3" width="206" height="32"></rect>
+            <rect x="29" y="1" width="206" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="39" y="21">someSampleBySelectQuery...</text></a><rect x="277" y="3" width="60" height="32" rx="10"></rect>
+         <rect x="275" y="1" width="60" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="285" y="21">FROM</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#lowerBound" xlink:title="lowerBound">
+            <rect x="357" y="3" width="94" height="32"></rect>
+            <rect x="355" y="1" width="94" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="365" y="21">lowerBound</text></a><rect x="491" y="35" width="38" height="32" rx="10"></rect>
+         <rect x="489" y="33" width="38" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="499" y="53">TO</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#upperBound" xlink:title="upperBound">
+            <rect x="549" y="35" width="96" height="32"></rect>
+            <rect x="547" y="33" width="96" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="557" y="53">upperBound</text></a><rect x="277" y="79" width="38" height="32" rx="10"></rect>
+         <rect x="275" y="77" width="38" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="285" y="97">TO</text><a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#upperBound" xlink:title="upperBound">
+            <rect x="335" y="79" width="96" height="32"></rect>
+            <rect x="333" y="77" width="96" height="32" class="nonterminal"></rect>
+            <text class="nonterminal" x="343" y="97">upperBound</text></a><path class="line" d="m17 17 h2 m0 0 h10 m206 0 h10 m20 0 h10 m60 0 h10 m0 0 h10 m94 0 h10 m20 0 h10 m0 0 h164 m-194 0 h20 m174 0 h20 m-214 0 q10 0 10 10 m194 0 q0 -10 10 -10 m-204 10 v12 m194 0 v-12 m-194 12 q0 10 10 10 m174 0 q10 0 10 -10 m-184 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m-408 -32 h20 m408 0 h20 m-448 0 q10 0 10 10 m428 0 q0 -10 10 -10 m-438 10 v56 m428 0 v-56 m-428 56 q0 10 10 10 m408 0 q10 0 10 -10 m-418 10 h10 m38 0 h10 m0 0 h10 m96 0 h10 m0 0 h234 m23 -76 h-3"></path>
+         <polygon points="703 17 711 13 711 21"></polygon>
+         <polygon points="703 17 695 13 695 21"></polygon>
 </svg>

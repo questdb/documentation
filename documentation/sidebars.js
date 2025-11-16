@@ -558,6 +558,7 @@ module.exports = {
         "concept/designated-timestamp",
         "concept/geohashes",
         "concept/array",
+        "concept/decimal",
         "concept/indexes",
         "concept/interval-scan",
         "concept/jit-compiler",
@@ -650,6 +651,11 @@ module.exports = {
         "troubleshooting/os-error-codes",
         "troubleshooting/error-codes",
       ],
+    },
+    {
+      label: "Release Notes",
+      type: "doc",
+      id: "release-notes-redirect",
     },
   ].filter(Boolean),
 }

@@ -199,7 +199,7 @@ SELECT * FROM (
     array_avg(@volumes[1:3]) top,
     array_avg(@volumes[3:6]) deep
   FROM market_data
-  WHERE timestamp > dateadd('h',-1,now()) )
+  WHERE timestamp > dateadd('m',-30,now()) )
 WHERE top > @dropoff_ratio * deep;
 ```
 
