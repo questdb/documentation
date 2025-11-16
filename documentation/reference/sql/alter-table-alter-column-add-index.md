@@ -8,8 +8,8 @@ Indexes an existing [`symbol`](/docs/concept/symbol/) column.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of the ALTER TABLE with ADD INDEX keyword](/images/docs/diagrams/alterTableAddIndex.svg)
+![Flow chart showing the syntax of the ALTER TABLE ALTER COLUMN ADD INDEX keyword](/images/docs/diagrams/alterTableAddIndex.svg)
+
 
 Adding an [index](/docs/concept/indexes/) is an atomic, non-blocking, and
 non-waiting operation. Once complete, the SQL optimizer will start using the new

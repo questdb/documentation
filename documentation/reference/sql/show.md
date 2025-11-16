@@ -77,7 +77,7 @@ SHOW CREATE TABLE trades;
 This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
 
 ```questdb-sql
-CREATE TABLE trades ( 
+CREATE TABLE trades (
 	symbol SYMBOL CAPACITY 256 CACHE,
 	side SYMBOL CAPACITY 256 CACHE,
 	price DOUBLE,
@@ -94,7 +94,7 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 For example,
 
 ```questdb-sql
-CREATE TABLE trades ( 
+CREATE TABLE trades (
 	symbol SYMBOL CAPACITY 256 CACHE,
 	side SYMBOL CAPACITY 256 CACHE,
 	price DOUBLE,
@@ -105,7 +105,7 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us
 OWNED BY 'admin';
 ```
 
-This clause assigns permissions for the table to that user. 
+This clause assigns permissions for the table to that user.
 
 If permissions should be assigned to a different user,
 please modify this clause appropriately.
@@ -135,25 +135,34 @@ The output demonstrates:
 - `env_var_name`: the matching env var for the key
 - `value`: the current value of the key
 - `value_source`: how the value is set (default, conf or env)
+- `sensitive`: if it is a sensitive value (passwords)
+- `reloadable`: if the value can be [reloaded without a server restart](/docs/configuration/#reloadable-settings)
 
-| property_path                             | env_var_name                                  | value      | value_source |
-| ----------------------------------------- | --------------------------------------------- | ---------- | ------------ |
-| http.min.net.connection.rcvbuf            | QDB_HTTP_MIN_NET_CONNECTION_RCVBUF            | 1024       | default      |
-| http.health.check.authentication.required | QDB_HTTP_HEALTH_CHECK_AUTHENTICATION_REQUIRED | true       | default      |
-| pg.select.cache.enabled                   | QDB_PG_SELECT_CACHE_ENABLED                   | true       | conf         |
-| cairo.sql.sort.key.max.pages              | QDB_CAIRO_SQL_SORT_KEY_MAX_PAGES              | 2147483647 | env          |
+| property_path                                   | env_var_name                                        | value                       | value_source | sensitive | reloadable |
+| ----------------------------------------------- | --------------------------------------------------- | --------------------------- | ------------ | --------- | ---------- |
+| http.min.net.connection.limit                   | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                   | 64                          | default      | false     | false      |
+| line.http.enabled                               | QDB_LINE_HTTP_ENABLED                               | true                        | default      | false     | false      |
+| cairo.parquet.export.row.group.size             | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE             | 100000                      | default      | false     | false      |
+| http.security.interrupt.on.closed.connection    | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION    | true                        | conf         | false     | false      |
+| pg.readonly.user.enabled                        | QDB_PG_READONLY_USER_ENABLED                        | true                        | conf         | false     | true       |
+| pg.readonly.password                            | QDB_PG_READONLY_PASSWORD                            | ****                        | default      | true      | true       |
+| http.password                                   | QDB_HTTP_PASSWORD                                   | ****                        | default      | true      | false      |
+
 
 You can optionally chain `SHOW PARAMETERS` with other clauses:
 
 ```questdb-sql
--- This query will return all parameters where the value contains 'C:'
-SHOW PARAMETERS WHERE value ILIKE '%C:%';
+-- This query will return all parameters where the value contains 'tmp', ignoring upper/lower case
+(SHOW PARAMETERS) WHERE value ILIKE '%tmp%';
 
 -- This query will return all parameters where the property_path is not 'cairo.root' or 'cairo.sql.backup.root', ordered by the first column
-SHOW PARAMETERS WHERE property_path NOT IN ('cairo.root', 'cairo.sql.backup.root') ORDER BY 1;
+(SHOW PARAMETERS) WHERE property_path NOT IN ('cairo.root', 'cairo.sql.backup.root') ORDER BY 1;
 
 -- This query will return all parameters where the value_source is 'env'
-SHOW PARAMETERS WHERE value_source = 'env';
+(SHOW PARAMETERS) WHERE value_source = 'env';
+
+-- Show all the parameters that have been modified from their defaults, via conf file or env variable
+(SHOW PARAMETERS) WHERE  value_source <> 'default';
 ```
 
 ### SHOW USER

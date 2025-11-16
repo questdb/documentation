@@ -1,5 +1,7 @@
 const fs = require("fs")
 const path = require("path")
+const clients = require("../../shared/clients.json")
+const ilpClients = require("../../shared/ilp_clients.json")
 
 /**
  * Parses JSX props from a string like: alt="test" height={300} src="..."
@@ -22,31 +24,79 @@ function parseProps(propsString) {
 }
 
 /**
- * Converts <Screenshot /> components to bold alt text
- * Example: <Screenshot alt="test" src="..." /> -> **test**
+ *
+ * @param {string} content - The content to search
+ * @param {string} componentName - Name of the component (e.g., "Screenshot")
+ * @returns {Array} Array of match objects with { props, children, fullMatch, index }
+ */
+function matchComponent(content, componentName) {
+  const matches = []
+
+  // Universal regex that matches:
+  // <ComponentName (props with any content including >) (self-closing /> OR open-tag > children </ComponentName>)
+  // Uses [\s\S]*? to match props across newlines (non-greedy to stop at /> or >)
+  const pattern = `<${componentName}([\\s\\S]*?)(?:\\/>|>([\\s\\S]*?)<\\/${componentName}>)`
+  const regex = new RegExp(pattern, 'g')
+
+  let match
+
+  while ((match = regex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      propsString: match[1] ? match[1].trim() : '',
+      props: parseProps(match[1] ? match[1].trim() : ''),
+      children: match[2] || '', // undefined if self-closing
+      index: match.index,
+      isSelfClosing: !match[2] && match[2] !== ''
+    })
+  }
+
+  return matches
+}
+
+/**
+ * Replace component occurrences using the unified matcher
+ *
+ * @param {string} content - The content to process
+ * @param {string} componentName - Name of the component
+ * @param {function} replacer - Function that receives match object and returns replacement string
+ * @returns {string} Processed content
+ */
+function replaceComponent(content, componentName, replacer) {
+  const matches = matchComponent(content, componentName)
+
+  // Replace from end to start to maintain correct indices
+  let result = content
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const match = matches[i]
+    const replacement = replacer(match)
+    result = result.substring(0, match.index) + replacement + result.substring(match.index + match.fullMatch.length)
+  }
+
+  return result
+}
+
+/**
+ * Removes <Screenshot /> components
  */
 function convertScreenshot(content) {
-  const screenshotRegex = /<Screenshot\s+([^>]*?)(?:\/?>|>\s*<\/Screenshot>)/gs
-
-  return content.replace(screenshotRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-    if (props.alt) {
-      return `\n\n**${props.alt}**\n\n`
-    }
-    return "\n\n**[Screenshot]**\n\n"
+  return replaceComponent(content, 'Screenshot', (_) => {
+    return ""
   })
+}
+
+function convertImages(content) {
+  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\.(svg|png|jpg|jpeg|gif|webp)\)/g
+  return content.replace(imageRegex, "")
 }
 
 /**
  * Converts <CodeBlock /> components to markdown code blocks
  */
 function convertCodeBlock(content) {
-  const codeBlockRegex = /<CodeBlock\s+([^>]*?)>([\s\S]*?)<\/CodeBlock>/g
-
-  return content.replace(codeBlockRegex, (match, propsString, children) => {
-    const props = parseProps(propsString)
-    const language = props.language || ""
-    const trimmedCode = children.trim()
+  return replaceComponent(content, 'CodeBlock', (match) => {
+    const language = match.props.language || match.props.className?.replace('language-', '') || ""
+    const trimmedCode = match.children.trim()
     return `\n\n\`\`\`${language}\n${trimmedCode}\n\`\`\`\n\n`
   })
 }
@@ -55,12 +105,14 @@ function convertCodeBlock(content) {
  * Converts <DocButton /> components to markdown links
  */
 function convertDocButton(content) {
-  const docButtonRegex = /<DocButton\s+([^>]*?)>([\s\S]*?)<\/DocButton>/g
-
-  return content.replace(docButtonRegex, (match, propsString, children) => {
-    const props = parseProps(propsString)
-    const href = props.href || props.to || "#"
-    const text = children.trim()
+  return replaceComponent(content, 'DocButton', (match) => {
+    const href = match.props.href || match.props.to || "#"
+    // Strip JSX tags like <>, </>, and other HTML/JSX elements from children
+    const text = match.children
+      .trim()
+      .replace(/<\/?>/g, '') // Remove React fragments <> and </>
+      .replace(/<[^>]+>/g, '') // Remove other HTML/JSX tags
+      .trim()
     return `[${text}](${href})`
   })
 }
@@ -69,13 +121,11 @@ function convertDocButton(content) {
  * Converts <Tabs> and <TabItem> to markdown table
  */
 function convertTabs(content) {
-  const tabsRegex = /<Tabs\s+([\s\S]*?)>([\s\S]*?)<\/Tabs>/g
-
-  return content.replace(tabsRegex, (match, propsString, children) => {
+  return replaceComponent(content, 'Tabs', (match) => {
     // Extract values array from props (can span multiple lines)
-    const valuesMatch = propsString.match(/values=\{(\[[\s\S]*?\])\}/s)
+    const valuesMatch = match.propsString.match(/values=\{(\[[\s\S]*?\])\}/s)
     if (!valuesMatch) {
-      return match // Return original if can't parse
+      return match.fullMatch // Return original if can't parse
     }
 
     let valuesArray
@@ -84,11 +134,11 @@ function convertTabs(content) {
       const valuesStr = valuesMatch[1]
         .replace(/'/g, '"') // Replace single quotes with double quotes
         .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas before } or ]
-        .replace(/(\w+):/g, '"$1":') // Quote unquoted keys
+        .replace(/([\[{,]\s*)(\w+):/g, '$1"$2":') // Quote unquoted keys (only after [, {, or ,)
       valuesArray = JSON.parse(valuesStr)
     } catch (e) {
       console.warn("[convert-components] Failed to parse Tabs values:", e.message)
-      return match
+      return match.fullMatch
     }
 
     // Extract TabItem contents
@@ -96,7 +146,7 @@ function convertTabs(content) {
     const tabItemRegex = /<TabItem\s+value=["']([^"']+)["'][^>]*?>([\s\S]*?)<\/TabItem>/g
     let tabMatch
 
-    while ((tabMatch = tabItemRegex.exec(children)) !== null) {
+    while ((tabMatch = tabItemRegex.exec(match.children)) !== null) {
       const value = tabMatch[1]
       const content = tabMatch[2].trim()
       tabItems.push({ value, content })
@@ -134,16 +184,12 @@ function convertConfigTable(content, docsPath) {
     importMap.set(varName, unescapedPath)
   }
 
-  const configTableRegex = /<ConfigTable\s+([^>]*?)\/>/g
-
-  return content.replace(configTableRegex, (match, propsString) => {
-    const props = parseProps(propsString)
-
+  return replaceComponent(content, 'ConfigTable', (match) => {
     // ConfigTable typically uses a rows prop pointing to JSON data
-    if (props.rows) {
+    if (match.props.rows) {
       try {
         // Get the import path for this variable
-        const importPath = importMap.get(props.rows)
+        const importPath = importMap.get(match.props.rows)
         if (importPath) {
           // Resolve the path relative to the markdown file's directory
           const configPath = path.join(docsPath, importPath)
@@ -158,14 +204,14 @@ function convertConfigTable(content, docsPath) {
               for (const item of configData) {
                 const property = item.property || item.name || ""
                 const type = item.type || ""
-                const description = (item.description || "").replace(/\n/g, " ")
+                const description = (item.description || "").replace(/\n/g, " ").replace(/\|/g, "\\|")
                 table += `| ${property} | ${type} | ${description} |\n`
               }
             } else if (typeof configData === 'object') {
               // Handle object format where keys are property names
               for (const [property, config] of Object.entries(configData)) {
                 const type = config.default || config.type || ""
-                const description = (config.description || "").replace(/\n/g, " ")
+                const description = (config.description || "").replace(/\n/g, " ").replace(/\|/g, "\\|")
                 table += `| ${property} | ${type} | ${description} |\n`
               }
             }
@@ -222,22 +268,25 @@ async function fetchReleaseVersion() {
 }
 
 function convertInterpolateReleaseData(content, releaseVersion) {
-  // Match <InterpolateReleaseData ... /> (self-closing)
-  // Extract what renderText returns and replace {release.name} with version
-  const interpolateRegex = /<InterpolateReleaseData[\s\S]*?\/>/g
+  return replaceComponent(content, 'InterpolateReleaseData', (match) => {
+    // Try two patterns:
+    // 1. Arrow function with implicit return: (release) => (...)
+    // 2. Arrow function with explicit return: (release) => { return (...) }
+    let renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\(([\s\S]*?)\)\s*\}/);
 
-  return content.replace(interpolateRegex, (match) => {
-    // Extract everything inside renderText={(...) => ( ... )}
-    // Match from the opening paren after => to the closing paren before )}
-    const renderTextMatch = match.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\(([\s\S]*?)\)\s*\}/);
+    if (!renderTextMatch) {
+      // Try pattern with { return (...) }
+      renderTextMatch = match.fullMatch.match(/renderText=\{[^(]*\([^)]*\)\s*=>\s*\{\s*return\s*\(([\s\S]*?)\)\s*\}\s*\}/);
+    }
 
     if (renderTextMatch) {
       // Extract the JSX content being returned
       let extracted = renderTextMatch[1].trim();
 
-      // Replace ${release.name} with the actual version (note the $ before the {)
-      extracted = extracted.replace(/\$\{release\.name\}/g, releaseVersion);
-      extracted = extracted.replace(/\$\{release\.tag_name\}/g, releaseVersion);
+      // Replace template literal placeholders with actual version
+      // Handles both ${release.name} (with $) and {release.name} (without $ inside template literals)
+      extracted = extracted.replace(/\$?\{release\.name\}/g, releaseVersion);
+      extracted = extracted.replace(/\$?\{release\.tag_name\}/g, releaseVersion);
 
       // Remove JSX template literal syntax: {`...`} becomes just the content
       extracted = extracted.replace(/\{`/g, '');
@@ -294,9 +343,99 @@ function convertRailroadDiagrams(content, docsPath) {
     if (definition) {
       return `\n\n\`\`\`railroad\n${definition}\n\`\`\`\n\n`
     }
+    console.warn(`[convert-components] Railroad diagram not found in .railroad file: ${diagramName}`)
 
     // If not found, remove the image reference
     return '\n\n'
+  })
+}
+
+/**
+ * Converts <RemoteRepoExample /> to markdown code block with actual code
+ * @param {string} content - The markdown content
+ * @param {object} repoExamples - Repository examples data from remote-repo-example plugin
+ */
+function convertRemoteRepoExample(content, repoExamples = {}) {
+  return replaceComponent(content, 'RemoteRepoExample', (match) => {
+    const name = match.props.name || 'unknown'
+    const lang = match.props.lang || 'text'
+    const id = `${name}/${lang}`
+
+    // Get the example from plugin data
+    const example = repoExamples[id]
+
+    if (!example || !example.code) {
+      // Fallback if example not found
+      return `\n\n\`\`\`${lang}\n// Code example: ${name} in ${lang}\n// (Example not found in repository data)\n\`\`\`\n\n`
+    }
+
+    // Build markdown output
+    let output = '\n\n'
+
+    // Add header if it exists and header prop is not false
+    if (match.props.header !== 'false' && example.header) {
+      output += `${example.header}\n\n`
+    }
+
+    // Add code block
+    output += `\`\`\`${lang}\n${example.code}\n\`\`\`\n\n`
+
+    return output
+  })
+}
+
+/**
+ * Converts <ILPClientsTable /> to markdown list with links
+ */
+function convertILPClientsTable(content) {
+  return replaceComponent(content, 'ILPClientsTable', (match) => {
+    const language = match.props.language
+
+    // Filter by language if specified
+    const filteredClients = language
+      ? ilpClients.filter(c => c.label === language)
+      : ilpClients
+
+    // Build markdown list
+    let markdown = '\n\n'
+
+    for (const client of filteredClients.sort((a, b) => a.label.localeCompare(b.label))) {
+      markdown += `**${client.label} Client**\n\n`
+
+      if (client.docsUrl) {
+        markdown += `- [View full docs](${client.docsUrl})\n`
+      }
+      if (client.sourceUrl) {
+        markdown += `- [View source code](${client.sourceUrl})\n`
+      }
+
+      markdown += '\n'
+    }
+
+    return markdown
+  })
+}
+
+function convertClients(content) {
+  return replaceComponent(content, 'Clients', (match) => {
+    const showProtocol = match.props.showProtocol
+    const filteredClients = showProtocol
+      ? clients.filter(c => c.protocol === showProtocol)
+      : clients
+    const protocols = showProtocol ? new Set([showProtocol]) : new Set(filteredClients.map(c => c.protocol))
+
+    let markdown = '\n\n'
+
+    for (const protocol of protocols) {
+      markdown += `**${protocol} Clients**\n\n`
+
+      for (const client of filteredClients.filter(c => c.protocol === protocol)) {
+        markdown += `- [${client.name}](${client.href}): ${client.description}\n`
+      }
+      markdown += '\n\n'
+    }
+
+    return markdown
   })
 }
 
@@ -305,8 +444,9 @@ function convertRailroadDiagrams(content, docsPath) {
  * @param {string} content - The markdown content
  * @param {string} currentFileDir - Directory of the current file (for resolving imports)
  * @param {string} docsRoot - Root documentation directory (for railroad diagrams)
+ * @param {object} repoExamples - Repository examples data (optional)
  */
-async function convertAllComponents(content, currentFileDir, docsRoot) {
+async function convertAllComponents(content, currentFileDir, docsRoot, repoExamples = {}) {
   let processed = content
 
   // Get release version once
@@ -314,23 +454,162 @@ async function convertAllComponents(content, currentFileDir, docsRoot) {
 
   // Convert components in order
   processed = convertInterpolateReleaseData(processed, releaseVersion)
+  processed = convertRemoteRepoExample(processed, repoExamples)
+  processed = convertILPClientsTable(processed)
+  processed = convertClients(processed)
   processed = convertScreenshot(processed)
   processed = convertDocButton(processed)
   processed = convertCodeBlock(processed)
   processed = convertTabs(processed)
   processed = convertConfigTable(processed, currentFileDir)
   processed = convertRailroadDiagrams(processed, docsRoot)
+  processed = convertImages(processed)
 
   return processed
 }
 
+/**
+ * Bumps markdown heading levels outside of code blocks
+ * @param {string} markdown - The markdown content
+ * @param {number} bumpBy - Number of levels to increase (default: 1)
+ * @returns {string} Markdown with adjusted heading levels
+ */
+function bumpHeadings(markdown, bumpBy = 1) {
+  const lines = markdown.split('\n')
+  let inFence = false
+  let fenceChar = ''
+  let fenceLen = 0
+
+  function isFence(line) {
+    // Match 3+ consecutive backticks OR 3+ consecutive tildes (not mixed)
+    const m = line.match(/^\s*(`{3,}|~{3,})(.*)$/)
+    if (!m) return null
+    return { ticks: m[1], info: m[2] }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+
+    const fenceMatch = isFence(line)
+    if (fenceMatch) {
+      if (!inFence) {
+        inFence = true
+        fenceChar = fenceMatch.ticks[0]
+        fenceLen = fenceMatch.ticks.length
+      } else if (fenceMatch.ticks[0] === fenceChar && fenceMatch.ticks.length >= fenceLen) {
+        inFence = false
+        fenceChar = ''
+        fenceLen = 0
+      }
+      continue
+    }
+
+    if (inFence) continue
+
+    // ATX heading outside code: optional leading spaces then 1-6 #'s and a space
+    const headingMatch = line.match(/^(\s{0,3})(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      const leading = headingMatch[1]
+      const hashes = headingMatch[2]
+      const text = headingMatch[3]
+      const newLevel = Math.min(hashes.length + bumpBy, 6)
+      lines[i] = `${leading}${'#'.repeat(newLevel)} ${text}`
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Removes import statements from processed markdown
+ * Handles both single-line and multi-line imports
+ * @param {string} content - The markdown content
+ * @returns {string} Content with imports removed
+ */
+function removeImports(content) {
+  let processed = content
+  // First handle single-line imports
+  processed = processed.replace(/^import\s+.+\s+from\s+['"].+['"];?\s*$/gm, '')
+  // Then handle multi-line imports (where line breaks exist)
+  processed = processed.replace(/^import\s+[\s\S]*?\s+from\s*\n?\s*['"].+['"];?\s*$/gm, '')
+  return processed
+}
+
+/**
+ * Processes partial component imports
+ * Extracts import statements and replaces component usage with actual content
+ * @param {string} content - The markdown content
+ * @param {Function} loadPartialFn - Function to load partial content: (partialPath, currentFileDir) => string
+ * @param {string} currentFileDir - Relative directory of current file from docs root
+ * @returns {string} Content with partials expanded
+ */
+function processPartialImports(content, loadPartialFn, currentFileDir) {
+  // Extract import statements to build a map of component names to partial paths
+  const importMap = new Map()
+  // Match: import ComponentName from "path/to/file.partial.mdx"
+  const importRegex = /^import\s+(\w+)\s*\n?\s*from\s*['"](.+\.partial\.mdx?)['"];?\s*$/gm
+  let match
+  while ((match = importRegex.exec(content)) !== null) {
+    const componentName = match[1]
+    const partialPath = match[2]
+    importMap.set(componentName, partialPath)
+  }
+
+  // Replace partial component references with their content
+  // Match <ComponentName /> or <ComponentName/>
+  let processed = content.replace(/<(\w+)\s*\/>/g, (fullMatch, componentName) => {
+    if (importMap.has(componentName)) {
+      const partialPath = importMap.get(componentName)
+      const partialContent = loadPartialFn(partialPath, currentFileDir)
+      // Add blank lines before and after the partial content
+      return `\n\n${partialContent}\n\n`
+    }
+    // If not a partial, keep the component reference
+    return fullMatch
+  })
+
+  return processed
+}
+
+/**
+ * Prepends frontmatter title and description to content
+ * @param {string} content - The markdown content
+ * @param {Object} frontmatter - Frontmatter object with title and description
+ * @param {boolean} includeTitle - Whether to include title as H1 (default: true)
+ * @returns {string} Content with title and description prepended
+ */
+function prependFrontmatter(content, frontmatter, includeTitle = true) {
+  let processedContent = ''
+
+  if (includeTitle && frontmatter.title) {
+    processedContent += `# ${frontmatter.title}\n\n`
+  }
+
+  if (frontmatter.description) {
+    processedContent += `${frontmatter.description}\n\n`
+  }
+
+  processedContent += content
+  return processedContent
+}
+
+/**
+ * Cleans processed markdown for final output
+ * Normalizes whitespace
+ * @param {string} content - The processed markdown content
+ * @returns {string} Cleaned markdown
+ */
+function normalizeNewLines(content) {
+  return content
+    .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
+    .trim()
+}
+
 module.exports = {
   convertAllComponents,
-  convertScreenshot,
-  convertDocButton,
-  convertCodeBlock,
-  convertTabs,
-  convertConfigTable,
-  convertInterpolateReleaseData,
-  fetchReleaseVersion,
+  bumpHeadings,
+  normalizeNewLines,
+  removeImports,
+  processPartialImports,
+  prependFrontmatter,
 }

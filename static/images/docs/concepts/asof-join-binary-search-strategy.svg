@@ -48,7 +48,7 @@
      text-anchor="middle"
      font-weight="bold"
      fill="#ffffff"
-     id="text366">Binary Search ASOF JOIN Strategy</text>
+     id="text366">ASOF JOIN with Binary Search</text>
   <!-- Tables -->
   <g
      id="g7734"
@@ -148,15 +148,15 @@
        sodipodi:role="line"
        id="tspan574"
        x="414.26334"
-       y="404.38239">Iterate the Joined table</tspan><tspan
+       y="404.38239">Scan the Joined table</tspan><tspan
        sodipodi:role="line"
        x="414.26334"
        y="424.38239"
-       id="tspan578">backwards to find</tspan><tspan
+       id="tspan578">backwards to find a row</tspan><tspan
        sodipodi:role="line"
        x="414.26334"
        y="444.38239"
-       id="tspan9661">a row matching the filter</tspan></text>
+       id="tspan9661">matching JOIN condition</tspan></text>
   <text
      x="500"
      y="435"

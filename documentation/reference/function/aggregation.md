@@ -22,17 +22,19 @@ Running it will result in the following error:
 
 You can work around this limitation by using CTEs or subqueries:
 
-```questdb-sql title="aggregates as function args workaround" demo
+```questdb-sql title="CTE workaround"
 -- CTE
 WITH minmax AS (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 )
 SELECT datediff('d', min_date, max_date) FROM minmax;
 
 -- Subquery
-SELECT datediff('d', min_date, max_date) FROM (
-    SELECT min(timestamp) as min_date, max(timestamp) as max_date FROM trades
+SELECT datediff('d', min_date, max_date)
+FROM (
+  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 );
+
 ```
 
 :::
@@ -491,8 +493,8 @@ SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY paym
 - `first(column_name)` - returns the first value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
-`uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
+`uuid` and `array`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
 then the first row is always the row with the lowest timestamp (oldest). For a table
@@ -653,8 +655,8 @@ FROM (SELECT rnd_double() a FROM long_sequence(100));
 - `last(column_name)` - returns the last value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
-`uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
+`uuid` and `array`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/), the
 last row is always the one with the highest (latest) timestamp.

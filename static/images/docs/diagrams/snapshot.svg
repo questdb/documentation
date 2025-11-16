@@ -1,1 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="447" height="125"><defs><style type="text/css">@namespace &quot;http://www.w3.org/2000/svg&quot;;text.terminal{font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Ubuntu,Cantarell,Helvetica,sans-serif;font-size:12px;fill:#fff;font-weight:700}polygon,rect{fill:none;stroke:none}rect.terminal{fill:none;stroke:#be2f5b}</style></defs><polygon points="9 17 1 13 1 21"/><polygon points="17 17 9 13 9 21"/><rect x="31" y="3" width="96" height="32" rx="10"/><rect x="29" y="1" width="96" height="32" class="terminal" rx="10"/><text class="terminal" x="39" y="21">SNAPSHOT</text><rect x="167" y="3" width="82" height="32" rx="10"/><rect x="165" y="1" width="82" height="32" class="terminal" rx="10"/><text class="terminal" x="175" y="21">PREPARE</text><rect x="167" y="47" width="92" height="32" rx="10"/><rect x="165" y="45" width="92" height="32" class="terminal" rx="10"/><text class="terminal" x="175" y="65">COMPLETE</text><rect x="299" y="3" width="24" height="32" rx="10"/><rect x="297" y="1" width="24" height="32" class="terminal" rx="10"/><text class="terminal" x="307" y="21">;</text><path xmlns:svg="http://www.w3.org/2000/svg" d="M17 17h2m0 0h10m96 0h10m20 0h10m82 0h10m0 0h10m-132 0h20m112 0h20m-152 0q10 0 10 10m132 0q0-10 10-10M145 27v24m132 0V27M145 51q0 10 10 10m112 0q10 0 10-10M155 61h10m92 0h10m20-44h10m24 0h10m3 0h-3" fill="none" stroke="#636273"/><polygon points="341 17 349 13 349 21"/><polygon points="341 17 333 13 333 21"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="351" height="81">
+    <defs>
+        <style type="text/css">
+            @namespace "http://www.w3.org/2000/svg";
+            .line                 {fill: none; stroke: #636273;}
+            .bold-line            {stroke: #636273; shape-rendering: crispEdges; stroke-width: 2; }
+            .thin-line           {stroke: #636273; shape-rendering: crispEdges}
+            .filled              {fill: #636273; stroke: none;}
+            text.terminal        {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #ffffff;
+            font-weight: bold;
+            }
+            text.nonterminal     {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #e289a4;
+            font-weight: normal;
+            }
+            text.regexp          {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, Helvetica, sans-serif;
+            font-size: 12px;
+            fill: #00141F;
+            font-weight: normal;
+            }
+            rect, circle, polygon {fill: none; stroke: none;}
+            rect.terminal        {fill: none; stroke: #be2f5b;}
+            rect.nonterminal     {fill: rgba(255,255,255,0.1); stroke: none;}
+            rect.text            {fill: none; stroke: none;}
+            polygon.regexp       {fill: #C7ECFF; stroke: #038cbc;}
+        </style>
+    </defs>
+    <polygon points="9 17 1 13 1 21"></polygon>
+         <polygon points="17 17 9 13 9 21"></polygon>
+         <rect x="31" y="3" width="96" height="32" rx="10"></rect>
+         <rect x="29" y="1" width="96" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="39" y="21">SNAPSHOT</text>
+         <rect x="167" y="3" width="82" height="32" rx="10"></rect>
+         <rect x="165" y="1" width="82" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="175" y="21">PREPARE</text>
+         <rect x="167" y="47" width="92" height="32" rx="10"></rect>
+         <rect x="165" y="45" width="92" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="175" y="65">COMPLETE</text>
+         <rect x="299" y="3" width="24" height="32" rx="10"></rect>
+         <rect x="297" y="1" width="24" height="32" class="terminal" rx="10"></rect>
+         <text class="terminal" x="307" y="21">;</text>
+         <path class="line" d="m17 17 h2 m0 0 h10 m96 0 h10 m20 0 h10 m82 0 h10 m0 0 h10 m-132 0 h20 m112 0 h20 m-152 0 q10 0 10 10 m132 0 q0 -10 10 -10 m-142 10 v24 m132 0 v-24 m-132 24 q0 10 10 10 m112 0 q10 0 10 -10 m-122 10 h10 m92 0 h10 m20 -44 h10 m24 0 h10 m3 0 h-3"></path>
+         <polygon points="341 17 349 13 349 21"></polygon>
+         <polygon points="341 17 333 13 333 21"></polygon>
+</svg>
