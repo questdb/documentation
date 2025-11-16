@@ -67,9 +67,10 @@ logic: for each row in the first time-series...
 1. consider all timestamps in the second time-series **earlier or equal to**
 the first one
 2. choose **the latest** such timestamp
-3. If the optional `TOLERANCE` clause is specified, an additional condition applies:
-   the chosen record from t2 must satisfy `t1.ts - t2.ts <= tolerance_value`. If no record
-   from t2 meets this condition (along with `t2.ts <= t1.ts`), then the row from t1 will not have a match.
+3. If the optional `TOLERANCE` clause is specified, an additional condition
+   applies: the chosen record from t2 must satisfy
+   `t1.ts - t2.ts <= tolerance_value`. If no record from t2 meets this condition
+   (along with `t2.ts <= t1.ts`), then the row from t1 will not have a match.
 
 ### Example
 
@@ -78,7 +79,8 @@ Let's use an example with two tables:
 - `market_data`: Multi-level L2 FX order book snapshots per symbol
 - `core_price`: Quote streamer per symbol and ECN
 
-`market_data` data: For the purposes of these examples, we will focus only on the best bid price.
+`market_data` data: For the purposes of these examples, we will focus only on
+the best bid price.
 
 ```questdb-sql title="Best Bid Price per Symbol from Market Data" demo
 SELECT timestamp, symbol, bids[1,1] as best_bid_price
@@ -110,6 +112,7 @@ FROM
 | 2025-09-16T14:00:00.073536Z | EURUSD | 1.1869         |
 | 2025-09-16T14:00:00.077558Z | GBPUSD | 1.3719         |
 | 2025-09-16T14:00:00.078433Z | GBPUSD | 1.3719         |
+
 </div>
 
 `core_price` data: We will focus only on the bid_price
@@ -237,23 +240,29 @@ Result:
 
 </div>
 
-Note how the first few rows for each symbol don't match anything on the `core_price` table, as there are no rows
-with timestamps equal or earlier than the timestamp on the `market_data` table for those first rows.
+Note how the first few rows for each symbol don't match anything on the
+`core_price` table, as there are no rows with timestamps equal or earlier than
+the timestamp on the `market_data` table for those first rows.
 
 ### How ASOF JOIN uses timestamps
 
-`ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to meet this requirement is to use a
-[designated timestamp](/docs/concept/designated-timestamp/), which is set when you create a table.
-This not only enforces the chronological order of your data but also tells QuestDB which column to use for time-series
-operations automatically.
+`ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to
+meet this requirement is to use a
+[designated timestamp](/docs/concept/designated-timestamp/), which is set when
+you create a table. This not only enforces the chronological order of your data
+but also tells QuestDB which column to use for time-series operations
+automatically.
 
 #### Default behavior
 
-By default, an `ASOF JOIN` will always use the designated timestamp of the tables involved.
+By default, an `ASOF JOIN` will always use the designated timestamp of the
+tables involved.
 
-This behavior is so fundamental that it extends to subqueries in a unique way: even if you do not explicitly SELECT the
-designated timestamp column in a subquery, QuestDB implicitly propagates it. The join is performed correctly under the
-hood using this hidden timestamp, which is then omitted from the final result set.
+This behavior is so fundamental that it extends to subqueries in a unique way:
+even if you do not explicitly SELECT the designated timestamp column in a
+subquery, QuestDB implicitly propagates it. The join is performed correctly
+under the hood using this hidden timestamp, which is then omitted from the final
+result set.
 
 This makes most `ASOF JOIN` queries simple and intuitive.
 
@@ -270,15 +279,20 @@ SELECT *
 FROM market_subset ASOF JOIN core_price ON (symbol);
 ```
 
-In more complicated subqueries, the implicit propagation of the designated timestamp may not work QuestDB responds with an error
-`left side of time series join has no timestamp`. In such cases, your subquery should explicitly include the designated
-timestamp column in the `SELECT` clause to ensure it is used for the join.
+In more complicated subqueries, the implicit propagation of the designated
+timestamp may not work QuestDB responds with an error
+`left side of time series join has no timestamp`. In such cases, your subquery
+should explicitly include the designated timestamp column in the `SELECT` clause
+to ensure it is used for the join.
 
 #### The standard override method: Using ORDER BY
 
-The easiest and safest way to join on a different timestamp column is to use an `ORDER BY ... ASC` clause in your subquery.
+The easiest and safest way to join on a different timestamp column is to use an
+`ORDER BY ... ASC` clause in your subquery.
 
-When you sort a subquery by a `TIMESTAMP` column, QuestDB makes that column the new designated timestamp for the subquery's results. The subsequent `ASOF JOIN` will automatically detect and use this new timestamp.
+When you sort a subquery by a `TIMESTAMP` column, QuestDB makes that column the
+new designated timestamp for the subquery's results. The subsequent `ASOF JOIN`
+will automatically detect and use this new timestamp.
 
 Example: Joining on `ingestion_time` instead of the default `trade_ts`
 
@@ -300,16 +314,19 @@ ASOF JOIN quotes ON (symbol);
 
 #### Using the timestamp() syntax
 
-The `timestamp()` syntax is an expert-level hint for the query engine. It should only be used to manually assign a
-timestamp to a dataset that does not have one, without forcing a sort.
+The `timestamp()` syntax is an expert-level hint for the query engine. It should
+only be used to manually assign a timestamp to a dataset that does not have one,
+without forcing a sort.
 
-You should only use this when you can guarantee that your data is already sorted by that timestamp column. Using
-`timestamp()` incorrectly on unsorted data will lead to incorrect join results.
+You should only use this when you can guarantee that your data is already sorted
+by that timestamp column. Using `timestamp()` incorrectly on unsorted data will
+lead to incorrect join results.
 
-The primary use case is performance optimization on a table that has no designated timestamp in its schema, but where
-you know the data is physically stored in chronological order. Using the `timestamp()` hint avoids a costly ORDER BY
-operation. This can be the case, for example, with external Parquet files where you know data is already sorted by
-timestamp.
+The primary use case is performance optimization on a table that has no
+designated timestamp in its schema, but where you know the data is physically
+stored in chronological order. Using the `timestamp()` hint avoids a costly
+ORDER BY operation. This can be the case, for example, with external Parquet
+files where you know data is already sorted by timestamp.
 
 ```questdb-sql title="ASOF JOIN with timestamp()" demo
 -- Use this ONLY IF the left-side table has NO designated timestamp,
@@ -327,20 +344,24 @@ ASOF JOIN trades ON (symbol);
 To summarize:
 
 1. By default, the table's designated timestamp is used.
-2. To join on a different column, the standard method is to `ORDER BY` that column in a subquery.
-3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a table with no designated timestamp, if and
-   only if you are certain the data is already sorted.
+2. To join on a different column, the standard method is to `ORDER BY` that
+   column in a subquery.
+3. Use the `timestamp()` syntax as an expert-level hint to avoid a sort on a
+   table with no designated timestamp, if and only if you are certain the data
+   is already sorted.
 
 ### TOLERANCE clause
 
-The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in time the join should look for a match in the right
-table. The `TOLERANCE` parameter accepts a time interval value (e.g., `2s`, `100ms`, `1d`).
+The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in
+time the join should look for a match in the right table. The `TOLERANCE`
+parameter accepts a time interval value (e.g., `2s`, `100ms`, `1d`).
 
-When specified, a record from the left table t1 at t1.ts will only be joined with a record from the right table t2 at
-t2.ts if both conditions are met: `t2.ts <= t1.ts` and `t1.ts - t2.ts <= tolerance_value`
+When specified, a record from the left table t1 at t1.ts will only be joined
+with a record from the right table t2 at t2.ts if both conditions are met:
+`t2.ts <= t1.ts` and `t1.ts - t2.ts <= tolerance_value`
 
-This ensures that the matched record from the right table is not only the latest one on or before t1.ts, but also within
-the specified time window.
+This ensures that the matched record from the right table is not only the latest
+one on or before t1.ts, but also within the specified time window.
 
 TOLERANCE works both with or without the ON clause:
 
@@ -351,12 +372,14 @@ ASOF JOIN core_price ON (symbol) TOLERANCE 50T
 WHERE market_data.timestamp IN today();
 ```
 
-The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100T' (100 milliseconds), '2m'
-(2 minutes), '3h' (3 hours), or '1d' (1 day).
-
+The interval_literal must be a valid QuestDB interval string, like '5s' (5
+seconds), '100T' (100 milliseconds), '2m' (2 minutes), '3h' (3 hours), or '1d'
+(1 day).
 
 #### Supported Units for interval_literal
+
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
+
 - n: Nanoseconds
 - U: Microseconds
 - T: Milliseconds
@@ -366,16 +389,26 @@ The `TOLERANCE` interval literal supports the following time unit qualifiers:
 - d: Days
 - w: Weeks
 
-For example, '500n' is 500 nanoseconds, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 seconds, '30m' is 30 minutes,
-'1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
-units for the `TOLERANCE` clause.
+For example, '500n' is 500 nanoseconds, '100U' is 100 microseconds, '50T' is 50
+milliseconds, '2s' is 2 seconds, '30m' is 30 minutes, '1h' is 1 hour, '7d' is 7
+days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not
+supported as units for the `TOLERANCE` clause.
 
 #### Performance impact of TOLERANCE
 
-Specifying `TOLERANCE` can also improve performance. `ASOF JOIN` execution plans often scan backward in time on the right
-table to find a matching entry for each left-table row. `TOLERANCE` allows these scans to terminate early - once a
-right-table record is older than the left-table record by more than the specified tolerance - thus avoiding unnecessary
-processing of more distant records.
+Specifying `TOLERANCE` can also improve performance. `ASOF JOIN` execution plans
+often scan backward in time on the right table to find a matching entry for each
+left-table row. `TOLERANCE` allows these scans to terminate early - once a
+right-table record is older than the left-table record by more than the
+specified tolerance - thus avoiding unnecessary processing of more distant
+records.
+
+### Choose the optimal algorithm with an SQL Hint
+
+QuestDB has several different algorithms that fit different queries and data
+distributions. If you query is performing poorly, consult the
+[SQL optimizer hints](/docs/concept/sql-optimizer-hints) page and try out the
+non-default algorithms.
 
 ## SPLICE JOIN
 

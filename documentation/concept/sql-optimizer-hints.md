@@ -5,48 +5,143 @@ description:
   This document describes available hints and when to use them.
 ---
 
-QuestDB's query optimizer automatically selects execution plans for SQL queries based on heuristics. While the default
-execution strategy should be the fastest for most scenarios, you can use hints to select a specific strategy that may
-better suit your data's characteristics. SQL hints influence the execution strategy of queries without changing their
-semantics.
+QuestDB's query optimizer automatically selects execution plans for SQL queries
+based on heuristics. While the default execution strategy should be the fastest
+for most scenarios, you can use hints to select a specific strategy that may
+better suit your data's characteristics. SQL hints influence the execution
+strategy of queries without changing their semantics.
 
 ## Hint Syntax
 
-In QuestDB, SQL hints are specified as SQL block comments with a plus sign after the opening comment marker. Hints must
-be placed immediately after the `SELECT` keyword:
+In QuestDB, you specify SQL hints in block comments with a plus sign after the
+opening comment marker. You must place the hint immediately after the `SELECT`
+keyword:
 
 ```questdb-sql title="SQL hint syntax"
 SELECT /*+ HINT_NAME(parameter1 parameter2) */ columns FROM table;
 ```
 
+Only block comment hints (`/*+ HINT */`) are supported, not line comment hints
+(`--+ HINT`).
+
 Hints are designed to be a safe optimization mechanism:
 
-- The database uses default optimization strategies when no hints are provided.
-- Syntax errors inside a hint block won't fail the entire SQL query.
-- The database safely ignores unknown hints.
-- Only block comment hints (`/*+ HINT */`) are supported, not line comment hints (`--+ HINT`).
+- without hints, QuestDB uses default optimization strategies
+- QuestDB silently ignores unknown hints and those that don't apply to a query
+- QuestDB silently ignores any syntax errors in a hint block
 
 -----
 
-## Time-series JOIN hints
+## Temporal JOIN hints
 
-Since QuestDB 9.0.0, QuestDB's optimizer defaults to using a binary search-based strategy for **`ASOF JOIN`** and
-**`LT JOIN`** (Less Than Join) queries that have a filter on the right-hand side (the joined or lookup table). This
-approach is generally faster as it avoids a full table scan.
+A significant factor in choosing the optimal algorithm for a
+[temporal join](/docs/reference/sql/asof-join) (ASOF and LT) is the pattern in
+which the rows of the left-hand dataset are matched to the rows of the
+right-hand dataset. When there's no additional join condition, only the implied
+matching on timesatmp, the situation is simple: we search for a timestamp in a
+dataset which is already sorted by timestamp. We can use binary search, or
+linear search if the search space is small enough.
 
-However, for some specific data distributions and filter conditions, the previous strategy of performing a parallel full
-table scan can be more performant. For these cases, QuestDB provides hints to modify the default search strategy.
+When there is an additional JOIN condition, as in
+`left ASOF JOIN right ON (condition)`, the matching row can be anywhere in the
+past from the row that matches by timestamp. For this, we need a more
+sophisticated algorithm.
 
-The `asof`-prefixed hints will also apply to `lt` joins.
+Our optimized algorithms assume the JOIN condition matches additional columns by
+equality. Basically, there's a join key that must match on both sides. An even
+narrower common case we optimize more aggressively for is matching on a _symbol
+column_ on both sides.
 
-### `asof_linear_search(l r)`
+We distinguish these two cases:
 
-This hint instructs the optimizer to revert to the pre-9.0 execution strategy for `ASOF JOIN` and `LT JOIN` queries,
-respectively. This older strategy involves performing a full parallel scan on the joined table to apply filters *before*
-executing the join.
+### 1. Localized matching
 
-```questdb-sql title="Using linear search for an ASOF join"
-SELECT /*+ asof_linear_search(orders md) */
+In this case, when scanning the right-hand table backward from the timestamp of
+the left-hand row, we find a match much sooner than reaching the timestamp of
+the previous left-hand row. We end up scanning only a small subset of the
+right-hand rows. In the diagram, we show the scanned portions of the right-hand
+dataset in red.
+
+The best way to perform this join is the straightforward one: first locate the
+right-hand row that matches by timestamp (marked with the dotted line), then
+scan backward to find the row satisfying additional join conditions.
+
+<Screenshot
+alt="Diagram showing localized row matching"
+src="images/docs/concepts/asof-join-sparse.svg"
+width={300}
+/>
+
+### 2. Distant matching
+
+In this case, the matching row is in the more distant past, earlier than the
+previous left-hand row. The scanning ranges now ovelap, and we end up scanning
+almost the entire right-hand dataset. If we do a separate scan for each
+left-hand row, we'll end up going over the same rows many times. In the diagram,
+this shows up as more intensely red regions in the right-hand table.
+
+The best way in this case is to scan the entire red region once, collect the
+join keys in a hashtable, and match up with the left-hand rows as needed.
+
+<Screenshot
+alt="Diagram showing distant row matching"
+src="images/docs/concepts/asof-join-dense.svg"
+width={300}
+/>
+
+## ASOF JOIN algorithms
+
+QuestDB implements several algorithms to deal with keyed joins.
+
+- _Fast_ algorithm is the best for localized row matching
+- _Dense_ algorithm is the best for distant row matching
+
+In a real scenario, you may not have such a clear-cut situation. If your join
+pattern is mostly localized, but with some distant matching, the _Memoized_
+algorithm may help. It remembers where the previous match was for a given join
+key, and can avoid rescanning to find it.
+
+When you use a WHERE clause on the right-hand dataset, and if it's highly
+selective (passing through a small fraction of rows), the _Light_ algorithm may
+be the best. It is the only one that allows QuestDB to use its parallelized
+filtering to quickly identify the filtered subset.
+
+The default algorithm is _Fast_, and you can enable others through query hints.
+
+### List of hints
+
+### `asof_dense(l r)`
+
+This hint enables the [Dense](#dense-algo) algorithm, the best choice (when it's
+available) for the case of distant row matching.
+
+```questdb-sql title="Applying the query hint for the Dense algorithm"
+SELECT /*+ asof_dense(orders md) */
+    orders.timestamp, orders.symbol, orders.price
+FROM orders
+ASOF JOIN (md) ON (symbol);
+```
+
+### `asof_linear(l r)`
+
+:::info
+
+This hint applies to `LT` joins as well.
+
+:::
+
+This enables the [Light](#light-algo) algorithm, similar to Dense but simpler.
+It is more generic and selected automatically in queries where the Dense algo
+isn't applicable. Its downside is that it must scan the entire history in
+the RHS table, up to the most recent LHS timestamp.
+
+There's a case where the Light algo is at an advantage even when the Dense algo
+is also available: when the right-hand side is a subquery with a WHERE clause
+that is highly selective, passing through a small number of rows. QuestDB has
+parallelized filtering support, which cannot be used with the other algorithms.
+
+```questdb-sql title="Applying the query hint for the Light algorithm"
+SELECT /*+ asof_linear(orders md) */
   orders.ts, orders.price, md.md_ts, md.bid, md.ask
 FROM orders
 ASOF JOIN (
@@ -55,98 +150,30 @@ ASOF JOIN (
 ) md;
 ```
 
-#### How it works
+### `asof_memoized(l r)`
 
-The **default strategy (binary search)** works as follows:
+This hint enables [Memoized](#memoized-algo), a variant of the
+[Fast](#fast-algo) algorithm. It works for queries that join on a symbol column,
+as in `left ASOF JOIN right ON (symbol)`. It helps when there's a mix of
+localized and distant matches by reusing the results of earlier backward scans.
 
-1. For each record in the main table, it uses a binary search to quickly locate a record with a matching timestamp in
-   the joined table.
-2. Starting from this located timestamp, it then iterates backward through rows in the joined table, in a single thread,
-   evaluating the filter condition until a match is found.
-
-<Screenshot
-alt="Diagram showing execution of the asof_linear_search hint"
-height={447}
-src="images/docs/concepts/asof-join-binary-search-strategy.svg"
-width={745}
-/>
-
-The hinted strategy forces this plan:
-
-1. Apply the filter to the *entire* joined table in parallel.
-2. Join the filtered (and now much smaller) result set to the main table.
-
-#### When to use it
-
-You should only need this hint in a specific scenario: when the filter on your joined table is **highly selective**.
-
-A filter is considered highly selective if it eliminates a very large percentage of rows (e.g., more than 95%). In this
-situation, the hinted strategy can be faster because:
-
-- The parallel pre-filtering step rapidly reduces the joined table to a very small size.
-- The subsequent join operation is then very fast.
-
-Conversely, the default binary search can be slower with highly selective filters because its single-threaded backward
-scan may have to check many rows before finding one that satisfies the filter condition.
-
-For most other cases, especially with filters that have low selectivity or when the joined table data is not in
-memory ("cold"), the default binary search is significantly faster as it minimizes I/O operations.
-
-### `asof_index_search(l r)`
-
-This hint instructs the optimizer to use a symbol's index to skip over any time partitions where the symbol does not appear. 
-
-In partitions where the symbol does appear, there will still be some scanning to locate the matching rows.
-
-```questdb-sql title="Using index search for an ASOF join"
-SELECT /*+ asof_index_search(orders md) */
+```questdb-sql title="Appling the query hint for the Memoized algorithm"
+SELECT /*+ asof_memoized(orders md) */
     orders.timestamp, orders.symbol, orders.price
 FROM orders
 ASOF JOIN (md) ON (symbol);
 ```
-
-#### When to use it
-
-When your symbol column has a highly selective index i.e. the symbol entry is rare, rarely appearing in any of
-your partitions. 
-
-If the symbol appears frequently, then this hint may cause a slower execution plan than the default.
-
-If no index exists on the column, this hint will be disregarded.
-
-### `asof_memoized_search(l r)`
-
-This hint instructs the optimizer to memoize (remember) rows it has previously seen, and use this information to avoid 
-repeated re-scanning of data.
-
-Imagine a linear scan. For each symbol, we must scan forward to find the next available row. This symbol could be far away.
-When the matching row is located, we store it, pick the next symbol, and repeat this scan. This causes repeated re-reading of data.
-
-Instead, the query engine will check each row for a matching symbol, recording the locations. Then when the symbol is next
-processed, the memoized rows are checked (look-ahead) and the cursor skips forward.
-
-```questdb-sql title="Using memoized search for an ASOF join"
-SELECT /*+ asof_memoized_search(orders md) */
-    orders.timestamp, orders.symbol, orders.price
-FROM orders
-ASOF JOIN (md) ON (symbol);
-```
-
-#### When to use it
-
-If your table has a very skewed symbol distribution, this hint can dramatically speed up the query. A typical skew
-would be a few symbols with very large row counts, and many symbols with very small row counts. This hint works well
-for Zipfian-distributed data.
 
 -----
 
-### Execution Plan Observation
+### Check the Execution Plan
 
-You can verify how QuestDB executes your query by examining its execution plan with the `EXPLAIN` statement.
+You can verify how QuestDB executes your query by examining its execution plan
+with the `EXPLAIN` statement.
 
 #### Default Execution Plan (Binary Search)
 
-Without any hints, a filtered `ASOF JOIN` will use the binary search strategy.
+Without any hints, a filtered `ASOF JOIN` will use the Fast algorithm.
 
 ```questdb-sql title="Observing the default execution plan" demo
 EXPLAIN SELECT  *
@@ -157,13 +184,13 @@ WHERE bids[1,1]=107.03 -- Highly selective filter
 ;
 ```
 
-The execution plan will show a `Filtered AsOf Join Fast Scan` operator, confirming the binary search strategy is being
-used.
+The execution plan will show a `Filtered AsOf Join Fast` operator,
+confirming the binary search strategy is being used.
 
 ```text
 SelectedRecord
     Filter filter: market_data.bids[1,1]=107.03
-        AsOf Join Fast Scan
+        AsOf Join Fast
           condition: market_data.symbol=core_price.symbol
             PageFrame
                 Row forward scan
@@ -173,13 +200,12 @@ SelectedRecord
                 Frame forward scan on: market_data
 ```
 
-
 #### Hinted Execution Plan (Full Scan)
 
-When you use the `asof_linear_search` hint, the plan changes.
+When you use the `asof_linear` hint, the plan changes.
 
-```questdb-sql title="Observing execution plan with the AVOID hint" demo
-EXPLAIN SELECT /*+ asof_linear_search(core_price market_data) */
+```questdb-sql title="Observing execution plan with asof_linear query hint" demo
+EXPLAIN SELECT /*+ asof_linear(core_price market_data) */
   *
 FROM core_price
 ASOF JOIN market_data
@@ -188,8 +214,8 @@ WHERE bids[1,1]=107.03 -- Highly selective filter
 ;
 ```
 
-The execution plan will now show a standard `AsOf Join` operator and a separate, preceding filtering step on the joined
-table.
+The execution plan will now show the `AsOf Join Light` operator and a separate,
+preceding filtering step on the joined table.
 
 ```text
 SelectedRecord
@@ -204,9 +230,131 @@ SelectedRecord
                 Frame forward scan on: market_data
 ```
 
+-----
+
+### Algorithms compared on an example
+
+Let's use the diagram below to explain the key differences among algorithms. It
+shows two tables, LHS and RHS. We show the rows aligned on timestamp, so there
+are gaps in the LHS column. These gaps don't represent any LHS rows, it is just
+the way we visualize the two tables.
+
+The example assumes a JOIN condition on a symbol column. We show the values of
+that column in the table:
+
+```text
+row | LHS | RHS
+----|-----|----
+ 1  |     | G
+ 2  |     | C
+ 3  |     | G
+ 4  |     | A
+ 5  |     | F
+ 6  |   A | B
+ 7  |     | D
+ 8  |     | B
+ 9  |   C | G
+10  |     | F
+11  |     | D
+12  |   B | E
+13  |     | D
+14  |     | C
+15  |   A | B
+```
+
+Since the match for each LHS row occurs in the RHS table at a time earlier than
+the previous LHS row, the join pattern is "distant matching".
+
+#### Light algo
+
+Light algo uses a forward-only scan of the RHS table. When matching the first
+RHS symbol (row 6, symbol A), it starts from RHS row 1, and proceeds all the way
+to row 6, collecting all the symbols into a hashtable. When done, it looks up
+symbol A in the hashtable and finds the prevailing RHS row is row 4. When
+matching the next RHS symbol (row 9, symbol C), it resumes the forward scan,
+touching rows 7, 8 and 9. Then it looks up symbol C, and finds the prevailing
+row is row 2.
+
+#### Fast algo
+
+Fast algo uses binary search over RHS timestamps to zero in on row 6 as the most
+recent row not newer than the first LHS row. Then it scans backward: rows 6, 5,
+4, and there it finds the matching symbol A. When matching the next LHS symbol
+(row 9, symbol C), it uses binary search to zero in on RHS row 9, then scans all
+the way back to row 2, where it finds symbol C.
+
+When matching symbol A in row LHS row 15, it uses binary search to zero in or
+RHS row 15, then scans backward, again all the way back to row 4.
+
+There's also an optimization that avoids the fixed cost of binary search by
+first searching linearly for the matching timestamp in the RHS row, for a
+smallish number of steps. This doesn't affect the backward search for the
+symbol.
+
+#### Memoized algo
+
+The Memoized algo is a variant of the Fast algo. It uses the exact same
+linear/binary search to find the matching timestamp in the RHS, and then uses
+the same backward search for the symbol. However, it memorizes for each symbol
+where it started the backward search, and where it found it.
+
+In our example, this means it handles the first LHS row (6) exactly the same
+way, scanning backward to row 4. But when it encounters the same symbol A in row
+15, it scans backward only until reaching row 6, and then directly uses the
+remembered result of the previous scan, and matches up with row 4.
+
+#### Dense algo
+
+The Dense algo starts like the Fast algo, performing a binary search to zero in
+on RHS row 6 and searching backward to find symbol A in row 4 of RHS. From then
+on, it behaves more like the Light algo.
+
+To match up LHS row 9 (symbol C), it first does a linear scan forward from row 6
+to row 9 (exactly like the Light algo). Since it didn't find C in this scan, it
+resumes the backward scan, touching rows 3 and 2, and there it finds the symbol
+C.
+
+At LHS row 12 (symbol B), it resumes the forward scan, touching rows 10, 11, and
+12. Then it finds symbol B in the hashtable, getting row 8 as the prevailing
+row. No backward scan nedeed here.
+
+At LHS row 15 (symbol A), it resumes the forward scan, touching rows 13, 14, and
+15. Then it looks up symbol A in the hashtable of the forward scan, finding
+nothing. Then it looks up symbol A in the hashtable of the backward scan, and
+finds it there. The prevailing row is number 4. Again, no backward search was
+needed.
+
+#### Discussion
+
+As expected for distant matching, the Fast and Memoized algos had to touch the
+most rows. Especially, when matching row 15, Fast algo had to scan backward to
+row 4, and Memoized did only slighly better, scanning until row 6.
+
+Light algo had to initially scan all the history (rows 1 to 6), but from then
+on, it only needed to touch the additional rows that came into scope as the LHS
+timestamp was moving on.
+
+Dense algo had the same advantage as Light, but it didn't have to scan all the
+history. It scanned only as far back into history as needed to find the most
+recent occurence of a symbol not yet seen in the forward scan.
+
+### RAM considerations
+
+The Fast algorithm is the only one that doesn't use any RAM to store the results
+of scanning. It is purely search-based, giving it an additional advantage when
+your symbol set is high-cardinality.
+
+---
+
 ## Deprecated hints
 
 - `avoid_asof_binary_search`
-  - superceded by `asof_linear_search`
+  - superseded by `asof_linear`
 - `avoid_lt_binary_search`
-  - superceded by `asof_linear_search`
+  - superseded by `asof_linear`
+- `asof_linear_search`
+  - superseded by `asof_linear`
+- `asof_index_search`
+  - superseded by `asof_index`
+- `asof_memoized_search`
+  - superseded by `asof_memoized`
