@@ -178,10 +178,10 @@ original timestamp when ingesting data into QuestDB. Using ingestion-time
 timestamps precludes the ability to deduplicate rows, which is
 [important for exactly-once processing](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
-<!-- ## Ingest decimals
+## Ingest decimals
 
 :::note
-Decimals are available in QuestDB 9.2.0+ and require the .NET client to speak ILP protocol version
+Decimals are available in QuestDB 9.2.0+ and require the .NET client v3.1.1+ to speak ILP protocol version
 3. Use `protocol_version=3` (or leave `protocol_version=auto` when connecting over HTTP so the handshake
 negotiates it for you). Earlier protocol versions throw an IngressError if you call the decimal
 overload.
@@ -227,7 +227,7 @@ You need to specify the precision and scale, unlike other types, QuestDB require
 
 decimal values in .NET carry up to 28 fractional digits; the client copies that scale byte-for-byte into
 the ILP frame and emits the 96-bit two’s-complement mantissa expected by QuestDB, so numbers such as
-`decimal.MaxValue`, `decimal.MinValue`, and high-scale fractions round-trip exactly. -->
+`decimal.MaxValue`, `decimal.MinValue`, and high-scale fractions round-trip exactly.
 
 ## Ways to create the client
 
