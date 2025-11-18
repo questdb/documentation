@@ -27,3 +27,13 @@
 # Revalidated sw on every request
 /sw.js
   Cache-Control: max-age=0, must-revalidate, public
+
+# Cache web-console JSON and markdown files for 1 hour
+/web-console/*.json?source=webconsole
+  Cache-Control: public, max-age=3600
+/reference/*.md?source=webconsole
+  Cache-Control: public, max-age=3600
+/reference/*/*.md?source=webconsole
+  Cache-Control: public, max-age=3600
+/reference-full.md?source=webconsole
+  Cache-Control: public, max-age=3600
