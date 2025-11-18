@@ -8,6 +8,12 @@
   Permissions-Policy: camera=(), geolocation=(), microphone=()
   Strict-Transport-Security: max-age=15768000
 
+/*/*.md
+  Cache-Control: public, max-age=60
+
+/*/web-console/*.json
+  Cache-Control: public, max-age=60
+
 # Cache JavaScript, CSS, SVG, TXT, and WebP files for a year
 /*.js
   Cache-Control: public, max-age=31536000
@@ -27,13 +33,3 @@
 # Revalidated sw on every request
 /sw.js
   Cache-Control: max-age=0, must-revalidate, public
-
-# Cache web-console JSON and markdown files for 1 hour
-/web-console/*.json?source=webconsole
-  Cache-Control: public, max-age=3600
-/reference/*.md?source=webconsole
-  Cache-Control: public, max-age=3600
-/reference/*/*.md?source=webconsole
-  Cache-Control: public, max-age=3600
-/reference-full.md?source=webconsole
-  Cache-Control: public, max-age=3600
