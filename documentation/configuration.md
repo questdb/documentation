@@ -70,12 +70,12 @@ properly format a `server.conf` key as an environment variable it must have:
 2. uppercase characters
 3. all `.` period characters replaced with `_` underscore
 
-For example, the server configuration key for shared workers must be passed as
+For example, the server configuration key for query timeout must be passed as
 described below:
 
-| `server.conf` key     | env var                   |
-| --------------------- | ------------------------- |
-| `shared.worker.count` | `QDB_SHARED_WORKER_COUNT` |
+| `server.conf` key  | env var              |
+| ------------------ | -------------------- |
+| `query.timeout`    | `QDB_QUERY_TIMEOUT`  |
 
 :::note
 
@@ -86,15 +86,14 @@ must be restarted in order for configuration changes to take effect.
 
 ### Examples
 
-The following configuration property customizes the number of worker threads
-shared across the application:
+The following configuration property customizes the query timeout:
 
 ```shell title="conf/server.conf"
-shared.worker.count=5
+query.timeout=120s
 ```
 
-```shell title="Customizing the worker count via environment variable"
-export QDB_SHARED_WORKER_COUNT=5
+```shell title="Customizing the query timeout via environment variable"
+export QDB_QUERY_TIMEOUT=120s
 ```
 
 ## Reloadable settings
@@ -141,8 +140,10 @@ http.net.connection.sndbuf=2m
 
 ### Shared worker
 
-Shared worker threads service SQL execution subsystems and (in the default
-configuration) every other subsystem.
+QuestDB uses three specialized worker pools to handle different workloads:
+- **Network pool**: handles HTTP, PostgreSQL, and ILP server I/O
+- **Query pool**: executes parallel query operations (filters, group-by)
+- **Write pool**: manages WAL apply jobs, table writes, materialized view refresh, and housekeeping tasks
 
 <ConfigTable rows={sharedWorkerConfig} />
 

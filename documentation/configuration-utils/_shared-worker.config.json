@@ -1,11 +1,27 @@
 {
-  "shared.worker.count": {
+  "shared.network.worker.count": {
     "default": "",
-    "description": "Number of worker threads shared across the application. Increasing this number will increase parallelism in the application at the expense of CPU resources."
+    "description": "Number of worker threads for the network pool, which handles HTTP, PostgreSQL, and ILP server I/O. Increasing this number will increase network I/O parallelism at the expense of CPU resources."
   },
-  "shared.worker.affinity": {
+  "shared.network.worker.affinity": {
     "default": "",
-    "description": "Comma-delimited list of CPU ids, one per thread specified in `shared.worker.count`. By default, threads have no CPU affinity."
+    "description": "Comma-delimited list of CPU ids, one per thread specified in `shared.network.worker.count`. By default, threads have no CPU affinity."
+  },
+  "shared.query.worker.count": {
+    "default": "",
+    "description": "Number of worker threads for the query pool, which executes parallel query operations (filters, group-by). Increasing this number will increase query parallelism at the expense of CPU resources."
+  },
+  "shared.query.worker.affinity": {
+    "default": "",
+    "description": "Comma-delimited list of CPU ids, one per thread specified in `shared.query.worker.count`. By default, threads have no CPU affinity."
+  },
+  "shared.write.worker.count": {
+    "default": "",
+    "description": "Number of worker threads for the write pool, which manages WAL apply jobs, table writes, materialized view refresh, and housekeeping tasks. Increasing this number will increase write parallelism at the expense of CPU resources."
+  },
+  "shared.write.worker.affinity": {
+    "default": "",
+    "description": "Comma-delimited list of CPU ids, one per thread specified in `shared.write.worker.count`. By default, threads have no CPU affinity."
   },
   "shared.worker.haltOnError": {
     "default": "false",
