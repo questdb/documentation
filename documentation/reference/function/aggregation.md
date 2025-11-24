@@ -549,8 +549,8 @@ SELECT first(device_id) FROM sensors_unordered;
 - `first_not_null(column_name)` - returns the first non-null value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
-`uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
+`uuid` and `array`.
 
 If a table has a designated timestamp, then the first non-null row is always the
 row with the lowest timestamp (oldest). For a table without a designated
@@ -714,8 +714,8 @@ SELECT last(device_id) FROM sensors_unordered;
 - `last_not_null(column_name)` - returns the last non-null value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
-`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar` and
-`uuid`.
+`short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
+`uuid` and `array`.
 
 If a table has a designated timestamp, then the last non-null row is always the
 row with the highest timestamp (most recent). For a table without a designated
