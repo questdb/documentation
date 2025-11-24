@@ -2452,10 +2452,10 @@
   resolved "https://registry.npmjs.org/@polka/url/-/url-1.0.0-next.28.tgz"
   integrity sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==
 
-"@questdb/sql-grammar@1.3.0":
-  version "1.3.0"
-  resolved "https://registry.npmjs.org/@questdb/sql-grammar/-/sql-grammar-1.3.0.tgz"
-  integrity sha512-79oMyuaP2zWZAGRSFZ1DchGM4ONAoOFQqHVwPKIEc6ini9Yw3k/e3/ZgG89VvhJy2TelR+NOx54IR5ntgZxWrQ==
+"@questdb/sql-grammar@1.4.1":
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/@questdb/sql-grammar/-/sql-grammar-1.4.1.tgz#78f9061886a84e58e36ff1fad621cea219fc114a"
+  integrity sha512-t5i1vedpjxt4KTFxYfHffGg5M3leFfGj9XVh+P2r5buab8Zb/T9KmBbZz+PUz9Im+5+na5ncYbcKVtHuH/YWLA==
 
 "@radix-ui/number@1.1.0":
   version "1.1.0"
