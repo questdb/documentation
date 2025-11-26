@@ -334,7 +334,7 @@ createMatViewDef
   ('WITH BASE' baseTableName)?
   (
     'REFRESH' ((('IMMEDIATE' | 'MANUAL') ('DEFERRED')?) | ('EVERY' interval ('DEFERRED')? ('START' timestamp)? ('TIME' 'ZONE' timezone)?) )?
-    ('PERIOD' '(' 'LENGTH' length ('TIME' 'ZONE' timezone)? ('DELAY' delay)? ')')?
+    ('PERIOD' '(' ('LENGTH' length ('TIME' 'ZONE' timezone)? ('DELAY' delay)?) | ('SAMPLE BY INTERVAL') ')')?
   )?
   'AS'
   ('(')?
