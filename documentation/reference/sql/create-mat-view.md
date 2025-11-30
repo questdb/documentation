@@ -177,7 +177,7 @@ REFRESH EVERY 10m PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
 Here, the `PERIOD` refresh still takes place once a period completes, but
 refreshes for older rows take place each 10 minutes.
 
-Finally, period materialized views can be configure for manual refresh:
+Period materialized views can be also configured for manual refresh:
 
 ```questdb-sql title="Period materialized view with timer refresh"
 CREATE MATERIALIZED VIEW trades_hourly_prices
@@ -189,6 +189,30 @@ The only way to refresh data on such a materialized view is to run
 [`REFRESH` SQL](/docs/reference/sql/refresh-mat-view/) explicitly. When run,
 `REFRESH` statement will refresh incrementally all recently completed periods,
 as well as all time intervals touched by the recent write transactions.
+
+Finally, there is also a compact `PERIOD` syntax. It configures the view
+to ignore writes into the latest, incomplete SAMPLE BY interval, e.g.
+incomplete hour in our example. Ignoring the latest SAMPLE BY interval
+until it ends improves materialized view refresh performance in case of
+intensive real-time ingestion into the base table since the refresh generates
+less transactions.
+
+Here is how the compact syntax looks like:
+
+```questdb-sql title="Compact syntax for period materialized views"
+CREATE MATERIALIZED VIEW trades_hour_prices
+REFRESH PERIOD (SAMPLE BY INTERVAL) AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1h
+ALIGN TO CALENDAR TIME ZONE 'Europe/London';
+```
+
+The above DDL statement creates a period materialized view with single day
+period in the `Europe/London` time zone, as defined by the SAMPLE BY clause.
 
 ## Initial refresh
 
@@ -312,6 +336,18 @@ SELECT
   avg(price) AS avg_price
 FROM trades
 SAMPLE BY 1h;
+```
+
+```questdb-sql title="Creating a materialized view with compact period syntax"
+CREATE MATERIALIZED VIEW trades_hourly_prices
+REFRESH PERIOD (SAMPLE BY INTERVAL) AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1h
+ALIGN CALENDAR TIME ZONE 'Europe/London';
 ```
 
 ```questdb-sql title="Creating a materialized view with timer refresh each 10 minutes"

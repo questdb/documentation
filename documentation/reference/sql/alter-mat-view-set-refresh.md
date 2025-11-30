@@ -30,6 +30,10 @@ ALTER MATERIALIZED VIEW trades_hourly_prices SET REFRESH PERIOD (LENGTH 1d DELAY
 ```
 
 ```questdb-sql
+ALTER MATERIALIZED VIEW trades_hourly_prices SET REFRESH PERIOD (SAMPLE BY INTERVAL);
+```
+
+```questdb-sql
 ALTER MATERIALIZED VIEW trades_hourly_prices SET REFRESH IMMEDIATE;
 ```
 

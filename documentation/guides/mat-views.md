@@ -207,6 +207,24 @@ FROM trades
 SAMPLE BY 1d;
 ```
 
+There is also compact `PERIOD` syntax:
+
+```questdb-sql title="Compact syntax for period materialized views"
+CREATE MATERIALIZED VIEW trades_daily_prices
+REFRESH PERIOD (SAMPLE BY INTERVAL) AS
+SELECT
+  timestamp,
+  symbol,
+  avg(price) AS avg_price
+FROM trades
+SAMPLE BY 1d;
+```
+
+The above DDL statement creates a period materialized view with single day
+period, as defined by the SAMPLE BY clause. Such configuration improves
+refresh performance in case of intensive real-time ingestion into the base
+table since the refresh generates less transactions.
+
 Refer to the following
 [documentation page](/docs/reference/sql/create-mat-view/#period-materialized-views)
 to learn more on period materialized views.
