@@ -1191,7 +1191,6 @@ Where:
 
 - $x_i$ are the values
 - $w_i$ are the weights
-- $n$ is the number of observations
 
 If the value is `NULL`, that observation is ignored.
 
@@ -1252,7 +1251,6 @@ Where:
 
 - $x_i$ are the values
 - $w_i$ are the frequency weights
-- $n$ is the number of observations
 
 If the value is `NULL`, that observation is ignored.
 
@@ -1321,7 +1319,6 @@ Where:
 
 - $x_i$ are the values
 - $w_i$ are the reliability weights
-- $n$ is the number of observations
 
 If the value is `NULL`, that observation is ignored.
 
