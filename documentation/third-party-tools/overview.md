@@ -1,5 +1,6 @@
 ---
-title: Overview
+title: Third-Party Tools Overview
+sidebar_label: Overview
 slug: overview
 description:
   QuestDB integrates well with a number of third-party tools. This page lists

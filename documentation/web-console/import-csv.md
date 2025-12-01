@@ -1,5 +1,6 @@
 ---
-title: Import CSV
+title: Import CSV Using Web Console
+sidebar_label: Import CSV
 description: Import CSV files into QuestDB using the Web Console's intuitive import interface
 ---
 

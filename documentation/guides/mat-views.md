@@ -1,5 +1,6 @@
 ---
-title: Materialized views
+title: Materialized Views Guides
+sidebar_label: Materialized views
 description:
   Overview of QuestDB's materialized views. This feature helps you significantly
   speed up your time-based aggregation queries.
