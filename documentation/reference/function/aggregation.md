@@ -1213,7 +1213,7 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Example title"
+```questdb-sql title="Weighted average of transaction prices"
 SELECT weighted_avg(price, quantity) FROM transactions;
 ```
 
