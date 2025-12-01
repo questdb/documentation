@@ -97,6 +97,5 @@ provides a variety of reader implementations.
 
 <Screenshot
   src="images/docs/concepts/storageSummary.webp"
+  alt="Summary of the storage model"
 />
-
-<span />
