@@ -416,3 +416,7 @@ html[data-theme="dark"] .DocSearch {
 .navbar__item.mobile-only {
   display: none;
 }
+
+.theme-doc-sidebar-item-link > a > [class^=iconExternalLink] {
+  margin-left: 0.5rem !important;
+}

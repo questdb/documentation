@@ -655,8 +655,8 @@ module.exports = {
     },
     {
       label: "Release Notes",
-      type: "doc",
-      id: "release-notes-redirect",
+      type: "link",
+      href: "https://questdb.com/release-notes",
     },
   ].filter(Boolean),
 }
