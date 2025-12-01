@@ -1299,7 +1299,7 @@ GROUP BY symbol;
 
 ## weighted_stddev_rel
 
-`weighted_stddev(value, weight)` - Calculates the unbiased weighted standard
+`weighted_stddev_rel(value, weight)` - Calculates the unbiased weighted standard
 deviation of a set of observations using reliability weights. You can also use
 the shorthand name `weighted_stddev`.
 
