@@ -23,7 +23,6 @@ const config = {
   projectName: "questdb",
   customFields,
   onBrokenLinks: isPreviews ? "warn" : "throw",
-  onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
   onBrokenAnchors: isPreviews ? "warn" : "throw",
   trailingSlash: true,
   future: {
@@ -139,6 +138,9 @@ const config = {
   ],
   markdown: {
     mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: isPreviews ? "warn" : "throw",
+    }
   },
   themes: ["@docusaurus/theme-mermaid"],
 
