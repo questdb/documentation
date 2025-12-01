@@ -327,7 +327,7 @@ Configuration string with HTTPS and custom retry timeout:
 https::addr=localhost:9000;retry_timeout=60000;
 ```
 
-See the [Java Client configuration guide](/docs/clients/java_ilp) for all
+See the [Java Client configuration guide](/docs/clients/java-ilp) for all
 available options. Note that client configuration options are different from
 connector configuration options. The client configuration string specifies how
 the connector communicates with the QuestDB server, while the connector

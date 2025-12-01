@@ -49,7 +49,7 @@ module.exports = {
               label: "Go",
             },
             {
-              id: "clients/java_ilp",
+              id: "clients/java-ilp",
               type: "doc",
               label: "Java",
             },

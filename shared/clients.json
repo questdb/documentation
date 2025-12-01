@@ -40,7 +40,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/clients/java_ilp",
+    "href": "/docs/clients/java-ilp",
     "name": "Java",
     "description":
       "Platform-independent client for enterprise applications and Android development.",

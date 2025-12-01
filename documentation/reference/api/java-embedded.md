@@ -449,5 +449,5 @@ caching of records pointless.
 
 ## InfluxDB Line Protocol client library
 
-We have [Java Client Library](/docs/clients/java_ilp/) to allow fast data
+We have [Java Client Library](/docs/clients/java-ilp/) to allow fast data
 ingestion.
