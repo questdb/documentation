@@ -10,7 +10,8 @@ calculations.
 
 :::note
 
-QuestDB does not support using aggregate functions as arguments to other functions. For example, this is not allowed:
+QuestDB does not support using aggregate functions as arguments to other
+functions. For example, this is not allowed:
 
 ```questdb-sql
 SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
@@ -82,7 +83,7 @@ SELECT approx_count_distinct(ip_address, 5) FROM logs;
 | :-------------------- |
 | 1234567               |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct user_id (int) values by date"
 SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
@@ -94,7 +95,7 @@ SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
 | 2023-01-02 | 2491                  |
 | ...        | ...                   |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct product_id values by region"
 SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
@@ -107,7 +108,7 @@ SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
 | East   | 1675                  |
 | West   | 1543                  |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct order_ids with precision 8"
 SELECT approx_count_distinct(order_id, 8) FROM orders;
@@ -117,7 +118,7 @@ SELECT approx_count_distinct(order_id, 8) FROM orders;
 | :-------------------- |
 | 3456789               |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct transaction_ids by store_id"
 SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP BY store_id;
@@ -167,14 +168,22 @@ SELECT approx_percentile(latency, 0.99) FROM request_logs;
 
 ## approx_median
 
-`approx_median(value, precision)` calculates the approximate median (50th percentile) of a set of non-negative numeric values using the [HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to calling `approx_percentile(value, 0.5, precision)`.
+`approx_median(value, precision)` calculates the approximate median (50th
+percentile) of a set of non-negative numeric values using the
+[HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to
+calling `approx_percentile(value, 0.5, precision)`.
 
-The function will throw an error if any negative values are encountered in the input. All input values must be non-negative.
+The function will throw an error if any negative values are encountered in the
+input. All input values must be non-negative.
 
 #### Parameters
 
 - `value` is any non-negative numeric value.
-- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is the number of significant decimal digits to which the histogram will maintain value resolution and separation. Higher precision leads to more accurate results with increased memory usage. Defaults to 1 (lower accuracy, high efficiency).
+- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is
+  the number of significant decimal digits to which the histogram will maintain
+  value resolution and separation. Higher precision leads to more accurate
+  results with increased memory usage. Defaults to 1 (lower accuracy, high
+  efficiency).
 
 #### Return value
 
@@ -497,8 +506,9 @@ Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `uuid` and `array`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
-then the first row is always the row with the lowest timestamp (oldest). For a table
-without a designated timestamp column, `first` returns the first row regardless of any timestamp column.
+then the first row is always the row with the lowest timestamp (oldest). For a
+table without a designated timestamp column, `first` returns the first row
+regardless of any timestamp column.
 
 #### Return value
 
@@ -658,11 +668,11 @@ Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
 `uuid` and `array`.
 
-If a table has a [designated timestamp](/docs/concept/designated-timestamp/), the
-last row is always the one with the highest (latest) timestamp.
+If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
+the last row is always the one with the highest (latest) timestamp.
 
-For a table without a designated timestamp column, `last`
-returns the last inserted row, regardless of any timestamp column.
+For a table without a designated timestamp column, `last` returns the last
+inserted row, regardless of any timestamp column.
 
 #### Return value
 
@@ -838,11 +848,14 @@ SELECT payment_type, min(amount) FROM transactions;
 
 ## mode
 
-`mode(value)` - calculates the mode (most frequent) value out of a particular dataset.
+`mode(value)` - calculates the mode (most frequent) value out of a particular
+dataset.
 
-For `mode(B)`, if there are an equal number of `true` and `false` values, `true` will be returned as a tie-breaker.
+For `mode(B)`, if there are an equal number of `true` and `false` values, `true`
+will be returned as a tie-breaker.
 
-For other modes, if there are equal mode values, the returned value will be whichever the code identifies first.
+For other modes, if there are equal mode values, the returned value will be
+whichever the code identifies first.
 
 To make the result deterministic, you must enforce an underlying sort order.
 
@@ -1039,9 +1052,10 @@ FROM trades
 WHERE timestamp in today();
 ```
 
-This query will return a single string containing all the distinct symbol
-values separated by commas. Even though the `symbol` column may have many rows with repeated values, `string_distinct_agg` aggregates only the unique non-null values. The result is a
-comma-separated list of all distinct symbols observed.
+This query will return a single string containing all the distinct symbol values
+separated by commas. Even though the `symbol` column may have many rows with
+repeated values, `string_distinct_agg` aggregates only the unique non-null
+values. The result is a comma-separated list of all distinct symbols observed.
 
 Result:
 
@@ -1065,7 +1079,8 @@ WHERE timestamp in today();
 | sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
 
 
-Note we don't need to add `GROUP BY side` as it is implicit. But you can add it, if you prefer that syntax.
+Note we don't need to add `GROUP BY side` as it is implicit. But you can add it,
+if you prefer that syntax.
 
 ## sum
 
