@@ -1177,3 +1177,188 @@ FROM (SELECT x FROM long_sequence(100));
 | stddev_samp |
 | :---------- |
 | 833.25      |
+
+## weighted_avg
+
+`weighted_avg(value, weight)` - Calculates the weighted mean (average) of a set
+of observations (database rows). It calculates the equivalent of:
+
+$$
+\bar{x}_w = \frac{\sum w_i x_i}{\sum w_i}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the weights
+- $n$ is the number of observations
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are no observations, the result is `NULL`.
+
+If the weights sum to zero, the result is `NULL`.
+
+Weights should be non-negative to make sense, but this isn't enforced.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Example title"
+SELECT weighted_avg(price, quantity) FROM transactions;
+```
+
+| weighted_avg |
+|--------------|
+| 25.3         |
+
+## weighted_stddev
+
+`weighted_stddev(value, weight)` - Calculates the unbiased weighted standard
+deviation of a set of observations using reliability weights.
+
+This is an alias for [weighted_stddev_rel](#weighted_stddev_rel).
+
+## weighted_stddev_freq
+
+`weighted_stddev_freq(value, weight)` - Calculates the unbiased weighted
+standard deviation of a set of observations using frequency weights.
+
+A **frequency weight** represents the number of occurrences of each observation
+in the dataset. This variant uses the frequency-weighted estimator for the
+population variance. It calculates the equivalent of:
+
+$$
+\sqrt{
+  \frac{
+    \sum w_i x_i^2 - \frac{(\sum w_i x_i)^2}{\sum w_i}
+  }{
+    \sum w_i - 1
+  }
+}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the frequency weights
+- $n$ is the number of observations
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are less than two observations, the result is `NULL`.
+
+Weights should be positive integers to make sense, but this isn't enforced.
+
+Weights must not be normalized. If they sum to one, the result is `null`.
+
+If the sum of weights is negative, the result is `null`.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value representing the frequency weight (typically an
+  integer).
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Weighted standard deviation of binned prices"
+SELECT weighted_stddev_freq(price_bucket, trade_count) FROM price_histogram;
+```
+
+| weighted_stddev_freq |
+| :------------------- |
+| 3.42                 |
+
+```questdb-sql title="Weighted standard deviation of bucketed trade data by symbol"
+SELECT symbol, weighted_stddev_freq(price_bucket, trade_count)
+FROM trade_histogram
+GROUP BY symbol;
+```
+
+| symbol  | weighted_stddev_freq |
+| :------ | :------------------- |
+| BTC-USD | 115.67               |
+| ETH-USD | 22.18                |
+
+## weighted_stddev_rel
+
+`weighted_stddev(value, weight)` - Calculates the unbiased weighted standard
+deviation of a set of observations using reliability weights. You can also use
+the shorthand name `weighted_stddev`.
+
+A **reliability weight** represents the "importance" or "trustworthiness" of
+each observation. This variant uses the reliability-weighted estimator for the
+population variance. It calculates the equivalent of:
+
+$$
+\sqrt{
+  \frac{
+    \sum w_i x_i^2 - \frac{(\sum w_i x_i)^2}{\sum w_i}
+  }{
+    \sum w_i - \frac{\sum w_i^2}{\sum w_i}
+  }
+}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the reliability weights
+- $n$ is the number of observations
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are less than two observations, the result is `NULL`.
+
+Weights should be positive to make sense, but this isn't enforced.
+
+If the sum of weights is not positive, the result is `null`.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value representing the reliability weight.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Weighted standard deviation of prices by trade volume"
+SELECT weighted_stddev(price, volume) FROM trades;
+```
+
+| weighted_stddev |
+| :-------------- |
+| 2.45            |
+
+```questdb-sql title="Weighted standard deviation grouped by symbol"
+SELECT symbol, weighted_stddev(price, volume)
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol  | weighted_stddev |
+| :------ | :-------------- |
+| BTC-USD | 125.34          |
+| ETH-USD | 18.92           |
