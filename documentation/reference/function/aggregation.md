@@ -1256,7 +1256,7 @@ If the value is `NULL`, that observation is ignored.
 
 If the weight is `NULL` or zero, that observation is ignored.
 
-If there are less than two observations, the result is `NULL`.
+If there are fewer than two observations, the result is `NULL`.
 
 Weights should be positive integers to make sense, but this isn't enforced.
 
@@ -1324,7 +1324,7 @@ If the value is `NULL`, that observation is ignored.
 
 If the weight is `NULL` or zero, that observation is ignored.
 
-If there are less than two observations, the result is `NULL`.
+If there are fewer than two observations, the result is `NULL`.
 
 Weights should be positive to make sense, but this isn't enforced.
 
