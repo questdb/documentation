@@ -1218,7 +1218,7 @@ SELECT weighted_avg(price, quantity) FROM transactions;
 ```
 
 | weighted_avg |
-|--------------|
+|:-------------|
 | 25.3         |
 
 ## weighted_stddev
