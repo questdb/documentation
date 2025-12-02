@@ -1,7 +1,7 @@
 ---
 title: Over Keyword - Window Functions
 sidebar_label: OVER
-description: Window SQL functions reference documentation and explanation.
+description: OVER keyword documentation for window calculations.
 ---
 
 Window functions perform calculations across sets of table rows that are related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for every row while considering a window of rows defined by the OVER clause.
