@@ -1,6 +1,7 @@
 ---
-title: Storage Engine
+title: QuestDB Storage Engine
 slug: storage-engine
+sidebar_label: Storage Engine
 description: The QuestDB Storage Engine uses a column-oriented design to ensure high I/O performance and low latency.
 ---
 
