@@ -10,7 +10,8 @@ calculations.
 
 :::note
 
-QuestDB does not support using aggregate functions as arguments to other functions. For example, this is not allowed:
+QuestDB does not support using aggregate functions as arguments to other
+functions. For example, this is not allowed:
 
 ```questdb-sql
 SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
@@ -42,7 +43,7 @@ FROM (
 ## approx_count_distinct
 
 `approx_count_distinct(column_name, precision)` - estimates the number of
-distinct non-`null` values in `IPv4`, `int`, or `long` columns using the
+distinct non-`NULL` values in `IPv4`, `int`, or `long` columns using the
 [HyperLogLog](/glossary/HyperLogLog/) data structure, which provides an
 approximation rather than an exact count.
 
@@ -82,7 +83,7 @@ SELECT approx_count_distinct(ip_address, 5) FROM logs;
 | :-------------------- |
 | 1234567               |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct user_id (int) values by date"
 SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
@@ -94,7 +95,7 @@ SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
 | 2023-01-02 | 2491                  |
 | ...        | ...                   |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct product_id values by region"
 SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
@@ -107,7 +108,7 @@ SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
 | East   | 1675                  |
 | West   | 1543                  |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct order_ids with precision 8"
 SELECT approx_count_distinct(order_id, 8) FROM orders;
@@ -117,7 +118,7 @@ SELECT approx_count_distinct(order_id, 8) FROM orders;
 | :-------------------- |
 | 3456789               |
 
----
+
 
 ```questdb-sql title="Estimate count of distinct transaction_ids by store_id"
 SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP BY store_id;
@@ -167,14 +168,22 @@ SELECT approx_percentile(latency, 0.99) FROM request_logs;
 
 ## approx_median
 
-`approx_median(value, precision)` calculates the approximate median (50th percentile) of a set of non-negative numeric values using the [HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to calling `approx_percentile(value, 0.5, precision)`.
+`approx_median(value, precision)` calculates the approximate median (50th
+percentile) of a set of non-negative numeric values using the
+[HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to
+calling `approx_percentile(value, 0.5, precision)`.
 
-The function will throw an error if any negative values are encountered in the input. All input values must be non-negative.
+The function will throw an error if any negative values are encountered in the
+input. All input values must be non-negative.
 
 #### Parameters
 
 - `value` is any non-negative numeric value.
-- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is the number of significant decimal digits to which the histogram will maintain value resolution and separation. Higher precision leads to more accurate results with increased memory usage. Defaults to 1 (lower accuracy, high efficiency).
+- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is
+  the number of significant decimal digits to which the histogram will maintain
+  value resolution and separation. Higher precision leads to more accurate
+  results with increased memory usage. Defaults to 1 (lower accuracy, high
+  efficiency).
 
 #### Return value
 
@@ -207,7 +216,7 @@ GROUP BY symbol;
 ## avg
 
 `avg(value)` calculates simple average of values ignoring missing data (e.g
-`null` values).
+`NULL` values).
 
 #### Parameters
 
@@ -235,7 +244,7 @@ SELECT payment_type, avg(amount) FROM transactions;
 | :----------- | :---- |
 | cash         | 22.1  |
 | card         | 27.4  |
-| null         | 18.02 |
+| NULL         | 18.02 |
 
 ## corr
 
@@ -279,13 +288,13 @@ SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_ty
 | :----------- | :--- |
 | cash         | 0.85 |
 | card         | 0.92 |
-| null         | 0.78 |
+| NULL         | 0.78 |
 
 ## count
 
 - `count()` or `count(*)` - counts the number of rows irrespective of underlying
   data.
-- `count(column_name)` - counts the number of non-null values in a given column.
+- `count(column_name)` - counts the number of non-NULL values in a given column.
 
 #### Parameters
 
@@ -333,9 +342,9 @@ SELECT payment_type, count() FROM transactions;
 | :----------- | :---- |
 | cash         | 25    |
 | card         | 70    |
-| null         | 5     |
+| NULL         | 5     |
 
-Count non-null transaction amounts:
+Count non-NULL transaction amounts:
 
 ```questdb-sql
 SELECT count(amount) FROM transactions;
@@ -345,7 +354,7 @@ SELECT count(amount) FROM transactions;
 | :---- |
 | 95    |
 
-Count non-null transaction amounts by `payment_type`:
+Count non-NULL transaction amounts by `payment_type`:
 
 ```questdb-sql
 SELECT payment_type, count(amount) FROM transactions;
@@ -355,17 +364,17 @@ SELECT payment_type, count(amount) FROM transactions;
 | :----------- | :---- |
 | cash         | 24    |
 | card         | 67    |
-| null         | 4     |
+| NULL         | 4     |
 
 :::note
 
-`null` values are aggregated with `count()`, but not with `count(column_name)`
+`NULL` values are aggregated with `count()`, but not with `count(column_name)`
 
 :::
 
 ## count_distinct
 
-`count_distinct(column_name)` - counts distinct non-`null` values in `varchar`,
+`count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
 
 #### Return value
@@ -375,7 +384,7 @@ Return value type is `long`.
 #### Examples
 
 - Count of distinct sides in the transactions table. Side column can either be
-  `BUY` or `SELL` or `null`.
+  `BUY` or `SELL` or `NULL`.
 
 ```questdb-sql
 SELECT count_distinct(side) FROM transactions;
@@ -396,7 +405,7 @@ SELECT payment_type, count_distinct(counterparty) FROM transactions;
 | :----------- | :------------- |
 | cash         | 3              |
 | card         | 23             |
-| null         | 5              |
+| NULL         | 5              |
 
 ## covar_pop
 
@@ -442,7 +451,7 @@ SELECT payment_type, covar_pop(price, quantity) FROM transactions GROUP BY payme
 | :----------- | :-------- |
 | cash         | 14.8      |
 | card         | 16.2      |
-| null         | 13.5      |
+| NULL         | 13.5      |
 
 ## covar_samp
 
@@ -486,7 +495,7 @@ SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY paym
 | :----------- | :--------- |
 | cash         | 15.4       |
 | card         | 16.8       |
-| null         | 14.1       |
+| NULL         | 14.1       |
 
 ## first
 
@@ -497,8 +506,9 @@ Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `uuid` and `array`.
 
 If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
-then the first row is always the row with the lowest timestamp (oldest). For a table
-without a designated timestamp column, `first` returns the first row regardless of any timestamp column.
+then the first row is always the row with the lowest timestamp (oldest). For a
+table without a designated timestamp column, `first` returns the first row
+regardless of any timestamp column.
 
 #### Return value
 
@@ -546,15 +556,15 @@ SELECT first(device_id) FROM sensors_unordered;
 
 ## first_not_null
 
-- `first_not_null(column_name)` - returns the first non-null value of a column.
+- `first_not_null(column_name)` - returns the first non-NULL value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
 `uuid` and `array`.
 
-If a table has a designated timestamp, then the first non-null row is always the
+If a table has a designated timestamp, then the first non-NULL row is always the
 row with the lowest timestamp (oldest). For a table without a designated
-timestamp column, `first_not_null` returns the first non-null row, regardless of
+timestamp column, `first_not_null` returns the first non-NULL row, regardless of
 any timestamp column.
 
 #### Return value
@@ -567,11 +577,11 @@ Given a table `sensors`, which has a designated timestamp column:
 
 | device_id  | temperature | ts                          |
 | :--------- | :---------- | :-------------------------- |
-| null       | 12          | 2021-06-02T14:33:19.970258Z |
+| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
 | arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
 | arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
 
-The following query returns oldest non-null value for the device_id column:
+The following query returns oldest non-NULL value for the device_id column:
 
 ```questdb-sql
 SELECT first_not_null(device_id) FROM sensors;
@@ -587,11 +597,11 @@ the query may return different result. Given an unordered table
 
 | device_id  | temperature | ts                          |
 | :--------- | :---------- | :-------------------------- |
-| null       | 12          | 2021-06-02T14:33:19.970258Z |
+| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
 | arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
 | arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the first non-null record for the device_id column:
+The following query returns the first non-NULL record for the device_id column:
 
 ```questdb-sql
 SELECT first_not_null(device_id) FROM sensors_unordered;
@@ -625,7 +635,7 @@ SELECT car_id, haversine_dist_deg(lat, lon, k)
 
 ## ksum
 
-`ksum(value)` - adds values ignoring missing data (e.g `null` values). Values
+`ksum(value)` - adds values ignoring missing data (e.g `NULL` values). Values
 are added using the
 
 [Kahan compensated sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm).
@@ -658,11 +668,11 @@ Supported column datatype: `double`, `float`, `integer`, `IPv4`, `character`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
 `uuid` and `array`.
 
-If a table has a [designated timestamp](/docs/concept/designated-timestamp/), the
-last row is always the one with the highest (latest) timestamp.
+If a table has a [designated timestamp](/docs/concept/designated-timestamp/),
+the last row is always the one with the highest (latest) timestamp.
 
-For a table without a designated timestamp column, `last`
-returns the last inserted row, regardless of any timestamp column.
+For a table without a designated timestamp column, `last` returns the last
+inserted row, regardless of any timestamp column.
 
 #### Return value
 
@@ -711,15 +721,15 @@ SELECT last(device_id) FROM sensors_unordered;
 
 ## last_not_null
 
-- `last_not_null(column_name)` - returns the last non-null value of a column.
+- `last_not_null(column_name)` - returns the last non-NULL value of a column.
 
 Supported column datatype: `double`, `float`, `integer`, `IPv4`, `char`,
 `short`, `byte`, `timestamp`, `date`, `long`, `geohash`, `symbol`, `varchar`,
 `uuid` and `array`.
 
-If a table has a designated timestamp, then the last non-null row is always the
+If a table has a designated timestamp, then the last non-NULL row is always the
 row with the highest timestamp (most recent). For a table without a designated
-timestamp column, `last_not_null` returns the last non-null row, regardless of
+timestamp column, `last_not_null` returns the last non-NULL row, regardless of
 any timestamp column.
 
 #### Return value
@@ -732,11 +742,11 @@ Given a table `sensors`, which has a designated timestamp column:
 
 | device_id  | temperature | ts                          |
 | :--------- | :---------- | :-------------------------- |
-| null       | 12          | 2021-06-02T14:33:19.970258Z |
+| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
 | arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
 | arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
 
-The following query returns most recent non-null value for the device_id column:
+The following query returns most recent non-NULL value for the device_id column:
 
 ```questdb-sql
 SELECT last_not_null(device_id) FROM sensors;
@@ -752,11 +762,11 @@ the query may return different result. Given an unordered table
 
 | device_id  | temperature | ts                          |
 | :--------- | :---------- | :-------------------------- |
-| null       | 12          | 2021-06-02T14:33:19.970258Z |
+| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
 | arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
 | arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the last non-null record for the `device_id` column:
+The following query returns the last non-NULL record for the `device_id` column:
 
 ```questdb-sql
 SELECT last_not_null(device_id) FROM sensors_unordered;
@@ -771,7 +781,7 @@ SELECT last_not_null(device_id) FROM sensors_unordered;
 
 ## max
 
-`max(value)` - returns the highest value ignoring missing data (e.g `null`
+`max(value)` - returns the highest value ignoring missing data (e.g `NULL`
 values).
 
 #### Parameters
@@ -800,11 +810,11 @@ SELECT payment_type, max(amount) FROM transactions;
 | :----------- | :----- |
 | cash         | 31.5   |
 | card         | 55.3   |
-| null         | 29.2   |
+| NULL         | 29.2   |
 
 ## min
 
-`min(value)` - returns the lowest value ignoring missing data (e.g `null`
+`min(value)` - returns the lowest value ignoring missing data (e.g `NULL`
 values).
 
 #### Parameters
@@ -833,16 +843,19 @@ SELECT payment_type, min(amount) FROM transactions;
 | :----------- | :--- |
 | cash         | 12.5 |
 | card         | 15.3 |
-| null         | 22.2 |
+| NULL         | 22.2 |
 
 
 ## mode
 
-`mode(value)` - calculates the mode (most frequent) value out of a particular dataset.
+`mode(value)` - calculates the mode (most frequent) value out of a particular
+dataset.
 
-For `mode(B)`, if there are an equal number of `true` and `false` values, `true` will be returned as a tie-breaker.
+For `mode(B)`, if there are an equal number of `true` and `false` values, `true`
+will be returned as a tie-breaker.
 
-For other modes, if there are equal mode values, the returned value will be whichever the code identifies first.
+For other modes, if there are equal mode values, the returned value will be
+whichever the code identifies first.
 
 To make the result deterministic, you must enforce an underlying sort order.
 
@@ -899,7 +912,7 @@ ORDER BY symbol ASC;
 
 ## nsum
 
-`nsum(value)` - adds values ignoring missing data (e.g `null` values). Values
+`nsum(value)` - adds values ignoring missing data (e.g `NULL` values). Values
 are added using the
 [Neumaier sum algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm#Further_enhancements).
 This is only beneficial for floating-point values such as `float` or `double`.
@@ -926,7 +939,7 @@ FROM (SELECT rnd_double() a FROM long_sequence(100));
 ## stddev / stddev_samp
 
 `stddev_samp(value)` - Calculates the sample standard deviation of a set of
-values, ignoring missing data (e.g., null values). The sample standard deviation
+values, ignoring missing data (e.g., NULL values). The sample standard deviation
 is a measure of the amount of variation or dispersion in a sample of a
 population. A low standard deviation indicates that the values tend to be close
 to the mean of the set, while a high standard deviation indicates that the
@@ -1007,11 +1020,11 @@ FROM (SELECT x FROM long_sequence(5));
 
 ## string_distinct_agg
 
-`string_distinct_agg(value, delimiter)` - concatenates distinct non-null string
+`string_distinct_agg(value, delimiter)` - concatenates distinct non-NULL string
 values into a single string, using the specified delimiter to separate the
 values.
 
-- `string_distinct_agg` ignores null values and only concatenates non-null
+- `string_distinct_agg` ignores NULL values and only concatenates non-NULL
   distinct values.
 
 - Order is guaranteed.
@@ -1039,9 +1052,10 @@ FROM trades
 WHERE timestamp in today();
 ```
 
-This query will return a single string containing all the distinct symbol
-values separated by commas. Even though the `symbol` column may have many rows with repeated values, `string_distinct_agg` aggregates only the unique non-null values. The result is a
-comma-separated list of all distinct symbols observed.
+This query will return a single string containing all the distinct symbol values
+separated by commas. Even though the `symbol` column may have many rows with
+repeated values, `string_distinct_agg` aggregates only the unique non-NULL
+values. The result is a comma-separated list of all distinct symbols observed.
 
 Result:
 
@@ -1065,11 +1079,12 @@ WHERE timestamp in today();
 | sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
 
 
-Note we don't need to add `GROUP BY side` as it is implicit. But you can add it, if you prefer that syntax.
+Note we don't need to add `GROUP BY side` as it is implicit. But you can add it,
+if you prefer that syntax.
 
 ## sum
 
-`sum(value)` - adds values ignoring missing data (e.g `null` values).
+`sum(value)` - adds values ignoring missing data (e.g `NULL` values).
 
 #### Parameters
 
@@ -1162,3 +1177,185 @@ FROM (SELECT x FROM long_sequence(100));
 | stddev_samp |
 | :---------- |
 | 833.25      |
+
+## weighted_avg
+
+`weighted_avg(value, weight)` - Calculates the weighted mean (average) of a set
+of observations (database rows). It calculates the equivalent of:
+
+$$
+\bar{x}_w = \frac{\sum w_i x_i}{\sum w_i}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the weights
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are no observations, the result is `NULL`.
+
+If the weights sum to zero, the result is `NULL`.
+
+Weights should be non-negative to make sense, but this isn't enforced.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Weighted average of transaction prices"
+SELECT weighted_avg(price, quantity) FROM transactions;
+```
+
+| weighted_avg |
+|:-------------|
+| 25.3         |
+
+## weighted_stddev
+
+`weighted_stddev(value, weight)` - Calculates the unbiased weighted standard
+deviation of a set of observations using reliability weights.
+
+This is an alias for [weighted_stddev_rel](#weighted_stddev_rel).
+
+## weighted_stddev_freq
+
+`weighted_stddev_freq(value, weight)` - Calculates the unbiased weighted
+standard deviation of a set of observations using frequency weights.
+
+A **frequency weight** represents the number of occurrences of each observation
+in the dataset. This variant uses the frequency-weighted estimator for the
+population variance. It calculates the equivalent of:
+
+$$
+\sqrt{
+  \frac{
+    \sum w_i x_i^2 - \frac{(\sum w_i x_i)^2}{\sum w_i}
+  }{
+    \sum w_i - 1
+  }
+}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the frequency weights
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are fewer than two observations, the result is `NULL`.
+
+Weights should be positive integers to make sense, but this isn't enforced.
+
+Weights must not be normalized. If they sum to one, the result is `NULL`.
+
+If the sum of weights is negative, the result is `NULL`.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value representing the frequency weight (typically an
+  integer).
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Weighted standard deviation of binned prices"
+SELECT weighted_stddev_freq(price_bucket, trade_count) FROM price_histogram;
+```
+
+| weighted_stddev_freq |
+| :------------------- |
+| 3.42                 |
+
+```questdb-sql title="Weighted standard deviation of bucketed trade data by symbol"
+SELECT symbol, weighted_stddev_freq(price_bucket, trade_count)
+FROM trade_histogram
+GROUP BY symbol;
+```
+
+| symbol  | weighted_stddev_freq |
+| :------ | :------------------- |
+| BTC-USD | 115.67               |
+| ETH-USD | 22.18                |
+
+## weighted_stddev_rel
+
+`weighted_stddev_rel(value, weight)` - Calculates the unbiased weighted standard
+deviation of a set of observations using reliability weights. You can also use
+the shorthand name `weighted_stddev`.
+
+A **reliability weight** represents the "importance" or "trustworthiness" of
+each observation. This variant uses the reliability-weighted estimator for the
+population variance. It calculates the equivalent of:
+
+$$
+\sqrt{
+  \frac{
+    \sum w_i x_i^2 - \frac{(\sum w_i x_i)^2}{\sum w_i}
+  }{
+    \sum w_i - \frac{\sum w_i^2}{\sum w_i}
+  }
+}
+$$
+
+Where:
+
+- $x_i$ are the values
+- $w_i$ are the reliability weights
+
+If the value is `NULL`, that observation is ignored.
+
+If the weight is `NULL` or zero, that observation is ignored.
+
+If there are fewer than two observations, the result is `NULL`.
+
+Weights should be positive to make sense, but this isn't enforced.
+
+If the sum of weights is not positive, the result is `NULL`.
+
+#### Parameters
+
+- `value` is any numeric value.
+- `weight` is any numeric value representing the reliability weight.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Weighted standard deviation of prices by trade volume"
+SELECT weighted_stddev(price, volume) FROM trades;
+```
+
+| weighted_stddev |
+| :-------------- |
+| 2.45            |
+
+```questdb-sql title="Weighted standard deviation grouped by symbol"
+SELECT symbol, weighted_stddev(price, volume)
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol  | weighted_stddev |
+| :------ | :-------------- |
+| BTC-USD | 125.34          |
+| ETH-USD | 18.92           |
