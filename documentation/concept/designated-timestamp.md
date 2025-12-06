@@ -64,6 +64,8 @@ Other ways to set a designated timestamp:
 For full CREATE TABLE syntax, see the
 [reference documentation](/docs/reference/sql/create-table/#designated-timestamp).
 
+QuestDB handles out-of-order data automatically during ingestion.
+
 ## Properties
 
 - Only a column of type `timestamp` or `timestamp_ns` can be elected as a designated timestamp.
