@@ -18,14 +18,14 @@ time-series SQL features.
 The designated timestamp is not just metadata - it determines how QuestDB
 physically organizes and queries your data. These features require it:
 
-- Partitioning
-- Time-series joins (ASOF, LT, SPLICE)
-- Interval scan optimization
-- SAMPLE BY queries
-- LATEST ON optimization
-- TTL
-- Deduplication
-- Replication
+- [Partitioning](/docs/concept/partitions/)
+- [Time-series joins](/docs/reference/sql/join/) (ASOF, LT, SPLICE)
+- [Interval scan](/docs/concept/interval-scan/) optimization
+- [SAMPLE BY](/docs/reference/sql/sample-by/) queries
+- [LATEST ON](/docs/reference/sql/latest-on/) optimization
+- [TTL](/docs/concept/ttl/)
+- [Deduplication](/docs/concept/deduplication/)
+- [Replication](/docs/operations/replication/)
 
 If your data has a time dimension - and for time-series workloads it always
 does - define a designated timestamp.
