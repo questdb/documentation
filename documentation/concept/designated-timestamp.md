@@ -64,8 +64,6 @@ Other ways to set a designated timestamp:
 For full CREATE TABLE syntax, see the
 [reference documentation](/docs/reference/sql/create-table/#designated-timestamp).
 
-QuestDB handles out-of-order data automatically during ingestion.
-
 ## Properties
 
 - Only a column of type `timestamp` or `timestamp_ns` can be elected as a designated timestamp.
@@ -83,3 +81,26 @@ for details.
 
 The [meta functions](/docs/reference/function/meta/) `tables()` and
 `table_columns()` show the designated timestamp settings for a table.
+
+## FAQ
+
+**What if my data arrives out of order?**
+
+QuestDB handles out-of-order data automatically during ingestion. No special
+configuration is required.
+
+**Can I change the designated timestamp later?**
+
+No. The designated timestamp is set at table creation and cannot be changed.
+To use a different column, create a new table and migrate your data.
+
+**Can I add a designated timestamp to an existing table?**
+
+No. You must define the designated timestamp when creating the table. If you
+have an existing table without one, create a new table with the designated
+timestamp and use `INSERT INTO ... SELECT` to migrate your data.
+
+**Can the designated timestamp contain NULL values?**
+
+No. The designated timestamp column cannot contain NULL values. Every row must
+have a valid timestamp.
