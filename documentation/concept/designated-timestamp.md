@@ -2,56 +2,82 @@
 title: Designated timestamp
 sidebar_label: Designated timestamp
 description:
-  How designated timestamps are implemented and why it is an important
-  functionality for time series.
+  Why every QuestDB table should have a designated timestamp and how to set one.
 ---
 
-QuestDB offers the option to elect a column as a _designated timestamp_. This
-allows you to specify which column the tables will be indexed by in order to
-leverage time-oriented language features and high-performance functionalities.
+Every table in QuestDB should have a designated timestamp. This column defines
+the time axis for your data and unlocks QuestDB's core time-series capabilities
+including partitioning, time-series joins, and optimized interval scans.
 
-A designated timestamp is elected by using the
-[`timestamp(columnName)`](/docs/reference/function/timestamp/) function:
+Without a designated timestamp, a table behaves like a generic append-only
+store - you lose partitioning, efficient time-range queries, and most
+time-series SQL features.
 
-- during a [CREATE TABLE](/docs/reference/sql/create-table/#designated-timestamp) operation
-- during a [SELECT](/docs/reference/sql/select/#timestamp) operation
-  (`dynamic timestamp`)
-- when ingesting data via InfluxDB Line Protocol, for tables that do not already
-  exist in QuestDB, partitions are applied automatically by day by default with
-  a `timestamp` column
+## Why it matters
+
+The designated timestamp is not just metadata - it determines how QuestDB
+physically organizes and queries your data:
+
+| Capability                              | Requires designated timestamp |
+| --------------------------------------- | ----------------------------- |
+| Partitioning                            | ✓ Required                    |
+| Time-series joins (ASOF, LT, SPLICE)    | ✓ Required                    |
+| Interval scan optimization              | ✓ Required                    |
+| SAMPLE BY queries                       | ✓ Required                    |
+| LATEST ON optimization                  | ✓ Required                    |
+| TTL (via partitioning)                  | ✓ Required                    |
+| Deduplication                           | ✓ Required                    |
+
+If your data has a time dimension - and for time-series workloads it always
+does - define a designated timestamp.
 
 :::note
 
-- There are two timestamp resolutions available in QuestDB: microseconds and nanoseconds. See
-  [Timestamps in QuestDB](/docs/guides/working-with-timestamps-timezones/#timestamps-in-questdb)
-  for more details.
+Static lookup or reference tables with no time dimension are the exception.
+These can be created without a designated timestamp.
 
 :::
+
+## How to set it
+
+Use the [`timestamp(columnName)`](/docs/reference/function/timestamp/) function
+at table creation:
+
+```questdb-sql
+CREATE TABLE readings (
+    ts TIMESTAMP,
+    sensor_id SYMBOL,
+    value DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+If you have multiple timestamp columns, designate the one you'll filter and
+aggregate by most often.
+
+Other ways to set a designated timestamp:
+
+- On query results: see [SELECT](/docs/reference/sql/select/#timestamp)
+  (`dynamic timestamp`)
+- Via InfluxDB Line Protocol: tables created automatically include a `timestamp`
+  column as the designated timestamp, partitioned by day by default
+
+For full CREATE TABLE syntax, see the
+[reference documentation](/docs/reference/sql/create-table/#designated-timestamp).
 
 ## Properties
 
 - Only a column of type `timestamp` or `timestamp_ns` can be elected as a designated timestamp.
 - Only one column can be elected for a given table.
 
-## Checking the designated timestamp settings
+:::note
 
-The [meta functions](/docs/reference/function/meta/), `tables()` and
-`table_columns()`, are designed to show the designated timestamp settings of the
-selected table.
+There are two timestamp resolutions available: microseconds and nanoseconds. See
+[Timestamps in QuestDB](/docs/guides/working-with-timestamps-timezones/#timestamps-in-questdb)
+for details.
 
-## Advantages of electing a designated timestamp
+:::
 
-Electing a designated timestamp allows you to:
+## Checking designated timestamp settings
 
-- Partition tables by time range. For more information, see the
-  [partitions reference](/docs/concept/partitions/).
-- Use time series joins such as `ASOF JOIN`. For more information, see the
-  [ASOF JOIN reference](/docs/reference/sql/asof-join/) or the more general
-  [JOIN reference](/docs/reference/sql/join/).
-- Optimize queries with [Interval scan](/docs/concept/interval-scan)
-
-## Out-of-order policy
-
-As of version 6.0.0, QuestDB supports the ingestion of records that are
-out-of-order (O3) by time. QuestDB detects and adjusts data ingestion for O3
-data automatically and no manual configuration is required.
+The [meta functions](/docs/reference/function/meta/) `tables()` and
+`table_columns()` show the designated timestamp settings for a table.
