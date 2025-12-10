@@ -230,10 +230,9 @@ Symbols are **dictionary-encoded** and optimized for filtering and grouping:
 
 ### Timestamps
 
-- **All timestamps in QuestDB are stored in UTC** at **Microsecond resolution**:
-  Even if you can ingest data sending timestamps in nanoseconds, nanosecond
-  precision is not retained.
-- The **`TIMESTAMP`** type is recommended over **`DATETIME`**, unless you have
+- **All timestamps in QuestDB are stored in UTC**, and they will use either
+-  **Microsecond** or **nanosecond** resolution, depending on the chosen data type:
+- The **`TIMESTAMP`** or **`TIMESTAMP_NS`** types are recommended over **`DATETIME`**, unless you have
   checked the data types reference and you know what you are doing.
 - **At query time, you can apply a time zone conversion for display purposes**.
 
@@ -243,6 +242,14 @@ Symbols are **dictionary-encoded** and optimized for filtering and grouping:
   **[`STRING`](/docs/reference/sql/datatypes/#varchar-and-string-considerations)**:
   It is a legacy data type.
 - Use **`VARCHAR`** instead for general string storage.
+
+### Arrays
+
+QuestDB supports [N-Dimensional arrays](/docs/concept/array/). Arrays are specially indicated when you have data which is very closely related.
+For example, if you are storing orderbook data with the price and the volume for each level in the orderbook, it can be
+a good idea to store it as a bi-dimensional array, with prices in the first position and volumes in the second. You
+could also store them as two independent arrays, one with the sizes and one with the volumes, and access them both using
+the same index.
 
 ### UUIDs
 
@@ -290,7 +297,7 @@ Some table properties **cannot be modified after creation**, including:
 
 - **The designated timestamp** (cannot be altered once set).
 - **Partitioning strategy** (cannot be changed later).
-- **Symbol capacity** (must be defined upfront, otherwise defaults apply).
+- **Symbol capacity** (can be defined upfront, but will auto-increase as needed).
 
 For changes, the typical workaround is:
 
@@ -405,3 +412,11 @@ CREATE TABLE metrics (
 PARTITION BY DAY WAL
 DEDUP UPSERT KEYS(timestamp, name);
 ```
+
+## Schema management tools
+
+Although QuestDB supports automatic schema creation, some users prefer to use a schema management tool to implement
+schema migrations.
+
+The QuestDB team has contributed a [Flyway driver](https://documentation.red-gate.com/fd/questdb-305791448.html) that
+can be used for this purpose.
