@@ -18,7 +18,7 @@ page.
   alt="Architecture of a Multi-Primary Cluster with Multiple Read-Replicas"
   title="Architecture of a Multi-Primary Cluster with Multiple Read-Replicas"
   src="/images/guides/architecture/replication.svg"
-  width={1000}
+  width={700}
   forceTheme="dark"
 />
 
@@ -81,7 +81,7 @@ QuestDB Enterprise can be fully managed by the end user, or it can be managed in
   alt="Diagram of the Bring Your Own Cloud Architecture"
   title="Diagram of the Bring Your Own Cloud Architecture"
   src="/images/guides/architecture/bring-your-own-cloud.png"
-  width={1000}
+  width={700}
   forceTheme="dark"
 />
 
