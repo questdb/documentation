@@ -412,3 +412,11 @@ CREATE TABLE metrics (
 PARTITION BY DAY WAL
 DEDUP UPSERT KEYS(timestamp, name);
 ```
+
+## Schema management tools
+
+Although QuestDB supports automatic schema creation, some users prefer to use a schema management tool to implement
+schema migrations.
+
+The QuestDB team has contributed a [Flyway driver](https://documentation.red-gate.com/fd/questdb-305791448.html) that
+can be used for this purpose.
