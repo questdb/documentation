@@ -75,7 +75,7 @@ Refer to the [ILP overview](/docs/reference/api/ilp/overview/#multiple-urls-for-
 
 #### Bring Your Own Cloud (BYOC)
 
-QuestDB Enterprise can be fully managed by the end user, or it can be managed in collaboration with QuestDB's team under the [BYOC model](/byoc).
+QuestDB Enterprise can be fully managed by the end user, or it can be managed in collaboration with QuestDB's team under the [BYOC model](https://questdb.com/byoc/).
 
 <Screenshot
   alt="Diagram of the Bring Your Own Cloud Architecture"
