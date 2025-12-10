@@ -38,7 +38,8 @@ and initial configuration:
 8. [Timestamp column name](/docs/reference/api/ilp/overview/#timestamp-column-name)
 9. [HTTP Transaction semantics](/docs/reference/api/ilp/overview/#http-transaction-semantics)
 10. [Exactly-once delivery](/docs/reference/api/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery)
-11. [Health Check](/docs/reference/api/ilp/overview/#health-check)
+11. [Multiple URLs for High Availability](/docs/reference/api/ilp/overview/#multiple-urls-for-high-availability)
+12. [Health Check](/docs/reference/api/ilp/overview/#health-check)
 
 ## Client libraries
 
@@ -499,6 +500,45 @@ The are two ways to mitigate this issue:
   send the batch only once, failed requests will not be retried and the client
   will receive an error. This effectively turns the client into an at-most-once
   delivery.
+
+## Multiple URLs for High Availability
+
+The ILP client can be configured with multiple possible endpoints to send your data to.
+Only one will be sent to at any one time.
+
+:::note
+
+This feature requires QuestDB OSS 9.1.0+ or Enterprise 3.0.4+. OSS users are discouraged of using
+this feature, as once data is sent to another primary, there is no way to reconcilliate the
+diverging instances. QuestDB Enterprise users can leverage this feature to transparently
+handle replication failover.
+
+:::
+
+To configure this feature, simply provide multiple addr entries. For example, when using Java:
+
+```java
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;addr=localhost:9999;")) {
+   // ...
+}
+```
+
+:::tip
+
+At the moment of writing this guide, only some of the QuestDB clients support multi-url configuration. Please
+refer to the documentation of your client to make sure it is available.
+
+:::
+
+On initialisation, if `protocol_version=auto`, the sender will identify the first instance that is writeable. Then it
+will stick to this instance and write any subsequent data to it.
+
+In the event that the instance becomes unavailable for writes, the client will retry the other possible endpoints. As long
+as one instance becomes writable before the maximum retry timeout is reached, it will stick to it instead. This unvailability is characterised by failures to connect or locate the instance, or the instance returning an error code due to it being read-only.
+
+By configuring multiple addresses, you can continue capturing data if your primary instance fails, without having to reconfigure the clients, as they will automatically failover to the new primary once available.
+
+Enterprise users can use multipe URLs to handle replication failover, without the need to introduce a load-balancer, reconfigure clients, or move to a [multi-primary](/docs/operations/multi-primary-ingestion/) deployment model.
 
 ## Health Check
 
