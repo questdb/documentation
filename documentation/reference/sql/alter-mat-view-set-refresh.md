@@ -22,7 +22,8 @@ The `REFRESH` follows the same format as [CREATE MATERIALIZED VIEW](/docs/refere
 ## Examples
 
 ```questdb-sql
-ALTER MATERIALIZED VIEW trades_hourly_prices SET REFRESH EVERY '1h';
+ALTER MATERIALIZED VIEW trades_hourly_prices
+SET REFRESH EVERY 12h START '2025-12-31T00:00:00.000000Z' TIME ZONE 'Europe/London';
 ```
 
 ```questdb-sql
