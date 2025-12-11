@@ -7,11 +7,15 @@ const DOCS_DIR = path.join(ROOT_DIR, 'documentation')
 const OUTPUT_DIR = path.join(ROOT_DIR, 'static', 'web-console')
 const BASE_URL = 'https://questdb.com/docs'
 
-// Categories to process
 const DOCS_CATEGORIES = {
   functions: path.join(DOCS_DIR, 'reference', 'function'),
   operators: path.join(DOCS_DIR, 'reference', 'operators'),
-  sql: path.join(DOCS_DIR, 'reference', 'sql')
+  sql: path.join(DOCS_DIR, 'reference', 'sql'),
+  concepts: path.join(DOCS_DIR, 'concept')
+}
+
+const SINGLE_FILE_CATEGORIES = {
+  schema: [path.join(DOCS_DIR, 'guides', 'schema-design-essentials.md')]
 }
 
 /**
@@ -75,9 +79,12 @@ function extractHeaders(content) {
  */
 function generateUrl(relativePath, slug) {
   if (slug) {
-    // Handle custom slug
+    // e.g., guides/schema-design-essentials.md with slug "schema-design-essentials"
+    // -> guides/schema-design-essentials/index.md
+    const dir = path.dirname(relativePath)
     const cleanSlug = slug.startsWith('/') ? slug.substring(1) : slug
-    return `${BASE_URL}/${cleanSlug}/index.md`
+    const urlPath = dir === '.' ? cleanSlug : `${dir}/${cleanSlug}`
+    return `${BASE_URL}/${urlPath}/index.md`
   }
 
   // Default: convert path to URL
@@ -151,6 +158,27 @@ function processCategory(categoryPath) {
 }
 
 /**
+ * Process a list of specific files for a category
+ */
+function processSingleFiles(filePaths) {
+  const results = []
+
+  for (const filePath of filePaths) {
+    if (!fs.existsSync(filePath)) {
+      console.warn(`File not found: ${filePath}`)
+      continue
+    }
+
+    const metadata = processMarkdownFile(filePath, DOCS_DIR)
+    if (metadata) {
+      results.push(metadata)
+    }
+  }
+
+  return results
+}
+
+/**
  * Generate ToC list from all categories
  */
 function generateTocList(allMetadata) {
@@ -188,10 +216,22 @@ function generateWebConsoleJson() {
 
   const allMetadata = {}
 
-  // Process each category
+  // Process each directory category
   for (const [category, categoryPath] of Object.entries(DOCS_CATEGORIES)) {
     console.log(`Processing ${category}...`)
     const metadata = processCategory(categoryPath)
+    allMetadata[category] = metadata
+
+    // Write category JSON file
+    const outputFile = path.join(OUTPUT_DIR, `${category}-docs.json`)
+    fs.writeFileSync(outputFile, JSON.stringify(metadata, null, 2), 'utf-8')
+    console.log(`  ✓ Created ${outputFile} (${metadata.length} files)`)
+  }
+
+  // Process single file categories
+  for (const [category, filePaths] of Object.entries(SINGLE_FILE_CATEGORIES)) {
+    console.log(`Processing ${category}...`)
+    const metadata = processSingleFiles(filePaths)
     allMetadata[category] = metadata
 
     // Write category JSON file
