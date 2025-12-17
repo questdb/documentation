@@ -7,7 +7,11 @@ description: How to profile QuestDB using async-profiler to diagnose performance
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
 
-QuestDB embeds [async-profiler](https://github.com/async-profiler/async-profiler) in the Linux x86_64 distribution, with convenience commands built into `questdb.sh`. Collecting profile data is straightforward. 
+Profiling lets you see what's happening inside the database at the code level - which functions are consuming CPU time, where memory is being allocated, and what's blocking threads. This is an advanced diagnostic technique. Most users will never need it; query plans, metrics, and logs are usually sufficient for understanding performance.
+
+However, when you're facing issues that can't be explained by the usual tools - unexplained CPU spikes, mysterious latency, or behavior that doesn't match what metrics suggest - profiling reveals the internal picture.
+
+QuestDB embeds [async-profiler](https://github.com/async-profiler/async-profiler) in the Linux x86_64 distribution, with convenience commands built into `questdb.sh`.
 
 There are two profiling approaches:
 
