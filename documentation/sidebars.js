@@ -364,6 +364,7 @@ module.exports = {
                 "reference/sql/fill",
                 "reference/sql/group-by",
                 "reference/sql/join",
+                "reference/sql/window-join",
                 "reference/sql/latest-on",
                 "reference/sql/limit",
                 "reference/sql/order-by",
