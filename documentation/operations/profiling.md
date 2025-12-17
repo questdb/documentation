@@ -22,7 +22,7 @@ This page covers:
 
 ## Prerequisites
 
-Profiling requires [async-profiler](https://github.com/async-profiler/async-profiler). QuestDB ships with async-profiler bundled in the **Linux x86_64** distribution only. For other platforms, you must install async-profiler separately.
+Profiling requires [async-profiler](https://github.com/async-profiler/async-profiler). QuestDB ships with async-profiler and the `jfrconv` converter bundled in the **Linux x86_64** distribution only. For other platforms, you must install async-profiler separately.
 
 ### Linux kernel settings
 
@@ -114,7 +114,7 @@ Profile a specific tagged instance:
 | `-d <seconds>` | Duration of profiling in seconds. |
 | `-f <file>` | Output file. Extension determines format: `.html` for flame graph, `.jfr` for JFR, `.svg` for SVG. |
 | `-i <interval>` | Sampling interval (e.g., `10ms`, `1us`). |
-| `-t` | Profile threads separately. Each stack trace will end with a frame that denotes a single thread. |
+| `-t` | Profile threads separately. Each stack trace will end with a frame that denotes a single thread. (Note: this is asprof's `-t`, distinct from the questdb.sh `-t` tag option used before `--`.) |
 | `--all-user` | Include only user-mode events. |
 
 For a complete list of options, see the [async-profiler documentation](https://github.com/async-profiler/async-profiler).
@@ -141,6 +141,8 @@ When you run `./questdb.sh start -p` without additional parameters, the profiler
 | Output directory | `<QDB_ROOT>/profiles` | Profile files are written here |
 | File name pattern | `profile-%n{48}.jfr` | Sequence number up to 48, then wraps around |
 
+With the default 30-minute loop and sequence limit of 48, the profiler keeps up to 24 hours of data before overwriting. JFR file sizes depend on workload activity - expect roughly 10-50 MB per 30-minute file under typical load. Monitor disk usage if running continuously in production.
+
 Override defaults via environment variables before starting QuestDB:
 
 ```shell
@@ -149,6 +151,8 @@ export PROFILER_INTERVAL="10ms"       # Less frequent sampling
 export PROFILER_LOOP="1h"             # New file every hour
 ./questdb.sh start -p
 ```
+
+If you pass custom agent parameters after `--`, they replace the environment variable defaults entirely.
 
 ### Syntax
 
@@ -169,22 +173,22 @@ Arguments after `--` are passed as JVM agent parameters to async-profiler.
 
 ### Examples
 
-Start QuestDB with continuous CPU profiling, writing to a JFR file:
+Start with default settings (profiles `cpu,wall` events, writes to `<QDB_ROOT>/profiles/`):
+
+```shell
+./questdb.sh start -p
+```
+
+Start with custom parameters (overrides all defaults):
 
 ```shell
 ./questdb.sh start -p -- start,event=cpu,file=/tmp/profile.jfr,interval=10ms
 ```
 
-Start with memory allocation profiling:
+Start with wall-clock profiling at a custom interval:
 
 ```shell
-./questdb.sh start -p -- start,event=alloc,file=/tmp/alloc.jfr
-```
-
-Start with wall-clock profiling (useful for detecting I/O wait times):
-
-```shell
-./questdb.sh start -p -- start,event=wall,file=/tmp/wall.jfr,interval=5ms
+./questdb.sh start -p -- start,event=wall,file=/tmp/wall.jfr,interval=20ms
 ```
 
 ### Agent parameters
