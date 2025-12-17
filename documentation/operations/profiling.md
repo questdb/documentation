@@ -7,7 +7,7 @@ description: How to profile QuestDB using async-profiler to diagnose performance
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
 
-QuestDB embeds [async-profiler](https://github.com/async-profiler/async-profiler) in the Linux x86_64 distribution, with convenience commands built into `questdb.sh`. Collecting profile data is straightforward. The challenge lies in interpreting the results - understanding what the flame graphs and heatmaps reveal about your workload.
+QuestDB embeds [async-profiler](https://github.com/async-profiler/async-profiler) in the Linux x86_64 distribution, with convenience commands built into `questdb.sh`. Collecting profile data is straightforward. 
 
 There are two profiling approaches:
 
@@ -19,6 +19,14 @@ This page covers:
 
 - [Ad-hoc profiling](#attach-to-a-running-instance) - Attach to a running instance and capture a flame graph
 - [Continuous profiling](#continuous-profiling) - Run the profiler in the background for later analysis
+
+<Screenshot
+alt="Architecture of the file storing a column"
+height={435}
+src="images/docs/concepts/heatmap.webp"
+width={745}
+title="Heatmap showing CPU usage over time with flame graph"
+/>
 
 ## Prerequisites
 
@@ -223,26 +231,21 @@ HTML flame graphs provide an interactive visualization of the call stack:
 
 ### JFR files
 
-JFR (Java Flight Recorder) files can be analyzed using:
+Use `jfrconv` (bundled in QuestDB's `lib` directory) to convert JFR files to flame graphs or heatmaps. The interactive HTML output is easier to navigate than GUI tools like JDK Mission Control.
 
-- **JDK Mission Control (JMC)** - Oracle's profiling tool
-- **IntelliJ IDEA** - Built-in JFR viewer
-- **VisualVM** - With JFR plugin
-- **async-profiler's converter** - Convert to other formats
-
-To convert JFR to HTML flame graph using `jfrconv` from QuestDB's `lib` directory:
+Convert to a flame graph:
 
 ```shell
 ./lib/jfrconv profile.jfr profile.html
 ```
 
-To convert JFR to a heatmap (useful for spotting patterns and infrequent hiccups/outliers):
+Convert to a heatmap:
 
 ```shell
 ./lib/jfrconv -o heatmap profile.jfr profile-heatmap.html
 ```
 
-Heatmaps visualize samples over time, making it easier to identify periodic patterns, latency spikes, and rare events that might be hidden in aggregated flame graphs.
+For continuous profiling data, start with the heatmap. It shows samples over time, making it easy to spot anomalies. Click and drag to select a time range and the flame graph updates instantly to show only that period.
 
 ## Common profiling scenarios
 
