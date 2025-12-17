@@ -33,7 +33,7 @@ WINDOW JOIN slave_table [alias]
 ### RANGE clause
 
 The `RANGE` clause defines the time window relative to each master row's
-timestamp:
+timestamp. Both boundaries are inclusive.
 
 ```questdb-sql
 RANGE BETWEEN <value> <unit> PRECEDING AND <value> <unit> FOLLOWING
@@ -60,8 +60,9 @@ JOIN.
 ### INCLUDE/EXCLUDE PREVAILING
 
 - `INCLUDE PREVAILING` (default): Includes slave rows within the time window
-  plus the most recent slave row before the window start, useful for "last known
-  value" scenarios
+  plus the most recent slave row with a timestamp equal to or earlier than the
+  window start (similar to [ASOF JOIN](/docs/reference/sql/asof-join/) behavior),
+  useful for "last known value" scenarios
 - `EXCLUDE PREVAILING`: Only includes slave rows strictly within the time window
 
 ## Requirements
