@@ -59,10 +59,10 @@ JOIN.
 
 ### INCLUDE/EXCLUDE PREVAILING
 
-- `EXCLUDE PREVAILING` (default): Only includes slave rows strictly within the
-  time window
-- `INCLUDE PREVAILING`: Also includes the most recent slave row before the
-  window start, useful for "last known value" scenarios
+- `INCLUDE PREVAILING` (default): Includes slave rows within the time window
+  plus the most recent slave row before the window start, useful for "last known
+  value" scenarios
+- `EXCLUDE PREVAILING`: Only includes slave rows strictly within the time window
 
 ## Requirements
 
@@ -74,15 +74,20 @@ JOIN.
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on
    symbol columns
 
-## Supported aggregate functions
+## Aggregate functions
 
-WINDOW JOIN supports the following aggregate functions on the slave table:
+WINDOW JOIN supports all aggregate functions on the slave table. However, the
+following functions use an optimized internal API and will run faster:
 
 - `sum()` - Sum of values
 - `avg()` - Average/mean
 - `count()` - Count of matching rows
 - `min()` / `max()` - Minimum/maximum values
-- `first()` - First value in the window
+- `first()` / `last()` - First/last value in the window
+- `first_not_null()` / `last_not_null()` - First/last non-null value
+
+When only these optimized functions are used, queries benefit from vectorized
+execution.
 
 ## Examples
 
@@ -192,11 +197,12 @@ WINDOW JOIN prices p
     EXCLUDE PREVAILING;
 ```
 
-### Using INCLUDE PREVAILING
+### Using EXCLUDE PREVAILING
 
-Include the last known price before the window starts:
+Exclude the prevailing value to only aggregate rows strictly within the time
+window:
 
-```questdb-sql title="WINDOW JOIN with prevailing value"
+```questdb-sql title="WINDOW JOIN excluding prevailing value"
 SELECT
     t.sym,
     t.ts,
@@ -205,11 +211,11 @@ FROM trades t
 WINDOW JOIN prices p
     ON (t.sym = p.sym)
     RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
-    INCLUDE PREVAILING;
+    EXCLUDE PREVAILING;
 ```
 
-This is useful when you need to include the most recent value before the window
-begins, even if it falls outside the specified time range.
+This is useful when you want strict window boundaries and do not need the last
+known value before the window starts.
 
 ### With master table filter
 
