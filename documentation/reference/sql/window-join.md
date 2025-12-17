@@ -197,6 +197,30 @@ WINDOW JOIN prices p
     EXCLUDE PREVAILING;
 ```
 
+### Chained WINDOW JOINs
+
+You can chain multiple WINDOW JOINs together to aggregate from different tables
+or with different time windows:
+
+```questdb-sql title="Chained WINDOW JOINs"
+SELECT
+    t.sym,
+    t.ts,
+    t.price,
+    sum(p.bid) AS sum_bids,
+    avg(q.ask) AS avg_asks
+FROM trades t
+WINDOW JOIN bids p
+    ON (t.sym = p.sym)
+    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
+WINDOW JOIN asks q
+    ON (t.sym = q.sym)
+    RANGE BETWEEN 30 seconds PRECEDING AND 30 seconds FOLLOWING;
+```
+
+Each WINDOW JOIN operates independently, allowing you to aggregate data from
+multiple related tables with different time windows in a single query.
+
 ### Using EXCLUDE PREVAILING
 
 Exclude the prevailing value to only aggregate rows strictly within the time
