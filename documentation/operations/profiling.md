@@ -7,12 +7,18 @@ description: How to profile QuestDB using async-profiler to diagnose performance
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
 
-QuestDB supports profiling via [async-profiler](https://github.com/async-profiler/async-profiler), a low-overhead sampling profiler for Java applications. Profiling helps diagnose performance issues by analyzing CPU usage, memory allocation, lock contention, and other runtime behaviors.
+QuestDB embeds [async-profiler](https://github.com/async-profiler/async-profiler) in the Linux x86_64 distribution, with convenience commands built into `questdb.sh`. Collecting profile data is straightforward. The challenge lies in interpreting the results - understanding what the flame graphs and heatmaps reveal about your workload.
 
-This page covers the two profiling modes available through the `questdb.sh` script:
+There are two profiling approaches:
 
-- [Attach to a running instance](#attach-to-a-running-instance) - Profile an already running QuestDB server
-- [Continuous profiling](#continuous-profiling) - Start QuestDB with the profiler agent loaded from startup
+- **Ad-hoc profiling** produces a single flame graph for a specific time window. Use this when you can reproduce an issue on demand - start profiling, trigger the problem, stop profiling, and analyze the result.
+
+- **Continuous profiling** records to JFR files in the background, which can later be converted to heatmaps. Heatmaps show activity over time, letting you spot anomalies and zoom into specific moments to generate flame graphs. Use this when problems occur unpredictably - the profiler is always running, so you can investigate after the fact.
+
+This page covers:
+
+- [Ad-hoc profiling](#attach-to-a-running-instance) - Attach to a running instance and capture a flame graph
+- [Continuous profiling](#continuous-profiling) - Run the profiler in the background for later analysis
 
 ## Prerequisites
 
@@ -63,7 +69,7 @@ Use the `profile` command to attach async-profiler to an already running QuestDB
 
 | Option | Description |
 | ------ | ----------- |
-| `-t`   | Process tag to identify which QuestDB instance to profile. Defaults to `questdb` if omitted. |
+| `-t`   | Process tag to identify which QuestDB instance to profile. Required only when profiling an instance started with a custom `-t` tag. |
 | `--`   | Separator between questdb.sh options and async-profiler arguments. |
 
 All arguments after `--` are passed directly to the `asprof` command-line tool.
@@ -82,12 +88,6 @@ Profile memory allocations:
 ./questdb.sh profile -- -e alloc -d 60 -f /tmp/alloc-profile.html
 ```
 
-Profile a specific tagged instance:
-
-```shell
-./questdb.sh profile -t mydb -- -e cpu -d 30 -f /tmp/profile.html
-```
-
 Profile lock contention:
 
 ```shell
@@ -100,6 +100,12 @@ Generate a JFR (Java Flight Recorder) file instead of HTML:
 ./questdb.sh profile -- -e cpu -d 60 -f /tmp/profile.jfr
 ```
 
+Profile a specific tagged instance:
+
+```shell
+./questdb.sh profile -t mydb -- -e cpu -d 30 -f /tmp/profile.html
+```
+
 ### Common profiler arguments
 
 | Argument | Description |
@@ -108,14 +114,41 @@ Generate a JFR (Java Flight Recorder) file instead of HTML:
 | `-d <seconds>` | Duration of profiling in seconds. |
 | `-f <file>` | Output file. Extension determines format: `.html` for flame graph, `.jfr` for JFR, `.svg` for SVG. |
 | `-i <interval>` | Sampling interval (e.g., `10ms`, `1us`). |
-| `-t` | Profile only specific threads. |
+| `-t` | Profile threads separately. Each stack trace will end with a frame that denotes a single thread. |
 | `--all-user` | Include only user-mode events. |
 
 For a complete list of options, see the [async-profiler documentation](https://github.com/async-profiler/async-profiler).
 
 ## Continuous profiling
 
-Use the `-p` flag with the `start` command to launch QuestDB with the profiler agent loaded from startup. This mode enables continuous profiling, which is useful for capturing events that occur during server initialization or for long-running profile sessions.
+### Overview
+
+Use the `-p` flag with the `start` command to run the profiler continuously in the background. This is valuable when you don't know when a problem will occur - the profiler is always recording, so you can analyze what happened after the fact. Continuous profiling helps catch rare events that are difficult to reproduce and reveals patterns and trends over time.
+
+Profile data is written to JFR files in the `<QDB_ROOT>/profiles` directory (e.g., `~/.questdb/profiles/`). These can later be converted to heatmaps. Heatmaps show samples over time, letting you spot anomalies and then zoom into a specific time window to generate a flame graph for just that period.
+
+### Default configuration
+
+When you run `./questdb.sh start -p` without additional parameters, the profiler uses these defaults:
+
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| Events | `cpu,wall` | Profiles both CPU time and wall-clock time simultaneously |
+| Interval | `5ms` | Sampling interval for CPU and wall-clock profiling |
+| Allocation interval | `512k` | Sample every 512 KB of allocations (when `alloc` event is enabled) |
+| Lock threshold | `10ms` | Sample locks held longer than 10ms (when `lock` event is enabled) |
+| Loop duration | `30m` | Start a new JFR file every 30 minutes |
+| Output directory | `<QDB_ROOT>/profiles` | Profile files are written here |
+| File name pattern | `profile-%n{48}.jfr` | Sequence number up to 48, then wraps around |
+
+Override defaults via environment variables before starting QuestDB:
+
+```shell
+export PROFILER_EVENT="cpu"           # Profile CPU only
+export PROFILER_INTERVAL="10ms"       # Less frequent sampling
+export PROFILER_LOOP="1h"             # New file every hour
+./questdb.sh start -p
+```
 
 ### Syntax
 
@@ -169,6 +202,12 @@ When using continuous profiling, parameters are passed in a comma-separated form
 
 ## Interpreting results
 
+:::note
+
+Interpreting profiling results is a non-trivial exercise. Flame graphs and heatmaps can be misleading without context about what's normal for your workload. If you're unsure what you're seeing, share your profile on the [QuestDB Community Slack](https://slack.questdb.io) - the team and community are happy to help.
+
+:::
+
 ### HTML flame graphs
 
 HTML flame graphs provide an interactive visualization of the call stack:
@@ -187,16 +226,16 @@ JFR (Java Flight Recorder) files can be analyzed using:
 - **VisualVM** - With JFR plugin
 - **async-profiler's converter** - Convert to other formats
 
-To convert JFR to HTML flame graph:
+To convert JFR to HTML flame graph using `jfrconv` from QuestDB's `lib` directory:
 
 ```shell
-java -cp /path/to/converter.jar jfr2flame profile.jfr output.html
+./lib/jfrconv profile.jfr profile.html
 ```
 
 To convert JFR to a heatmap (useful for spotting patterns and infrequent hiccups/outliers):
 
 ```shell
-java -cp /path/to/converter.jar jfr2heat profile.jfr output.html
+./lib/jfrconv -o heatmap profile.jfr profile-heatmap.html
 ```
 
 Heatmaps visualize samples over time, making it easier to identify periodic patterns, latency spikes, and rare events that might be hidden in aggregated flame graphs.
@@ -252,7 +291,7 @@ If the profiler cannot attach to a running instance:
 If the flame graph shows `[unknown]` frames:
 
 1. Ensure debug symbols are available for native libraries
-2. On Linux, install `perf-map-agent` for JIT-compiled code symbols
+2. Try different C stack walking modes with `--cstack`: `fp` (frame pointer), `dwarf`, `lbr` (Last Branch Record), or `vm`/`vmx` (HotSpot VM structs)
 3. Use the `--all-user` flag to exclude kernel frames if not needed
 
 ### High overhead
