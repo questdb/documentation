@@ -77,7 +77,7 @@ JOIN.
 ## Aggregate functions
 
 WINDOW JOIN supports all aggregate functions on the slave table. However, the
-following functions use an optimized internal API and will run faster:
+following functions use SIMD-optimized aggregation and will run faster:
 
 - `sum()` - Sum of values
 - `avg()` - Average/mean
