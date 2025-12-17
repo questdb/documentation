@@ -7,8 +7,8 @@ description: JOIN SQL keyword reference documentation.
 QuestDB supports the type of joins you can frequently find in
 [relational databases](/glossary/relational-database/): `INNER`, `LEFT (OUTER)`,
 `CROSS`. Additionally, it implements joins which are particularly useful for
-time-series analytics: `ASOF`, `LT`, and `SPLICE`. `FULL` joins are not yet
-implemented and are on our roadmap.
+time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`. `FULL` joins are
+not yet implemented and are on our roadmap.
 
 All supported join types can be combined in a single SQL statement; QuestDB
 SQL's optimizer determines the best execution order and algorithms.
@@ -210,6 +210,14 @@ The result of both queries is the following:
 ASOF JOIN is a powerful time-series join extension.
 
 It has its own page, [ASOF JOIN](/docs/reference/sql/asof-join/).
+
+## WINDOW JOIN
+
+WINDOW JOIN aggregates data from a related table within a time-based window
+around each row. It is useful for calculating rolling statistics, moving
+averages, or aggregating readings within time windows.
+
+It has its own page, [WINDOW JOIN](/docs/reference/sql/window-join/).
 
 ## (INNER) JOIN
 
