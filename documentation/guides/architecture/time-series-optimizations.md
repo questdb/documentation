@@ -72,7 +72,7 @@ sequential reads, materialized views, and in-memory processing.
 
 - Materialized views can be chained, with the output of one serving as the input to another, and support TTLs for lifecycle management.
 
-### Time-To_Life and Data lifecycle
+### Time-To-Live and Data lifecycle
 
 QuestDB supports [Time To Live (TTL)](/docs/concept/ttl/) configuration for both regular tables and
 materialized views. With TTL enabled, partitions older than the configured horizon will automatically
