@@ -10,14 +10,22 @@ over time. If stale data is no longer required, users can delete old data from
 QuestDB to either save disk space or adhere to a data retention policy. This is
 achieved in QuestDB by removing data partitions from a table.
 
+QuestDB offers two approaches for data retention:
+
+- **Automatic**: Use [Time To Live (TTL)](/docs/concept/ttl/) to automatically
+  drop partitions when data ages beyond a specified threshold. This is the
+  simplest approach for most use cases.
+- **Manual**: Use `DROP PARTITION` commands as described on this page for
+  explicit control over which partitions to remove and when.
+
 This page provides a high-level overview of partitioning with examples to drop
 data by date. For more details on partitioning, see the
 [partitioning](/docs/concept/partitions/) page.
 
-## Strategy for data retention
+## Manual partition management
 
-A simple approach to removing stale data is to drop data that has been
-partitioned by time. A table must have a
+This section covers the manual approach to removing stale data by dropping
+partitions. A table must have a
 [designated timestamp](/docs/concept/designated-timestamp/) assigned and a
 partitioning strategy specified during a `CREATE TABLE` operation to achieve
 this.
@@ -78,7 +86,8 @@ syntax. Partitions may be dropped by:
 
   ```questdb-sql
   --Drop partitions older than 30 days
-  WHERE timestamp < dateadd('d', -30, now())
+  ALTER TABLE my_table DROP PARTITION
+  WHERE timestamp < dateadd('d', -30, now());
   ```
 
 **Usage notes:**
@@ -87,6 +96,9 @@ syntax. Partitions may be dropped by:
 - Arbitrary partitions may be dropped, which means they may not be the oldest
   chronologically. Depending on the types of queries users are performing on a
   dataset, it may not be desirable to have gaps caused by dropped partitions.
+- Unlike TTL, `DROP PARTITION` commands must be triggered manually or via
+  external scheduling (e.g., cron jobs). For fully automated retention, consider
+  using [TTL](/docs/concept/ttl/) instead.
 
 ### Example
 
