@@ -198,6 +198,6 @@ The web console uses different authentication than the PostgreSQL wire protocol.
 :::info Related Documentation
 - [PostgreSQL wire protocol](/docs/reference/api/postgres/)
 - [QuestDB Enterprise RBAC](/docs/operations/rbac/)
-- [Configuration reference](/docs/reference/configuration/)
+- [Configuration reference](/docs/configuration/)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)
 :::

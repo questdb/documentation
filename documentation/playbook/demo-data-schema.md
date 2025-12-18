@@ -171,8 +171,8 @@ The demo instance is read-only. For testing write operations (INSERT, UPDATE, DE
 :::
 
 :::info Related Documentation
-- [SYMBOL type](/docs/reference/sql/data-types/#symbol)
-- [Arrays in QuestDB](/docs/reference/sql/data-types/#arrays)
+- [SYMBOL type](/docs/concept/symbol/)
+- [Arrays in QuestDB](/docs/concept/array/)
 - [Designated timestamp](/docs/concept/designated-timestamp/)
 - [Time-series aggregations](/docs/reference/function/aggregation/)
 :::

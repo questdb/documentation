@@ -131,7 +131,7 @@ If you encounter permission errors with mounted volumes, ensure the QuestDB cont
 :::
 
 :::info Related Documentation
-- [Server Configuration Reference](/docs/reference/configuration/)
+- [Server Configuration Reference](/docs/configuration/)
 - [Docker Deployment Guide](/docs/deployment/docker/)
 - [PostgreSQL Wire Protocol](/docs/reference/api/postgres/)
 :::

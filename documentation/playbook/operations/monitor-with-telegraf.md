@@ -4,7 +4,7 @@ sidebar_label: Monitor with Telegraf
 description: Scrape QuestDB Prometheus metrics using Telegraf and store them in QuestDB for monitoring dashboards
 ---
 
-Monitor QuestDB by scraping its Prometheus metrics using Telegraf and storing them back in a QuestDB table. This creates a self-monitoring setup where QuestDB stores its own operational metrics, allowing you to track performance, resource usage, and health over time using familiar SQL queries and Grafana dashboards.
+Store QuestDB's operational metrics in QuestDB itself by scraping Prometheus metrics using Telegraf. This enables you to track performance, resource usage, and health over time using familiar SQL queries and Grafana dashboards, without needing a separate metrics database.
 
 ## Problem: Monitor QuestDB Without Prometheus
 
@@ -375,7 +375,7 @@ Be cautious about monitoring QuestDB with itself - if QuestDB fails, you lose mo
 :::
 
 :::info Related Documentation
-- [QuestDB metrics reference](/docs/operations/health-monitoring/)
+- [QuestDB metrics reference](/docs/operations/logging-metrics/#metrics)
 - [Telegraf prometheus input](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/prometheus)
 - [Telegraf merge aggregator](https://github.com/influxdata/telegraf/tree/master/plugins/aggregators/merge)
 - [ILP reference](/docs/reference/api/ilp/overview/)
