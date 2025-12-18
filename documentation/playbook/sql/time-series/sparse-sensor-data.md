@@ -125,7 +125,7 @@ ASOF JOIN s120 ON s1.vehicle_id = s120.vehicle_id;
 
 :::info Related Documentation
 - [ASOF JOIN](/docs/reference/sql/join/#asof-join)
-- [LEFT JOIN](/docs/reference/sql/join/#left-join)
+- [LEFT JOIN](/docs/reference/sql/join/#left-outer-join)
 - [CROSS JOIN](/docs/reference/sql/join/#cross-join)
 - [LATEST ON](/docs/reference/sql/select/#latest-on)
 :::

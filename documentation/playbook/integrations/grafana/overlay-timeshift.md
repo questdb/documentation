@@ -67,6 +67,6 @@ This creates an overlay chart where yesterday's and today's data align on the sa
 
 :::info Related Documentation
 - [UNION ALL](/docs/reference/sql/union-except-intersect/)
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [Grafana integration](/docs/third-party-tools/grafana/)
 :::

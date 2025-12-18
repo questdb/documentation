@@ -79,8 +79,8 @@ The final query divides the `wh` reported in the session by the number of `attri
 **Note:** If you want to filter the results by timestamp or operationId, you should add the filter at the first query (the one named `sampled`), so the rest of the process is done on the relevant subset of data.
 
 :::info Related Documentation
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
 - [FILL](/docs/reference/sql/select/#fill)
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [FIRST_VALUE](/docs/reference/function/window/#first_value)
 :::

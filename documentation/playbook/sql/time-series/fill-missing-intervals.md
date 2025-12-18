@@ -33,6 +33,6 @@ The `FILL` keyword applies the same strategy to all columns in the result set. Q
 To achieve different fill strategies for different columns, you would need to use separate queries with UNION ALL, or handle the conditional filling logic in your application layer.
 
 :::info Related Documentation
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
 - [FILL keyword](/docs/reference/sql/select/#fill)
 :::

@@ -59,8 +59,8 @@ SAMPLE BY 1d ALIGN TO CALENDAR;
 ```
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [AVG window function](/docs/reference/function/window/#avg)
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
-- [ALIGN TO CALENDAR](/docs/reference/sql/select/#align-to-calendar-time-zone)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
+- [ALIGN TO CALENDAR](/docs/reference/sql/sample-by/#align-to-calendar)
 :::

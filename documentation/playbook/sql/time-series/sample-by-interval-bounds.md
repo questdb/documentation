@@ -47,6 +47,6 @@ SAMPLE BY 15m
 ```
 
 :::info Related Documentation
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
 - [dateadd()](/docs/reference/function/date-time/#dateadd)
 :::

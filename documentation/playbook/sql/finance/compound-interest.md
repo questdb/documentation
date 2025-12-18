@@ -106,7 +106,7 @@ For more complex scenarios like monthly or quarterly compounding, adjust the tim
 
 :::info Related Documentation
 - [POWER function](/docs/reference/function/numeric/#power)
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [FIRST_VALUE window function](/docs/reference/function/window/#first_value)
 - [long_sequence](/docs/reference/function/row-generator/#long_sequence)
 :::

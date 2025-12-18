@@ -185,7 +185,7 @@ The first buy or sell transaction will produce NULL values for some calculations
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [SUM aggregate](/docs/reference/function/aggregation/#sum)
 - [CASE expressions](/docs/reference/sql/case/)
 :::

@@ -220,6 +220,6 @@ This pattern assumes all tables have identical schemas. If schemas differ:
 - [ASOF JOIN](/docs/reference/sql/join/#asof-join)
 - [tables() function](/docs/reference/function/meta/#tables)
 - [string_agg()](/docs/reference/function/aggregation/#string_agg)
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)
 :::

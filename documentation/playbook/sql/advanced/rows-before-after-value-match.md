@@ -132,6 +132,6 @@ This is a workaround since QuestDB doesn't have `ROWS FOLLOWING` syntax yet.
 :::info Related Documentation
 - [LAG window function](/docs/reference/function/window/#lag)
 - [LEAD window function](/docs/reference/function/window/#lead)
-- [Window functions overview](/docs/reference/sql/select/#window-functions)
-- [Window frame clauses](/docs/reference/sql/select/#frame-clause)
+- [Window functions overview](/docs/reference/sql/over/)
+- [Window frame clauses](/docs/reference/sql/over/#frame-types-and-behavior)
 :::

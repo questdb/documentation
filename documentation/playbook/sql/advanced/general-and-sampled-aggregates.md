@@ -97,6 +97,6 @@ Grafana will plot both series, making it easy to see when current values deviate
 
 :::info Related Documentation
 - [CROSS JOIN](/docs/reference/sql/join/#cross-join)
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
+- [SAMPLE BY](/docs/reference/sql/sample-by/)
 - [Grafana integration](/docs/third-party-tools/grafana/)
 :::

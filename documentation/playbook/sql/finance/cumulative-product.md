@@ -117,7 +117,7 @@ This pattern is essential for Monte Carlo simulations in finance. Generate rando
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/select/#window-functions)
+- [Window functions](/docs/reference/sql/over/)
 - [Mathematical functions](/docs/reference/function/numeric/)
 - [SUM aggregate](/docs/reference/function/aggregation/#sum)
 :::
