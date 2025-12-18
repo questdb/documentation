@@ -654,6 +654,48 @@ module.exports = {
       ],
     },
     {
+      label: "Playbook",
+      type: "category",
+      collapsed: false,
+      items: [
+        "playbook/overview",
+        "playbook/demo-data-schema",
+        {
+          type: "category",
+          label: "SQL Recipes",
+          collapsed: true,
+          items: [
+            "playbook/sql/force-designated-timestamp",
+            "playbook/sql/pivoting",
+            "playbook/sql/calculate-compound-interest",
+            "playbook/sql/rows-before-after-value-match",
+          ],
+        },
+        {
+          type: "category",
+          label: "Programmatic",
+          collapsed: true,
+          items: [
+            {
+              type: "category",
+              label: "PHP",
+              items: [
+                "playbook/programmatic/php/inserting-ilp",
+              ],
+            },
+          ],
+        },
+        {
+          type: "category",
+          label: "Operations",
+          collapsed: true,
+          items: [
+            "playbook/operations/docker-compose-config",
+          ],
+        },
+      ],
+    },
+    {
       label: "Release Notes",
       type: "link",
       href: "https://questdb.com/release-notes",
