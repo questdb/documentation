@@ -404,8 +404,8 @@ Full query logging can generate significant data:
 :::
 
 :::info Related Documentation
-- [HTTP slow query logging](/docs/reference/configuration/#http-slow-query-log)
-- [Prometheus metrics](/docs/reference/metrics/)
+- [HTTP slow query logging](/docs/configuration/)
+- [Prometheus metrics](/docs/operations/logging-metrics/)
 - [percentile() function](/docs/reference/function/aggregation/#percentile)
 - [Grafana integration](/docs/third-party-tools/grafana/)
 :::

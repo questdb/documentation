@@ -483,7 +483,7 @@ Or use a certbot hook to reload PgBouncer after renewal.
 
 :::info Related Documentation
 - [PostgreSQL wire protocol](/docs/reference/api/postgres/)
-- [QuestDB security](/docs/operations/security/)
+- [QuestDB security](/docs/guides/architecture/security/)
 - [PgBouncer documentation](https://www.pgbouncer.org/config.html)
-- [Docker deployment](/docs/operations/deployment/docker/)
+- [Docker deployment](/docs/deployment/docker/)
 :::

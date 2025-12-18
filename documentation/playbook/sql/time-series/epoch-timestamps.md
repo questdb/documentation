@@ -275,7 +275,7 @@ Wrong precision will give incorrect results by factors of 1000x!
 :::
 
 :::info Related Documentation
-- [CAST function](/docs/reference/function/cast/)
+- [CAST function](/docs/reference/sql/cast/)
 - [Timestamp types](/docs/reference/sql/datatypes/#timestamp-and-date)
 - [dateadd()](/docs/reference/function/date-time/#dateadd)
 - [now()](/docs/reference/function/date-time/#now)

@@ -418,7 +418,7 @@ Grafana heatmaps require:
 
 :::info Related Documentation
 - [Aggregate functions](/docs/reference/function/aggregation/)
-- [CAST function](/docs/reference/function/cast/)
+- [CAST function](/docs/reference/sql/cast/)
 - [percentile()](/docs/reference/function/aggregation/#percentile)
 - [Window functions](/docs/reference/sql/select/#window-functions)
 :::

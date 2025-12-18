@@ -394,9 +394,9 @@ Timestamps between 1970 and ~2000 can be ambiguous (seconds could look like mill
 :::
 
 :::info Related Documentation
-- [CSV import via Web Console](/docs/operations/importing-data/#web-console-csv-import)
-- [REST API import](/docs/operations/importing-data/#rest-api)
+- [CSV import via Web Console](/docs/web-console/import-csv/)
+- [REST API import](/docs/guides/import-csv/)
 - [COPY command](/docs/reference/sql/copy/)
 - [Timestamp types](/docs/reference/sql/datatypes/#timestamp-and-date)
-- [ILP ingestion](/docs/operations/ingesting-data/#influxdb-line-protocol)
+- [ILP ingestion](/docs/ingestion-overview/)
 :::

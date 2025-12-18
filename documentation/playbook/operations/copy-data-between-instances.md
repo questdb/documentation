@@ -524,8 +524,8 @@ Methods with no downtime:
 :::
 
 :::info Related Documentation
-- [Backup command](/docs/reference/sql/backup/)
+- [Backup command](/docs/operations/backup/)
 - [COPY command](/docs/reference/sql/copy/)
-- [ILP ingestion](/docs/operations/ingesting-data/)
+- [ILP ingestion](/docs/ingestion-overview/)
 - [PostgreSQL wire protocol](/docs/reference/api/postgres/)
 :::

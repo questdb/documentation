@@ -320,7 +320,7 @@ UNION ALL creates multiple copies of your data. For very large tables:
 :::
 
 :::info Related Documentation
-- [UNION](/docs/reference/sql/union/)
+- [UNION](/docs/reference/sql/union-except-intersect/)
 - [CASE expressions](/docs/reference/sql/case/)
-- [Pivoting (opposite operation)](/playbook/sql/pivoting)
+- [Pivoting (opposite operation)](/docs/playbook/sql/advanced/pivot-table/)
 :::

@@ -454,7 +454,7 @@ Mismatched timezones will misalign the overlay.
 :::info Related Documentation
 - [dateadd() function](/docs/reference/function/date-time/#dateadd)
 - [date_trunc() function](/docs/reference/function/date-time/#date_trunc)
-- [UNION ALL](/docs/reference/sql/union/)
+- [UNION ALL](/docs/reference/sql/union-except-intersect/)
 - [SAMPLE BY](/docs/reference/sql/select/#sample-by)
 - [Grafana time series](/docs/third-party-tools/grafana/)
 :::

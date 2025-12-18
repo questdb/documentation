@@ -355,7 +355,7 @@ QuestDB's array support is focused on specific use cases. For extensive array ma
 :::
 
 :::info Related Documentation
-- [CAST function](/docs/reference/function/cast/)
+- [CAST function](/docs/reference/sql/cast/)
 - [Data types](/docs/reference/sql/datatypes/)
 - [String functions](/docs/reference/function/text/)
 :::
