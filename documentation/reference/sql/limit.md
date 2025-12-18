@@ -22,13 +22,16 @@ are positive numbers, and negative numbers are explicitly labeled `-m` and `-n`.
 
 - `LIMIT n`: take the first `n` records
 - `LIMIT -n`: take the last `n` records
-- `LIMIT m, n`: take the first `n` records, then drop the first `m` records from
-  that. The result is the range of records `(m, n]` (number 1 denotes the first
-  record). If `m > n`, implicitly swap the arguments. PostgreSQL equivalent:
-  `OFFSET m LIMIT (n-m)`
+- `LIMIT m, n`: skip the first `m` records, then take up to record number `n`
+  (inclusive)
+  - result is the range of records `(m, n]` number 1 denoting the first record
+  - if `m > n`, implicitly swap the arguments
+  - PostgreSQL equivalent: `OFFSET m LIMIT (n-m)`
 - `LIMIT -m, -n`: take the last `m` records, then drop the last `n` records from
-  that. The result is the range of records `[-m, -n)` (number -1 denotes the
-  last record). If `m < n`, implicitly swap them.
+  that
+  - result is the range of records `[-m, -n)`, number -1 denoting the last
+    record
+  - if `m < n`, implicitly swap them
 - `LIMIT m, -n`: drop the first `m` and the last `n` records. This gives you the
   range `(m, -n)`. These arguments will not be swapped.
 
