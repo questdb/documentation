@@ -668,7 +668,6 @@ module.exports = {
           collapsed: true,
           items: [
             "playbook/sql/force-designated-timestamp",
-            "playbook/sql/pivoting",
             "playbook/sql/rows-before-after-value-match",
             {
               type: "category",
@@ -691,6 +690,15 @@ module.exports = {
               collapsed: true,
               items: [
                 "playbook/sql/time-series/latest-n-per-partition",
+                "playbook/sql/time-series/session-windows",
+                "playbook/sql/time-series/latest-activity-window",
+                "playbook/sql/time-series/filter-by-week",
+                "playbook/sql/time-series/expand-power-over-time",
+                "playbook/sql/time-series/epoch-timestamps",
+                "playbook/sql/time-series/sample-by-interval-bounds",
+                "playbook/sql/time-series/remove-outliers",
+                "playbook/sql/time-series/fill-missing-intervals",
+                "playbook/sql/time-series/sparse-sensor-data",
               ],
             },
             {
@@ -699,6 +707,13 @@ module.exports = {
               collapsed: true,
               items: [
                 "playbook/sql/advanced/top-n-plus-others",
+                "playbook/sql/advanced/pivot-table",
+                "playbook/sql/advanced/unpivot-table",
+                "playbook/sql/advanced/sankey-funnel",
+                "playbook/sql/advanced/conditional-aggregates",
+                "playbook/sql/advanced/general-and-sampled-aggregates",
+                "playbook/sql/advanced/consistent-histogram-buckets",
+                "playbook/sql/advanced/array-from-string",
               ],
             },
           ],
@@ -708,6 +723,7 @@ module.exports = {
           label: "Integrations",
           collapsed: true,
           items: [
+            "playbook/integrations/opcua-dense-format",
             {
               type: "category",
               label: "Grafana",
@@ -716,14 +732,7 @@ module.exports = {
                 "playbook/integrations/grafana/dynamic-table-queries",
                 "playbook/integrations/grafana/read-only-user",
                 "playbook/integrations/grafana/variable-dropdown",
-              ],
-            },
-            {
-              type: "category",
-              label: "Telegraf",
-              collapsed: true,
-              items: [
-                "playbook/integrations/telegraf/opcua-dense-format",
+                "playbook/integrations/grafana/overlay-timeshift",
               ],
             },
           ],
@@ -770,6 +779,10 @@ module.exports = {
           items: [
             "playbook/operations/docker-compose-config",
             "playbook/operations/monitor-with-telegraf",
+            "playbook/operations/csv-import-milliseconds",
+            "playbook/operations/tls-pgbouncer",
+            "playbook/operations/copy-data-between-instances",
+            "playbook/operations/query-times-histogram",
           ],
         },
       ],
