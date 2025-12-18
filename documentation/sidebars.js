@@ -667,8 +667,6 @@ module.exports = {
           label: "SQL Recipes",
           collapsed: true,
           items: [
-            "playbook/sql/force-designated-timestamp",
-            "playbook/sql/rows-before-after-value-match",
             {
               type: "category",
               label: "Finance",
@@ -689,6 +687,7 @@ module.exports = {
               label: "Time-Series Patterns",
               collapsed: true,
               items: [
+                "playbook/sql/time-series/force-designated-timestamp",
                 "playbook/sql/time-series/latest-n-per-partition",
                 "playbook/sql/time-series/session-windows",
                 "playbook/sql/time-series/latest-activity-window",
@@ -706,6 +705,7 @@ module.exports = {
               label: "Advanced SQL",
               collapsed: true,
               items: [
+                "playbook/sql/advanced/rows-before-after-value-match",
                 "playbook/sql/advanced/top-n-plus-others",
                 "playbook/sql/advanced/pivot-table",
                 "playbook/sql/advanced/unpivot-table",
@@ -742,6 +742,7 @@ module.exports = {
           label: "Programmatic",
           collapsed: true,
           items: [
+            "playbook/programmatic/tls-ca-configuration",
             {
               type: "category",
               label: "PHP",
@@ -754,13 +755,6 @@ module.exports = {
               label: "Ruby",
               items: [
                 "playbook/programmatic/ruby/inserting-ilp",
-              ],
-            },
-            {
-              type: "category",
-              label: "Rust",
-              items: [
-                "playbook/programmatic/rust/tls-configuration",
               ],
             },
             {

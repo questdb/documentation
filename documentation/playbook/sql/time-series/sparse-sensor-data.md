@@ -1,387 +1,131 @@
 ---
 title: Join Strategies for Sparse Sensor Data
 sidebar_label: Sparse sensor data
-description: Compare CROSS JOIN, LEFT JOIN, and ASOF JOIN strategies for combining data from sensors that report at different times
+description: Compare CROSS JOIN, LEFT JOIN, and ASOF JOIN strategies for combining data from sensors stored in separate tables
 ---
 
-Combine data from multiple sensors that report at different times and frequencies. This guide compares three join strategies—CROSS JOIN, LEFT JOIN, and ASOF JOIN—showing when to use each for optimal results.
+Efficiently query sparse sensor data by splitting wide tables into narrow tables and joining them with different strategies.
 
-## Problem: Sensors Report at Different Times
+## Problem
 
-You have three temperature sensors with different reporting schedules:
+You have a sparse sensors table with 120 sensor columns, in which you are getting just a few sensor values at any given timestamp, so most values are null.
 
-**Sensor A (every 1 minute):**
-| timestamp | temperature |
-|-----------|-------------|
-| 10:00:00  | 22.5 |
-| 10:01:00  | 22.7 |
-| 10:02:00  | 22.6 |
+When you want to query data from any given sensor, you first SAMPLE the data with an `avg` or a `last_not_null` function aggregation, and then often build a CTE and call `LATEST ON` to get results:
 
-**Sensor B (every 2 minutes):**
-| timestamp | temperature |
-|-----------|-------------|
-| 10:00:00  | 23.1 |
-| 10:02:00  | 23.3 |
-
-**Sensor C (irregular):**
-| timestamp | temperature |
-|-----------|-------------|
-| 10:00:30  | 21.8 |
-| 10:01:45  | 22.0 |
-
-You want to analyze all sensors together, but their timestamps don't align.
-
-## Strategy 1: CROSS JOIN for Complete Combinations
-
-Generate all possible combinations of readings across sensors:
-
-```questdb-sql demo title="CROSS JOIN all sensor combinations"
-WITH sensor_a AS (
-  SELECT timestamp as ts_a, temperature as temp_a
-  FROM sensor_readings
-  WHERE sensor_id = 'A'
-    AND timestamp >= '2025-01-15T10:00:00'
-    AND timestamp < '2025-01-15T10:10:00'
-),
-sensor_b AS (
-  SELECT timestamp as ts_b, temperature as temp_b
-  FROM sensor_readings
-  WHERE sensor_id = 'B'
-    AND timestamp >= '2025-01-15T10:00:00'
-    AND timestamp < '2025-01-15T10:10:00'
-)
+```sql
 SELECT
-  sensor_a.ts_a,
-  sensor_a.temp_a,
-  sensor_b.ts_b,
-  sensor_b.temp_b,
-  ABS(sensor_a.ts_a - sensor_b.ts_b) / 1000000 as time_diff_seconds
-FROM sensor_a
-CROSS JOIN sensor_b
-WHERE ABS(sensor_a.ts_a - sensor_b.ts_b) < 30000000  -- Within 30 seconds
-ORDER BY sensor_a.ts_a, sensor_b.ts_b;
+  timestamp,
+  vehicle_id,
+  avg(sensor_1) AS avg_sensor_1, avg(sensor_2) AS avg_sensor_2,
+  ...
+  avg(sensor_119) AS avg_sensor_119, avg(sensor_120) AS avg_sensor_120
+FROM
+  vehicle_sensor_data
+-- WHERE vehicle_id = 'AAA0000'
+SAMPLE BY 30s
+LIMIT 100000;
 ```
 
-**Results:**
+This works, but it is not super fast (1sec for 10 million rows, in a table with 120 sensor columns and with 10k different vehicle_ids), and it is also not very efficient because `null` columns take some bytes on disk.
 
-| ts_a | temp_a | ts_b | temp_b | time_diff_seconds |
-|------|--------|------|--------|-------------------|
-| 10:00:00 | 22.5 | 10:00:00 | 23.1 | 0 |
-| 10:01:00 | 22.7 | 10:00:00 | 23.1 | 60 | ← Matched to previous B reading
-| 10:02:00 | 22.6 | 10:02:00 | 23.3 | 0 |
+## Solution: Multiple Narrow Tables with Joins
 
-**When to use:**
-- Small datasets (CROSS JOIN creates N × M rows)
-- Need all combinations within a time window
-- Analyzing correlation between sensors with tolerance
+A single table works, but there is a more efficient (although a bit more cumbersome if you compose queries by hand) way to do this.
 
-**Pros:**
-- Simple to understand
-- Captures all possible pairings
-- Can filter by time difference after joining
+You can create 120 tables, one per sensor, rather than a table with 120 columns. Well, technically you probably want 121 tables, one with the common dimensions, then 1 per sensor. Or maybe you want N tables, one for the common dimensions, then N depending on how many sensor groups you have, as some groups might always send in sync. In any case, rather than a wide table you would end up with several narrow tables that you would need to join.
 
-**Cons:**
-- Explodes result set (cartesian product)
-- Not scalable for large datasets
-- May create duplicate matches
+Now for joining the tables there are three potential ways, depending on the results you are after:
+ * To see the _LATEST_ known value for all the metrics _for a given series_, use a `CROSS JOIN` strategy (example below). This returns a single row.
+ * To see the _LATEST_ known value for all the metrics and _for all or several series_, use a `LEFT JOIN` strategy. This returns a single row per series (example below).
+ * To see the _rolling view of all the latest known values_ regarding the current row for one of the metrics, use an `ASOF JOIN` strategy. This returns as many rows as you have in the main metric you are querying (example below).
 
-## Strategy 2: LEFT JOIN on Common Intervals
+### Performance
 
-Resample both sensors to common intervals, then join:
+The three approaches perform well. The three queries were executed on a table like the initial one, with 10 million rows representing sparse data from 10k series and across 120 metrics, so 120 tables. Each of the 120 tables had ~83k records (which times 120 is ~10 million rows).
 
-```questdb-sql demo title="LEFT JOIN after resampling to common intervals"
-WITH sensor_a_resampled AS (
-  SELECT timestamp, first(temperature) as temp_a
-  FROM sensor_readings
-  WHERE sensor_id = 'A'
-    AND timestamp >= '2025-01-15T10:00:00'
-    AND timestamp < '2025-01-15T10:10:00'
-  SAMPLE BY 1m FILL(PREV)
-),
-sensor_b_resampled AS (
-  SELECT timestamp, first(temperature) as temp_b
-  FROM sensor_readings
-  WHERE sensor_id = 'B'
-    AND timestamp >= '2025-01-15T10:00:00'
-    AND timestamp < '2025-01-15T10:10:00'
-  SAMPLE BY 1m FILL(PREV)
-)
-SELECT
-  sensor_a_resampled.timestamp,
-  sensor_a_resampled.temp_a,
-  sensor_b_resampled.temp_b,
-  (sensor_a_resampled.temp_a - sensor_b_resampled.temp_b) as temp_difference
-FROM sensor_a_resampled
-LEFT JOIN sensor_b_resampled
-  ON sensor_a_resampled.timestamp = sensor_b_resampled.timestamp
-ORDER BY sensor_a_resampled.timestamp;
+`CROSS JOIN` is the fastest, executing in 23ms, `ASOF JOIN` is second with 123 ms, and `LEFT JOIN` is the slowest at 880ms. Still not too bad, as you probably will not want to get all the sensors from all the devices all the time, and joining fewer tables would perform better.
+
+## Strategy 1: CROSS JOIN
+
+We first find the latest point in each of the 120 tables for the given series (AAA0000), so we get a value per table, and then do a `CROSS JOIN`, to get a single row.
+
+```sql
+WITH
+s1 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_1
+    WHERE vehicle_id = 'AAA0000' LATEST ON timestamp PARTITION BY vehicle_id),
+s2 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_2
+    WHERE vehicle_id = 'AAA0000' LATEST ON timestamp PARTITION BY vehicle_id),
+...
+s119 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_119
+    WHERE vehicle_id = 'AAA0000' LATEST ON timestamp PARTITION BY vehicle_id),
+s120 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_120
+    WHERE vehicle_id = 'AAA0000' LATEST ON timestamp PARTITION BY vehicle_id)
+SELECT s1.timestamp, s1.vehicle_id, s1.value AS value_1,
+s2.value AS value_2,
+...
+s119.value AS value_119,
+s120.value AS value_120
+FROM s1
+CROSS JOIN s2
+CROSS JOIN ...
+CROSS JOIN s119
+CROSS JOIN s120;
 ```
 
-**Results:**
+## Strategy 2: LEFT JOIN
 
-| timestamp | temp_a | temp_b | temp_difference |
-|-----------|--------|--------|-----------------|
-| 10:00:00  | 22.5   | 23.1   | -0.6 |
-| 10:01:00  | 22.7   | 23.1   | -0.4 | ← B value filled forward
-| 10:02:00  | 22.6   | 23.3   | -0.7 |
+We first find the latest point in each of the 120 tables for each series, so we get a value per table and series, and then do a `LEFT JOIN` on the series ID, to get a single row for each different series (10K rows in our example).
 
-**When to use:**
-- Sensors can be resampled to common frequency
-- Want aligned timestamps for easy comparison
-- Need forward-filled or interpolated values
-
-**Pros:**
-- Clean aligned results
-- Predictable row count (one per interval)
-- Works well with Grafana visualization
-
-**Cons:**
-- Requires choosing resample interval
-- May introduce synthetic data (FILL)
-- Less precise than original timestamps
-
-## Strategy 3: ASOF JOIN for Temporal Proximity
-
-Match each sensor A reading with the most recent sensor B reading:
-
-```questdb-sql demo title="ASOF JOIN to match most recent readings"
-SELECT
-  a.timestamp as ts_a,
-  a.temperature as temp_a,
-  b.timestamp as ts_b,
-  b.temperature as temp_b,
-  (a.timestamp - b.timestamp) / 1000000 as seconds_since_b_reading,
-  (a.temperature - b.temperature) as temp_difference
-FROM sensor_readings a
-ASOF JOIN sensor_readings b
-  ON a.sensor_id = 'A' AND b.sensor_id = 'B'
-WHERE a.sensor_id = 'A'
-  AND a.timestamp >= '2025-01-15T10:00:00'
-  AND a.timestamp < '2025-01-15T10:10:00'
-ORDER BY a.timestamp;
+```sql
+WITH
+s1 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_1
+    LATEST ON timestamp PARTITION BY vehicle_id),
+s2 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_2
+    LATEST ON timestamp PARTITION BY vehicle_id),
+...
+s119 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_119
+    LATEST ON timestamp PARTITION BY vehicle_id),
+s120 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_120
+    LATEST ON timestamp PARTITION BY vehicle_id)
+SELECT s1.timestamp, s1.vehicle_id, s1.value AS value_1,
+s2.value AS value_2,
+...
+s119.value AS value_119,
+s120.value AS value_120
+FROM s1
+LEFT JOIN s2 ON s1.vehicle_id = s2.vehicle_id
+LEFT JOIN ...
+LEFT JOIN s119 ON s1.vehicle_id = s119.vehicle_id
+LEFT JOIN s120 ON s1.vehicle_id = s120.vehicle_id;
 ```
 
-**Results:**
+## Strategy 3: ASOF JOIN
 
-| ts_a | temp_a | ts_b | temp_b | seconds_since_b_reading | temp_difference |
-|------|--------|------|--------|-------------------------|-----------------|
-| 10:00:00 | 22.5 | 10:00:00 | 23.1 | 0 | -0.6 |
-| 10:01:00 | 22.7 | 10:00:00 | 23.1 | 60 | -0.4 | ← Most recent B reading
-| 10:02:00 | 22.6 | 10:02:00 | 23.3 | 0 | -0.7 |
+We get all the rows in all the tables, then do an `ASOF JOIN` on the series ID, so we get a row for each row of the first table in the query, in our example ~83K results.
 
-**When to use:**
-- Need point-in-time comparison (what was B when A reported?)
-- Sensors report at irregular intervals
-- Want actual timestamps, not resampled intervals
-- Large datasets (very efficient)
-
-**Pros:**
-- Extremely fast (optimized for time-series)
-- No data synthesis (uses actual readings)
-- Handles irregular timestamps naturally
-- Scalable to millions of rows
-
-**Cons:**
-- More complex syntax
-- May need to filter by max time difference
-- Requires understanding of ASOF semantics
-
-## Comparison: Three Sensors Combined
-
-Combine three sensors using ASOF JOIN:
-
-```questdb-sql demo title="ASOF JOIN multiple sensors"
-SELECT
-  a.timestamp as ts_a,
-  a.temperature as temp_a,
-  b.timestamp as ts_b,
-  b.temperature as temp_b,
-  c.timestamp as ts_c,
-  c.temperature as temp_c,
-  (a.temperature + b.temperature + c.temperature) / 3 as avg_temperature
-FROM sensor_readings a
-ASOF JOIN sensor_readings b
-  ON a.sensor_id = 'A' AND b.sensor_id = 'B'
-ASOF JOIN sensor_readings c
-  ON a.sensor_id = 'A' AND c.sensor_id = 'C'
-WHERE a.sensor_id = 'A'
-  AND a.timestamp >= '2025-01-15T10:00:00'
-  AND a.timestamp < '2025-01-15T10:10:00'
-ORDER BY a.timestamp;
+```sql
+WITH
+s1 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_1 ),
+s2 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_2 ),
+...
+s118 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_118 ),
+s119 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_119 ),
+s120 AS (SELECT timestamp, vehicle_id, value FROM vehicle_sensor_120 )
+SELECT s1.timestamp, s1.vehicle_id, s1.value AS value_1,
+       s2.value AS value_2,
+       ...
+       s119.value AS value_119,
+       s120.value AS value_120
+FROM s1
+ASOF JOIN s2 ON s1.vehicle_id = s2.vehicle_id
+ASOF JOIN ...
+ASOF JOIN s119 ON s1.vehicle_id = s119.vehicle_id
+ASOF JOIN s120 ON s1.vehicle_id = s120.vehicle_id;
 ```
-
-Each sensor A reading is matched with the most recent reading from sensors B and C.
-
-## Filtering by Maximum Time Difference
-
-Ensure joined readings aren't too stale:
-
-```questdb-sql demo title="ASOF JOIN with staleness filter"
-WITH joined AS (
-  SELECT
-    a.timestamp as ts_a,
-    a.temperature as temp_a,
-    b.timestamp as ts_b,
-    b.temperature as temp_b,
-    (a.timestamp - b.timestamp) as time_diff_micros
-  FROM sensor_readings a
-  ASOF JOIN sensor_readings b
-    ON a.sensor_id = 'A' AND b.sensor_id = 'B'
-  WHERE a.sensor_id = 'A'
-    AND a.timestamp >= '2025-01-15T10:00:00'
-    AND a.timestamp < '2025-01-15T10:10:00'
-)
-SELECT *
-FROM joined
-WHERE time_diff_micros <= 120000000  -- B reading not older than 2 minutes
-ORDER BY ts_a;
-```
-
-This filters out matches where sensor B's reading is too old.
-
-## LT JOIN for Strictly Before
-
-Use LT JOIN when you need readings strictly before (not at the same time):
-
-```questdb-sql demo title="LT JOIN for strictly previous reading"
-SELECT
-  a.timestamp as ts_a,
-  a.temperature as temp_a,
-  b.timestamp as ts_b,
-  b.temperature as temp_b,
-  (a.temperature - b.temperature) as temp_change
-FROM sensor_readings a
-LT JOIN sensor_readings b
-  ON a.sensor_id = 'A' AND b.sensor_id = 'A'  -- Same sensor, previous reading
-WHERE a.sensor_id = 'A'
-  AND a.timestamp >= '2025-01-15T10:00:00'
-  AND a.timestamp < '2025-01-15T10:10:00'
-ORDER BY a.timestamp;
-```
-
-This matches each reading with the strictly previous reading from the same sensor (useful for calculating deltas).
-
-## Handling NULL Results
-
-ASOF JOIN returns NULL when no previous reading exists:
-
-```questdb-sql demo title="Handle NULL from ASOF JOIN"
-SELECT
-  a.timestamp as ts_a,
-  a.temperature as temp_a,
-  COALESCE(b.temperature, a.temperature) as temp_b,  -- Use A if B is NULL
-  CASE
-    WHEN b.timestamp IS NULL THEN 'NO_PREVIOUS_READING'
-    ELSE 'OK'
-  END as status
-FROM sensor_readings a
-ASOF JOIN sensor_readings b
-  ON a.sensor_id = 'A' AND b.sensor_id = 'B'
-WHERE a.sensor_id = 'A'
-ORDER BY a.timestamp;
-```
-
-## Performance Comparison
-
-| Strategy | Rows Generated | Query Speed | Memory Usage | Best For |
-|----------|----------------|-------------|--------------|----------|
-| **CROSS JOIN** | N × M | Slow | High | Small datasets, all combinations |
-| **LEFT JOIN** | N | Medium | Medium | Regular intervals, visualization |
-| **ASOF JOIN** | N | Fast | Low | Large datasets, irregular data |
-
-**Benchmark example (1M rows each):**
-- CROSS JOIN: ~30 seconds, creates 1T rows (filtered to 1M)
-- LEFT JOIN: ~5 seconds, creates 1M rows
-- ASOF JOIN: ~0.5 seconds, creates 1M rows
-
-## Combining Strategies
-
-Use resampling + ASOF for best of both worlds:
-
-```questdb-sql demo title="Resample then ASOF JOIN"
-WITH sensor_a_minute AS (
-  SELECT timestamp, first(temperature) as temp_a
-  FROM sensor_readings
-  WHERE sensor_id = 'A'
-  SAMPLE BY 1m
-)
-SELECT
-  a.timestamp,
-  a.temp_a,
-  b.temperature as temp_b_asof
-FROM sensor_a_minute a
-ASOF JOIN sensor_readings b
-  ON b.sensor_id = 'B'
-WHERE a.timestamp >= '2025-01-15T10:00:00'
-ORDER BY a.timestamp;
-```
-
-- Resample sensor A for regular intervals
-- Use ASOF JOIN to find sensor B readings without resampling B
-
-## Grafana Multi-Sensor Dashboard
-
-Format for Grafana with multiple series:
-
-```questdb-sql demo title="Multi-sensor data for Grafana"
-WITH sensor_a AS (
-  SELECT timestamp, first(temperature) as temperature
-  FROM sensor_readings
-  WHERE sensor_id = 'A'
-    AND $__timeFilter(timestamp)
-  SAMPLE BY $__interval FILL(PREV)
-),
-sensor_b AS (
-  SELECT timestamp, first(temperature) as temperature
-  FROM sensor_readings
-  WHERE sensor_id = 'B'
-    AND $__timeFilter(timestamp)
-  SAMPLE BY $__interval FILL(PREV)
-)
-SELECT timestamp as time, 'Sensor A' as metric, temperature as value FROM sensor_a
-UNION ALL
-SELECT timestamp as time, 'Sensor B' as metric, temperature as value FROM sensor_b
-ORDER BY time;
-```
-
-Creates separate series for each sensor in Grafana.
-
-## Decision Matrix
-
-**Choose CROSS JOIN when:**
-- Datasets are small (< 10K rows each)
-- You need all possible combinations
-- Time tolerance is flexible (e.g., "within 1 minute")
-- Analyzing correlation between sensors
-
-**Choose LEFT JOIN when:**
-- You can resample to common intervals
-- Clean, aligned timestamps are important
-- Visualizing in Grafana with multiple sensors
-- Forward-filling is acceptable
-
-**Choose ASOF JOIN when:**
-- Datasets are large (> 100K rows)
-- Timestamps are irregular
-- Point-in-time accuracy matters
-- Query performance is critical
-- You want actual readings, not interpolated values
-
-:::tip ASOF JOIN is Usually Best
-For most real-world sensor data scenarios, ASOF JOIN offers the best combination of performance, accuracy, and simplicity. It's specifically designed for time-series data and handles irregular intervals naturally.
-:::
-
-:::warning CROSS JOIN Explosion
-Never use CROSS JOIN without a strong WHERE filter on large tables. A CROSS JOIN of two 1M-row tables creates 1 trillion rows before filtering!
-
-Safe: `CROSS JOIN ... WHERE ABS(a.ts - b.ts) < threshold`
-Dangerous: `CROSS JOIN ... ` (without WHERE on time difference)
-:::
 
 :::info Related Documentation
 - [ASOF JOIN](/docs/reference/sql/join/#asof-join)
-- [LT JOIN](/docs/reference/sql/join/#lt-join)
 - [LEFT JOIN](/docs/reference/sql/join/#left-join)
-- [SAMPLE BY](/docs/reference/sql/select/#sample-by)
-- [FILL strategies](/docs/reference/sql/select/#fill)
+- [CROSS JOIN](/docs/reference/sql/join/#cross-join)
+- [LATEST ON](/docs/reference/sql/select/#latest-on)
 :::

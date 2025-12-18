@@ -1,10 +1,10 @@
 ---
-title: UNPIVOT Table Results
-sidebar_label: UNPIVOT
-description: Convert wide-format data to long format using UNION ALL to transform column-based data into row-based data
+title: Unpivoting Query Results
+sidebar_label: Unpivoting results
+description: Convert wide-format data to long format using UNION ALL
 ---
 
-Transform wide-format data (multiple columns) into long format (rows) using UNION ALL. This "unpivot" operation is useful for converting column-based data into a row-based format suitable for visualization or further analysis.
+Transform wide-format data (multiple columns) into long format (rows) using UNION ALL.
 
 ## Problem: Wide Format to Long Format
 
@@ -140,59 +140,6 @@ ORDER BY timestamp, sensor_id, metric;
 | 10:00:00  | S001      | pressure    | 1013.2|
 | 10:00:00  | S001      | temperature | 22.5  |
 
-## Simplified Syntax (When All Values Present)
-
-If you know there are no NULL values, skip the filtering:
-
-```sql
-SELECT timestamp, symbol, 'buy' as side, buy_price as price
-FROM trades_summary
-
-UNION ALL
-
-SELECT timestamp, symbol, 'sell' as side, sell_price as price
-FROM trades_summary;
-```
-
-## Use Cases
-
-**Grafana visualization:**
-```sql
--- Convert wide format to Grafana-friendly long format
-SELECT
-  timestamp as time,
-  metric_name as metric,
-  value
-FROM (
-  SELECT timestamp, 'cpu' as metric_name, cpu_usage as value FROM metrics
-  UNION ALL
-  SELECT timestamp, 'memory' as metric_name, memory_usage as value FROM metrics
-  UNION ALL
-  SELECT timestamp, 'disk' as metric_name, disk_usage as value FROM metrics
-)
-WHERE value IS NOT NULL;
-```
-
-**Pivot table to chart:**
-```sql
--- From crosstab format to plottable format
-SELECT month, 'revenue' as metric, revenue as value FROM monthly_stats
-UNION ALL
-SELECT month, 'costs' as metric, costs as value FROM monthly_stats
-UNION ALL
-SELECT month, 'profit' as metric, profit as value FROM monthly_stats;
-```
-
-**Multiple symbols analysis:**
-```sql
--- Stack different symbols as rows
-SELECT timestamp, 'BTC-USDT' as symbol, btc_price as price FROM market_data
-UNION ALL
-SELECT timestamp, 'ETH-USDT' as symbol, eth_price as price FROM market_data
-UNION ALL
-SELECT timestamp, 'SOL-USDT' as symbol, sol_price as price FROM market_data;
-```
-
 ## Performance Considerations
 
 **UNION ALL vs UNION:**
@@ -206,91 +153,11 @@ SELECT ... UNION SELECT ...
 
 Always use `UNION ALL` for unpivoting unless you specifically need deduplication.
 
-**Index usage:**
-- Each SELECT in the UNION can use indexes independently
-- Filter before UNION for better performance:
-
-```sql
--- Good: Filter in each SELECT
-SELECT timestamp, 'buy' as side, price FROM trades WHERE side = 'buy'
-UNION ALL
-SELECT timestamp, 'sell' as side, price FROM trades WHERE side = 'sell'
-
--- Less efficient: Filter after UNION
-SELECT * FROM (
-  SELECT timestamp, 'buy' as side, price_buy as price FROM trades
-  UNION ALL
-  SELECT timestamp, 'sell' as side, price_sell as price FROM trades
-) WHERE price > 0
-```
-
-## Alternative: Case-Based Approach
-
-For simple scenarios, use CASE without UNION:
-
-```sql
--- If your source data has a side column already
-SELECT
-  timestamp,
-  symbol,
-  side,
-  CASE
-    WHEN side = 'buy' THEN buy_price
-    WHEN side = 'sell' THEN sell_price
-  END as price
-FROM trades
-WHERE price IS NOT NULL;
-```
-
-This works when you have a discriminator column (like `side`) that indicates which price column to use.
-
-## Dynamic Unpivoting
-
-For tables with many columns, generate UNION queries programmatically:
-
-```python
-# Python example
-columns = ['temperature', 'humidity', 'pressure', 'wind_speed']
-queries = []
-
-for col in columns:
-    query = f"SELECT timestamp, sensor_id, '{col}' as metric, {col} as value FROM sensors WHERE {col} IS NOT NULL"
-    queries.append(query)
-
-full_query = " UNION ALL ".join(queries)
-```
-
-## Unpivoting with Metadata
-
-Include additional information in unpivoted results:
-
-```sql
-WITH source AS (
-  SELECT
-    timestamp,
-    device_id,
-    location,
-    temperature,
-    humidity
-  FROM iot_sensors
-)
-SELECT timestamp, device_id, location, 'temperature' as metric, temperature as value, 'celsius' as unit
-FROM source WHERE temperature IS NOT NULL
-
-UNION ALL
-
-SELECT timestamp, device_id, location, 'humidity' as metric, humidity as value, 'percent' as unit
-FROM source WHERE humidity IS NOT NULL
-
-ORDER BY timestamp, device_id, metric;
-```
-
 ## Reverse: Pivot (Long to Wide)
 
 To go back from long to wide format, use aggregation with CASE:
 
 ```sql
--- From long format
 SELECT
   timestamp,
   sensor_id,
@@ -301,23 +168,7 @@ FROM sensor_readings_long
 GROUP BY timestamp, sensor_id;
 ```
 
-See the [Pivoting](/playbook/sql/pivoting) guide for more details.
-
-:::tip When to UNPIVOT
-Unpivot data when:
-- Visualizing multiple metrics on the same chart (Grafana, BI tools)
-- Applying the same calculation to multiple columns
-- Storing column-based data in a narrow table format
-- Preparing data for machine learning (feature columns → feature rows)
-:::
-
-:::warning Performance Impact
-UNION ALL creates multiple copies of your data. For very large tables:
-- Filter early to reduce dataset size
-- Consider if unpivoting is necessary (some tools handle wide format well)
-- Use indexes on filtered columns
-- Test query performance before using in production
-:::
+See the [Pivoting](/docs/playbook/sql/advanced/pivot-table/) guide for more details.
 
 :::info Related Documentation
 - [UNION](/docs/reference/sql/union-except-intersect/)
