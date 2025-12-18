@@ -667,8 +667,63 @@ module.exports = {
           items: [
             "playbook/sql/force-designated-timestamp",
             "playbook/sql/pivoting",
-            "playbook/sql/calculate-compound-interest",
             "playbook/sql/rows-before-after-value-match",
+            {
+              type: "category",
+              label: "Finance",
+              collapsed: true,
+              items: [
+                "playbook/sql/finance/compound-interest",
+                "playbook/sql/finance/cumulative-product",
+                "playbook/sql/finance/vwap",
+                "playbook/sql/finance/bollinger-bands",
+                "playbook/sql/finance/tick-trin",
+                "playbook/sql/finance/volume-profile",
+                "playbook/sql/finance/volume-spike",
+                "playbook/sql/finance/rolling-stddev",
+              ],
+            },
+            {
+              type: "category",
+              label: "Time-Series Patterns",
+              collapsed: true,
+              items: [
+                "playbook/sql/time-series/latest-n-per-partition",
+              ],
+            },
+            {
+              type: "category",
+              label: "Advanced SQL",
+              collapsed: true,
+              items: [
+                "playbook/sql/advanced/top-n-plus-others",
+              ],
+            },
+          ],
+        },
+        {
+          type: "category",
+          label: "Integrations",
+          collapsed: true,
+          items: [
+            {
+              type: "category",
+              label: "Grafana",
+              collapsed: true,
+              items: [
+                "playbook/integrations/grafana/dynamic-table-queries",
+                "playbook/integrations/grafana/read-only-user",
+                "playbook/integrations/grafana/variable-dropdown",
+              ],
+            },
+            {
+              type: "category",
+              label: "Telegraf",
+              collapsed: true,
+              items: [
+                "playbook/integrations/telegraf/opcua-dense-format",
+              ],
+            },
           ],
         },
         {
@@ -683,6 +738,27 @@ module.exports = {
                 "playbook/programmatic/php/inserting-ilp",
               ],
             },
+            {
+              type: "category",
+              label: "Ruby",
+              items: [
+                "playbook/programmatic/ruby/inserting-ilp",
+              ],
+            },
+            {
+              type: "category",
+              label: "Rust",
+              items: [
+                "playbook/programmatic/rust/tls-configuration",
+              ],
+            },
+            {
+              type: "category",
+              label: "C++",
+              items: [
+                "playbook/programmatic/cpp/missing-columns",
+              ],
+            },
           ],
         },
         {
@@ -691,6 +767,7 @@ module.exports = {
           collapsed: true,
           items: [
             "playbook/operations/docker-compose-config",
+            "playbook/operations/monitor-with-telegraf",
           ],
         },
       ],
