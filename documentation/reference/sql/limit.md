@@ -66,7 +66,7 @@ SELECT * FROM tango LIMIT -5;
  10
 ```
 
-```questdb-sql title="Records 3, 4, 5"
+```questdb-sql title="Records 3, 4, and 5"
 SELECT * FROM tango LIMIT 2, 5;
 
  id
@@ -76,7 +76,7 @@ SELECT * FROM tango LIMIT 2, 5;
  5
 ```
 
-```questdb-sql title="Records -5, -4"
+```questdb-sql title="Records -5 and -4"
 SELECT * FROM tango LIMIT -5, -3;
 
  id
@@ -109,7 +109,7 @@ SELECT * FROM tango LIMIT 5, 2;
  5
 ```
 
-```questdb-sql title="Implicit argument swap, records -5, -4"
+```questdb-sql title="Implicit argument swap, records -5 and -4"
 SELECT * FROM tango LIMIT -3, -5;
 
  id
