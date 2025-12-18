@@ -20,17 +20,22 @@ Our implementation uses `LIMIT` for both the offset from start and limit.
 Here's the exhaustive list of supported combinations of arguments. `m` and `n`
 are positive numbers, and negative numbers are explicitly labeled `-m` and `-n`.
 
-- `LIMIT n` = `LIMIT n, 0` = `LIMIT 0, n` = `LIMIT n,` = `LIMIT , n`: take the
-  first `n` records
-- `LIMIT -n` = `LIMIT -n, 0` = `LIMIT -n,`: take the last `n` records
+- `LIMIT n`: take the first `n` records
+- `LIMIT -n`: take the last `n` records
 - `LIMIT m, n`: take the first `n` records, then drop the first `m` records from
   that. The result is the range of records `(m, n]` (number 1 denotes the first
-  record). If `m > n`, implicitly swap the arguments.
+  record). If `m > n`, implicitly swap the arguments. PostgreSQL equivalent:
+  `OFFSET m LIMIT (n-m)`
 - `LIMIT -m, -n`: take the last `m` records, then drop the last `n` records from
   that. The result is the range of records `[-m, -n)` (number -1 denotes the
   last record). If `m < n`, implicitly swap them.
 - `LIMIT m, -n`: drop the first `m` and the last `n` records. This gives you the
   range `(m, -n)`. These arguments will not be swapped.
+
+These are additional edge-case variants:
+
+- `LIMIT n, 0` = `LIMIT 0, n` = `LIMIT n,` = `LIMIT , n` = `LIMIT n`
+- `LIMIT -n, 0` = `LIMIT -n,` = `LIMIT -n`
 
 ## Examples
 
