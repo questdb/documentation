@@ -33,7 +33,7 @@ Any time you are performing database modification, please remember to
 
 ### Using the timestamp field
 
-Here's a worked example using the timestamp column:
+Here's a working example using the timestamp column:
 
 ```questdb-sql
 CREATE TABLE takeaway_order (
