@@ -97,6 +97,6 @@ The examples are in Rust but the concepts are similar in other languages. Check 
 :::info Related Documentation
 - [QuestDB Rust client](https://docs.rs/questdb/)
 - [QuestDB Python client](/docs/clients/ingest-python/)
-- [QuestDB C++ client](/docs/clients/ingest-cpp/)
+- [QuestDB C++ client](/docs/clients/ingest-c-and-cpp/)
 - [QuestDB TLS configuration](/docs/operations/tls/)
 :::

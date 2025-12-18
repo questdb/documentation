@@ -63,5 +63,5 @@ Read the CSV line-by-line and convert, then send via the ILP client.
 :::info Related Documentation
 - [CSV import](/docs/web-console/import-csv/)
 - [ILP ingestion](/docs/ingestion-overview/)
-- [read_parquet()](/docs/reference/function/table/#read_parquet)
+- [read_parquet()](/docs/reference/function/parquet/)
 :::

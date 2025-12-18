@@ -108,6 +108,6 @@ Query tracing needs to be enabled for the `_query_trace` table to be populated. 
 :::
 
 :::info Related Documentation
-- [_query_trace system table](/docs/reference/system-tables/#_query_trace)
+- [Query tracing](/docs/concept/query-tracing/)
 - [approx_percentile() function](/docs/reference/function/aggregation/#approx_percentile)
 :::
