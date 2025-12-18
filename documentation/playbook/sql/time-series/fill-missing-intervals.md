@@ -1,38 +1,55 @@
 ---
-title: Fill Missing Time Intervals
-sidebar_label: Fill missing intervals
-description: Create regular time intervals and propagate sparse values using FILL with PREV
+title: Fill Missing Intervals with Value from Another Column
+sidebar_label: Fill from one column
+description: Use window functions to propagate values from one column to fill multiple columns in SAMPLE BY queries
 ---
 
-Transform sparse event data into regular time-series by creating fixed intervals and filling gaps with previous values.
+Fill missing intervals using the previous value from a specific column to populate multiple columns.
 
 ## Problem
 
 You have a query like this:
 
 ```sql
-SELECT timestamp, id, sum(price) as price, sum(dayVolume) as dayVolume
-FROM nasdaq_trades
-WHERE id = 'NVDA'
+SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
+FROM core_price
+WHERE symbol = 'EURUSD' AND timestamp IN today()
 SAMPLE BY 1s FILL(PREV, PREV);
 ```
 
-When there is an interpolation, instead of getting the PREV value for `price` and previous for `dayVolume`, you want both the price and the volume to show the PREV known value for the `dayVolume`. Imagine this SQL was valid:
+But when there is an interpolation, instead of getting the PREV value for `bid_price` and previous for `ask_price`, you want both prices to show the PREV known value for the `ask_price`. Imagine this SQL was valid:
 
 ```sql
-SELECT timestamp, id, sum(price) as price, sum(dayVolume) as dayVolume
-FROM nasdaq_trades
-WHERE id = 'NVDA'
-SAMPLE BY 1s FILL(PREV(dayVolume), PREV);
+SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
+FROM core_price
+WHERE symbol = 'EURUSD' AND timestamp IN today()
+SAMPLE BY 1s FILL(PREV(ask_price), PREV);
 ```
 
 ## Solution
 
-The `FILL` keyword applies the same strategy to all columns in the result set. QuestDB does not currently support column-specific fill strategies in a single `SAMPLE BY` clause.
+The only way to do this is in multiple steps within a single query: first get the sampled data interpolating with null values, then use a window function to get the last non-null value for the reference column, and finally coalesce the missing columns with this filler value.
 
-To achieve different fill strategies for different columns, you would need to use separate queries with UNION ALL, or handle the conditional filling logic in your application layer.
+```questdb-sql demo title="Fill bid and ask prices with value from ask price"
+WITH sampled AS (
+  SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
+  FROM core_price
+  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  SAMPLE BY 1s FILL(null)
+), with_previous_vals AS (
+  SELECT *,
+    last_value(ask_price) IGNORE NULLS OVER(PARTITION BY symbol ORDER BY timestamp) as filler
+  FROM sampled
+)
+SELECT timestamp, symbol, coalesce(bid_price, filler) as bid_price, coalesce(ask_price, filler) as ask_price
+FROM with_previous_vals;
+```
+
+Note the use of `IGNORE NULLS` modifier on the window function to make sure we always look back for a value, rather than just over the previous row.
 
 :::info Related Documentation
 - [SAMPLE BY](/docs/reference/sql/sample-by/)
-- [FILL keyword](/docs/reference/sql/select/#fill)
+- [FILL keyword](/docs/reference/sql/sample-by/#fill)
+- [Window functions](/docs/reference/sql/over/)
+- [last_value()](/docs/reference/function/window/#last_value)
 :::
