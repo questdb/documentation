@@ -547,7 +547,7 @@ module.exports = {
           ],
         },
         {
-            label: "Playbook",
+            label: "Playbook (useful snippets)",
             type: "category",
             collapsed: false,
             items: [
