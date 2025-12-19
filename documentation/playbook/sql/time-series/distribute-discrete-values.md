@@ -1,14 +1,18 @@
 ---
-title: Expand Average Power Over Time
-sidebar_label: Expand power over time
-description: Distribute average power values across hourly intervals using sessions and window functions
+title: Distribute Discrete Values Across Time Intervals
+sidebar_label: Distribute discrete values
+description: Spread cumulative measurements across time intervals using sessions and window functions
 ---
 
-Expand discrete energy measurements (watt-hours) across time intervals. When an IoT device sends a `wh` value at discrete timestamps, you can distribute that energy across the hours between measurements to visualize average power consumption per hour.
+Distribute discrete cumulative measurements across the time intervals between observations. When devices report cumulative values at irregular timestamps, you can spread those values proportionally across the intervals to get per-period averages.
+
+This pattern is useful for scenarios like energy consumption, data transfer volumes, accumulated costs, or any metric where a cumulative value needs to be attributed to the intervals that contributed to it.
 
 ## Problem
 
 You have IoT devices reporting watt-hour (Wh) values at irregular timestamps, identified by an `operationId`. You want to plot the sum of average power per operation, broken down by hour.
+
+When an IoT device sends a `wh` value at discrete timestamps, you need to distribute that energy across the hours between measurements to visualize average power consumption per hour.
 
 Raw data:
 
