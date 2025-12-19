@@ -68,6 +68,18 @@ LIMIT 10;
 
 This query combines the last minute of data twice using `UNION ALL`, then restores the designated timestamp.
 
+## Querying External Parquet Files
+
+When querying external parquet files using `read_parquet()`, the result does not have a designated timestamp. You need to force it using `TIMESTAMP()` to enable time-series operations like `SAMPLE BY`:
+
+```questdb-sql demo title="Query parquet file with designated timestamp"
+SELECT timestamp, avg(price)
+FROM ((read_parquet('trades.parquet') ORDER BY timestamp) TIMESTAMP(timestamp))
+SAMPLE BY 1m;
+```
+
+This query reads from a parquet file, applies ordering, forces the designated timestamp, and then performs time-series aggregation.
+
 :::warning Order is Required
 The `TIMESTAMP()` keyword requires that the data is already sorted by the timestamp column. If the data is not in order, the query will fail. Always include `ORDER BY` before applying `TIMESTAMP()`.
 :::
@@ -76,4 +88,5 @@ The `TIMESTAMP()` keyword requires that the data is already sorted by the timest
 - [Designated Timestamp concept](/docs/concept/designated-timestamp/)
 - [TIMESTAMP keyword reference](/docs/reference/sql/select/#timestamp)
 - [SAMPLE BY aggregation](/docs/reference/sql/sample-by/)
+- [Parquet functions](/docs/reference/function/parquet/)
 :::
