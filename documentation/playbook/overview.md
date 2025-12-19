@@ -26,7 +26,7 @@ The Playbook is organized into three main sections:
 
 ## Running the Examples
 
-**Most recipes run directly on our [live demo instance at demo.questdb.io](https://demo.questdb.io)** without any local setup. Queries that can be executed on the demo site are marked with a direct link to run them.
+**Most recipes run directly on our [live demo instance at demo.questdb.com](https://demo.questdb.com)** without any local setup. Queries that can be executed on the demo site are marked with a direct link to run them.
 
 For recipes that require write operations or specific configuration, the recipe will indicate what setup is needed.
 
