@@ -42,7 +42,10 @@ backup.enabled=true
 backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
 ```
 
-Optional schedule:
+#### Scheduled backups
+
+You can configure automatic scheduled backups using cron syntax. The example
+below runs a backup every day at midnight UTC.
 
 ```conf
 backup.schedule.cron=0 0 * * *
@@ -50,6 +53,8 @@ backup.schedule.tz=UTC
 ```
 
 ### Run a backup
+
+Once configured, you can run a backup at any time using the following command:
 
 ```questdb-sql title="Backup database"
 BACKUP DATABASE;
@@ -62,6 +67,8 @@ Example output:
 | 2024-08-24T12:34:56.789123Z   |
 
 ### Monitor and abort
+
+You can monitor backup progress and history using the `backups()` table function:
 
 ```questdb-sql title="Backup history"
 SELECT * FROM backups();
