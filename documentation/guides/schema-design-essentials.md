@@ -287,9 +287,31 @@ via:
 
 - **Setting a [TTL retention](/docs/concept/ttl) period** per table to control
   partition expiration.
-- **Materialized views**: QuestDB **automatically refreshes**
-  [materialized views](/reference/sql/create-mat-view/), storing aggregated data
-  at lower granularity. You can also apply TTL expiration on the base table.
+- **[Materialized views](/docs/concept/mat-views/)**: Pre-compute and store
+  aggregated data for fast reads.
+
+### Materialized views for fast aggregations
+
+If your application frequently reads aggregated data (hourly averages, daily
+counts, etc.), [materialized views](/docs/concept/mat-views/) can dramatically
+improve query performance. QuestDB automatically refreshes them as new data
+arrives - no manual refresh needed.
+
+```questdb-sql
+-- Pre-aggregate sensor readings by hour
+CREATE MATERIALIZED VIEW hourly_readings AS
+  SELECT
+    timestamp,
+    sensor_id,
+    avg(temperature) as avg_temp,
+    max(temperature) as max_temp
+  FROM readings
+  SAMPLE BY 1h;
+```
+
+Queries against the materialized view are instant, regardless of how much raw
+data exists in the base table. See the
+[Materialized Views tutorial](/docs/guides/mat-views/) for a complete example.
 
 ## Schema decisions that cannot be easily changed
 

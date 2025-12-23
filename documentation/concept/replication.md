@@ -1,60 +1,28 @@
 ---
-title: Database replication concepts
-sidebar_label: Replication
+title: Replication overview
+sidebar_label: Overview
 description:
-  Explains the concept of replication in QuestDB. From the architecture, to the
-  roadmap, down to limitations.
+  Learn how QuestDB Enterprise replication works, its benefits, and architecture.
 ---
 
-QuestDB Enterprise offers primary-replica replication with eventual consistency.
+QuestDB Enterprise provides **primary-replica replication** for high availability
+and disaster recovery. Your data is automatically synced to replica instances
+via an object store, with no direct network connections required between nodes.
 
-This document will teach you about the architecture, some configuration, a
-roadmap and limitations.
+## Why use replication?
 
-For a self-hosted setup guide and configuration details, see the
-[Replication](/docs/operations/replication) page within Operations.
+- **High availability** - Replicas can take over if the primary fails
+- **Read scaling** - Distribute query load across multiple replicas
+- **Disaster recovery** - Restore from any point in time using stored WAL files
+- **Geographic distribution** - Place replicas closer to users in different regions
+- **Zero performance impact** - Replicas don't affect primary performance
 
-## Architecture
+## How it works
 
-Replication in QuestDB operates by designating a single **"primary"** database
-that uploads [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) files to a
-remote object store. These files can be downloaded and applied by any number of
-**"replica"** instances, either continuously or at a later time.
-
-**Primary** instances offer the same features as stand-alone instances, while
-**replicas** are read-only, designed to distribute data and load across multiple
-locations and instances.
-
-Two common storage strategies are:
-
-- **Hot availability:** A read-only **replica** operates alongside the
-  **primary** node, enabling quick switch-over in case of **primary** failure.
-  Multiple **replicas** can follow a single **primary**. It is faster and more
-  expensive.
-
-- **Cold availability:** A new **primary** node can be reconstructed from the
-  latest snapshot and WAL files in the object store, without a constantly
-  running replica. It is slower and often cheaper.
-
-Replicating instances communicate via the object store, and not direct network
-connections.
-
-This results in a decoupled, flexible architecture with high availability.
-
-Key benefits include:
-
-- **Replica** instances do not impact the performance of the **primary**
-  instance, regardless of their number
-- Object store-held replication data can enable "point in time recovery",
-  restoring an instance to a specific timestamp. This works with full database
-  nightly backup snapshots
-
-The architecture consists of:
-
-- A **primary** database instance
-- An object store, such as AWS S3 or Azure Blob Storage, or an NFS distributed
-  file system
-- Any number of **replica** instances
+The **primary** instance writes data to a
+[Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) and uploads these files
+to an object store (AWS S3, Azure Blob Storage, GCS, or NFS). **Replica**
+instances download and apply these files to stay in sync.
 
 ```mermaid
 graph TD
@@ -70,82 +38,47 @@ graph TD
     objectStore --> replicaN
 ```
 
-## Supported Object Stores
+This decoupled architecture means:
+- Add or remove replicas without touching the primary
+- Replicas can be in different regions or availability zones
+- Object store provides durability and point-in-time recovery
 
-The [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) object storage layer
-used in QuestDB replication is designed to be plug-able and extensible.
+## Availability strategies
 
-We provide native support for AWS S3, Azure Blob Storage, and the NFS
-distributed file system.
+**Hot availability** - Run replicas continuously alongside the primary for
+instant failover. Faster recovery, higher cost.
 
-HDFS support is on our roadmap.
+**Cold availability** - Reconstruct a new primary from the latest snapshot and
+WAL files when needed. Slower recovery, lower cost.
 
-We also plan to support other object stores such as Google Cloud Storage:
+## Supported object stores
 
-```mermaid
-timeline
-    Currently  : AWS S3
-               : Azure Blob Store
-               : NFS Filesystem
-               : Google Cloud Storage
-    Next-up    : HDFS
-```
+| Store | Status |
+|-------|--------|
+| AWS S3 | Supported |
+| Azure Blob Storage | Supported |
+| Google Cloud Storage | Supported |
+| NFS filesystem | Supported |
+| HDFS | Planned |
 
-Something missing? Want to see it sooner? [Contact us](/enterprise/contact)!
+Need something else? [Contact us](/enterprise/contact).
 
-## Object Store Configuration
+## Requirements
 
-The object store is defined in the `replication.object.store` configuration
-setting. The string requires a prefix of `s3`, `azblob` or `fs` followed by a
-semi-colon-terminated set of key-value pairs.
+Replication works with **WAL-enabled tables** - tables that have a
+[designated timestamp](/docs/concept/designated-timestamp/) and are
+[partitioned](/docs/concept/partitions/). This covers most time-series use
+cases.
 
-An example of a replication object store configuration using AWS S3 is:
-`replication.object.store=s3::bucket=somename;root=a/path;region=us-east-1;`.
-
-An example of a replication object store configuration using Azure Blob Storage
-is:
-`replication.object.store=azblob::endpoint=https://someaccount.blob.core.windows.net;container=somename;root=a/path;account_name=someaccount;account_key=somekey;`.
-
-An example of a replication object store configuration using NFS is:
-`replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;`
-
-An example of a replication object store configuration using GCS is:
-
-`replication.object.store=gcs::bucket=<bucket name here>;root=/;credential=<base64 encoded key>;`
-
-For `GCS`, you can also use `credential_path` to set a key-file location.
-
-See the [Replication setup guide](/docs/operations/replication) for direct
-examples.
-
-<Screenshot
-  alt="Two primaries sharing an object store service."
-  src="images/docs/concepts/replication-streams.webp"
-/>
-
-In addition, the same object store can be re-used for multiple replication
-clusters. To do so, provide a unique `DB_INSTANCE_NAME` value.
-
-## Limitations
-
-The replication and point in time recovery features rely on the presence of a
-table's [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) and, for now,
-only time series tables. WAL tables have a
-[designated timestamp column](/docs/concept/designated-timestamp/) that is
-[partitioned](/docs/concept/partitions/).
-
-This covers all tables, except that of tables that are used for referential data
-(i.e. SQL JOIN operations) that don't have a timestamp. These generally tend to
-contain semi-static data referential data that will have to be updated and kept
-up to date manually and are often generally just inserted during the database
-tables setup phase.
-
-This limitation will be lifted in the future.
+Tables without timestamps (typically used for reference/lookup data) are not
+replicated automatically and should be populated separately on each instance.
 
 ## Multi-primary ingestion
 
-[QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
-multiple primaries can write to the same database.
+For even higher throughput, QuestDB Enterprise supports
+[multi-primary ingestion](/docs/operations/multi-primary-ingestion/) where
+multiple primaries write concurrently to the same logical database.
 
-See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/)
-page for more information.
+## Next steps
+
+Ready to set up replication? Continue to the [Setup Guide](/docs/operations/replication/).

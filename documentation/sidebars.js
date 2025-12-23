@@ -36,6 +36,12 @@ module.exports = {
           customProps: { tag: "Enterprise" },
         },
         {
+          id: "guides/enterprise-quick-start",
+          type: "doc",
+          label: "Enterprise Quick Start",
+          customProps: { tag: "Enterprise" },
+        },
+        {
           type: "category",
           label: "Web Console",
           collapsed: true,
@@ -496,6 +502,12 @@ module.exports = {
             "concept/designated-timestamp",
             "concept/partitions",
             "concept/symbol",
+            {
+              id: "concept/mat-views",
+              type: "doc",
+              label: "Materialized Views",
+              customProps: { tag: "Popular" },
+            },
             "concept/storage-model",
             "concept/write-ahead-log",
             "concept/root-directory-structure",
@@ -510,18 +522,10 @@ module.exports = {
             "concept/interval-scan",
             "concept/deduplication",
             "concept/ttl",
-            "concept/mat-views",
             "concept/jit-compiler",
             "concept/query-tracing",
             "concept/sql-extensions",
             "concept/sql-optimizer-hints",
-            {
-              customProps: {
-                tag: "Enterprise",
-              },
-              type: "doc",
-              id: "concept/replication",
-            },
           ],
         },
       ],
@@ -592,6 +596,40 @@ module.exports = {
     },
 
     // ===================
+    // HIGH AVAILABILITY
+    // ===================
+    {
+      label: "High Availability",
+      type: "category",
+      customProps: { tag: "Enterprise" },
+      items: [
+        {
+          id: "concept/replication",
+          type: "doc",
+          label: "Overview",
+          customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "operations/replication",
+          type: "doc",
+          label: "Setup Guide",
+          customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "operations/multi-primary-ingestion",
+          type: "doc",
+          label: "Multi-primary Ingestion",
+          customProps: { tag: "Enterprise" },
+        },
+        {
+          id: "guides/replication-tuning",
+          type: "doc",
+          label: "Tuning",
+        },
+      ],
+    },
+
+    // ===================
     // OPERATIONS
     // ===================
     {
@@ -605,25 +643,6 @@ module.exports = {
         "operations/design-for-performance",
         "operations/updating-data",
         "operations/task-automation",
-        {
-          label: "Replication",
-          type: "category",
-          collapsed: false,
-          items: [
-            {
-              type: "doc",
-              id: "operations/replication",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "operations/multi-primary-ingestion",
-              type: "doc",
-              label: "Multi-primary Ingestion",
-              customProps: { tag: "Enterprise" },
-            },
-            "guides/replication-tuning",
-          ],
-        },
       ],
     },
 
@@ -679,14 +698,6 @@ module.exports = {
         },
         {
           type: "category",
-          label: "Monitoring",
-          collapsed: false,
-          items: [
-            "third-party-tools/prometheus",
-          ],
-        },
-        {
-          type: "category",
           label: "Orchestration",
           collapsed: false,
           items: [
@@ -696,17 +707,11 @@ module.exports = {
         },
         {
           type: "category",
-          label: "Industrial & IoT",
-          collapsed: false,
-          items: [
-            "third-party-tools/ignition",
-          ],
-        },
-        {
-          type: "category",
           label: "Other Tools",
           collapsed: false,
           items: [
+            "third-party-tools/prometheus",
+            "third-party-tools/ignition",
             "third-party-tools/qstudio",
             "third-party-tools/sqlalchemy",
             "third-party-tools/mindsdb",
@@ -740,11 +745,6 @@ module.exports = {
           id: "guides/influxdb-migration",
           type: "doc",
           customProps: { tag: "Popular" },
-        },
-        {
-          id: "guides/enterprise-quick-start",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
         },
         {
           label: "Blog Tutorials",
