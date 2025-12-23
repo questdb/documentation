@@ -2,8 +2,8 @@
 title: Introduction
 slug: /
 description:
-  The official QuestDB documentation. Learn how to accelerate your time-series,
-  capital markets, and heavy industry use cases.
+  Official QuestDB documentation covering installation, data ingestion, SQL
+  reference, and operations for both open source and Enterprise editions.
 custom_edit_url: null
 ---
 
@@ -12,68 +12,42 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is a top performance database that specializes in time-series.
+QuestDB is a high-performance time-series database optimized for fast ingestion
+and SQL analytics.
 
-It offers **category-leading ingestion throughput** and **fast SQL queries**
-with operational simplicity.
-
-Given its effiency, QuestDB **reduces operational costs**, all while overcoming
-ingestion bottlenecks.
-
-As a result, QuestDB amplifies intensive **time-series**, **capital markets**,
-and **heavy industry** use cases.
+It handles millions of rows per second with sub-millisecond queries, making it
+ideal for financial data, IoT, and real-time analytics.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
     <>Quick start</>
   </DocButton>
 
-{" "}
-<DocButton
-  href="/docs/ingestion-overview/#first-party-clients"
-  variant="outline"
-  style={{ marginRight: "20px" }}
->
-  <>Explore clients</>
-</DocButton>
-
-{" "}
-<DocButton
-  href="/docs/why-questdb/"
-  variant="outline"
-  style={{ marginRight: "20px" }}
->
-  <>Why QuestDB?</>
-</DocButton>
-
   <DocButton href="https://demo.questdb.io" variant="outline" style={{ marginRight: '20px' }}>
-    <>Try live demo</>
+    <>Live demo</>
   </DocButton>
 </div>
 
-## Ingest your data
+## About this documentation
 
-Once running, the next step is to get your data into QuestDB.
+This documentation covers both **QuestDB Open Source** and **QuestDB Enterprise**.
 
-We've got a range of first-party clients, protocols and methods for ingestion.
+QuestDB Enterprise builds on top of QuestDB Open Source, using it as its core
+library. Everything in open source works in Enterprise, but not the other way
+around. Enterprise adds features like high availability, advanced security, and
+RBAC.
 
-Whether you're using first-party clients or interfacing with a third-party tool
-or library, we've got you covered.
+Sections specific to QuestDB Enterprise are marked with an **Enterprise** label.
 
-<div className="not-prose">
-  <DocButton href="/docs/ingestion-overview/" variant="text" arrow="right">
-    <>Read the ingestion overview</>
-  </DocButton>
-</div>
+## Get started
 
-## QuestDB Enterprise
-
-QuestDB Enterprise offers everything from open source, plus additional features
-for running QuestDB at greater scale or significance.
+1. **[Quick start](/docs/quick-start/)** - Install and run QuestDB
+2. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using ILP clients or SQL
+3. **[Query data](/docs/reference/sql/select/)** - Analyze with SQL
 
 <div className="not-prose">
-  <DocButton href="/enterprise/" absolute variant="text" arrow="right">
-    <>Learn more</>
+  <DocButton href="/docs/why-questdb/" variant="text" arrow="right">
+    <>Why choose QuestDB?</>
   </DocButton>
 </div>
 

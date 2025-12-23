@@ -317,4 +317,4 @@ If profiling causes noticeable performance impact:
 
 - [Logging and metrics](/docs/operations/logging-metrics/) - Configure logging and Prometheus metrics
 - [Monitoring and alerting](/docs/operations/monitoring-alerting/) - Set up health checks and alerts
-- [Design for performance](/docs/operations/design-for-performance/) - Performance optimization guidelines
+- [Schema design essentials](/docs/guides/schema-design-essentials/) - Schema and performance guidelines

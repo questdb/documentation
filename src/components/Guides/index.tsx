@@ -7,9 +7,9 @@ const guides = [
     description: 'Select a storage medium, plan, size and compress your QuestDB deployment.',
   },
   {
-    href: '/docs/operations/design-for-performance/',
-    name: 'Design for performance',
-    description: 'Design and tweak your data model to set yourself up for reliable, optimal performance.',
+    href: '/docs/guides/schema-design-essentials/',
+    name: 'Schema design essentials',
+    description: 'Design your tables, partitions, and data types for optimal performance.',
   },
   {
     href: '/docs/guides/working-with-timestamps-timezones/',

@@ -35,6 +35,25 @@ In addition to the scalar types above, QuestDB also supports
 [N-dimensional arrays](/docs/concept/array), currently only for the `DOUBLE`
 type.
 
+## Decimal
+
+The `DECIMAL` type provides exact decimal arithmetic with user-specified
+precision and scale. Use it when floating point approximation is unacceptable,
+such as financial calculations.
+
+QuestDB's decimal is high-performance: only ~2x slower than double, faster than
+ClickHouse and DuckDB decimals, and non-allocating during computations.
+
+```questdb-sql
+CREATE TABLE prices (
+    ts TIMESTAMP,
+    amount DECIMAL(18, 6)  -- 18 total digits, 6 after decimal point
+) TIMESTAMP(ts);
+```
+
+For detailed information on precision, scale, storage, and arithmetic behavior,
+see [Decimal](/docs/concept/decimal/).
+
 ## VARCHAR and STRING considerations
 
 QuestDB supports two types for storing strings: `VARCHAR` and `STRING`.

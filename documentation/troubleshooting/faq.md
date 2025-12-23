@@ -49,10 +49,9 @@ See more details at
 [ALTER TABLE COLUMN TYPE documentation](/docs/reference/sql/alter-table-change-column-type/)
 
 While setting the capacity of `SYMBOL` is optional, doing so enhances the
-performance of both the conversion process and data inserts. Therefore, it's
-advisable to choose the capacity correctly. To learn more, see the
-[SYMBOL column capacity](/docs/operations/design-for-performance/#symbol-caching)
-section in our design for performance page.
+performance of both the conversion process and data inserts. Symbol capacity
+expands automatically as needed. To learn more, see the
+[SYMBOL documentation](/docs/concept/symbol/).
 
 ## Why do I get `table busy` error messages when inserting data over PostgreSQL wire protocol?
 

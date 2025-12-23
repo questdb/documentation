@@ -126,12 +126,27 @@ For timezone handling at query time, see
 | Type | Use case |
 |------|----------|
 | `VARCHAR` | Free-text strings |
-| `DOUBLE` / `FLOAT` | Decimal numbers |
+| `DOUBLE` / `FLOAT` | Floating point numbers |
+| `DECIMAL(precision, scale)` | Exact decimal numbers (financial data) |
 | `LONG` / `INT` / `SHORT` | Integers |
 | `BOOLEAN` | True/false flags |
 | `UUID` | Unique identifiers (more efficient than VARCHAR) |
 | `IPv4` | IP addresses |
-| `BYTES` | Binary data |
+| `BINARY` | Binary data |
+| `ARRAY` | N-dimensional arrays (e.g. `DOUBLE[3][4]`) |
+
+**Numeric type storage sizes:**
+
+| Type | Storage | Range |
+|------|---------|-------|
+| `BYTE` | 8 bits | -128 to 127 |
+| `SHORT` | 16 bits | -32,768 to 32,767 |
+| `INT` | 32 bits | -2.1B to 2.1B |
+| `LONG` | 64 bits | -9.2E18 to 9.2E18 |
+| `FLOAT` | 32 bits | Single precision IEEE 754 |
+| `DOUBLE` | 64 bits | Double precision IEEE 754 |
+
+Choose the smallest type that fits your data to save storage.
 
 For arrays and geospatial data, see [Data Types](/docs/reference/sql/datatypes/).
 
