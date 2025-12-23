@@ -141,7 +141,7 @@ INSERT INTO my_table VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
 SELECT * FROM my_table WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 ```
 
-If you use the [PostgreSQL Wire Protocol](/docs/reference/api/postgres/) then
+If you use the [PostgreSQL Wire Protocol](/docs/pgwire/pgwire-intro/) then
 you can use the `uuid` type in your queries. The JDBC API does not distinguish
 the UUID type, but the Postgres JDBC driver supports it in prepared statements:
 

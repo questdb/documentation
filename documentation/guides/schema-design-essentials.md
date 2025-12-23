@@ -112,7 +112,7 @@ When using table prefixes for multi-tenancy:
 ## PostgreSQL protocol compatibility
 
 QuestDB is **not** a PostgreSQL database but is **compatible with the
-[PostgreSQL wire protocol](/docs/reference/api/postgres/)**. This means you can
+[PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/)**. This means you can
 connect using PostgreSQL-compatible libraries and clients and execute SQL
 commands. However, compatibility with PostgreSQL system catalogs, metadata
 queries, data types, and functions is limited.
@@ -130,7 +130,7 @@ The easiest way to create a schema is through the
 **[Web Console](/docs/web-console/)** or by sending SQL commands using:
 
 - The [**REST API**](/docs/reference/api/rest/) (`CREATE TABLE` statements)
-- The **[PostgreSQL wire protocol](/docs/reference/api/postgres/) clients**
+- The **[PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/) clients**
 
 ### Schema auto-creation with ILP protocol
 

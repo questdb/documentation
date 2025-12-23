@@ -86,7 +86,7 @@ For all CSV import methods, including using the APIs directly, see the
 ## PostgreSQL Wire Protocol
 
 QuestDB also supports the
-[PostgreSQL Wire Protocol (PGWire)](/docs/reference/api/postgres/).
+[PostgreSQL Wire Protocol (PGWire)](/docs/pgwire/pgwire-intro/).
 
 It offers most PostgreSQL keywords and functions, including parameterized
 queries and `psql` on the command line.

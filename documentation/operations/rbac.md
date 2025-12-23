@@ -114,7 +114,7 @@ QuestDB supports three different ways of authentication:
   Only a single password can be set for a user; there is no option to have
   multiple passwords at the same time. Password authentication is supported by
   the [REST](/docs/reference/api/rest/#authentication-rbac) and the
-  [PostgreSQL Wire](/docs/reference/api/postgres/) endpoints.
+  [PostgreSQL Wire](/docs/pgwire/pgwire-intro/) endpoints.
 - **JWK Token**: The user is required to provide a JWK token. The private key of
   the token is tested against their public key which has been recorded
   previously in the database. Only a single token can be set for a user; there

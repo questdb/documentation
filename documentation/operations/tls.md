@@ -9,7 +9,7 @@ Transport Layer Security (TLS) encryption is available on all supported network
 interfaces and protocols:
 
 - [InfluxDB Line Protocol over TCP](/docs/reference/api/ilp/overview/)
-- [PGWire](/docs/reference/api/postgres/)
+- [PGWire](/docs/pgwire/pgwire-intro/)
 - [HTTP](/docs/reference/api/rest/) (REST API)
 
 It's possible to configure encryption on all interfaces at once or individually.

@@ -129,7 +129,7 @@ Replace `<your-ip>` with your actual public IP address. For production deploymen
 
 **Default QuestDB Ports:**
 - `9000`: [Web Console](/docs/web-console/) and [REST API](/docs/reference/api/rest/)
-- `8812`: [PostgreSQL wire protocol](/docs/reference/api/postgres/)
+- `8812`: [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/)
 - `9009`: [InfluxDB line protocol](/docs/reference/api/ilp/overview/) (TCP)
 - `9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
@@ -239,7 +239,7 @@ renderText={(release) => (
 **Port mappings explained:**
 - `-p 9000:9000`: [Web Console](/docs/web-console/) and [REST API](/docs/reference/api/rest/)
 - `-p 9009:9009`: [InfluxDB line protocol](/docs/reference/api/ilp/overview/) (TCP)
-- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/reference/api/postgres/)
+- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/)
 - `-p 9003:9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
 :::tip Port Selection
@@ -554,7 +554,7 @@ questdb01$ psql -c "SELECT version();"
 
 Expected output should show QuestDB version information, confirming successful database connectivity.
 
-For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/reference/api/postgres/) documentation.
+For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/) documentation.
 
 ### Manual Backup Test
 

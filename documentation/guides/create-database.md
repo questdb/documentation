@@ -31,7 +31,7 @@ All commands are run through the [Web Console](/docs/web-console/) accessible at
 [http://localhost:9000](http://localhost:9000).
 
 You can also run the same SQL via the
-[Postgres endpoint](/docs/reference/api/postgres/) or the
+[Postgres endpoint](/docs/pgwire/pgwire-intro/) or the
 [REST API](/docs/reference/api/rest/).
 
 If QuestDB is not running locally, checkout the
