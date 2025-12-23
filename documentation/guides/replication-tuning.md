@@ -8,29 +8,28 @@ description:
 import Screenshot from "@theme/Screenshot"
 
 Replication tuning lets you balance **latency** against **network costs**. By
-default, QuestDB optimizes for low latency. If network bandwidth or cloud
-storage costs are a concern, you can tune for efficiency instead.
+default, QuestDB uses balanced settings. You can tune for lower latency or
+reduced network traffic depending on your needs.
 
 ## When to tune
 
 | Goal | Approach |
 |------|----------|
-| **Low latency** (default) | Keep defaults. Replicas stay up-to-date within seconds. |
-| **Lower network costs** | Increase batch sizes and throttle windows. Trades latency for efficiency. |
-| **High-throughput ingestion** | Larger WAL segments reduce overhead during bursts. |
+| **Low latency** | Smaller WAL segments, shorter throttle windows. |
+| **Lower network costs** | Larger WAL segments, longer throttle windows. |
 
 ## Quick reference
 
-**For low latency** (default):
+**For low latency**:
 ```ini
-cairo.wal.segment.rollover.size=2097152
-replication.primary.throttle.window.duration=10000
+cairo.wal.segment.rollover.size=262144
+replication.primary.throttle.window.duration=1000
 replication.primary.sequencer.part.txn.count=5000
 ```
 
-**For network efficiency** (57% less network traffic):
+**For network efficiency**:
 ```ini
-cairo.wal.segment.rollover.size=262144
+cairo.wal.segment.rollover.size=2097152
 replication.primary.throttle.window.duration=60000
 replication.primary.sequencer.part.txn.count=1000
 ```
@@ -68,7 +67,7 @@ costs.
 ### WAL segment size
 
 ```ini
-cairo.wal.segment.rollover.size=2097152  # 2 MiB (default)
+cairo.wal.segment.rollover.size=2097152
 ```
 
 Controls when WAL segments are closed and uploaded. Smaller segments upload
@@ -76,8 +75,8 @@ sooner (lower latency) but create more files.
 
 | Value | Behavior |
 |-------|----------|
-| `2097152` (2 MiB) | Default. Good balance for most cases. |
-| `262144` (256 KiB) | Smaller files, less network overhead. |
+| `262144` (256 KiB) | Lower latency, but more network traffic. |
+| `2097152` (2 MiB) | Higher latency, but less network traffic. |
 
 :::note
 Some object stores have minimum file size requirements. AWS S3 Intelligent
@@ -95,7 +94,8 @@ fill up before upload, reducing redundant uploads (write amplification).
 
 | Value | Behavior |
 |-------|----------|
-| `10000` (10s) | Default. Low latency, more uploads. |
+| `1000` (1s) | Lowest latency, most uploads. |
+| `10000` (10s) | Default. Balanced. |
 | `60000` (60s) | 1 minute delay OK. Fewer uploads. |
 | `300000` (5 min) | Cost-sensitive. Batches more data. |
 
@@ -105,24 +105,31 @@ manages replication to prevent backlogs during bursts.
 ### Sequencer part size
 
 ```ini
-replication.primary.sequencer.part.txn.count=5000  # transactions (default)
+replication.primary.sequencer.part.txn.count=5000
 ```
 
-Transactions are grouped into "parts" for upload. Smaller parts = smaller files.
+Controls how many transactions are grouped into each sequencer part file.
 
-| Value | Approx. compressed size |
-|-------|-------------------------|
-| `5000` | ~23 KiB |
-| `1000` | ~4.5 KiB |
+Instead of uploading the entire transaction log on every replication cycle
+(which grows indefinitely), the sequencer is split into fixed-size part files.
+Only new or changed parts are uploaded, significantly reducing network overhead.
+
+| Value | Effect |
+|-------|--------|
+| Lower (e.g. `1000`) | Smaller part files, more frequent new parts, more object storage requests, faster incremental uploads. |
+| Higher (e.g. `5000`) | Larger part files, fewer parts, fewer object storage requests, larger per-upload size. |
+
+Default is `5000` (each part ~34-68 KiB compressed).
 
 :::warning
-This setting is **fixed once replication is enabled**. You cannot change it
-later for existing tables.
+This setting is **fixed at table creation**. You cannot change it for existing
+tables.
 :::
 
-## Compression impact
+## Compression (reference)
 
-WAL data is compressed before upload. Expect roughly:
+WAL data is compressed before upload. This isn't tunable, but useful for
+estimating storage and network requirements:
 
 | Data type | Compression ratio |
 |-----------|-------------------|
