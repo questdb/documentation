@@ -228,7 +228,7 @@ When the header row is missing, column names are generated automatically.
 ### Consistency guarantees
 
 `/imp` benefits from the properties of the QuestDB
-[storage model](/docs/concept/storage-model#consistency-and-durability),
+[storage engine](/docs/guides/architecture/storage-engine/#durability),
 although Atomicity and Durability can be relaxed to meet convenience and
 performance demands.
 

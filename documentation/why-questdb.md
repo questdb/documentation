@@ -2,75 +2,38 @@
 title: Why QuestDB?
 slug: why-questdb
 description:
-  We'll explain the main features, advances and benefits of QuestDB. Learn how to accelerate your time-series use cases.
+  Learn when to use QuestDB, what makes it fast, and whether it's right for your use case.
 ---
 
 import { Clients } from '../src/components/Clients'
 import Screenshot from "@theme/Screenshot"
 
-This pages provides a brief overview on:
+QuestDB is a high-performance time-series database built for speed and efficiency.
 
-- [Top QuestDB features](#features)
-- [Benefits of QuestDB](#benefits)
-- [Where to next?](#next-up)
-- [Support](#support)
+> **Ready to try it? Jump to the [quick start](/docs/quick-start/).**
 
-<hr />
+## When to use QuestDB
 
-> **Just want to build? Jump to the [quick start](/docs/quick-start/) guide.**
+QuestDB is designed for workloads where:
 
-<hr />
+- **You're ingesting time-stamped data continuously** — sensor readings, financial ticks, application metrics, logs, events
+- **You need fast aggregations over time** — dashboards, real-time analytics, OHLC charts, downsampling
+- **You want SQL, not a new query language** — standard SQL with time-series extensions
+- **Hardware efficiency matters** — get more from less infrastructure
 
-## Top QuestDB features {#features}
+### Common use cases
 
-QuestDB is applied within cutting edge use cases around the world.
+| Domain | Examples |
+|--------|----------|
+| **Financial services** | Market data, tick-by-tick analysis, risk calculations |
+| **Space exploration** | Telemetry processing, satellite monitoring, mission analytics |
+| **Energy** | Grid monitoring, smart meter data, renewable output tracking |
 
-Developers are most enthusiastic about the following key features:
+## What makes QuestDB fast
 
-#### Massive ingestion handling & throughput
+### Ingestion performance
 
-If you are running into throughput bottlenecks using an existing storage engine
-or time series database, QuestDB can help.
-
-#### High performance deduplication & out-of-order indexing
-
-[High data cardinality](/glossary/high-cardinality/) will not lead to
-performance degradation.
-
-#### Hardware efficiency
-
-Strong, cost-saving performance on very mninimal hardware, including sensors and
-Raspberry Pi.
-
-#### SQL with time series extensions
-
-Fast, SIMD-optimized SQL extensions to cruise through querying and analysis.
-
-No obscure domain-specific languages required.
-
-Greatest hits include:
-
-- [`SAMPLE BY`](/docs/reference/sql/sample-by/) summarizes data into chunks
-  based on a specified time interval, from a year to a microsecond
-- [`WHERE IN`](/docs/reference/sql/where/#time-range-where-in) to compress time ranges
-  into concise intervals
-- [`LATEST ON`](/docs/reference/sql/latest-on/) for latest values within
-  multiple series within a table
-- [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
-  a series based on proximity; no extra indices required
-- [Materialized Views](/docs/guides/mat-views/) for pre-computing and automatically
-  refreshing complex query results to optimize performance
-
-## Benefits of QuestDB {#benefits}
-
-To avoid ingestion bottlenecks, high performance data ingestion is essential.
-
-But performance is only part of the story.
-
-Efficiency measures how well a database performs relative to its available
-resources.
-
-QuestDB, on maximal hardware, significantly outperforms peers:
+QuestDB ingests millions of rows per second on commodity hardware.
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
@@ -79,26 +42,21 @@ QuestDB, on maximal hardware, significantly outperforms peers:
   title="Results for QuestDB 9.1.0, Timescale 2.22.1, InfluxDB 2.7.12, and Clickhouse 25.10.1.1486"
 />
 
-On less robust hardware the difference is even more pronounced. As an example, we were
-able to ingest ~270,000 rows per second, using 4 workers, [on a Raspberry Pi](https://questdb.com/blog/raspberry-pi-5-benchmark/).
+On a Raspberry Pi 5, QuestDB ingests [~270,000 rows per second](https://questdb.com/blog/raspberry-pi-5-benchmark/).
 
-Beyond performance and efficiency, with a specialized
-[time-series database](/glossary/time-series-database/), you don't need to worry
-about:
+### Built-in handling for real-world data
 
-- out-of-order data
-- duplicates
-- exactly one semantics
-- frequency of ingestion
-- many other details you will find in demanding real-world scenarios
+Time-series data is messy. QuestDB handles it automatically:
 
-QuestDB provides simplified, hyper-fast data ingestion with tremendous
-efficiency and therefore value.
+- **Out-of-order data** — late-arriving records are merged efficiently
+- **Deduplication** — duplicates are detected and handled at ingestion
+- **High cardinality** — millions of unique series without performance degradation
 
-Write blazing-fast queries and create real-time
-[Grafana](/docs/third-party-tools/grafana/) via familiar SQL:
+### SQL with time-series extensions
 
-```questdb-sql title='Navigate time with SQL' demo
+No proprietary query language. Use SQL you already know, extended for time-series:
+
+```questdb-sql title='OHLC aggregation with SAMPLE BY' demo
 SELECT
     timestamp, symbol,
     first(price) AS open,
@@ -107,51 +65,46 @@ SELECT
     max(price),
     sum(amount) AS volume
 FROM trades
-WHERE  timestamp > dateadd('d', -1, now())
+WHERE timestamp > dateadd('d', -1, now())
 SAMPLE BY 15m;
 ```
 
-Intrigued? The best way to see whether QuestDB is right for you is to try it
-out.
+Key extensions:
 
-Click _Demo this query_ in the snippet above to visit our demo instance and
-experiment.
+- [`SAMPLE BY`](/docs/reference/sql/sample-by/) — aggregate by time buckets (1 minute, 1 hour, 1 day, etc.)
+- [`LATEST ON`](/docs/reference/sql/latest-on/) — get the most recent value per series
+- [`ASOF JOIN`](/docs/reference/sql/asof-join/) — join time-series by closest timestamp
+- [Materialized Views](/docs/concept/mat-views/) — pre-compute aggregations automatically
 
-To bring your own data and learn more, keep reading!
+## When QuestDB might not be the right fit
 
+QuestDB is optimized for time-series. Consider alternatives if:
 
-## Where to next? {#next-up}
+- **You need general-purpose OLTP** — frequent updates, deletes, complex transactions → PostgreSQL
+- **Your data isn't time-series** — no timestamp column, no time-based queries → traditional RDBMS
+- **You need full-text search** — log text searching → Elasticsearch or Loki
 
-You'll be inserting data and generating valuable queries in little time.
+## Get started
 
-First, the [quick start](/docs/quick-start/) guide will get you running.
+The [quick start](/docs/quick-start/) gets you running in minutes.
 
-Choose from one of our premium ingest-only language clients:
+Choose a client library to start ingesting:
 
 <Clients />
 
-From there, you can learn more about what's to offer.
+Or explore more:
 
-- [Ingestion overview](/docs/ingestion-overview/) want to see all available
-  ingestion options? Checkout the overview.
-- [Query & SQL Overview](/docs/reference/sql/overview/) learn how to query
-  QuestDB
-- [Web Console](/docs/web-console/) for quick SQL queries, charting and CSV
-  upload/export functionality
-- [Grafana guide](/docs/third-party-tools/grafana/) to visualize your data as
-  beautiful and functional charts.
-- [Capacity planning](/docs/operations/capacity-planning/) to optimize your
-  QuestDB deployment for production workloads.
+- [Ingestion overview](/docs/ingestion-overview/) — all ingestion options
+- [Query & SQL overview](/docs/reference/sql/overview/) — SQL reference
+- [Web Console](/docs/web-console/) — built-in SQL editor and charting
+- [Grafana integration](/docs/third-party-tools/grafana/) — dashboards and visualization
+- [Capacity planning](/docs/operations/capacity-planning/) — production deployment
 
 ## Support
 
-We are happy to help with any question you may have.
+We're happy to help:
 
-The team loves a good performance optimization challenge!
-
-Feel free to reach out using the following channels:
-
-- [Raise an issue on GitHub](https://github.com/questdb/questdb/issues/new/choose)
-- [Join our community forums](https://community.questdb.com/)
-- [QuestDB on Stack Overflow](https://stackoverflow.com/questions/tagged/questdb)
-- or email us at [hello@questdb.io](mailto:hello@questdb.io)
+- [GitHub Issues](https://github.com/questdb/questdb/issues/new/choose) — bug reports and feature requests
+- [Community Forum](https://community.questdb.com/) — questions and discussion
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/questdb) — tagged questions
+- [hello@questdb.io](mailto:hello@questdb.io) — direct contact

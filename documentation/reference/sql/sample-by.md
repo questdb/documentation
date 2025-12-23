@@ -576,7 +576,7 @@ ALIGN TO CALENDAR;
 
 ## Performance optimization
 
-For frequently executed `SAMPLE BY` queries, consider using [materialized views](/docs/guides/mat-views/) to pre-compute aggregates. This can significantly improve query performance, especially for complex sampling operations on large datasets.
+For frequently executed `SAMPLE BY` queries, consider using [materialized views](/docs/concept/mat-views/) to pre-compute aggregates. This can significantly improve query performance, especially for complex sampling operations on large datasets.
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW hourly_metrics AS
@@ -593,6 +593,6 @@ SAMPLE BY 1h;
 
 This section includes links to additional information such as tutorials:
 
-- [Materialized Views Guide](/docs/guides/mat-views/) - Pre-compute SAMPLE BY queries for better performance
+- [Materialized Views](/docs/concept/mat-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)
 - [Three SQL Keywords for Finding Missing Data](/blog/three-sql-keywords-for-finding-missing-data/)

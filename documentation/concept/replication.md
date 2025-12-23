@@ -79,6 +79,16 @@ For even higher throughput, QuestDB Enterprise supports
 [multi-primary ingestion](/docs/operations/multi-primary-ingestion/) where
 multiple primaries write concurrently to the same logical database.
 
+## Bring Your Own Cloud (BYOC)
+
+QuestDB Enterprise can be self-managed or operated by QuestDB's team under the
+[BYOC model](https://questdb.com/byoc/).
+
+With BYOC, QuestDB handles operations of all primary and replica instances on
+your infrastructure. Managed infrastructure uses standard cloud provider tools
+(CloudFormation for AWS, Lighthouse for Azure) and is fully owned and auditable
+by you.
+
 ## Next steps
 
 Ready to set up replication? Continue to the [Setup Guide](/docs/operations/replication/).

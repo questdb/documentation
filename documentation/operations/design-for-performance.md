@@ -22,7 +22,7 @@ formulating queries.
 
 ### Materialized views
 
-[Materialized views](/docs/guides/mat-views/) are a powerful feature for optimizing query performance, especially for
+[Materialized views](/docs/concept/mat-views/) are a powerful feature for optimizing query performance, especially for
 complex aggregate queries. They pre-compute and store query results, providing significant performance improvements for
 frequently executed queries.
 
@@ -50,7 +50,7 @@ This view automatically updates as new rows are added to the `trades` table. Que
 they access these pre-computed results instead of scanning the full trades table.
 
 For more details on implementing and managing materialized views, see
-the [materialized views guide](/docs/guides/mat-views/).
+the [Materialized Views](/docs/concept/mat-views/) documentation.
 
 ### Row serialization
 

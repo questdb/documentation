@@ -74,7 +74,7 @@ module.exports = {
         {
           type: "category",
           label: "InfluxDB Line Protocol (ILP)",
-          collapsed: false,
+          collapsed: true,
           items: [
             {
               id: "reference/api/ilp/overview",
@@ -141,7 +141,7 @@ module.exports = {
         {
           type: "category",
           label: "PostgreSQL Wire Protocol",
-          collapsed: false,
+          collapsed: true,
           items: [
             {
               id: "pgwire/pgwire-intro",
@@ -508,24 +508,23 @@ module.exports = {
               label: "Materialized Views",
               customProps: { tag: "Popular" },
             },
-            "concept/storage-model",
+            "concept/deduplication",
+            "concept/ttl",
             "concept/write-ahead-log",
-            "concept/root-directory-structure",
           ],
         },
         {
           type: "category",
-          label: "Advanced Concepts",
-          collapsed: false,
+          label: "Deep Dive",
+          collapsed: true,
           items: [
             "concept/indexes",
             "concept/interval-scan",
-            "concept/deduplication",
-            "concept/ttl",
             "concept/jit-compiler",
             "concept/query-tracing",
             "concept/sql-extensions",
             "concept/sql-optimizer-hints",
+            "concept/root-directory-structure",
           ],
         },
       ],
@@ -545,7 +544,6 @@ module.exports = {
         "guides/architecture/time-series-optimizations",
         "guides/architecture/data-ingestion-engine",
         "guides/architecture/networking-layer",
-        "guides/architecture/replication-layer",
         "guides/architecture/security",
         "guides/architecture/observability",
         "guides/architecture/web-console",
@@ -731,7 +729,6 @@ module.exports = {
       type: "category",
       items: [
         "guides/import-csv",
-        "guides/mat-views",
         "guides/working-with-timestamps-timezones",
         "guides/compression-zfs",
         "guides/export-parquet",

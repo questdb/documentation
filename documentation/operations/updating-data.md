@@ -11,7 +11,7 @@ happens under the hood when an update is executed.
 
 To be able to understand how table rows are updated in QuestDB, first we need to
 have an idea of how the data is stored. The documentation contains detailed
-descriptions of the [storage model](/docs/concept/storage-model/) and the
+descriptions of the [storage engine](/docs/guides/architecture/storage-engine/) and the
 [directory layout](/docs/concept/root-directory-structure/#db-directory) but if
 we quickly want to summarize it:
 

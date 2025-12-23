@@ -42,8 +42,7 @@ appears consistent to all readers, even during ongoing write operations.
 ### Tier Two: QuestDB Binary Table Storage
 
 Changes in the parallel WAL files are stored in columnar binary format by the TableWriter. The TableWriter
-also handles and resolves out-of-order data writes and enables deduplication. Column files use an
-[append model](/docs/concept/storage-model/).
+also handles and resolves out-of-order data writes and enables deduplication. Column files use an append model.
 
 The active (most recent) partition for each table is always stored in this storage tier for minimum query latency and
 to optimize writes in the event of out-of-order data or when updating sampling intervals in materialized views.
@@ -98,7 +97,17 @@ deduplicated on additional columns.
   when [ZFS compression](/docs/guides/compression-zfs/) is enabled. Parquet files generated
   by QuestDB use native compression.
 
+### Durability
 
+By default, QuestDB relies on OS-level durability, letting the OS write dirty pages to disk.
+For stronger guarantees, enable sync commit mode:
+
+```ini title="server.conf"
+cairo.commit.mode=sync
+```
+
+This invokes `fsync()` on each commit, ensuring data survives OS crashes or power loss
+at the cost of reduced write throughput.
 
 ## Next Steps
 

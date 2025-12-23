@@ -428,7 +428,7 @@ And to learn about some of our favourite, most powerful syntax:
   multiple series within a table
 - [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
   a series based on proximity; no extra indices required
-- [Materialized Views](/docs/guides/mat-views/) to pre-compute complex queries
+- [Materialized Views](/docs/concept/mat-views/) to pre-compute complex queries
   for optimal performance
 
 Looking for visuals?
