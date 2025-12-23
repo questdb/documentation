@@ -1,6 +1,6 @@
 ---
-title: Data types
-sidebar_label: Data types
+title: Data Types Overview
+sidebar_label: Overview
 description: Data types reference documentation.
 ---
 

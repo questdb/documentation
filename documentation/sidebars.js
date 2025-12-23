@@ -87,16 +87,6 @@ module.exports = {
               label: "Configuration String",
             },
             {
-              id: "reference/api/ilp/advanced-settings",
-              type: "doc",
-              label: "Advanced Settings",
-            },
-            {
-              id: "reference/api/ilp/columnset-types",
-              type: "doc",
-              label: "Columnset Types",
-            },
-            {
               id: "clients/ingest-python",
               type: "doc",
               label: "Python",
@@ -135,6 +125,16 @@ module.exports = {
               id: "clients/date-to-timestamp-conversion",
               type: "doc",
               label: "Date to Timestamp Conversion",
+            },
+            {
+              id: "reference/api/ilp/columnset-types",
+              type: "doc",
+              label: "Columnset Types",
+            },
+            {
+              id: "reference/api/ilp/advanced-settings",
+              type: "doc",
+              label: "Advanced Settings",
             },
           ],
         },
@@ -224,7 +224,11 @@ module.exports = {
           label: "Data Types",
           collapsed: false,
           items: [
-            "reference/sql/datatypes",
+            {
+              id: "reference/sql/datatypes",
+              type: "doc",
+              label: "Overview",
+            },
             "concept/array",
             "concept/decimal",
             "concept/geohashes",

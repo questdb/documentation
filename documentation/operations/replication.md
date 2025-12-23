@@ -112,13 +112,11 @@ Restart QuestDB.
 
 ## 3. Take a snapshot
 
-Create a snapshot of your primary for initializing replicas:
+Replicas are initialized from a snapshot of the primary's data. This involves
+creating a backup of the primary and preparing it for restoration on replica
+nodes.
 
-```questdb-sql
-SNAPSHOT PREPARE;
-```
-
-See [Backup and restore](/docs/operations/backup/) for details.
+See [Backup and restore](/docs/operations/backup/) for the full procedure.
 
 :::tip
 Set up regular snapshots (daily or weekly). See

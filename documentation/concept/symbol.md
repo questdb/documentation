@@ -7,8 +7,10 @@ description:
 ---
 
 `SYMBOL` is a data type designed for columns with repetitive string values.
-Internally, symbols are stored as integers mapped to strings, making them
-much faster to filter and group than regular strings.
+Internally, symbols use dictionary encoding—each unique string is stored once
+in a lookup table, and rows store integer references to that table. This is
+the same approach used by columnar formats like Parquet and Arrow. The result
+is much faster filtering and grouping compared to regular strings.
 
 ## When to use SYMBOL
 
@@ -66,6 +68,48 @@ CREATE TABLE events (
 
 Symbol capacity scales automatically as new values are added. No manual
 configuration is needed.
+
+<details>
+<summary>Note for users upgrading from versions before 9.0.0</summary>
+
+Prior to QuestDB 9.0.0, symbol capacity required manual configuration. You had
+to estimate the number of distinct values upfront and set the capacity
+explicitly. Undersizing caused performance issues; oversizing wasted memory.
+
+From 9.0.0 onwards, symbol capacity is fully automatic. The `CAPACITY` setting
+is now obsolete and can be removed from your table definitions.
+
+</details>
+
+## NOCACHE option
+
+By default, QuestDB caches the symbol dictionary in memory for fast lookups.
+For columns with very high cardinality (10 million+ distinct values), this
+cache can consume significant memory.
+
+Use `NOCACHE` to disable dictionary caching:
+
+```questdb-sql
+CREATE TABLE events (
+    timestamp TIMESTAMP,
+    high_cardinality_id SYMBOL NOCACHE,
+    event_type SYMBOL
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+**Trade-off:** `NOCACHE` reduces memory usage but makes dictionary lookups
+slower. Only use it for symbols with millions of distinct values where memory
+is a concern.
+
+To toggle caching on an existing column:
+
+```questdb-sql
+-- Disable cache
+ALTER TABLE events ALTER COLUMN high_cardinality_id NOCACHE;
+
+-- Re-enable cache
+ALTER TABLE events ALTER COLUMN high_cardinality_id CACHE;
+```
 
 ## Indexing symbols
 

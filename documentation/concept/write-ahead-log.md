@@ -31,10 +31,10 @@ on commit, enabling real-time replication to standby nodes.
 WAL is enabled by default for partitioned tables:
 
 ```questdb-sql
-CREATE TABLE readings (
+CREATE TABLE prices (
     ts TIMESTAMP,
-    sensor_id SYMBOL,
-    value DOUBLE
+    ticker SYMBOL,
+    price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY;
 -- This is a WAL table (default)
 ```
@@ -42,7 +42,7 @@ CREATE TABLE readings (
 You can be explicit with the `WAL` keyword:
 
 ```questdb-sql
-CREATE TABLE readings (...)
+CREATE TABLE prices (...)
 TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
 
@@ -52,10 +52,10 @@ WAL tables must be partitioned. Non-partitioned tables cannot use WAL:
 
 ```questdb-sql
 -- Non-partitioned = no WAL (not recommended)
-CREATE TABLE config (key VARCHAR, value VARCHAR);
+CREATE TABLE static_data (key VARCHAR, value VARCHAR);
 
 -- Partitioned = WAL enabled (recommended)
-CREATE TABLE events (...)
+CREATE TABLE prices (...)
 TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
@@ -66,7 +66,7 @@ Always use partitioned tables to get WAL benefits.
 Check if a table uses WAL:
 
 ```questdb-sql
-SELECT name, walEnabled FROM tables() WHERE name = 'readings';
+SELECT name, walEnabled FROM tables() WHERE name = 'prices';
 ```
 
 Check WAL table status:
@@ -78,7 +78,7 @@ SELECT * FROM wal_tables();
 If WAL transactions are suspended (rare), resume them:
 
 ```questdb-sql
-ALTER TABLE readings RESUME WAL;
+ALTER TABLE prices RESUME WAL;
 ```
 
 ## How WAL works
@@ -119,7 +119,7 @@ WAL behavior can be tuned via server configuration:
 To convert an existing table between WAL and non-WAL:
 
 ```questdb-sql
-ALTER TABLE readings SET TYPE WAL;
+ALTER TABLE prices SET TYPE WAL;
 -- Requires database restart to take effect
 ```
 

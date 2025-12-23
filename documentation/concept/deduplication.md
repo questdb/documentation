@@ -83,12 +83,12 @@ cheap — QuestDB detects identical rows and skips unnecessary writes.
 ### Create table with deduplication
 
 ```questdb-sql
-CREATE TABLE sensor_data (
+CREATE TABLE prices (
     ts TIMESTAMP,
-    sensor_id SYMBOL,
-    reading DOUBLE
+    ticker SYMBOL,
+    price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY WAL
-DEDUP UPSERT KEYS(ts, sensor_id);
+DEDUP UPSERT KEYS(ts, ticker);
 ```
 
 The designated timestamp must always be included in UPSERT KEYS.
@@ -96,19 +96,19 @@ The designated timestamp must always be included in UPSERT KEYS.
 ### Enable on existing table
 
 ```questdb-sql
-ALTER TABLE sensor_data DEDUP ENABLE UPSERT KEYS(ts, sensor_id);
+ALTER TABLE prices DEDUP ENABLE UPSERT KEYS(ts, ticker);
 ```
 
 ### Disable deduplication
 
 ```questdb-sql
-ALTER TABLE sensor_data DEDUP DISABLE;
+ALTER TABLE prices DEDUP DISABLE;
 ```
 
 ### Change UPSERT KEYS
 
 ```questdb-sql
-ALTER TABLE sensor_data DEDUP ENABLE UPSERT KEYS(ts, sensor_id, region);
+ALTER TABLE prices DEDUP ENABLE UPSERT KEYS(ts, ticker, exchange);
 ```
 
 ## Checking configuration
@@ -116,13 +116,13 @@ ALTER TABLE sensor_data DEDUP ENABLE UPSERT KEYS(ts, sensor_id, region);
 Check if deduplication is enabled:
 
 ```questdb-sql
-SELECT dedup FROM tables() WHERE table_name = 'sensor_data';
+SELECT dedup FROM tables() WHERE table_name = 'prices';
 ```
 
 Check which columns are UPSERT KEYS:
 
 ```questdb-sql
-SELECT "column", upsertKey FROM table_columns('sensor_data');
+SELECT "column", upsertKey FROM table_columns('prices');
 ```
 
 ## Requirements
