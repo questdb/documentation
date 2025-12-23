@@ -38,29 +38,15 @@ QuestDB is comprised of several key components:
   optimizations, such as a designated timestamp, sequential reads, materialized
   views, and in-memory processing.
 
-- **[Data ingestion engine](/docs/guides/architecture/data-ingestion):**
-  Supports both bulk and streaming ingestion. It writes data to a row-based
-  write-ahead log (WAL) and then converts it into a columnar format. In QuestDB
-  Enterprise, the WAL segments are shipped to object storage for replication.
-
-- **[Networking layer](/docs/guides/architecture/networking-layer):** The system
-  exposes RESTful APIs and implements ILP and PostgreSQL wire protocols to
-  ensure compatibility with existing tools and drivers. It also offers a health
-  and metrics endpoint.
-
 - **[Replication](/docs/concept/replication/):** QuestDB Enterprise supports
   high availability with read replicas and multi-primary configurations.
   See [High Availability](/docs/concept/replication/) for details.
-
-- **[Security](/docs/guides/architecture/security):** QuestDB implements
-  enterprise-grade security with TLS, single sign-on (SSO), and role-based
-  access control with fine-grained granularity.
 
 - **[Observability](/docs/guides/architecture/observability):** QuestDB exposes
   real-time metrics, health checks, and structured logs to monitor performance
   and streamline diagnostics.
 
-- **[Web console](/docs/guides/architecture/web-console):** The engine includes
+- **[Web console](/docs/web-console/):** The engine includes
   a web console for running SQL statements, bulk loading CSV files, and
   displaying monitoring dashboards. QuestDB Enterprise supports single sign-on
   (SSO) in the web console.

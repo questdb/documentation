@@ -542,11 +542,7 @@ module.exports = {
         "guides/architecture/memory-management",
         "guides/architecture/query-engine",
         "guides/architecture/time-series-optimizations",
-        "guides/architecture/data-ingestion-engine",
-        "guides/architecture/networking-layer",
-        "guides/architecture/security",
         "guides/architecture/observability",
-        "guides/architecture/web-console",
       ],
     },
 
