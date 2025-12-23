@@ -287,9 +287,24 @@ QuestDB uses a **single database per instance**. For multi-tenant applications,
 use table name prefixes:
 
 ```questdb-sql
-CREATE TABLE tenant1_events (...);
-CREATE TABLE tenant2_events (...);
+-- Customer-specific tables
+CREATE TABLE acme_orders (...);
+CREATE TABLE globex_orders (...);
+
+-- Environment-based tables
+CREATE TABLE prod_us_metrics (...);
+CREATE TABLE prod_eu_metrics (...);
+CREATE TABLE staging_metrics (...);
+
+-- Department-based tables
+CREATE TABLE finance_transactions (...);
+CREATE TABLE ops_sensor_data (...);
 ```
+
+**Naming conventions:**
+- Use consistent prefixes: `{tenant}_`, `{env}_{region}_`, `{dept}_`
+- Keep names lowercase with underscores
+- Consider query patterns when choosing prefix granularity
 
 With [QuestDB Enterprise](/docs/operations/rbac/), you can enforce per-table
 permissions for access control.
@@ -332,12 +347,12 @@ DEDUP UPSERT KEYS(timestamp, name);
 <details>
 <summary>InfluxDB</summary>
 
+```text
+# InfluxDB line protocol
+metrics,name=cpu,region=us value=0.64
 ```
--- InfluxDB measurement
-measurement: metrics
-tags: name, region
-fields: value
 
+```questdb-sql
 -- QuestDB equivalent
 CREATE TABLE metrics (
     timestamp TIMESTAMP,
@@ -368,6 +383,27 @@ CREATE TABLE metrics (
     value DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL
 DEDUP UPSERT KEYS(timestamp, name);
+```
+
+</details>
+
+<details>
+<summary>DuckDB</summary>
+
+```questdb-sql
+-- DuckDB
+CREATE TABLE metrics (
+    timestamp TIMESTAMP,
+    name VARCHAR,
+    value DOUBLE
+);
+
+-- QuestDB equivalent
+CREATE TABLE metrics (
+    timestamp TIMESTAMP,
+    name SYMBOL,          -- Use SYMBOL for repeated strings
+    value DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 </details>
