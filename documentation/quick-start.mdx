@@ -57,12 +57,12 @@ Once Docker is installed, pull and run QuestDB:
 <InterpolateReleaseData
   renderText={(release) => (
     <CodeBlock className="language-shell">
-      {`docker run -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 questdb/questdb:${release.name}`}
+      {`docker run -p 9000:9000 -p 8812:8812 -p 9003:9003 questdb/questdb:${release.name}`}
     </CodeBlock>
   )}
 />
 
-This exposes the Web Console (9000), ILP ingestion (9009), PostgreSQL wire (8812), and health endpoint (9003).
+This exposes the Web Console (9000), PostgreSQL wire (8812), and health endpoint (9003).
 
 For deeper instructions, see the
 [Docker deployment guide](/docs/deployment/docker/).
@@ -250,7 +250,7 @@ It works? You're ready to bring your data.
 | Port | Service |
 |------|---------|
 | `9000` | [REST API](/docs/reference/api/rest/) and [Web Console](/docs/web-console/) |
-| `9009` | [InfluxDB Line Protocol (ILP)](/docs/reference/api/ilp/overview/) |
+| `9009` | [InfluxDB Line Protocol (ILP)](/docs/reference/api/ilp/overview/) - Legacy TCP, use HTTP instead |
 | `8812` | [PostgreSQL Wire Protocol](/docs/pgwire/pgwire-intro/) |
 | `9003` | [Health endpoint](/docs/operations/logging-metrics/#minimal-http-server) |
 
