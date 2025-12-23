@@ -371,7 +371,7 @@ CREATE TABLE table_name (
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
-Refer to the [symbol type documentation](/docs/concept/symbol/#symbol-columns)
+Refer to the [symbol type documentation](/docs/concept/symbol/)
 for more information on configuring the symbol capacity.
 
 </p>

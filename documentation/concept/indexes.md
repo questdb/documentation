@@ -107,7 +107,7 @@ When in doubt, reach out via the QuestDB support channels for advice.
 :::note
 
 - The **index capacity** and
-  [**symbol capacity**](/docs/concept/symbol/#usage-of-symbols) are different
+  [**symbol capacity**](/docs/concept/symbol/) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
   the implications.

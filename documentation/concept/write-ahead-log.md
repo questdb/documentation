@@ -127,6 +127,6 @@ See [ALTER TABLE SET TYPE](/docs/reference/sql/alter-table-set-type/) for detail
 
 ## See also
 
-- [High Availability](/docs/operations/high-availability/) — replication and failover
+- [Replication](/docs/concept/replication/) — high availability and failover
 - [Deduplication](/docs/concept/deduplication/) — requires WAL
 - [CREATE TABLE](/docs/reference/sql/create-table/#write-ahead-log-wal-settings) — WAL syntax

@@ -41,7 +41,7 @@ command:
 ALTER TABLE TICKER_PRICE DEDUP ENABLE UPSERT KEYS(ts, ticker)
 ```
 
-See more example at [data deduplication](/docs/concept/deduplication#example)
+See more example at [data deduplication](/docs/concept/deduplication/#quick-example)
 page
 
 ## See also

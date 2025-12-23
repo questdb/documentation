@@ -137,7 +137,7 @@ the [CREATE TABLE](/docs/reference/sql/create-table/#symbols) page.
 
 #### Symbol caching
 
-[Symbol cache](/docs/concept/symbol/#usage-of-symbols) enables the use of
+[Symbol cache](/docs/concept/symbol/) enables the use of
 on-heap cache for reads and can enhance performance. However, the cache size
 grows as the number of distinct value increases, and the size of the cached
 symbol may hinder query performance.
@@ -147,13 +147,13 @@ We recommend that users check the JVM and GC metrics via
 of the following steps:
 
 - Disabling the symbol cache. See
-  [Usage of `symbols`](/docs/concept/symbol/#usage-of-symbols) for server-wide
+  [Usage of `symbols`](/docs/concept/symbol/) for server-wide
   and table-wide configuration options.
 - Increasing the JVM heap size using the `-Xmx` argument.
 
 #### Symbol capacity
 
-[Symbol capacity](/docs/concept/symbol/#usage-of-symbols) should be the same or
+[Symbol capacity](/docs/concept/symbol/) should be the same or
 slightly larger than the count of distinct symbol values.
 
 Undersized symbol columns slow down query performance. Similarly, there is a
