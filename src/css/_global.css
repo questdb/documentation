@@ -32,8 +32,8 @@
   --transition-bezier: cubic-bezier(0.17, 0.67, 0.83, 0.67);
   --transition-fastest: 100ms;
 
-  --font-family-base: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu,
-    sans-serif;
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 
   --font-size-small: 15px;
   --font-size-normal: 16px;
@@ -65,7 +65,7 @@
   --ifm-font-family-base: var(--font-family-base);
   --ifm-font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
-  --ifm-font-size-base: var(--font-size-small);
+  --ifm-font-size-base: var(--font-size-normal);
   --ifm-global-border-radius: 8px;
   --ifm-h1-font-size: var(--font-size-big-4);
   --ifm-h2-font-size: var(--font-size-big-2);
@@ -75,7 +75,7 @@
   --ifm-heading-margin-bottom: 1.5rem;
   --ifm-hr-border-color: var(--palette-white-20);
   /* DARK theme link color */
-  --ifm-link-color: #5089f3;
+  --ifm-link-color: #79a8ff;
   --ifm-link-hover-color: #6390e2;
   --ifm-list-paragraph-margin: 0.5rem;
   --ifm-menu-link-sublist-icon: url("/images/infima/arrow.svg");
@@ -170,47 +170,6 @@ html[data-theme="dark"] .DocSearch {
     var(--palette-gray) 0%,
     var(--palette-rock) 100%
   );
-}
-
-@font-face {
-  font-family: SegoeUI;
-  src:
-    local("Segoe UI Light"),
-    /*web storm may not recognise the fact the font will be there, but it is*/
-      url(/fonts/segoe-ui-100.woff2) format("woff2");
-  font-weight: 100;
-}
-
-@font-face {
-  font-family: SegoeUI;
-  src:
-    local("Segoe UI Semilight"),
-    url(/fonts/segoe-ui-200.woff2) format("woff2");
-  font-weight: 200;
-}
-
-@font-face {
-  font-family: SegoeUI;
-  src:
-    local("Segoe UI"),
-    url(/fonts/segoe-ui-400.woff2) format("woff2");
-  font-weight: 400;
-}
-
-@font-face {
-  font-family: SegoeUI;
-  src:
-    local("Segoe UI Bold"),
-    url(/fonts/segoe-ui-600.woff2) format("woff2");
-  font-weight: 600;
-}
-
-@font-face {
-  font-family: SegoeUI;
-  src:
-    local("Segoe UI Semiold"),
-    url(/fonts/segoe-ui-700.woff2) format("woff2");
-  font-weight: 700;
 }
 
 .table-of-contents {
