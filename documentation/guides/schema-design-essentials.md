@@ -6,27 +6,26 @@ description:
   partitioning, data types, deduplication, and retention strategies.
 ---
 
-This guide covers how to design tables that take full advantage of QuestDB's
-time-series architecture.
+New to QuestDB? This guide covers the essential concepts for designing efficient time-series tables.
 
 ## Your first table
 
 Here's a minimal, well-designed QuestDB table:
 
 ```questdb-sql
-CREATE TABLE readings (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    sensor_id SYMBOL,
-    temperature DOUBLE,
-    humidity DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+    symbol SYMBOL,
+    side SYMBOL,
+    price DOUBLE,
+    quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Key elements:
 - **`TIMESTAMP(timestamp)`** — designates the time column (required for time-series)
 - **`PARTITION BY DAY`** — splits data into daily partitions for efficient queries
-- **`WAL`** — enables write-ahead log for concurrent writes
-- **`SYMBOL`** — optimized type for categorical data like IDs
+- **`SYMBOL`** — optimized type for categorical data like tickers
 
 ## Designated timestamp
 
@@ -37,10 +36,10 @@ Every time-series table needs a **designated timestamp**. This column:
 - Powers time-series functions like `SAMPLE BY` and `LATEST ON`
 
 ```questdb-sql
-CREATE TABLE events (
+CREATE TABLE market_data (
     ts TIMESTAMP,        -- Will be the designated timestamp
-    event_type SYMBOL,
-    payload VARCHAR
+    symbol SYMBOL,
+    price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
@@ -65,12 +64,12 @@ Partitioning splits your table into time-based chunks. Choose based on your data
 - Too few large partitions = slower queries and more memory usage
 
 ```questdb-sql
--- High-volume IoT data
-CREATE TABLE sensor_data (...)
+-- High-volume tick data
+CREATE TABLE trades (...)
 TIMESTAMP(ts) PARTITION BY HOUR;
 
--- Lower-volume business metrics
-CREATE TABLE daily_metrics (...)
+-- Lower-volume end-of-day prices
+CREATE TABLE eod_prices (...)
 TIMESTAMP(ts) PARTITION BY MONTH;
 ```
 
@@ -78,9 +77,21 @@ See [Partitions](/docs/concept/partitions/) for details.
 
 ## Data types
 
-### SYMBOL (for categorical data)
+### SYMBOL vs VARCHAR
 
-Use `SYMBOL` for columns with repeated string values:
+**When to use SYMBOL:**
+- Repetitive string values (stock tickers, country codes, status flags)
+- Up to tens of millions of distinct values
+- Columns used in `WHERE` filters or `GROUP BY`
+
+**When to use VARCHAR:**
+- Unique/high-cardinality values (hundreds of millions of distinct)
+- User-generated text (comments, log messages)
+- UUIDs (though the `UUID` type is better)
+
+**Why it matters:**
+- SYMBOL uses dictionary encoding (integer lookups vs string comparisons)
+- Faster filtering, faster grouping, less storage
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -92,27 +103,18 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-**When to use SYMBOL:**
-- Limited set of values (country codes, status flags, device IDs)
-- Column is used in `WHERE` filters or `GROUP BY`
-- Up to a few million distinct values
-
-**When to use VARCHAR instead:**
-- Truly unique values (user-generated content, log messages)
-- Very high cardinality (> millions of distinct values)
-- Values that won't be filtered or grouped
-
-Symbol capacity expands automatically as needed.
+See [Symbol](/docs/concept/symbol/) for details.
 
 ### Timestamps
 
 QuestDB stores all timestamps in **UTC** with microsecond precision.
 
 ```questdb-sql
-CREATE TABLE events (
+CREATE TABLE trades (
     ts TIMESTAMP,              -- Microsecond precision (recommended)
-    ts_nano TIMESTAMP_NS,      -- Nanosecond precision (if needed)
-    created_at TIMESTAMP
+    exchange_ts TIMESTAMP_NS,  -- Nanosecond precision (if needed)
+    symbol SYMBOL,
+    price DOUBLE
 ) TIMESTAMP(ts);
 ```
 
@@ -155,15 +157,16 @@ For arrays and geospatial data, see [Data Types](/docs/reference/sql/datatypes/)
 QuestDB allows duplicates by default. To enforce uniqueness, use `DEDUP UPSERT KEYS`:
 
 ```questdb-sql
-CREATE TABLE metrics (
+CREATE TABLE quotes (
     timestamp TIMESTAMP,
-    name SYMBOL,
-    value DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL
-DEDUP UPSERT KEYS(timestamp, name);
+    symbol SYMBOL,
+    bid DOUBLE,
+    ask DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
-When a row arrives with the same `timestamp` and `name`, the old row is replaced.
+When a row arrives with the same `timestamp` and `symbol`, the old row is replaced.
 
 **Deduplication has no noticeable performance penalty.**
 
@@ -175,14 +178,15 @@ QuestDB doesn't support individual row deletes. Instead, use TTL to automaticall
 drop old partitions:
 
 ```questdb-sql
-CREATE TABLE logs (
+CREATE TABLE tick_data (
     timestamp TIMESTAMP,
-    level SYMBOL,
-    message VARCHAR
-) TIMESTAMP(timestamp) PARTITION BY DAY TTL 30 DAYS;
+    symbol SYMBOL,
+    price DOUBLE,
+    size LONG
+) TIMESTAMP(timestamp) PARTITION BY DAY TTL 90 DAYS;
 ```
 
-This keeps the last 30 days of data and automatically removes older partitions.
+This keeps the last 90 days of data and automatically removes older partitions.
 
 See [TTL](/docs/concept/ttl/) for details.
 
@@ -191,13 +195,16 @@ See [TTL](/docs/concept/ttl/) for details.
 For frequently-run aggregations, pre-compute results with materialized views:
 
 ```questdb-sql
-CREATE MATERIALIZED VIEW hourly_stats AS
+CREATE MATERIALIZED VIEW ohlc_1h AS
   SELECT
     timestamp,
-    sensor_id,
-    avg(temperature) as avg_temp,
-    max(temperature) as max_temp
-  FROM readings
+    symbol,
+    first(price) as open,
+    max(price) as high,
+    min(price) as low,
+    last(price) as close,
+    sum(quantity) as volume
+  FROM trades
   SAMPLE BY 1h;
 ```
 
@@ -212,16 +219,16 @@ See [Materialized Views](/docs/concept/mat-views/) for details.
 
 ```questdb-sql
 -- Bad: VARCHAR for repeated values
-CREATE TABLE events (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    event_type VARCHAR,     -- Slow filtering and grouping
+    symbol VARCHAR,        -- Slow filtering and grouping
     ...
 );
 
 -- Good: SYMBOL for categorical data
-CREATE TABLE events (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    event_type SYMBOL,      -- Fast filtering and grouping
+    symbol SYMBOL,         -- Fast filtering and grouping
     ...
 );
 ```
@@ -230,11 +237,11 @@ CREATE TABLE events (
 
 ```questdb-sql
 -- Bad: Yearly partitions for high-volume data
-CREATE TABLE sensor_data (...)
+CREATE TABLE trades (...)
 PARTITION BY YEAR;          -- Partitions will be huge
 
 -- Good: Match partition size to data volume
-CREATE TABLE sensor_data (...)
+CREATE TABLE trades (...)
 PARTITION BY HOUR;
 ```
 
@@ -242,15 +249,15 @@ PARTITION BY HOUR;
 
 ```questdb-sql
 -- Bad: No designated timestamp
-CREATE TABLE readings (
+CREATE TABLE trades (
     ts TIMESTAMP,
-    value DOUBLE
+    price DOUBLE
 );
 
 -- Good: Explicit designated timestamp
-CREATE TABLE readings (
+CREATE TABLE trades (
     ts TIMESTAMP,
-    value DOUBLE
+    price DOUBLE
 ) TIMESTAMP(ts);
 ```
 
@@ -271,14 +278,14 @@ To change immutable properties, create a new table and migrate data:
 
 ```questdb-sql
 -- 1. Create new table with desired schema
-CREATE TABLE readings_new (...) PARTITION BY HOUR;
+CREATE TABLE trades_new (...) PARTITION BY HOUR;
 
 -- 2. Copy data
-INSERT INTO readings_new SELECT * FROM readings;
+INSERT INTO trades_new SELECT * FROM trades;
 
 -- 3. Swap tables
-DROP TABLE readings;
-RENAME TABLE readings_new TO readings;
+DROP TABLE trades;
+RENAME TABLE trades_new TO trades;
 ```
 
 ## Multi-tenancy
@@ -287,22 +294,23 @@ QuestDB uses a **single database per instance**. For multi-tenant applications,
 use table name prefixes:
 
 ```questdb-sql
--- Customer-specific tables
-CREATE TABLE acme_orders (...);
-CREATE TABLE globex_orders (...);
+-- Client-specific tables
+CREATE TABLE acme_trades (...);
+CREATE TABLE globex_trades (...);
 
--- Environment-based tables
-CREATE TABLE prod_us_metrics (...);
-CREATE TABLE prod_eu_metrics (...);
-CREATE TABLE staging_metrics (...);
+-- Environment and region tables
+CREATE TABLE prod_us_trades (...);
+CREATE TABLE prod_eu_trades (...);
+CREATE TABLE staging_trades (...);
 
--- Department-based tables
-CREATE TABLE finance_transactions (...);
-CREATE TABLE ops_sensor_data (...);
+-- Asset class tables
+CREATE TABLE equities_trades (...);
+CREATE TABLE fx_trades (...);
+CREATE TABLE crypto_trades (...);
 ```
 
 **Naming conventions:**
-- Use consistent prefixes: `{tenant}_`, `{env}_{region}_`, `{dept}_`
+- Use consistent prefixes: `{client}_`, `{env}_{region}_`, `{asset_class}_`
 - Keep names lowercase with underscores
 - Consider query patterns when choosing prefix granularity
 
@@ -338,7 +346,7 @@ CREATE TABLE metrics (
     timestamp TIMESTAMP,
     name SYMBOL,
     value DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL
+) TIMESTAMP(timestamp) PARTITION BY DAY
 DEDUP UPSERT KEYS(timestamp, name);
 ```
 
@@ -381,7 +389,7 @@ CREATE TABLE metrics (
     timestamp TIMESTAMP,
     name SYMBOL,
     value DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL
+) TIMESTAMP(timestamp) PARTITION BY DAY
 DEDUP UPSERT KEYS(timestamp, name);
 ```
 
@@ -414,3 +422,10 @@ For schema migrations, QuestDB supports [Flyway](https://documentation.red-gate.
 
 You can also use ILP auto-creation for dynamic schemas, though this applies
 default settings. See [ILP Overview](/docs/reference/api/ilp/overview/) for details.
+
+## Next steps
+
+- [Quick Start](/docs/quick-start/) — Create your first table and run queries
+- [Capacity Planning](/docs/operations/capacity-planning/) — Size your deployment for production
+- [Connect & Ingest](/docs/ingestion-overview/) — Load data into QuestDB
+- [Materialized Views](/docs/concept/mat-views/) — Pre-compute aggregations for fast dashboards

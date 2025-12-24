@@ -39,7 +39,7 @@ Use `VARCHAR` when values are unique or very high cardinality:
 - User-generated text (comments, descriptions)
 - Log messages
 - UUIDs or unique identifiers (consider the `UUID` type instead)
-- Columns with millions of distinct values
+- Columns with hundreds of millions of distinct values
 
 ## Why SYMBOL is fast
 
