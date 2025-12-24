@@ -1,0 +1,26 @@
+.menuLink {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.tagEnterprise {
+  background-color: var(--ifm-color-primary);
+  color: white;
+}
+
+.tagPopular {
+  background-color: #10b981;
+  color: white;
+}
