@@ -522,6 +522,47 @@ materialized_views();
 | trades_latest_1d | immediate   | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
 
 
+## views
+
+`views()` returns the list of all views in the database.
+
+**Arguments:**
+
+- `views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `view_name` - view name
+- `view_sql` - query used to define the view (without CREATE VIEW wrapper)
+- `view_table_dir_name` - internal directory name
+- `invalidation_reason` - message explaining why the view was marked as invalid,
+  empty if valid
+- `view_status` - view status: `valid` or `invalid`
+- `view_status_update_time` - timestamp of last status change
+
+**Examples:**
+
+```questdb-sql title="List all views"
+views();
+```
+
+| view_name      | view_sql                                              | view_table_dir_name | invalidation_reason | view_status | view_status_update_time     |
+| -------------- | ----------------------------------------------------- | ------------------- | ------------------- | ----------- | --------------------------- |
+| hourly_summary | SELECT ts, symbol, sum(qty) FROM trades SAMPLE BY 1h  | hourly_summary~1    |                     | valid       | 2025-05-30T10:15:00.000000Z |
+| price_view     | SELECT symbol, last(price) FROM trades SAMPLE BY 1d   | price_view~2        |                     | valid       | 2025-05-30T10:20:00.000000Z |
+
+```questdb-sql title="Find invalid views"
+SELECT view_name, invalidation_reason
+FROM views()
+WHERE view_status = 'invalid';
+```
+
+```questdb-sql title="List views ordered by name"
+SELECT * FROM views() ORDER BY view_name;
+```
+
 ## version/pg_catalog.version
 
 `version()` or `pg_catalog.version()` returns the supported version of the

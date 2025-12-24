@@ -309,6 +309,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
+                "reference/sql/alter-view",
               ],
             },
             {
@@ -318,6 +319,7 @@ module.exports = {
             },
             "reference/sql/cancel-query",
             "reference/sql/checkpoint",
+            "reference/sql/compile-view",
             "reference/sql/copy",
             {
               type: "category",
@@ -340,6 +342,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
+                "reference/sql/create-view",
               ],
             },
             {
@@ -363,6 +366,7 @@ module.exports = {
                   type: "doc",
                   customProps: { tag: "Enterprise" },
                 },
+                "reference/sql/drop-view",
               ],
             },
             {
@@ -506,6 +510,11 @@ module.exports = {
             "concept/designated-timestamp",
             "concept/partitions",
             "concept/symbol",
+            {
+              id: "concept/views",
+              type: "doc",
+              label: "Views",
+            },
             {
               id: "concept/mat-views",
               type: "doc",
