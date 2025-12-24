@@ -369,9 +369,9 @@ Learn more about the [ILP text format](/docs/reference/api/ilp/advanced-settings
 
 ## Date to Timestamp in PHP
 
-Both of the `DateTime` and `DateTimeImmutable` classes store date and time information
+Both the `DateTime` and `DateTimeImmutable` classes store date and time information.
 
-QuestDB does not have an official PHP client, but you can send a POST request comprising the ILP messages. Within this messages, you can pass an epoch timestamp in nanoseconds as the designated timestamp, and pass epoch timestamps in microseconds for other timestamp columns. 
+QuestDB does not have an official PHP client, but you can send a POST request comprising the ILP messages. Within these messages, you can pass an epoch timestamp in nanoseconds as the designated timestamp, and pass epoch timestamps in microseconds for other timestamp columns. 
 
 Alternatively, you can use the [InfluxDB PHP Client](https://github.com/influxdata/influxdb-client-php), which is compatible with QuestDB.
 
@@ -379,15 +379,17 @@ Alternatively, you can use the [InfluxDB PHP Client](https://github.com/influxda
 <?php
 $date_str = '2024-08-05';
 $date_obj = DateTime::createFromFormat('Y-m-d', $date_str);
+$time_precise = new DateTime('now'); // or DateTime::createFromFormat('Y-m-d H:i:s.u', '2024-08-05 12:13:14.123456');
 
-// Timestamp in microseconds
-$timestamp = $date_obj->getTimestamp() * 1000000;
+// Timestamps in microseconds
+$timestamp_coarse = $date_obj->getTimestamp() * 1000000;
+$timestamp_precise = (int)$time_precise->format('Uu');
 
-echo "Date: " . $date_obj->format('Y-m-d') . "
-";
-echo "Timestamp (microseconds): " . $timestamp . "
-";
-?>
+echo "Date: " . $date_obj->format('Y-m-d') . PHP_EOL;
+echo "Timestamp (microseconds): " . $timestamp_coarse . PHP_EOL;
+
+echo "Date: " . $time_precise->format('Y-m-d H:i:s.u') . PHP_EOL;
+echo "Timestamp (microseconds): " . $timestamp_precise . PHP_EOL;
 ```
 
 Learn more about the [ILP text format](/docs/reference/api/ilp/advanced-settings/).
