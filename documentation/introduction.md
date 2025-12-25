@@ -12,15 +12,12 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is an open source, high-performance time-series database:
-
-**Low-latency architecture** — sub-millisecond queries on billions of rows\
-**High-throughput ingestion** — millions of rows per second\
-**Fast SQL with time-series extensions** — SAMPLE BY, LATEST ON, ASOF JOIN\
-**Open formats** — built on Parquet, no vendor lock-in\
-**AI-ready** — query with LLMs or use BYOK AI in the Web Console
-
-Used in capital markets, fintech, crypto, energy, heavy industry, space exploration, and robotics.
+QuestDB is a time-series database optimized for fast ingestion and SQL queries.
+It uses a column-oriented storage model, memory-mapped files, and SIMD
+instructions to run analytical queries with low latency. Data is ingested via
+InfluxDB Line Protocol (ILP) and queried through PostgreSQL wire protocol or
+REST API. QuestDB extends SQL with time-series operations like `SAMPLE BY`,
+`LATEST ON`, `ASOF JOIN`, and `WINDOW JOIN`.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
@@ -47,12 +44,6 @@ automated backups, and multi-tier storage with seamless object storage integrati
 2. **[Schema design](/docs/guides/schema-design-essentials/)** - Design your tables
 3. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using QuestDB clients
 4. **[Query data](/docs/reference/sql/overview/)** - Analyze with SQL
-
-<div className="not-prose">
-  <DocButton href="/docs/why-questdb/" variant="text" arrow="right">
-    <>Why choose QuestDB?</>
-  </DocButton>
-</div>
 
 ## Guides
 

@@ -1,7 +1,6 @@
 module.exports = {
   docs: [
     "introduction",
-    "why-questdb",
     "guides/schema-design-essentials",
 
     // ===================
@@ -171,6 +170,11 @@ module.exports = {
               id: "pgwire/pgwire-intro",
               type: "doc",
               label: "Overview",
+            },
+            {
+              id: "pgwire/large-result-sets",
+              type: "doc",
+              label: "Large Result Sets",
             },
             {
               id: "pgwire/python",

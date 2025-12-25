@@ -58,6 +58,17 @@ ingestion. For high-throughput ingestion, use the
 
 ## Important considerations
 
+### Large result sets
+
+When querying large datasets, most PostgreSQL drivers load the entire result
+set into memory before returning rows. This causes out-of-memory errors and
+slow performance.
+
+**Solution:** Use cursor-based fetching to retrieve rows in batches.
+
+See [Handling Large Result Sets](/docs/pgwire/large-result-sets/) for
+per-language examples.
+
 ### Timestamp handling
 
 QuestDB stores all timestamps internally in
