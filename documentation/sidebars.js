@@ -494,6 +494,7 @@ module.exports = {
           collapsed: false,
           items: [
             "concept/designated-timestamp",
+            "guides/working-with-timestamps-timezones",
             "concept/partitions",
             "concept/symbol",
             {
@@ -715,7 +716,6 @@ module.exports = {
       type: "category",
       items: [
         "guides/import-csv",
-        "guides/working-with-timestamps-timezones",
         "guides/compression-zfs",
         "guides/export-parquet",
         "guides/modifying-data",

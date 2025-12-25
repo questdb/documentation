@@ -152,6 +152,20 @@ Choose the smallest type that fits your data to save storage.
 
 For arrays and geospatial data, see [Data Types](/docs/reference/sql/datatypes/).
 
+### STRING vs VARCHAR
+
+QuestDB has two string types:
+
+| Type | Encoding | Status |
+|------|----------|--------|
+| `VARCHAR` | UTF-8 | Recommended |
+| `STRING` | UTF-16 | Legacy, not recommended |
+
+**Always use `VARCHAR` for new tables.** The `STRING` type exists for backward
+compatibility but is less efficient. If you have existing tables with `STRING`
+columns, they will continue to work, but consider migrating to `VARCHAR` when
+convenient.
+
 ## Deduplication
 
 QuestDB allows duplicates by default. To enforce uniqueness, use `DEDUP UPSERT KEYS`:
