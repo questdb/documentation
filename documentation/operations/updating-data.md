@@ -1,11 +1,17 @@
 ---
-title: Updating data
-sidebar_label: Updating data
+title: How UPDATE works
+sidebar_label: How UPDATE works
 description: How the UPDATE statement is implemented in QuestDB.
 ---
 
-This document describes how the UPDATE statement works in QuestDB and what
-happens under the hood when an update is executed.
+This page explains how QuestDB implements the
+[UPDATE statement](/docs/reference/sql/update/) internally.
+
+:::tip
+UPDATE uses copy-on-write which increases disk usage. For high-frequency
+modifications, consider [append-oriented alternatives](/docs/operations/modifying-data/)
+that work with QuestDB's storage model.
+:::
 
 ## Storage model
 
@@ -27,16 +33,14 @@ we quickly want to summarize it:
 
 ## Column versions
 
-Since the data is stored in order and the files are append-only updating it is
-not straightforward. We took the optimistic approach and assumed that past data
-will never have to change. This is great for read performance. However,
-sometimes you may need to **amend data** which has been recorded incorrectly
-because of a bug or for any other reason.
+Since files are append-only, updating existing data is not straightforward.
+QuestDB's storage model assumes past data rarely changes, which optimizes read
+performance. However, sometimes you need to amend data that was recorded
+incorrectly.
 
-We could break our append-only model and start accessing different parts of the
-column files to fix incorrect data. The problem we would face with is
-inconsistent reads. Readers running queries on the table would not be happy as
-they could see some part of the data updated but not others.
+We could break our append-only model and modify column files in place, but this
+would cause inconsistent reads. Concurrent queries could see partially updated
+data.
 
 The solution is to make the update **transactional** and **copy-on-write**.
 Basically a new column file is created when processing the UPDATE statement. All
@@ -54,10 +58,6 @@ column files will get a new version where data is actually changing. For
 example, if only a single column is updated in a single partition of a table,
 then only a single column file will be rewritten.
 
-Please, also check the following guide on
-[modifying data](/docs/guides/modifying-data/) in QuestDB for additional
-information.
-
 ## Vacuum updated columns
 
 When a column is updated, the new version of the column is written to disk and a
@@ -70,12 +70,9 @@ trigger it.
 
 ## Limitations
 
-Current implementation of the UPDATE operation rewrites the column files by
-copying records in their existing order from the previous version, and replacing
-the value if it needs changing. As a result the **designated timestamp cannot be
-updated.**
+UPDATE rewrites column files by copying records in their existing order and
+replacing values as needed. As a result, the **designated timestamp column
+cannot be updated**.
 
-Modifying the designated timestamp would lead to rewriting history of the time
-series. Records would need to be reordered, this could even mean moving rows in
-between different partitions. We may remove this limitation in the future if
-there is enough demand by users.
+Modifying the designated timestamp would require reordering records and
+potentially moving rows between partitions.

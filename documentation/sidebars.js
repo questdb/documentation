@@ -150,6 +150,7 @@ module.exports = {
             },
           ],
         },
+        "guides/import-csv",
       ],
     },
 
@@ -607,11 +608,6 @@ module.exports = {
           label: "Setup Guide",
         },
         {
-          id: "operations/multi-primary-ingestion",
-          type: "doc",
-          label: "Multi-primary Ingestion",
-        },
-        {
           id: "guides/replication-tuning",
           type: "doc",
           label: "Tuning",
@@ -631,6 +627,7 @@ module.exports = {
         "operations/monitoring-alerting",
         "operations/data-retention",
         "operations/updating-data",
+        "operations/modifying-data",
         "operations/task-automation",
       ],
     },
@@ -719,10 +716,8 @@ module.exports = {
       label: "Tutorials",
       type: "category",
       items: [
-        "guides/import-csv",
         "guides/compression-zfs",
         "guides/export-parquet",
-        "guides/modifying-data",
         {
           id: "guides/order-book",
           label: "Order Book Analytics",

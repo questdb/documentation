@@ -14,10 +14,10 @@ import { DocButton } from "../src/components/DocButton"
 
 QuestDB is a time-series database optimized for fast ingestion and SQL queries.
 It uses a column-oriented storage model, memory-mapped files, and SIMD
-instructions to run analytical queries with low latency. Data is ingested via
-InfluxDB Line Protocol (ILP) and queried through PostgreSQL wire protocol or
-REST API. QuestDB extends SQL with time-series operations like `SAMPLE BY`,
-`LATEST ON`, `ASOF JOIN`, and `WINDOW JOIN`.
+instructions to run analytical queries with low latency. QuestDB extends SQL
+with time-series operations like `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, and
+`WINDOW JOIN`. See [Architecture](/docs/guides/architecture/questdb-architecture/)
+for details on how QuestDB works.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>

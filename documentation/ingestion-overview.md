@@ -47,6 +47,24 @@ trades,symbol=ETH-USD,side=buy price=2615.4,amount=0.002 1646762637764098000\n
 Once inside of QuestDB, it's yours to manipulate and query via extended SQL. Please note that table and column names
 must follow the QuestDB [naming rules](/docs/reference/sql/create-table/#table-name).
 
+### Ingestion characteristics
+
+QuestDB is optimized for both throughput and latency. Send data when you have
+it - there's no need to artificially batch on the client side.
+
+| Mode | Throughput (per connection) |
+|------|----------------------------|
+| Batched writes | ~400k rows/sec |
+| Single-row writes | ~60-80k rows/sec |
+
+Clients control batching via explicit `flush()` calls. Each flush ends a batch
+and sends it to the server. If your data arrives one row at a time, send it one
+row at a time - QuestDB handles this efficiently. If data arrives in bursts,
+batch it naturally and flush when ready.
+
+Server-side, WAL processing is asynchronous. Transactions are grouped into
+segments that roll based on size or row count, requiring no client-side tuning.
+
 ## Message brokers and queues
 
 If you already have Kafka, Flink, or another streaming platform in your stack,

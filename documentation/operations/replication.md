@@ -247,7 +247,5 @@ Restore the database to a specific historical timestamp.
 
 ## Next steps
 
-- [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/) - Scale
-  write throughput with multiple primaries
 - [Tuning guide](/docs/guides/replication-tuning/) - Optimize replication
   performance

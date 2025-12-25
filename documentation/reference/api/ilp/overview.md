@@ -539,7 +539,7 @@ as one instance becomes writable before the maximum retry timeout is reached, it
 
 By configuring multiple addresses, you can continue capturing data if your primary instance fails, without having to reconfigure the clients, as they will automatically failover to the new primary once available.
 
-Enterprise users can use multipe URLs to handle replication failover, without the need to introduce a load-balancer, reconfigure clients, or move to a [multi-primary](/docs/operations/multi-primary-ingestion/) deployment model.
+Enterprise users can use multiple URLs to handle replication failover, without the need to introduce a load-balancer or reconfigure clients.
 
 ## Health Check
 

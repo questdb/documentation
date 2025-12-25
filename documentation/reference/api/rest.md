@@ -141,6 +141,11 @@ need high-performance inserts.
 
 ## /imp - Import data
 
+:::tip
+For a complete guide including text loader configuration and troubleshooting,
+see [CSV Import](/docs/guides/import-csv/#import-csv-via-rest).
+:::
+
 `/imp` streams tabular text data directly into a table. It supports CSV, TAB and
 pipe (`|`) delimited inputs with optional headers. There are no restrictions on
 data size. Data types and structures are detected automatically, without

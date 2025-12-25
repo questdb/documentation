@@ -1,32 +1,37 @@
-# Modify data
+---
+title: Alternatives to UPDATE
+sidebar_label: Update alternatives
+description:
+  Append-oriented patterns for modifying data in QuestDB without using UPDATE.
+---
 
-QuestDB is a [time-series database](/glossary/time-series-database/) optimized
-to ingest data.
+QuestDB is optimized for append-only ingestion. For best performance, design
+your application to avoid frequently editing existing records.
 
-For best performance, design your application to avoid having to frequently edit
-existing records.
+When you need to modify data, you have two options:
 
-If you need to, the [`UPDATE`](/docs/reference/sql/update/) statement is
-intended for correcting data that was inserted incorrectly.
+1. **[UPDATE statement](/docs/reference/sql/update/)** - For correcting
+   incorrectly inserted data. See
+   [How UPDATE works](/docs/operations/updating-data/) for implementation
+   details.
 
-These are three alternatives to `UPDATE` that you may consider:
+2. **Append-oriented alternatives** (this page) - Patterns that work with
+   QuestDB's storage model instead of against it.
 
-- [Append newest state](#append-newest-state): Insert a newer state to replace
-  an older one: This has the added advantage that you can query back in time to
-  a previous state. It is also the basis of organizing data for
-  [bi-temporality](https://martinfowler.com/articles/bitemporal-history.html).
+## Alternatives to UPDATE
 
-- [Replace a table](#replace-table): Create a new table with the new data you
-  need, drop the old one and rename.
+- **[Append newest state](#append-newest-state)** - Insert a newer state to
+  replace an older one. This preserves history and enables
+  [bi-temporal queries](https://martinfowler.com/articles/bitemporal-history.html).
 
-- [Delete by dropping partitions](#delete-by-dropping-partitions): Create your
-  time-series tables with partitions, then delete the ones you no longer need.
+- **[Replace table](#replace-table)** - Create a new table with filtered data,
+  drop the original, and rename.
+
+- **[Drop partitions](#delete-by-dropping-partitions)** - Delete entire
+  time-based partitions you no longer need.
 
 :::note
-
-Any time you are performing database modification, please remember to
-[backup your database](/docs/operations/backup/)!
-
+Always [backup your database](/docs/operations/backup/) before modifying data.
 :::
 
 ## Append newest state

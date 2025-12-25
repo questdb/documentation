@@ -1,25 +1,28 @@
 ---
-title: Import CSV
-sidebar_label: Import CSV
+title: CSV Import
+sidebar_label: CSV Import
 description:
   This document describes how to load CSV data and specify text loader
   configuration for timestamp and date parsing. It demonstrates how to do it via
   COPY SQL or REST.
 ---
 
-There are three methods for CSV Import:
+:::tip
+CSV import is for bulk/batch loading. For streaming data, use
+[InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) instead.
+:::
 
-1. [Import CSV via COPY SQL](#import-csv-via-copy-sql)
-2. [Import CSV via REST](#import-csv-via-rest)
-3. [Import CSV via Web Console](/docs/web-console/import-csv)
+There are three methods for CSV import:
+
+1. [COPY SQL](#import-csv-via-copy-sql) - Best for large files and migrations
+2. [REST API](#import-csv-via-rest) - For programmatic uploads of smaller files
+3. [Web Console](/docs/web-console/import-csv) - Interactive uploads via browser
 
 ## Import CSV via COPY SQL
 
 The [COPY](/docs/reference/sql/copy/) SQL command is the preferred way to import
-large CSV files into partitioned tables. It should be used to migrate data from
-another database into QuestDB. This guide describes the method of migrating data
-to QuestDB via CSV files. For the time being this is the only way to migrate
-data from other databases into QuestDB.
+large CSV files into partitioned tables. Use it for bulk data migrations from
+other databases.
 
 For partitioned tables, the best `COPY` performance can be achieved only on a
 machine with a local, physically attached SSD. It is possible to use a network
@@ -40,8 +43,8 @@ Preparation is key. Import is a multi-step process, which consists of:
 
 #### Export the existing database
 
-Export data using one CSV file per table. Make sure to export a column, which
-can be used as timestamp. Data in CSV is not expected to be in any particular
+Export data using one CSV file per table. Include a column that can be used as
+the designated timestamp. Data in CSV is not expected to be in any particular
 order. If it is not possible to export the table as one CSV, export multiple
 files and concatenate these files before importing into QuestDB.
 
@@ -113,8 +116,8 @@ csvstack *.csv > singleFile.csv
 
 - `COPY` is parallel when target table is partitioned.
 
-- `COPY` is _serial_ when target table is non-partitioned, out-of-order
-  timestamps will be rejected.
+- `COPY` is _serial_ when target table is non-partitioned. Out-of-order
+  timestamps are rejected.
 
 - `COPY` cannot import data into non-empty table.
 
@@ -136,8 +139,8 @@ csvstack *.csv > singleFile.csv
 If you know the target table schema already, you can
 [skip this section](#import-csv).
 
-QuestDB could analyze the input file and "guess" the schema. This logic is
-activated when target table does not exist.
+QuestDB can analyze the input file and infer the schema. This happens
+automatically when the target table does not exist.
 
 To have QuestDB help with determining file schema, it is best to work with a
 sub-set of CSV. A smaller file allows us to iterate faster if iteration is
@@ -168,8 +171,8 @@ head -1000 weather.csv > test_file.csv
    COPY weather from 'test_file.csv' WITH HEADER true;
    ```
 
-Table `weather` is created and it quickly returns an id of asynchronous import
-process running in the background:
+This creates the `weather` table and returns the ID of the background import
+process:
 
 | id               |
 | ---------------- |
@@ -381,8 +384,8 @@ for more information on configuring the symbol capacity.
   <summary>What happens in a database crash or OS reboot?</summary>
 <p>
 
-If reboot/power loss happens while partitions are being attached, then table
-might be left with incomplete data. Please truncate table before re-importing
+If reboot/power loss happens while partitions are being attached, the table
+may be left with incomplete data. Truncate the table before re-importing
 with:
 
 ```questdb-sql
@@ -518,7 +521,7 @@ again.
   <summary>I'm getting "name is reserved" error message</summary>
 <p>
 
-The table you're trying import into is in bad state (metadata is incomplete).
+The table you're trying to import into is in a bad state (incomplete metadata).
 
 Please either drop the table with:
 
@@ -591,8 +594,8 @@ referencing the offset as related to the start of the file.
   <summary>Import finished but table column names are `f0`, `f1`, ...</summary>
 <p>
 
-Input file misses header and target table does not exist, so columns received
-synthetic names . You can rename them with the `ALTER TABLE` command:
+The input file has no header and the target table does not exist, so columns
+received synthetic names. You can rename them with `ALTER TABLE`:
 
 ```questdb-sql
 ALTER TABLE table_name RENAME COLUMN f0 TO ts;

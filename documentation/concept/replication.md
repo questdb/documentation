@@ -79,12 +79,6 @@ cases.
 Tables without timestamps (typically used for reference/lookup data) are not
 replicated automatically and should be populated separately on each instance.
 
-## Multi-primary ingestion
-
-For even higher throughput, QuestDB Enterprise supports
-[multi-primary ingestion](/docs/operations/multi-primary-ingestion/) where
-multiple primaries write concurrently to the same logical database.
-
 ## Bring Your Own Cloud (BYOC)
 
 QuestDB Enterprise can be self-managed or operated by QuestDB's team under the
