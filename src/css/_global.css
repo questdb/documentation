@@ -83,7 +83,11 @@
   --ifm-navbar-shadow: 0 1px 0 0 var(--palette-white-10);
   --ifm-navbar-height: 60px;
   --ifm-pre-background: var(--palette-midnight);
-  --ifm-table-cell-padding: 0.15rem 1rem;
+  --ifm-table-cell-padding: 0.75rem 1rem;
+  --ifm-table-border-color: var(--palette-white-20);
+  --ifm-table-head-background: var(--palette-charade);
+  --ifm-table-background: transparent;
+  --ifm-table-stripe-background: var(--palette-white-03);
   --ifm-toc-border-color: var(--palette-white-10);
   --ifm-heading-line-height: 1.5;
   --ifm-footer-link-color: var(--palette-white);
@@ -320,6 +324,28 @@ html[data-theme="dark"] .DocSearch {
 .table-alternate th:nth-child(even),
 .table-alternate td:nth-child(even) {
   background: var(--color-even);
+}
+
+/**
+ * Documentation table styles
+ */
+.theme-doc-markdown table {
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid var(--ifm-table-border-color);
+  border-radius: 6px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+.theme-doc-markdown table th {
+  background: var(--ifm-table-head-background);
+  font-weight: 600;
+}
+
+.theme-doc-markdown table tr:hover {
+  background: var(--palette-white-05);
 }
 
 /* Restore default Docusaurus navbar sticky positioning */
