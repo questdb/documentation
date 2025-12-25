@@ -225,6 +225,7 @@ module.exports = {
           ],
         },
         "reference/api/rest",
+        "guides/export-parquet",
         {
           type: "category",
           label: "Data Types",
@@ -647,6 +648,7 @@ module.exports = {
         "deployment/gcp",
         "deployment/digital-ocean",
         "deployment/hetzner",
+        "guides/compression-zfs",
       ],
     },
 
@@ -670,6 +672,7 @@ module.exports = {
             "third-party-tools/powerbi",
             "third-party-tools/superset",
             "third-party-tools/embeddable",
+            "third-party-tools/qstudio",
           ],
         },
         {
@@ -698,7 +701,6 @@ module.exports = {
           items: [
             "third-party-tools/prometheus",
             "third-party-tools/ignition",
-            "third-party-tools/qstudio",
             "third-party-tools/sqlalchemy",
             "third-party-tools/mindsdb",
             "third-party-tools/cube",
@@ -716,8 +718,6 @@ module.exports = {
       label: "Tutorials",
       type: "category",
       items: [
-        "guides/compression-zfs",
-        "guides/export-parquet",
         {
           id: "guides/order-book",
           label: "Order Book Analytics",
