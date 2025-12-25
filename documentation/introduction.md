@@ -12,11 +12,15 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is a high-performance time-series database optimized for fast ingestion
-and SQL analytics.
+QuestDB is a high-performance time-series database built for speed:
 
-It handles millions of rows per second with sub-millisecond queries, making it
-ideal for financial data, IoT, and real-time analytics.
+- **Low-latency architecture** — sub-millisecond queries on billions of rows
+- **High-throughput ingestion** — millions of rows per second
+- **Fast SQL with time-series extensions** — SAMPLE BY, LATEST ON, ASOF JOIN
+- **Open formats** — built on Parquet, no vendor lock-in
+- **AI-ready** — query with LLMs or use BYOK AI in the Web Console
+
+Used in capital markets, fintech, crypto, energy, heavy industry, space exploration, and robotics.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
@@ -40,8 +44,8 @@ RBAC.
 ## Get started
 
 1. **[Quick start](/docs/quick-start/)** - Install and run QuestDB
-2. **[Data Modeling Basics](/docs/data-modeling-basics/)** - Design your tables
-3. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using ILP clients
+2. **[Schema design](/docs/guides/schema-design-essentials/)** - Design your tables
+3. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using QuestDB clients
 4. **[Query data](/docs/reference/sql/overview/)** - Analyze with SQL
 
 <div className="not-prose">

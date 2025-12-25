@@ -8,26 +8,29 @@ description:
 import { Clients } from '../src/components/Clients'
 import Screenshot from "@theme/Screenshot"
 
-QuestDB is a high-performance time-series database built for speed and efficiency.
+QuestDB is an open source time-series database with a multi-tier storage engine for scale and low-latency analytics for the most demanding time-series workloads. It is built on open formats such as Parquet to avoid vendor lock-in.
 
 > **Ready to try it? Jump to the [quick start](/docs/quick-start/).**
 
 ## When to use QuestDB
 
-QuestDB is designed for workloads where:
+QuestDB is designed for workloads that require:
 
-- **You're ingesting time-stamped data continuously** — sensor readings, financial ticks, application metrics, logs, events
-- **You need fast aggregations over time** — dashboards, real-time analytics, OHLC charts, downsampling
-- **You want SQL, not a new query language** — standard SQL with time-series extensions
-- **Hardware efficiency matters** — get more from less infrastructure
+- **Continuous ingestion of time-stamped data** — financial tick data, sensor readings, events
+- **Fast time-based queries** — dashboards, real-time analytics, downsampling, high QPS
+- **Efficient petabyte-scale storage** — [multi-tier architecture](/docs/guides/architecture/questdb-architecture/) with long-term storage in Parquet files
+- **SQL, not a new query language** — standard SQL with time-series extensions
+- **Hardware efficiency** — get more from less infrastructure
+- **Capital markets and crypto capabilities** — [N-dimensional arrays](/docs/concept/array/), [order book analytics](/docs/guides/order-book/), [OHLC charts](https://questdb.com/blog/kline-candlestick-charts-with-grafana-and-questdb/), advanced post-trade analysis, ultra-low latency architecture, and a [strong customer base](https://questdb.com/customers/) in financial services
 
 ### Common use cases
 
 | Domain | Examples |
 |--------|----------|
-| **Financial services** | Market data, tick-by-tick analysis, risk calculations |
-| **Space exploration** | Telemetry processing, satellite monitoring, mission analytics |
-| **Energy** | Grid monitoring, smart meter data, renewable output tracking |
+| **Capital markets** | Market data, tick-by-tick analysis, pre and post trade analytics |
+| **Banking** | Retail banking analytics, fraud detection, transaction monitoring |
+| **Aerospace** | Flight telemetry, satellite monitoring, rocket engine simulations |
+| **Energy** | Grid monitoring, anomaly detection, power generation forecasting |
 
 ## What makes QuestDB fast
 
