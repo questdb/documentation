@@ -237,8 +237,8 @@ html[data-theme="dark"] .DocSearch {
 
 .markdown table code {
   display: inline-block;
-  max-width: 25ch;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .markdown table td p:only-child {
