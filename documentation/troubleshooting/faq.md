@@ -18,7 +18,7 @@ Check the [log](/docs/operations/logging-metrics/) page for the available log le
 
 ## How do I delete a row?
 
-See our guide on [modifying data](/docs/guides/modifying-data/).
+See our guide on [modifying data](/docs/operations/modifying-data/).
 
 ## How do I migrate a `STRING` column to a `VARCHAR`?
 
@@ -105,7 +105,7 @@ is `2K`, i.e. 2KB, so you may need to set it to a larger value, e.g. `32K`.
 We have an open
 [feature request to optionally de-duplicate rows](https://github.com/questdb/roadmap/issues/3)
 inserted with identical fields. Until then, you need to
-[modify the data](/docs/guides/modifying-data/) after it's inserted and use a
+[modify the data](/docs/operations/modifying-data/) after it's inserted and use a
 `GROUP BY` query to identify duplicates.
 
 ## Can I query by time?
