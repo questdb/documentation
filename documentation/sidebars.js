@@ -145,11 +145,6 @@ module.exports = {
               ],
             },
             {
-              id: "reference/api/rest",
-              type: "doc",
-              label: "REST HTTP API",
-            },
-            {
               id: "reference/api/java-embedded",
               type: "doc",
               label: "Java Embedded",
