@@ -54,9 +54,8 @@ series data an intuitive and flexible experience.
 Queries can be written into many applications using existing drivers and clients
 of the PostgreSQL or REST-ful ecosystems. However, querying is also leveraged
 heavily by third-party tools to provide visualizations, such as within
-[Grafana](/docs/third-party-tools/grafana/), or for connectivity into broad data
-infrastructure and application environments such as with a tool like
-[Cube](/docs/third-party-tools/cube/).
+[Grafana](/docs/third-party-tools/grafana/), or for data analysis with dataframe
+libraries like [Polars](/docs/third-party-tools/polars/).
 
 > Need to ingest data first? Checkout our
 > [Ingestion overview](/docs/ingestion-overview/).

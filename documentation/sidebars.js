@@ -57,14 +57,9 @@ module.exports = {
         },
         {
           type: "category",
-          label: "InfluxDB Line Protocol (ILP)",
+          label: "Language Clients",
           collapsed: true,
           items: [
-            {
-              id: "reference/api/ilp/overview",
-              type: "doc",
-              label: "Overview",
-            },
             {
               id: "configuration-string",
               type: "doc",
@@ -108,17 +103,7 @@ module.exports = {
             {
               id: "clients/date-to-timestamp-conversion",
               type: "doc",
-              label: "Date to Timestamp Conversion",
-            },
-            {
-              id: "reference/api/ilp/columnset-types",
-              type: "doc",
-              label: "Columnset Types",
-            },
-            {
-              id: "reference/api/ilp/advanced-settings",
-              type: "doc",
-              label: "Advanced Settings",
+              label: "Date to Timestamp",
             },
           ],
         },
@@ -133,7 +118,44 @@ module.exports = {
             "third-party-tools/flink",
           ],
         },
-        "reference/api/java-embedded",
+        {
+          type: "category",
+          label: "Protocols",
+          collapsed: true,
+          items: [
+            {
+              type: "category",
+              label: "InfluxDB Line Protocol (ILP)",
+              items: [
+                {
+                  id: "reference/api/ilp/overview",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "reference/api/ilp/columnset-types",
+                  type: "doc",
+                  label: "Columnset Types",
+                },
+                {
+                  id: "reference/api/ilp/advanced-settings",
+                  type: "doc",
+                  label: "Advanced Settings",
+                },
+              ],
+            },
+            {
+              id: "reference/api/rest",
+              type: "doc",
+              label: "REST HTTP API",
+            },
+            {
+              id: "reference/api/java-embedded",
+              type: "doc",
+              label: "Java Embedded",
+            },
+          ],
+        },
       ],
     },
 

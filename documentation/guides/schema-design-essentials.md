@@ -1,7 +1,6 @@
 ---
-title: Data Modeling Basics
-sidebar_label: Data Modeling Basics
-slug: data-modeling-basics
+title: Schema design
+sidebar_label: Schema design
 description:
   Learn how to design efficient schemas in QuestDB. Covers timestamps,
   partitioning, data types, deduplication, and retention strategies.

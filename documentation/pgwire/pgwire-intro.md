@@ -2,7 +2,7 @@
 title: PostgreSQL Wire Protocol
 description:
   QuestDB supports the PostgreSQL wire protocol (PGWire), allowing you to connect
-  using standard PostgreSQL client libraries for querying and data ingestion.
+  using standard PostgreSQL client libraries for querying data.
 ---
 
 import { Clients } from "../../src/components/Clients"
@@ -16,21 +16,17 @@ import GoInsertPartial from "../partials/_go.sql.insert.partial.mdx"
 import RustInsertPartial from "../partials/_rust.sql.insert.partial.mdx"
 
 QuestDB implements the PostgreSQL wire protocol (PGWire), allowing you to
-connect using standard PostgreSQL client libraries. This is a great way to get
-started with QuestDB, as you can use existing PostgreSQL clients and tools.
+connect using standard PostgreSQL client libraries. This is the recommended way
+to **query data** from QuestDB, as you can use existing PostgreSQL clients and
+tools.
+
+PGWire also supports [INSERT statements](#insert-examples) for lower-volume data
+ingestion. For high-throughput ingestion, use the
+[QuestDB clients](/docs/ingestion-overview/) instead.
+
+## Query examples
 
 <Clients showProtocol="PGWire" />
-
-## Querying vs. ingestion
-
-The PGWire interface is recommended for **querying data** from QuestDB.
-
-For **data ingestion**, especially high-throughput scenarios, we recommend using
-the [InfluxDB Line Protocol (ILP)](/docs/ingestion-overview/) clients instead.
-ILP is optimized for fast data insertion and provides better performance.
-
-That said, PGWire does support INSERT statements for lower-volume ingestion use
-cases.
 
 ## Compatibility
 
@@ -59,45 +55,6 @@ cases.
 | `user`     | admin                      | User name configured in `pg.user` or `pg.readonly.user` property in `server.conf`. Default: `admin`                                   |
 | `password` | quest                      | Password from `pg.password` or `pg.readonly.password` property in `server.conf`. Default: `quest`                                     |
 | `options`  | -c statement_timeout=60000 | The only supported option is `statement_timeout`, which specifies maximum execution time in milliseconds for SELECT or UPDATE statements. |
-
-## Ingest examples
-
-<Tabs defaultValue="python" values={[
-  { label: "psql", value: "psql" },
-  { label: "Python", value: "python" },
-  { label: "Java", value: "java" },
-  { label: "NodeJS", value: "nodejs" },
-  { label: "Go", value: "go" },
-  { label: "Rust", value: "rust" },
-]}>
-
-<TabItem value="psql">
-  <PsqlInsertPartial />
-</TabItem>
-
-<TabItem value="python">
-  <PythonInsertPartial />
-</TabItem>
-
-<TabItem value="java">
-  <JavaInsertPartial />
-</TabItem>
-
-<TabItem value="nodejs">
-  <NodeInsertPartial />
-</TabItem>
-
-<TabItem value="go">
-  <GoInsertPartial />
-</TabItem>
-
-<TabItem value="rust">
-  <RustInsertPartial />
-</TabItem>
-
-</Tabs>
-
-For query examples, see the [Query & SQL Overview](/docs/reference/sql/overview/#postgresql).
 
 ## Important considerations
 
@@ -153,6 +110,59 @@ your client library allows:
 
 The specifics of how to configure this will vary by client library.
 
+## Highly-available reads (Enterprise)
+
+QuestDB Enterprise supports running
+[multiple replicas](/docs/operations/replication/) to serve queries. Many client
+libraries allow specifying **multiple hosts** in the connection string. This
+ensures that initial connections succeed even if a node is unavailable. If the
+connected node fails later, the application should catch the error, reconnect to
+another host, and retry the read.
+
+For background and code samples in multiple languages, see:
+
+- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
+- Examples: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
+
+## INSERT examples
+
+PGWire supports INSERT statements for lower-volume ingestion use cases.
+
+<Tabs defaultValue="python" values={[
+  { label: "psql", value: "psql" },
+  { label: "Python", value: "python" },
+  { label: "Java", value: "java" },
+  { label: "NodeJS", value: "nodejs" },
+  { label: "Go", value: "go" },
+  { label: "Rust", value: "rust" },
+]}>
+
+<TabItem value="psql">
+  <PsqlInsertPartial />
+</TabItem>
+
+<TabItem value="python">
+  <PythonInsertPartial />
+</TabItem>
+
+<TabItem value="java">
+  <JavaInsertPartial />
+</TabItem>
+
+<TabItem value="nodejs">
+  <NodeInsertPartial />
+</TabItem>
+
+<TabItem value="go">
+  <GoInsertPartial />
+</TabItem>
+
+<TabItem value="rust">
+  <RustInsertPartial />
+</TabItem>
+
+</Tabs>
+
 ### Decimal values
 
 To insert `decimal` values via PGWire, you must either use the `m` suffix to
@@ -168,17 +178,3 @@ Currently, QuestDB parses these strings as `double` values and doesn't
 implicitly convert them to `decimal` to avoid unintended precision loss. You
 must explicitly cast `double` values to `decimal` in your SQL queries when
 inserting into `decimal` columns.
-
-## Highly-available reads (Enterprise)
-
-QuestDB Enterprise supports running
-[multiple replicas](/docs/operations/replication/) to serve queries. Many client
-libraries allow specifying **multiple hosts** in the connection string. This
-ensures that initial connections succeed even if a node is unavailable. If the
-connected node fails later, the application should catch the error, reconnect to
-another host, and retry the read.
-
-For background and code samples in multiple languages, see:
-
-- Blog: [Highly-available reads with QuestDB](https://questdb.com/blog/highly-available-reads-with-questdb/)
-- Examples: [questdb/questdb-ha-reads](https://github.com/questdb/questdb-ha-reads)
