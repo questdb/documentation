@@ -12,6 +12,7 @@ module.exports = {
       collapsed: true,
       items: [
         "quick-start",
+        "third-party-tools/claude-code",
         "operations/capacity-planning",
         "guides/create-database",
         {
@@ -666,7 +667,7 @@ module.exports = {
         {
           type: "category",
           label: "Visualization",
-          collapsed: false,
+          collapsed: true,
           items: [
             "third-party-tools/grafana",
             "third-party-tools/powerbi",
@@ -678,7 +679,7 @@ module.exports = {
         {
           type: "category",
           label: "Data Processing",
-          collapsed: false,
+          collapsed: true,
           items: [
             "third-party-tools/pandas",
             "third-party-tools/polars",
@@ -688,7 +689,7 @@ module.exports = {
         {
           type: "category",
           label: "Orchestration",
-          collapsed: false,
+          collapsed: true,
           items: [
             "third-party-tools/airflow",
             "third-party-tools/dagster",
@@ -697,7 +698,7 @@ module.exports = {
         {
           type: "category",
           label: "Other Tools",
-          collapsed: false,
+          collapsed: true,
           items: [
             "third-party-tools/prometheus",
             "third-party-tools/ignition",
