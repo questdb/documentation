@@ -172,7 +172,48 @@ html[data-theme="dark"] .DocSearch {
   );
 }
 
+@font-face {
+  font-family: SegoeUI;
+  src:
+    local("Segoe UI Light"),
+    url(/fonts/segoe-ui-100.woff2) format("woff2");
+  font-weight: 100;
+}
+
+@font-face {
+  font-family: SegoeUI;
+  src:
+    local("Segoe UI Semilight"),
+    url(/fonts/segoe-ui-200.woff2) format("woff2");
+  font-weight: 200;
+}
+
+@font-face {
+  font-family: SegoeUI;
+  src:
+    local("Segoe UI"),
+    url(/fonts/segoe-ui-400.woff2) format("woff2");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: SegoeUI;
+  src:
+    local("Segoe UI Bold"),
+    url(/fonts/segoe-ui-600.woff2) format("woff2");
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: SegoeUI;
+  src:
+    local("Segoe UI Semibold"),
+    url(/fonts/segoe-ui-700.woff2) format("woff2");
+  font-weight: 700;
+}
+
 .table-of-contents {
+  font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
   font-size: var(--font-size-small);
   font-weight: var(--ifm-font-weight-semibold);
   top: 100px;
@@ -378,4 +419,10 @@ html[data-theme="dark"] .DocSearch {
 
 .theme-doc-sidebar-item-link > a > [class^=iconExternalLink] {
   margin-left: 0.5rem !important;
+}
+
+/* Keep sidebar at original font style */
+.menu {
+  font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
+  font-size: var(--font-size-small);
 }
