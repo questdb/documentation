@@ -12,7 +12,7 @@ sidebar_label: CACHE | NOCACHE
 
 - `columnName` is the `symbol` data type.
 - By default, a symbol column is cached.
-- Refer to the [Guide on symbol](/docs/concept/symbol/#symbol-columns) for the
+- Refer to the [Guide on symbol](/docs/concept/symbol/) for the
   advantages of caching `symbols`.
 
 ## Examples

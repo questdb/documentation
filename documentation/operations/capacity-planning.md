@@ -101,12 +101,28 @@ For instructions on how to do so, see the
 
 ### Write amplification
 
-In QuestDB, the write amplification is calculated using the formula from
-[metrics](/docs/third-party-tools/prometheus/#scraping-prometheus-metrics-from-questdb):
-`questdb_physically_written_rows_total` / `questdb_committed_rows_total`.
+Write amplification measures how many times data is rewritten during ingestion.
+A value of 1.0 means each row is written once (ideal). Higher values indicate
+rewrites due to out-of-order data merging into existing partitions.
 
-When ingesting out-of-order data, a high disk write rate combined with high
-write amplification may reduce database performance.
+Calculate it using [Prometheus metrics](/docs/third-party-tools/prometheus/#scraping-prometheus-metrics-from-questdb):
+
+```
+write_amplification = questdb_physically_written_rows_total / questdb_committed_rows_total
+```
+
+These are **cumulative lifetime counters**. To measure current write amplification,
+compare the delta of both values over a time window (e.g., 5 minutes).
+
+| Value | Interpretation |
+|-------|----------------|
+| 1.0 – 1.5 | Excellent – minimal rewrites |
+| 1.5 – 3.0 | Normal for moderate out-of-order data |
+| 3.0 – 5.0 | Consider reducing partition size |
+| > 5.0 | High – reduce partition size or investigate ingestion patterns |
+
+When ingesting out-of-order data, high write amplification combined with high
+disk write rate may reduce database performance.
 
 For data ingestion over PostgreSQL Wire Protocol, or as a further step for
 InfluxDB Line Protocol ingestion, using smaller table

@@ -9,6 +9,9 @@ expand this guide to be more helpful. If you have any recommendations, feel free
 to [create an issue](https://github.com/questdb/documentation/issues) or a PR on
 GitHub.
 
+For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
+see the [Prometheus integration guide](/docs/third-party-tools/prometheus/).
+
 ## Basic health check
 
 QuestDB comes with an out-of-the-box health check HTTP endpoint:

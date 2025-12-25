@@ -1,5 +1,5 @@
 ---
-title: Enterprise quick start
+title: QuestDB Enterprise quick start
 description:
   "Get started with QuestDB Enterprise, as quickly as possible. Instructions
   follow a happy path, and will get you running with all the latest and greatest
@@ -20,19 +20,19 @@ inform your own unique choices.
 
 ---
 
-- [Requirements](#requirements)
-- [0. Secure the built in admin](#0-secure-the-built-in-admin)
-- [1. Setup TLS](#1-setup-tls)
-- [2. Setup a database administrator](#2-setup-a-database-administrator)
-- [3. Create interactive user accounts](#3-create-interactive-user-accounts)
-- [4. Ingest data, InfluxDB Line Protocol](#4-ingest-data-influxdb-line-protocol)
-- [5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)
-- [6. Query data, PostgreSQL query](#6-query-data-postgresql-query)
-- [7. Setup replication](#7-setup-replication)
-- [8. Enable compression](#8-enable-compression)
-- [9. Double-check kernel limits](#9-double-check-kernel-limits)
-- [Next steps](#next-steps)
-- [FAQ](#faq)
+[Requirements](#requirements)\
+[0. Secure the built in admin](#0-secure-the-built-in-admin)\
+[1. Setup TLS](#1-setup-tls)\
+[2. Setup a database administrator](#2-setup-a-database-administrator)\
+[3. Create interactive user accounts](#3-create-interactive-user-accounts)\
+[4. Ingest data, InfluxDB Line Protocol](#4-ingest-data-influxdb-line-protocol)\
+[5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)\
+[6. Query data, PostgreSQL query](#6-query-data-postgresql-query)\
+[7. Setup replication](#7-setup-replication)\
+[8. Enable compression](#8-enable-compression)\
+[9. Double-check kernel limits](#9-double-check-kernel-limits)\
+[Next steps](#next-steps)\
+[FAQ](#faq)
 
 ---
 
@@ -76,6 +76,8 @@ acl.admin.password=my_very_secure_pwd
 
 We will optionally disable this built-in administrator account later.
 
+For more on access control, see [Role-Based Access Control](/docs/operations/rbac/).
+
 ## 1. Setup TLS
 
 QuestDB supports TLS versions 1.2 and 1.3.
@@ -113,7 +115,7 @@ accounts.
 
 Create a new database admin:
 
-```sql title="Web Console - Creating an admin; use your own, secure password!"
+```questdb-sql title="Web Console - Creating an admin; use your own, secure password!"
 CREATE USER myadmin WITH PASSWORD 'xyz';
 GRANT all TO myadmin WITH GRANT OPTION;
 ```
@@ -256,6 +258,10 @@ Connecting a client to ILP is a common path.
 
 However, you may use something like [Kafka](/docs/third-party-tools/kafka).
 
+For more on ILP ingestion, see:
+- [ILP Overview](/docs/reference/api/ilp/overview/) — Protocol details and configuration
+- [Ingestion Overview](/docs/ingestion-overview/) — Client libraries and ingestion methods
+
 ## 5. Ingest data, Kafka Connect (optional)
 
 _If you're not using Kafka, you can skip to section 6._
@@ -346,7 +352,7 @@ application.
 
 To setup the service account:
 
-```sql title="Web Console - Create a service account called "dashboard" and grant permissions"
+```questdb-sql title="Web Console - Create a service account called 'dashboard' and grant permissions"
 CREATE SERVICE ACCOUNT dashboard WITH password 'pwd';
 GRANT pgwire TO dashboard;
 GRANT select on all tables TO dashboard;
@@ -356,9 +362,7 @@ Applying Java & jdbc, we can setup a client to query.
 
 We're providing a username and password instead of a token:
 
-```java
-Java client example:
-
+```java title="Java - Querying via JDBC"
 import java.sql.*;
 import java.util.Properties;
 
@@ -388,6 +392,10 @@ public class App {
 This covers the very basics of user creation and service accounts.
 
 We have an `ingest` service account and a `dashboard` service account.
+
+For more on querying, see:
+- [PostgreSQL Wire Protocol](/docs/pgwire/pgwire-intro/) — Connection details and compatibility
+- [Query & SQL Overview](/docs/reference/sql/overview/) — SQL syntax and functions
 
 > For the full role-based access control docs, including group management, see
 > the [RBAC operations guide](/docs/operations/rbac/).
@@ -447,6 +455,8 @@ If you are running QuestDB Enterprise in Kubernetes, QuestDB offers a
 
 Please contact us for more information to see if your version and distribution
 of Kubernetes is supported.
+
+For more on storage and compression, see [Enable compression with ZFS](/docs/guides/compression-zfs/).
 
 ## 9. Double-check kernel limits
 

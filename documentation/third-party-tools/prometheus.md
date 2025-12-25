@@ -21,6 +21,9 @@ exposed by QuestDB at port `9003`. This document describes how to enable metrics
 via this endpoint, how to configure Prometheus to scrape metrics from a QuestDB
 instance, and how to enable alerting from QuestDB to Prometheus Alertmanager.
 
+For guidance on what metrics to monitor and alerting strategies, see
+[Monitoring and alerting](/docs/operations/monitoring-alerting/).
+
 ## Prerequisites
 
 - **QuestDB** must be running and accessible. Checkout the

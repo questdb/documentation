@@ -2,132 +2,107 @@
 title: Write-Ahead Log (WAL)
 sidebar_label: Write-Ahead Log
 description:
-  Documentation for properties of a WAL table and comparison with its non-WAL
-  counterpart.
+  WAL enables concurrent writes, crash recovery, and replication for
+  high availability.
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-As of 7.3.10, QuestDB tables are Write-Ahead Log (WAL)-enabled by default. This
-page introduces the properties and benefits of a WAL-enabled table. It also
-contains a summary of key components, relevant functions, as well as related SQL
-keywords.
+Write-Ahead Log (WAL) records all changes before applying them to storage.
+This enables concurrent writes, crash recovery, and replication.
 
-## Properties
+**WAL is enabled by default and recommended for all tables.**
 
-A WAL table must be [partitioned](/docs/concept/partitions/). It permits the
-following concurrent transactions:
+## Why WAL matters
 
-- Data ingestion through different interfaces
-- Data modifications
-- Table schema changes
+| Capability | Description |
+|------------|-------------|
+| **Concurrent writes** | Multiple clients can write simultaneously without blocking |
+| **Crash recovery** | Committed data is never lost — replay from log after restart |
+| **Replication** | WAL enables high availability and disaster recovery |
+| **Out-of-order handling** | Late-arriving data is merged efficiently |
+| **Deduplication** | Enables [DEDUP UPSERT KEYS](/docs/concept/deduplication/) |
 
-## Write-Ahead Log benefits
+In QuestDB Enterprise, WAL segments are sent to object storage immediately
+on commit, enabling real-time replication to standby nodes.
 
-A Write-Ahead Log (WAL) ensures that all changes to data are recorded in a log
-before they are written to the database files. This means that in case of a
-system crash or power failure, the database can recover to a consistent state by
-replaying the log entries.
+## Creating WAL tables
 
-WAL tables also support concurrent data ingestion, modifications, and schema
-changes without locking the entire table, allowing for high availability and
-better performance in multi-user environments. By decoupling the transaction
-commit from the disk write process, a WAL improves the performance of
-write-intensive workloads, as it allows for sequential disk writes which are
-generally faster than random ones.
+WAL is enabled by default for partitioned tables:
 
-As a result, a WAL assists with crash recovery by providing a clear sequence of
-committed transactions, ensuring that any data written to the WAL can be
-restored up to the last committed transaction.
+```questdb-sql
+CREATE TABLE prices (
+    ts TIMESTAMP,
+    ticker SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY;
+-- This is a WAL table (default)
+```
 
-As additional benefits, the sequencer in a WAL system ensures that data appears
-consistent to all readers, even during ongoing write operations. And the
-`TableWriter` can handle and resolve out-of-order data writes, which can be a
-common issue in real workloads. It also enables
-[deduplication](/docs/concept/deduplication/).
+You can be explicit with the `WAL` keyword:
 
-Furthermore, the WAL-enabled tables in QuestDB can be fine-tuned. Various WAL
-configurations (like parallel threads for WAL application) allow the database's
-performance and behavior to match the specific needs of different use cases.
+```questdb-sql
+CREATE TABLE prices (...)
+TIMESTAMP(ts) PARTITION BY DAY WAL;
+```
 
-Overall, WAL-enabled tables aim to balance the needs for speed, consistency, and
-resilience in a database environment that may face concurrent access patterns
-and the requirement for high availability. While recommended and largely
-beneficial, there are limitations which we are working to resolve.
+## Requirements
 
-## Limitations
+**WAL requires partitioning.** Non-partitioned tables cannot use WAL.
 
-We have the following as limitations, which we aim to soon resolve:
+| Table creation method | Default partitioning | WAL enabled? |
+|----------------------|---------------------|--------------|
+| SQL `CREATE TABLE` without `PARTITION BY` | None | **No** |
+| SQL `CREATE TABLE` with `PARTITION BY` | As specified | Yes |
+| ILP auto-created tables | `PARTITION BY DAY` | Yes |
 
-- [UPDATE](/docs/reference/sql/update/)
-  - No row count returned
-  - No support for JOIN
-- ALTER TABLE
-  - [ADD COLUMN](/docs/reference/sql/alter-table-add-column/) can only add 1
-    column per statement
-  - Non-structural operations may fail silently. These are partition-level and
-    configuration operations:
-    - [ATTACH PARTITION](/docs/reference/sql/alter-table-attach-partition/)
-    - [DETACH PARTITION](/docs/reference/sql/alter-table-detach-partition/)
-    - [DROP PARTITION](/docs/reference/sql/alter-table-drop-partition/)
-      - If a partition does not exist, then `DROP` will "succeed"
-      - If partition does exist, then `DROP` may fail. If it does - the SQL
-        execution will "succeed", but the database will log "critical" log
-        citing a `DROP` issue.
-    - [SET PARAM](/docs/reference/sql/alter-table-set-param/)
+```questdb-sql
+-- Non-partitioned = no WAL (not recommended for time-series)
+CREATE TABLE static_data (key VARCHAR, value VARCHAR);
 
-### WAL configurations
+-- Partitioned = WAL enabled (recommended)
+CREATE TABLE prices (...)
+TIMESTAMP(ts) PARTITION BY DAY;
+```
 
-WAL-enabled tables are the default table.
+If you need WAL features (concurrent writes, replication, deduplication),
+always specify `PARTITION BY` when creating tables via SQL.
 
-You can choose to use non-WAL tables, if it's appropriate for your usecase.
+## Checking WAL status
 
-For more information, see the
-[`CREATE TABLE`](/docs/reference/sql/create-table/#write-ahead-log-wal-settings)
-reference.
+Check if a table uses WAL:
 
-Other related configurations include:
+```questdb-sql
+SELECT name, walEnabled FROM tables() WHERE name = 'prices';
+```
 
-- Base table creation via [`CREATE TABLE`](/docs/reference/sql/create-table/)
+Check WAL table status:
 
-- Converting an existing table to a WAL table or vice versa via
-  [`SET TYPE`](/docs/reference/sql/alter-table-set-type/) following a database
-  restart.
+```questdb-sql
+SELECT * FROM wal_tables();
+```
 
-- Server-wide configuration via `cairo.wal.enabled.default`
+If WAL transactions are suspended (rare), resume them:
 
-  - When `cairo.wal.enabled.default` is set to `true` (default), the
-    [`CREATE TABLE`](/docs/reference/sql/create-table/) SQL keyword generates
-    WAL tables as the default.
+```questdb-sql
+ALTER TABLE prices RESUME WAL;
+```
 
-- Parallel threads to apply WAL data to the table storage can be configured, see
-  [WAL table configuration](/docs/configuration/#wal-table-configurations) for
-  more details.
+## How WAL works
 
-## Key components
+When data is written to a WAL table:
 
-A WAL table uses the following components to manage concurrent commit requests:
+1. Data is written to WAL segments (fast sequential writes)
+2. Transaction is committed and acknowledged to client
+3. WAL apply job merges data into table storage asynchronously
+4. In Enterprise, WAL segments replicate to object storage
 
-- **WAL**: acts as a dedicated API for each ingestion interface. When data is
-  ingested via multiple interfaces, dedicated `WALs` ensure that the table is
-  not locked by one interface only.
-
-- **Sequencer**: centrally manages transactions, providing a single source of
-  truth. The sequencer generates unique `txn` numbers as transaction identifiers
-  and keeps a log that tracks their allocation, preventing duplicates. This log
-  is called `TransactionLog` and is stored in a meta file called `_txnlog`. See
-  [root directory](/docs/concept/root-directory-structure/#db-directory) for
-  more information.
-
-- **WAL apply job**: collects the commit requests based on the unique `txn`
-  numbers and sends them to the `TableWriter` to be committed.
-
-- **TableWriter**: updates the database and resolves any out-of-order data
-  writes.
+This decouples the commit (fast) from storage application (background),
+enabling high write throughput.
 
 <Screenshot
-  alt="Diagram showing the sequencer allocating txn numbers to events cronologically"
-  title="The sequencer allocates unique txn numbers to transactions from different WALs chronologically and serves as the single source of truth."
+  alt="Diagram showing the sequencer allocating txn numbers to events chronologically"
+  title="The sequencer allocates unique transaction numbers and serves as the single source of truth."
   height={435}
   src="images/docs/concepts/wal_sequencer.webp"
   width={745}
@@ -135,23 +110,30 @@ A WAL table uses the following components to manage concurrent commit requests:
 
 <Screenshot
   alt="Diagram showing the WAL job application and WAL collect events and commit to QuestDB"
-  title="The WAL job application collects the transactions sequencially for the TableWriter to commit to QuestDB."
+  title="The WAL apply job collects transactions sequentially for writing to storage."
   height={435}
   src="images/docs/concepts/wal_process.webp"
   width={745}
 />
 
-## Checking WAL configurations
+## Configuration
 
-The following table metadata functions are useful for checking WAL table
-settings:
+WAL behavior can be tuned via server configuration:
 
-- [`tables()`](/docs/reference/function/meta/#tables) returns general table
-  metadata, including whether a table is a WAL table or not.
-- [`wal_tables()`](/docs/reference/function/meta/#wal_tables) returns WAL-table
-  status.
-- [ALTER TABLE RESUME WAL](/docs/reference/sql/alter-table-resume-wal/) restarts
-  suspended transactions.
+- `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
+- Parallel threads for WAL application — see [WAL configuration](/docs/configuration/#wal-table-configurations)
 
-<!-- ## See also -->
-<!-- Adding links to blog posts etc -->
+To convert an existing table between WAL and non-WAL:
+
+```questdb-sql
+ALTER TABLE prices SET TYPE WAL;
+-- Requires database restart to take effect
+```
+
+See [ALTER TABLE SET TYPE](/docs/reference/sql/alter-table-set-type/) for details.
+
+## See also
+
+- [Replication](/docs/concept/replication/) — high availability and failover
+- [Deduplication](/docs/concept/deduplication/) — requires WAL
+- [CREATE TABLE](/docs/reference/sql/create-table/#write-ahead-log-wal-settings) — WAL syntax

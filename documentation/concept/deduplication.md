@@ -1,104 +1,33 @@
 ---
-title: Data Deduplication
-sidebar_label: Data deduplication
-description: What is built-in storage deduplication and why it can be useful.
+title: Deduplication
+sidebar_label: Deduplication
+description:
+  Deduplication prevents duplicate rows and reduces write amplification
+  when reloading data.
 ---
 
-Starting from QuestDB 7.3, there is an option to enable storage-level data
-deduplication on a table. Data deduplication works on all the data inserted into
-the table and replaces matching rows with the new versions. Only new rows that
-do no match existing data will be inserted.
+Deduplication ensures that only one row exists for a given set of key columns.
+When a new row matches an existing row's keys, the old row is replaced.
 
-:::note
+## When to use deduplication
 
-Deduplication can only be enabled for
-[Write-Ahead Log (WAL)](/docs/concept/write-ahead-log) tables.
+**Use deduplication when:**
 
-:::
+- You need idempotent writes (safe to retry or resend data)
+- You're reloading data that may have changed (e.g., third-party data feeds)
+- You want "last write wins" behavior for a given key
+- You're recovering from ingestion errors and need to resend a time range
 
-## Practical considerations
+**Skip deduplication when:**
 
-Deduplication in QuestDB makes table inserts
-[idempotent](https://en.wikipedia.org/wiki/Idempotence). The primary use case is
-to allow for re-sending data within a given time range without creating
-duplicates.
+- Your timestamps are always unique (no duplicates possible)
+- You're doing append-only logging where duplicates are acceptable
+- Write performance is critical and you're certain duplicates won't occur
 
-This can be particularly useful in situations where there is an error in sending
-data, such as when using
-[InfluxDB Line Protocol](/docs/reference/api/ilp/overview), and there is no
-clear indication of how much of the data has already been written. With
-deduplication enabled, it is safe to re-send data from a fixed period in the
-past to resume the writing process.
-
-Enabling deduplication on a table has an impact on writing performance,
-especially when multiple `UPSERT KEYS` are configured. Generally, if the data
-have mostly unique timestamps across all the rows, the performance impact of
-deduplication is low. Conversely, the most demanding data pattern occurs when
-there are many rows with the same timestamp that need to be deduplicated on
-additional columns.
-
-For example, in use cases where 10 million devices send CPU metrics every second
-precisely, deduplicating the data based on the device ID can be expensive.
-However, in cases where CPU metrics are sent at random and typically have unique
-timestamps, the cost of deduplication is negligible.
-
-:::note
-
-The on-disk ordering of rows with duplicate timestamps differs when deduplication is enabled.
-
-- Without deduplication:
-    - the insertion order of each row will be preserved for rows with the same timestamp
-- With deduplication:
-    - the rows will be stored in order sorted by the `DEDUP UPSERT` keys, with the same timestamp
-
-For example:
+## Quick example
 
 ```questdb-sql
-DEDUP UPSERT keys(timestamp, symbol, price)
-
--- will be stored on-disk in an order like:
-
-ORDER BY timestamp, symbol, price
-```
-
-This is the natural order of data returned in plain queries, without any grouping, filtering or ordering. The SQL standard does not guarantee the ordering of result sets without explicit `ORDER BY` clauses.
-
-:::
-
-## Configuration
-
-Create a WAL-enabled table with deduplication using
-[`CREATE TABLE`](/docs/reference/sql/create-table/#deduplication) syntax.
-
-Enable or disable deduplication at any time for individual tables using the
-following statements:
-
-- [ALTER TABLE DEDUP ENABLE ](/docs/reference/sql/alter-table-enable-deduplication)
-- [ALTER TABLE DEDUP DISABLE](/docs/reference/sql/alter-table-disable-deduplication)
-
-Remember: correct `UPSERT KEYS` ensure that deduplication functions as expected.
-
-## Deduplication UPSERT Keys
-
-_UPSERT_ is an abbreviation for _UPDATE_ or _INSERT_, which is a common database
-concept. It means that the new row _UPDATEs_ the existing row (or multiple rows
-in the general case) when the matching criteria are met. Otherwise, the new row
-is _INSERTed_ into the table. In QuestDB deduplication, the _UPSERT_ matching
-criteria are set by defining a column list in the `UPSERT KEYS` clause in the
-`CREATE` or `ALTER` table statement.
-
-`UPSERT KEYS` can be changed at any time. It can contain one or more columns.
-
-Please be aware that the [designated Timestamp](/docs/concept/designated-timestamp)
-column must always be included in the `UPSERT KEYS` list.
-
-
-## Example
-
-The easiest way to explain the usage of `UPSERT KEYS` is through an example:
-
-```questdb-sql
-CREATE TABLE TICKER_PRICE (
+CREATE TABLE prices (
     ts TIMESTAMP,
     ticker SYMBOL,
     price DOUBLE
@@ -106,117 +35,104 @@ CREATE TABLE TICKER_PRICE (
 DEDUP UPSERT KEYS(ts, ticker);
 ```
 
-In this example, the deduplication keys are set to the `ts` column, which is the
-designated timestamp, and the `ticker` column. The intention is to have no more
-than one price point per ticker at any given time. Therefore, if the same
-price/day combination is sent twice, only the last price is saved.
-
-The following inserts demonstrate the deduplication behavior:
+With this configuration, each `(ts, ticker)` combination can have only one row:
 
 ```questdb-sql
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 78.56); -- row 1
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 78.34); -- row 2
+INSERT INTO prices VALUES ('2024-01-15T10:00:00', 'AAPL', 185.50);
+INSERT INTO prices VALUES ('2024-01-15T10:00:00', 'AAPL', 186.00);  -- replaces previous
 
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'AAPL', 104.40); -- row 3
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'AAPL', 105.18); -- row 4
+SELECT * FROM prices;
 ```
 
-In this case, deduplication overwrites row 1 with row 2 because both
-deduplication keys have the same values: `ts='2023-07-14'` and `ticker='QQQ'`.
-The same behavior applies to the second pair of rows, where row 4 overwrites
-row 3.
+| ts | ticker | price |
+|----|--------|-------|
+| 2024-01-15T10:00:00 | AAPL | 186.00 |
 
-As a result, the table contains only two rows:
+Only the last value is kept.
+
+## How it works
+
+When deduplication is enabled, QuestDB:
+
+1. Checks if incoming rows match existing rows by UPSERT KEYS
+2. If keys match, compares the full row content
+3. If the row is identical, skips the write entirely (no disk I/O)
+4. If the row differs, replaces the old row with the new one
+
+This full-row comparison significantly reduces write amplification when
+reloading large datasets where only a small portion has changed — common
+when consuming third-party data feeds that provide full snapshots.
+
+## Performance
+
+Deduplication has minimal overhead when:
+
+- Timestamps are mostly unique across rows
+- Data arrives in roughly time-ordered fashion
+
+Deduplication is more expensive when:
+
+- Many rows share the same timestamp
+- Deduplication keys have high cardinality
+
+The full-row check optimization means that reloading unchanged data is
+cheap — QuestDB detects identical rows and skips unnecessary writes.
+
+## Configuration
+
+### Create table with deduplication
 
 ```questdb-sql
-SELECT * FROM TICKER_PRICE;
+CREATE TABLE prices (
+    ts TIMESTAMP,
+    ticker SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY WAL
+DEDUP UPSERT KEYS(ts, ticker);
 ```
 
-| ts         | ticker | price  |
-| ---------- | ------ | ------ |
-| 2023-07-14 | QQQ    | 78.34  |
-| 2023-07-14 | AAPL   | 105.18 |
+The designated timestamp must always be included in UPSERT KEYS.
 
-Regardless of whether the inserts are executed in a single transaction/batch or
-as individual inserts, the outcome remains unchanged as long as the order of the
-inserts is maintained.
-
-Deduplication can be disabled using the DEDUP DISABLE SQL statement:
+### Enable on existing table
 
 ```questdb-sql
-ALTER TABLE TICKER_PRICE DEDUP DISABLE
+ALTER TABLE prices DEDUP ENABLE UPSERT KEYS(ts, ticker);
 ```
 
-This reverts the table to behave as usual, allowing the following inserts:
+### Disable deduplication
 
 ```questdb-sql
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 84.59); -- row 1
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'AAPL', 105.21); -- row 2
+ALTER TABLE prices DEDUP DISABLE;
 ```
 
-These inserts add two more rows to the TICKER_PRICE table:
+### Change UPSERT KEYS
 
 ```questdb-sql
-SELECT * FROM TICKER_PRICE;
+ALTER TABLE prices DEDUP ENABLE UPSERT KEYS(ts, ticker, exchange);
 ```
 
-| ts         | ticker | price  |
-| ---------- | ------ | ------ |
-| 2023-07-14 | QQQ    | 78.34  |
-| 2023-07-14 | QQQ    | 84.59  |
-| 2023-07-14 | AAPL   | 105.18 |
-| 2023-07-14 | AAPL   | 105.21 |
+## Checking configuration
 
-Deduplication can be enabled again at any time:
+Check if deduplication is enabled:
 
 ```questdb-sql
-ALTER TABLE TICKER_PRICE DEDUP ENABLE UPSERT KEYS(ts, ticker)
+SELECT dedup FROM tables() WHERE table_name = 'prices';
 ```
 
-:::note
-
-Enabling deduplication does not have any effect on the existing data and only
-applies to newly inserted data. This means that a table with deduplication
-enabled can still contain duplicate data.
-
-:::
-
-Enabling deduplication does not change the number of rows in the table. After
-enabling deduplication, the following inserts demonstrate the deduplication
-behavior:
+Check which columns are UPSERT KEYS:
 
 ```questdb-sql
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 98.02); -- row 1
-INSERT INTO TICKER_PRICE VALUES ('2023-07-14', 'QQQ', 91.16); -- row 2
+SELECT "column", upsertKey FROM table_columns('prices');
 ```
 
-After these inserts, all rows with `ts='2023-07-14'` and `ticker='QQQ'` are
-replaced, first by row 1 and then by row 2, and the price is set to **91.16**:
+## Requirements
 
-```questdb-sql
-SELECT * FROM TICKER_PRICE;
-```
+- Deduplication requires [WAL tables](/docs/concept/write-ahead-log/)
+- The designated timestamp must be included in UPSERT KEYS
+- Enabling deduplication does not deduplicate existing data — only new inserts
 
-| ts         | ticker | price  |
-| ---------- | ------ | ------ |
-| 2023-07-14 | QQQ    | 91.16  |
-| 2023-07-14 | QQQ    | 91.16  |
-| 2023-07-14 | AAPL   | 105.18 |
-| 2023-07-14 | AAPL   | 105.21 |
+## See also
 
-## Checking Deduplication Configuration
-
-It is possible to utilize metadata
-[tables](/docs/reference/function/meta#tables) query to verify whether
-deduplication is enabled for a specific table:
-
-```questdb-sql
-SELECT dedup FROM tables() WHERE table_name = '<the table name>'
-```
-
-The function [table_columns](/docs/reference/function/meta#table_columns) can be
-used to identify which columns are configured as deduplication UPSERT KEYS:
-
-```questdb-sql
-SELECT `column`, upsertKey from table_columns('<the table name>')
-```
+- [CREATE TABLE ... DEDUP](/docs/reference/sql/create-table/#deduplication)
+- [ALTER TABLE DEDUP ENABLE](/docs/reference/sql/alter-table-enable-deduplication/)
+- [ALTER TABLE DEDUP DISABLE](/docs/reference/sql/alter-table-disable-deduplication/)

@@ -226,7 +226,7 @@ const config = {
         },
         {
           to: "https://questdb.com/enterprise/",
-          label: "Enterprise",
+          label: "QuestDB Enterprise",
           position: "left",
           className: "mobile-only",
         },

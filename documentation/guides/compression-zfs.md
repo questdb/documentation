@@ -1,14 +1,14 @@
 ---
-title: Enable compression with ZFS
+title: ZFS Compression
+sidebar_label: ZFS Compression
 description:
-  "This guide demonstrates how to install ZFS and enable system-level compression within QuestDB."
+  How to install ZFS and enable system-level compression for QuestDB.
 ---
 
-Compression requires the
-[Zettabyte File System (ZFS)](https://openzfs.org/wiki/Main_Page).
+QuestDB can use [ZFS](https://openzfs.org/wiki/Main_Page) for system-level
+compression, reducing disk usage without application changes.
 
-We'll assume Ubuntu, and demonstrate the basics CLI commands which you'd apply
-in something like an AWS EC2 to enable ZFS:
+The following example shows how to set up ZFS on Ubuntu:
 
 ```bash title="Ubuntu - Install ZFS"
 sudo apt update
@@ -17,8 +17,8 @@ sudo apt install zfsutils-linux
 
 To enable compression, create a ZPool with compression enabled:
 
-```shell title="Ubuntu - Enable compression"
-zpool create -m legacy -o feature@lz4_compress=enabled autoexpand=on -O compression=lz4 -t volume1 questdb-pool sdf
+```bash title="Ubuntu - Enable compression"
+zpool create -m legacy -o feature@lz4_compress=enabled -o autoexpand=on -O compression=lz4 -t volume1 questdb-pool sdf
 ```
 
 The exact commands depend on which version of ZFS you are running. Use the
@@ -37,8 +37,7 @@ ZFS offers a number of compression choices when constructing the volume.
 
 As always, it is best to benchmark your choice to ensure that the performance matches your use case.
 
-:::note 
-
-We regularly run tests using *ZFS* with *LZ4* compression. If you encounter issues with other compression algorithms, please let us know.
-
+:::note
+We regularly test ZFS with LZ4 compression. If you encounter issues with other
+compression algorithms, please let us know.
 :::

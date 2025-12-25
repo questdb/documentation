@@ -18,5 +18,5 @@ Disable deduplication on table `TICKER_PRICE`:
 ALTER TABLE TICKER_PRICE DEDUP DISABLE
 ```
 
-See more example at [data deduplication](/docs/concept/deduplication#example)
+See more example at [data deduplication](/docs/concept/deduplication/#quick-example)
 page

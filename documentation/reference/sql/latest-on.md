@@ -35,31 +35,27 @@ timestamp.
 The query syntax has an impact on the [execution order](#execution-order) of the
 `LATEST ON` clause and the `WHERE` clause.
 
-To illustrate how `LATEST ON` is intended to be used, consider the `trips` table
+To illustrate how `LATEST ON` is intended to be used, consider the `trades` table
 [in the QuestDB demo instance](https://demo.questdb.io/). This table has a
-`payment_type` column as `SYMBOL` type which specifies the method of payment per
-trip. We can find the most recent trip for each unique method of payment with
-the following query:
+`symbol` column as `SYMBOL` type which specifies the traded instrument. We can
+find the most recent trade for each symbol with the following query:
 
 ```questdb-sql
-SELECT payment_type, pickup_datetime, trip_distance
-FROM trips
-LATEST ON pickup_datetime PARTITION BY payment_type;
+SELECT symbol, timestamp, price
+FROM trades
+LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| payment_type | pickup_datetime             | trip_distance |
-| ------------ | --------------------------- | ------------- |
-| Dispute      | 2014-12-31T23:55:27.000000Z | 1.2           |
-| Voided       | 2019-06-27T17:56:45.000000Z | 1.9           |
-| Unknown      | 2019-06-30T23:57:42.000000Z | 3.9           |
-| No Charge    | 2019-06-30T23:59:30.000000Z | 5.2           |
-| Cash         | 2019-06-30T23:59:54.000000Z | 2             |
-| Card         | 2019-06-30T23:59:56.000000Z | 1             |
+| symbol  | timestamp                   | price   |
+| ------- | --------------------------- | ------- |
+| BTC-USD | 2024-06-30T23:59:56.000000Z | 61432.5 |
+| ETH-USD | 2024-06-30T23:59:54.000000Z | 3421.8  |
+| SOL-USD | 2024-06-30T23:59:42.000000Z | 142.3   |
 
 The above query returns the latest value within each time series stored in the
 table. Those time series are determined based on the values in the column(s)
 specified in the `LATEST ON` clause. In our example those time series are
-represented by different payment types. Then the column used in the `LATEST ON`
+represented by different symbols. Then the column used in the `LATEST ON`
 part of the clause stands for the designated timestamp column for the table.
 This allows the database to find the latest value within each time series.
 

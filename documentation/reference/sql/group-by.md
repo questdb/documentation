@@ -25,28 +25,28 @@ The below queries perform aggregations on a single key. Using `GROUP BY`
 explicitly or implicitly yields the same results:
 
 ```questdb-sql title="Single key aggregation, explicit GROUP BY"
-SELECT sensorId, avg(temp)
-FROM readings
-GROUP BY sensorId;
+SELECT symbol, avg(price)
+FROM trades
+GROUP BY symbol;
 ```
 
 ```questdb-sql title="Single key aggregation, implicit GROUP BY"
-SELECT sensorId, avg(temp)
-FROM readings;
+SELECT symbol, avg(price)
+FROM trades;
 ```
 
 The below queries perform aggregations on multiple keys. Using `GROUP BY`
 explicitly or implicitly yields the same results:
 
 ```questdb-sql title="Multiple key aggregation, explicit GROUP BY"
-SELECT sensorId, sensorType, avg(temp)
-FROM readings
-GROUP BY sensorId,sensorType;
+SELECT symbol, side, avg(price)
+FROM trades
+GROUP BY symbol, side;
 ```
 
 ```questdb-sql title="Multiple key aggregation, implicit GROUP BY"
-SELECT sensorId, sensorType, avg(temp)
-FROM readings;
+SELECT symbol, side, avg(price)
+FROM trades;
 ```
 
 When used explicitly, the list of keys in the `GROUP BY` clause must match the

@@ -38,8 +38,6 @@ QuestDB leverages both memory mapping and explicit memory management techniques,
     This integration lets QuestDB use Java for rapid development and C++/Rust for low-level,
     high-performance routines.
 
-## Next Steps
+## Next up
 
-- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
-- [QuestDB GitHub Repository](https://github.com/questdb/questdb)
-- [QuestDB Documentation](/docs)
+Continue to [Query Engine](/docs/guides/architecture/query-engine/) to learn how QuestDB parses, optimizes, and executes SQL queries.

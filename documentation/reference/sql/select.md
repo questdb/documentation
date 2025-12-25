@@ -31,11 +31,11 @@ omit most of the statement and pass the table name.
 
 The two examples below are equivalent
 
-```questdb-sql title="QuestDB dialect"
+```questdb-sql title="QuestDB dialect" demo
 trades;
 ```
 
-```questdb-sql title="Traditional SQL equivalent"
+```questdb-sql title="Traditional SQL equivalent" demo
 SELECT * FROM trades;
 ```
 
@@ -46,7 +46,7 @@ interested in.
 
 Example:
 
-```questdb-sql
+```questdb-sql title="Select specific columns" demo
 SELECT timestamp, symbol, side FROM trades;
 ```
 
@@ -62,7 +62,7 @@ Alias names and column names must be unique.
 
 :::
 
-```questdb-sql
+```questdb-sql title="Column aliases" demo
 SELECT timestamp, symbol,
     price AS rate,
     amount quantity
@@ -77,11 +77,11 @@ Notice how you can use or omit the `AS` keyword.
 mix comma separated lists of expressions with the column names you are
 selecting.
 
-```questdb-sql
+```questdb-sql title="Arithmetic expressions" demo
 SELECT timestamp, symbol,
     price * 0.25 AS price25pct,
     amount > 10 AS over10
-FROM trades
+FROM trades;
 ```
 
 The result of `amount > 10` is a boolean. The column will be named "over10" and
@@ -138,18 +138,18 @@ whenever there is a mix of column names and aggregation functions
 in a `SELECT` clause. You can have any number of discrete value columns and
 any number of aggregation functions. The three statements below are equivalent.
 
-```questdb-sql title="QuestDB dialect"
+```questdb-sql title="QuestDB dialect" demo
 SELECT symbol, avg(price), count()
 FROM trades;
 ```
 
-```questdb-sql title="Traditional SQL equivalent"
+```questdb-sql title="Traditional SQL equivalent" demo
 SELECT symbol, avg(price), count()
 FROM trades
-GROUP BY Symbol;
+GROUP BY symbol;
 ```
 
-```questdb-sql title="Traditional SQL equivalent with positional argument"
+```questdb-sql title="Traditional SQL equivalent with positional argument" demo
 SELECT symbol, avg(price), count()
 FROM trades
 GROUP BY 1;
@@ -160,7 +160,7 @@ GROUP BY 1;
 Aggregation functions can be used in arithmetic expressions. The following
 computes `mid` of prices for every symbol.
 
-```questdb-sql
+```questdb-sql title="Aggregation arithmetic" demo
 SELECT symbol, (min(price) + max(price))/2 mid, count() count
 FROM trades;
 ```

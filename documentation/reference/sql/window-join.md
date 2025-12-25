@@ -19,20 +19,20 @@ many of its execution traits.
 
 ```questdb-sql
 SELECT
-    master_columns,
-    aggregate_function(slave_column) AS result
-FROM master_table [alias]
-WINDOW JOIN slave_table [alias]
+    left_columns,
+    aggregate_function(right_column) AS result
+FROM left_table [alias]
+WINDOW JOIN right_table [alias]
     [ON join_condition]
     RANGE BETWEEN <lo_bound> AND <hi_bound>
     [INCLUDE PREVAILING | EXCLUDE PREVAILING]
-[WHERE filter_on_master]
+[WHERE filter_on_left]
 [ORDER BY ...]
 ```
 
 ### RANGE clause
 
-The `RANGE` clause defines the time window relative to each master row's
+The `RANGE` clause defines the time window relative to each left row's
 timestamp. Both boundaries are inclusive.
 
 ```questdb-sql
@@ -59,25 +59,25 @@ JOIN.
 
 ### INCLUDE/EXCLUDE PREVAILING
 
-- `INCLUDE PREVAILING` (default): Includes slave rows within the time window
-  plus the most recent slave row with a timestamp equal to or earlier than the
+- `INCLUDE PREVAILING` (default): Includes right table rows within the time window
+  plus the most recent right row with a timestamp equal to or earlier than the
   window start (similar to [ASOF JOIN](/docs/reference/sql/asof-join/) behavior),
   useful for "last known value" scenarios
-- `EXCLUDE PREVAILING`: Only includes slave rows strictly within the time window
+- `EXCLUDE PREVAILING`: Only includes right table rows strictly within the time window
 
 ## Requirements
 
 1. Both tables must have [designated timestamps](/docs/concept/designated-timestamp/)
    and be partitioned
-2. The slave (right) table must be a direct table reference, not a subquery
+2. The right table must be a direct table reference, not a subquery
 3. Aggregate functions are required - you cannot select non-aggregated columns
-   from the slave table
+   from the right table
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on
    symbol columns
 
 ## Aggregate functions
 
-WINDOW JOIN supports all aggregate functions on the slave table. However, the
+WINDOW JOIN supports all aggregate functions on the right table. However, the
 following functions use SIMD-optimized aggregation and will run faster:
 
 - `sum()` - Sum of values
@@ -136,7 +136,7 @@ WINDOW JOIN prices p
 
 ### With additional join filters
 
-You can add additional conditions to the `ON` clause to filter the slave table:
+You can add additional conditions to the `ON` clause to filter the right table:
 
 ```questdb-sql title="WINDOW JOIN with price filter"
 SELECT
@@ -242,9 +242,9 @@ WINDOW JOIN prices p
 This is useful when you want strict window boundaries and do not need the last
 known value before the window starts.
 
-### With master table filter
+### With left table filter
 
-Filter master table rows using a `WHERE` clause:
+Filter left table rows using a `WHERE` clause:
 
 ```questdb-sql title="WINDOW JOIN with WHERE filter"
 SELECT
@@ -282,8 +282,8 @@ Look for these indicators in the plan:
 ## Limitations
 
 1. `UNBOUNDED PRECEDING` and `UNBOUNDED FOLLOWING` are not supported
-2. The slave (right) table must be a direct table, not a subquery
-3. Cannot reference non-aggregated slave columns in `SELECT`
+2. The right table must be a direct table, not a subquery
+3. Cannot reference non-aggregated right table columns in `SELECT`
 4. Window high boundary cannot be less than low boundary
 5. Aggregate functions cannot reference columns from both tables simultaneously
 6. WINDOW JOIN can be combined with another WINDOW JOIN, but not with other JOIN
@@ -294,7 +294,7 @@ Look for these indicators in the plan:
 1. **Use symbol-based joins**: When possible, join on symbol columns to enable
    the Fast Join optimization
 2. **Narrow time windows**: Smaller windows mean less data to aggregate
-3. **Filter the master table**: Use `WHERE` clauses to reduce the number of rows
+3. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
    processed
 4. **Parallel execution**: WINDOW JOIN automatically leverages parallel
    execution based on your worker configuration

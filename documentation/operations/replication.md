@@ -1,525 +1,251 @@
 ---
-title: Database replication operations
-sidebar_label: Replication
+title: Replication setup guide
+sidebar_label: Setup Guide
 description:
-  Explains operational details for QuestDB replication. Provides a setup guide
-  object storage, basic hot replication, and thorough configuration details.
+  Step-by-step guide to setting up QuestDB Enterprise replication with object
+  storage, primary and replica nodes.
 ---
 
 import { ConfigTable } from "@theme/ConfigTable"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 import replicationConfig from "../configuration-utils/\_replication.config.json"
 
-QuestDB Enterprise supports high availability through primary-replica
-replication and point-in-time recovery.
+<EnterpriseNote>
+  This guide covers setting up primary-replica replication.
+</EnterpriseNote>
 
-This document will walk you through setup for database replication.
+This guide walks you through setting up QuestDB Enterprise replication.
 
-If the cluster is already running, enabling replication requires minimal steps:
+**Prerequisites:** Read the [Replication overview](/docs/concept/replication/)
+to understand how replication works.
 
-1. Create and configure object storage for
-   [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) files in AWS, Azure,
-   or NFS
-2. Enable a **primary** node and upload WAL files to the object storage
-3. Take a data [Snapshot](/docs/operations/backup/) of the
-   **primary** node
-4. Configure a **replica** node or and restore via snapshot or allow sync via
-   WAL files
+## Setup steps
 
-If the cluster is new and not already running:
+1. Configure object storage (AWS S3, Azure Blob, GCS, or NFS)
+2. Configure the **primary** node
+3. Take a snapshot of the primary
+4. Configure **replica** node(s)
 
-1. Create and configure object storage for
-   [Write Ahead Log (WAL)](/docs/concept/write-ahead-log/) files in AWS, Azure,
-   or NFS
-1. Enable a **primary** node and upload WAL files to the object storage
-1. Enable one or more replica nodes
+## 1. Configure object storage
 
-Before you begin the setup process, consider reading
-[Replication concepts](/docs/concept/replication/).
+Choose your object storage provider and build the connection string for
+`replication.object.store` in `server.conf`.
 
-## Setup object storage
+### AWS S3
 
-Choose where you intend to store replication data:
+Create an S3 bucket following
+[AWS documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/create-bucket-overview.html).
 
-1. [Azure blob storage](/docs/operations/replication/#azure-blob-storage)
-2. [Amazon S3](/docs/operations/replication/#amazon-aws-s3)
-3. [NFS](/docs/operations/replication/#nfs)
+**Recommendations:**
+- Select a region close to your primary node
+- Disable blob versioning
+- Set up a
+  [lifecycle policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)
+  to manage WAL file retention (see [Snapshot and expiration policies](#snapshot-and-expiration-policies))
 
-Our goal is to build a string value for the `replication.object.store` key
-within `server.conf`.
+**Connection string:**
+
+```ini
+replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};region=${AWS_REGION};access_key_id=${AWS_ACCESS_KEY};secret_access_key=${AWS_SECRET_ACCESS_KEY};
+```
+
+`DB_INSTANCE_NAME` can be any unique alphanumeric string (dashes allowed). Use
+the same value across all nodes in your replication cluster.
 
 ### Azure Blob Storage
 
-Setup storage in Azure and retrieve values for:
+Create a Storage Account following
+[Azure documentation](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create?tabs=azure-portal),
+then create a Blob Container.
 
-- `STORE_ACCOUNT`
-- `BLOB_CONTAINER`
-- `STORE_KEY`
-
-First, follow Azure documentation to
-[create a Storage Account](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create?tabs=azure-portal).
-
-There are some important considerations.
-
-For appropriate balance, be sure to:
-
-- Select a geographical location close to the **primary** QuestDB node to reduce
-  the network latency
-- Choose optimal redundancy and performance options according to Microsoft
+**Recommendations:**
+- Select a region close to your primary node
 - Disable blob versioning
+- Set up
+  [Lifecycle Management](https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-configure?tabs=azure-portal)
+  for WAL file retention
 
-Keep your `STORE_ACCOUNT` value.
+**Connection string:**
 
-Next, set up
-[Lifecycle Management](https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-configure?tabs=azure-portal)
-for the blobs produced by replication. There are considerations to ensure
-cost-effective WAL file storage. For further information, see the
-[object store expiration policy](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
-section.
-
-After that,
-[create a Blob Container](https://learn.microsoft.com/en-us/azure/storage/blobs/quickstart-storage-explorer) to
-be the root of your replicated data blobs.
-
-It will will soon be referenced in the `BLOB_CONTAINER` variable.
-
-Finally, save the
-[Account Key](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-portal).
-It will be used to configure the QuestDB primary node as `STORE_KEY`.
-
-In total, from Azure you will have retrieved:
-
-- `STORE_ACCOUNT`
-- `BLOB_CONTAINER`
-- `STORE_KEY`
-
-The value provided to `replication.object.store` is thus:
-
-```conf
-azblob::endpoint=https://${STORE_ACCOUNT}.blob.core.windows.net;container={BLOB_CONTAINER};root=${DB_INSTANCE_NAME};account_name=${STORE_ACCOUNT};account_key=${STORE_KEY};
+```ini
+replication.object.store=azblob::endpoint=https://${STORE_ACCOUNT}.blob.core.windows.net;container=${BLOB_CONTAINER};root=${DB_INSTANCE_NAME};account_name=${STORE_ACCOUNT};account_key=${STORE_KEY};
 ```
 
-The value of `DB_INSTANCE_NAME` can be any unique alphanumeric string, which
-includes dashes `-`.
+### Google Cloud Storage
 
-Be sure to use the same name across all the **primary** and **replica** nodes
-within the replication cluster.
+Create a GCS bucket, then create a service account with `Storage Admin` (or
+equivalent) permissions. Download the JSON key and encode it as Base64:
 
-With your values, skip to the
-[Setup database replication](/docs/operations/replication/#setup-database-replication)
-section.
-
-### Amazon AWS S3
-
-Our goal is to setup AWS S3 storage and retrieve:
-
-- `BUCKET_NAME`
-- `AWS_REGION`
-- `AWS_ACCESS_KEY` (Optional)
-- `AWS_SECRET_ACCESS_KEY` (Optional)
-
-First, create an S3 bucket as described in
-[AWS documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/create-bucket-overview.html).
-The name is our `BUCKET_NAME` & `AWS_REGION`. Prepare your `AWS_ACCESS_KEY` and
-`AWS_SECRET_ACCESS_KEY` if needed, depending on how you manage AWS credentials.
-
-There are some important considerations.
-
-For appropriate balance, be sure to:
-
-- Select a geographical location close to the **primary** QuestDB node to reduce
-  the network latency
-- Choose optimal redundancy and performance options according to Amazon
-- Disable blob versioning
-
-Finally,
-[set up bucket lifecycle configuration policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)
-to clean up WAL files after a period of time. There are considerations to ensure
-that the storage of the WAL files remains cost-effective. For deeper background,
-see the
-[object storage expiration policy](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
-section.
-
-We have now prepared the following:
-
-- `BUCKET_NAME`
-- `AWS_REGION`
-- `AWS_ACCESS_KEY` (Optional)
-- `AWS_SECRET_ACCESS_KEY` (Optional)
-
-And created a value for `replication.object.store`:
-
-```conf
-s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};region=${AWS_REGION};access_key_id=${AWS_ACCESS_KEY};secret_access_key=${AWS_SECRET_ACCESS_KEY};
-```
-
-The value of `DB_INSTANCE_NAME` can be any unique alphanumeric string, which
-includes dashes `-`.
-
-Be sure to use the same name across all the **primary** and **replica** nodes
-within the replication cluster.
-
-With your values, continue to the
-[Setup database replication](/docs/operations/replication/#setup-database-replication)
-section.
-
-### NFS
-
-Setup your NFS server and mount the shared file system on the **primary** and
-any **replicas**. Make sure the user starting QuestDB has read and write
-permissions for the shared mount.
-
-There are some important considerations.
-
-For appropriate balance, be sure to:
-
-- Select a geographical location of the NFS server close to the **primary**
-  QuestDB node to reduce the network latency
-- Choose optimal redundancy and performance options
-
-There are considerations to ensure cost-effective WAL file storage. For further
-information, see the
-[object store expiration policy](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
-section.
-
-Replication via NFS will use two folders, one for the WAL files, and one for
-temporary — or scratch — files. The two folders will be created on **primary**'s
-startup if they don't exist. It is **important** that both folders are under the
-same NFS mount, as otherwise object writes might get corrupted.
-
-The value provided to `replication.object.store` is thus:
-
-```conf
-fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;
-```
-
-The example above uses `/mtn/nfs_replication` as the NFS mountpoint. Please
-change accordingly on the **primary** and any **replicas** to match your local
-configuration.
-
-With your values, skip to the
-[Setup database replication](/docs/operations/replication/#setup-database-replication)
-section.
-
-### Google GCP GCS
-
-First, create a new Google Cloud Storage (GCS) bucket, most likely with
-`Public access: Not public`.
-
-Then create a new service account, and give it read-write permissions for the
-bucket. The simplest role is `Storage Admin`, but you may set up more granular
-permissions as needed.
-
-Create a new private key for this user and download it in `JSON` format. Then
-encode this key as `Base64`.
-
-If you are on Linux, you can `cat` the file and pass it to `base64`:
-
-```
+```bash
 cat <key>.json | base64
 ```
 
-Then construct the connection string:
+**Connection string:**
 
+```ini
+replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;credential=${BASE64_ENCODED_KEY};
 ```
-replication.object.store=gcs::bucket=<bucket name here>;root=/;credential=<base64 encoded key>;
+
+Alternatively, use `credential_path` to reference the key file directly.
+
+### NFS
+
+Mount the shared filesystem on all nodes. Ensure the QuestDB user has read/write
+permissions.
+
+**Important:** Both the WAL folder and scratch folder must be on the same NFS
+mount to prevent write corruption.
+
+**Connection string:**
+
+```ini
+replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;
 ```
 
-If you do not want to put the credentials directly in the connection string, you
-can swap the `credential` key for `credential_path`, and give it a path to the
-key-file.
+## 2. Configure the primary node
 
-With your values, continue to the
-[Setup database replication](/docs/operations/replication/#setup-database-replication)
-section.
+Add to `server.conf`:
 
-## Setup database replication
+| Setting | Value |
+|---------|-------|
+| `replication.role` | `primary` |
+| `replication.object.store` | Your connection string from step 1 |
+| `cairo.snapshot.instance.id` | Unique UUID for this node |
 
-Set the following changes in their respective `server.conf` files:
+Restart QuestDB.
 
-1. Enable a **primary** node to upload to object storage
+## 3. Take a snapshot
 
-2. Set **replica(s)** to download from object storage
+Replicas are initialized from a snapshot of the primary's data. This involves
+creating a backup of the primary and preparing it for restoration on replica
+nodes.
 
-### Set up a primary node
+See [Backup and restore](/docs/operations/backup/) for the full procedure.
 
-| Setting                        | Description                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| **replication.role**           | Set to `primary` .                                                                               |
-| **replication.object.store**   | Created based on provider specifications. The result of the above setup object storage sections. |
-| **cairo.snapshot.instance.id** | Unique UUID of the primary node                                                                  |
-
-After the node is configured for replication, restart QuestDB.
-
-At this point, create a database [snapshot](/docs/reference/sql/snapshot/).
-
-Frequent snapshots can alter the effectiveness of your replication strategy.
-
-To help you determine the right snapshot, see the
-[snapshot schedule](/docs/operations/replication/#snapshot-schedule-and-object-store-expiration-policy)
-section.
-
-Now that a primary is configured, next setup a replica - or two, or three - or
-more!
-
-### Set up replica node(s)
-
-Create a new QuestDB instance.
-
-Set `server.conf` properties:
-
-| Setting                        | Value                                        |
-| ------------------------------ | -------------------------------------------- |
-| **replication.role**           | Set to `replica`.                            |
-| **replication.object.store**   | The same string used in the **primary** node |
-| **cairo.snapshot.instance.id** | Unique UUID of the replica node              |
-
-:::note
-
-Please do not copy `server.conf` files from the **primary** node when creating
-the replica. Setting the same `replication.object.store` stream on 2 nodes and
-enabling 2 nodes to act as **primary** will break the replication setup.
-
+:::tip
+Set up regular snapshots (daily or weekly). See
+[Snapshot and expiration policies](#snapshot-and-expiration-policies) for
+guidance.
 :::
 
-After the blank replica database is created, restore the `db` directory folder
-from the snapshot taken from the **primary** node. Then start the replica node.
-The replica will download changes and will catch up with the **primary** node.
+## 4. Configure replica node(s)
 
-This concludes a walkthrough of basic replication.
+Create a new QuestDB instance. Add to `server.conf`:
 
-For full configuration details, see the next section.
+| Setting | Value |
+|---------|-------|
+| `replication.role` | `replica` |
+| `replication.object.store` | Same connection string as primary |
+| `cairo.snapshot.instance.id` | Unique UUID for this replica |
 
-To learn more about the roadmap, architecture and topology types, see the
-[Replication](/docs/concept/replication) concept page.
+:::warning
+Do not copy `server.conf` from the primary. Two nodes configured as primary
+with the same object store will break replication.
+:::
 
-## Configuration
+Restore the `db` directory from the primary's snapshot, then start the replica.
+It will download and apply WAL files to catch up with the primary.
 
-The following presents all available configuration and tuning options.
+## Configuration reference
 
-All replication configuration is kept in the same
-[`server.conf`](/docs/configuration/) file as all other database settings.
+All replication settings go in `server.conf`. After changes, restart QuestDB.
 
-:::note
-
-These settings can be sensitive - especially within Azure.
-
-Consider using environment variables.
-
-For example, to specify the object store setting from an environment variable
-specify:
+:::tip
+Use environment variables for sensitive settings:
 
 ```bash
-export QDB_REPLICATION_OBJECT_STORE="azblob::DefaultEndPointsProtocol..."
+export QDB_REPLICATION_OBJECT_STORE="azblob::..."
 ```
-
 :::
-
-Once settings are changed, stop and restart the database.
-
-Note that replication is performed by the database process itself.
-
-There is no need to start external agents, register cron jobs or similar.
-
-### Replication settings
-
-> Read our in-depth [Replication tuning Guide](/docs/guides/replication-tuning/)
-> for more information.
-
-Some of these settings alter resource usage.
-
-Replication is implemented using a set of worker threads for IO operations.
-
-The defaults should be appropriate in most cases.
 
 <ConfigTable rows={replicationConfig} />
 
-## Snapshot schedule and object store expiration policy
+For tuning options, see the [Tuning guide](/docs/guides/replication-tuning/).
 
-Replication files are typically read by **replica** nodes shortly after upload
-from the **primary** node. After initial access, these files are rarely used
-unless a new **replica** node starts. To optimize costs, we suggest moving files
-to cooler storage tiers using expiration policies after 1-7 days. These tiers
-are more cost-effective for long-term storage of infrequently accessed files.
+## Snapshot and expiration policies
 
-We recommend:
+WAL files are typically read by replicas shortly after upload. To optimize
+costs, move files to cooler storage tiers after 1-7 days.
 
-1. Set up periodic **primary** node snapshots on a 1-7 day interval
-2. Keep [Write Ahead Log (WAL)](/docs/concept/write-ahead-log) files in the
-   object store for at least 30 days
+**Recommendations:**
+- Take snapshots every 1-7 days
+- Keep WAL files for at least 30 days
+- Ensure snapshot interval is shorter than WAL expiration
 
-Taking snapshots every 7 days and storing WAL files for 30 days allows database
-restoration within 23 days. Extending WAL storage to 60 days increases this to
-53 days.
-
-Ensure snapshot intervals are shorter than WAL expiration for successful data
-restoration. Shorter intervals also speed up database rebuilding after a
-failure. For instance, weekly snapshots take 7 times longer to restore than
-daily ones due to the computational and IO demands of applying WAL files.
-
-For systems with high daily data injection, daily snapshots are recommended.
-Infrequent snapshots or long snapshot periods, such as 60 days with 30-day WAL
-expiration, may prevent successful database restoration.
+Example: Weekly snapshots + 30-day WAL retention = ability to restore up to 23
+days back. Daily snapshots restore faster but use more storage.
 
 ## Disaster recovery
 
-QuestDB can fail in a number of ways, some recoverable, and some unrecoverable.
+### Failure scenarios
 
-In general, we can group them into a small matrix:
-
-|         | recoverable     | unrecoverable                       |
-|---------|-----------------|-------------------------------------|
-| primary | restart primary | promote replica, create new replica |
-| replica | restart replica | destroy and recreate replica        |
-
-To successfully recover from serious failures, we strongly advise that operators:
-
-- Follow best practices
-- **Regularly back up data**
+| Node | Recoverable | Unrecoverable |
+|------|-------------|---------------|
+| Primary | Restart | Promote replica, create new replica |
+| Replica | Restart | Destroy and recreate |
 
 ### Network partitions
 
-Temporary network partitions introduce delays between when data is written to
-the primary, and when it becomes available for read in the replica. A temporary
-network partition is not necessarily a problem.
+Temporary partitions cause replicas to lag, then catch up when connectivity
+restores. This is normal operation.
 
-For example, data can be ingested into the primary when the object-store is not
-available. In this case, the replicas will contain stale data, and then catch-up
-when the primary reconnects and successfully uploads to the object store.
-
-Permanent network partitions are not recoverable, and the
-[emergency primary migration](#emergency-primary-migration) flow should be
-followed.
+Permanent partitions require [emergency primary migration](#emergency-primary-migration).
 
 ### Instance crashes
 
-An instance crash may be recoverable or unrecoverable, depending on the specific
-cause of the crash. If the instance crashes during ingestion, then it is
-possible for transactions to be corrupted. This will lead to a table suspension
-on restart.
+If a crash corrupts transactions, tables may suspend on restart. You can skip
+the corrupted transaction and reload missing data, or follow the emergency
+migration flow.
 
-To recover in this case, you can skip the transaction,
-and reload any missing data.
+### Disk failures
 
-In the event that the corruption is severe, or confidence in the underlying
-instance is removed, you should follow the
-[emergency primary migration](#emergency-primary-migration) flow.
+Symptoms: high latency, unmounted disk, suspended tables. Follow the emergency
+migration flow to move to new storage.
 
-### Disk or block storage failure
+## Migration procedures
 
-Disk failures can present in several forms, which may be difficult to detect.
+### Planned primary migration
 
-Look for the following symptoms:
+Use when the current primary is healthy but you want to switch to a new one.
 
-1. High latency for reads and writes.
-    - This could be a failing disk, which will need replacing
-    - Alternatively, it could be caused by under-provisioned IOPS, and need upgrading
-2. Disk not available/unmounted
-    - This could be a configuration issue between your server and storage
-    - Alternatively, this could indicate a complete drive failure
-3. Data corruption reported by database (i.e. you see suspended tables)
-    - This is usually caused by writes to disk partially or completely failing
-    - This can also be caused by running out of disk space
+1. Stop the primary
+2. Restart with `replication.role=primary-catchup-uploads`
+3. Wait for uploads to complete (exits with code 0)
+4. Follow emergency migration steps below
 
-As with an instance crash, the consequences can be far-reaching and not
-immediately clear in all cases.
+### Emergency primary migration
 
-To migrate to a new disk, follow the
-[emergency primary migration](#emergency-primary-migration) flow. When you
-create a new replica, you can populate it with the latest snapshot you have
-taken, and then recover the rest using replicated WALs in the object store.
+Use when the primary has failed.
 
-### Flows
-
-#### Planned primary migration
-
-Use this flow when you want to change your primary to another instance, but the
-primary has not failed.
-
-The database can be started in a mode which disallows further ingestion, but
-allows replication. With this method, you can ensure that all outstanding data
-has been replicated before you start ingesting into a new primary instance.
-
-- Ensure primary instance is still capable of replicating data  to the object store
-- Stop primary instance
-- Restart primary instance with `replication.role=primary-catchup-uploads`
-- Wait for the instance to complete its uploads and exit with `code 0`
-- Then follow the [emergency primary migration](#emergency-primary-migration) flow
-
-#### Emergency primary migration
-
-Use this flow when you wish to discard a failed primary instance and move to a new one.
-
-- Stop primary instance, and ensure it **cannot** restart
-- Stop the replica instance
-- Set `replication.role=primary` on the replica
-- Ensure other primary-related settings are configured appropriately
-  - for example, snapshotting policies
-- Create an empty `_migrate_primary` file in your database installation
-  directory (i.e. the parent of `conf` and `db`)
-- Start the replica instance, which is now the new primary
-- Create a new replica instance to replace the promoted replica
+1. Stop the failed primary (ensure it cannot restart)
+2. Stop the replica
+3. Set `replication.role=primary` on the replica
+4. Create an empty `_migrate_primary` file in the installation directory
+5. Start the replica (now the new primary)
+6. Create a new replica to replace the promoted one
 
 :::warning
-
-Any data committed to the primary, but not yet replicated, will be lost. If the
-primary has not completely failed, you can follow the
-[planned primary migration](#planned-primary-migration) flow to ensure that all
-remaining data has been replicated before switching primary.
-
+Data committed to the primary but not yet replicated will be lost. Use planned
+migration if the primary is still functional.
 :::
 
-#### When could migration fail?
+### Point-in-time recovery
 
-Two primaries started within the same
-`replication.primary.keepalive.interval=10s` may still break.
+Restore the database to a specific historical timestamp.
 
-It is important not to migrate the primary without stopping the first primary,
-if it is still within this interval.
+1. Locate a snapshot from before your target timestamp
+2. Create a new instance from the snapshot (do not start it)
+3. Create a `_recover_point_in_time` file containing:
+   ```ini
+   replication.object.store=<source object store>
+   replication.recovery.timestamp=YYYY-MM-DDThh:mm:ss.mmmZ
+   ```
+4. If using a snapshot, create a `_restore` file to trigger recovery
+5. Optionally configure `server.conf` to replicate to a **new** object store
+6. Start the instance
 
-This config can be set in the range of 1 to 300 seconds.
+## Next steps
 
-#### Point-in-time recovery
-
-Create a QuestDB instance matching a specific historical point in time.
-
-This builds a new instance based on a recently recovered snapshot and WAL
-data in the object store.
-
-It can also be used if you wish to remove the latest transactions from the
-database, or if you encounter corrupted transactions (though replicating a
-corrupt transaction has never been observed).
-
-**Flow**
-
-- (Recommended) Locate a recent primary instance snapshot that predates your
-  intended recovery timestamp.
-  - A snapshot taken from **after** your intended recovery timestamp will not work.
-- Create the new primary instance, ideally from a snapshot, and ensure it is not
-  running.
-- Touch a `_recover_point_in_time` file.
-- Inside this file, add a `replication.object.store` setting pointing to the
-  object store you wish to load transactions from.
-- Also add a `replication.recovery.timestamp` setting with the UTC time to which
-  you would like to recover.
-  - The format is `YYYY-MM-DDThh:mm:ss.mmmZ`.
-- (Optional) Configure replication settings in `server.conf` pointing at a
-  **new** object store location.
-  - You can either configure this instance as a standalone (non-replicated)
-    instance, or
-  - Configure it as a new primary by setting `replication.role=primary`. In this
-    case, the `replication.object.store` **must** point to a fresh, empty
-    location.
-- If you have created the new primary using a snapshot, touch a `_restore` file
-  to trigger the snapshot recovery process.
-  - More details can be found in the
-    [backup and restore](/documentation/operations/backup.md) documentation.
-- Start new primary instance.
-
-## Multi-primary ingestion
-
-[QuestDB Enterprise](/enterprise/) supports multi-primary ingestion, where
-multiple primaries can write to the same database.
-
-See the [Multi-primary ingestion](/docs/operations/multi-primary-ingestion/)
-page for more information.
+- [Tuning guide](/docs/guides/replication-tuning/) - Optimize replication
+  performance

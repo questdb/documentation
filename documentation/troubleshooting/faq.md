@@ -18,7 +18,7 @@ Check the [log](/docs/operations/logging-metrics/) page for the available log le
 
 ## How do I delete a row?
 
-See our guide on [modifying data](/docs/guides/modifying-data/).
+See our guide on [modifying data](/docs/operations/modifying-data/).
 
 ## How do I migrate a `STRING` column to a `VARCHAR`?
 
@@ -49,10 +49,9 @@ See more details at
 [ALTER TABLE COLUMN TYPE documentation](/docs/reference/sql/alter-table-change-column-type/)
 
 While setting the capacity of `SYMBOL` is optional, doing so enhances the
-performance of both the conversion process and data inserts. Therefore, it's
-advisable to choose the capacity correctly. To learn more, see the
-[SYMBOL column capacity](/docs/operations/design-for-performance/#symbol-caching)
-section in our design for performance page.
+performance of both the conversion process and data inserts. Symbol capacity
+expands automatically as needed. To learn more, see the
+[SYMBOL documentation](/docs/concept/symbol/).
 
 ## Why do I get `table busy` error messages when inserting data over PostgreSQL wire protocol?
 
@@ -106,7 +105,7 @@ is `2K`, i.e. 2KB, so you may need to set it to a larger value, e.g. `32K`.
 We have an open
 [feature request to optionally de-duplicate rows](https://github.com/questdb/roadmap/issues/3)
 inserted with identical fields. Until then, you need to
-[modify the data](/docs/guides/modifying-data/) after it's inserted and use a
+[modify the data](/docs/operations/modifying-data/) after it's inserted and use a
 `GROUP BY` query to identify duplicates.
 
 ## Can I query by time?

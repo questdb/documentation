@@ -124,10 +124,10 @@ automatically as the user zooms in and out of the panel.
 
 ```questdb-sql title="An example of $__interval"
 SELECT
-  pickup_datetime AS time,
-  avg(trip_distance) AS distance
-FROM taxi_trips
-WHERE $__timeFilter(pickup_datetime)
+  timestamp AS time,
+  avg(price) AS avg_price
+FROM trades
+WHERE $__timeFilter(timestamp)
 SAMPLE BY $__interval;
 ```
 

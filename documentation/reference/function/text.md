@@ -334,8 +334,8 @@ group, separated by the specified delimiter.
 **Examples:**
 
 ```questdb-sql
-SELECT string_agg(make, ',') as makes
-FROM sensors;
+SELECT string_agg(symbol, ',') as symbols
+FROM trades;
 ```
 
 | makes                                                       |
@@ -346,10 +346,10 @@ It's common to append a `LIMIT` so that, such as in this case, the values
 repeat:
 
 ```questdb-sql
-SELECT string_agg(make, ',') as makes
+SELECT string_agg(symbol, ',') as symbols
 FROM (
-  SELECT make
-  FROM sensors
+  SELECT symbol
+  FROM trades
   LIMIT 10
 ) sub;
 ```

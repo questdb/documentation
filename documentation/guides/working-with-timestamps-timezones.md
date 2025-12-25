@@ -25,7 +25,7 @@ into a timestamp column directly:
 ```questdb-sql
 CREATE TABLE my_table (ts timestamp, col1 int) timestamp(ts);
 INSERT INTO my_table VALUES(1623167145123456, 12);
-my_table;
+SELECT * FROM my_table;
 ```
 
 | ts                          | col1 |
@@ -36,7 +36,7 @@ Timestamps may also be inserted as strings in the following way:
 
 ```questdb-sql
 INSERT INTO my_table VALUES('2021-06-08T16:45:45.123456Z', 13);
-my_table;
+SELECT * FROM my_table;
 ```
 
 | ts                          | col1 |
@@ -55,7 +55,7 @@ INSERT INTO my_table VALUES(to_timestamp('2021-06-09T16:45:46.123456789', 'yyyy-
 
 INSERT INTO my_table VALUES(to_timestamp('2021-06-10T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.SSSUUUN'), 14);
 
-my_table;
+SELECT * FROM my_table;
 ```
 
 The output maintains microsecond resolution:
@@ -83,7 +83,7 @@ INSERT INTO my_table VALUES('2021-06-08T16:45:45.123456123Z', 13);
 INSERT INTO my_table VALUES(to_timestamp_ns('2021-06-09T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.N+'), 14);
 INSERT INTO my_table VALUES(to_timestamp_ns('2021-06-10T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.SSSUUUN'), 14);
 
-my_table;
+SELECT * FROM my_table;
 ```
 
 | ts                             | col1 |
@@ -210,10 +210,10 @@ SELECT to_timezone(1213086329000000, '+02:00');
 | :-------------------------- |
 | 2008-06-10T10:25:29.000000Z |
 
-```questdb-sql title="to_timezone with Offset" demo
+```questdb-sql title="to_utc with Offset" demo
 SELECT to_utc('2008-06-10T10:25:29.000000Z', '+02:00');
 ```
 
-| to_timezone                 |
+| to_utc                      |
 | :-------------------------- |
 | 2008-06-10T08:25:29.000000Z |

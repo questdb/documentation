@@ -419,15 +419,16 @@ and the [role-based access control](/docs/operations/rbac/) guides.
 
 ## Timestamp Column Name
 
-QuestDB's underlying ILP protocol sends timestamps to QuestDB without a name.
+QuestDB's ILP protocol sends timestamps without a column name.
 
-If your table has been created beforehand, the designated timestamp will be
-correctly assigned based on the payload sent bt the client. But if your table
-does not exist, it will be automatically created and the timestamp column will
-be named `timestamp`. To use a custom name, say `my_ts`, pre-create the table
-with the desired timestamp column name.
+**Auto-created tables always use `timestamp` as the designated timestamp column name.**
+There is no client-side option to change this. If you need a different column name,
+you must pre-create the table before sending data.
 
-To do so, issue a `CREATE TABLE` statement to create the table in advance:
+If the table already exists, the designated timestamp column is used regardless
+of its name.
+
+To pre-create a table with a custom timestamp column name, use `CREATE TABLE`:
 
 ```questdb-sql title="Creating a timestamp named my_ts"
 CREATE TABLE IF NOT EXISTS 'trades' (
@@ -538,7 +539,7 @@ as one instance becomes writable before the maximum retry timeout is reached, it
 
 By configuring multiple addresses, you can continue capturing data if your primary instance fails, without having to reconfigure the clients, as they will automatically failover to the new primary once available.
 
-Enterprise users can use multipe URLs to handle replication failover, without the need to introduce a load-balancer, reconfigure clients, or move to a [multi-primary](/docs/operations/multi-primary-ingestion/) deployment model.
+Enterprise users can use multiple URLs to handle replication failover, without the need to introduce a load-balancer or reconfigure clients.
 
 ## Health Check
 

@@ -5,22 +5,22 @@ description:
   available network interfaces.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  TLS encryption secures all network interfaces and protocols.
+</EnterpriseNote>
+
 Transport Layer Security (TLS) encryption is available on all supported network
 interfaces and protocols:
 
 - [InfluxDB Line Protocol over TCP](/docs/reference/api/ilp/overview/)
-- [PGWire](/docs/reference/api/postgres/)
+- [PGWire](/docs/pgwire/pgwire-intro/)
 - [HTTP](/docs/reference/api/rest/) (REST API)
 
 It's possible to configure encryption on all interfaces at once or individually.
 
 QuestDB supports TLS v1.2 and v1.3.
-
-:::note
-
-TLS encryption is only available in [QuestDB Enterprise](/enterprise/).
-
-:::
 
 ## Enabling TLS
 
