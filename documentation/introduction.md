@@ -37,13 +37,12 @@ library. Everything in open source works in Enterprise, but not the other way
 around. Enterprise adds features like high availability, advanced security, and
 RBAC.
 
-Sections specific to QuestDB Enterprise are marked with an **Enterprise** label.
-
 ## Get started
 
 1. **[Quick start](/docs/quick-start/)** - Install and run QuestDB
-2. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using ILP clients or SQL
-3. **[Query data](/docs/reference/sql/select/)** - Analyze with SQL
+2. **[Data Modeling Basics](/docs/data-modeling-basics/)** - Design your tables
+3. **[Ingest data](/docs/ingestion-overview/)** - Bring your data using ILP clients
+4. **[Query data](/docs/reference/sql/overview/)** - Analyze with SQL
 
 <div className="not-prose">
   <DocButton href="/docs/why-questdb/" variant="text" arrow="right">

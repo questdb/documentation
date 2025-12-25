@@ -6,6 +6,11 @@ description:
 ---
 
 import Screenshot from "@theme/Screenshot"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Tune replication for lower latency or reduced network costs.
+</EnterpriseNote>
 
 Replication tuning lets you balance **latency** against **network costs**. By
 default, QuestDB uses balanced settings. You can tune for lower latency or

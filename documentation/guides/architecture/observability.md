@@ -35,8 +35,6 @@ QuestDB provides real-time metrics, a health check endpoint, and logging to moni
 />
 
 
-## Next Steps
+## Next up
 
-- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
-- [QuestDB GitHub Repository](https://github.com/questdb/questdb)
-- [QuestDB Documentation](/docs)
+Back to [Architecture Overview](/docs/guides/architecture/questdb-architecture/) or continue to [Configuration](/docs/configuration/).

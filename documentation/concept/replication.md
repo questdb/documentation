@@ -5,6 +5,12 @@ description:
   Learn how QuestDB Enterprise replication works, its benefits, and architecture.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Replication provides high availability and disaster recovery for your QuestDB cluster.
+</EnterpriseNote>
+
 QuestDB Enterprise provides **primary-replica replication** for high availability
 and disaster recovery. Your data is automatically synced to replica instances
 via an object store, with no direct network connections required between nodes.

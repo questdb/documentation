@@ -7,15 +7,14 @@ description:
 ---
 
 import Screenshot from "@theme/Screenshot"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Role-based Access Control (RBAC) provides fine-grained permissions for your QuestDB instance.
+</EnterpriseNote>
 
 QuestDB Enterprise provides fine-grained access control that can restrict access
 at **database**, **table**, **column**, and even **row** level (using views).
-
-:::note
-
-Role-based Access Control (RBAC) is available in QuestDB Enterprise.
-
-:::
 
 ## Quick start
 

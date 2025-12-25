@@ -54,15 +54,14 @@ CREATE TABLE trades (
     side SYMBOL,
     price DOUBLE,
     amount DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL
+) TIMESTAMP(timestamp) PARTITION BY DAY
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
 This is a basic yet robust table. It applies [SYMBOL](/docs/concept/symbol/)s
 for ticker and side, a price, and a
 [designated timestamp](/docs/concept/designated-timestamp/). It's
-[partitioned by day](/docs/concept/partitions/), is a
-[WAL table](/docs/concept/write-ahead-log/), and
+[partitioned by day](/docs/concept/partitions/) and
 [deduplicates](/docs/concept/deduplication/) the timestamp and ticker columns.
 As the links above show, there's lots to unpack in this table! Feel free to
 learn more about the nuances.

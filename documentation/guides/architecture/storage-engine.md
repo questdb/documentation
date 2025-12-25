@@ -109,8 +109,6 @@ cairo.commit.mode=sync
 This invokes `fsync()` on each commit, ensuring data survives OS crashes or power loss
 at the cost of reduced write throughput.
 
-## Next Steps
+## Next up
 
-- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
-- [QuestDB GitHub Repository](https://github.com/questdb/questdb)
-- [QuestDB Documentation](/docs)
+Continue to [Memory Management](/docs/guides/architecture/memory-management/) to learn how QuestDB manages memory and integrates native code.

@@ -5,17 +5,17 @@ description:
   Instructions and advice on performing multi-primary ingestion within QuestDB Enterprise.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Multi-primary ingestion enables concurrent writes across multiple primary nodes.
+</EnterpriseNote>
+
 QuestDB Enterprise's multi-primary ingestion enables **strong throughput** and **high availability** via concurrent writes across multiple primaries. With the addition of **automatic failover**, it provides reliable ingestion under most failure and zero-downtime update scenarios.
 
 Multi-primary ingestion applies multiple primary nodes to handle parallel ingestion operations. Each primary node can sustain up to **5 million rows per second** as per [Time Series Benchmark Suite (TSBS)](https://github.com/questdb/tsbs) benchmarks.
 
-This document explains multi-primary ingestion, and provides details on the use of FoundationDB for metadata coordination, a sequencer for conflict resolution, and failover mechanisms for added reliability. 
-
-:::note
-
-Multi-primary ingestion is coming soon to QuestDB Enterprise.
-
-:::
+This document explains multi-primary ingestion, and provides details on the use of FoundationDB for metadata coordination, a sequencer for conflict resolution, and failover mechanisms for added reliability.
 
 ## How multi-primary ingestion works
 

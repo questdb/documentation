@@ -1,37 +1,29 @@
 module.exports = {
   docs: [
+    "introduction",
+    "why-questdb",
+    "guides/schema-design-essentials",
+
     // ===================
     // GETTING STARTED
     // ===================
     {
       type: "category",
       label: "Getting Started",
-      collapsed: false,
+      collapsed: true,
       items: [
-        {
-          id: "introduction",
-          type: "doc",
-        },
         "quick-start",
-        "why-questdb",
-        {
-          id: "guides/schema-design-essentials",
-          type: "doc",
-          customProps: { tag: "Recommended" },
-        },
         "operations/capacity-planning",
         "guides/create-database",
         {
           id: "operations/migrate-to-enterprise",
           type: "doc",
           label: "Upgrade to Enterprise",
-          customProps: { tag: "Enterprise" },
         },
         {
           id: "guides/enterprise-quick-start",
           type: "doc",
           label: "Enterprise Quick Start",
-          customProps: { tag: "Enterprise" },
         },
         {
           type: "category",
@@ -52,11 +44,11 @@ module.exports = {
     },
 
     // ===================
-    // CONNECT & INGEST
+    // INGESTION REFERENCE
     // ===================
     {
       type: "category",
-      label: "Connect & Ingest",
+      label: "Ingestion Reference",
       items: [
         {
           id: "ingestion-overview",
@@ -132,6 +124,29 @@ module.exports = {
         },
         {
           type: "category",
+          label: "Message Brokers",
+          collapsed: true,
+          items: [
+            "third-party-tools/kafka",
+            "third-party-tools/telegraf",
+            "third-party-tools/redpanda",
+            "third-party-tools/flink",
+          ],
+        },
+        "reference/api/java-embedded",
+      ],
+    },
+
+    // ===================
+    // QUERY & SQL REFERENCE
+    // ===================
+    {
+      type: "category",
+      label: "Query & SQL Reference",
+      items: [
+        "reference/sql/overview",
+        {
+          type: "category",
           label: "PostgreSQL Wire Protocol",
           collapsed: true,
           items: [
@@ -188,33 +203,10 @@ module.exports = {
           ],
         },
         "reference/api/rest",
-        "reference/api/java-embedded",
-        {
-          type: "category",
-          label: "Message Brokers",
-          collapsed: false,
-          items: [
-            "third-party-tools/kafka",
-            "third-party-tools/telegraf",
-            "third-party-tools/redpanda",
-            "third-party-tools/flink",
-          ],
-        },
-      ],
-    },
-
-    // ===================
-    // QUERY DATA
-    // ===================
-    {
-      type: "category",
-      label: "Query Data",
-      items: [
-        "reference/sql/overview",
         {
           type: "category",
           label: "Data Types",
-          collapsed: false,
+          collapsed: true,
           items: [
             {
               id: "reference/sql/datatypes",
@@ -224,6 +216,203 @@ module.exports = {
             "concept/array",
             "concept/decimal",
             "concept/geohashes",
+          ],
+        },
+        {
+          type: "category",
+          label: "SQL Syntax",
+          collapsed: true,
+          items: [
+            {
+              id: "reference/sql/acl/add-user",
+              type: "doc",
+                },
+            {
+              type: "category",
+              label: "ALTER",
+              items: [
+                {
+                  type: "category",
+                  label: "ALTER COLUMN (TABLE)",
+                  items: [
+                    "reference/sql/alter-table-alter-column-add-index",
+                    "reference/sql/alter-table-alter-column-cache",
+                    "reference/sql/alter-table-change-column-type",
+                    "reference/sql/alter-table-alter-column-drop-index",
+                    "reference/sql/alter-table-change-symbol-capacity",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER COLUMN (VIEW)",
+                  items: [
+                    "reference/sql/alter-mat-view-alter-column-add-index",
+                    "reference/sql/alter-mat-view-alter-column-drop-index",
+                  ],
+                },
+                {
+                  id: "reference/sql/acl/alter-service-account",
+                  type: "doc",
+                        },
+                {
+                  type: "category",
+                  label: "ALTER TABLE",
+                  items: [
+                    "reference/sql/alter-table-add-column",
+                    "reference/sql/alter-table-attach-partition",
+                    "reference/sql/alter-table-change-column-type",
+                    "reference/sql/alter-table-enable-deduplication",
+                    "reference/sql/alter-table-disable-deduplication",
+                    "reference/sql/alter-table-detach-partition",
+                    "reference/sql/alter-table-drop-column",
+                    "reference/sql/alter-table-drop-partition",
+                    "reference/sql/alter-table-rename-column",
+                    "reference/sql/alter-table-resume-wal",
+                    "reference/sql/alter-table-set-param",
+                    "reference/sql/alter-table-set-ttl",
+                    "reference/sql/alter-table-set-type",
+                    "reference/sql/alter-table-squash-partitions",
+                    "reference/sql/alter-table-change-symbol-capacity",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "ALTER MATERIALIZED VIEW",
+                  items: [
+                    "reference/sql/alter-mat-view-resume-wal",
+                    "reference/sql/alter-mat-view-set-refresh",
+                    "reference/sql/alter-mat-view-set-refresh-limit",
+                    "reference/sql/alter-mat-view-set-ttl",
+                    "reference/sql/alter-mat-view-change-symbol-capacity",
+                  ],
+                },
+                {
+                  id: "reference/sql/acl/alter-user",
+                  type: "doc",
+                        },
+                "reference/sql/alter-view",
+              ],
+            },
+            {
+              id: "reference/sql/acl/assume-service-account",
+              type: "doc",
+                },
+            "reference/sql/cancel-query",
+            "reference/sql/checkpoint",
+            "reference/sql/compile-view",
+            "reference/sql/copy",
+            {
+              type: "category",
+              label: "CREATE",
+              items: [
+                {
+                  id: "reference/sql/acl/create-group",
+                  type: "doc",
+                        },
+                "reference/sql/create-mat-view",
+                {
+                  id: "reference/sql/acl/create-service-account",
+                  type: "doc",
+                        },
+                "reference/sql/create-table",
+                {
+                  id: "reference/sql/acl/create-user",
+                  type: "doc",
+                        },
+                "reference/sql/create-view",
+              ],
+            },
+            {
+              type: "category",
+              label: "DROP",
+              items: [
+                {
+                  id: "reference/sql/acl/drop-group",
+                  type: "doc",
+                        },
+                "reference/sql/drop-mat-view",
+                {
+                  id: "reference/sql/acl/drop-service-account",
+                  type: "doc",
+                        },
+                "reference/sql/drop",
+                {
+                  id: "reference/sql/acl/drop-user",
+                  type: "doc",
+                        },
+                "reference/sql/drop-view",
+              ],
+            },
+            {
+              id: "reference/sql/acl/exit-service-account",
+              type: "doc",
+                },
+            "reference/sql/explain",
+            {
+              type: "category",
+              label: "GRANT",
+                  items: [
+                {
+                  id: "reference/sql/acl/grant",
+                  type: "doc",
+                },
+                {
+                  id: "reference/sql/acl/grant-assume-service-account",
+                  type: "doc",
+                },
+              ],
+            },
+            "reference/sql/insert",
+            "reference/sql/refresh-mat-view",
+            "reference/sql/reindex",
+            {
+              id: "reference/sql/acl/remove-user",
+              type: "doc",
+                },
+            "reference/sql/rename",
+            {
+              type: "category",
+              label: "REVOKE",
+                  items: [
+                {
+                  id: "reference/sql/acl/revoke",
+                  type: "doc",
+                },
+                {
+                  id: "reference/sql/acl/revoke-assume-service-account",
+                  type: "doc",
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "SELECT",
+              items: [
+                "reference/sql/select",
+                "reference/sql/asof-join",
+                "reference/sql/case",
+                "reference/sql/cast",
+                "reference/sql/declare",
+                "reference/sql/distinct",
+                "reference/sql/fill",
+                "reference/sql/group-by",
+                "reference/sql/join",
+                "reference/sql/window-join",
+                "reference/sql/latest-on",
+                "reference/sql/limit",
+                "reference/sql/order-by",
+                "reference/sql/over",
+                "reference/sql/sample-by",
+                "reference/sql/where",
+                "reference/sql/with",
+              ],
+            },
+            "reference/sql/show",
+            "reference/sql/snapshot",
+            "reference/sql/truncate",
+            "reference/sql/union-except-intersect",
+            "reference/sql/update",
+            "reference/sql/vacuum-table",
           ],
         },
         "concept/sql-execution-order",
@@ -360,7 +549,6 @@ module.exports = {
     {
       label: "Security",
       type: "category",
-      customProps: { tag: "Enterprise" },
       items: [
         {
           id: "operations/rbac",
@@ -385,7 +573,6 @@ module.exports = {
     {
       label: "High Availability",
       type: "category",
-      customProps: { tag: "Enterprise" },
       items: [
         {
           id: "concept/replication",
@@ -540,220 +727,6 @@ module.exports = {
         "operations/profiling",
         "troubleshooting/os-error-codes",
         "troubleshooting/error-codes",
-      ],
-    },
-
-    // ===================
-    // SQL REFERENCE
-    // ===================
-    {
-      label: "SQL Reference",
-      type: "category",
-      items: [
-        {
-          id: "reference/sql/acl/add-user",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        {
-          type: "category",
-          label: "ALTER",
-          items: [
-            {
-              type: "category",
-              label: "ALTER COLUMN (TABLE)",
-              items: [
-                "reference/sql/alter-table-alter-column-add-index",
-                "reference/sql/alter-table-alter-column-cache",
-                "reference/sql/alter-table-change-column-type",
-                "reference/sql/alter-table-alter-column-drop-index",
-                "reference/sql/alter-table-change-symbol-capacity",
-              ],
-            },
-            {
-              type: "category",
-              label: "ALTER COLUMN (VIEW)",
-              items: [
-                "reference/sql/alter-mat-view-alter-column-add-index",
-                "reference/sql/alter-mat-view-alter-column-drop-index",
-              ],
-            },
-            {
-              id: "reference/sql/acl/alter-service-account",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "category",
-              label: "ALTER TABLE",
-              items: [
-                "reference/sql/alter-table-add-column",
-                "reference/sql/alter-table-attach-partition",
-                "reference/sql/alter-table-change-column-type",
-                "reference/sql/alter-table-enable-deduplication",
-                "reference/sql/alter-table-disable-deduplication",
-                "reference/sql/alter-table-detach-partition",
-                "reference/sql/alter-table-drop-column",
-                "reference/sql/alter-table-drop-partition",
-                "reference/sql/alter-table-rename-column",
-                "reference/sql/alter-table-resume-wal",
-                "reference/sql/alter-table-set-param",
-                "reference/sql/alter-table-set-ttl",
-                "reference/sql/alter-table-set-type",
-                "reference/sql/alter-table-squash-partitions",
-                "reference/sql/alter-table-change-symbol-capacity",
-              ],
-            },
-            {
-              type: "category",
-              label: "ALTER MATERIALIZED VIEW",
-              items: [
-                "reference/sql/alter-mat-view-resume-wal",
-                "reference/sql/alter-mat-view-set-refresh",
-                "reference/sql/alter-mat-view-set-refresh-limit",
-                "reference/sql/alter-mat-view-set-ttl",
-                "reference/sql/alter-mat-view-change-symbol-capacity",
-              ],
-            },
-            {
-              id: "reference/sql/acl/alter-user",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/alter-view",
-          ],
-        },
-        {
-          id: "reference/sql/acl/assume-service-account",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        "reference/sql/cancel-query",
-        "reference/sql/checkpoint",
-        "reference/sql/compile-view",
-        "reference/sql/copy",
-        {
-          type: "category",
-          label: "CREATE",
-          items: [
-            {
-              id: "reference/sql/acl/create-group",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/create-mat-view",
-            {
-              id: "reference/sql/acl/create-service-account",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/create-table",
-            {
-              id: "reference/sql/acl/create-user",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/create-view",
-          ],
-        },
-        {
-          type: "category",
-          label: "DROP",
-          items: [
-            {
-              id: "reference/sql/acl/drop-group",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/drop-mat-view",
-            {
-              id: "reference/sql/acl/drop-service-account",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/drop",
-            {
-              id: "reference/sql/acl/drop-user",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
-            "reference/sql/drop-view",
-          ],
-        },
-        {
-          id: "reference/sql/acl/exit-service-account",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        "reference/sql/explain",
-        {
-          type: "category",
-          label: "GRANT",
-          customProps: { tag: "Enterprise" },
-          items: [
-            {
-              id: "reference/sql/acl/grant",
-              type: "doc",
-            },
-            {
-              id: "reference/sql/acl/grant-assume-service-account",
-              type: "doc",
-            },
-          ],
-        },
-        "reference/sql/insert",
-        "reference/sql/refresh-mat-view",
-        "reference/sql/reindex",
-        {
-          id: "reference/sql/acl/remove-user",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        "reference/sql/rename",
-        {
-          type: "category",
-          label: "REVOKE",
-          customProps: { tag: "Enterprise" },
-          items: [
-            {
-              id: "reference/sql/acl/revoke",
-              type: "doc",
-            },
-            {
-              id: "reference/sql/acl/revoke-assume-service-account",
-              type: "doc",
-            },
-          ],
-        },
-        {
-          type: "category",
-          label: "SELECT",
-          items: [
-            "reference/sql/select",
-            "reference/sql/asof-join",
-            "reference/sql/case",
-            "reference/sql/cast",
-            "reference/sql/declare",
-            "reference/sql/distinct",
-            "reference/sql/fill",
-            "reference/sql/group-by",
-            "reference/sql/join",
-            "reference/sql/window-join",
-            "reference/sql/latest-on",
-            "reference/sql/limit",
-            "reference/sql/order-by",
-            "reference/sql/over",
-            "reference/sql/sample-by",
-            "reference/sql/where",
-            "reference/sql/with",
-          ],
-        },
-        "reference/sql/show",
-        "reference/sql/snapshot",
-        "reference/sql/truncate",
-        "reference/sql/union-except-intersect",
-        "reference/sql/update",
-        "reference/sql/vacuum-table",
       ],
     },
 

@@ -7,8 +7,13 @@ description:
 ---
 
 import { ConfigTable } from "@theme/ConfigTable"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 import replicationConfig from "../configuration-utils/\_replication.config.json"
+
+<EnterpriseNote>
+  This guide covers setting up primary-replica replication.
+</EnterpriseNote>
 
 This guide walks you through setting up QuestDB Enterprise replication.
 
