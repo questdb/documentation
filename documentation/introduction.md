@@ -12,13 +12,13 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is a high-performance time-series database built for speed:
+QuestDB is an open source, high-performance time-series database:
 
-- **Low-latency architecture** — sub-millisecond queries on billions of rows
-- **High-throughput ingestion** — millions of rows per second
-- **Fast SQL with time-series extensions** — SAMPLE BY, LATEST ON, ASOF JOIN
-- **Open formats** — built on Parquet, no vendor lock-in
-- **AI-ready** — query with LLMs or use BYOK AI in the Web Console
+**Low-latency architecture** — sub-millisecond queries on billions of rows\
+**High-throughput ingestion** — millions of rows per second\
+**Fast SQL with time-series extensions** — SAMPLE BY, LATEST ON, ASOF JOIN\
+**Open formats** — built on Parquet, no vendor lock-in\
+**AI-ready** — query with LLMs or use BYOK AI in the Web Console
 
 Used in capital markets, fintech, crypto, energy, heavy industry, space exploration, and robotics.
 
@@ -38,8 +38,8 @@ This documentation covers both **QuestDB Open Source** and **QuestDB Enterprise*
 
 QuestDB Enterprise builds on top of QuestDB Open Source, using it as its core
 library. Everything in open source works in Enterprise, but not the other way
-around. Enterprise adds features like high availability, advanced security, and
-RBAC.
+around. Enterprise adds features like high availability, advanced security, RBAC,
+automated backups, and multi-tier storage with seamless object storage integration.
 
 ## Get started
 

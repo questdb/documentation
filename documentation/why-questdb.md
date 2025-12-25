@@ -21,7 +21,7 @@ QuestDB is designed for workloads that require:
 - **Efficient petabyte-scale storage** — [multi-tier architecture](/docs/guides/architecture/questdb-architecture/) with long-term storage in Parquet files
 - **SQL, not a new query language** — standard SQL with time-series extensions
 - **Hardware efficiency** — get more from less infrastructure
-- **Capital markets and crypto capabilities** — [N-dimensional arrays](/docs/concept/array/), [order book analytics](/docs/guides/order-book/), [OHLC charts](https://questdb.com/blog/kline-candlestick-charts-with-grafana-and-questdb/), advanced post-trade analysis, ultra-low latency architecture, and a [strong customer base](https://questdb.com/customers/) in financial services
+- **Capital markets capabilities** — [N-dimensional arrays](/docs/concept/array/), [order book analytics](/docs/guides/order-book/), [OHLC charts](https://questdb.com/blog/kline-candlestick-charts-with-grafana-and-questdb/), advanced post-trade analysis, ultra-low latency architecture, and a [strong customer base](https://questdb.com/customers/) in financial services
 
 ### Common use cases
 

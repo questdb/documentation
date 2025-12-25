@@ -17,8 +17,8 @@ workloads.
 ## First-party clients
 
 Our first-party clients are **the fastest way to insert data**. They excel
-with high-volume, [high-cardinality](/glossary/high-cardinality/) data streaming
-and are the recommended choice for production deployments.
+with high-throughput, low-latency data streaming and are the recommended choice
+for production deployments.
 
 To start quickly, select your language:
 

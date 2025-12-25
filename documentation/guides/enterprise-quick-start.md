@@ -1,5 +1,5 @@
 ---
-title: Enterprise quick start
+title: QuestDB Enterprise quick start
 description:
   "Get started with QuestDB Enterprise, as quickly as possible. Instructions
   follow a happy path, and will get you running with all the latest and greatest
@@ -20,19 +20,19 @@ inform your own unique choices.
 
 ---
 
-- [Requirements](#requirements)
-- [0. Secure the built in admin](#0-secure-the-built-in-admin)
-- [1. Setup TLS](#1-setup-tls)
-- [2. Setup a database administrator](#2-setup-a-database-administrator)
-- [3. Create interactive user accounts](#3-create-interactive-user-accounts)
-- [4. Ingest data, InfluxDB Line Protocol](#4-ingest-data-influxdb-line-protocol)
-- [5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)
-- [6. Query data, PostgreSQL query](#6-query-data-postgresql-query)
-- [7. Setup replication](#7-setup-replication)
-- [8. Enable compression](#8-enable-compression)
-- [9. Double-check kernel limits](#9-double-check-kernel-limits)
-- [Next steps](#next-steps)
-- [FAQ](#faq)
+[Requirements](#requirements)\
+[0. Secure the built in admin](#0-secure-the-built-in-admin)\
+[1. Setup TLS](#1-setup-tls)\
+[2. Setup a database administrator](#2-setup-a-database-administrator)\
+[3. Create interactive user accounts](#3-create-interactive-user-accounts)\
+[4. Ingest data, InfluxDB Line Protocol](#4-ingest-data-influxdb-line-protocol)\
+[5. Ingest data, Kafka Connect (optional)](#5-ingest-data-kafka-connect-optional)\
+[6. Query data, PostgreSQL query](#6-query-data-postgresql-query)\
+[7. Setup replication](#7-setup-replication)\
+[8. Enable compression](#8-enable-compression)\
+[9. Double-check kernel limits](#9-double-check-kernel-limits)\
+[Next steps](#next-steps)\
+[FAQ](#faq)
 
 ---
 

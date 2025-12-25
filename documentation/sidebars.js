@@ -18,12 +18,12 @@ module.exports = {
         {
           id: "operations/migrate-to-enterprise",
           type: "doc",
-          label: "Upgrade to Enterprise",
+          label: "Upgrade to QuestDB Enterprise",
         },
         {
           id: "guides/enterprise-quick-start",
           type: "doc",
-          label: "Enterprise Quick Start",
+          label: "QuestDB Enterprise Quick Start",
         },
         {
           type: "category",
