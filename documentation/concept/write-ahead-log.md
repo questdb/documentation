@@ -48,10 +48,16 @@ TIMESTAMP(ts) PARTITION BY DAY WAL;
 
 ## Requirements
 
-WAL tables must be partitioned. Non-partitioned tables cannot use WAL:
+**WAL requires partitioning.** Non-partitioned tables cannot use WAL.
+
+| Table creation method | Default partitioning | WAL enabled? |
+|----------------------|---------------------|--------------|
+| SQL `CREATE TABLE` without `PARTITION BY` | None | **No** |
+| SQL `CREATE TABLE` with `PARTITION BY` | As specified | Yes |
+| ILP auto-created tables | `PARTITION BY DAY` | Yes |
 
 ```questdb-sql
--- Non-partitioned = no WAL (not recommended)
+-- Non-partitioned = no WAL (not recommended for time-series)
 CREATE TABLE static_data (key VARCHAR, value VARCHAR);
 
 -- Partitioned = WAL enabled (recommended)
@@ -59,7 +65,8 @@ CREATE TABLE prices (...)
 TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
-Always use partitioned tables to get WAL benefits.
+If you need WAL features (concurrent writes, replication, deduplication),
+always specify `PARTITION BY` when creating tables via SQL.
 
 ## Checking WAL status
 

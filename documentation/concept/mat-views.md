@@ -207,9 +207,25 @@ to learn more on period materialized views.
 
 ## Initial refresh
 
-As soon as a materialized view is created an asynchronous refresh is started. In
-situations when this is not desirable, `DEFERRED` keyword can be specified along
-with the refresh strategy:
+When a materialized view is created, QuestDB starts an **asynchronous full refresh**.
+
+**What this means:**
+- The `CREATE MATERIALIZED VIEW` statement returns immediately
+- The view is queryable right away, but **returns no data** until the refresh completes
+- The initial refresh scans the entire base table (not incremental)
+- For large base tables, this may take significant time
+
+**Check if the initial refresh is complete:**
+
+```questdb-sql
+SELECT view_name, view_status, refresh_base_table_txn, base_table_txn
+FROM materialized_views()
+WHERE view_name = 'your_view';
+```
+
+When `refresh_base_table_txn` equals `base_table_txn`, the view is fully populated.
+
+**To defer the initial refresh**, use the `DEFERRED` keyword:
 
 ```questdb-sql title="Deferred manual refresh"
 CREATE MATERIALIZED VIEW trades_daily_prices
