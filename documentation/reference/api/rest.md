@@ -496,7 +496,7 @@ Supported HTTP headers:
 
 ```shell
 curl -G \
-  --data-urlencode "query=SELECT timestamp, tempF FROM weather LIMIT 2;" \
+  --data-urlencode "query=SELECT timestamp, price FROM trades LIMIT 2;" \
   --data-urlencode "count=true" \
   http://localhost:9000/exec
 ```
@@ -505,21 +505,21 @@ A HTTP status code of `200` is returned with the following response body:
 
 ```json
 {
-  "query": "SELECT timestamp, tempF FROM weather LIMIT 2;",
+  "query": "SELECT timestamp, price FROM trades LIMIT 2;",
   "columns": [
     {
       "name": "timestamp",
       "type": "TIMESTAMP"
     },
     {
-      "name": "tempF",
-      "type": "INT"
+      "name": "price",
+      "type": "DOUBLE"
     }
   ],
   "timestamp": 0
   "dataset": [
-    ["2010-01-01T00:00:00.000000Z", 34],
-    ["2010-01-01T00:51:00.000000Z", 34]
+    ["2024-01-01T00:00:00.000000Z", 142.50],
+    ["2024-01-01T00:00:01.000000Z", 142.75]
   ],
   "count": 2
 }

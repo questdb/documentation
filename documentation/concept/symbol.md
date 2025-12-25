@@ -58,11 +58,12 @@ Symbols provide:
 ## Creating SYMBOL columns
 
 ```questdb-sql
-CREATE TABLE events (
+CREATE TABLE orders (
     timestamp TIMESTAMP,
-    event_type SYMBOL,
-    user_region SYMBOL,
-    payload VARCHAR
+    symbol SYMBOL,
+    side SYMBOL,
+    order_type SYMBOL,
+    price DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -90,10 +91,10 @@ cache can consume significant memory.
 Use `NOCACHE` to disable dictionary caching:
 
 ```questdb-sql
-CREATE TABLE events (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    high_cardinality_id SYMBOL NOCACHE,
-    event_type SYMBOL
+    client_id SYMBOL NOCACHE,
+    symbol SYMBOL
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -105,10 +106,10 @@ To toggle caching on an existing column:
 
 ```questdb-sql
 -- Disable cache
-ALTER TABLE events ALTER COLUMN high_cardinality_id NOCACHE;
+ALTER TABLE trades ALTER COLUMN client_id NOCACHE;
 
 -- Re-enable cache
-ALTER TABLE events ALTER COLUMN high_cardinality_id CACHE;
+ALTER TABLE trades ALTER COLUMN client_id CACHE;
 ```
 
 ## Indexing symbols
@@ -116,17 +117,17 @@ ALTER TABLE events ALTER COLUMN high_cardinality_id CACHE;
 For columns frequently used in `WHERE` clauses, add an index:
 
 ```questdb-sql
-CREATE TABLE events (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    event_type SYMBOL INDEX,
-    payload VARCHAR
+    symbol SYMBOL INDEX,
+    price DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Or add an index later:
 
 ```questdb-sql
-ALTER TABLE events ALTER COLUMN event_type ADD INDEX;
+ALTER TABLE trades ALTER COLUMN symbol ADD INDEX;
 ```
 
 See [Indexes](/docs/concept/indexes/) for more information.

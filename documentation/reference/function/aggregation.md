@@ -75,8 +75,8 @@ Return value type is `long`.
 _Please note that exact example values will vary as they are approximations
 derived from the HyperLogLog algorithm._
 
-```questdb-sql title="Estimate count of distinct IPv4 addresses with precision 5"
-SELECT approx_count_distinct(ip_address, 5) FROM logs;
+```questdb-sql title="Estimate count of distinct symbols with precision 5"
+SELECT approx_count_distinct(symbol, 5) FROM trades;
 ```
 
 | approx_count_distinct |
@@ -159,7 +159,7 @@ Return value type is `double`.
 #### Examples
 
 ```questdb-sql title="Approximate percentile"
-SELECT approx_percentile(latency, 0.99) FROM request_logs;
+SELECT approx_percentile(price, 0.99) FROM trades;
 ```
 
 | approx_percentile |
@@ -516,43 +516,43 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-Given a table `sensors`, which has a designated timestamp column:
+Given a table `trades`, which has a designated timestamp column:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| AAPL   | 142   | 2021-06-02T14:33:19.970258Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
 
-The following query returns oldest value for the `device_id` column:
+The following query returns oldest value for the `symbol` column:
 
 ```questdb-sql
-SELECT first(device_id) FROM sensors;
+SELECT first(symbol) FROM trades;
 ```
 
-| first      |
-| :--------- |
-| arduino-01 |
+| first |
+| :---- |
+| AAPL  |
 
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
-`sensors_unordered`:
+`trades_unordered`:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| AAPL   | 142   | 2021-06-02T14:33:19.970258Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the first record for the `device_id` column:
+The following query returns the first record for the `symbol` column:
 
 ```questdb-sql
-SELECT first(device_id) FROM sensors_unordered;
+SELECT first(symbol) FROM trades_unordered;
 ```
 
-| first      |
-| :--------- |
-| arduino-01 |
+| first |
+| :---- |
+| AAPL  |
 
 ## first_not_null
 
@@ -573,43 +573,43 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-Given a table `sensors`, which has a designated timestamp column:
+Given a table `trades`, which has a designated timestamp column:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| NULL   | 142   | 2021-06-02T14:33:19.970258Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
 
-The following query returns oldest non-NULL value for the device_id column:
+The following query returns oldest non-NULL value for the symbol column:
 
 ```questdb-sql
-SELECT first_not_null(device_id) FROM sensors;
+SELECT first_not_null(symbol) FROM trades;
 ```
 
 | first_not_null |
 | :------------- |
-| arduino-02     |
+| GOOGL          |
 
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
-`sensors_unordered`:
+`trades_unordered`:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| NULL   | 142   | 2021-06-02T14:33:19.970258Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the first non-NULL record for the device_id column:
+The following query returns the first non-NULL record for the symbol column:
 
 ```questdb-sql
-SELECT first_not_null(device_id) FROM sensors_unordered;
+SELECT first_not_null(symbol) FROM trades_unordered;
 ```
 
 | first_not_null |
 | :------------- |
-| arduino-03     |
+| MSFT           |
 
 ## haversine_dist_deg
 
@@ -680,43 +680,43 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-Given a table `sensors`, which has a designated timestamp column:
+Given a table `trades`, which has a designated timestamp column:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| AAPL   | 142   | 2021-06-02T14:33:19.970258Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
 
-The following query returns the latest symbol value for the `device_id` column:
+The following query returns the latest value for the `symbol` column:
 
 ```questdb-sql
-SELECT last(device_id) FROM sensors;
+SELECT last(symbol) FROM trades;
 ```
 
-| last       |
-| :--------- |
-| arduino-03 |
+| last |
+| :--- |
+| MSFT |
 
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
-`sensors_unordered`:
+`trades_unordered`:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| arduino-01 | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| AAPL   | 142   | 2021-06-02T14:33:19.970258Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the last record for the `device_id` column:
+The following query returns the last record for the `symbol` column:
 
 ```questdb-sql
-SELECT last(device_id) FROM sensors_unordered;
+SELECT last(symbol) FROM trades_unordered;
 ```
 
-| last       |
-| :--------- |
-| arduino-02 |
+| last  |
+| :---- |
+| GOOGL |
 
 
 ## last_not_null
@@ -738,43 +738,43 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-Given a table `sensors`, which has a designated timestamp column:
+Given a table `trades`, which has a designated timestamp column:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| NULL   | 142   | 2021-06-02T14:33:19.970258Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
 
-The following query returns most recent non-NULL value for the device_id column:
+The following query returns most recent non-NULL value for the symbol column:
 
 ```questdb-sql
-SELECT last_not_null(device_id) FROM sensors;
+SELECT last_not_null(symbol) FROM trades;
 ```
 
 | last_not_null |
 | :------------ |
-| arduino-03    |
+| MSFT          |
 
 Without selecting a designated timestamp column, the table may be unordered and
 the query may return different result. Given an unordered table
-`sensors_unordered`:
+`trades_unordered`:
 
-| device_id  | temperature | ts                          |
-| :--------- | :---------- | :-------------------------- |
-| NULL       | 12          | 2021-06-02T14:33:19.970258Z |
-| arduino-03 | 18          | 2021-06-02T14:33:23.707013Z |
-| arduino-02 | 10          | 2021-06-02T14:33:21.703934Z |
+| symbol | price | ts                          |
+| :----- | :---- | :-------------------------- |
+| NULL   | 142   | 2021-06-02T14:33:19.970258Z |
+| MSFT   | 285   | 2021-06-02T14:33:23.707013Z |
+| GOOGL  | 2750  | 2021-06-02T14:33:21.703934Z |
 
-The following query returns the last non-NULL record for the `device_id` column:
+The following query returns the last non-NULL record for the `symbol` column:
 
 ```questdb-sql
-SELECT last_not_null(device_id) FROM sensors_unordered;
+SELECT last_not_null(symbol) FROM trades_unordered;
 ```
 
 | last_not_null |
 | :------------ |
-| arduino-02    |
+| GOOGL         |
 
 
 

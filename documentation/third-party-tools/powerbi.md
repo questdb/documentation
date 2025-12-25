@@ -72,18 +72,18 @@ To leverage QuestDB-specific features like `SAMPLE BY` and `LATEST ON`, you can 
 Here are some useful query examples:
 
 ```questdb-sql
--- Get 1-hour samples of sensor readings
-SELECT 
+-- Get 1-hour samples of trade prices
+SELECT
     timestamp,
-    avg(temperature) as avg_temp,
-    avg(humidity) as avg_humidity
-FROM sensors
+    avg(price) as avg_price,
+    sum(amount) as volume
+FROM trades
 WHERE timestamp >= dateadd('d', -7, now())
 SAMPLE BY 1h;
 
--- Get latest reading for each sensor
-SELECT * FROM sensors
-LATEST ON timestamp PARTITION BY sensor_id;
+-- Get latest trade for each symbol
+SELECT * FROM trades
+LATEST ON timestamp PARTITION BY symbol;
 
 -- Combine SAMPLE BY with multiple aggregations
 SELECT 

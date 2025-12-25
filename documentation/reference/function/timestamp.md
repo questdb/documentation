@@ -90,26 +90,26 @@ timestamp(ts);
 The following will query a table and assign a
 [designated timestamp](/docs/concept/designated-timestamp/) to the output. Note
 the use of brackets to ensure the timestamp clause is applied to the result of
-the query instead of the whole `readings` table.
+the query instead of the whole `trades` table.
 
 ```questdb-sql title="Dynamic timestamp"
-(SELECT cast(dateTime AS TIMESTAMP) ts, device, value FROM readings) timestamp(ts);
+(SELECT cast(dateTime AS TIMESTAMP) ts, symbol, price FROM trades) timestamp(ts);
 ```
 
-Although the `readings` table does not have a designated timestamp, we are able
+Although the `trades` table does not have a designated timestamp, we are able
 to create one on the fly. Now, we can use this into a subquery to perform
 timestamp operations.
 
 ```questdb-sql title="Dynamic timestamp subquery"
-SELECT ts, avg(value) FROM
-(SELECT cast(dateTime AS TIMESTAMP) ts, value FROM readings) timestamp(ts)
+SELECT ts, avg(price) FROM
+(SELECT cast(dateTime AS TIMESTAMP) ts, price FROM trades) timestamp(ts)
 SAMPLE BY 1d;
 ```
 
 If the data is unordered, it is important to order it first.
 
 ```questdb-sql title="Dynamic timestamp - unordered data"
-SELECT ts, avg(value) FROM
-(SELECT ts, value FROM unordered_readings ORDER BY ts) timestamp(ts)
+SELECT ts, avg(price) FROM
+(SELECT ts, price FROM unordered_trades ORDER BY ts) timestamp(ts)
 SAMPLE BY 1d;
 ```

@@ -518,14 +518,14 @@ CREATE BATCH 4096 o3MaxLag 1s TABLE new_trades AS (
 ### Turning unordered data into ordered data
 
 As an additional example, let's assume we imported a text file into the table
-`taxi_trips_unordered` and now we want to turn this data into time series
-through ordering trips by `pickup_time`, assign dedicated timestamp and
+`trades_unordered` and now we want to turn this data into time series
+through ordering trades by `timestamp`, assign dedicated timestamp and
 partition by month:
 
 ```questdb-sql title="Create table as select with data manipulation"
-CREATE TABLE taxi_trips AS (
-  SELECT * FROM taxi_trips_unordered ORDER BY pickup_time
-) TIMESTAMP(pickup_time)
+CREATE TABLE trades AS (
+  SELECT * FROM trades_unordered ORDER BY timestamp
+) TIMESTAMP(timestamp)
 PARTITION BY MONTH;
 ```
 

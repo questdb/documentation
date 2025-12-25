@@ -43,10 +43,11 @@ Use the [`timestamp(columnName)`](/docs/reference/function/timestamp/) function
 at table creation:
 
 ```questdb-sql
-CREATE TABLE readings (
+CREATE TABLE trades (
     ts TIMESTAMP,
-    sensor_id SYMBOL,
-    value DOUBLE
+    symbol SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 

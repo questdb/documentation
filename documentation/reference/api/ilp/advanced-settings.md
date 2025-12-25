@@ -49,29 +49,29 @@ table.
 
 Let's assume the following data:
 
-| timestamp           | city    | temperature | humidity | make      |
-| :------------------ | :------ | :---------- | :------- | :-------- |
-| 1465839830100400000 | London  | 23.5        | 0.343    | Omron     |
-| 1465839830100600000 | Bristol | 23.2        | 0.443    | Honeywell |
-| 1465839830100700000 | London  | 23.6        | 0.358    | Omron     |
+| timestamp           | symbol  | price  | amount | side |
+| :------------------ | :------ | :----- | :----- | :--- |
+| 1465839830100400000 | BTC-USD | 61432  | 0.5    | buy  |
+| 1465839830100600000 | ETH-USD | 3421   | 2.1    | sell |
+| 1465839830100700000 | BTC-USD | 61435  | 1.2    | buy  |
 
 The line protocol syntax for that table is:
 
 ```shell
-readings,city=London,make=Omron temperature=23.5,humidity=0.343 1465839830100400000\n
-readings,city=Bristol,make=Honeywell temperature=23.2,humidity=0.443 1465839830100600000\n
-readings,city=London,make=Omron temperature=23.6,humidity=0.348 1465839830100700000\n
+trades,symbol=BTC-USD,side=buy price=61432,amount=0.5 1465839830100400000\n
+trades,symbol=ETH-USD,side=sell price=3421,amount=2.1 1465839830100600000\n
+trades,symbol=BTC-USD,side=buy price=61435,amount=1.2 1465839830100700000\n
 ```
 
 This would create table similar to this SQL statement and populate it.
 
 ```questdb-sql
-CREATE TABLE readings (
+CREATE TABLE trades (
   timestamp TIMESTAMP,
-  city SYMBOL,
-  temperature DOUBLE,
-  humidity DOUBLE,
-  make SYMBOL
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE,
+  side SYMBOL
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -103,7 +103,7 @@ as the row timestamp. See `cairo.timestamp.locale` and `line.tcp.timestamp`
 
 ```shell
 curl -i -XPOST 'http://localhost:9000/write?db=mydb&precision=s' \
---data-binary 'weather,location=us-midwest temperature=82 1465839830100400200'
+--data-binary 'trades,symbol=BTC-USD price=61432 1465839830100400200'
 ```
 
 :::
@@ -134,18 +134,18 @@ example just above highlights structured data, it is possible for InfluxDB line
 protocol users to send data as follows:
 
 ```shell
-readings,city=London temperature=23.2 1465839830100400000\n
-readings,city=London temperature=23.6 1465839830100700000\n
-readings,make=Honeywell temperature=23.2,humidity=0.443 1465839830100800000\n
+trades,symbol=BTC-USD price=61432 1465839830100400000\n
+trades,symbol=BTC-USD price=61435 1465839830100700000\n
+trades,symbol=ETH-USD price=3421,amount=2.1 1465839830100800000\n
 ```
 
 This would result in the following table:
 
-| timestamp           | city   | temperature | humidity | make      |
-| :------------------ | :----- | :---------- | :------- | :-------- |
-| 1465839830100400000 | London | 23.5        | NULL     | NULL      |
-| 1465839830100700000 | London | 23.6        | NULL     | NULL      |
-| 1465839830100800000 | NULL   | 23.2        | 0.358    | Honeywell |
+| timestamp           | symbol  | price | amount |
+| :------------------ | :------ | :---- | :----- |
+| 1465839830100400000 | BTC-USD | 61432 | NULL   |
+| 1465839830100700000 | BTC-USD | 61435 | NULL   |
+| 1465839830100800000 | ETH-USD | 3421  | 2.1    |
 
 :::tip
 
