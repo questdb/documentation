@@ -5,7 +5,7 @@
   },
   "query.timeout.sec": {
     "default": "60",
-    "description": "A global timeout (in seconds) for long-running queries. Timeout for each query can override the default by setting HTTP header [`Statement-Timeout`](/docs/reference/api/rest/#headers) or Postgres [`options`](/docs/reference/api/postgres/#list-of-supported-connection-properties)."
+    "description": "A global timeout (in seconds) for long-running queries. Timeout for each query can override the default by setting HTTP header [`Statement-Timeout`](/docs/reference/api/rest/#headers) or Postgres [`options`](/docs/pgwire/pgwire-intro/#list-of-supported-connection-properties)."
   },
   "cairo.max.uncommitted.rows": {
     "default": "500000",

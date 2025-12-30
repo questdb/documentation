@@ -21,6 +21,7 @@ and partition storage size on disk.
   table.
 - `SHOW PARTITIONS` returns the partition information for the selected table.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
+- `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
 - `SHOW USER` shows user secret (enterprise-only)
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
     (enterprise-only)
@@ -109,6 +110,19 @@ This clause assigns permissions for the table to that user.
 
 If permissions should be assigned to a different user,
 please modify this clause appropriately.
+
+### SHOW CREATE VIEW
+
+```questdb-sql title="retrieving view ddl"
+SHOW CREATE VIEW my_view;
+```
+
+| ddl                                                                |
+| ------------------------------------------------------------------ |
+| CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades);   |
+
+This returns the `CREATE VIEW` statement that would recreate the view,
+including any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW PARTITIONS
 
@@ -315,9 +329,10 @@ SHOW SERVER_VERSION;
 
 ## See also
 
-The following functions allow querying tables with filters and using the results
-as part of a function:
+The following functions allow querying tables and views with filters and using
+the results as part of a function:
 
 - [table_columns()](/docs/reference/function/meta/#table_columns)
 - [tables()](/docs/reference/function/meta/#tables)
 - [table_partitions()](/docs/reference/function/meta/#table_partitions)
+- [views()](/docs/reference/function/meta/#views)

@@ -141,6 +141,11 @@ need high-performance inserts.
 
 ## /imp - Import data
 
+:::tip
+For a complete guide including text loader configuration and troubleshooting,
+see [CSV Import](/docs/guides/import-csv/#import-csv-via-rest).
+:::
+
 `/imp` streams tabular text data directly into a table. It supports CSV, TAB and
 pipe (`|`) delimited inputs with optional headers. There are no restrictions on
 data size. Data types and structures are detected automatically, without
@@ -228,7 +233,7 @@ When the header row is missing, column names are generated automatically.
 ### Consistency guarantees
 
 `/imp` benefits from the properties of the QuestDB
-[storage model](/docs/concept/storage-model#consistency-and-durability),
+[storage engine](/docs/guides/architecture/storage-engine/#durability),
 although Atomicity and Durability can be relaxed to meet convenience and
 performance demands.
 
@@ -491,7 +496,7 @@ Supported HTTP headers:
 
 ```shell
 curl -G \
-  --data-urlencode "query=SELECT timestamp, tempF FROM weather LIMIT 2;" \
+  --data-urlencode "query=SELECT timestamp, price FROM trades LIMIT 2;" \
   --data-urlencode "count=true" \
   http://localhost:9000/exec
 ```
@@ -500,21 +505,21 @@ A HTTP status code of `200` is returned with the following response body:
 
 ```json
 {
-  "query": "SELECT timestamp, tempF FROM weather LIMIT 2;",
+  "query": "SELECT timestamp, price FROM trades LIMIT 2;",
   "columns": [
     {
       "name": "timestamp",
       "type": "TIMESTAMP"
     },
     {
-      "name": "tempF",
-      "type": "INT"
+      "name": "price",
+      "type": "DOUBLE"
     }
   ],
   "timestamp": 0
   "dataset": [
-    ["2010-01-01T00:00:00.000000Z", 34],
-    ["2010-01-01T00:51:00.000000Z", 34]
+    ["2024-01-01T00:00:00.000000Z", 142.50],
+    ["2024-01-01T00:00:01.000000Z", 142.75]
   ],
   "count": 2
 }

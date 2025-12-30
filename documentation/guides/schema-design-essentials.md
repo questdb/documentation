@@ -1,422 +1,445 @@
 ---
-title: Schema Design
-slug: schema-design-essentials
+title: Schema design
+sidebar_label: Schema design
 description:
-  Learn how to design efficient schemas in QuestDB. This guide covers best
-  practices for partitioning, indexing, symbols, timestamps, deduplication,
-  retention strategies, and schema modifications to optimize performance in
-  time-series workloads
+  Learn how to design efficient schemas in QuestDB. Covers timestamps,
+  partitioning, data types, deduplication, and retention strategies.
 ---
 
-This guide covers key concepts and best practices to take full advantage of
-QuestDB's performance-oriented architecture, highlighting some important
-differences with most databases.
+New to QuestDB? This guide covers the essential concepts for designing efficient time-series tables.
 
-## QuestDB's single database model
+## Your first table
 
-QuestDB has a **single database per instance**. Unlike PostgreSQL and other
-database engines, where you may have multiple databases or multiple schemas
-within an instance, in QuestDB, you operate within a single namespace.
-
-The default database is named `qdb`, and this can be changed via configuration.
-However, unlike a standard SQL database, there is no need to issue
-`USE DATABASE` commands. Once connected, you can immediately start querying and
-inserting data.
-
-### Multi-tenancy considerations
-
-If you need **multi-tenancy**, you must manage table names manually, often by
-using **prefixes** for different datasets. Since QuestDB does not support
-multiple schemas, this is the primary way to segment data. In QuestDB
-Enterprise, you can
-[enforce permissions per table to restrict access](/docs/operations/rbac/),
-allowing finer control over multi-tenant environments.
-
-Here are common patterns for implementing multi-tenancy:
-
-#### Customer-specific tables
+Here's a minimal, well-designed QuestDB table:
 
 ```questdb-sql
--- Customer-specific trading data
-CREATE TABLE customer1_trades (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
     symbol SYMBOL,
-    price DOUBLE
+    side SYMBOL,
+    price DOUBLE,
+    quantity DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
 
-CREATE TABLE customer2_trades (
-    timestamp TIMESTAMP,
+Key elements:
+- **`TIMESTAMP(timestamp)`** — designates the time column (required for time-series)
+- **`PARTITION BY DAY`** — splits data into daily partitions for efficient queries
+- **`SYMBOL`** — optimized type for categorical data like tickers
+
+## Designated timestamp
+
+Every time-series table needs a **designated timestamp**. This column:
+
+- Determines physical storage order (data is sorted by this column)
+- Enables partition pruning (queries skip irrelevant time ranges)
+- Powers time-series functions like `SAMPLE BY` and `LATEST ON`
+
+```questdb-sql
+CREATE TABLE market_data (
+    ts TIMESTAMP,        -- Will be the designated timestamp
     symbol SYMBOL,
     price DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY;
+) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
-#### Environment or region-based separation
+Without a designated timestamp, you lose most of QuestDB's performance benefits.
+
+See [Designated Timestamp](/docs/concept/designated-timestamp/) for details.
+
+## Partitioning
+
+Partitioning splits your table into time-based chunks. Choose based on your data volume:
+
+| Data volume | Recommended partition |
+|-------------|----------------------|
+| < 100K rows/day | `MONTH` or `YEAR` |
+| 100K - 10M rows/day | `DAY` |
+| 10M - 100M rows/day | `HOUR` |
+| > 100M rows/day | `HOUR` (consider multiple tables) |
+
+**Guidelines:**
+- Each partition should be a few hundred MB to a few GB
+- Too many small partitions = more file operations
+- Too few large partitions = slower queries and more memory usage
 
 ```questdb-sql
--- Production vs. Development environments
-CREATE TABLE prod_metrics (
-    timestamp TIMESTAMP,
-    metric_name SYMBOL,
-    value DOUBLE
-) TIMESTAMP(timestamp);
+-- High-volume tick data
+CREATE TABLE trades (...)
+TIMESTAMP(ts) PARTITION BY HOUR;
 
-CREATE TABLE dev_metrics (
-    timestamp TIMESTAMP,
-    metric_name SYMBOL,
-    value DOUBLE
-) TIMESTAMP(timestamp);
-
--- Regional data separation
-CREATE TABLE eu_users (
-    timestamp TIMESTAMP,
-    user_id SYMBOL,
-    action SYMBOL
-) TIMESTAMP(timestamp);
-
-CREATE TABLE us_users (
-    timestamp TIMESTAMP,
-    user_id SYMBOL,
-    action SYMBOL
-) TIMESTAMP(timestamp);
+-- Lower-volume end-of-day prices
+CREATE TABLE eod_prices (...)
+TIMESTAMP(ts) PARTITION BY MONTH;
 ```
 
-#### Department or team-based separation
+See [Partitions](/docs/concept/partitions/) for details.
+
+## Data types
+
+### SYMBOL vs VARCHAR
+
+**When to use SYMBOL:**
+- Repetitive string values (stock tickers, country codes, status flags)
+- Up to tens of millions of distinct values
+- Columns used in `WHERE` filters or `GROUP BY`
+
+**When to use VARCHAR:**
+- Unique/high-cardinality values (hundreds of millions of distinct)
+- User-generated text (comments, log messages)
+- UUIDs (though the `UUID` type is better)
+
+**Why it matters:**
+- SYMBOL uses dictionary encoding (integer lookups vs string comparisons)
+- Faster filtering, faster grouping, less storage
 
 ```questdb-sql
--- Department-specific analytics
-CREATE TABLE sales_daily_stats (
+CREATE TABLE trades (
     timestamp TIMESTAMP,
-    region SYMBOL,
-    revenue DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY;
-
-CREATE TABLE marketing_campaign_metrics (
-    timestamp TIMESTAMP,
-    campaign_id SYMBOL,
-    clicks LONG,
-    impressions LONG
+    symbol SYMBOL,       -- Stock ticker: AAPL, GOOGL, etc.
+    side SYMBOL,         -- BUY or SELL
+    price DOUBLE,
+    quantity DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-:::tip
-
-When using table prefixes for multi-tenancy:
-
-- Use consistent naming conventions (e.g., always `<tenant>_<table>`)
-- Consider using uppercase for tenant identifiers to improve readability
-- Document your naming convention in your team's schema design guidelines
-
-:::
-
-## PostgreSQL protocol compatibility
-
-QuestDB is **not** a PostgreSQL database but is **compatible with the
-[PostgreSQL wire protocol](/docs/reference/api/postgres/)**. This means you can
-connect using PostgreSQL-compatible libraries and clients and execute SQL
-commands. However, compatibility with PostgreSQL system catalogs, metadata
-queries, data types, and functions is limited.
-
-While most PostgreSQL-compatible low-level libraries work with QuestDB, some
-higher-level components that depend heavily on PostgreSQL metadata might fail.
-If you encounter such a case, please report it as an
-[issue on GitHub](https://github.com/questdb/questdb/issues) so we can track it.
-
-## Creating a schema in QuestDB
-
-### Recommended approach
-
-The easiest way to create a schema is through the
-**[Web Console](/docs/web-console/)** or by sending SQL commands using:
-
-- The [**REST API**](/docs/reference/api/rest/) (`CREATE TABLE` statements)
-- The **[PostgreSQL wire protocol](/docs/reference/api/postgres/) clients**
-
-### Schema auto-creation with ILP protocol
-
-When using the **[Influx Line Protocol](/docs/reference/api/ilp/overview/)
-(ILP)**, QuestDB automatically creates tables and columns based on incoming
-data. This is useful for users migrating from InfluxDB or using tools like
-**InfluxDB client libraries or Telegraf**, as they can send data directly to
-QuestDB without pre-defining schemas. However, this comes with limitations:
-
-- QuestDB applies the **default settings** to auto-created tables and columns
-  (e.g., partitioning, symbol capacity, and data types).
-- You **cannot modify [partitioning](/docs/concept/partitions/) or
-  [symbol capacity](/docs/concept/symbol/#usage-of-symbols) later**.
-- You cannot auto-create the `IPv4` data type. Sending an IP address as a string
-  will create a `VARCHAR` column.
-
-You can disable column auto-creation
-[via configuration](/docs/configuration/#influxdb-line-protocol-ilp).
-
-## The designated timestamp and partitioning strategy
-
-QuestDB is designed for time-series workloads. The database engine is optimized
-to perform exceptionally well for time-series queries. One of the most important
-optimizations in QuestDB is that data is physically stored and ordered by
-incremental timestamp. Therefore, the user must choose the
-**[designated timestamp](/docs/concept/designated-timestamp/)** when creating a
-table.
-
-The **designated timestamp** is crucial in QuestDB. It directly affects:
-
-- **How QuestDB partitions data** (by hour, day, week, month, or year).
-- **Physical data storage order**, as data is always stored **sorted by the
-  designated timestamp**.
-- **Query efficiency**, since QuestDB **prunes partitions** based on the
-  timestamp range in your query, reducing disk I/O.
-- **Insertion performance**, because **out-of-order data forces QuestDB to
-  rewrite partitions**, slowing down ingestion.
-
-### Partitioning guidelines
-
-When choosing the [partition](/docs/concept/partitions/) resolution for your
-tables, consider the time ranges you will query most frequently and keep in mind
-the following:
-
-- **Avoid very large partitions**: A partition should be at most **a few
-  gigabytes**.
-- **Avoid too many small partitions**: Querying more partitions means opening
-  more files.
-- **Query efficiency**: When filtering data, QuestDB prunes partitions, but
-  querying many partitions results in more disk operations. If most of your
-  queries span a monthly range, weekly or daily partitioning sounds sensible,
-  but hourly partitioning might slow down your queries.
-- **Data ingestion performance**: If data arrives out of order, QuestDB rewrites
-  the active partition, impacting performance.
-
-## Columnar storage model and table density
-
-QuestDB is **[columnar](/glossary/columnar-database/)**, meaning:
-
-- **Columns are stored separately**, allowing fast queries on specific columns
-  without loading unnecessary data.
-- **Each column is stored in one or two files per partition**: The more columns
-  you include in a `SELECT` and the more partitions the query spans, the more
-  files will need to be opened and cached into working memory.
-
-### Sparse vs. dense tables
-
-- **QuestDB handles wide tables efficiently** due to its columnar architecture,
-  as it will open only the column files referenced in each query.
-- **Null values take
-  [storage space](/docs/reference/sql/datatypes/#type-nullability)**, so it is
-  recommended to avoid sparse tables where possible.
-- **Dense tables** (where most columns have values) are more efficient in terms
-  of storage and query performance. If you cannot design a dense table, consider
-  creating different tables for distinct record structures.
-
-## Data types and best practices
-
-### Symbols (recommended for categorical data)
-
-QuestDB introduces a specialized [`SYMBOL`](/docs/concept/symbol) data type.
-Symbols are **dictionary-encoded** and optimized for filtering and grouping:
-
-- Use symbols for **categorical data** with a limited number of unique values
-  (e.g., country codes, stock tickers, factory floor IDs).
-- Symbols are fine for **storing up to a few million distinct values** but
-  should be avoided beyond that.
-- Avoid using a **`SYMBOL`** for columns that would be considered a
-  `PRIMARY KEY` in other databases.
-- **If very high cardinality is expected**, use **`VARCHAR`** instead of
-  **`SYMBOL`**.
-- **Symbols are compact on disk**, reducing storage overhead.
-- **Symbol capacity defaults to 256**, but it will dynamically expand as needed,
-  causing temporary slowdowns.
-- **If you expect high cardinality, define the symbol capacity at table creation
-  time** to avoid performance issues.
+See [Symbol](/docs/concept/symbol/) for details.
 
 ### Timestamps
 
-- **All timestamps in QuestDB are stored in UTC**, and they will use either
--  **Microsecond** or **nanosecond** resolution, depending on the chosen data type:
-- The **`TIMESTAMP`** or **`TIMESTAMP_NS`** types are recommended over **`DATETIME`**, unless you have
-  checked the data types reference and you know what you are doing.
-- **At query time, you can apply a time zone conversion for display purposes**.
+QuestDB stores all timestamps in **UTC** with microsecond precision.
 
-### Strings vs. varchar
+```questdb-sql
+CREATE TABLE trades (
+    ts TIMESTAMP,              -- Microsecond precision (recommended)
+    exchange_ts TIMESTAMP_NS,  -- Nanosecond precision (if needed)
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts);
+```
 
-- Avoid
-  **[`STRING`](/docs/reference/sql/datatypes/#varchar-and-string-considerations)**:
-  It is a legacy data type.
-- Use **`VARCHAR`** instead for general string storage.
+Use `TIMESTAMP` unless you specifically need nanosecond precision.
 
-### Arrays
+For timezone handling at query time, see
+[Working with Timestamps and Timezones](/docs/guides/working-with-timestamps-timezones/).
 
-QuestDB supports [N-Dimensional arrays](/docs/concept/array/). Arrays are specially indicated when you have data which is very closely related.
-For example, if you are storing orderbook data with the price and the volume for each level in the orderbook, it can be
-a good idea to store it as a bi-dimensional array, with prices in the first position and volumes in the second. You
-could also store them as two independent arrays, one with the sizes and one with the volumes, and access them both using
-the same index.
+### Other types
 
-### UUIDs
+| Type | Use case |
+|------|----------|
+| `VARCHAR` | Free-text strings |
+| `DOUBLE` / `FLOAT` | Floating point numbers |
+| `DECIMAL(precision, scale)` | Exact decimal numbers (financial data) |
+| `LONG` / `INT` / `SHORT` | Integers |
+| `BOOLEAN` | True/false flags |
+| `UUID` | Unique identifiers (more efficient than VARCHAR) |
+| `IPv4` | IP addresses |
+| `BINARY` | Binary data |
+| `ARRAY` | N-dimensional arrays (e.g. `DOUBLE[3][4]`) |
 
-- QuestDB has a dedicated
-  **[`UUID`](/blog/uuid-coordination-free-unique-keys/)** type, which is more
-  efficient than storing UUIDs as `VARCHAR`.
+**Numeric type storage sizes:**
 
-### Other data types
+| Type | Storage | Range |
+|------|---------|-------|
+| `BYTE` | 8 bits | -128 to 127 |
+| `SHORT` | 16 bits | -32,768 to 32,767 |
+| `INT` | 32 bits | -2.1B to 2.1B |
+| `LONG` | 64 bits | -9.2E18 to 9.2E18 |
+| `FLOAT` | 32 bits | Single precision IEEE 754 |
+| `DOUBLE` | 64 bits | Double precision IEEE 754 |
 
-- **Booleans**: `true`/`false` values are supported.
-- **Bytes**: `BYTES` type allows storing raw binary data.
-- **IPv4**: QuestDB has a dedicated `IPv4` type for optimized IP storage and
-  filtering.
-- **Several [numeric datatypes](/docs/reference/sql/datatypes)** are supported.
-- **Geo**: QuestDB provides
-  [spatial support via geohashes](/docs/concept/geohashes/).
+Choose the smallest type that fits your data to save storage.
 
-## Referential integrity, constraints, and deduplication
+For arrays and geospatial data, see [Data Types](/docs/reference/sql/datatypes/).
 
-- QuestDB **does not enforce** `PRIMARY KEYS`, `FOREIGN KEYS`, or **`NOT NULL`**
-  constraints.
-- **Joins between tables work even without referential integrity**, as long as
-  the data types on the [join condition](/docs/reference/sql/join/) are
-  compatible.
-- **[Duplicate data](/docs/concept/deduplication/) is allowed by default**, but
-  `UPSERT KEYS` can be defined to **ensure uniqueness**.
-- **Deduplication in QuestDB happens on an exact timestamp and optionally a set
-  of other columns (`UPSERT KEYS`)**.
-- **Deduplication has no noticeable performance penalty**.
+### STRING vs VARCHAR
 
-## Retention strategies with TTL and materialized views
+QuestDB has two string types:
 
-Since **individual row deletions are not supported**, data retention is managed
-via:
+| Type | Encoding | Status |
+|------|----------|--------|
+| `VARCHAR` | UTF-8 | Recommended |
+| `STRING` | UTF-16 | Legacy, not recommended |
 
-- **Setting a [TTL retention](/docs/concept/ttl) period** per table to control
-  partition expiration.
-- **Materialized views**: QuestDB **automatically refreshes**
-  [materialized views](/reference/sql/create-mat-view/), storing aggregated data
-  at lower granularity. You can also apply TTL expiration on the base table.
+**Always use `VARCHAR` for new tables.** The `STRING` type exists for backward
+compatibility but is less efficient. If you have existing tables with `STRING`
+columns, they will continue to work, but consider migrating to `VARCHAR` when
+convenient.
 
-## Schema decisions that cannot be easily changed
+## Deduplication
 
-Some table properties **cannot be modified after creation**, including:
+QuestDB allows duplicates by default. To enforce uniqueness, use `DEDUP UPSERT KEYS`:
 
-- **The designated timestamp** (cannot be altered once set).
-- **Partitioning strategy** (cannot be changed later).
-- **Symbol capacity** (can be defined upfront, but will auto-increase as needed).
+```questdb-sql
+CREATE TABLE quotes (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    bid DOUBLE,
+    ask DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, symbol);
+```
 
-For changes, the typical workaround is:
+When a row arrives with the same `timestamp` and `symbol`, the old row is replaced.
 
-1. Create a **new column** with the updated configuration.
-2. [Copy data](/reference/sql/update/) from the old column into the new one.
-3. Drop the old column and rename the new one.
-4. **If changes affect table-wide properties** (e.g., partitioning, timestamp
-   column, or WAL settings), create a new table with the required properties,
-   [insert data from the old table](/reference/sql/insert/#inserting-query-results),
-   drop the old table, and rename the new table.
+**Deduplication has no noticeable performance penalty.**
 
-## Examples of schema translations from other databases
+See [Deduplication](/docs/concept/deduplication/) for details.
 
-```questdb-sql title="Create sample table with deduplication/upsert for PostgreSQL
+## Data retention with TTL
+
+QuestDB doesn't support individual row deletes. Instead, use TTL to automatically
+drop old partitions:
+
+```questdb-sql
+CREATE TABLE tick_data (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE,
+    size LONG
+) TIMESTAMP(timestamp) PARTITION BY DAY TTL 90 DAYS;
+```
+
+This keeps the last 90 days of data and automatically removes older partitions.
+
+See [TTL](/docs/concept/ttl/) for details.
+
+## Materialized views
+
+For frequently-run aggregations, pre-compute results with materialized views:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW ohlc_1h AS
+  SELECT
+    timestamp,
+    symbol,
+    first(price) as open,
+    max(price) as high,
+    min(price) as low,
+    last(price) as close,
+    sum(quantity) as volume
+  FROM trades
+  SAMPLE BY 1h;
+```
+
+QuestDB automatically refreshes the view as new data arrives. Queries against
+the view are instant regardless of base table size.
+
+See [Materialized Views](/docs/concept/mat-views/) for details.
+
+## Common mistakes
+
+### Using VARCHAR for categorical data
+
+```questdb-sql
+-- Bad: VARCHAR for repeated values
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol VARCHAR,        -- Slow filtering and grouping
+    ...
+);
+
+-- Good: SYMBOL for categorical data
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,         -- Fast filtering and grouping
+    ...
+);
+```
+
+### Wrong partition size
+
+```questdb-sql
+-- Bad: Yearly partitions for high-volume data
+CREATE TABLE trades (...)
+PARTITION BY YEAR;          -- Partitions will be huge
+
+-- Good: Match partition size to data volume
+CREATE TABLE trades (...)
+PARTITION BY HOUR;
+```
+
+### Forgetting the designated timestamp
+
+```questdb-sql
+-- Bad: No designated timestamp
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    price DOUBLE
+);
+
+-- Good: Explicit designated timestamp
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    price DOUBLE
+) TIMESTAMP(ts);
+```
+
+## Schema changes
+
+Some properties **cannot be changed** after table creation:
+
+| Property | Can modify? |
+|----------|-------------|
+| Designated timestamp column | No |
+| Partitioning strategy | No |
+| Add new columns | Yes |
+| Drop columns | Yes |
+| Rename columns | Yes |
+| Change column type | Limited |
+
+To change immutable properties, create a new table and migrate data:
+
+```questdb-sql
+-- 1. Create new table with desired schema
+CREATE TABLE trades_new (...) PARTITION BY HOUR;
+
+-- 2. Copy data
+INSERT INTO trades_new SELECT * FROM trades;
+
+-- 3. Swap tables
+DROP TABLE trades;
+RENAME TABLE trades_new TO trades;
+```
+
+## Multi-tenancy
+
+QuestDB uses a **single database per instance**. For multi-tenant applications,
+use table name prefixes:
+
+```questdb-sql
+-- Client-specific tables
+CREATE TABLE acme_trades (...);
+CREATE TABLE globex_trades (...);
+
+-- Environment and region tables
+CREATE TABLE prod_us_trades (...);
+CREATE TABLE prod_eu_trades (...);
+CREATE TABLE staging_trades (...);
+
+-- Asset class tables
+CREATE TABLE equities_trades (...);
+CREATE TABLE fx_trades (...);
+CREATE TABLE crypto_trades (...);
+```
+
+**Naming conventions:**
+- Use consistent prefixes: `{client}_`, `{env}_{region}_`, `{asset_class}_`
+- Keep names lowercase with underscores
+- Consider query patterns when choosing prefix granularity
+
+With [QuestDB Enterprise](/docs/operations/rbac/), you can enforce per-table
+permissions for access control.
+
+## PostgreSQL compatibility
+
+QuestDB supports the [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/),
+so most PostgreSQL client libraries work. However, QuestDB is not PostgreSQL:
+
+- No `PRIMARY KEY`, `FOREIGN KEY`, or `NOT NULL` constraints
+- Limited system catalog compatibility
+- Some PostgreSQL functions may not be available
+
+## Migrating from other databases
+
+<details>
+<summary>PostgreSQL / TimescaleDB</summary>
+
+```questdb-sql
 -- PostgreSQL
 CREATE TABLE metrics (
     timestamp TIMESTAMP PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    description VARCHAR(500),
-    unit VARCHAR(50),
-    id UUID PRIMARY KEY,
     value DOUBLE PRECISION NOT NULL
 );
-CREATE INDEX ON metrics (name, timestamp);
+INSERT INTO metrics VALUES (...)
+ON CONFLICT (timestamp) DO UPDATE SET value = EXCLUDED.value;
 
--- UPSERT behavior in PostgreSQL
-INSERT INTO metrics (timestamp, name, description, unit, id, value)
-VALUES (...)
-ON CONFLICT (timestamp, name) DO UPDATE
-SET description = EXCLUDED.description,
-    unit = EXCLUDED.unit,
-    value = EXCLUDED.value;
-```
-
-```questdb-sql title="Create sample table with deduplication/upsert for Timescale
--- Timescale
+-- QuestDB equivalent
 CREATE TABLE metrics (
-    timestamp TIMESTAMPTZ NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description VARCHAR(500),
-    unit VARCHAR(50),
-    id UUID PRIMARY KEY,
-    value DOUBLE PRECISION NOT NULL
-);
-SELECT create_hypertable('metrics', 'timestamp');
-CREATE INDEX ON metrics (name, timestamp);
-
--- UPSERT behavior in Timescale
-INSERT INTO metrics (timestamp, name, description, unit, id, value)
-VALUES (...)
-ON CONFLICT (timestamp, name) DO UPDATE
-SET description = EXCLUDED.description,
-    unit = EXCLUDED.unit,
-    value = EXCLUDED.value;
+    timestamp TIMESTAMP,
+    name SYMBOL,
+    value DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
+DEDUP UPSERT KEYS(timestamp, name);
 ```
 
-```questdb-sql title="Create sample table with deduplication/upsert for DuckDB"
--- DuckDB
+</details>
+
+<details>
+<summary>InfluxDB</summary>
+
+```text
+# InfluxDB line protocol
+metrics,name=cpu,region=us value=0.64
+```
+
+```questdb-sql
+-- QuestDB equivalent
 CREATE TABLE metrics (
-    timestamp TIMESTAMP NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description VARCHAR(500),
-    unit VARCHAR(50),
-    id UUID PRIMARY KEY,
-    value DOUBLE NOT NULL
-);
-
-CREATE INDEX ON metrics (name, timestamp);
-
--- UPSERT behavior in DuckDB
-INSERT INTO metrics (timestamp, name, description, unit, id, value)
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT (timestamp, name) DO UPDATE
-SET description = EXCLUDED.description,
-    unit = EXCLUDED.unit,
-    value = EXCLUDED.value;
+    timestamp TIMESTAMP,
+    name SYMBOL,
+    region SYMBOL,
+    value DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-```questdb-sql title="Create sample table with eventual upserts for ClickHouse"
+</details>
+
+<details>
+<summary>ClickHouse</summary>
+
+```questdb-sql
 -- ClickHouse
 CREATE TABLE metrics (
     timestamp DateTime,
     name String,
-    description String,
-    unit String,
-    id UUID,
     value Float64
 ) ENGINE = ReplacingMergeTree
 ORDER BY (name, timestamp);
-```
 
-```questdb-sql title="Create sample measure (table) for InfluxDB"
--- InfluxDB measurement
-measurement: metrics
-name (tag)
-description (tag)
-unit (tag)
-id (tag)
-value (field)
-```
-
-```questdb-sql title="Create sample table with deduplication/upsert for QuestDB"
 -- QuestDB equivalent
 CREATE TABLE metrics (
-    timestamp TIMESTAMP,      -- Explicit timestamp for time-series queries
-    name SYMBOL CAPACITY 50000,  -- Optimized for high-cardinality categorical values
-    description VARCHAR,      -- Free-text description, not ideal for SYMBOL indexing
-    unit SYMBOL CAPACITY 256, -- Limited set of unit types, efficient as SYMBOL
-    id UUID,                  -- UUID optimized for unique identifiers
-    value DOUBLE              -- Numeric measurement field
-) TIMESTAMP(timestamp)
-PARTITION BY DAY WAL
+    timestamp TIMESTAMP,
+    name SYMBOL,
+    value DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY
 DEDUP UPSERT KEYS(timestamp, name);
 ```
 
-## Schema management tools
+</details>
 
-Although QuestDB supports automatic schema creation, some users prefer to use a schema management tool to implement
-schema migrations.
+<details>
+<summary>DuckDB</summary>
 
-The QuestDB team has contributed a [Flyway driver](https://documentation.red-gate.com/fd/questdb-305791448.html) that
-can be used for this purpose.
+```questdb-sql
+-- DuckDB
+CREATE TABLE metrics (
+    timestamp TIMESTAMP,
+    name VARCHAR,
+    value DOUBLE
+);
+
+-- QuestDB equivalent
+CREATE TABLE metrics (
+    timestamp TIMESTAMP,
+    name SYMBOL,          -- Use SYMBOL for repeated strings
+    value DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+</details>
+
+## Schema management
+
+For schema migrations, QuestDB supports [Flyway](https://documentation.red-gate.com/fd/questdb-305791448.html).
+
+You can also use ILP auto-creation for dynamic schemas, though this applies
+default settings. See [ILP Overview](/docs/reference/api/ilp/overview/) for details.
+
+## Next steps
+
+- [Quick Start](/docs/quick-start/) — Create your first table and run queries
+- [Capacity Planning](/docs/operations/capacity-planning/) — Size your deployment for production
+- [Connect & Ingest](/docs/ingestion-overview/) — Load data into QuestDB
+- [Materialized Views](/docs/concept/mat-views/) — Pre-compute aggregations for fast dashboards

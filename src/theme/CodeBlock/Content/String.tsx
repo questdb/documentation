@@ -66,7 +66,7 @@ export default function CodeBlockString({
     : null
 
   const handleDemoClick = () => {
-    window.posthog.capture("demo_started", { title })
+    window.posthog?.capture("demo_started", { title })
   }
 
   return (

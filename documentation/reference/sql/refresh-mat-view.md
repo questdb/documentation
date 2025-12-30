@@ -5,16 +5,6 @@ description:
   Documentation for the REFRESH MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-:::info
-
-Materialized View support is now generally available (GA) and ready for
-production use.
-
-If you are using versions earlier than `8.3.1`, we suggest you upgrade at your
-earliest convenience.
-
-:::
-
 `REFRESH MATERIALIZED VIEW` refreshes a materialized view. This is helpful when
 a view becomes invalid, and no longer refreshes incrementally.
 
@@ -59,5 +49,4 @@ REFRESH MATERIALIZED VIEW trades_1h RANGE FROM '2025-05-05T01:00:00.000000Z' TO 
 ## See also
 
 For more information on the concept, see the the
-[introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/) on
-materialized views.
+[Materialized Views](/docs/concept/mat-views/).

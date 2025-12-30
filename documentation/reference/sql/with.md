@@ -34,10 +34,10 @@ first_5_users AS (SELECT * FROM first_10_users limit 5)
 SELECT user_name FROM first_5_users;
 ```
 
-```questdb-sql title="Flag whether individual trips are longer or shorter than average"
-WITH avg_distance AS (SELECT avg(trip_distance) average FROM trips)
-SELECT pickup_datetime, trips.trip_distance > avg_distance.average longer_than_average
-FROM trips CROSS JOIN avg_distance;
+```questdb-sql title="Flag whether individual trades are above or below average price"
+WITH avg_price AS (SELECT avg(price) average FROM trades)
+SELECT timestamp, trades.price > avg_price.average above_average
+FROM trades CROSS JOIN avg_price;
 ```
 
 ```questdb-sql title="Update with a sub-query"

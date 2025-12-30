@@ -29,14 +29,33 @@ import Screenshot from "@theme/Screenshot"
   [designated timestamp](/docs/concept/designated-timestamp/).
 - Available partition intervals are `NONE`, `YEAR`, `MONTH`, `WEEK`, `DAY`, and
   `HOUR`.
-- Default behavior is`PARTITION BY NONE` when using
-  [CREATE TABLE](/docs/reference/sql/create-table/).
-- Default behavior is `PARTITION BY DAY` via
-  [InfluxDB Line Protocol ingestion](/docs/reference/api/ilp/overview/). This is
-  set by `line.default.partition.by`.
 - Partitions are defined at table creation. For more information, refer to the
   [CREATE TABLE section](/docs/reference/sql/create-table/).
-- The naming convention for partition directories is as follows:
+
+### Default partitioning by creation method
+
+| Creation method | Default partition | WAL enabled? | Supports dedup/replication? |
+|-----------------|-------------------|--------------|------------------------------|
+| SQL `CREATE TABLE` (no `PARTITION BY`) | `NONE` | No | No |
+| SQL `CREATE TABLE` (with `PARTITION BY`) | As specified | Yes | Yes |
+| ILP auto-created tables | `DAY` | Yes | Yes |
+
+**This difference matters.** Tables without partitioning cannot use WAL, which means
+they don't support concurrent writes, deduplication, or replication.
+
+When using SQL, always specify `PARTITION BY` for time-series tables:
+
+```questdb-sql
+CREATE TABLE prices (ts TIMESTAMP, price DOUBLE)
+TIMESTAMP(ts) PARTITION BY DAY;  -- Explicitly partitioned
+```
+
+The ILP default (`PARTITION BY DAY`) can be changed via `line.default.partition.by`
+in `server.conf`.
+
+### Partition directory naming
+
+The naming convention for partition directories is as follows:
 
 | Table Partition | Partition format |
 | --------------- | ---------------- |

@@ -10,19 +10,15 @@ import Screenshot from "@theme/Screenshot"
 
 import { Clients } from "../src/components/Clients"
 
-QuestDB makes top performance "data-in" easy.
-
-This guide will prepare you to get the most out of (and into!) QuestDB.
-
-Choose from first-party clients, apply message brokers, event streaming
-platforms, queues, and more.
+For high-throughput data ingestion, use our **first-party clients** with the
+**InfluxDB Line Protocol (ILP)**. This is the recommended method for production
+workloads.
 
 ## First-party clients
 
-**Recommended!**
-
-Our first party clients are **the fastest way to insert data, and they excel
-with high volume, [high cardinality](/glossary/high-cardinality/) data streaming.**
+Our first-party clients are **the fastest way to insert data**. They excel
+with high-throughput, low-latency data streaming and are the recommended choice
+for production deployments.
 
 To start quickly, select your language:
 
@@ -51,26 +47,39 @@ trades,symbol=ETH-USD,side=buy price=2615.4,amount=0.002 1646762637764098000\n
 Once inside of QuestDB, it's yours to manipulate and query via extended SQL. Please note that table and column names
 must follow the QuestDB [naming rules](/docs/reference/sql/create-table/#table-name).
 
+### Ingestion characteristics
+
+QuestDB is optimized for both throughput and latency. Send data when you have
+it - there's no need to artificially batch on the client side.
+
+| Mode | Throughput (per connection) |
+|------|----------------------------|
+| Batched writes | ~400k rows/sec |
+| Single-row writes | ~60-80k rows/sec |
+
+Clients control batching via explicit `flush()` calls. Each flush ends a batch
+and sends it to the server. If your data arrives one row at a time, send it one
+row at a time - QuestDB handles this efficiently. If data arrives in bursts,
+batch it naturally and flush when ready.
+
+Server-side, WAL processing is asynchronous. Transactions are grouped into
+segments that roll based on size or row count, requiring no client-side tuning.
+
 ## Message brokers and queues
 
-**Recommended!**
+If you already have Kafka, Flink, or another streaming platform in your stack,
+QuestDB integrates seamlessly.
 
-QuestDB supports several excellent message brokers, event streaming platforms
-and/or queues.
-
-Checkout our quick start guides for the following:
+See our integration guides:
 
 - [Flink](/docs/third-party-tools/flink)
 - [Kafka](/docs/third-party-tools/kafka)
 - [Redpanda](/docs/third-party-tools/redpanda)
 - [Telegraf](/docs/third-party-tools/telegraf)
 
-## Easy CSV upload
+## CSV import
 
-**Recommended!**
-
-For GUI-driven CSV upload which leverages the
-[built-in REST HTTP API](/docs/reference/api/rest/), use the
+For bulk imports or one-time data loads, use the
 [Import CSV tab](/docs/web-console/import-csv) in the [Web Console](/docs/web-console/):
 
 <Screenshot
@@ -82,20 +91,6 @@ For GUI-driven CSV upload which leverages the
 
 For all CSV import methods, including using the APIs directly, see the
 [CSV Import Guide](/docs/guides/import-csv/).
-
-## PostgreSQL Wire Protocol
-
-QuestDB also supports the
-[PostgreSQL Wire Protocol (PGWire)](/docs/reference/api/postgres/).
-
-It offers most PostgreSQL keywords and functions, including parameterized
-queries and `psql` on the command line.
-
-While PGWire is supported, we recommend applying the first-party clients or
-other tools if possible.
-
-This is to take advantage of maximum performance and overcome limitations in the
-protocol.
 
 ## Create new data
 

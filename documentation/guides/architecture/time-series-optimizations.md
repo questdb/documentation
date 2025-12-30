@@ -119,8 +119,6 @@ Varchar data (column file):
 +---+---+---+---+---+---+---+---+---+---+---+
 ```
 
-## Next Steps
+## Next up
 
-- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
-- [QuestDB GitHub Repository](https://github.com/questdb/questdb)
-- [QuestDB Documentation](/docs)
+Continue to [Observability](/docs/guides/architecture/observability/) to learn about monitoring, metrics, and diagnostics.

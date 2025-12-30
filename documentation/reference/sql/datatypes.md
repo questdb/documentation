@@ -1,6 +1,6 @@
 ---
-title: Data types
-sidebar_label: Data types
+title: Data Types Overview
+sidebar_label: Overview
 description: Data types reference documentation.
 ---
 
@@ -34,6 +34,25 @@ description: Data types reference documentation.
 In addition to the scalar types above, QuestDB also supports
 [N-dimensional arrays](/docs/concept/array), currently only for the `DOUBLE`
 type.
+
+## Decimal
+
+The `DECIMAL` type provides exact decimal arithmetic with user-specified
+precision and scale. Use it when floating point approximation is unacceptable,
+such as financial calculations.
+
+QuestDB's decimal is high-performance: only ~2x slower than double, faster than
+ClickHouse and DuckDB decimals, and non-allocating during computations.
+
+```questdb-sql
+CREATE TABLE prices (
+    ts TIMESTAMP,
+    amount DECIMAL(18, 6)  -- 18 total digits, 6 after decimal point
+) TIMESTAMP(ts);
+```
+
+For detailed information on precision, scale, storage, and arithmetic behavior,
+see [Decimal](/docs/concept/decimal/).
 
 ## VARCHAR and STRING considerations
 
@@ -141,7 +160,7 @@ INSERT INTO my_table VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
 SELECT * FROM my_table WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 ```
 
-If you use the [PostgreSQL Wire Protocol](/docs/reference/api/postgres/) then
+If you use the [PostgreSQL Wire Protocol](/docs/pgwire/pgwire-intro/) then
 you can use the `uuid` type in your queries. The JDBC API does not distinguish
 the UUID type, but the Postgres JDBC driver supports it in prepared statements:
 

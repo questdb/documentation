@@ -1,5 +1,6 @@
 ---
 title: Query & SQL Overview
+sidebar_label: Overview
 description:
   This document shows how to work with QuestDB as a time-series database by
   generating dummy time-series data, inserting the data into a table, then
@@ -53,9 +54,8 @@ series data an intuitive and flexible experience.
 Queries can be written into many applications using existing drivers and clients
 of the PostgreSQL or REST-ful ecosystems. However, querying is also leveraged
 heavily by third-party tools to provide visualizations, such as within
-[Grafana](/docs/third-party-tools/grafana/), or for connectivity into broad data
-infrastructure and application environments such as with a tool like
-[Cube](/docs/third-party-tools/cube/).
+[Grafana](/docs/third-party-tools/grafana/), or for data analysis with dataframe
+libraries like [Polars](/docs/third-party-tools/polars/).
 
 > Need to ingest data first? Checkout our
 > [Ingestion overview](/docs/ingestion-overview/).
@@ -428,7 +428,7 @@ And to learn about some of our favourite, most powerful syntax:
   multiple series within a table
 - [`ASOF JOIN`](/docs/reference/sql/asof-join/) to associate timestamps between
   a series based on proximity; no extra indices required
-- [Materialized Views](/docs/guides/mat-views/) to pre-compute complex queries
+- [Materialized Views](/docs/concept/mat-views/) to pre-compute complex queries
   for optimal performance
 
 Looking for visuals?

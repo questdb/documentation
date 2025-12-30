@@ -1,6 +1,6 @@
 ---
-title: Export or Convert Data to Parquet
-sidebar_label: Export or Convert to Parquet
+title: Parquet Export
+sidebar_label: Parquet Export
 description:
   This document describes how to convert or export data to Parquet. It demonstrates how to
   convert partitions in-place, using alter table, or how to export data as
@@ -21,7 +21,7 @@ over QuestDB’s native format is its built-in compression.
 
 You can configure compression in `server.conf` with:
 
-```
+```ini
 # zstd
 cairo.partition.encoder.parquet.compression.codec=6
 # level is from 1 to 22, 1 is fastest
@@ -46,13 +46,13 @@ See also the [/exp documentation](/docs/reference/api/rest/#exp---export-data).
 
 You can use the same parameters as when doing a [CSV export](/docs/reference/api/rest/#exp---export-data), only passing `parquet` as the `fmt` parameter value.
 
-```
- curl  -G \
-        --data-urlencode "query=select * from market_data limit 3;" \
-        'http://localhost:9000/exp?fmt=parquet' > ~/tmp/exp.parquet
+```bash
+curl -G \
+  --data-urlencode "query=select * from market_data limit 3;" \
+  'http://localhost:9000/exp?fmt=parquet' > ~/tmp/exp.parquet
 ```
 
-By default the Parquet file will not be compressed, but it can be controlled with the `server.conf` variables above.
+By default, the Parquet file will not be compressed, but it can be controlled with the `server.conf` variables above.
 
 :::note
 Exporting via REST API is a synchronous process. For larger queries you might
@@ -63,7 +63,7 @@ Once exported, you can just use it from anywhere, including DuckDB, Pandas, or P
 to point DuckDB to the example file exported in the previous example, you could
 start DuckDB and execute:
 
-```
+```sql
 select * from read_parquet('~/tmp/exp.parquet');
 ```
 
@@ -83,13 +83,13 @@ or using the [`exec` endpoint](/docs/reference/api/rest/#exec---execute-queries)
 
 You can export a query:
 
-```
+```questdb-sql
 COPY (select * from market_data limit 3) TO 'market_data_parquet_table' WITH FORMAT PARQUET;
 ```
 
 Or you can export a whole table:
 
-```
+```questdb-sql
 COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET;
 ```
 
@@ -105,20 +105,20 @@ id string:
 
 If you want to monitor the export process, you can issue a call like this:
 
-```
+```questdb-sql
 SELECT * FROM 'sys.copy_export_log' WHERE id = '45ba24e5ba338099';
 ```
 
 While it is running, export can be cancelled with:
 
-```
+```questdb-sql
 COPY '45ba24e5ba338099' CANCEL;
 ```
 
 By default, the Parquet files will not be compressed, unless server-side configuration is applied, as seen above.
 However, you can override the compression individually for each export. For example:
 
-```
+```questdb-sql
 COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET COMPRESSION_CODEC LZ4_RAW;
 ```
 
@@ -178,7 +178,7 @@ command. Partitions in the Parquet format will have the `isParquet` column set t
 
 ### Converting from Native Format into Parquet
 
-```
+```questdb-sql
 ALTER TABLE trades CONVERT PARTITION TO PARQUET WHERE timestamp < '2025-08-31';
 ```
 
@@ -187,7 +187,7 @@ From this moment on, any changes sent to the affected partitions will be discard
 
 ### Converting from Parquet into Native Format
 
-```
+```questdb-sql
 ALTER TABLE trades CONVERT PARTITION TO NATIVE WHERE timestamp < '2025-08-31';
 ```
 

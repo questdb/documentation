@@ -2,82 +2,133 @@
 title: Symbol
 sidebar_label: Symbol
 description:
-  Documentation for usage of the symbol data type in QuestDB. This type is used
-  to store repetitive strings in order to enable optimizations on storage and
-  search.
+  The SYMBOL data type in QuestDB stores repetitive strings efficiently,
+  enabling fast filtering and grouping operations.
 ---
 
-QuestDB introduces a data type called `symbol`; a data structure used to store
-repetitive strings. Internally, `symbol` types are stored as a table of integers
-and their corresponding string values.
+`SYMBOL` is a data type designed for columns with repetitive string values.
+Internally, symbols use dictionary encoding—each unique string is stored once
+in a lookup table, and rows store integer references to that table. This is
+the same approach used by columnar formats like Parquet and Arrow. The result
+is much faster filtering and grouping compared to regular strings.
 
-This page presents the concept, optional setting, and their indication for
-`symbol` types.
+## When to use SYMBOL
 
-## Advantages of `symbol` types
+Use `SYMBOL` for categorical data with a limited set of repeated values:
 
-- Greatly improved query performance as string operations compare and write
-  `int` types instead of `varchar`.
-- Greatly improved storage efficiency as `int` maps to `varchar` types.
-- Unobtrusive to the user because SQL execution has the same result as handling
-  string values.
-- Reduced complexity of database schemas by removing the need for explicit
-  additional tables or joins.
+- Stock tickers (`AAPL`, `GOOGL`, `MSFT`)
+- Country or region codes (`US`, `EU`, `APAC`)
+- Status values (`pending`, `completed`, `failed`)
+- Device or sensor IDs
+- Any column frequently used in `WHERE` or `GROUP BY`
 
-## Properties
-
-- Symbol tables are stored separately from column data.
-- Fast conversion from `varchar` to `int` and vice-versa when reading or writing
-  data.
-- Columns defined as `symbol` types support indexing.
-- By default, QuestDB caches `symbol` types in memory for improved query speed
-  and InfluxDB Line Protocol ingestion speed. The setting is configurable.
-
-## Usage of `symbols`
-
-### `Symbol` columns
-
-Columns can be specified as `SYMBOL` using
-[CREATE TABLE](/docs/reference/sql/create-table/), similar to other types:
-
-```questdb-sql title="Create table with a SYMBOL type"
-CREATE TABLE my_table
-  (symb SYMBOL CAPACITY 128 NOCACHE, price DOUBLE, ts TIMESTAMP)
-timestamp(ts);
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,        -- Good: limited set of tickers
+    side SYMBOL,          -- Good: just BUY/SELL
+    price DOUBLE,
+    quantity DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-The following additional symbol settings are defined, either globally as part of
-the [server configuration](/docs/configuration/) or locally when a table is
-created:
+## When to use VARCHAR instead
 
-- **Symbol capacity**: Optional setting used to indicate how many distinct
-  values this column is expected to have. Based on the value used, the data
-  structures will resize themselves when necessary, to allow QuestDB to function
-  correctly. Underestimating the symbol value count may result in drop of
-  performance whereas over-estimating may result in higher disk space and memory
-  consumption. Symbol capacity is also used to set the initial symbol cache size
-  when the cache is enabled.
+Use `VARCHAR` when values are unique or very high cardinality:
 
-  - Server-wide setting: `cairo.default.symbol.capacity` with a default of `256`
-  - Column-wide setting: The
-    [`CAPACITY` option](/docs/reference/sql/create-table/#symbol-capacity) for
-    `CREATE TABLE`
+- User-generated text (comments, descriptions)
+- Log messages
+- UUIDs or unique identifiers (consider the `UUID` type instead)
+- Columns with hundreds of millions of distinct values
 
-- **Cache**: Optional setting specifying whether a symbol should be cached. When
-  a `symbol` column is cached, QuestDB will use a Java heap-based hash table to
-  resolve symbol values and keys. When a column has a large number of distinct
-  symbol values (over 100,000, for example), the heap impact might be
-  significant and may cause OutOfMemory errors, depending on the heap size. Not
-  caching leverages a memory-mapped structure which can deal with larger value
-  counts but is slower.
+## Why SYMBOL is fast
 
-  - Server-wide setting: `cairo.default.symbol.cache.flag` with a default of
-    `true`
-  - Column-wide setting when a table is created: The
-    [`CACHE | NOCACHE` keyword](/docs/reference/sql/create-table/#symbol-caching)
-    for `CREATE TABLE`
+| Operation | VARCHAR | SYMBOL |
+|-----------|---------|--------|
+| Storage | Full string per row | Integer + shared dictionary |
+| Filtering (`WHERE symbol = 'X'`) | String comparison | Integer comparison |
+| Grouping (`GROUP BY`) | String hashing | Integer grouping |
+| Disk usage | Higher | Lower |
 
-### Symbols for column indexing
+Symbols provide:
+- **Faster queries** — integer comparisons instead of string operations
+- **Lower storage** — strings stored once in a dictionary, rows store integers
+- **Index support** — symbol columns can be indexed for even faster lookups
 
-`Symbols` may also be indexed for faster query execution. See
-[Index](/docs/concept/indexes/) for more information.
+## Creating SYMBOL columns
+
+```questdb-sql
+CREATE TABLE orders (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    side SYMBOL,
+    order_type SYMBOL,
+    price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+Symbol capacity scales automatically as new values are added. No manual
+configuration is needed.
+
+<details>
+<summary>Note for users upgrading from versions before 9.0.0</summary>
+
+Prior to QuestDB 9.0.0, symbol capacity required manual configuration. You had
+to estimate the number of distinct values upfront and set the capacity
+explicitly. Undersizing caused performance issues; oversizing wasted memory.
+
+From 9.0.0 onwards, symbol capacity is fully automatic. The `CAPACITY` setting
+is now obsolete and can be removed from your table definitions.
+
+</details>
+
+## NOCACHE option
+
+By default, QuestDB caches the symbol dictionary in memory for fast lookups.
+For columns with very high cardinality (10 million+ distinct values), this
+cache can consume significant memory.
+
+Use `NOCACHE` to disable dictionary caching:
+
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    client_id SYMBOL NOCACHE,
+    symbol SYMBOL
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+**Trade-off:** `NOCACHE` reduces memory usage but makes dictionary lookups
+slower. Only use it for symbols with millions of distinct values where memory
+is a concern.
+
+To toggle caching on an existing column:
+
+```questdb-sql
+-- Disable cache
+ALTER TABLE trades ALTER COLUMN client_id NOCACHE;
+
+-- Re-enable cache
+ALTER TABLE trades ALTER COLUMN client_id CACHE;
+```
+
+## Indexing symbols
+
+For columns frequently used in `WHERE` clauses, add an index:
+
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL INDEX,
+    price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+```
+
+Or add an index later:
+
+```questdb-sql
+ALTER TABLE trades ALTER COLUMN symbol ADD INDEX;
+```
+
+See [Indexes](/docs/concept/indexes/) for more information.
+

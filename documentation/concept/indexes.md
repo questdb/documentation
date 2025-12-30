@@ -107,7 +107,7 @@ When in doubt, reach out via the QuestDB support channels for advice.
 :::note
 
 - The **index capacity** and
-  [**symbol capacity**](/docs/concept/symbol/#usage-of-symbols) are different
+  [**symbol capacity**](/docs/concept/symbol/) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
   the implications.
@@ -131,8 +131,11 @@ over-sizing the setting will result in higher than necessary disk space usage.
 
 
 Consider an example table with 200 unique stock symbols and 1,000,000,000
-records over time. The index will have to store 1,000,000,000 / 200 row IDs for
-each symbol, i.e. 5,000,000 per symbol.
+records over time stored in a single partition. The index will have to store
+1,000,000,000 / 200 row IDs for each symbol, i.e. 5,000,000 per symbol.
+
+Since indexes are per-partition, spreading data across multiple partitions
+reduces the row IDs stored in each partition's index.
 
 - If the index capacity is set to 1,048,576 in this case, QuestDB will use 5
   blocks to store the row IDs.

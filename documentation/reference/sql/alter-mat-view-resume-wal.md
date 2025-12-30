@@ -6,14 +6,6 @@ description:
   QuestDB.
 ---
 
-:::info
-
-Materialized View support is now generally available (GA) and ready for production use.
-
-If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
-
-:::
-
 `ALTER MATERIALIZED VIEW RESUME WAL` restarts
 [WAL table](/docs/concept/write-ahead-log/) transactions after resolving errors.
 

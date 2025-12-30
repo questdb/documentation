@@ -72,7 +72,7 @@ The following ports may also be used:
 
 - 9000: [REST API](/docs/reference/api/rest/) and
   [Web Console](/docs/web-console/)
-- 8812: [Postgres](/docs/reference/api/postgres/)
+- 8812: [Postgres](/docs/pgwire/pgwire-intro/)
 - 9009: [InfluxDB line protocol](/docs/reference/api/ilp/overview/)
 
 ## Customizing the deployment

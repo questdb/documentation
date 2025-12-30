@@ -838,8 +838,8 @@ SELECT now() FROM long_sequence(3)
 | 2021-02-01T21:51:34.443726Z |
 
 ```questdb-sql title="Query based on last minute"
-SELECT * FROM readings
-WHERE date_time > now() - 60000000L;
+SELECT * FROM trades
+WHERE timestamp > now() - 60000000L;
 ```
 
 ## pg_postmaster_start_time
@@ -998,8 +998,8 @@ VALUES(sysdate(), 123.5);
 | 2020-01-02T19:28:48.727516Z | 123.5   |
 
 ```questdb-sql title="Query based on last minute"
-SELECT * FROM readings
-WHERE date_time > sysdate() - 60000000L;
+SELECT * FROM trades
+WHERE timestamp > sysdate() - 60000000L;
 ```
 
 ## systimestamp
@@ -1229,9 +1229,9 @@ Gives:
 You can test this on the QuestDB Demo:
 
 ```questdb-sql
-SELECT timestamp_floor('5d', pickup_datetime, '2018') t, count
-FROM trips
-WHERE pickup_datetime in '2018'
+SELECT timestamp_floor('5d', timestamp, '2018') t, count
+FROM trades
+WHERE timestamp in '2018'
 ORDER BY 1;
 ```
 

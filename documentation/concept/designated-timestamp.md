@@ -43,10 +43,11 @@ Use the [`timestamp(columnName)`](/docs/reference/function/timestamp/) function
 at table creation:
 
 ```questdb-sql
-CREATE TABLE readings (
+CREATE TABLE trades (
     ts TIMESTAMP,
-    sensor_id SYMBOL,
-    value DOUBLE
+    symbol SYMBOL,
+    price DOUBLE,
+    amount DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
@@ -68,13 +69,20 @@ For full CREATE TABLE syntax, see the
 - Only a column of type `timestamp` or `timestamp_ns` can be elected as a designated timestamp.
 - Only one column can be elected for a given table.
 
-:::note
+## Resolution
 
-There are two timestamp resolutions available: microseconds and nanoseconds. See
-[Timestamps in QuestDB](/docs/guides/working-with-timestamps-timezones/#timestamps-in-questdb)
-for details.
+QuestDB supports two timestamp resolutions:
 
-:::
+| Type | Resolution | Precision | Use case |
+|------|------------|-----------|----------|
+| `timestamp` | microseconds | 10⁻⁶ s | Most applications |
+| `timestamp_ns` | nanoseconds | 10⁻⁹ s | High-frequency trading, scientific data |
+
+Use `timestamp` unless you need nanosecond precision. Both types work identically
+with all time-series features.
+
+For more on working with timestamps, see
+[Timestamps and time zones](/docs/guides/working-with-timestamps-timezones/).
 
 ## Checking designated timestamp settings
 

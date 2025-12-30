@@ -207,11 +207,15 @@ SELECT CAST(99.99m AS DOUBLE);  -- Result: 99.99 (as floating-point)
 - **Predictable behavior**: No surprising rounding errors
 - **Regulatory compliance**: Meets requirements for exact monetary calculations
 
-### Trade-offs
+### Performance
 
-- **Slower than floating-point**: Typically slower than `double` operations
-- **More storage**: May use more space than `float` for equivalent range
-- **Complex operations**: Division have overhead
+QuestDB's decimal implementation is designed for high performance:
+
+- **Only ~2x slower than double** for heavy computations like division
+- **Faster than other databases** including ClickHouse and DuckDB decimal types
+- **Non-allocating** during computations (no garbage collection overhead)
+- **Native implementation** - unlike Java's BigDecimal, QuestDB's decimal is
+  purpose-built for time-series workloads
 
 ### Performance tips
 

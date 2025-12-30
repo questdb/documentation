@@ -5,24 +5,13 @@ description:
   Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-:::info
-
-Materialized View support is now generally available (GA) and ready for
-production use.
-
-If you are using versions earlier than `8.3.1`, we suggest you upgrade at your
-earliest convenience.
-
-:::
-
 To create a new materialized view in the database, use the
 `CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
 materialized view.
 
 A materialized view holds the result set of the given query, and is
-automatically refreshed and persisted. For more information on the concept, see
-the [introduction](/docs/concept/mat-views/) and
-[guide](/docs/guides/mat-views/) on materialized views.
+automatically refreshed and persisted. For more information, see the
+[Materialized Views](/docs/concept/mat-views/) documentation.
 
 ## Syntax
 
@@ -33,7 +22,7 @@ sufficient.
 ![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
 
 For more on the semantics of the compact syntax, see the
-[materialized view guide](/docs/guides/mat-views/#compact-syntax).
+[Materialized Views](/docs/concept/mat-views/#compact-syntax) documentation.
 
 To create a materialized view with full syntax, you need to enter the following
 parameters and settings:
@@ -286,7 +275,7 @@ The partitioning strategy **cannot be changed** after the materialized view has
 been created.
 
 If unspecified, the `CREATE MATERIALIZED VIEW` statement will infer the
-[default partitioning strategy](/docs/guides/mat-views/#default-partitioning).
+[default partitioning strategy](/docs/concept/mat-views/#default-partitioning).
 
 ## Time To Live (TTL)
 
@@ -430,5 +419,5 @@ statement.
 
 There is a list of requirements for the queries that are used in materialized
 views. Refer to this
-[documentation section](/docs/guides/mat-views/#technical-requirements) to learn
+[technical requirements](/docs/concept/mat-views/#technical-requirements) to learn
 about them.

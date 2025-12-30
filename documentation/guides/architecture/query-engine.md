@@ -70,8 +70,6 @@ parsing incoming data, applying WAL file changes, handling PostgreSQL-Wire proto
   Data pages read from disk are kept in system memory. Sufficient memory prevents frequent disk
   reads.
 
-## Next Steps
+## Next up
 
-- Back to the [QuestDB Architecture](/docs/guides/architecture/questdb-architecture) overview
-- [QuestDB GitHub Repository](https://github.com/questdb/questdb)
-- [QuestDB Documentation](/docs)
+Continue to [Time-series Optimizations](/docs/guides/architecture/time-series-optimizations/) to learn about QuestDB's time-series specific features.

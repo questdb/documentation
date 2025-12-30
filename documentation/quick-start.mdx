@@ -52,16 +52,17 @@ Choose from the following options:
 To use Docker, one must have Docker. You can find installation guides for your
 platform on the [official documentation](https://docs.docker.com/get-docker/).
 
-Once Docker is installed, you will need to pull QuestDB's image from
-[Docker Hub](https://hub.docker.com/r/questdb/questdb) and create a container:
+Once Docker is installed, pull and run QuestDB:
 
 <InterpolateReleaseData
   renderText={(release) => (
     <CodeBlock className="language-shell">
-      {`docker run \\   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\   questdb/questdb:${release.name}`}
+      {`docker run -p 9000:9000 -p 8812:8812 -p 9003:9003 questdb/questdb:${release.name}`}
     </CodeBlock>
   )}
 />
+
+This exposes the Web Console (9000), PostgreSQL wire (8812), and health endpoint (9003).
 
 For deeper instructions, see the
 [Docker deployment guide](/docs/deployment/docker/).
@@ -75,7 +76,7 @@ brew install questdb
 ```
 
 On macOS, the location of the root directory of QuestDB and
-[server configuration](/docs/configuration/) files depending on the chip:
+[server configuration](/docs/configuration/) files depend on the chip:
 
 - Apple Silicon (M1/M2/M\*) chip: `/opt/homebrew/var/questdb`
 
@@ -163,14 +164,34 @@ Select your platform of choice:
 <TabItem value="nix">
 
 ```shell
+./questdb.sh start
+```
+
+To stop: `./questdb.sh stop` | To check status: `./questdb.sh status`
+
+<details>
+<summary>All options</summary>
+
+```shell
 ./questdb.sh [start|stop|status] [-d dir] [-f] [-n] [-t tag]
 ```
 
 <OptionsNotWindows />
 
+</details>
+
 </TabItem>
 
 <TabItem value="macos">
+
+```shell
+questdb start
+```
+
+To stop: `questdb stop` | To check status: `questdb status`
+
+<details>
+<summary>All options</summary>
 
 ```shell
 questdb [start|stop|status] [-d dir] [-f] [-n] [-t tag]
@@ -178,9 +199,20 @@ questdb [start|stop|status] [-d dir] [-f] [-n] [-t tag]
 
 <OptionsNotWindows />
 
+</details>
+
 </TabItem>
 
 <TabItem value="windows">
+
+```shell
+questdb.exe start
+```
+
+To stop: `questdb.exe stop` | To check status: `questdb.exe status`
+
+<details>
+<summary>All options</summary>
 
 ```shell
 questdb.exe [start|stop|status|install|remove] \
@@ -189,30 +221,38 @@ questdb.exe [start|stop|status|install|remove] \
 
 <OptionsWindows />
 
+</details>
+
 </TabItem>
 
 </Tabs>
 
 <!-- prettier-ignore-start -->
 
-## Enjoy QuestDB
+## Verify installation
 
-Congratulations! 🎉 QuestDB is now running.
+Open [http://localhost:9000](http://localhost:9000) in your browser.
 
-The QuestDB [Web Console](/docs/web-console/) is available by default at:
-[http://localhost:9000](http://localhost:9000).
+You should see the QuestDB [Web Console](/docs/web-console/).
 
-Also by default, QuestDB will use the following ports:
+Try running your first query in the SQL editor:
 
-- `9000` - [REST API](/docs/reference/api/rest/) and
-  [Web Console](/docs/web-console/)
-- `9000` - [InfluxDB Line Protocol (ILP)](/docs/reference/api/ilp/overview/)
-- `8812` - [Postgres Wire Protocol (PGWire)](/docs/reference/api/postgres/)
-- `9003` -
-  [Min health server](/docs/operations/logging-metrics/#minimal-http-server)
+```questdb-sql
+CREATE TABLE test (ts TIMESTAMP, val DOUBLE) TIMESTAMP(ts);
+INSERT INTO test VALUES (now(), 42.5);
+SELECT * FROM test;
+```
 
-With that, you're ready to bring your data and enjoy the high performance and
-reliability of QuestDB.
+It works? You're ready to bring your data.
+
+**Default ports:**
+
+| Port | Service |
+|------|---------|
+| `9000` | [REST API](/docs/reference/api/rest/) and [Web Console](/docs/web-console/) |
+| `9009` | [InfluxDB Line Protocol (ILP)](/docs/reference/api/ilp/overview/) - Legacy TCP, use HTTP instead |
+| `8812` | [PostgreSQL Wire Protocol](/docs/pgwire/pgwire-intro/) |
+| `9003` | [Health endpoint](/docs/operations/logging-metrics/#minimal-http-server) |
 
 ## Bring your data
 
@@ -253,7 +293,7 @@ see:
   configurations for operating QuestDB in production**
 - [Configuration](/docs/configuration/) to see all of the available options in
   your `server.conf` file
-- [Design for performance](/docs/operations/design-for-performance/) for tips
+- [Schema design](/docs/guides/schema-design-essentials/) for tips
   and tricks
 - [Visualize with Grafana](/docs/third-party-tools/grafana/) to create useful
   dashboards and visualizations from your data

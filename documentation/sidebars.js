@@ -1,24 +1,51 @@
 module.exports = {
   docs: [
+    "introduction",
+    "guides/schema-design-essentials",
+
+    // ===================
+    // GETTING STARTED
+    // ===================
     {
-      id: "introduction",
-      type: "doc",
+      type: "category",
+      label: "Getting Started",
+      collapsed: true,
+      items: [
+        "quick-start",
+        "third-party-tools/llm-coding-assistants",
+        "operations/capacity-planning",
+        "guides/create-database",
+        {
+          id: "operations/migrate-to-enterprise",
+          type: "doc",
+          label: "Upgrade to QuestDB Enterprise",
+        },
+        {
+          id: "guides/enterprise-quick-start",
+          type: "doc",
+          label: "QuestDB Enterprise Quick Start",
+        },
+        {
+          type: "category",
+          label: "Web Console",
+          collapsed: true,
+          items: [
+            "web-console",
+            "web-console/code-editor",
+            "web-console/metrics-view",
+            "web-console/schema-explorer",
+            "web-console/result-grid",
+            "web-console/query-log",
+            "web-console/import-csv",
+            "web-console/create-table",
+          ],
+        },
+      ],
     },
-    {
-      id: "quick-start",
-      type: "doc",
-      customProps: { tag: "Popular" },
-    },
-    {
-      id: "why-questdb",
-      type: "doc",
-      customProps: { tag: "Popular" },
-    },
-    {
-      id: "guides/schema-design-essentials",
-      type: "doc",
-      customProps: { tag: "Popular" },
-    },
+
+    // ===================
+    // INGESTION REFERENCE
+    // ===================
     {
       type: "category",
       label: "Ingestion Reference",
@@ -31,12 +58,12 @@ module.exports = {
         {
           type: "category",
           label: "Language Clients",
-          collapsed: false,
+          collapsed: true,
           items: [
             {
               id: "configuration-string",
               type: "doc",
-              label: "Configuration string",
+              label: "Configuration String",
             },
             {
               id: "clients/ingest-python",
@@ -76,14 +103,14 @@ module.exports = {
             {
               id: "clients/date-to-timestamp-conversion",
               type: "doc",
-              label: "Date to Timestamp Conversion",
+              label: "Date to Timestamp",
             },
           ],
         },
         {
           type: "category",
           label: "Message Brokers",
-          collapsed: false,
+          collapsed: true,
           items: [
             "third-party-tools/kafka",
             "third-party-tools/telegraf",
@@ -94,22 +121,43 @@ module.exports = {
         {
           type: "category",
           label: "Protocols",
+          collapsed: true,
           items: [
             {
               type: "category",
               label: "InfluxDB Line Protocol (ILP)",
               items: [
-                "reference/api/ilp/overview",
-                "reference/api/ilp/advanced-settings",
-                "reference/api/ilp/columnset-types",
+                {
+                  id: "reference/api/ilp/overview",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "reference/api/ilp/columnset-types",
+                  type: "doc",
+                  label: "Columnset Types",
+                },
+                {
+                  id: "reference/api/ilp/advanced-settings",
+                  type: "doc",
+                  label: "Advanced Settings",
+                },
               ],
             },
-            "reference/api/postgres",
-            "reference/api/rest",
+            {
+              id: "reference/api/java-embedded",
+              type: "doc",
+              label: "Java Embedded",
+            },
           ],
         },
+        "guides/import-csv",
       ],
     },
+
+    // ===================
+    // QUERY & SQL REFERENCE
+    // ===================
     {
       type: "category",
       label: "Query & SQL Reference",
@@ -117,13 +165,18 @@ module.exports = {
         "reference/sql/overview",
         {
           type: "category",
-          label: "PGWire Clients",
-          collapsed: false,
+          label: "PostgreSQL Wire Protocol",
+          collapsed: true,
           items: [
             {
               id: "pgwire/pgwire-intro",
               type: "doc",
               label: "Overview",
+            },
+            {
+              id: "pgwire/large-result-sets",
+              type: "doc",
+              label: "Large Result Sets",
             },
             {
               id: "pgwire/python",
@@ -172,17 +225,32 @@ module.exports = {
             },
           ],
         },
-        "reference/sql/datatypes",
-        "concept/sql-execution-order",
+        "reference/api/rest",
+        "guides/export-parquet",
+        {
+          type: "category",
+          label: "Data Types",
+          collapsed: true,
+          items: [
+            {
+              id: "reference/sql/datatypes",
+              type: "doc",
+              label: "Overview",
+            },
+            "concept/array",
+            "concept/decimal",
+            "concept/geohashes",
+          ],
+        },
         {
           type: "category",
           label: "SQL Syntax",
+          collapsed: true,
           items: [
             {
               id: "reference/sql/acl/add-user",
               type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+                },
             {
               type: "category",
               label: "ALTER",
@@ -209,8 +277,7 @@ module.exports = {
                 {
                   id: "reference/sql/acl/alter-service-account",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
                 {
                   type: "category",
                   label: "ALTER TABLE",
@@ -246,17 +313,17 @@ module.exports = {
                 {
                   id: "reference/sql/acl/alter-user",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
+                "reference/sql/alter-view",
               ],
             },
             {
               id: "reference/sql/acl/assume-service-account",
               type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+                },
             "reference/sql/cancel-query",
             "reference/sql/checkpoint",
+            "reference/sql/compile-view",
             "reference/sql/copy",
             {
               type: "category",
@@ -265,20 +332,18 @@ module.exports = {
                 {
                   id: "reference/sql/acl/create-group",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
                 "reference/sql/create-mat-view",
                 {
                   id: "reference/sql/acl/create-service-account",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
                 "reference/sql/create-table",
                 {
                   id: "reference/sql/acl/create-user",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
+                "reference/sql/create-view",
               ],
             },
             {
@@ -288,41 +353,36 @@ module.exports = {
                 {
                   id: "reference/sql/acl/drop-group",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
                 "reference/sql/drop-mat-view",
                 {
                   id: "reference/sql/acl/drop-service-account",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
                 "reference/sql/drop",
                 {
                   id: "reference/sql/acl/drop-user",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
-                },
+                        },
+                "reference/sql/drop-view",
               ],
             },
             {
               id: "reference/sql/acl/exit-service-account",
               type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+                },
             "reference/sql/explain",
             {
               type: "category",
               label: "GRANT",
-              items: [
+                  items: [
                 {
                   id: "reference/sql/acl/grant",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
                 },
                 {
                   id: "reference/sql/acl/grant-assume-service-account",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
                 },
               ],
             },
@@ -332,22 +392,19 @@ module.exports = {
             {
               id: "reference/sql/acl/remove-user",
               type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+                },
             "reference/sql/rename",
             {
               type: "category",
               label: "REVOKE",
-              items: [
+                  items: [
                 {
                   id: "reference/sql/acl/revoke",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
                 },
                 {
                   id: "reference/sql/acl/revoke-assume-service-account",
                   type: "doc",
-                  customProps: { tag: "Enterprise" },
                 },
               ],
             },
@@ -382,6 +439,7 @@ module.exports = {
             "reference/sql/vacuum-table",
           ],
         },
+        "concept/sql-execution-order",
         {
           type: "category",
           label: "Functions",
@@ -429,6 +487,156 @@ module.exports = {
         },
       ],
     },
+
+    // ===================
+    // CONCEPTS
+    // ===================
+    {
+      label: "Concepts",
+      type: "category",
+      items: [
+        {
+          type: "category",
+          label: "Core Concepts",
+          collapsed: false,
+          items: [
+            "concept/designated-timestamp",
+            "guides/working-with-timestamps-timezones",
+            "concept/partitions",
+            "concept/symbol",
+            {
+              id: "concept/views",
+              type: "doc",
+              label: "Views",
+            },
+            {
+              id: "concept/mat-views",
+              type: "doc",
+              label: "Materialized Views",
+            },
+            "concept/deduplication",
+            "concept/ttl",
+            "concept/write-ahead-log",
+          ],
+        },
+        {
+          type: "category",
+          label: "Deep Dive",
+          collapsed: true,
+          items: [
+            "concept/indexes",
+            "concept/interval-scan",
+            "concept/jit-compiler",
+            "concept/query-tracing",
+            "concept/sql-extensions",
+            "concept/sql-optimizer-hints",
+            "concept/root-directory-structure",
+          ],
+        },
+      ],
+    },
+
+    // ===================
+    // ARCHITECTURE
+    // ===================
+    {
+      label: "Architecture",
+      type: "category",
+      items: [
+        "guides/architecture/overview",
+        "guides/architecture/storage-engine",
+        "guides/architecture/memory-management",
+        "guides/architecture/query-engine",
+        "guides/architecture/time-series-optimizations",
+        "guides/architecture/observability",
+      ],
+    },
+
+    // ===================
+    // CONFIGURATION
+    // ===================
+    {
+      label: "Configuration",
+      type: "category",
+      items: [
+        {
+          id: "configuration",
+          type: "doc",
+          label: "Overview",
+        },
+        "operations/command-line-options",
+      ],
+    },
+
+    // ===================
+    // SECURITY
+    // ===================
+    {
+      label: "Security",
+      type: "category",
+      items: [
+        {
+          id: "operations/rbac",
+          type: "doc",
+          label: "Role-Based Access Control (RBAC)",
+        },
+        {
+          id: "operations/openid-connect-oidc-integration",
+          type: "doc",
+          label: "OpenID Connect (OIDC)",
+        },
+        {
+          type: "doc",
+          id: "operations/tls",
+        },
+      ],
+    },
+
+    // ===================
+    // HIGH AVAILABILITY
+    // ===================
+    {
+      label: "High Availability",
+      type: "category",
+      items: [
+        {
+          id: "concept/replication",
+          type: "doc",
+          label: "Overview",
+        },
+        {
+          id: "operations/replication",
+          type: "doc",
+          label: "Setup Guide",
+        },
+        {
+          id: "guides/replication-tuning",
+          type: "doc",
+          label: "Tuning",
+        },
+      ],
+    },
+
+    // ===================
+    // OPERATIONS
+    // ===================
+    {
+      label: "Operations",
+      type: "category",
+      items: [
+        "operations/backup",
+        "operations/logging-metrics",
+        "operations/monitoring-alerting",
+        "operations/data-retention",
+        "operations/updating-data",
+        "operations/modifying-data",
+        "operations/task-automation",
+      ],
+    },
+
+    // ===================
+    // DEPLOYMENT
+    // ===================
     {
       label: "Deployment",
       type: "category",
@@ -440,169 +648,16 @@ module.exports = {
         "deployment/azure",
         "deployment/gcp",
         "deployment/digital-ocean",
-        "deployment/hetzner"
-      ],
-    },
-    {
-      label: "Operations",
-      type: "category",
-      items: [
-        {
-          id: "operations/migrate-to-enterprise",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        "operations/capacity-planning",
-        "operations/command-line-options",
-        "operations/backup",
-        {
-          label: "Authentication",
-          type: "category",
-          collapsed: false,
-          items: [
-            {
-              id: "operations/rbac",
-              type: "doc",
-              label: "Role-Based Access Control (RBAC)",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              id: "operations/openid-connect-oidc-integration",
-              type: "doc",
-              label: "OpenID Connect (OIDC)",
-              customProps: { tag: "Enterprise" },
-            },
-            {
-              type: "doc",
-              id: "operations/tls",
-              customProps: { tag: "Enterprise" },
-            },
-          ],
-        },
-        "operations/logging-metrics",
-        "operations/monitoring-alerting",
-        "operations/profiling",
-        "operations/data-retention",
-        "operations/design-for-performance",
-        "operations/updating-data",
-        "operations/task-automation",
-        {
-          type: "doc",
-          id: "operations/replication",
-          customProps: { tag: "Enterprise" },
-        },
-        {
-          id: "operations/multi-primary-ingestion",
-          type: "doc",
-          label: "Multi-primary ingestion",
-          customProps: { tag: "Enterprise" },
-        },
-        {
-          id: "configuration",
-          type: "doc",
-        },
-      ],
-    },
-    {
-      label: "Guides & Tutorials",
-      type: "category",
-      items: [
-        "guides/create-database",
-        "guides/import-csv",
-        "guides/mat-views",
-        "guides/working-with-timestamps-timezones",
+        "deployment/hetzner",
         "guides/compression-zfs",
-        {
-          id: "guides/enterprise-quick-start",
-          type: "doc",
-          customProps: { tag: "Enterprise" },
-        },
-        "guides/export-parquet",
-        "guides/replication-tuning",
-        "reference/api/java-embedded",
-        "guides/modifying-data",
-        {
-          id: "guides/order-book",
-          label: "Order book analytics",
-          type: "doc",
-        },
-        {
-          id: "guides/influxdb-migration",
-          type: "doc",
-          customProps: { tag: "Popular" },
-        },
-        {
-          type: "category",
-          label: "Web Console",
-          collapsed: true,
-          items: [
-            "web-console",
-            "web-console/code-editor",
-            "web-console/metrics-view",
-            "web-console/schema-explorer",
-            "web-console/result-grid",
-            "web-console/query-log",
-            "web-console/import-csv",
-            "web-console/create-table",
-          ],
-        },
-        {
-          label: "Blog tutorials 🔗",
-          type: "link",
-          href: "https://questdb.com/blog/?tag=tutorial",
-        },
       ],
     },
+
+    // ===================
+    // INTEGRATIONS
+    // ===================
     {
-      label: "Concepts",
-      type: "category",
-      items: [
-        "concept/deduplication",
-        "concept/designated-timestamp",
-        "concept/geohashes",
-        "concept/array",
-        "concept/decimal",
-        "concept/indexes",
-        "concept/interval-scan",
-        "concept/jit-compiler",
-        "concept/mat-views",
-        "concept/partitions",
-        "concept/query-tracing",
-        {
-          customProps: {
-            tag: "Enterprise",
-          },
-          type: "doc",
-          id: "concept/replication",
-        },
-        "concept/root-directory-structure",
-        "concept/sql-extensions",
-        "concept/sql-optimizer-hints",
-        "concept/storage-model",
-        "concept/symbol",
-        "concept/ttl",
-        "concept/write-ahead-log",
-      ],
-    },
-    {
-      label: "Architecture",
-      type: "category",
-      items: [
-        "guides/architecture/overview",
-        "guides/architecture/storage-engine",
-        "guides/architecture/memory-management",
-        "guides/architecture/query-engine",
-        "guides/architecture/time-series-optimizations",
-        "guides/architecture/data-ingestion-engine",
-        "guides/architecture/networking-layer",
-        "guides/architecture/replication-layer",
-        "guides/architecture/security",
-        "guides/architecture/observability",
-        "guides/architecture/web-console",
-      ],
-    },
-    {
-      label: "Third-party Tools",
+      label: "Integrations",
       type: "category",
       items: [
         {
@@ -611,50 +666,95 @@ module.exports = {
         },
         {
           type: "category",
-          label: "Recommended",
-          collapsed: false,
+          label: "Visualization",
+          collapsed: true,
           items: [
             "third-party-tools/grafana",
-            "third-party-tools/kafka",
-            "third-party-tools/redpanda",
-            "third-party-tools/powerbi",
-            "third-party-tools/pandas",
-            "third-party-tools/polars",
-            "third-party-tools/telegraf",
-            "third-party-tools/prometheus",
             "third-party-tools/qstudio",
             "third-party-tools/superset",
-            "third-party-tools/flink",
-            "third-party-tools/spark",
-            "third-party-tools/ignition"
+            "third-party-tools/powerbi",
+            "third-party-tools/embeddable",
           ],
         },
         {
-          label: "Other tools",
           type: "category",
-          collapsed: false,
+          label: "Data Processing",
+          collapsed: true,
           items: [
-            "third-party-tools/sqlalchemy",
-            "third-party-tools/mindsdb",
+            "third-party-tools/pandas",
+            "third-party-tools/polars",
+            "third-party-tools/spark",
+          ],
+        },
+        {
+          type: "category",
+          label: "Orchestration",
+          collapsed: true,
+          items: [
             "third-party-tools/airflow",
             "third-party-tools/dagster",
-            "third-party-tools/cube",
+          ],
+        },
+        {
+          type: "category",
+          label: "Other Tools",
+          collapsed: true,
+          items: [
+            "third-party-tools/prometheus",
+            "third-party-tools/sqlalchemy",
+            "third-party-tools/mindsdb",
             "third-party-tools/databento",
-            "third-party-tools/embeddable",
+            "third-party-tools/cube",
+            "third-party-tools/ignition",
             "third-party-tools/airbyte",
           ],
         },
       ],
     },
+
+    // ===================
+    // TUTORIALS
+    // ===================
+    {
+      label: "Tutorials",
+      type: "category",
+      items: [
+        {
+          id: "guides/order-book",
+          label: "Order Book Analytics",
+          type: "doc",
+        },
+        {
+          label: "Ingest L2 order book data",
+          type: "link",
+          href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
+        },
+        "guides/influxdb-migration",
+        {
+          label: "Blog Tutorials",
+          type: "link",
+          href: "https://questdb.com/blog/?tag=tutorial",
+        },
+      ],
+    },
+
+    // ===================
+    // TROUBLESHOOTING
+    // ===================
     {
       label: "Troubleshooting",
       type: "category",
       items: [
         "troubleshooting/faq",
+        "operations/profiling",
         "troubleshooting/os-error-codes",
         "troubleshooting/error-codes",
       ],
     },
+
+    // ===================
+    // RELEASE NOTES
+    // ===================
     {
       label: "Release Notes",
       type: "link",

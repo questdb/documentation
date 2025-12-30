@@ -5,14 +5,6 @@ description:
   Documentation for the DROP MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-:::info
-
-Materialized View support is now generally available (GA) and ready for production use.
-
-If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
-
-:::
-
 `DROP MATERIALIZED VIEW` permanently deletes a materialized view and its
 contents.
 
@@ -43,5 +35,4 @@ it exists.
 ## See also
 
 For more information on the concept, see the the
-[introduction](/docs/concept/mat-views/) and [guide](/docs/guides/mat-views/) on
-materialized views.
+[Materialized Views](/docs/concept/mat-views/).

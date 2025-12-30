@@ -87,13 +87,13 @@ other than the timestamp.
 
 Specify the shape of the query using `FROM` and `TO`:
 
-```questdb-sql title='Pre-filling trip data' demo
-SELECT pickup_datetime as t, count()
-FROM trips
-SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
+```questdb-sql title='Pre-filling trade data' demo
+SELECT timestamp as ts, count()
+FROM trades
+SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
 ```
 
-Since no rows existed before 2009, QuestDB automatically fills in these rows.
+If no rows exist at the start of the range, QuestDB automatically fills in these rows.
 
 This is distinct from the `WHERE` clause with a simple rule of thumb -
 `WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
@@ -109,12 +109,12 @@ This means that the query will run optimally, and avoid touching data not releva
 
 Therefore, we compile the prior query into something similar to this:
 
-```questdb-sql title='Pre-filling trip data with WHERE optimisation' demo
-SELECT pickup_datetime as t, count()
-FROM trips
-WHERE pickup_datetime >= '2008-12-28'
-  AND pickup_datetime <  '2009-01-05'
-SAMPLE BY 1d FROM '2008-12-28' TO '2009-01-05' FILL(NULL);
+```questdb-sql title='Pre-filling trade data with WHERE optimisation' demo
+SELECT timestamp as ts, count()
+FROM trades
+WHERE timestamp >= '2009-01-01'
+  AND timestamp <  '2009-01-10'
+SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
 ```
 
 #### Limitations
@@ -284,29 +284,29 @@ Alternatively, one can set the `cairo.sql.sampleby.default.alignment.calendar` o
 
 ## ALIGN TO FIRST OBSERVATION
 
-Consider a table `sensors` with the following data spanning three calendar days:
+Consider a table `trades` with the following data spanning three calendar days:
 
 ```questdb-sql
-CREATE TABLE sensors (
+CREATE TABLE trades (
   ts TIMESTAMP,
-  val INT
+  price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY WAL;
 
-INSERT INTO sensors (ts, val) VALUES
-  ('2021-05-31T23:10:00.000000Z', 10),
-  ('2021-06-01T01:10:00.000000Z', 80),
-  ('2021-06-01T07:20:00.000000Z', 15),
-  ('2021-06-01T13:20:00.000000Z', 10),
-  ('2021-06-01T19:20:00.000000Z', 40),
-  ('2021-06-02T01:10:00.000000Z', 90),
-  ('2021-06-02T07:20:00.000000Z', 30);
+INSERT INTO trades (ts, price) VALUES
+  ('2021-05-31T23:10:00.000000Z', 100.5),
+  ('2021-06-01T01:10:00.000000Z', 101.2),
+  ('2021-06-01T07:20:00.000000Z', 100.8),
+  ('2021-06-01T13:20:00.000000Z', 101.0),
+  ('2021-06-01T19:20:00.000000Z', 102.1),
+  ('2021-06-02T01:10:00.000000Z', 101.5),
+  ('2021-06-02T07:20:00.000000Z', 100.9);
 ```
 
 The following query can be used to sample the table by day.
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d
 ALIGN TO FIRST OBSERVATION;
 ```
@@ -330,7 +330,7 @@ The default behaviour for SAMPLE BY, this option aligns data to calendar dates, 
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d;
 ```
 
@@ -338,7 +338,7 @@ or:
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d
 ALIGN TO CALENDAR;
 ```
@@ -365,7 +365,7 @@ guide for
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d
 ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin';
 ```
@@ -382,7 +382,7 @@ calendar
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d
 ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin' WITH OFFSET '00:45';
 ```
@@ -405,7 +405,7 @@ be used.
 SELECT to_timezone(ts, 'PST') ts, count
 FROM (
   SELECT ts, count()
-  FROM sensors
+  FROM trades
   SAMPLE BY 2h
   ALIGN TO CALENDAR TIME ZONE 'PST'
 );
@@ -422,23 +422,23 @@ total number of hours due to daylight savings time. Considering the 31st October
 
 When a `SAMPLE BY` operation crosses time zone transitions in cases such as
 this, the first sampled group which spans a transition will include aggregates
-by full calendar range. Consider a table `sensors` with one data point per hour
+by full calendar range. Consider a table `trades` with one trade per hour
 spanning five calendar hours:
 
-| ts                          | val |
-| --------------------------- | --- |
-| 2021-10-31T00:10:00.000000Z | 10  |
-| 2021-10-31T01:10:00.000000Z | 20  |
-| 2021-10-31T02:10:00.000000Z | 30  |
-| 2021-10-31T03:10:00.000000Z | 40  |
-| 2021-10-31T04:10:00.000000Z | 50  |
+| ts                          | price |
+| --------------------------- | ----- |
+| 2021-10-31T00:10:00.000000Z | 100.5 |
+| 2021-10-31T01:10:00.000000Z | 101.2 |
+| 2021-10-31T02:10:00.000000Z | 100.8 |
+| 2021-10-31T03:10:00.000000Z | 101.5 |
+| 2021-10-31T04:10:00.000000Z | 102.0 |
 
 The following query will sample by hour with the `Europe/London` time zone and
 align to calendar ranges:
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1h
 ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
@@ -470,7 +470,7 @@ The query uses the default offset '00:00' if the parameter is not set.
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1d
 ALIGN TO CALENDAR WITH OFFSET '02:00';
 ```
@@ -489,7 +489,7 @@ The `TIME ZONE` and `WITH OFFSET` options can be combined.
 
 ```questdb-sql
 SELECT ts, count()
-FROM sensors
+FROM trades
 SAMPLE BY 1h
 ALIGN TO CALENDAR TIME ZONE 'Europe/London' WITH OFFSET '02:00';
 ```
@@ -576,7 +576,7 @@ ALIGN TO CALENDAR;
 
 ## Performance optimization
 
-For frequently executed `SAMPLE BY` queries, consider using [materialized views](/docs/guides/mat-views/) to pre-compute aggregates. This can significantly improve query performance, especially for complex sampling operations on large datasets.
+For frequently executed `SAMPLE BY` queries, consider using [materialized views](/docs/concept/mat-views/) to pre-compute aggregates. This can significantly improve query performance, especially for complex sampling operations on large datasets.
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW hourly_metrics AS
@@ -593,6 +593,6 @@ SAMPLE BY 1h;
 
 This section includes links to additional information such as tutorials:
 
-- [Materialized Views Guide](/docs/guides/mat-views/) - Pre-compute SAMPLE BY queries for better performance
+- [Materialized Views](/docs/concept/mat-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)
 - [Three SQL Keywords for Finding Missing Data](/blog/three-sql-keywords-for-finding-missing-data/)
