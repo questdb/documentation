@@ -110,4 +110,4 @@ this reason:
 - If reusing an object store from a test Enterprise instance, clear it first
 
 Have a complex migration scenario?
-[Contact us](https://questdb.com/contact/) and we'll help with your setup.
+[Contact us](https://questdb.com/enterprise/contact/) and we'll help with your setup.
