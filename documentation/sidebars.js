@@ -12,7 +12,7 @@ module.exports = {
       collapsed: true,
       items: [
         "quick-start",
-        "third-party-tools/claude-code",
+        "third-party-tools/llm-coding-assistants",
         "operations/capacity-planning",
         "guides/create-database",
         {
@@ -670,10 +670,10 @@ module.exports = {
           collapsed: true,
           items: [
             "third-party-tools/grafana",
-            "third-party-tools/powerbi",
-            "third-party-tools/superset",
-            "third-party-tools/embeddable",
             "third-party-tools/qstudio",
+            "third-party-tools/superset",
+            "third-party-tools/powerbi",
+            "third-party-tools/embeddable",
           ],
         },
         {
@@ -701,11 +701,11 @@ module.exports = {
           collapsed: true,
           items: [
             "third-party-tools/prometheus",
-            "third-party-tools/ignition",
             "third-party-tools/sqlalchemy",
             "third-party-tools/mindsdb",
-            "third-party-tools/cube",
             "third-party-tools/databento",
+            "third-party-tools/cube",
+            "third-party-tools/ignition",
             "third-party-tools/airbyte",
           ],
         },
@@ -723,6 +723,11 @@ module.exports = {
           id: "guides/order-book",
           label: "Order Book Analytics",
           type: "doc",
+        },
+        {
+          label: "Ingest L2 order book data",
+          type: "link",
+          href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
         },
         "guides/influxdb-migration",
         {

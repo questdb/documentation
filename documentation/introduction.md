@@ -12,12 +12,7 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is a time-series database optimized for fast ingestion and SQL queries.
-It uses a column-oriented storage model, memory-mapped files, and SIMD
-instructions to run analytical queries with low latency. QuestDB extends SQL
-with time-series operations like `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, and
-`WINDOW JOIN`. See [Architecture](/docs/guides/architecture/questdb-architecture/)
-for details on how QuestDB works.
+QuestDB is an open source time-series database engineered for low latency. It uses a column-oriented, time-partitioned storage engine with memory-mapped files and vectorized (SIMD) execution to support high-throughput ingestion and millisecond-level analytical queries. The system is built from scratch with a zero-GC Java core and focused C++/Rust components, in a compact codebase optimized for cache locality and predictable tail latency. SQL is extended with time-series operators such as `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, and `WINDOW JOIN`. See [Architecture](https://questdb.com/docs/guides/architecture/questdb-architecture/) for details.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
   <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>

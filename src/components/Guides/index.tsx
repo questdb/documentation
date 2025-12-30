@@ -21,7 +21,7 @@ const guides = [
     href: '/docs/operations/backup/',
     name: 'Backup and restore',
     description:
-      'Safety is key! See the methods to backup and restore your QuestDB deployment.',
+      'See the methods to backup and restore your QuestDB deployment.',
   },
 ]
 
