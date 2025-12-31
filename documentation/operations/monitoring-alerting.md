@@ -79,6 +79,52 @@ You can create an alert that detects a steadily increasing difference between
 these two numbers. It won't tell you which table is experiencing issues, but it
 is a low-impact way to detect there's a problem which needs further diagnosing.
 
+## Monitor ingestion with SQL
+
+For detailed per-table ingestion monitoring, use the [`tables()`](/docs/reference/function/meta/#tables)
+function. Unlike Prometheus metrics which provide aggregate counters, `tables()`
+returns real-time statistics for each table including WAL lag, memory pressure,
+and performance histograms. The function is lightweight and fully in-memory,
+suitable for frequent polling.
+
+Key columns for ingestion monitoring:
+
+| Column | Description |
+|--------|-------------|
+| `pendingRowCount` | Rows written to WAL but not yet applied to the table |
+| `suspended` | Whether the table is suspended (WAL apply halted) |
+| `memoryPressureLevel` | `0` (normal), `1` (reduced parallelism), `2` (backoff) |
+| `sequencerTxn - writerTxn` | Number of pending WAL transactions |
+| `writeAmplificationP99` | Out-of-order merge overhead (1.0 = optimal) |
+| `mergeThroughputP99` | Slowest merge throughput in rows/second |
+
+Example health dashboard query:
+
+```questdb-sql
+SELECT
+    table_name,
+    rowCount,
+    pendingRowCount,
+    CASE
+        WHEN suspended THEN 'SUSPENDED'
+        WHEN memoryPressureLevel = 2 THEN 'BACKOFF'
+        WHEN memoryPressureLevel = 1 THEN 'PRESSURE'
+        ELSE 'OK'
+    END AS status,
+    sequencerTxn - writerTxn AS lag_txns,
+    writeAmplificationP50 AS write_amp,
+    mergeThroughputP99 AS slowest_merge
+FROM tables()
+WHERE walEnabled
+ORDER BY
+    suspended DESC,
+    memoryPressureLevel DESC,
+    pendingRowCount DESC;
+```
+
+See the [`tables()` reference](/docs/reference/function/meta/#tables) for the
+complete list of columns and additional example queries.
+
 ## Detect slow queries
 
 QuestDB maintains a table called `_query_trace`, which records each executed
