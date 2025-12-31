@@ -48,7 +48,7 @@ For open-source users, you may want to:
 
 :::warning
 
-QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](/docs/operations/capacity-planning/)
+QuestDB does **not** support `blobfuse2`. Please use the above recommendations, or refer to [capacity planning](/docs/getting-started/capacity-planning/)
 
 :::
 
@@ -65,7 +65,7 @@ We would recommend using `Azure Blob Storage` instead as a simpler, and cheaper,
 QuestDB supports `Azure Blob Storage` as its replication object-store in the Enterprise edition.
 
 To get started, use `Azure Storage Explorer` to create new `Blob Container`, and then follow the 
-[Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to create a connection string and 
+[Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to create a connection string and 
 configure QuestDB.
 
 ### Minimum specification
@@ -227,4 +227,4 @@ title="Click to zoom"
 ## Single Sign On with EntraID
 
 If you are using EntraID to manage users, [QuestDB enterprise](/enterprise/) offers the possibility to do Single Sign On and manage your database permissions.
-See more information at the [Microsoft EntraID OIDC guide](/docs/operations/openid-connect-oidc-integration/#microsoft-entraid).
+See more information at the [Microsoft EntraID OIDC guide](/docs/security/oidc/#microsoft-entraid).

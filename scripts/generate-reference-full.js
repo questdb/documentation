@@ -15,10 +15,10 @@ const DOCS_DIR = path.join(ROOT_DIR, 'documentation')
 const OUTPUT_DIR = path.join(ROOT_DIR, 'static')
 
 const SECTIONS = [
-  { base: 'reference', dir: 'function', label: 'Functions' },
-  { base: 'reference', dir: 'operators', label: 'Operators' },
-  { base: 'reference', dir: 'sql', label: 'SQL' },
-  { base: 'concept', dir: '', label: 'Concept' }
+  { base: 'query', dir: 'functions', label: 'Functions' },
+  { base: 'query', dir: 'operators', label: 'Operators' },
+  { base: 'query', dir: 'sql', label: 'SQL' },
+  { base: 'concepts', dir: '', label: 'Concepts' }
 ]
 
 function readFileIfExists(filePath) {

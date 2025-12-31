@@ -1,6 +1,6 @@
 ## Highly-Available Reads with QuestDB Enterprise
 
-QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/operations/replication/) to serve queries.
+QuestDB Enterprise supports running [multiple replicas](https://questdb.com/docs/high-availability/setup/) to serve queries.
 Client applications can specify **multiple hosts** in the connection string. This ensures that initial connections
 succeed even if a node is down. If the connected node fails later, the application should catch the error, reconnect to
 another host, and retry the read.

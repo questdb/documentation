@@ -53,16 +53,16 @@ Below each parameter is described in detail.
 
 This parameter will expose a port to the host. You can specify:
 
-- `-p 9000:9000` - [REST API](/docs/reference/api/rest/) and
-  [Web Console](/docs/web-console/)
-- `-p 9009:9009` - [InfluxDB line protocol](/docs/reference/api/ilp/overview/)
-- `-p 8812:8812` - [Postgres wire protocol](/docs/pgwire/pgwire-intro/)
+- `-p 9000:9000` - [REST API](/docs/query/rest-api/) and
+  [Web Console](/docs/getting-started/web-console/overview/)
+- `-p 9009:9009` - [InfluxDB line protocol](/docs/ingestion/ilp/overview/)
+- `-p 8812:8812` - [Postgres wire protocol](/docs/query/pgwire/overview/)
 - `-p 9003:9003` -
   [Min health server](/docs/operations/logging-metrics/#minimal-http-server)
 
 All ports are optional, you can pick only the ones you need. For example, it is
 enough to expose `8812` if you only plan to use
-[Postgres wire protocol](/docs/pgwire/pgwire-intro/).
+[Postgres wire protocol](/docs/query/pgwire/overview/).
 
 ### `-v` parameter to mount storage
 
@@ -70,7 +70,7 @@ This parameter will make a local directory available to QuestDB Docker
 container. It will have all data ingested to QuestDB, server logs and
 configuration.
 
-The QuestDB [root_directory](/docs/concept/root-directory-structure/) is located
+The QuestDB [root_directory](/docs/concepts/deep-dive/root-directory-structure/) is located
 at the `/var/lib/questdb` path in the container.
 
 ### Docker image version
@@ -95,7 +95,7 @@ Server configuration can be passed to QuestDB running in Docker by using the
 docker run -p 4000:4000 -e QDB_HTTP_BIND_TO=0.0.0.0:4000 questdb/questdb
 ```
 
-For a list of configuration options, see [Configuration](/docs/configuration/).
+For a list of configuration options, see [Configuration](/docs/configuration/overview/).
 
 ## Container status
 
@@ -161,11 +161,11 @@ the root cause.
 When QuestDB is running, you can start interacting with it:
 
 - Port `9000` is for REST. More info is available on the
-  [REST documentation page](/docs/reference/api/rest/).
+  [REST documentation page](/docs/query/rest-api/).
 - Port `8812` is used for Postgres. Check our
-  [Postgres reference page](/docs/pgwire/pgwire-intro/).
+  [Postgres reference page](/docs/query/pgwire/overview/).
 - Port `9009` is dedicated to InfluxDB Line Protocol. Consult our
-  [InfluxDB protocol page](/docs/reference/api/ilp/overview/).
+  [InfluxDB protocol page](/docs/ingestion/ilp/overview/).
 
 ## Data persistence
 
@@ -211,7 +211,7 @@ http.bind.to=0.0.0.0:4000
 
 Running the container with the `-v` flag allows for mounting the current
 directory to QuestDB's `conf` directory in the container. With the server
-configuration above, HTTP ports for the [Web Console](/docs/web-console/) and REST API will be
+configuration above, HTTP ports for the [Web Console](/docs/getting-started/web-console/overview/) and REST API will be
 available on [localhost:4000](http://localhost:4000):
 
 ```bash
