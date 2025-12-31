@@ -230,7 +230,7 @@ Then, click 'Publish'.
 
 ### See result from QuestDB
 
-Go to QuestDB web console at [http://localhost:9000](http://localhost:9000). Run
+Go to QuestDB web console at http://localhost:9000. Run
 a `SELECT` query:
 
 ```questdb-sql

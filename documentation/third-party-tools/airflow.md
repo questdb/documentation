@@ -76,7 +76,7 @@ cleanup_task = PostgresOperator(
 
 ## Running the Airflow DAG
 
-1. Open the Airflow UI at [http://localhost:8080](http://localhost:8080).
+1. Open the Airflow UI at http://localhost:8080.
 2. Enable and trigger the `questdb_cleanup` DAG manually.
 
 
