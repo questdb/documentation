@@ -326,6 +326,10 @@ html[data-theme="dark"] .DocSearch {
   background: var(--color-even);
 }
 
+.config-table {
+  overflow: auto;
+}
+
 /**
  * Documentation table styles
  */
@@ -336,7 +340,7 @@ html[data-theme="dark"] .DocSearch {
   border-radius: 6px;
   border-collapse: separate;
   border-spacing: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .theme-doc-markdown table th {
