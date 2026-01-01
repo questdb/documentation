@@ -79,7 +79,7 @@ pip install 'questdb-connect==1.1.3'
 ## Connecting QuestDB to Superset
 
 Once installed and initialized, Apache Superset is accessible via
-http://localhost:8088.
+`http://localhost:8088`.
 
 1. Sign in with the following details:
    - Username: admin

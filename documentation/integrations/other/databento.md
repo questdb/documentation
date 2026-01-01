@@ -74,7 +74,7 @@ sender.flush()
 
 ## Query QuestDB
 
-Now that data is flowing, you can visit QuestDB at http://localhost:9000 to try some queries.
+Now that data is flowing, you can visit QuestDB at `http://localhost:9000` to try some queries.
 
 Read our [SQL Overview](/docs/query/overview/) to learn more about the power and depth of querying.
 

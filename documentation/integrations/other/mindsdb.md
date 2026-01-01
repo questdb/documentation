@@ -24,7 +24,7 @@ data from MindsDB to produce powerful ML models.
 - [docker](https://docs.docker.com/): To create an image and run the container.
 - mysql: The client we use to interact with MindsDB
   (`mysql -h 127.0.0.1 --port 47335 -u mindsdb -p`). Alternatively, use MindsDB
-  web console at http://localhost:47334 instead.
+  web console at `http://localhost:47334` instead.
 - [Curl](https://curl.se/download.html): To upload data to QuestDB from a local
   CSV file.
 
@@ -109,7 +109,7 @@ There are different ways to [insert data to QuestDB](/docs/ingestion/overview/).
 #### SQL
 
 We can access QuestDB's [Web Console](/docs/getting-started/web-console/overview/) at
-http://localhost:9000.
+`http://localhost:9000`.
 
 Run the following SQL query to create a simple table:
 
@@ -173,7 +173,7 @@ mysql -h 127.0.0.1 --port 47335 -u mindsdb -p
 ```
 
 Alternatively, we can use MindsDB web console at
-http://localhost:47334:
+`http://localhost:47334`:
 
 From the terminal or the MindsDB web console, run the following command to check
 the available databases:
@@ -271,7 +271,7 @@ The result should be something like this:
 
 Beyond SELECT statements, for instance when we need to save the results of a
 query into a new table, we need to use QuestDB's [Web Console](/docs/getting-started/web-console/overview/) available at
-http://localhost:9000:
+`http://localhost:9000`:
 
 ```questdb-sql
 CREATE TABLE sample_query_results AS (

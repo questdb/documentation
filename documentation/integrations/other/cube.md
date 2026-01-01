@@ -90,8 +90,8 @@ docker-compose up -d
 
 Both applications are now up and ready.
 
-- QuestDB: http://localhost:9000
-- Cube: http://localhost:4000
+- QuestDB: `http://localhost:9000`
+- Cube: `http://localhost:4000`
 
 Not sure what to do next? Check out
 [our tutorial](/blog/2022/04/26/time-series-data-analytics-with-questdb-and-cube/)
