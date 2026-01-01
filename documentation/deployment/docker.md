@@ -212,7 +212,7 @@ http.bind.to=0.0.0.0:4000
 Running the container with the `-v` flag allows for mounting the current
 directory to QuestDB's `conf` directory in the container. With the server
 configuration above, HTTP ports for the [Web Console](/docs/getting-started/web-console/overview/) and REST API will be
-available on [localhost:4000](http://localhost:4000):
+available on http://localhost:4000:
 
 ```bash
 docker run -v "$(pwd):/var/lib/questdb/conf" -p 4000:4000 questdb/questdb

@@ -235,7 +235,7 @@ http::addr=localhost:9000;
 ```
 
 For all the extra options you can use, please check
-[the client docs](https://questdb.github.io/nodejs-questdb-client/SenderOptions.html)
+[the client docs](https://questdb.github.io/nodejs-questdb-client/classes/SenderOptions.html)
 
 Alternatively, for a breakdown of Configuration string options available across
 all clients, see the [Configuration string](/docs/ingestion/clients/configuration-string/) page.

@@ -97,7 +97,7 @@ Flink. The overall steps are the followings:
   This command used Flink SQL to insert a row into the `Orders` table in Flink.
   The table is connected to QuestDB, so the row is also into QuestDB.
 
-- Go to the QuestDB [Web Console](/docs/getting-started/web-console/overview/) [http://localhost:9000](http://localhost:9000)
+- Go to the QuestDB [Web Console](/docs/getting-started/web-console/overview/) at http://localhost:9000
   and execute this query:
 
   ```questdb-sql

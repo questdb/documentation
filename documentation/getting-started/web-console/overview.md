@@ -18,7 +18,7 @@ provides UI tools to query and explore the data, visualize the results in a tabl
 ### Accessing the Web Console
 
 Web Console will be available at `http://[server-address]:9000`. When
-running locally, this will be [http://localhost:9000](http://localhost:9000).
+running locally, this will be http://localhost:9000.
 
 ### Layout
 

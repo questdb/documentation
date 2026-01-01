@@ -63,7 +63,7 @@ libraries like [Polars](/docs/integrations/data-processing/polars/).
 ## QuestDB Web Console
 
 The Web Console is available by default at
-[localhost:9000](http://localhost:9000). The GUI makes it easy to write, return
+http://localhost:9000. The GUI makes it easy to write, return
 and chart queries. There is autocomplete, syntax highlighting, errors, and more.
 If you want to test a query or interact direclty with your data in the cleanest
 and simplest way, apply queries via the [Web Console](/docs/getting-started/web-console/overview/).
