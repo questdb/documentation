@@ -57,7 +57,7 @@ def questdb_cleanup_job():
    ```bash
    dagster dev
    ```
-2. Open [http://localhost:3000](http://localhost:3000) and trigger the `questdb_cleanup_job` manually.
+2. Open http://localhost:3000 and trigger the `questdb_cleanup_job` manually.
 
 ## Scheduling the Job
 

@@ -53,11 +53,11 @@ Therefore the example below provides trivialized write examples.
 ### Switch client URLs
 
 By default, the InfluxDB connection string of
-[http://localhost:8086](http://localhost:8086) is included in client examples.
+http://localhost:8086 is included in client examples.
 
 With QuestDB, change `url` in the client method to an active QuestDB instance.
 
-The default QuestDB endpoint is: [http://localhost:9000](http://localhost:9000).
+The default QuestDB endpoint is: http://localhost:9000.
 
 If you would prefer to use `8086` or any port, alter the HTTP port via
 `http.bind.to` in `server.conf`:
