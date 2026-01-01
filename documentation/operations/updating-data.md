@@ -5,7 +5,7 @@ description: How the UPDATE statement is implemented in QuestDB.
 ---
 
 This page explains how QuestDB implements the
-[UPDATE statement](/docs/reference/sql/update/) internally.
+[UPDATE statement](/docs/query/sql/update/) internally.
 
 :::tip
 UPDATE uses copy-on-write which increases disk usage. For high-frequency
@@ -17,8 +17,8 @@ that work with QuestDB's storage model.
 
 To be able to understand how table rows are updated in QuestDB, first we need to
 have an idea of how the data is stored. The documentation contains detailed
-descriptions of the [storage engine](/docs/guides/architecture/storage-engine/) and the
-[directory layout](/docs/concept/root-directory-structure/#db-directory) but if
+descriptions of the [storage engine](/docs/architecture/storage-engine/) and the
+[directory layout](/docs/concepts/deep-dive/root-directory-structure/#db-directory) but if
 we quickly want to summarize it:
 
 - Each table has its own folder in the db root, the directory is named after the
@@ -65,7 +65,7 @@ background task starts to vacuum redundant column files. The term Vacuum
 originates from Postgres, it means the collection of garbage and release of disk
 space. The Vacuum task checks periodically if older column versions are still
 used by readers and deletes unused files. Vacuum runs automatically and there is
-also a [`VACUUM TABLE`](/docs/reference/sql/vacuum-table/) SQL command to
+also a [`VACUUM TABLE`](/docs/query/sql/vacuum-table/) SQL command to
 trigger it.
 
 ## Limitations

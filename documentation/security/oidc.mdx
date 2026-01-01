@@ -1,0 +1,1334 @@
+---
+title: OpenID Connect (OIDC) Integration
+description: Configure OpenID Connect (OIDC) integration with external Identity Providers for SSO authentication in QuestDB Enterprise Web Console.
+---
+
+import Screenshot from "@theme/Screenshot";
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  OpenID Connect (OIDC) enables SSO authentication with external Identity Providers.
+</EnterpriseNote>
+
+OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
+QuestDB.
+
+It is a convenient way to integrate QuestDB into your enterprise environment,
+and it provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/).
+
+Microsoft Active Directory and Azure AD, for example, can be turned into an
+Identity Provider.
+
+Specific installation steps depend on the type of the provider.
+
+## Architecture overview
+
+Altogether, the architecture appears as such:
+
+<Screenshot
+  alt="Overall architecture"
+  src="images/docs/guide/oidc/oidc-architecture.webp"
+  title="Architecture diagram"
+  width={750}
+/>
+
+We can break it down into core components.
+
+### Web Console
+
+QuestDB's interactive UI. Users must authenticate before accessing the database
+via the interface.
+
+The [Web Console](/docs/getting-started/web-console/overview/) uses PKCE (Proof Key for Code Exchange) to
+secure the authentication and authorization flow.
+
+In OAuth2/OIDC terms, the [Web Console](/docs/getting-started/web-console/overview/) is referred to as
+the _client_, and it is assigned an identifier: the **Client Id**.
+
+Each application which integrates via OIDC should be given a different **Client
+Id**.
+
+### OIDC Provider
+
+Typically consists of a number of modules.
+
+We are interested in two of them only.
+
+1. The _Identity Provider_ holds user identities and user information, capable
+   of authenticating users, and to issue an ID Token which uniquely identify
+   them.
+
+2. The _Authorization Server_ grants access to resources, such as a database, in
+   the form of access tokens.
+
+The OIDC Provider usually integrates with a number of applications which require
+different access to a number of resources.
+
+These clients communicate with the OIDC Provider via its endpoints.
+
+It exposes a number of APIs, including the Authorization, Token and User Info
+endpoints.
+
+### QuestDB
+
+The database, in OAuth2/OIDC terms the _protected resource_ or _resource
+server_.
+
+Only processes requests which contain a valid access token.
+
+## Authentication and Authorization Flow
+
+The OAuth2/OIDC standard defines different ways of obtaining access and ID
+tokens from the OIDC Provider, referred to as the "_flow_".
+
+The goal of this flow is to get the user, who is sitting in front of the Web
+Console, authenticated.
+
+Then, it allows QuestDB to determine the user's permissions based on user
+information provided by the Identity Providers.
+
+Specifically, the QuestDB [Web Console](/docs/getting-started/web-console/overview/) uses the
+`Authorization Code Flow with PKCE` option.
+
+It consists of ten steps...
+
+### 1. Secret generation
+
+First the [Web Console](/docs/getting-started/web-console/overview/) generates a cryptographically strong
+random secret called the _code verifier_.
+
+The secret is hashed using the _SHA256 algorithm_. The result is the _code
+challenge_.
+
+After PKCE initialization the [Web Console](/docs/getting-started/web-console/overview/) requests an
+_authorization code_ from the OIDC Provider.
+
+It calls the Authorization endpoint with a few parameters, including the:
+
+- **Client Id**
+- requested scopes (the list of scopes are configurable, default is `openid`
+  only)
+- code challenge
+- algorithm used to generate the code challenge from the code verifier (SHA256)
+
+When the Authorization Server receives the request, it checks if the user has
+been authenticated already:
+
+- If the user has a valid session, it can be provided with an authorization code
+  straight away, so we jump to step 4.
+
+- If the user does not have a valid session yet, it will be redirected to the
+  Identity Provider for authentication.
+
+```bash title="Authorization code request example"
+https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
+```
+
+### 2. Prove identity
+
+Next, the user must prove its identity.
+
+This could be a username with:
+
+- a password,
+- an OTP
+- facial recognition via a mobile app
+- or anything else supported by the Identity Provider.
+
+<Screenshot
+  alt="Creating profiles"
+  src="images/docs/guide/oidc/oidc-setup-1.webp"
+  title="Prove identity"
+  width={450}
+/>
+
+### 3. Scope consent
+
+After successful authentication, the user provides consent for the requested
+scopes.
+
+The list of scopes are configurable.
+
+By default the Web Console requests only the `openid` scope which is mandatory
+for OIDC.
+
+No ID Token is issued without it.
+
+The OIDC provider can be configured to provide the consent automatically,
+without presenting the user with an additional screen in the browser.
+
+<Screenshot
+  alt="Openid and profile"
+  src="images/docs/guide/oidc/oidc-setup-2.webp"
+  title="Scope consent"
+  width={650}
+/>
+
+### 4. Redirection
+
+Consent is granted!
+
+The Authorization Server redirects the user back to the
+[Web Console](/docs/getting-started/web-console/overview/) with the _authorization code_:
+
+```bash title="Authorization code response example"
+https://questdb.host:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
+```
+
+### 5. Credential request
+
+Now, the QuestDB [Web Console](/docs/getting-started/web-console/overview/) requests the ID and access
+tokens from the Token endpoint of the OIDC Provider with the authorization code.
+
+It includes the Client ID and the PKCE code verifier together with the
+authorization code in the request.
+
+The endpoint then hashes the code verifier using the method specified previously
+in step 1.
+
+The result must match the code challenge, also provided in step 1.
+
+The matching code challenge proves that the token is requested by the client
+which requested the authorization code, and it was not stolen:
+
+```bash title="Token request example"
+POST https://oidc.provider:443/as/token.oauth2 HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
+```
+
+### 6. Credentials received
+
+If the PKCE check is passed, the Web Console receives the ID and access tokens.
+
+There is a third token in the response too, the refresh token.
+
+The refresh token is used by the Web Console to refresh the access token before
+it expires.
+
+Without the refresh token mechanism, the user would be forced to re-authenticate
+when the access token expires.
+
+The validity of the tokens are configurable inside the OIDC Provider.
+
+```json title="Token response example"
+{
+  "access_token": "gslpJtzmmi6RwaPSx0dYGD4tEkom",
+  "refresh_token": "FUuAAqMp6LSTKmkUd5uZuodhiE4Kr6M7Eyv.eg83ge",
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6I...",
+  "token_type": "Bearer",
+  "expires_in": 300 // In seconds, thus 5 minutes
+}
+```
+
+### 7. Database access
+
+With the tokens, the Web Console can interact with the database.
+
+The access token is in the header of every request sent to QuestDB.
+
+> **Worried about exposing the token?** It is rather opaque and does not contain
+> user details.
+
+To carry out permission checks, the database has to know more about the user.
+
+For this, QuestDB has a User Info Cache.
+
+If it finds a valid entry with the access token in the cache, steps 8 and 9 are
+skipped:
+
+```bash title="Query request example"
+https://questdb.host:9999/exec?query=select%20current_user()
+Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
+```
+
+### 8. Find user information
+
+No user information in the cache, or stale information?
+
+QuestDB uses the access token to request user information from the OIDC
+Provider's User Info endpoint.
+
+This call also serves as token validation.
+
+If the token is not real or has been expired, the User Info endpoint replies
+with an error:
+
+```bash title="User info request example"
+https://oidc.provider:443/idp/userinfo.openid
+Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
+```
+
+### 9. Receive user information
+
+If the access token is valid, QuestDB receives the required user information
+from the endpoint, then updates its cache.
+
+The cache improves performance, as QuestDB does not have to turn to the OIDC
+Provider on every single request.
+
+Do note that cache expiry is configurable:
+
+```json title="User info response example with Active Directory groups"
+{
+  "sub": "externalUser",
+  "name": "External User",
+  "groups": [
+    "CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev",
+    "CN=TestGroup2,OU=DC Users,DC=ad,DC=quest,DC=dev"
+  ]
+}
+```
+
+### 10. Permission check
+
+With the help of the user information, QuestDB can carry out
+[permission checks](#user-permissions).
+
+If the permission check is successful, the database will process the request,
+and then sends the results back:
+
+```json title="Query response example"
+{
+  "query": "select current_user()",
+  "columns": [
+    {
+      "name": "current_user",
+      "type": "STRING"
+    }
+  ],
+  "dataset": [["External User"]],
+  "count": 1,
+  "timestamp": -1
+}
+```
+
+## Interactive clients
+
+Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an
+OIDC provider. However, the level of support will vary between these tools.
+
+Interactive clients usually fall into one of the following categories:
+
+- Browser-based clients with support for HTTP redirects; this includes the Web
+  Console or any javascript UI
+- Applications running in a browser without support for redirects, such as
+  Jupyter notebooks
+- Non-browser based clients, usually some kind of command line interface (CLI)
+  or a standalone application, such as Microsoft Access
+
+### Browser-based clients
+
+If the tool is browser based and can handle HTTP redirects, it can implement two
+possible flows to request an access token.:
+
+1. [Authorization Code](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+   flow **(Recommended, more secure)**
+
+2. [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth)
+   flow
+
+The Web Console implements the
+[Authorization Code Flow with PKCE](https://oauth.net/2/pkce), which is a
+special version of the Authorization Code flow designed for mobile apps and
+single page applications.
+
+Regardless of which flow is used by the web or mobile application, the requested
+access token can be used for authentication and authorization when communicating
+with QuestDB as explained in the [above 7th step](#7-database-access).
+
+### Jupyter notebook
+
+JupyterHub can integrate with OAuth2 providers using OAuthenticator, as
+described in its
+[documentation](https://jupyterhub.readthedocs.io/en/stable/explanation/oauth.html).
+The OAuthenticator documentation also contains
+[examples](https://oauthenticator.readthedocs.io/en/latest/tutorials/provider-specific-setup/index.html)
+using different identity providers.
+
+If Jupyter notebooks are used without JupyterHub, one option for OAuth2
+integration is to use the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow.
+It is likely that enabling this flow in your OAuth2 provider will require
+additional setup.
+
+:::caution
+
+The Resource Owner Password Credentials flow is legacy, and should be used as a last resort.
+
+:::
+
+We can use the code below to acquire an access token in our notebook:
+
+```python
+from urllib import request, parse
+import json
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": "testuser",
+    "password": "testpwd",
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+This token can be used to authenticate with QuestDB:
+
+```python
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/exec?{query}")
+req.add_header("Authorization", f"Bearer {access_token}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+#### Externalizing credentials
+
+The above example saves the user's credentials into the notebook, potentially
+exposing them to others. One way to improve this is to use environment variables
+or files to externalize the username and password.
+
+Here is an example using the `dotenv` library.
+
+First we need to create a file named `.env` with the settings:
+
+```python
+username=testuser
+password=testpwd
+```
+
+Then load it in our notebook, and use it to request tokens:
+
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request, parse
+import json
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+url = "https://oidc.provider:443/as/token.oauth2"
+data = parse.urlencode( {
+    "grant_type": "password",
+    "username": user,
+    "password": pwd,
+    "scope": "openid",
+    "client_id": "testclient"
+} ).encode()
+req = request.Request(url=url, data=data)
+req.add_header("Content-Type", "application/x-www-form-urlencoded")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    access_token = resp["access_token"]
+```
+
+#### Enable ROPC
+
+The Resource Owner Password Credentials flow can be enabled in QuestDB within
+`server.conf`:
+
+```
+acl.oidc.ropc.flow.enabled = true
+```
+
+> Note that the flow also has to be configured in the OAuth2/OIDC provider!
+
+Now we can use Basic Authentication to simplify our code. We send the
+credentials to QuestDB, and the database will validate the credentials against
+the OAuth2 provider.
+
+```python
+from dotenv import load_dotenv
+import os
+from urllib import request
+import base64
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+query = parse.urlencode({
+    "query": "select current_user()"
+})
+req = request.Request(f"http://localhost:9000/exec?{query}")
+b64credentials = base64.standard_b64encode(f"{user}:{pwd}".encode()).decode()
+req.add_header("Authorization", f"Basic {b64credentials}")
+with request.urlopen(req) as f:
+    body = f.read().decode(f.headers.get_content_charset())
+    resp = json.loads(body)
+    print(resp)
+```
+
+We can also use a postgres client to connect to the database:
+
+:::note
+
+QuestDB never persists the user's credentials.
+
+:::
+
+```python
+import psycopg as pg
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conn_str = f"user={user} password={pwd} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute("select current_user()")
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+
+### CLI, standalone applications
+
+When using CLI tools, such as `psql`, or standalone applications like Microsoft
+Access, the best option may be the Resource Owner Password Credentials flow.
+
+The user logs in with their SSO credentials, and the server validates the
+details with the OAuth2 provider:
+
+```shell
+% psql -h localhost -p 8812 -U testuser
+Password for user testuser:
+psql (14.2, server 11.3)
+Type "help" for help.
+
+testldap=>
+testldap=>
+```
+
+## Non-interactive clients
+
+Non-interactive clients are usually jobs or standalone applications, such as a
+client for ingesting data. It is practical to manage their credentials via an
+OAuth2 provider too.
+
+As seen in the Jupyter notebook examples, the clients can request a token
+themselves and then use it to authorise data ingestion:
+
+```python
+import json
+import os
+import requests
+import pandas as pd
+from dotenv import load_dotenv
+from questdb.ingress import Sender
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+token_endpoint = "https://oidc.provider:443/as/token.oauth2"
+response = requests.post(token_endpoint,
+                         data={"grant_type": "password",
+                               "client_id": "testclient",
+                               "username": user,
+                               "password": pwd,
+                               "scope": "openid"},
+                         headers={"Content-Type": "application/x-www-form-urlencoded"})
+
+response_body = response.content.decode("utf-8")
+tokens = json.loads(response_body)
+access_token = tokens["access_token"]
+
+conf = f"http::addr=localhost:9000;token={access_token};"
+with Sender.from_conf(conf) as sender:
+    df = pd.read_csv("data.csv")
+    df["ts"] = pd.to_datetime(df["ts"])
+    sender.dataframe(df, table_name="foo", at="ts")
+```
+
+Alternatively, a user may rely on QuestDB to authenticate them via the OAuth2
+provider when the Resource Owner Password Credentials flow is enabled on the
+server side:
+
+```python
+import os
+import pandas as pd
+from dotenv import load_dotenv
+from questdb.ingress import Sender
+
+load_dotenv()
+user = os.environ.get("username")
+pwd = os.environ.get("password")
+
+conf = f"http::addr=localhost:9000;username={user};password={pwd};"
+with Sender.from_conf(conf) as sender:
+    df = pd.read_csv("data.csv")
+    df["ts"] = pd.to_datetime(df["ts"])
+    sender.dataframe(df, table_name="foo", at="ts")
+```
+
+## OIDC for the PGWire endpoint
+
+If the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow is not an option, we can still authenticate via OIDC on the PGWire endpoint.
+However, in this case the client's responsibility to source the token required for authentication.
+This method works wherever a Postgres client library is available, including jupyter notebooks.
+
+Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
+
+The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option:
+
+```python
+import psycopg as pg
+
+token = "token_requested_from_the_oauth2_provider"
+
+conn_str = f"user=_sso password={token} host=localhost port=8812 dbname=qdb"
+with pg.connect(conn_str, autocommit=True) as connection:
+    with connection.cursor() as cur:
+        cur.execute('select current_user()')
+        records = cur.fetchall()
+        for row in records:
+            print(row)
+```
+
+## User permissions
+
+QuestDB requires additional user information to be able to construct the user's
+access list.
+
+As a reminder, the access list is the list of permissions that determines what
+the user can and cannot do.
+
+QuestDB itself does not store external users, nor their passwords or any other
+authentication related detail.
+
+External users and their authentication methods are managed by the Identity
+Provider.
+
+Since external users are not managed by QuestDB, permissions cannot be granted
+to them directly.
+
+Instead, the database expects a list of groups, called the _groups claim_ to be
+present in the user information.
+
+These external group names are mapped to QuestDB's own groups.
+
+The access list of the external user consists of the permissions granted to
+those groups:
+
+<Screenshot
+  alt="OpenID setup"
+  src="images/docs/guide/oidc/oidc-setup-3.webp"
+  title="User permissions"
+  width={550}
+/>
+
+### Mapping user permissions
+
+The mappings between external and QuestDB groups are managed with the following
+SQL commands:
+
+```questdb-sql title="Create a group which is mapped to an Active Directory group"
+CREATE GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+```questdb-sql title="Map an Active Directory group to an already existing QuestDB group"
+ALTER GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+```questdb-sql title="Remove an Active Directory mapping without deleting the QuestDB group"
+ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
+```
+
+QuestDB works the list of external groups out from the User Info response
+message.
+
+If we take the example used earlier, we will see that the message contains a
+claim called `groups`. This name is configurable in QuestDB.
+
+If the groups claim is missing or it is an empty list, the user cannot access
+the database.
+
+Although the user is authenticated, they have no permissions at all.
+
+The user has to have at least the `HTTP` permission to be able to successfully
+login via the [Web Console](/docs/getting-started/web-console/overview/).
+
+```json title="User info response example with Active Directory groups"
+{
+  "sub": "externalUser",
+  "name": "External User",
+  "groups": [
+    "CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev",
+    "CN=TestGroup2,OU=DC Users,DC=ad,DC=quest,DC=dev"
+  ]
+}
+```
+
+Any change made to the user's group membership in the Identity Provider, QuestDB
+will adjust the user's access list.
+
+:::note
+
+There may be a slight delay due to the User Info Cache.
+
+QuestDB will use the cached information until it becomes stale, and gets
+updated.
+
+:::
+
+The same stands for changes made to the user's status within the Identity
+Provider.
+
+For example, a disabled user will not be kicked out of QuestDB immediately.
+
+The `acl.oidc.cache.ttl` config option drives how often user information should
+be synchronized with the Identity Providers.
+
+It should be set accordingly to your organization's policies.
+
+Other parts of the user information, such as the `sub` and the `name` also used
+by QuestDB.
+
+They could be displayed in the [Web Console](/docs/getting-started/web-console/overview/), or appear in
+the logs, for example.
+
+## Configuration options
+
+For all OIDC-related configuration options of QuestDB, see
+[Configuration](/docs/configuration/overview/#openid-connect-oidc).
+
+<br />
+
+## Active Directory
+
+The following sections are guides for setting up single sign-on (SSO) with various OAuth2 providers.
+
+### PingFederate
+
+This document helps set up SSO authentication for the Web Console in
+[PingFederate](https://www.pingidentity.com/en/platform/capabilities/authentication-authority/pingfederate.html).
+
+It is assumed that the Azure Active Directory serves as the Identity Provider
+(IdP).
+
+#### Set up PingFederate client
+
+First thing first, let's pick a name for the client!
+
+<Screenshot
+  alt="PingFederate image, naming the client."
+  src="images/guides/active-directory/1.webp"
+  title="Picking a name"
+  width={750}
+/>
+
+The QuestDB [Web Console](/docs/getting-started/web-console/overview/) is a SPA (Single Page App).
+
+As a result, it cannot store safely a client secret.
+
+Instead it can use PKCE (Proof Key for Code Exchange) to secure the flow.
+
+As shown above, leave the client authentication disabled.
+
+We also have to white list the URL of the [Web Console](/docs/getting-started/web-console/overview/) as a redirection URL:
+
+<Screenshot
+  alt="PingFederate image, redirection URL"
+  src="images/guides/active-directory/2.webp"
+  title="Whitelist the redirection URL"
+  width={600}
+/>
+
+We can instruct PingFederate to automatically authorize the scopes requested by
+the [Web Console](/docs/getting-started/web-console/overview/).
+
+The user will not be presented the extra window asking for consent after
+authentication:
+
+<Screenshot
+  alt="PingFederate, bypass approval"
+  src="images/guides/active-directory/3.webp"
+  title="Bypass, please"
+  width={500}
+/>
+
+The [Web Console](/docs/getting-started/web-console/overview/) uses the
+[Authorization Code Flow](/docs/security/oidc/#authentication-and-authorization-flow),
+and refreshes tokens automatically.
+
+Next, enable the grant types required for this flow:
+
+<Screenshot
+  alt="PingFederate, granting types"
+  src="images/guides/active-directory/4.webp"
+  title="Granted"
+  width={600}
+/>
+
+We've selected:
+
+- Authorization Code
+- Refresh Token
+- Access Token Validation (Client is a Resource Server)
+
+After that, select the token manager for the client.
+
+The token manager is responsible for issuing access tokens.
+
+All token related settings should be configured in the token manager.
+
+<Screenshot
+  alt=""
+  src="images/guides/active-directory/5.webp"
+  title="PKCE enabled"
+  width={500}
+/>
+
+Finally, enable PKCE - as shown above - and save the settings.
+
+#### Access Token Manager settings
+
+QuestDB does not require any special setup regarding the access token.
+
+We recommend that you do not to use shorter tokens than the default 28
+characters.
+
+As the QuestDB [Web Console](/docs/getting-started/web-console/overview/) refreshes the token automatically, there is no need
+for long-lived tokens:
+
+<Screenshot
+  alt="PingFederate, access token management UI"
+  src="images/guides/active-directory/6.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+We've selected:
+
+- Token length: 28
+- Token lifetime: 5
+- Lifetime extension policy: None
+- Maximum token lifetime: Null
+- Lifetime extension threshold percentage: 30
+
+For the next step, we tune the Authorization Server.
+
+#### Authorization Server settings
+
+These settings relate to the authorization code, refresh token and CORS.
+
+<Screenshot
+  alt="PingFederate, auth server image"
+  src="images/guides/active-directory/7.webp"
+  title="Authorization server"
+  width={750}
+/>
+
+In this section, we've entered:
+
+- Authorization code timeout: 60
+- Authorization code entropy: 30
+- Client secret retention period: 0
+
+Next, ensure the `ROLL REFRESH TOKEN VALUES` option is selected:
+
+<Screenshot
+  alt="PingFederate, auth server settings ui"
+  src="images/guides/active-directory/8.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+It is also important to whitelist the [Web Console](/docs/getting-started/web-console/overview/)'s URL on the CORS list:
+
+<Screenshot
+  alt="PingFederate, authorization server ui"
+  src="images/guides/active-directory/9.webp"
+  title="Port 9000, or your custom port"
+  width={500}
+/>
+
+#### Set up a Microsoft Entra ID Data Source
+
+PingFederate needs a Data Source setup.
+
+This is a secure LDAP connection to Microsoft Entra ID, formerly known as Azure
+Active Directory.
+
+The data source needs a:
+
+- name
+- hostname
+- port
+- username and password for the LDAP connection
+
+<Screenshot
+  alt="PingFederate, data and credential storage"
+  src="images/guides/active-directory/10.webp"
+  title="Configuring our data source"
+  width={750}
+/>
+
+We have given it the name EntraDS and it will be applied later.
+
+#### Set up a Password Credential Validator
+
+Now that PingFederate has an LDAP connection, we can use it for authentication.
+
+First, create a Password Credential Validator:
+
+<Screenshot
+  alt="PingFederate, create a PCV view "
+  src="images/guides/active-directory/11.webp"
+  title="Create the PCV"
+  width={750}
+/>
+
+We've entered:
+
+- Instance name: EntraPCV
+- Instance ID: EntraPCV
+- Selected: LDAP Username Password Credential Validator
+- Parent instance: None
+
+Furthermore, we now declare our previously created data source (`EntraDS`):
+
+<Screenshot
+  alt="PingFederate, additional PCV details"
+  src="images/guides/active-directory/12.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+This links our data store (`EntraDS`) to our PCV (`EntraPCV`).
+
+#### Set up an Identity Provider
+
+We can use our PCV once we set up an Identity Provider.
+
+The IdP will be used to authenticate users against Active Directory using the
+LDAP connection.
+
+We do this in the Type subsection:
+
+<Screenshot
+  alt="PingFederate, IdP adapters"
+  src="images/guides/active-directory/13.webp"
+  title="Defining an adapter"
+  width={750}
+/>
+Next, in the IdP Adapter section...
+
+Click: Add a new row to Credential Validators.
+
+Select the PCV (`EntraPCV`) we created.
+
+Optionally alter number of retries:
+
+<Screenshot
+  alt="PingFederate, selecting PCV "
+  src="images/guides/active-directory/14.webp"
+  title="Select the PCV"
+  jumbo={true}
+/>
+
+#### Add groups to OIDC policy management
+
+QuestDB now needs to know about the user's AD group memberships to find their
+permissions.
+
+Groups are passed to QuestDB inside the User Info object in a custom claim.
+
+This has to be added in the OpenID Connect Policy Management.
+
+The field is Multi-Valued, because it is a list of group names.
+
+Under the Attribute Contract subsection, see:
+
+<Screenshot
+  alt="PingFederate, Attribute Contract subsection"
+  src="images/guides/active-directory/15.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+Next, click to the Attribute Scopes subsection.
+
+Ensure `groups` is among the `openid` attributes:
+
+<Screenshot
+  alt="PingFederate, Attribute Scopes"
+  src="images/guides/active-directory/16.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+Onwards to the Attribute Sources & User Lookup Section.
+
+From this view, you can add local data stores.
+
+Note item `test` of type of LDAP:
+
+<Screenshot
+  alt="PingFederate, Attribute Sources & User Lookup ui"
+  src="images/guides/active-directory/17.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+We created it via the following choices in Add Attribute Source:
+
+<Screenshot
+  alt="PingFederate, Add Attribute Source ui"
+  src="images/guides/active-directory/18.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+Note where we specified the Data Store (`EntraDS`).
+
+This is also where the directory search parameters are defined.
+
+Back at the Attribute Sources & User Lookup Section section, note we have set
+`email`.
+
+The source is `LDAP (test)`, while the value is `usePrincipalName`:
+
+<Screenshot
+  alt="PingFederate, Policy Management ui"
+  src="images/guides/active-directory/19.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+And finally!
+
+In the same Attribute Sources & User Lookup Section...
+
+Find `groups`.
+
+Note the definition of Source (`LDAP (test)`) that bridges our various parts.
+
+The value is `memberOf`.
+
+<Screenshot
+  alt="PingFederate, associating groups with the source"
+  src="images/guides/active-directory/20.webp"
+  title="Click to zoom"
+  jumbo={true}
+/>
+
+#### Enable Resource Owner Password Credentials (ROPC) flow
+
+As described in the
+[OIDC operations document](/docs/security/oidc/#enable-ropc)
+tools - such as `psql` - can be integrated with the OIDC provider using the ROPC flow.
+
+When setting this flow up, enable the Resource Owner Password Credentials flow in the
+client settings.
+
+Next, create a Resource Owner Credentials Grant Mapping to map values obtained from
+the Password Credential Validator (PCV) into the persistent grants.
+
+When setting this up, select the previously created LDAP Data Source and IdP Adapter, which links
+to the existing PCV.
+
+Then select the `username` attribute of the PCV as `USER_KEY`.
+
+#### Confirm QuestDB mappings and login
+
+QuestDB requires a mapping, as laid out in the
+[OIDC operations document](/docs/security/oidc/#mapping-user-permissions).
+
+If a given user has the HTTP permission, they will be able to now login via the
+[Web Console](/docs/getting-started/web-console/overview/).
+
+To test, head to [http://localhost:9000](http://localhost:9000) and login.
+
+If all has been wired up well, then login will succeed.
+
+<br />
+
+### Microsoft EntraId
+
+This document sets up SSO authentication for the [QuestDB Web Console](/docs/getting-started/web-console/overview/) in
+[Microsoft EntraID](https://www.microsoft.com/en-gb/security/business/identity-access/microsoft-entra-id), formerly known as Azure AD.
+
+
+:::tip
+
+To enlarge the images, click or tap them.
+
+:::
+
+#### Set up the client application in Entra ID
+
+First thing first, let's pick a name for the client!
+
+Then head to _Microsoft Entra Admin Center_, and register the application
+under _Identity - App registrations - New registration_.
+
+<Screenshot
+  alt="EntraID image, app registration."
+  src="images/guides/active-directory-entraid/1_app_registration.webp"
+  title="App registration"
+  width={750}
+/>
+
+The QuestDB [Web Console](/docs/getting-started/web-console/overview/) is a SPA (Single Page App).
+
+As a result, it cannot store safely a client secret.
+
+Instead, it can use PKCE (Proof Key for Code Exchange) to secure the flow.
+
+When registering the application, select the SPA platform.
+
+We also have to specify the URL of the [Web Console](/docs/getting-started/web-console/overview/) as Redirect URI.
+
+<Screenshot
+  alt="EntraID image, SPA and redirection URI"
+  src="images/guides/active-directory-entraid/2_spa_redirect_uri.webp"
+  title="Add SPA platform with the redirection URI"
+  width={600}
+/>
+
+After clicking _Register_, we have created a client application with the
+name _QuestDB_.
+
+Each application is assigned a unique id (known as Client ID in the
+OAuth2 - OIDC standard). The client will identify itself with this id
+when sending requests to Entra ID.
+
+<Screenshot
+alt="EntraID image, application ID"
+src="images/guides/active-directory-entraid/3_application_id.webp"
+title="Application ID"
+width={600}
+/>
+
+We find the platform configurations under _Authentication_. This is the place where
+the previously set redirect URI can be viewed and modified. We can also specify
+additional redirect URIs, if necessary.
+
+The redirect URIs of the application are automatically eligible for the
+_Authorization Code Flow with PKCE_, which is a special version of the OAuth2 standard's
+Authorization Code Flow. It is specifically designed for applications where a client
+secret (e.g. a password) could not be kept safely. As single page applications run in
+the browser, they fall into this category.
+
+The redirect URIs are also added to the _CORS_ (Cross-Origin Resource Sharing) policy
+of EntraID. CORS is a mechanism to allow a web page, such as the Web Console, to access
+resources from a different domain than the one that served the page. In this context
+this means that we let the Web Console to access Entra ID, while its origin is the
+HTTP endpoint of QuestDB.
+
+<Screenshot
+alt="EntraID image, PKCE and CORS"
+src="images/guides/active-directory-entraid/4_cors_pkce.webp"
+title="PKCE and CORS"
+width={600}
+/>
+
+If we scroll down to the bottom of this page, we can also find a section where we
+can enable the _Resource Owner Password Credential Flow_.
+
+This OAuth2 flow is legacy, and should be enabled only if there is a requirement
+of connecting to QuestDB using SSO (Single Sign-On) via clients not supporting
+redirect based web flows.
+This could mean a Postgres client without OAuth2 integration, such as _psql_, or
+a standalone in-house client application, or could be just a jupyter notebook.
+
+The main issue with this flow is that the client application has to be trusted
+with the user's login details. The user's credentials are passed to the
+application, in this case to QuestDB, and the client application uses these
+credentials to authenticate the user by forwarding them to the identity provider,
+in this case to Entra ID.
+
+It is guaranteed that QuestDB does not store the user's credentials in any way.
+They are not persisted into the database, not even in encrypted form.
+The login details are treated as passthrough information. Only exception is
+that server logs can contain the username, logged for audit purposes.
+
+<Screenshot
+alt="EntraID image, enable ROPC"
+src="images/guides/active-directory-entraid/5_ropc.webp"
+title="Enable ROPC"
+width={600}
+/>
+
+Our next stop is the _Token configuration_, where the OAuth2/OIDC access and ID
+tokens can be customized.
+
+Note that users can be authenticated without customized tokens, but authorization
+would prove to be challenging. The user's security groups are not included
+in the tokens by default.
+
+QuestDB can be configured to request the user's groups from the UserInfo
+endpoint of the OAuth2 server, but Entra ID cannot be configured to provide
+this information via the UserInfo endpoint.
+Therefore, we choose to customize the tokens, QuestDB will decode and
+validate the ID token, and take the group information from there.
+
+QuestDB authorization relies on receiving the group memberships of the user.
+Entra ID groups should be mapped to QuestDB groups, and permissions can be
+granted to the QuestDB groups. Detailed information about group mappings can
+be found in the [OIDC integration](/docs/security/oidc/#user-permissions)
+documentation.
+
+<Screenshot
+alt="EntraID image, token customization"
+src="images/guides/active-directory-entraid/6_token_customization.webp"
+title="Token customization"
+width={600}
+/>
+
+The customized tokens contain user information which cannot be accessed
+without permission. User information is provided by Microsoft Graph, so
+the client application needs specific permissions to access
+Microsoft Graph APIs.
+
+These permissions can be configured under _API permissions_. It is important
+to note that we will be setting _Delegated_ permissions here, meaning we
+are not granting actual permissions to access user data. Instead, each user
+logging into QuestDB will have to consent to accessing their user profile.
+
+<Screenshot
+alt="EntraID image, API permissions"
+src="images/guides/active-directory-entraid/7_API_permissions.webp"
+title="API permissions"
+width={600}
+/>
+
+By default, the _User.Read_ permission is added to the list, but what we
+really need is:
+ - openid: to be able to issue ID tokens
+ - profile: to access user information
+ - offline_access: to be able to issue refresh tokens
+
+By clicking on _Microsoft Graph_ we can select and add these permissions.
+
+<Screenshot
+alt="EntraID image, add openid permissions"
+src="images/guides/active-directory-entraid/8_add_openid_permissions.webp"
+title="Add openid permissions"
+width={600}
+/>
+
+The _User.Read_ permission is not needed. It can be removed by clicking
+on the `...` at the end of the row, and selecting _Remove permission_ from
+the popup menu.
+
+<Screenshot
+alt="EntraID image, permissions final"
+src="images/guides/active-directory-entraid/9_permissions_final.webp"
+title="Permissions final list"
+width={600}
+/>
+
+With this we have finished setting up the QuestDB client application
+in Entra ID, and now we can wire QuestDB and Entra ID together by
+adding OIDC configuration to QuestDB.
+
+#### QuestDB configuration
+
+The below should be set in QuestDB's `server.conf`:
+
+```shell
+# enable OIDC
+acl.oidc.enabled=true
+
+# the claim contains the username or user id
+acl.oidc.sub.claim=name
+
+# the claim contains the user's group memberships
+acl.oidc.groups.claim=groups
+
+# groups are encoded in the token
+acl.oidc.groups.encoded.in.token=true
+
+# OIDC configuration endpoint of Entra ID
+acl.oidc.configuration.url=https://login.microsoftonline.com/12345678-1234-1234-1234-123456789abc/v2.0/.well-known/openid-configuration
+
+# application ID taken from Entra ID
+acl.oidc.client.id=8de84b90-1ea5-4e41-9e84-dba860aa01a6
+
+# redirect URI, QuestDB's HTTP endpoint
+acl.oidc.redirect.uri=http://localhost:9000
+
+# OAuth scopes the user has to consent to
+acl.oidc.scope=openid profile offline_access
+
+# enable ROPC flow
+# optional, required only if ROPC is enabled in Entra ID
+acl.oidc.ropc.flow.enabled=true
+```
+
+The application ID and the OIDC configuration endpoint's URL can be found
+in the Overview of the application in Entra ID.
+
+The application ID is displayed right under the application's name, the
+OIDC configuration endpoint is displayed on the panel which opens up when
+the _Endpoints_ button is clicked.
+
+<Screenshot
+alt="EntraID image, overview"
+src="images/guides/active-directory-entraid/10_overview.webp"
+title="Application overview"
+width={600}
+/>
+
+#### Map groups and grant permissions
+
+Now we can start QuestDB, and login with the built-in admin to create
+group mappings.
+
+As mentioned earlier, authorization works by mapping Entra ID groups
+to QuestDB groups. When the user logs in, QuestDB decodes Entra ID
+group memberships from the token, then finds the QuestDB groups
+mapped to them, and the user gets the permissions based on the
+mapped groups.
+
+```questdb-sql title="Create a group which is mapped to an Entra ID group"
+CREATE GROUP extUsers WITH EXTERNAL ALIAS '87654321-1234-1234-1234-123456789abc';
+```
+The above command maps the Entra ID group identified by object
+id `87654321-1234-1234-1234-123456789abc` to a QuestDB group called `extUsers`.
+
+We should grant the necessary QuestDB endpoint permissions first
+to make sure users can access the Web Console, Postgres and ILP
+interfaces as required. [Read more about endpoint permissions](/docs/security/rbac/#endpoint-permissions).
+
+```questdb-sql title="Grant endpoint permissions"
+GRANT HTTP, PGWIRE TO groupName;
+```
+
+Now we can grant the rest of the permissions as required. We can
+grant access to tables, for example.
+
+```questdb-sql title="Grant database permissions"
+GRANT SELECT ON table1, table2 to groupName;
+```
+
+#### Confirm group mappings and login
+
+To test, head to the Web Console and login.
+
+If all has been wired up well, then login will succeed, and the user
+will have the access granted to them.
+
+<br />

@@ -10,7 +10,7 @@ your application to avoid frequently editing existing records.
 
 When you need to modify data, you have two options:
 
-1. **[UPDATE statement](/docs/reference/sql/update/)** - For correcting
+1. **[UPDATE statement](/docs/query/sql/update/)** - For correcting
    incorrectly inserted data. See
    [How UPDATE works](/docs/operations/updating-data/) for implementation
    details.
@@ -110,10 +110,10 @@ RENAME table mytable_copy TO mytable;
 ## Delete by Dropping Partitions
 
 When you create tables with a timestamp, you may organise them into
-[partitions](/docs/concept/partitions/) using the
-[`CREATE TABLE .. PARTITION BY`](/docs/reference/sql/create-table/#partitioning)
+[partitions](/docs/concepts/partitions/) using the
+[`CREATE TABLE .. PARTITION BY`](/docs/query/sql/create-table/#partitioning)
 SQL statement. But first, [backup your database](/docs/operations/backup/).
 
 You may then use the
-[`ALTER TABLE DROP PARTITION`](/docs/reference/sql/alter-table-drop-partition/)
+[`ALTER TABLE DROP PARTITION`](/docs/query/sql/alter-table-drop-partition/)
 SQL statement to drop partitions you no longer need.

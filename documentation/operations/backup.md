@@ -8,7 +8,7 @@ description:
 You should back up QuestDB to be prepared for the case where your original
 database or data is lost, or if your database or table is corrupted. The backup
 & restore process is also necessary to create
-[replica instances](/docs/operations/replication/) in QuestDB Enterprise.
+[replica instances](/docs/high-availability/setup/) in QuestDB Enterprise.
 
 ## Overview
 
@@ -60,7 +60,7 @@ space, the safer it is to enter the checkpoint mode.
 We recommend daily backups.
 
 If you are using QuestDB Enterprise, the frequency of backups impacts the time
-it takes to create a new [replica instance](/docs/operations/replication/).
+it takes to create a new [replica instance](/docs/high-availability/setup/).
 Creating replicas involves choosing a backup and having the replica replay WAL
 files until it has caught up. The older the backup, the more WAL files the
 replica will have to replay, and thus there is a longer time-frame. For these
@@ -255,10 +255,10 @@ QuestDB supports the following filesystems:
 
 Other file systems are untested and while they may work, we do not officially
 support them. See the
-[filesystem compatibility](/docs/operations/capacity-planning/#supported-filesystems)
+[filesystem compatibility](/docs/getting-started/capacity-planning/#supported-filesystems)
 section for more information.
 
 ## Further reading
 
 To learn more, see the
-[`CHECKPOINT` SQL reference documentation](/docs/reference/sql/checkpoint/).
+[`CHECKPOINT` SQL reference documentation](/docs/query/sql/checkpoint/).

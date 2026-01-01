@@ -48,7 +48,7 @@ but `Google Cloud Storage` is likely simpler and cheaper to use.
 QuestDB supports `Google Cloud Storage` as its replication object-store in the Enterprise edition.
 
 To get started, create a bucket for the database to use. Then follow the 
-[Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to create a connection string and
+[Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to create a connection string and
 configure QuestDB.
 
 ### Minimum specification
@@ -200,7 +200,7 @@ tag** `questdb` will now have this firewall rule applied.
 
 The ports we have opened are:
 
-- `9000` for the REST API and [Web Console](/docs/web-console/)
+- `9000` for the REST API and [Web Console](/docs/getting-started/web-console/overview/)
 - `8812` for the PostgreSQL wire protocol
 
 ## Verify the deployment
@@ -221,7 +221,7 @@ To verify that the QuestDB deployment is operating as expected:
 1. Copy the **External IP** of the instance
 2. Navigate to `http://<external_ip>:9000` in a browser
 
-The [Web Console](/docs/web-console/) should now be visible:
+The [Web Console](/docs/getting-started/web-console/overview/) should now be visible:
 
 <Screenshot
 alt="The QuestDB Web Console running on a VM instance on Google Cloud Platform"

@@ -2,17 +2,17 @@ import { DocButton } from '../DocButton'
 
 const guides = [
   {
-    href: '/docs/guides/create-database/',
+    href: '/docs/getting-started/create-database/',
     name: 'Create database',
     description: 'Set up your first QuestDB database and start storing time-series data.',
   },
   {
-    href: '/docs/operations/capacity-planning/',
+    href: '/docs/getting-started/capacity-planning/',
     name: 'Capacity planning',
     description: 'Select a storage medium, plan, size and compress your QuestDB deployment.',
   },
   {
-    href: '/docs/guides/working-with-timestamps-timezones/',
+    href: '/docs/concepts/timestamps-timezones/',
     name: 'Working with time',
     description:
       `It's about time. Learn how to work with timestamps and timezones in QuestDB.`,

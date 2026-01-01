@@ -8,14 +8,14 @@ const OUTPUT_DIR = path.join(ROOT_DIR, 'static', 'web-console')
 const BASE_URL = 'https://questdb.com/docs'
 
 const DOCS_CATEGORIES = {
-  functions: path.join(DOCS_DIR, 'reference', 'function'),
-  operators: path.join(DOCS_DIR, 'reference', 'operators'),
-  sql: path.join(DOCS_DIR, 'reference', 'sql'),
-  concepts: path.join(DOCS_DIR, 'concept')
+  functions: path.join(DOCS_DIR, 'query', 'functions'),
+  operators: path.join(DOCS_DIR, 'query', 'operators'),
+  sql: path.join(DOCS_DIR, 'query', 'sql'),
+  concepts: path.join(DOCS_DIR, 'concepts')
 }
 
 const SINGLE_FILE_CATEGORIES = {
-  schema: [path.join(DOCS_DIR, 'guides', 'schema-design-essentials.md')]
+  schema: [path.join(DOCS_DIR, 'schema-design-essentials.md')]
 }
 
 /**

@@ -10,7 +10,7 @@ to [create an issue](https://github.com/questdb/documentation/issues) or a PR on
 GitHub.
 
 For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
-see the [Prometheus integration guide](/docs/third-party-tools/prometheus/).
+see the [Prometheus integration guide](/docs/integrations/other/prometheus/).
 
 ## Basic health check
 
@@ -85,4 +85,4 @@ QuestDB maintains a table called `_query_trace`, which records each executed
 query and the time it took. You can query this table to find slow queries.
 
 Read more on query tracing on the
-[Concepts page](/docs/concept/query-tracing/).
+[Concepts page](/docs/concepts/deep-dive/query-tracing/).
