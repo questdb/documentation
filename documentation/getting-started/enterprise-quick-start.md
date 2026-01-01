@@ -92,7 +92,7 @@ tls.private.key.path=/path/to/private_key
 
 To hot-reload the certificate and private key and update the files on disk,
 login to your QuestDB [Web Console](/docs/getting-started/web-console/overview/). This is accessible by default at
-http://localhost:9000. Login using the built-in administrator
+`http://localhost:9000`. Login using the built-in administrator
 credential.
 
 Then, execute:

@@ -206,7 +206,7 @@ Now the Kafka Connect is initiated.
 
 ### Send a message
 
-Open the [Redpanda UI topic page](http://127.0.0.1:8080/topics). It should
+Open the Redpanda UI topic page at `http://127.0.0.1:8080/topics`. It should
 display `example-topic`:
 
 ![Screenshot of the Redpanda UI showing the example-topic](/images/docs/guide/redpanda/redpanda-topic.webp)
@@ -230,7 +230,7 @@ Then, click 'Publish'.
 
 ### See result from QuestDB
 
-Go to QuestDB web console at http://localhost:9000. Run
+Go to QuestDB web console at `http://localhost:9000`. Run
 a `SELECT` query:
 
 ```questdb-sql
@@ -326,7 +326,7 @@ The command above sends two JSON messages to Redpanda Connect standard input, wh
 
 ### Verify the integration
 
-Navigate to the QuestDB Web Console at http://localhost:9000 and run the following query to see your data:
+Navigate to the QuestDB Web Console at `http://localhost:9000` and run the following query to see your data:
 
 ```sql
 SELECT *

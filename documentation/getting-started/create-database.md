@@ -28,7 +28,7 @@ All that said, in this tutorial you will learn how to:
 ### Before we begin...
 
 All commands are run through the [Web Console](/docs/getting-started/web-console/overview/) accessible at
-http://localhost:9000.
+`http://localhost:9000`.
 
 You can also run the same SQL via the
 [Postgres endpoint](/docs/query/pgwire/overview/) or the

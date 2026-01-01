@@ -37,7 +37,7 @@ grafana/grafana-oss
 ```
 
 Once the Grafana server has started, you can access it via port 3000
-(http://localhost:3000). The default login credentials
+(`http://localhost:3000`). The default login credentials
 are as follows:
 
 ```shell
@@ -61,7 +61,7 @@ questdb/questdb:latest
 ## Add a data source
 
 1. Open Grafana's UI (by default available at
-   http://localhost:3000)
+   `http://localhost:3000`)
 2. Navigate to the bottom of the page and click **Find more data source
    plugins**.
 3. Search for QuestDB and click **Install**.

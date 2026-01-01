@@ -105,7 +105,7 @@ Protocol endpoints. The former is required for opening the Web Console, and the
 latter is used by Spark to connect to the database.
 
 Open the [Web Console](/docs/getting-started/web-console/overview/) in your browser at
-http://localhost:9000.
+`http://localhost:9000`.
 
 Run the following SQL commands using the console:
 
