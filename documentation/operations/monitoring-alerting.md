@@ -91,38 +91,38 @@ Key columns for ingestion monitoring:
 
 | Column | Description |
 |--------|-------------|
-| `pendingRowCount` | Rows written to WAL but not yet applied to the table |
-| `suspended` | Whether the table is suspended (WAL apply halted) |
-| `memoryPressureLevel` | `0` (normal), `1` (reduced parallelism), `2` (backoff) |
-| `sequencerTxn - writerTxn` | Number of pending WAL transactions |
-| `writeAmplificationP99` | Out-of-order merge overhead (1.0 = optimal) |
-| `mergeThroughputP99` | Slowest merge throughput in rows/second |
+| `wal_pending_row_count` | Rows written to WAL but not yet applied to the table |
+| `table_suspended` | Whether the table is suspended (WAL apply halted) |
+| `table_memory_pressure_level` | `0` (normal), `1` (reduced parallelism), `2` (backoff) |
+| `wal_txn - table_txn` | Number of pending WAL transactions |
+| `table_write_amp_p99` | Out-of-order merge overhead (1.0 = optimal) |
+| `table_merge_rate_p99` | Slowest merge throughput in rows/second |
 
 Example health dashboard query:
 
 ```questdb-sql
 SELECT
     table_name,
-    rowCount,
-    pendingRowCount,
+    table_row_count,
+    wal_pending_row_count,
     CASE
-        WHEN suspended THEN 'SUSPENDED'
-        WHEN memoryPressureLevel = 2 THEN 'BACKOFF'
-        WHEN memoryPressureLevel = 1 THEN 'PRESSURE'
+        WHEN table_suspended THEN 'SUSPENDED'
+        WHEN table_memory_pressure_level = 2 THEN 'BACKOFF'
+        WHEN table_memory_pressure_level = 1 THEN 'PRESSURE'
         ELSE 'OK'
     END AS status,
-    sequencerTxn - writerTxn AS lag_txns,
-    writeAmplificationP50 AS write_amp,
-    mergeThroughputP99 AS slowest_merge
+    wal_txn - table_txn AS lag_txns,
+    table_write_amp_p50 AS write_amp,
+    table_merge_rate_p99 AS slowest_merge
 FROM tables()
 WHERE walEnabled
 ORDER BY
-    suspended DESC,
-    memoryPressureLevel DESC,
-    pendingRowCount DESC;
+    table_suspended DESC,
+    table_memory_pressure_level DESC,
+    wal_pending_row_count DESC;
 ```
 
-See the [`tables()` reference](/docs/reference/function/meta/#tables) for the
+See the [`tables()` reference](/docs/query/functions/meta/#tables) for the
 complete list of columns and additional example queries.
 
 ## Detect slow queries
