@@ -81,7 +81,7 @@ is a low-impact way to detect there's a problem which needs further diagnosing.
 
 ## Monitor ingestion with SQL
 
-For detailed per-table ingestion monitoring, use the [`tables()`](/docs/reference/function/meta/#tables)
+For detailed per-table ingestion monitoring, use the [`tables()`](/docs/query/functions/meta/#tables)
 function. Unlike Prometheus metrics which provide aggregate counters, `tables()`
 returns real-time statistics for each table including WAL lag, memory pressure,
 and performance histograms. The function is lightweight and fully in-memory,
