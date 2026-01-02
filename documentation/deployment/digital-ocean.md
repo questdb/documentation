@@ -13,7 +13,7 @@ run on cloud resources. This guide describes how to launch QuestDB via the
 DigitalOcean marketplace using the official listing. This document also
 describes usage instructions after you have launched the instance, including
 hints for authentication, the available interfaces, and tips for accessing the
-REST API and [Web Console](/docs/web-console/).
+REST API and [Web Console](/docs/getting-started/web-console/overview/).
 
 ## Prerequisites
 
@@ -74,11 +74,11 @@ The server configuration file is at the following location on the droplet:
 ```
 
 For details on the server properties and using this file, see the
-[server configuration documentation](/docs/configuration/).
+[server configuration documentation](/docs/configuration/overview/).
 
 The default ports used by QuestDB interfaces are as follows:
 
-- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
+- [Web Console](/docs/getting-started/web-console/overview/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`
@@ -99,7 +99,7 @@ pg.password=...
 ```
 
 For details on authentication using InfluxDB line protocol, see the
-[InfluxDB line protocol authentication guide](/docs/reference/api/ilp/overview/#authentication).
+[InfluxDB line protocol authentication guide](/docs/ingestion/ilp/overview/#authentication).
 
 ### Disabling authentication
 

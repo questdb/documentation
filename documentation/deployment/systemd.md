@@ -50,7 +50,7 @@ However, should you choose to update your own and serve it via a scripted method
 or similar, you may do so.
 
 Read more about the available options in our
-[Configuration reference page](/docs/configuration/).
+[Configuration reference page](/docs/configuration/overview/).
 
 ## Example questdb.service
 
@@ -124,7 +124,7 @@ systemctl --user status questdb.service
 Your QuestDB instance should now be accessible at localhost, with services
 available at the following default ports:
 
-- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
+- [Web Console](/docs/getting-started/web-console/overview/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`

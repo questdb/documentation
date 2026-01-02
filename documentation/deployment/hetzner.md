@@ -45,7 +45,7 @@ fio --name=write_throughput --directory=/questdb/fiotest --numjobs=8 \
 ```
 </details>
 
-For more guidance on storage requirements, see the [Capacity Planning](/docs/operations/capacity-planning/) documentation.
+For more guidance on storage requirements, see the [Capacity Planning](/docs/getting-started/capacity-planning/) documentation.
 
 
 ## Provisioning Resources
@@ -128,9 +128,9 @@ Replace `<your-ip>` with your actual public IP address. For production deploymen
 :::
 
 **Default QuestDB Ports:**
-- `9000`: [Web Console](/docs/web-console/) and [REST API](/docs/reference/api/rest/)
-- `8812`: [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/)
-- `9009`: [InfluxDB line protocol](/docs/reference/api/ilp/overview/) (TCP)
+- `9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/query/rest-api/)
+- `8812`: [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- `9009`: [InfluxDB line protocol](/docs/ingestion/ilp/overview/) (TCP)
 - `9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
 Add firewall rules for additional ports as needed for your specific use case.
@@ -195,7 +195,7 @@ questdb01$ df -h /questdb
 - `defaults`: Uses standard mount options (rw,suid,dev,exec,auto,nouser,async)
 :::
 
-The QuestDB [root directory structure](/docs/concept/root-directory-structure/) will be created automatically on first startup.
+The QuestDB [root directory structure](/docs/concepts/deep-dive/root-directory-structure/) will be created automatically on first startup.
 
 
 ## Installing and Running QuestDB
@@ -237,9 +237,9 @@ renderText={(release) => (
 />
 
 **Port mappings explained:**
-- `-p 9000:9000`: [Web Console](/docs/web-console/) and [REST API](/docs/reference/api/rest/)
-- `-p 9009:9009`: [InfluxDB line protocol](/docs/reference/api/ilp/overview/) (TCP)
-- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/)
+- `-p 9000:9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/query/rest-api/)
+- `-p 9009:9009`: [InfluxDB line protocol](/docs/ingestion/ilp/overview/) (TCP)
+- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
 - `-p 9003:9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
 :::tip Port Selection
@@ -271,7 +271,7 @@ questdb01$ docker ps
 questdb01$ docker logs questdb
 ```
 
-Navigate to `http://<external_ip>:9000` in your browser to access the [Web Console](/docs/web-console/).
+Navigate to `http://<external_ip>:9000` in your browser to access the [Web Console](/docs/getting-started/web-console/overview/).
 
 ## QuestDB Configuration
 
@@ -318,14 +318,14 @@ questdb01$ docker restart questdb
 
 ### Additional Configuration Options
 
-For comprehensive configuration options, see the [Configuration reference](/docs/configuration/) documentation. Common production settings include:
+For comprehensive configuration options, see the [Configuration reference](/docs/configuration/overview/) documentation. Common production settings include:
 
 - **Connection limits**: `pg.connection.pool.size`
 - **Memory settings**: `shared.worker.count`
-- **Security**: [TLS configuration](/docs/operations/tls/)
-- **Authentication**: [RBAC setup](/docs/operations/rbac/)
+- **Security**: [TLS configuration](/docs/security/tls/)
+- **Authentication**: [RBAC setup](/docs/security/rbac/)
 
-The QuestDB [root directory structure](/docs/concept/root-directory-structure/) contains all configuration files and data.
+The QuestDB [root directory structure](/docs/concepts/deep-dive/root-directory-structure/) contains all configuration files and data.
 
 
 ## Upgrading QuestDB
@@ -554,7 +554,7 @@ questdb01$ psql -c "SELECT version();"
 
 Expected output should show QuestDB version information, confirming successful database connectivity.
 
-For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/pgwire/pgwire-intro/) documentation.
+For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/query/pgwire/overview/) documentation.
 
 ### Manual Backup Test
 

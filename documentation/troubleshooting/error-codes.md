@@ -15,7 +15,7 @@ It does so by keeping a rolling ID locally and in the object store in sync.
 
 If these two IDs are out of sync, the primary instance will raise an error.
 
-For additional information, refer to the [replication overview](/docs/concept/replication) and [replication setup guide](/docs/operations/replication), especially its "Disaster Recovery" section.
+For additional information, refer to the [replication overview](/docs/high-availability/overview) and [replication setup guide](/docs/high-availability/setup), especially its "Disaster Recovery" section.
 
 ## ER001
 
@@ -53,7 +53,7 @@ The workflow to enable replication on the primary instance and create replicas i
 * Reconfigure the replica instance with `replication.role=replica` and ensure its `replication.object.store` points to the same object store as the primary. Also, set a new and unique value to the `cairo.snapshot.instance.id` configuration.
 * Start the replica instance.
 
-See the [checkpointing](/docs/reference/sql/checkpoint/) page for more details
+See the [checkpointing](/docs/query/sql/checkpoint/) page for more details
 on how to create and restore snapshots.
 
 ## ER004

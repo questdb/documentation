@@ -1,0 +1,77 @@
+---
+title: Architecture Overview
+sidebar_label: Overview
+slug: questdb-architecture
+description:
+  A deep technical dive into the internal architecture, storage engine, query
+  processing, and native integrations of QuestDB.
+---
+
+import ThreeTierChart from "@site/src/components/ThreeTierChart"
+
+QuestDB offers high-speed ingestion and low-latency analytics on time-series
+data. It stores data in a three-tier architecture (streaming WAL files, local
+binary storage, and local or remote storage in Parquet format) to improve
+interoperability and avoid vendor lock-in.
+
+<ThreeTierChart />
+
+This document explains QuestDB's internal architecture.
+
+## Key components
+
+QuestDB is comprised of several key components:
+
+- **[Storage engine](/docs/architecture/storage-engine):** Uses a
+  column-oriented design to ensure high I/O performance and low latency.
+
+- **[Memory management and native integration](/docs/architecture/memory-management):**
+  The system leverages both memory mapping and explicit memory management
+  techniques, integrating native code for performance-critical tasks.
+
+- **[Query engine](/docs/architecture/query-engine):** A custom SQL
+  parser, a just-in-time (JIT) compiler, and a vectorized execution engine
+  process data in table page frames for better CPU use.
+
+- **[Time-series optimizations](/docs/architecture/time-series-optimizations):**
+  QuestDB is specifically designed for time-series, and it provides several
+  optimizations, such as a designated timestamp, sequential reads, materialized
+  views, and in-memory processing.
+
+- **[Replication](/docs/high-availability/overview/):** QuestDB Enterprise supports
+  high availability with read replicas and multi-primary configurations.
+  See [High Availability](/docs/high-availability/overview/) for details.
+
+- **[Observability](/docs/architecture/observability):** QuestDB exposes
+  real-time metrics, health checks, and structured logs to monitor performance
+  and streamline diagnostics.
+
+- **[Web console](/docs/getting-started/web-console/overview/):** The engine includes
+  a web console for running SQL statements, bulk loading CSV files, and
+  displaying monitoring dashboards. QuestDB Enterprise supports single sign-on
+  (SSO) in the web console.
+
+## Design patterns & best practices throughout the codebase
+
+- **Immutable data structures:** The system favors immutability to avoid
+  concurrency issues and simplify state management.
+
+- **Modular architecture:** Each component (eg., storage, query processing,
+  ingestion, etc.) has well-defined interfaces that enhance maintainability and
+  decouple functionality.
+
+- **Factory & builder patterns:** These patterns are used to centralize
+  construction logic for complex objects such as SQL execution plans and storage
+  buffers.
+
+- **Lazy initialization:** Resource-intensive components initialize only when
+  needed to reduce startup overhead.
+
+- **Rigorous testing & benchmarks:**
+  [Unit tests, integration tests](https://github.com/questdb/questdb/tree/master/core/src/test),
+  and performance benchmarks ensure that new enhancements do not compromise
+  reliability or performance.
+
+## Next up
+
+Continue to [Storage Engine](/docs/architecture/storage-engine/) to learn how QuestDB stores and manages data on disk.

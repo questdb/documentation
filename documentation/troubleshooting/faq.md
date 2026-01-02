@@ -11,7 +11,7 @@ find the answers to your question, please join our
 ## Where do I find the log and how do I filter the log messages?
 
 Log files are stored in the `log` folder under the
-[root_directory](/docs/concept/root-directory-structure/). The log has the
+[root_directory](/docs/concepts/deep-dive/root-directory-structure/). The log has the
 following levels to assist filtering:
 
 Check the [log](/docs/operations/logging-metrics/) page for the available log levels.
@@ -32,7 +32,7 @@ ALTER TABLE my_table ALTER COLUMN str_col TYPE VARCHAR;
 ```
 
 See more details at
-[ALTER TABLE COLUMN TYPE documentation](/docs/reference/sql/alter-table-change-column-type/)
+[ALTER TABLE COLUMN TYPE documentation](/docs/query/sql/alter-table-change-column-type/)
 
 ## How do I convert a `VARCHAR` column to a `SYMBOL` or vice versa?
 
@@ -46,12 +46,12 @@ ALTER TABLE my_table ALTER COLUMN var_col TYPE SYMBOL CAPACITY 4096;
 ```
 
 See more details at
-[ALTER TABLE COLUMN TYPE documentation](/docs/reference/sql/alter-table-change-column-type/)
+[ALTER TABLE COLUMN TYPE documentation](/docs/query/sql/alter-table-change-column-type/)
 
 While setting the capacity of `SYMBOL` is optional, doing so enhances the
 performance of both the conversion process and data inserts. Symbol capacity
 expands automatically as needed. To learn more, see the
-[SYMBOL documentation](/docs/concept/symbol/).
+[SYMBOL documentation](/docs/concepts/symbol/).
 
 ## Why do I get `table busy` error messages when inserting data over PostgreSQL wire protocol?
 
@@ -60,7 +60,7 @@ statements concurrently on the same table. This means that the table is locked
 by inserts issued from another SQL connection or other client protocols for data
 import, like InfluxDB Line Protocol over TCP or CSV over HTTP.
 
-To avoid this error, we recommend using [WAL](/docs/concept/write-ahead-log/)
+To avoid this error, we recommend using [WAL](/docs/concepts/write-ahead-log/)
 tables to allow concurrent ingestion across all interfaces.
 
 ## Why do I see `could not open read-write` messages when creating a table or inserting rows?
@@ -75,7 +75,7 @@ io.questdb.cairo.CairoException: [24] could not open read-only [file=/root/.ques
 
 The machine may have insufficient limits for the maximum number of open files.
 Try checking the `ulimit` value on your machine. Refer to
-[capacity planning](/docs/operations/capacity-planning/#maximum-open-files) page
+[capacity planning](/docs/getting-started/capacity-planning/#maximum-open-files) page
 for more details.
 
 ## Why do I see `errno=12` mmap messages in the server logs?
@@ -89,13 +89,13 @@ Log messages may appear like the following:
 The machine may have insufficient limits of memory map areas a process may have.
 Try checking and increasing the `vm.max_map_count` value on your machine. Refer
 to
-[capacity planning](/docs/operations/capacity-planning/#max-virtual-memory-areas-limit)
+[capacity planning](/docs/getting-started/capacity-planning/#max-virtual-memory-areas-limit)
 page for more details.
 
 ## Why do I see `async command/event queue buffer overflow` messages when dropping partitions?
 
 It could be the case that there are a lot of partitions to be dropped by the
-DROP PARTITION [statement](/docs/reference/sql/alter-table-drop-partition)
+DROP PARTITION [statement](/docs/query/sql/alter-table-drop-partition)
 you're trying to run, so the internal queue used by the server cannot fit them.
 Try to increase `cairo.writer.command.queue.slot.size` value. Its default value
 is `2K`, i.e. 2KB, so you may need to set it to a larger value, e.g. `32K`.
@@ -111,7 +111,7 @@ inserted with identical fields. Until then, you need to
 ## Can I query by time?
 
 Yes! When using the `WHERE` statement to define the time range for a query, the
-[`IN`](/docs/reference/sql/where/#time-range-with-interval-modifier) keyword allows
+[`IN`](/docs/query/sql/where/#time-range-with-interval-modifier) keyword allows
 modifying the range and interval of the search. The range can be tuned to a
 second resolution.
 
@@ -181,9 +181,9 @@ you cannot navigate backwards or access result positions as you might with
 scrollable cursors in PostgreSQL.
 
 For more information and for tips to work around, see the
-[PostgreSQL compatability section](/docs/pgwire/pgwire-intro/#forward-only-cursors)
+[PostgreSQL compatability section](/docs/query/pgwire/overview/#forward-only-cursors)
 in our Query & SQL overview.
 
 ## My table has corrupted WAL data due to a previous full disk or kernel limits error. What do I do?
 
-You need to skip the problematic transation using the [RESUME WAL](/docs/reference/sql/alter-table-resume-wal/) SQL statement. If there are multiple transactions that rely on the corrupted WAL data, you may need to follow [this instruction](/docs/reference/sql/alter-table-resume-wal/#diagnosing-corrupted-wal-transactions).
+You need to skip the problematic transation using the [RESUME WAL](/docs/query/sql/alter-table-resume-wal/) SQL statement. If there are multiple transactions that rely on the corrupted WAL data, you may need to follow [this instruction](/docs/query/sql/alter-table-resume-wal/#diagnosing-corrupted-wal-transactions).

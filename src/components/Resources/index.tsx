@@ -27,8 +27,8 @@ interface Resource {
 
 const resources: Array<Resource> = [
   {
-    href: '/docs/reference/sql/overview/',
-    name: 'SQL overview',
+    href: '/docs/query/overview/',
+    name: 'Query overview',
     description:
       'Learn about our powerful extended SQL and how to use it to query QuestDB.',
     icon: MagnifyingGlassIcon,
@@ -41,7 +41,7 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/docs/ingestion-overview/#first-party-clients',
+    href: '/docs/ingestion/overview/#first-party-clients',
     name: 'Language clients',
     description:
       'Explore our language clients and how to use them to ingest data into QuestDB.',
@@ -55,7 +55,7 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/docs/configuration/',
+    href: '/docs/configuration/overview/',
     name: 'Configuration',
     description:
       'See all of our available configuration options and fine-tune to match your use case.',
@@ -69,7 +69,7 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/docs/third-party-tools/overview/',
+    href: '/docs/integrations/overview/',
     name: 'Third-Party Tools',
     description:
       'Our recommended third-party tools can aid you in analyzing and visualizing your data.',

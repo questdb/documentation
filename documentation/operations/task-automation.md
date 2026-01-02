@@ -5,12 +5,12 @@ description:
   Learn how to automate QuestDB tasks using the REST HTTP API, or one of our recommended workflow orchestrators.
 ---
 
-QuestDB provides a simple [HTTP API](/docs/reference/api/rest/) that allows you to interact with the database using SQL queries.
+QuestDB provides a simple [HTTP API](/docs/query/rest-api/) that allows you to interact with the database using SQL queries.
 This API can be leveraged for automation using Bash scripts and scheduled execution via cron jobs. This is a lightweight
 approach that requires minimal dependencies.
 
 For a more robust approach, you might want to explore the integration with workflow orchestrators such as
-[Apache Airflow](/docs/third-party-tools/airflow/) or [Dagster](/docs/third-party-tools/dagster/).
+[Apache Airflow](/docs/integrations/orchestration/airflow/) or [Dagster](/docs/integrations/orchestration/dagster/).
 
 
 ## Prerequisites
@@ -56,8 +56,8 @@ To execute this script daily at midnight, add the following line to your crontab
 
 ## Next Steps
 
-For more advanced automation, consider using a workflow orchestrator like [**Dagster**](/docs/third-party-tools/dagster/) or
-[**Apache Airflow**](/docs/third-party-tools/airflow/).
+For more advanced automation, consider using a workflow orchestrator like [**Dagster**](/docs/integrations/orchestration/dagster/) or
+[**Apache Airflow**](/docs/integrations/orchestration/airflow/).
 
 - **Full Example Repository**: [https://github.com/questdb/data-orchestration-and-scheduling-samples](https://github.com/questdb/data-orchestration-and-scheduling-samples)
 
