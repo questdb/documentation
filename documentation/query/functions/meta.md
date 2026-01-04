@@ -189,8 +189,8 @@ statement without any arguments.
 
 ## tables
 
-`tables()` or `all_tables()` returns all tables and materialized views in the
-database including table metadata.
+`tables()` returns metadata and real-time statistics for all tables in the
+database, including write activity, WAL status, and performance metrics.
 
 **Arguments:**
 
@@ -198,19 +198,24 @@ database including table metadata.
 
 **Return value:**
 
-Returns a `table`.
+Returns a `table` with the following columns:
 
-**Examples:**
+### Basic table information
 
-```questdb-sql title="List all tables"
-tables();
-```
-
-| id  | table_name  | designatedTimestamp | partitionBy | maxUncommittedRows | o3MaxLag   | walEnabled | directoryName    | dedup | ttlValue | ttlUnit | matView |
-| --- | ----------- | ------------------- | ----------- | ------------------ | ---------- | ---------- | ---------------- | ----- | -------- | ------- | ------- |
-| 1   | my_table    | ts                  | DAY         | 500000             | 30000000 0 | false      | my_table         | false | 0        | HOUR    | false   |
-| 2   | device_data | null                | NONE        | 10000              | 30000000   | false      | device_data      | false | 0        | HOUR    | false   |
-| 3   | short_lived | null                | HOUR        | 10000              | 30000000   | false      | short_lived (->) | false | 1        | HOUR    | false   |
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INT | Internal table ID |
+| `table_name` | STRING | Table name |
+| `designatedTimestamp` | STRING | Name of the designated timestamp column, or `null` |
+| `partitionBy` | STRING | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `walEnabled` | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled |
+| `dedup` | BOOLEAN | Whether deduplication is enabled |
+| `ttlValue` | INT | TTL (Time-To-Live) value |
+| `ttlUnit` | STRING | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `matView` | BOOLEAN | Whether this is a materialized view |
+| `directoryName` | STRING | Directory name on disk (includes ` (->)` suffix for symlinks) |
+| `maxUncommittedRows` | INT | Table's `maxUncommittedRows` setting |
+| `o3MaxLag` | LONG | Table's `o3MaxLag` setting in microseconds |
 
 :::note
 
@@ -219,13 +224,227 @@ tables();
 
 :::
 
+### Table metrics (table_* prefix)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `table_suspended` | BOOLEAN | Whether a WAL table is suspended (`false` for non-WAL tables) |
+| `table_row_count` | LONG | Approximate row count at last tracked write |
+| `table_max_timestamp` | TIMESTAMP | Approximate timestamp of last TableWriter commit |
+| `table_txn` | LONG | TableWriter transaction number at last tracked write |
+| `table_memory_pressure_level` | INT | Memory pressure: `0` (none), `1` (reduced parallelism), `2` (backoff). `null` for non-WAL |
+| `table_write_amp_count` | LONG | Total write amplification samples recorded |
+| `table_write_amp_p50` | DOUBLE | Median write amplification ratio |
+| `table_write_amp_p90` | DOUBLE | 90th percentile ratio |
+| `table_write_amp_p99` | DOUBLE | 99th percentile ratio |
+| `table_write_amp_max` | DOUBLE | Maximum ratio |
+| `table_merge_rate_count` | LONG | Total merge throughput samples recorded |
+| `table_merge_rate_p50` | LONG | Median throughput in rows/second |
+| `table_merge_rate_p90` | LONG | Throughput that 90% of jobs **exceeded** (slowest 10%) |
+| `table_merge_rate_p99` | LONG | Throughput that 99% of jobs **exceeded** (slowest 1%) |
+| `table_merge_rate_max` | LONG | Maximum throughput in rows/second |
+
+Write amplification measures O3 (out-of-order) merge overhead as `physicalRowsWritten / logicalRows`.
+A ratio of `1.0` means no amplification. Higher values indicate O3 merge overhead.
+
+:::note
+
+Merge rate P99 shows the *lowest* throughput (worst performance), not the highest.
+
+:::
+
+### WAL metrics (wal_* prefix)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `wal_pending_row_count` | LONG | Rows written to WAL but not yet applied to table |
+| `dedup_row_count_since_start` | LONG | Cumulative rows removed by deduplication (since server start) |
+| `wal_txn` | LONG | WAL sequencer transaction number (WAL tables only) |
+| `wal_max_timestamp` | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only) |
+| `wal_tx_count` | LONG | Total WAL transactions recorded (since server start) |
+| `wal_tx_size_p50` | LONG | Median transaction size in rows |
+| `wal_tx_size_p90` | LONG | 90th percentile transaction size in rows |
+| `wal_tx_size_p99` | LONG | 99th percentile transaction size in rows |
+| `wal_tx_size_max` | LONG | Maximum transaction size in rows |
+
+### Replica metrics (replica_* prefix)
+
+These columns are populated on **replicas only** via replication download tracking:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `replica_batch_count` | LONG | Total download batches recorded |
+| `replica_batch_size_p50` | LONG | Median batch size in rows |
+| `replica_batch_size_p90` | LONG | 90th percentile batch size |
+| `replica_batch_size_p99` | LONG | 99th percentile batch size |
+| `replica_batch_size_max` | LONG | Maximum batch size |
+| `replica_more_pending` | BOOLEAN | `true` if the last download batch was limited and more data is available |
+
+On primary instances, these columns will be `0` or `false`.
+
+### Data precision and limitations
+
+These values are approximations, not precise real-time metrics:
+
+- **Null when not tracked**: Values are `null` for tables not written to since server start, or evicted from the tracker
+- **Writer stats updated on pool return**: `table_row_count`, `table_max_timestamp`, `table_txn` are captured when TableWriter returns to the pool, not on every commit. A writer held for a long time won't update these columns until released.
+- **WAL stats updated in real-time**:
+  - On WAL commit: `wal_pending_row_count` (incremented), `wal_txn`, `wal_max_timestamp`, `wal_tx_size_*` histogram
+  - On WAL apply: `wal_pending_row_count` (decremented), `dedup_row_count_since_start`, `table_write_amp_*`, `table_merge_rate_*`
+- **LRU eviction**: Tracker maintains bounded memory (default 1000 tables). Least recently written tables are evicted when capacity is exceeded
+- **Startup hydration**: Values are hydrated from table metadata (`TxReader`) on startup, but diverge as writes occur
+
+**Non-WAL tables**: `wal_txn`, `wal_max_timestamp`, `wal_pending_row_count`, `dedup_row_count_since_start`, `table_memory_pressure_level`, and histogram columns are `null` or `0`.
+
+**WAL tables**: All columns populated when tracked. `wal_max_timestamp` reflects the max data timestamp from the WAL transaction, not wall-clock time.
+
+### Configuration
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `cairo.recent.write.tracker.capacity` | 1000 | Maximum number of tables tracked |
+
+Tables exceeding this capacity are evicted based on least recent write activity.
+
+**Examples:**
+
+```questdb-sql title="List all tables"
+tables();
+```
+
+| id  | table_name  | designatedTimestamp | partitionBy | walEnabled | directoryName    | dedup | ttlValue | ttlUnit | matView |
+| --- | ----------- | ------------------- | ----------- | ---------- | ---------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table    | ts                  | DAY         | false      | my_table         | false | 0        | HOUR    | false   |
+| 2   | device_data | null                | NONE        | false      | device_data      | false | 0        | HOUR    | false   |
+| 3   | short_lived | null                | HOUR        | false      | short_lived (->) | false | 1        | HOUR    | false   |
+
 ```questdb-sql title="All tables with a daily partitioning strategy"
 tables() WHERE partitionBy = 'DAY';
 ```
 
-| id  | name     | designatedTimestamp | partitionBy | maxUncommittedRows | walEnabled | directoryName | dedup | ttlValue | ttlUnit | matView |
-| --- | -------- | ------------------- | ----------- | ------------------ | ---------- | ------------- | ----- | -------- | ------- | ------- |
-| 1   | my_table | ts                  | DAY         | 500000             | true       | my_table      | false | 0        | HOUR    | false   |
+| id  | table_name | designatedTimestamp | partitionBy | walEnabled | directoryName | dedup | ttlValue | ttlUnit | matView |
+| --- | ---------- | ------------------- | ----------- | ---------- | ------------- | ----- | -------- | ------- | ------- |
+| 1   | my_table   | ts                  | DAY         | true       | my_table      | false | 0        | HOUR    | false   |
+
+```questdb-sql title="Recently written tables"
+SELECT table_name, table_row_count, table_max_timestamp
+FROM tables()
+WHERE table_max_timestamp IS NOT NULL
+ORDER BY table_max_timestamp DESC
+LIMIT 10;
+```
+
+```questdb-sql title="WAL apply lag"
+SELECT
+    table_name,
+    wal_txn - table_txn AS pending_txns,
+    wal_pending_row_count
+FROM tables()
+WHERE walEnabled
+  AND wal_txn IS NOT NULL
+  AND wal_txn > table_txn
+ORDER BY pending_txns DESC;
+```
+
+```questdb-sql title="Suspended tables"
+SELECT table_name, table_suspended, table_memory_pressure_level
+FROM tables()
+WHERE walEnabled AND table_suspended;
+```
+
+```questdb-sql title="Memory pressure"
+SELECT table_name, table_memory_pressure_level
+FROM tables()
+WHERE table_memory_pressure_level > 0
+ORDER BY table_memory_pressure_level DESC;
+```
+
+```questdb-sql title="Deduplication activity"
+SELECT table_name, dedup_row_count_since_start, wal_tx_count,
+       dedup_row_count_since_start * 100.0 / NULLIF(wal_tx_count, 0) AS dedup_ratio
+FROM tables()
+WHERE dedup_row_count_since_start > 0
+ORDER BY dedup_row_count_since_start DESC;
+```
+
+```questdb-sql title="Large transactions"
+SELECT table_name, wal_tx_count, wal_tx_size_p50, wal_tx_size_p99, wal_tx_size_max
+FROM tables()
+WHERE walEnabled AND wal_tx_count > 0
+ORDER BY wal_tx_size_p99 DESC;
+```
+
+```questdb-sql title="High variance (spiky workloads)"
+SELECT table_name, wal_tx_size_p50, wal_tx_size_max,
+       wal_tx_size_max / NULLIF(wal_tx_size_p50, 0) AS spike_ratio
+FROM tables()
+WHERE walEnabled AND wal_tx_size_max > wal_tx_size_p50 * 10;
+```
+
+```questdb-sql title="High write amplification (O3 overhead)"
+SELECT table_name,
+       table_write_amp_count,
+       table_write_amp_p50,
+       table_write_amp_p99,
+       table_write_amp_max
+FROM tables()
+WHERE walEnabled
+  AND table_write_amp_p50 > 2.0
+ORDER BY table_write_amp_p99 DESC;
+```
+
+```questdb-sql title="Slow merge performance"
+SELECT table_name,
+       table_merge_rate_p99 AS slowest_throughput,
+       table_merge_rate_p50 AS median_throughput,
+       table_merge_rate_max AS best_throughput
+FROM tables()
+WHERE walEnabled
+  AND table_merge_rate_count > 0
+ORDER BY table_merge_rate_p99 ASC;
+```
+
+```questdb-sql title="Replica download statistics"
+SELECT table_name, replica_batch_count, replica_batch_size_p50,
+       replica_batch_size_p90, replica_batch_size_max, replica_more_pending
+FROM tables()
+WHERE replica_batch_count > 0
+ORDER BY replica_batch_count DESC;
+```
+
+```questdb-sql title="Table configuration overview"
+SELECT table_name,
+       partitionBy,
+       walEnabled,
+       dedup,
+       maxUncommittedRows,
+       o3MaxLag / 1000000 AS o3MaxLagSeconds
+FROM tables()
+WHERE walEnabled
+ORDER BY table_name;
+```
+
+```questdb-sql title="Health dashboard query"
+SELECT
+    table_name,
+    table_row_count,
+    wal_pending_row_count,
+    CASE
+        WHEN table_suspended THEN 'SUSPENDED'
+        WHEN table_memory_pressure_level = 2 THEN 'BACKOFF'
+        WHEN table_memory_pressure_level = 1 THEN 'PRESSURE'
+        ELSE 'OK'
+    END AS status,
+    wal_txn - table_txn AS lag_txns,
+    table_write_amp_p50 AS write_amp,
+    table_merge_rate_p99 AS slowest_merge
+FROM tables()
+WHERE walEnabled
+ORDER BY
+    table_suspended DESC,
+    table_memory_pressure_level DESC,
+    wal_pending_row_count DESC;
+```
 
 ## table_storage
 
@@ -304,6 +523,16 @@ WHERE partitionBy = 'HOUR';
 
 ## wal_tables
 
+:::note
+
+For monitoring and observability, use [`tables()`](#tables) instead.
+`tables()` provides all the same information plus additional metrics
+(pending rows, memory pressure, deduplication stats, throughput histograms),
+and is fully in-memory. `wal_tables()` reads from disk and is less suitable
+for frequent polling.
+
+:::
+
 `wal_tables()` returns the WAL status for all
 [WAL tables](/docs/concepts/write-ahead-log/) or materialized views in the
 database.
@@ -318,11 +547,11 @@ Returns a `table` including the following information:
 
 - `name` - table or materialized view name
 - `suspended` - suspended status flag
-- `writerTxn` - the last committed transaction in TableWriter
+- `writerTxn` - the last committed transaction in TableWriter (equivalent to `table_txn` in `tables()`)
 - `writerLagTxnCount` - the number of transactions that are kept invisible when
   writing to the table; these transactions will be eventually moved to the table
-  data and become visible for readers
-- `sequencerTxn` - the last committed transaction in the sequencer
+  data and become visible for readers (equivalent to `wal_txn - table_txn`)
+- `sequencerTxn` - the last committed transaction in the sequencer (equivalent to `wal_txn` in `tables()`)
 
 **Examples:**
 
