@@ -233,37 +233,36 @@ PIVOT (
 
 ## Column naming
 
-Output columns are automatically named based on the combination of values and aggregates.
+Output columns are automatically named based on the combination of FOR values and aggregates.
 
-When using **different aggregate functions** (e.g., `avg` and `sum`), the function name is used:
+With a **single aggregate**, columns are named using just the FOR value:
 
 ```questdb-sql
-PIVOT (avg(price), sum(price) FOR symbol IN ('BTC-USD'))
--- Columns: BTC-USD_avg, BTC-USD_sum
+PIVOT (sum(population) FOR year IN (2000, 2010))
+-- Columns: 2000, 2010
 ```
 
-When using the **same aggregate function multiple times** (e.g., `avg(price)` and `avg(amount)`), the full expression is used to distinguish them:
+With **multiple aggregates**, the full function expression is included:
 
 ```questdb-sql
-PIVOT (avg(price), avg(amount) FOR symbol IN ('BTC-USD'))
--- Columns: BTC-USD_avg(price), BTC-USD_avg(amount)
+PIVOT (sum(population), avg(population) FOR year IN (2000, 2010))
+-- Columns: 2000_sum(population), 2000_avg(population), 2010_sum(population), 2010_avg(population)
 ```
 
-Use aliases for cleaner column names:
+Use **aliases** for cleaner column names:
 
 ```questdb-sql
-PIVOT (avg(price) AS avg_price, avg(amount) AS avg_amt FOR symbol IN ('BTC-USD'))
--- Columns: BTC-USD_avg_price, BTC-USD_avg_amt
+PIVOT (sum(population) AS total, avg(population) AS average FOR year IN (2000, 2010))
+-- Columns: 2000_total, 2000_average, 2010_total, 2010_average
 ```
 
 | Scenario | Example | Column name |
 |----------|---------|-------------|
-| Single FOR, single aggregate | `avg(price) FOR symbol IN ('BTC')` | `BTC` |
-| Single FOR, different aggregates | `avg(price), sum(price) FOR symbol IN ('BTC')` | `BTC_avg`, `BTC_sum` |
-| Single FOR, same aggregate | `avg(price), avg(amount) FOR symbol IN ('BTC')` | `BTC_avg(price)`, `BTC_avg(amount)` |
-| Multiple FOR | `avg(price) FOR symbol IN ('BTC') side IN ('buy')` | `BTC_buy` |
-| With alias on value | `FOR symbol IN ('BTC-USD' AS btc)` | `btc` |
-| With alias on aggregate | `avg(price) AS avg_price FOR symbol IN ('BTC')` | `BTC_avg_price` |
+| Single aggregate | `sum(pop) FOR year IN (2000)` | `2000` |
+| Multiple aggregates | `sum(pop), avg(pop) FOR year IN (2000)` | `2000_sum(pop)`, `2000_avg(pop)` |
+| Multiple FOR | `sum(pop) FOR year IN (2000) country IN ('US')` | `2000_US` |
+| With alias on value | `FOR year IN (2000 AS Y2K)` | `Y2K` |
+| With alias on aggregate | `sum(pop) AS total FOR year IN (2000)` | `2000_total` |
 
 ## Limits
 
