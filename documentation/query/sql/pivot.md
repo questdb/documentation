@@ -187,6 +187,14 @@ trades PIVOT (
 | buy  | 39300.00  | 2620.00  |
 | sell | 39267.64  | 2615.54  |
 
+:::note
+When a GROUP BY key has no matching FOR values in the data, the entire row is
+excluded from results rather than appearing with NULL pivot columns. This is
+due to filter optimization that pushes `FOR column IN (values)` to the WHERE clause.
+
+For example, if `side = 'hold'` exists but has no matching symbols, that row won't appear.
+:::
+
 ### Dynamic IN list from subquery
 
 Column names determined at query compile time:
