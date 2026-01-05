@@ -120,6 +120,17 @@ GROUP BY symbol;
 | BTC-USD | 39267.64  |
 | ETH-USD | 2615.42   |
 
+Without `PIVOT`, converting rows to columns requires verbose `CASE` expressions:
+
+```questdb-sql title="Manual pivot with CASE"
+SELECT
+    avg(CASE WHEN symbol = 'BTC-USD' THEN price END) AS "BTC-USD",
+    avg(CASE WHEN symbol = 'ETH-USD' THEN price END) AS "ETH-USD"
+FROM trades;
+```
+
+`PIVOT` simplifies this pattern:
+
 ```questdb-sql title="Pivoted to columns"
 trades PIVOT (
     avg(price)
@@ -199,6 +210,12 @@ Subqueries in the `IN` clause must:
 - Return at least one row (empty result sets cause an error)
 :::
 
+:::tip
+If the subquery runs on a large table, it can slow down the overall `PIVOT` query.
+For exploratory analysis, dynamic subqueries are convenient. For production queries,
+use a constant list or store keys in a small dimension table for better performance.
+:::
+
 ### With CTEs
 
 ```questdb-sql
@@ -216,12 +233,34 @@ PIVOT (
 
 ## Column naming
 
-Output columns are named using the pattern: `{value}_{aggregate}` or `{value1}_{value2}_{aggregate}`
+Output columns are automatically named based on the combination of values and aggregates.
+
+When using **different aggregate functions** (e.g., `avg` and `sum`), the function name is used:
+
+```questdb-sql
+PIVOT (avg(price), sum(price) FOR symbol IN ('BTC-USD'))
+-- Columns: BTC-USD_avg, BTC-USD_sum
+```
+
+When using the **same aggregate function multiple times** (e.g., `avg(price)` and `avg(amount)`), the full expression is used to distinguish them:
+
+```questdb-sql
+PIVOT (avg(price), avg(amount) FOR symbol IN ('BTC-USD'))
+-- Columns: BTC-USD_avg(price), BTC-USD_avg(amount)
+```
+
+Use aliases for cleaner column names:
+
+```questdb-sql
+PIVOT (avg(price) AS avg_price, avg(amount) AS avg_amt FOR symbol IN ('BTC-USD'))
+-- Columns: BTC-USD_avg_price, BTC-USD_avg_amt
+```
 
 | Scenario | Example | Column name |
 |----------|---------|-------------|
 | Single FOR, single aggregate | `avg(price) FOR symbol IN ('BTC')` | `BTC` |
-| Single FOR, multiple aggregates | `avg(price), sum(price) FOR symbol IN ('BTC')` | `BTC_avg(price)`, `BTC_sum(price)` |
+| Single FOR, different aggregates | `avg(price), sum(price) FOR symbol IN ('BTC')` | `BTC_avg`, `BTC_sum` |
+| Single FOR, same aggregate | `avg(price), avg(amount) FOR symbol IN ('BTC')` | `BTC_avg(price)`, `BTC_avg(amount)` |
 | Multiple FOR | `avg(price) FOR symbol IN ('BTC') side IN ('buy')` | `BTC_buy` |
 | With alias on value | `FOR symbol IN ('BTC-USD' AS btc)` | `btc` |
 | With alias on aggregate | `avg(price) AS avg_price FOR symbol IN ('BTC')` | `BTC_avg_price` |
