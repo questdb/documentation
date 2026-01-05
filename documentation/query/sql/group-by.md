@@ -69,3 +69,9 @@ SELECT a, b, avg(temp)
 FROM tab
 GROUP BY a, b;
 ```
+
+## See also
+
+- [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+- [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions
