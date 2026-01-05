@@ -11,12 +11,13 @@ This is useful for analytics, charting, and transforming time-series sensor data
 
 ```
 ( selectQuery | tableName )
+[ WHERE condition ]
 PIVOT (
-    aggregateFunc [ AS alias ] [, aggregateFunc [ AS alias ] ...]
-    FOR pivotColumn IN ( valueList | selectDistinctQuery )
-    [ FOR pivotColumn IN ( valueList | selectDistinctQuery ) ... ]
+    aggregateExpression [ AS alias ] [, aggregateExpression [ AS alias ] ...]
+    FOR pivotExpression IN ( valueList | selectDistinctQuery )
+    [ FOR pivotExpression IN ( valueList | selectDistinctQuery ) ... ]
     [ GROUP BY column [, column ...] ]
-)
+) [ AS alias ]
 [ ORDER BY column [, column ...] ]
 [ LIMIT n ]
 ```
@@ -46,8 +47,8 @@ Define one or more aggregations, separated by commas:
 
 ```questdb-sql
 PIVOT (
-    avg(price),                    -- multiple aggregates
-    sum(amount) AS total_amount    -- with optional alias
+    avg(price),                          -- multiple aggregates
+    sum(price * amount) / 2 AS notional  -- expressions supported
     FOR ...
 )
 ```
@@ -78,7 +79,7 @@ Groups results by additional columns:
 
 ```questdb-sql
 PIVOT (
-    sum(amount)
+    sum(price * amount) / 2
     FOR symbol IN ('BTC-USD', 'ETH-USD')
     GROUP BY side    -- inside PIVOT parentheses
 )
@@ -147,14 +148,14 @@ trades PIVOT (
 ```questdb-sql
 trades PIVOT (
     avg(price) AS avg_price,
-    sum(amount) AS total
+    sum(price * amount) / 2 AS notional
     FOR symbol IN ('BTC-USD', 'ETH-USD')
 );
 ```
 
-| BTC-USD_avg_price | BTC-USD_total | ETH-USD_avg_price | ETH-USD_total |
-|-------------------|---------------|-------------------|---------------|
-| 39267.64          | 1.25          | 2615.42           | 0.45          |
+| BTC-USD_avg_price | BTC-USD_notional | ETH-USD_avg_price | ETH-USD_notional |
+|-------------------|------------------|-------------------|------------------|
+| 39267.64          | 24500.12         | 2615.42           | 588.25           |
 
 ### Multiple FOR clauses (Cartesian product)
 
@@ -246,31 +247,40 @@ Output columns are automatically named based on the combination of FOR values an
 With a **single aggregate**, columns are named using just the FOR value:
 
 ```questdb-sql
-PIVOT (sum(population) FOR year IN (2000, 2010))
--- Columns: 2000, 2010
+trades PIVOT (
+    avg(price)
+    FOR symbol IN ('BTC-USD', 'ETH-USD')
+);
+-- Columns: BTC-USD, ETH-USD
 ```
 
 With **multiple aggregates**, the full function expression is included:
 
 ```questdb-sql
-PIVOT (sum(population), avg(population) FOR year IN (2000, 2010))
--- Columns: 2000_sum(population), 2000_avg(population), 2010_sum(population), 2010_avg(population)
+trades PIVOT (
+    avg(price), sum(price)
+    FOR symbol IN ('BTC-USD', 'ETH-USD')
+);
+-- Columns: BTC-USD_avg(price), BTC-USD_sum(price), ETH-USD_avg(price), ETH-USD_sum(price)
 ```
 
 Use **aliases** for cleaner column names:
 
 ```questdb-sql
-PIVOT (sum(population) AS total, avg(population) AS average FOR year IN (2000, 2010))
--- Columns: 2000_total, 2000_average, 2010_total, 2010_average
+trades PIVOT (
+    avg(price) AS avg_price, sum(price) AS total_price
+    FOR symbol IN ('BTC-USD', 'ETH-USD')
+);
+-- Columns: BTC-USD_avg_price, BTC-USD_total_price, ETH-USD_avg_price, ETH-USD_total_price
 ```
 
 | Scenario | Example | Column name |
 |----------|---------|-------------|
-| Single aggregate | `sum(pop) FOR year IN (2000)` | `2000` |
-| Multiple aggregates | `sum(pop), avg(pop) FOR year IN (2000)` | `2000_sum(pop)`, `2000_avg(pop)` |
-| Multiple FOR | `sum(pop) FOR year IN (2000) country IN ('US')` | `2000_US` |
-| With alias on value | `FOR year IN (2000 AS Y2K)` | `Y2K` |
-| With alias on aggregate | `sum(pop) AS total FOR year IN (2000)` | `2000_total` |
+| Single aggregate | `avg(price) FOR symbol IN ('BTC')` | `BTC` |
+| Multiple aggregates | `avg(price), sum(price) FOR symbol IN ('BTC')` | `BTC_avg(price)`, `BTC_sum(price)` |
+| Multiple FOR | `avg(price) FOR symbol IN ('BTC') side IN ('buy')` | `BTC_buy` |
+| With alias on value | `FOR symbol IN ('BTC-USD' AS btc)` | `btc` |
+| With alias on aggregate | `avg(price) AS avg_price FOR symbol IN ('BTC')` | `BTC_avg_price` |
 
 ## Limits
 
@@ -285,15 +295,6 @@ trades PIVOT (
         side IN ('buy', 'sell')                         -- × 2
 );
 ```
-
-## Comparison with other databases
-
-| Feature | QuestDB | Oracle/SQL Server | BigQuery |
-|---------|---------|-------------------|----------|
-| GROUP BY | Optional (inside PIVOT) | Implicit | Implicit |
-| Multiple FOR | Yes (separate clauses) | Tuple syntax | Tuple syntax |
-| Subquery in IN | Yes | No | Limited |
-| Top-level syntax | `table PIVOT(...)` | No | No |
 
 ## See also
 
