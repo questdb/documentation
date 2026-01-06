@@ -140,9 +140,9 @@ Navigate to `http://localhost:4000/#/schema` and select the `ethereum` table:
 
 <Screenshot
   alt="Generate Schema on Cube"
-  height={224}
+  height={180}
   src="images/guides/cube/cube-generate-schema.webp"
-  width={700}
+  width={560}
 />
 
 Click "Generate Data Model" to create a cube in the `model` directory. Open the
