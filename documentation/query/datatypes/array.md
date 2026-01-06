@@ -9,9 +9,10 @@ QuestDB supports N-dimensional arrays, modeled after NumPy's `NDArray` type.
 Arrays are useful for storing vectors, matrices, and higher-dimensional data
 directly in your database.
 
-:::note
+:::important
 
-The current supported element type is `DOUBLE`.
+Arrays currently only support `DOUBLE` elements. Other element types are not yet
+available.
 
 :::
 
@@ -27,6 +28,7 @@ The current supported element type is `DOUBLE`.
 | Slice (range) | `arr[low:high]` | `arr[1:3]` keeps dimensionality |
 | Slice (open-ended) | `arr[low:]` | `arr[2:]` to end of dimension |
 | Mixed access | `arr[i, low:high]` | `arr[1, 2:4]` |
+| Compare arrays | `=`, `<>` | `arr1 = arr2` (same shape and elements) |
 
 Array types are written as `DOUBLE[dim1][dim2]...`, for example:
 - `DOUBLE[3]` — 1D array with 3 elements
@@ -259,6 +261,36 @@ SELECT arr[1:, 3, 2] subarr FROM tango;
 This left the top dimension unconstrained, then took the 3rd sub-array in each
 of the top-level sub-arrays, and then selected just the 2nd element in each of
 them.
+
+## Comparing arrays
+
+Arrays can be compared using the `=` and `<>` operators. Two arrays are equal if
+and only if:
+
+1. They have the same shape (dimensions and lengths)
+2. All corresponding elements are equal
+
+```questdb-sql
+SELECT
+  ARRAY[1, 2, 3] = ARRAY[1, 2, 3] as same,
+  ARRAY[1, 2, 3] = ARRAY[1, 2, 4] as different_value,
+  ARRAY[1, 2, 3] = ARRAY[[1, 2, 3]] as different_shape;
+```
+
+| same  | different_value | different_shape |
+| ----- | --------------- | --------------- |
+| true  | false           | false           |
+
+`NULL` elements are handled consistently with scalar `DOUBLE` behavior: two
+`NULL` values are considered equal when comparing arrays.
+
+```questdb-sql
+SELECT ARRAY[1, NULL, 3] = ARRAY[1, NULL, 3] as with_nulls;
+```
+
+| with_nulls |
+| ---------- |
+| true       |
 
 ## Array functions
 
