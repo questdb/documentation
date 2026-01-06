@@ -20,6 +20,7 @@ together. For a deeper tutorial, see
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/)
 - [QuestDB](/download/)
 - [Cube](https://github.com/cube-js/cube)
 
@@ -35,7 +36,7 @@ mkdir questdb-cube && cd $_
 
 ### Dockerfile
 
-Next, create a dockerfile within the project directory:
+Next, create a `docker-compose.yml` file within the project directory:
 
 ```yaml title=docker-compose.yml
 version: "2.2"
@@ -80,7 +81,7 @@ Create `model` directory to be used by Cube:
 mkdir model
 ```
 
-Finally, bring it all up with Docker:
+Finally, bring it all up with Docker Compose:
 
 ```bash title=shell
 docker-compose up -d
@@ -92,6 +93,53 @@ Both applications are now up and ready.
 
 - QuestDB: `http://localhost:9000`
 - Cube: `http://localhost:4000`
+
+## Access QuestDB Tables via Cube
+
+You can now create a QuestDB table in [Web Console](http://localhost:9000):
+
+```sql
+-- create table
+CREATE TABLE IF NOT EXISTS trades ( 
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+-- generate sample data
+INSERT INTO trades
+    SELECT
+        timestamp_sequence('2024-01-01T00:00:00', 60000L * x) timestamp,2024
+        rnd_str('ETH-USD', 'BTC-USD', 'SOL-USD', 'LTC-USD', 'UNI-USD') symbol,
+        rnd_str('buy', 'sell') side,
+        rnd_double() * 1000 + 100 price,
+        rnd_double() * 2000 + 0.1 amount
+    FROM long_sequence(100) x;
+```
+
+Then open `http://127.0.0.1:4000/#/schema`, select `trades` table in Cube UI and click
+the Generate Data Model button. You can select either YAML or JavaScript model to be
+generated.
+
+import Screenshot from "@theme/Screenshot"
+
+<Screenshot
+  alt="Creating a model in Cube UI"
+  height={272}
+  src="images/guides/cube/cube-create-model.webp"
+  width={830}
+/>
+
+Once that's done, you can use `trades` model in the Cube Playground to run queries:
+
+<Screenshot
+  alt="Running queries in Cube UI"
+  height={462}
+  src="images/guides/cube/cube-run-query.webp"
+  width={925}
+/>
 
 Not sure what to do next? Check out
 [our tutorial](/blog/2022/04/26/time-series-data-analytics-with-questdb-and-cube/)
