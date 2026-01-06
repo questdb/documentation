@@ -79,7 +79,7 @@ const integrations: Array<{
   {
     logo: { ...logos.cube, svg: CubeLogo },
     label: "Cube",
-    src: "/blog/2022/04/26/time-series-data-analytics-with-questdb-and-cube/",
+    src: "/docs/integrations/other/cube/",
   },
   {
     logo: { ...logos.databento, svg: DatabentoLogo },
