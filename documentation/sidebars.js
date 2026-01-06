@@ -426,6 +426,7 @@ module.exports = {
                 "query/sql/limit",
                 "query/sql/order-by",
                 "query/sql/over",
+                "query/sql/pivot",
                 "query/sql/sample-by",
                 "query/sql/where",
                 "query/sql/with",

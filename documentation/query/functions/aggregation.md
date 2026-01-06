@@ -1359,3 +1359,9 @@ GROUP BY symbol;
 | :------ | :-------------- |
 | BTC-USD | 125.34          |
 | ETH-USD | 18.92           |
+
+## See also
+
+- [GROUP BY](/docs/query/sql/group-by/) - Group rows for aggregation
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+- [PIVOT](/docs/query/sql/pivot/) - Transform aggregation results from rows to columns

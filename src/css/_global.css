@@ -48,6 +48,8 @@
   --ifm-blockquote-color: var(--palette-pale-blue);
   --ifm-code-background: var(--palette-gray);
   --ifm-code-color: var(--palette-white);
+  --ifm-code-border-radius: 8px;
+  --ifm-code-border-color: #555;
   --ifm-code-font-size: var(--font-size-small);
   --ifm-color-emphasis-300: var(--palette-pale-blue);
   --ifm-color-primary: var(--palette-pink);
