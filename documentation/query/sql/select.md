@@ -234,6 +234,14 @@ Join tables based on a key or timestamp.
 For more information, please refer to the
 [JOIN reference](/docs/query/sql/join/)
 
+### PIVOT
+
+Transforms rows into columns by aggregating data across specified values.
+Useful for analytics, charting, and reshaping time-series data.
+
+For more information, please refer to the
+[PIVOT reference](/docs/query/sql/pivot/)
+
 ### LIMIT
 
 Specify the number and position of records returned by a query.

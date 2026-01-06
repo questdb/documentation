@@ -1,15 +1,15 @@
 const color = {
-  draculaBackground: "#262833",
-  draculaForeground: "#f8f8f2",
+  draculaBackground: "#2d2d2d",
+  draculaForeground: "#ffffff",
   draculaSelection: "#44475a",
-  draculaComment: "#6272a4",
-  draculaRed: "#ff5555",
-  draculaOrange: "#ffb86c",
-  draculaYellow: "#f1fa8c",
-  draculaGreen: "#50fa7b",
-  draculaPurple: "#bd93f9",
-  draculaCyan: "#8be9fd",
-  draculaPink: "#ff79c6",
+  draculaComment: "#8899cc",
+  draculaRed: "#ff4466",
+  draculaOrange: "#ffaa33",
+  draculaYellow: "#ffee55",
+  draculaGreen: "#44ff77",
+  draculaPurple: "#bb77ff",
+  draculaCyan: "#55eeff",
+  draculaPink: "#ff55bb",
 }
 
 const theme = {
