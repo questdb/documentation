@@ -127,18 +127,18 @@ import Screenshot from "@theme/Screenshot"
 
 <Screenshot
   alt="Creating a model in Cube UI"
-  height={272}
   src="images/guides/cube/cube-create-model.webp"
-  width={830}
+  width={664}
+  height={216}
 />
 
 Once that's done, you can use `trades` model in the Cube Playground to run queries:
 
 <Screenshot
   alt="Running queries in Cube UI"
-  height={462}
   src="images/guides/cube/cube-run-query.webp"
   width={925}
+  height={462}
 />
 
 Not sure what to do next? Check out
