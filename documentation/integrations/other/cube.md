@@ -245,6 +245,13 @@ cube(`Ethereum`, {
 })
 ```
 
+:::note
+
+QuestDB also supports [materialized views](/docs/concepts/materialized-views/)
+that can be used to speed up queries directly at the database level.
+
+:::
+
 ### Consuming Data via APIs
 
 Cube's API-first approach enables you to connect to any data application. API
