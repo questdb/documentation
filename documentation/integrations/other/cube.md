@@ -12,7 +12,7 @@ and analytics, business or AI tools, Cube consolidates the complexity of overall
 data modelling and cross-source data exchange into a cleaner interface.
 
 As a high performance [time-series database](/glossary/time-series-database/),
-QuestDB and Cube are a strong pair. Together, efficiently bridge your QuestDB
+QuestDB and Cube are a strong pair. Together, they efficiently bridge your QuestDB
 data to one of the many applications and libraries which integrate with Cube.
 
 <Screenshot
@@ -89,7 +89,8 @@ Both applications are now available:
 ## Tutorial: Crypto Price Analytics
 
 In this tutorial, we'll build a crypto price analysis pipeline using the
-[Kaggle Crypto dataset](https://www.kaggle.com/datasets/sudalairajkumar/cryptocurrencypricehistory).
+[Kaggle Crypto dataset](https://www.kaggle.com/datasets/sudalairajkumar/cryptocurrencypricehistory)
+(requires a free Kaggle account to download).
 We'll import data into QuestDB, build a Cube data model, and expose it via APIs.
 
 ### Importing Data into QuestDB
@@ -144,7 +145,7 @@ Navigate to `http://localhost:4000/#/schema` and select the `ethereum` table:
   width={700}
 />
 
-Click "Generate Schema" to create a cube in the `model` directory. Open the
+Click "Generate Data Model" to create a cube in the `model` directory. Open the
 generated `Ethereum.js` file and customize it to include price columns:
 
 ```javascript
@@ -220,16 +221,28 @@ data to speed up queries. It creates materialized rollups of specified
 dimensions and measures, then uses aggregate awareness logic to route queries to
 the most optimal pre-aggregation.
 
-Add pre-aggregations to your data model:
+Add a `preAggregations` block to your cube definition in `Ethereum.js`:
 
 ```javascript
-preAggregations: {
-  main: {
-    measures: [avgHigh, avgLow],
-    timeDimension: date,
-    granularity: "day"
-  }
-}
+cube(`Ethereum`, {
+  sql: `SELECT * FROM ethereum`,
+
+  preAggregations: {
+    main: {
+      measures: [avgHigh, avgLow],
+      timeDimension: date,
+      granularity: "day"
+    }
+  },
+
+  measures: {
+    // ... existing measures
+  },
+
+  dimensions: {
+    // ... existing dimensions
+  },
+})
 ```
 
 ### Consuming Data via APIs
