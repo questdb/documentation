@@ -5,122 +5,39 @@ description:
   Explains the technical design and syntax to use N-dimensional arrays.
 ---
 
+QuestDB supports N-dimensional arrays, modeled after NumPy's `NDArray` type.
+Arrays are useful for storing vectors, matrices, and higher-dimensional data
+directly in your database.
+
 :::note
 
-N-dimensional arrays are in beta. The current supported element type is
-`DOUBLE`.
+The current supported element type is `DOUBLE`.
 
 :::
 
-As of version 9, QuestDB supports the N-dimensional array type.
+## Quick reference
 
-Its design matches that of the `NDArray` type in NumPy, which has become the
-de-facto standard for handling N-dimensional data. In order to effectively use
-arrays in QuestDB, it may help to understand the basic design principles behind
-it.
+| Operation | Syntax | Example |
+|-----------|--------|---------|
+| Create 1D array | `ARRAY[v1, v2, ...]` | `ARRAY[1.0, 2.0, 3.0]` |
+| Create 2D array | `ARRAY[[...], [...]]` | `ARRAY[[1, 2], [3, 4]]` |
+| Create 3D array | `ARRAY[[[...]], [[...]]]` | `ARRAY[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]` |
+| Access element | `arr[i, j, ...]` or `arr[i][j]...` | `arr[1, 2, 3]` returns `DOUBLE` |
+| Access sub-array | `arr[i]` | `arr[1]` returns lower-dimensional array |
+| Slice (range) | `arr[low:high]` | `arr[1:3]` keeps dimensionality |
+| Slice (open-ended) | `arr[low:]` | `arr[2:]` to end of dimension |
+| Mixed access | `arr[i, low:high]` | `arr[1, 2:4]` |
 
-The physical layout of the N-dimensional array is a single memory block with
-values arranged (by default) in _row-major_ order, where the coordinates of the
-adjacent elements differ in the rightmost coordinate first (much like the
-adjacent numbers differ in the rightmost digit first: 41, 42, 43, etc.)
+Array types are written as `DOUBLE[dim1][dim2]...`, for example:
+- `DOUBLE[3]` — 1D array with 3 elements
+- `DOUBLE[2][3]` — 2D array (2 rows, 3 columns)
+- `DOUBLE[2][3][4]` — 3D array
 
-Separately, there are two lists of integers that describe this block of values,
-and give it its N-dimensional appearance: _shape_ and _strides_. Both have
-length equal to the number of dimensions.
+Indexing is **1-based** (SQL standard). See [array functions](/docs/query/functions/array) for operations like `array_sum`, `array_avg`, `matmul`, etc.
 
-- the numbers in _shape_ tell the length along each dimension -- the range of
-  values you can use as a coordinate for that dimension
-- the numbers in _strides_ tell how far apart are adjacent elements along that
-  dimension.
+## Creating arrays
 
-Unlike NumPy, QuestDB expresses strides as element jumps, not byte count jumps.
-Strides are used to perform a number of operations (such as transpose, slicing,
-etc) without the need to copy the array data itself.
-
-Also unlike NumPy, QuestDB's `DOUBLE[]` allows `NULL` elements, with the same
-semantics as plain `DOUBLE` values: all non-finite floating point values (`NaN`,
-`Infinity`, `-Infinity`) are seen as `NULL`.
-
-Here's a visual example of a 3-dimensional array of type `DOUBLE[2][3][2]`:
-
-```text
-dim 1: |. . . . . .|. . . . . .| -- stride = 6, len = 2
-dim 2: |. .|. .|. .|. .|. .|. .| -- stride = 2, len = 3
-dim 3: |.|.|.|.|.|.|.|.|.|.|.|.| -- stride = 1, len = 2
-```
-
-The dots are the individual values (`DOUBLE` numbers in our case). Each row
-shows the whole array, but with different subdivisions according to the
-dimension. So, in `dim 1`, the row is divided into two slots, the sub-arrays at
-coordinates 1 and 2 along that dimension, and the distance between the start of
-slot 1 and slot 2 is 6 (the stride for that dimension). In `dim 3`, each slot
-contains an individual number, and the stride is 1.
-
-The legal values for the coordinate in `dim 3` are just 1 and 2, even though you
-would be able to access any array element just by using a large-enough number.
-This is how the flat array gets its 3-dimensional appearance: for each value,
-there's a unique list of coordinates, `[i, j, k]`, that addresses it.
-
-The relevance of all this to you as the user is that QuestDB can perform all of
-the following operations cheaply, by editing just the two small lists, `shape`
-and `strides`, and doing nothing to the potentially huge block of memory holding
-the array values:
-
-1. _Slice_: extract a 3-dimensional array that is just a part of the full one,
-   by constraining the range of legal coordinates at each dimension. Example:
-   `array[1:2, 2:4, 1:2]` will give us a view into the array with the shape
-   `DOUBLE[1, 2, 1]`, covering just the ranges of coordinates indicated in the
-   expression.
-
-2. _Take a sub-array_: constrain the coordinate at a given dimension to just one
-   choice, and then eliminate that dimension from the array. Example: `array[2]`
-   has the shape `DOUBLE[3, 2]` and consists of the second subarray in the 1st
-   dimension.
-
-3. _Flatten_: remove a dimension from the array, flattening it into the
-   next-finer dimension. Example: flattening `dim 2` gives us an array shape
-   `DOUBLE[2, 6]`. All elements are still available, but using just 2
-   coordinates.
-
-4. _Transpose_: reverse the shape and the strides, changing the meaning of each
-   coordinate. Example: transposing our array changes the strides from
-   `(6, 2, 1)` to `(1, 2, 6)`. What we used to access with the 3rd coordinate,
-   we now access with the 1st coordinate. On a 2D array, this would have the
-   effect of swapping rows and columns (transposing a matrix).
-
-## Importance of the "vanilla" array shape
-
-QuestDB stores the _shape_ along with the array. However, it has no need to
-store _strides_: they can be calculated from the shape. Strides become relevant
-once you perform one of the mentioned array shape transformations. We say that
-an array whose shape hasn't been transformed (that is, it matches the physical
-arrangement of elements) is a _vanilla_ array, and this has consequences for
-performance.
-
-A “vanilla” array is just a plain, contiguous N‑D array in row‑major order. A
-vanilla array can be processed by optimized bulk operations that go over the
-entire block of memory, disregarding the shape and strides, whereas for most
-other arrays we have to step through all the coordinates one by one and
-calculate the position of each element.
-
-There's a special case where the array is transformed just so that the new array
-can be found in vanilla shape within the memory block of the original array (a
-contiguous sub-array). Such a transformed array is also considered vanilla.
-Major examples are slicing the array at the top (leftmost) dimension, and taking
-a sub-array at the top dimension.
-
-While performing a shape transformation is cheap on its own, whole-array
-operations, such as equality checks, adding/multiplying two arrays, etc., are
-expected to be faster on vanilla arrays.
-
-QuestDB always stores arrays in vanilla form. If you transform an array's shape
-and then store it to the database, QuestDB will physically rearrange the
-elements, and store the new array in vanilla shape.
-
-## The ARRAY literal
-
-You can create an array from scalar values using the `ARRAY[...]` syntax, as in
-this example:
+You can create an array from scalar values using the `ARRAY[...]` syntax:
 
 ```questdb-sql
 CREATE TABLE tango AS (SELECT ARRAY[
@@ -144,17 +61,10 @@ SELECT ARRAY[arr, brr] FROM tango;
 | --------------------- |
 | [[1.0,2.0],[3.0,4.0]] |
 
-## Array functions
-
-Functions that operate on arrays are documented on a
-[dedicated page](/docs/query/functions/array). There are also some
-[financial functions](/docs/query/functions/finance#l2price) that operate on
-arrays.
-
 ## Array access syntax
 
-We model our N-dimensional array access syntax on Python's `NDArray`, except
-that we inherit 1-based indexing from SQL. This is the syntax:
+Array access syntax is modeled on Python's `NDArray`, except
+that QuestDB uses 1-based indexing (as is standard in SQL):
 
 ```questdb-sql
 arr[<dim1-selector>, <dim2-selector>, ...]
@@ -317,7 +227,7 @@ SELECT arr[2:100, 3:100] slice FROM tango;
 | --------------------------------------- |
 | [[[16.0,17.0,18.0]],[[25.0,26.0,27.0]]] |
 
-The result is the same same as if using `arr[2:, 3:]`.
+The result is the same as if using `arr[2:, 3:]`.
 
 ### Mixing selectors
 
@@ -349,3 +259,116 @@ SELECT arr[1:, 3, 2] subarr FROM tango;
 This left the top dimension unconstrained, then took the 3rd sub-array in each
 of the top-level sub-arrays, and then selected just the 2nd element in each of
 them.
+
+## Array functions
+
+Functions that operate on arrays are documented on a
+[dedicated page](/docs/query/functions/array). There are also some
+[financial functions](/docs/query/functions/finance#l2price) that operate on
+arrays.
+
+## Technical details
+
+This section explains the internal design of N-dimensional arrays. Understanding
+these concepts can help you write more efficient queries.
+
+### Memory layout and structure
+
+The physical layout of the N-dimensional array is a single memory block with
+values arranged (by default) in _row-major_ order, where the coordinates of the
+adjacent elements differ in the rightmost coordinate first (much like the
+adjacent numbers differ in the rightmost digit first: 41, 42, 43, etc.)
+
+Separately, there are two lists of integers that describe this block of values,
+and give it its N-dimensional appearance: _shape_ and _strides_. Both have
+length equal to the number of dimensions.
+
+- the numbers in _shape_ tell the length along each dimension -- the range of
+  values you can use as a coordinate for that dimension
+- the numbers in _strides_ tell how far apart are adjacent elements along that
+  dimension.
+
+Unlike NumPy, QuestDB expresses strides as element jumps, not byte count jumps.
+Strides are used to perform a number of operations (such as transpose, slicing,
+etc) without the need to copy the array data itself.
+
+Also unlike NumPy, QuestDB's `DOUBLE[]` allows `NULL` elements, with the same
+semantics as plain `DOUBLE` values: all non-finite floating point values (`NaN`,
+`Infinity`, `-Infinity`) are seen as `NULL`.
+
+Here's a visual example of a 3-dimensional array of type `DOUBLE[2][3][2]`:
+
+```text
+dim 1: |. . . . . .|. . . . . .| -- stride = 6, len = 2
+dim 2: |. .|. .|. .|. .|. .|. .| -- stride = 2, len = 3
+dim 3: |.|.|.|.|.|.|.|.|.|.|.|.| -- stride = 1, len = 2
+```
+
+The dots are the individual values (`DOUBLE` numbers in our case). Each row
+shows the whole array, but with different subdivisions according to the
+dimension. So, in `dim 1`, the row is divided into two slots, the sub-arrays at
+coordinates 1 and 2 along that dimension, and the distance between the start of
+slot 1 and slot 2 is 6 (the stride for that dimension). In `dim 3`, each slot
+contains an individual number, and the stride is 1.
+
+The legal values for the coordinate in `dim 3` are just 1 and 2, even though you
+would be able to access any array element just by using a large-enough number.
+This is how the flat array gets its 3-dimensional appearance: for each value,
+there's a unique list of coordinates, `[i, j, k]`, that addresses it.
+
+### Efficient operations
+
+QuestDB can perform all of the following operations cheaply, by editing just the
+two small lists, `shape` and `strides`, and doing nothing to the potentially
+huge block of memory holding the array values:
+
+1. _Slice_: extract a 3-dimensional array that is just a part of the full one,
+   by constraining the range of legal coordinates at each dimension. Example:
+   `array[1:2, 2:4, 1:2]` will give us a view into the array with the shape
+   `DOUBLE[1, 2, 1]`, covering just the ranges of coordinates indicated in the
+   expression.
+
+2. _Take a sub-array_: constrain the coordinate at a given dimension to just one
+   choice, and then eliminate that dimension from the array. Example: `array[2]`
+   has the shape `DOUBLE[3, 2]` and consists of the second subarray in the 1st
+   dimension.
+
+3. _Flatten_: remove a dimension from the array, flattening it into the
+   next-finer dimension. Example: flattening `dim 2` gives us an array shape
+   `DOUBLE[2, 6]`. All elements are still available, but using just 2
+   coordinates.
+
+4. _Transpose_: reverse the shape and the strides, changing the meaning of each
+   coordinate. Example: transposing our array changes the strides from
+   `(6, 2, 1)` to `(1, 2, 6)`. What we used to access with the 3rd coordinate,
+   we now access with the 1st coordinate. On a 2D array, this would have the
+   effect of swapping rows and columns (transposing a matrix).
+
+### Vanilla arrays and performance
+
+QuestDB stores the _shape_ along with the array. However, it has no need to
+store _strides_: they can be calculated from the shape. Strides become relevant
+once you perform one of the mentioned array shape transformations. We say that
+an array whose shape hasn't been transformed (that is, it matches the physical
+arrangement of elements) is a _vanilla_ array, and this has consequences for
+performance.
+
+A "vanilla" array is just a plain, contiguous N-D array in row-major order. A
+vanilla array can be processed by optimized bulk operations that go over the
+entire block of memory, disregarding the shape and strides, whereas for most
+other arrays we have to step through all the coordinates one by one and
+calculate the position of each element.
+
+There's a special case where the array is transformed just so that the new array
+can be found in vanilla shape within the memory block of the original array (a
+contiguous sub-array). Such a transformed array is also considered vanilla.
+Major examples are slicing the array at the top (leftmost) dimension, and taking
+a sub-array at the top dimension.
+
+While performing a shape transformation is cheap on its own, whole-array
+operations, such as equality checks, adding/multiplying two arrays, etc., are
+expected to be faster on vanilla arrays.
+
+QuestDB always stores arrays in vanilla form. If you transform an array's shape
+and then store it to the database, QuestDB will physically rearrange the
+elements, and store the new array in vanilla shape.
