@@ -96,7 +96,7 @@ Both applications are now up and ready.
 
 ## Access QuestDB Tables via Cube
 
-You can now create a QuestDB table in [Web Console](http://localhost:9000):
+You can now create a QuestDB table in Web Console - `http://localhost:9000`:
 
 ```sql
 -- create table
@@ -132,7 +132,8 @@ import Screenshot from "@theme/Screenshot"
   height={216}
 />
 
-Once that's done, you can use `trades` model in the Cube Playground to run queries:
+Once that's done, you can run queries against `trades` model in Cube Playground -
+`http://127.0.0.1:4000/#/build`:
 
 <Screenshot
   alt="Running queries in Cube UI"
