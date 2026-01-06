@@ -34,7 +34,7 @@ First, create and enter an example directory:
 mkdir questdb-cube && cd $_
 ```
 
-### Dockerfile
+### Docker Compose Configuration
 
 Next, create a `docker-compose.yml` file within the project directory:
 
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS trades (
 -- generate sample data
 INSERT INTO trades
     SELECT
-        timestamp_sequence('2024-01-01T00:00:00', 60000L * x) timestamp,2024
+        timestamp_sequence('2024-01-01T00:00:00', 60000L * x) timestamp,
         rnd_str('ETH-USD', 'BTC-USD', 'SOL-USD', 'LTC-USD', 'UNI-USD') symbol,
         rnd_str('buy', 'sell') side,
         rnd_double() * 1000 + 100 price,
