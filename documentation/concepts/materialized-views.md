@@ -27,13 +27,9 @@ CREATE TABLE 'trades' (
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-Queries that rely on a specific subset of the data (say, the last hour) will
-continue to run fast, but anything that requires scanning large numbers of rows
-or the entire dataset will begin to slow down.
-
 One of the most common queries for time series data is the `SAMPLE BY` query.
-This query is used to aggregate data into time-window buckets. Here's an example
-that can analyze trade volumes by the minute, broken down by symbol.
+This query aggregates data into time-window buckets. Here's an example that
+calculates trade notional by the minute for today:
 
 ```questdb-sql title="SAMPLE BY query" demo
 SELECT
@@ -46,11 +42,14 @@ WHERE timestamp IN today()
 SAMPLE BY 1m;
 ```
 
-Each time this query is run it will scan the entire dataset. This type of query
-will become slower as the dataset grows. Materialized views run the query only
-on small subset of rows of the base table each time when new rows are inserted.
-In other words, materialized views are designed to maintain the speed of your
-queries as you scale your data.
+Thanks to partition pruning, this query only scans today's data. But even so,
+aggregating millions of rows takes time - and dashboards or applications may run
+this query repeatedly.
+
+Materialized views solve this by pre-computing and storing the aggregated
+results. When new data arrives, only the new rows are processed incrementally.
+Querying the materialized view becomes a simple lookup rather than a
+re-aggregation, making dashboard refreshes near-instant.
 
 When you create a materialized view you register your time-based grouping
 query with the QuestDB database against a base table.
