@@ -14,22 +14,21 @@ frequently.
 
 ## What are materialized views for?
 
-Let's say that your application is ingesting vast amounts of time series data.
-Soon your QuestDB instance will grow from gigabytes to terabytes.
+Let's say your application ingests trade data into a table like this:
 
-```questdb-sql title="trades ddl"
-CREATE TABLE 'trades' (
-	symbol SYMBOL,
-	side SYMBOL,
-	price DOUBLE,
-	amount DOUBLE,
-	timestamp TIMESTAMP
+```questdb-sql title="trades table"
+CREATE TABLE trades (
+  symbol SYMBOL,
+  side SYMBOL,
+  price DOUBLE,
+  amount DOUBLE,
+  timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-One of the most common queries for time series data is the `SAMPLE BY` query.
-This query aggregates data into time-window buckets. Here's an example that
-calculates trade notional by the minute for today:
+As your QuestDB instance grows from gigabytes to terabytes, aggregation queries
+become a bottleneck. A common pattern is using `SAMPLE BY` to bucket data by
+time - for example, calculating notional value (price × amount) by the minute:
 
 ```questdb-sql title="SAMPLE BY query" demo
 SELECT
@@ -86,8 +85,8 @@ SELECT * FROM trades_ohlc_15m
 WHERE timestamp IN today();
 ```
 
-That's it. The view automatically stays up-to-date as new data arrives in
-`trades`. Details on customization and options follow below.
+That's it. The view refreshes incrementally as new data arrives in `trades`.
+Details on customization and options follow below.
 
 ## When to use materialized views
 
@@ -100,18 +99,38 @@ Materialized views are ideal for:
 
 Use regular [views](/docs/concepts/views/) instead when:
 
-- The underlying query is fast enough without pre-computation
-- You need always-current results with no refresh delay
+- Query execution cost is acceptable for your workload
 - You need parameterized queries with `DECLARE`
+- You need patterns not supported by materialized views (e.g., data enrichment)
 - Storage cost is a concern (materialized views consume disk space)
+
+The key tradeoff: views execute the full query each time (multi-threaded, can
+be resource-intensive), while materialized views pre-compute results so queries
+become simple lookups. For dashboards with many concurrent users, running
+parallel aggregations doesn't scale - materialized views reduce this to O(1)
+reads on a smaller, pre-aggregated dataset.
 
 ### Not suited for: data enrichment
 
-A common use case that materialized views **do not currently support** is data
-enrichment - keeping raw (non-aggregated) rows from a base table while adding
-columns from aggregated data in another table.
+Materialized views support JOINs, but `SAMPLE BY` (aggregation) is mandatory.
+This means you can enrich aggregated results with data from other tables, but
+you cannot keep raw (non-aggregated) rows while adding enrichment columns.
 
-For example, this pattern does not work:
+For example, joining aggregated trades with instrument metadata works:
+
+```questdb-sql title="Supported: aggregation with JOIN"
+CREATE MATERIALIZED VIEW trades_with_metadata AS
+SELECT
+  t.timestamp,
+  t.symbol,
+  m.description,
+  sum(t.amount) AS volume
+FROM trades t
+JOIN instruments m ON t.symbol = m.symbol
+SAMPLE BY 1h;
+```
+
+But this pattern does not work:
 
 ```questdb-sql title="Not supported: enrichment without aggregation"
 -- Users try this but it won't work
@@ -126,9 +145,10 @@ FROM trades t
 ASOF JOIN hourly_stats h ON t.symbol = h.symbol;
 ```
 
-Materialized views require a `SAMPLE BY` or time-based `GROUP BY`, meaning they
-must downsample data. They cannot maintain a 1:1 row mapping with the base table
-while adding enrichment columns.
+The view cannot maintain a 1:1 row mapping with the base table.
+
+Also note: only changes to the base table (the one in `SAMPLE BY`) trigger a
+refresh. Changes to joined tables do not trigger updates.
 
 **Coming soon**: We are actively developing a new type of materialized view that
 will support data enrichment use cases. Stay tuned for updates.
@@ -368,7 +388,7 @@ WHERE timestamp IN today();
 
 ### Performance comparison
 
-Without a materialized view, aggregating 6 months of data:
+Without a materialized view, aggregating 1 month of data:
 
 ```questdb-sql title="Direct query - slow" demo
 SELECT
@@ -377,23 +397,21 @@ SELECT
   min(price) AS low, last(price) AS close,
   sum(amount) AS volume
 FROM trades
-WHERE timestamp > dateadd('M', -6, now())
+WHERE timestamp > dateadd('M', -1, now())
 SAMPLE BY 15m;
 ```
 
-This takes **seconds**, scanning hundreds of millions of rows.
+This takes hundreds of milliseconds, scanning tens of millions of rows.
 
 With the materialized view:
 
 ```questdb-sql title="Materialized view - fast" demo
 SELECT * FROM trades_ohlc_15m
-WHERE timestamp > dateadd('M', -6, now());
+WHERE timestamp > dateadd('M', -1, now());
 ```
 
-This returns in **milliseconds**. The data is pre-aggregated.
-
-Even for small time ranges (one day), materialized views are faster: `16ms`
-direct query vs `2ms` from the view. No aggregation is required.
+This returns in single-digit milliseconds. The data is pre-aggregated, so no
+aggregation work is needed at query time.
 
 ## Managing materialized views
 
