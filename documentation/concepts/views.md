@@ -116,14 +116,14 @@ sub-queries directly.
 
 ## Parameterized views
 
-Views support the `DECLARE` statement to define parameters with default values
-that can be overridden at query time.
+Views support the `DECLARE` statement to define parameters with default values.
+Use `OVERRIDABLE` to allow users to change parameter values at query time.
 
 ### Creating a parameterized view
 
 ```questdb-sql
 CREATE VIEW filtered_trades AS (
-  DECLARE @min_price := 100
+  DECLARE OVERRIDABLE @min_price := 100
   SELECT ts, symbol, price FROM trades WHERE price >= @min_price
 )
 ```
@@ -144,9 +144,12 @@ DECLARE @min_price := 500 SELECT * FROM filtered_trades
 
 ### Multiple parameters
 
+By default, parameters are **non-overridable**. Use `OVERRIDABLE` to allow
+override at query time:
+
 ```questdb-sql
 CREATE VIEW price_range AS (
-  DECLARE @lo := 100, @hi := 1000
+  DECLARE OVERRIDABLE @lo := 100, OVERRIDABLE @hi := 1000
   SELECT ts, symbol, price FROM trades WHERE price >= @lo AND price <= @hi
 )
 
@@ -154,18 +157,33 @@ CREATE VIEW price_range AS (
 DECLARE @lo := 50, @hi := 200 SELECT * FROM price_range
 ```
 
-### CONST parameters
+### Non-overridable parameters
 
-Use `CONST` to prevent parameter override:
+Parameters without `OVERRIDABLE` cannot be changed at query time, providing
+security for sensitive filters:
 
 ```questdb-sql
 CREATE VIEW secure_view AS (
-  DECLARE CONST @min_value := 0
+  DECLARE @min_value := 0
   SELECT * FROM trades WHERE value >= @min_value
 )
 
--- This will fail with "cannot override CONST variable: @min_value"
+-- This will fail with "variable is not overridable: @min_value"
 DECLARE @min_value := -100 SELECT * FROM secure_view
+```
+
+### Mixed parameters
+
+Combine overridable and non-overridable parameters:
+
+```questdb-sql
+CREATE VIEW mixed_params AS (
+  DECLARE @fixed_filter := 'active', OVERRIDABLE @limit := 100
+  SELECT * FROM data WHERE status = @fixed_filter LIMIT @limit
+)
+
+-- @limit can be overridden, @fixed_filter cannot
+DECLARE @limit := 50 SELECT * FROM mixed_params
 ```
 
 ## View hierarchies
@@ -338,15 +356,55 @@ For detailed comparisons and examples, see
 
 ## Security with views
 
-Views provide a security boundary between users and underlying data. Users need
-permission on the view only, not on underlying tables.
+Views provide a security boundary between users and underlying data.
 
-This allows you to:
+### Definer security model (Enterprise)
 
-- Expose specific data subsets to users
-- Hide sensitive columns
-- Enforce row-level security patterns
-- Provide read-only access to aggregated data
+Views use a **definer security model**. When a view is created, the creator's
+permissions are captured. Users querying the view only need `SELECT` permission
+on the view itself - they do **not** need permissions on the underlying tables.
+
+```questdb-sql
+-- Admin creates a view on sensitive table
+CREATE VIEW public_summary AS (
+  SELECT date, region, sum(sales) as total FROM sensitive_sales GROUP BY date, region
+);
+
+-- Grant SELECT on the view to analysts
+GRANT SELECT ON public_summary TO analyst_role;
+
+-- Analysts can query the view without access to sensitive_sales
+SELECT * FROM public_summary;  -- Works!
+SELECT * FROM sensitive_sales; -- Access denied!
+```
+
+The view's definer permissions are preserved even if the creator's account is
+later disabled or deleted.
+
+### No column-level permissions on views
+
+Unlike tables, views do **not** support column-level permissions. You can only
+grant or revoke permissions on the entire view:
+
+```questdb-sql
+-- This works: grant SELECT on entire view
+GRANT SELECT ON my_view TO user1;
+
+-- Column-level permissions are NOT supported for views
+-- Use separate views to expose different column subsets
+```
+
+To provide different column access to different users, create multiple views
+with different column selections.
+
+### Security patterns
+
+Views enable several security patterns:
+
+- **Data subsetting**: Expose only specific rows or columns
+- **Column masking**: Hide sensitive columns from certain users
+- **Row-level security**: Filter rows based on business rules
+- **Aggregation-only access**: Provide summaries without raw data access
 
 ### Column-level security example
 
@@ -424,6 +482,8 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
 4. **Read-only**: You cannot INSERT, UPDATE, or DELETE on views
 5. **No DDL operations**: You cannot run DDL operations (like `RENAME TABLE`) on
    views
+6. **No column-level permissions**: Unlike tables, you cannot grant permissions
+   on individual view columns (Enterprise)
 
 ## Related documentation
 

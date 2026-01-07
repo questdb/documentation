@@ -79,7 +79,23 @@ valid again.
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist` | View doesn't exist and `IF EXISTS` not specified |
+| `view does not exist [view=name]` | View doesn't exist and `IF EXISTS` not specified |
+| `Access denied [DROP VIEW on view_name]` | User lacks `DROP VIEW` permission (Enterprise) |
+
+## Permissions (Enterprise)
+
+Dropping a view requires the `DROP VIEW` permission on that view:
+
+```questdb-sql
+-- Grant DROP VIEW permission to a user
+GRANT DROP VIEW ON my_view TO username;
+
+-- Grant DROP VIEW permission on multiple views
+GRANT DROP VIEW ON view1, view2 TO username;
+```
+
+When a user creates a view, they are automatically granted all permissions
+including `DROP VIEW` on that view.
 
 ## See also
 

@@ -106,18 +106,63 @@ ALTER VIEW trades_filtered AS (
 
 | Error | Cause |
 | ----- | ----- |
-| `view does not exist` | View with specified name doesn't exist |
-| `table does not exist` | Referenced table in new query doesn't exist |
+| `view does not exist [view=name]` | View with specified name doesn't exist |
+| `table does not exist [table=name]` | Referenced table in new query doesn't exist |
 | `Invalid column` | Column in new query doesn't exist |
-| `cycle detected` | New definition would create circular reference |
+| `circular dependency detected` | New definition would create circular reference |
+| `Access denied [ALTER VIEW on view_name]` | User lacks `ALTER VIEW` permission (Enterprise) |
+| `Access denied [SELECT on table_name]` | User lacks SELECT on tables in new definition (Enterprise) |
 
-## Notes
+## Behavior
 
 - Altering a view replaces its entire definition
 - The new query must be valid at the time of alteration
 - Dependent views may become invalid if the altered view's output changes
 - Use `CREATE OR REPLACE VIEW` as an alternative if you want to create the view
   when it doesn't exist
+
+### Definer permissions transfer (Enterprise)
+
+When a user alters a view, the view's **definer permissions** transfer to that
+user. This means:
+
+- The view now runs with the permissions of the user who performed the ALTER
+- Other users querying the view can access data the new definer has access to
+- The original creator's permissions no longer apply to the view
+
+```questdb-sql title="Definer transfer example"
+-- UserA creates view on table1 (UserA has SELECT on table1)
+-- UserA is the "definer"
+CREATE VIEW my_view AS (SELECT * FROM table1);
+
+-- UserB alters view to reference table2 (UserB has SELECT on table2)
+-- UserB becomes the new "definer"
+ALTER VIEW my_view AS (SELECT * FROM table2);
+
+-- UserC (with SELECT on my_view) now sees table2 data
+-- using UserB's permissions
+SELECT * FROM my_view;
+```
+
+## Permissions (Enterprise)
+
+Altering a view requires:
+
+1. `ALTER VIEW` permission on the view
+2. `SELECT` permission on all tables referenced in the **new** definition
+
+```questdb-sql
+-- Grant ALTER VIEW permission
+GRANT ALTER VIEW ON my_view TO username;
+```
+
+You cannot use `ALTER VIEW` to access tables you don't have permission for:
+
+```questdb-sql
+-- This fails if user doesn't have SELECT on secret_table
+ALTER VIEW my_view AS (SELECT * FROM secret_table);
+-- Error: Access denied for username [SELECT on secret_table]
+```
 
 ## See also
 
