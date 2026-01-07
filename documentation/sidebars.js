@@ -268,7 +268,7 @@ module.exports = {
                 },
                 {
                   type: "category",
-                  label: "ALTER COLUMN (VIEW)",
+                  label: "ALTER COLUMN (MAT VIEW)",
                   items: [
                     "query/sql/alter-mat-view-alter-column-add-index",
                     "query/sql/alter-mat-view-alter-column-drop-index",
@@ -307,7 +307,6 @@ module.exports = {
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
                     "query/sql/alter-mat-view-set-ttl",
-                    "query/sql/alter-mat-view-change-symbol-capacity",
                   ],
                 },
                 {

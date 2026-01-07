@@ -592,8 +592,6 @@ the replica's view was not fully up-to-date.
     Sets the time limit for incremental refresh on a materialized view
   - [`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/):
     Sets the time-to-live (TTL) period on a materialized view
-  - [`ALTER MATERIALIZED VIEW SYMBOL CAPACITY`](/docs/query/sql/alter-mat-view-change-symbol-capacity/):
-    Changes the capacity of an existing SYMBOL column in a materialized view
 
 - **Configuration**
   - [Materialized views configs](/docs/configuration/overview/#materialized-views):

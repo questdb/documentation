@@ -374,10 +374,10 @@ alterMatViewSetRefresh
   ('PERIOD' '(' 'LENGTH' length ('TIME' 'ZONE' timezone)? ('DELAY' delay)? ')')?
 
 refreshMatView
-  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('INTERVAL' 'FROM' fromTimestamp 'TO' toTimestamp))
+  ::= 'REFRESH' 'MATERIALIZED' 'VIEW' viewName ('FULL' | 'INCREMENTAL' | ('RANGE' 'FROM' fromTimestamp 'TO' toTimestamp))
 
 dropMatView
-  ::= 'DROP' 'MATERIALIZED' 'VIEW' viewName
+  ::= 'DROP' 'MATERIALIZED' 'VIEW' ('IF' 'EXISTS')? viewName
 
 pivot
   ::= ( '(' selectQuery ')' | tableName )

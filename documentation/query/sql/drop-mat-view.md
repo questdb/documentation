@@ -5,34 +5,66 @@ description:
   Documentation for the DROP MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-`DROP MATERIALIZED VIEW` permanently deletes a materialized view and its
-contents.
-
-The deletion is **permanent** and **not recoverable**, except if the view was
-created in a non-standard volume. In such cases, the view is only logically
-removed while the underlying data remains intact in its volume.
-
-Disk space is reclaimed asynchronously after the materialized view is dropped.
-
-Existing read queries for this view may delay space reclamation.
+Permanently deletes a materialized view and all its data.
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP MATERIALIZED VIEW keyword](/images/docs/diagrams/dropMatView.svg)
-
-## Example
-
-```questdb-sql
-DROP MATERIALIZED VIEW trades_1h;
+```
+DROP MATERIALIZED VIEW [ IF EXISTS ] viewName
 ```
 
-## IF EXISTS
+## Parameters
 
-Add an optional `IF EXISTS` clause after the `DROP MATERIALIZED VIEW` keywords
-to indicate that the selected materialized view should be dropped, but only if
-it exists.
+| Parameter | Description |
+| --------- | ----------- |
+| `viewName` | Name of the materialized view to drop |
+| `IF EXISTS` | Suppress error if view doesn't exist |
+
+## Examples
+
+```questdb-sql title="Drop a materialized view"
+DROP MATERIALIZED VIEW trades_hourly;
+```
+
+```questdb-sql title="Drop only if exists (no error if missing)"
+DROP MATERIALIZED VIEW IF EXISTS trades_hourly;
+```
+
+## Behavior
+
+| Aspect | Description |
+| ------ | ----------- |
+| Permanence | Deletion is permanent and not recoverable |
+| Space reclamation | Disk space is reclaimed asynchronously |
+| Active queries | Existing read queries may delay space reclamation |
+| Non-standard volumes | View is logically removed; data remains in the volume |
+
+:::warning
+This operation cannot be undone. The view and all its pre-computed data will be
+permanently deleted.
+:::
+
+## Permissions (Enterprise)
+
+Dropping a materialized view requires the `DROP MATERIALIZED VIEW` permission on
+the specific view:
+
+```questdb-sql title="Grant drop permission"
+GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
+```
+
+The view creator automatically receives this permission with the `GRANT` option.
+
+## Errors
+
+| Error | Cause |
+| ----- | ----- |
+| `materialized view does not exist` | View doesn't exist and `IF EXISTS` not specified |
+| `permission denied` | Missing `DROP MATERIALIZED VIEW` permission (Enterprise) |
 
 ## See also
 
-For more information on the concept, see the the
-[Materialized Views](/docs/concepts/materialized-views/).
+- [Materialized views concept](/docs/concepts/materialized-views/)
+- [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)
+- [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
+- [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)

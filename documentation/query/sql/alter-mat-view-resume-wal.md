@@ -6,25 +6,36 @@ description:
   QuestDB.
 ---
 
-`ALTER MATERIALIZED VIEW RESUME WAL` restarts
-[WAL table](/docs/concepts/write-ahead-log/) transactions after resolving errors.
-
-Accepts the same optional `sequencerTxn` input as the
-[`ALTER TABLE RESUME WAL`](/docs/query/sql/alter-table-resume-wal/)
-operation. Refer to that page for more details.
+Restarts [WAL](/docs/concepts/write-ahead-log/) transactions on a materialized
+view after resolving errors that caused suspension.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER MATERIALIZED VIEW keyword](/images/docs/diagrams/alterMatView.svg)
+```
+ALTER MATERIALIZED VIEW viewName RESUME WAL [ FROM TRANSACTION sequencerTxn ]
+```
 
-![Flow chart showing the syntax of ALTER MATERIALIZED VIEW with RESUME WAL keyword](/images/docs/diagrams/resumeWal.svg)
+## Parameters
 
-## Example
+| Parameter | Description |
+| --------- | ----------- |
+| `viewName` | Name of the materialized view to resume |
+| `FROM TRANSACTION` | Optional starting transaction number (defaults to failed transaction) |
 
-Use the [`wal_tables()`](/docs/query/functions/meta/#wal_tables) function to
-investigate the materialized view status:
+## When to use
 
-```questdb-sql title="List all tables and materialized views" demo
+Use this command when a materialized view's WAL processing has been suspended
+due to an error. The view will be marked as `suspended = true` in the
+`wal_tables()` output.
+
+## Examples
+
+### Check WAL status
+
+Use [`wal_tables()`](/docs/query/functions/meta/#wal_tables) to identify
+suspended views:
+
+```questdb-sql title="List WAL status for all tables and views"
 wal_tables();
 ```
 
@@ -32,15 +43,55 @@ wal_tables();
 | --------- | --------- | --------- | ------------ |
 | trades_1h | true      | 3         | 5            |
 
-The `trades_1h` view is suspended. The last successful commit is `3`.
+The `trades_1h` view is suspended. The last successful commit was transaction
+`3`.
 
-The following query restarts transactions from the failed transaction, `4`:
+### Resume from failed transaction
 
-```questdb-sql
+Restart processing from the next transaction after the last successful one:
+
+```questdb-sql title="Resume WAL processing"
 ALTER MATERIALIZED VIEW trades_1h RESUME WAL;
 ```
 
+This resumes from transaction `4` (the failed transaction).
+
+### Resume from specific transaction
+
+Skip problematic transactions by specifying a starting point:
+
+```questdb-sql title="Resume from specific transaction"
+ALTER MATERIALIZED VIEW trades_1h RESUME WAL FROM TRANSACTION 5;
+```
+
+## Behavior
+
+| Aspect | Description |
+| ------ | ----------- |
+| Default resume point | Resumes from the transaction after `writerTxn` |
+| Skipped transactions | When using `FROM TRANSACTION`, earlier transactions are skipped |
+| Error resolution | Fix the underlying issue before resuming, or skip past it |
+
+## Permissions (Enterprise)
+
+Resuming WAL on a materialized view requires the `ALTER MATERIALIZED VIEW`
+permission on the specific view:
+
+```questdb-sql title="Grant alter permission"
+GRANT ALTER MATERIALIZED VIEW ON trades_1h TO user1;
+```
+
+## Errors
+
+| Error | Cause |
+| ----- | ----- |
+| `materialized view does not exist` | View with specified name doesn't exist |
+| `view is not suspended` | WAL is already running normally |
+| `permission denied` | Missing `ALTER MATERIALIZED VIEW` permission (Enterprise) |
+
 ## See also
 
-For more information on the concept, see the
-[reference](/docs/concepts/materialized-views/) on materialized views.
+- [Materialized views concept](/docs/concepts/materialized-views/)
+- [Write-Ahead Log](/docs/concepts/write-ahead-log/)
+- [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/)
+- [wal_tables() function](/docs/query/functions/meta/#wal_tables)
