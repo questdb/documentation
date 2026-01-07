@@ -272,16 +272,6 @@ DROP VIEW IF EXISTS my_view
 
 For full syntax, see [DROP VIEW](/docs/query/sql/drop-view/).
 
-### Compiling views
-
-Force recompilation to validate a view:
-
-```questdb-sql
-COMPILE VIEW my_view
-```
-
-For full syntax, see [COMPILE VIEW](/docs/query/sql/compile-view/).
-
 ## View invalidation
 
 Views are automatically invalidated when their dependencies change:
@@ -491,8 +481,6 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [`CREATE VIEW`](/docs/query/sql/create-view/): Create a new view
   - [`ALTER VIEW`](/docs/query/sql/alter-view/): Modify a view definition
   - [`DROP VIEW`](/docs/query/sql/drop-view/): Remove a view
-  - [`COMPILE VIEW`](/docs/query/sql/compile-view/): Force view
-    recompilation
 
 - **Related Concepts**
   - [Materialized Views](/docs/concepts/materialized-views/): Pre-computed query results
