@@ -336,10 +336,12 @@ html[data-theme="dark"] .DocSearch {
  * Documentation table styles
  */
 .theme-doc-markdown table {
+  --table-radius: 6px;
+  --table-radius-inner: calc(var(--table-radius) - 1px);
   width: max-content;
   max-width: 100%;
   border: 1px solid var(--ifm-table-border-color);
-  border-radius: 6px;
+  border-radius: var(--table-radius);
   border-collapse: separate;
   border-spacing: 0;
   overflow: auto;
@@ -348,6 +350,22 @@ html[data-theme="dark"] .DocSearch {
 .theme-doc-markdown table th {
   background: var(--ifm-table-head-background);
   font-weight: 600;
+}
+
+.theme-doc-markdown table th:first-child {
+  border-top-left-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table th:last-child {
+  border-top-right-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table tr:last-child td:first-child {
+  border-bottom-left-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table tr:last-child td:last-child {
+  border-bottom-right-radius: var(--table-radius-inner);
 }
 
 .theme-doc-markdown table tr:hover {
