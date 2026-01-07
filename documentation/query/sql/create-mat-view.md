@@ -22,7 +22,7 @@ sufficient.
 ![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
 
 For more on the semantics of the compact syntax, see the
-[Materialized Views](/docs/concepts/materialized-views/#compact-syntax) documentation.
+[Materialized Views](/docs/concepts/materialized-views/#basic-syntax) documentation.
 
 To create a materialized view with full syntax, you need to enter the following
 parameters and settings:
@@ -418,6 +418,6 @@ statement.
 ## Query constraints
 
 There is a list of requirements for the queries that are used in materialized
-views. Refer to this
-[technical requirements](/docs/concepts/materialized-views/#technical-requirements) to learn
+views. Refer to the
+[query constraints](/docs/concepts/materialized-views/#query-constraints) section to learn
 about them.
