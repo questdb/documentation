@@ -48,7 +48,7 @@ Define one or more aggregations, separated by commas:
 ```questdb-sql
 PIVOT (
     avg(price),                          -- multiple aggregates
-    sum(price * amount) / 2 AS notional  -- expressions supported
+    sum(price * amount) / 2 AS half_value  -- expressions supported
     FOR ...
 )
 ```
@@ -148,14 +148,14 @@ trades PIVOT (
 ```questdb-sql
 trades PIVOT (
     avg(price) AS avg_price,
-    sum(price * amount) / 2 AS notional
+    sum(price * amount) / 2 AS half_value
     FOR symbol IN ('BTC-USD', 'ETH-USD')
 );
 ```
 
-| BTC-USD_avg_price | BTC-USD_notional | ETH-USD_avg_price | ETH-USD_notional |
-|-------------------|------------------|-------------------|------------------|
-| 39267.64          | 24500.12         | 2615.42           | 588.25           |
+| BTC-USD_avg_price | BTC-USD_half_value | ETH-USD_avg_price | ETH-USD_half_value |
+|-------------------|--------------------|-------------------|--------------------|
+| 39267.64          | 24500.12           | 2615.42           | 588.25             |
 
 ### Multiple FOR clauses (Cartesian product)
 

@@ -5,43 +5,66 @@ description:
   Documentation for the CREATE MATERIALIZED VIEW SQL keyword in QuestDB.
 ---
 
-To create a new materialized view in the database, use the
-`CREATE MATERIALIZED VIEW` keywords followed by the query that defines the
-materialized view.
-
-A materialized view holds the result set of the given query, and is
-automatically refreshed and persisted. For more information, see the
-[Materialized Views](/docs/concepts/materialized-views/) documentation.
+Creates a materialized view that stores pre-computed query results and refreshes
+incrementally as new data arrives. For conceptual overview, see
+[Materialized Views](/docs/concepts/materialized-views/).
 
 ## Syntax
 
-The `CREATE MATERIALIZED VIEW` statement comes in two flavors: compact and full
-syntax. The compact syntax can be used when the default parameters are
-sufficient.
+```
+CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
+[ WITH BASE baseTableName ]
+[ REFRESH ( IMMEDIATE | MANUAL | EVERY interval ) [ DEFERRED ]
+           [ START timestamp ] [ TIME ZONE timezone ]
+           [ PERIOD ( LENGTH length [ TIME ZONE tz ] [ DELAY delay ] ) ]
+           [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
+AS [ ( ] query [ ) ]
+[ TIMESTAMP ( columnRef ) ]
+[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) [ TTL n timeUnit ] ]
+[ OWNED BY ownerName ]
+```
 
-![Flow chart showing the syntax of the compact CREATE MATERIALIZED VIEW syntax](/images/docs/diagrams/createMatViewCompactDef.svg)
+Where:
+- `interval`: Duration like `1m`, `10m`, `1h`, `1d`
+- `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
+- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
 
-For more on the semantics of the compact syntax, see the
-[Materialized Views](/docs/concepts/materialized-views/#compact-syntax) documentation.
+## Parameters
 
-To create a materialized view with full syntax, you need to enter the following
-parameters and settings:
+| Parameter | Description |
+| --------- | ----------- |
+| `viewName` | Name for the materialized view |
+| `IF NOT EXISTS` | Create only if view doesn't already exist |
+| `WITH BASE` | Specify base table (required for JOINs) |
+| `REFRESH` | Refresh strategy (default: `IMMEDIATE`) |
+| `DEFERRED` | Skip initial refresh on creation |
+| `query` | A `SAMPLE BY` or time-based `GROUP BY` query |
+| `TIMESTAMP` | Designate timestamp column for the view |
+| `PARTITION BY` | Partitioning unit for view storage |
+| `TTL` | Retention period for view data |
+| `OWNED BY` | Assign ownership (Enterprise) |
 
-![Flow chart showing the syntax of the CREATE MATERIALIZED VIEW keyword](/images/docs/diagrams/createMatViewDef.svg)
+## Rules and defaults
 
-## Metadata
+| Rule | Description |
+| ---- | ----------- |
+| Query must aggregate | Requires `SAMPLE BY` or `GROUP BY` with designated timestamp |
+| Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
+| WITH BASE required | Must specify when query contains JOINs |
+| PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
+| PERIOD requires SAMPLE BY | The `PERIOD` clause only works with `SAMPLE BY` queries |
+| EVERY minimum | Minimum timer interval is `1m` |
 
-To check materialized view metadata, use the `materialized_views()` function,
-which is described in the [meta functions](/docs/query/functions/meta/)
-documentation page.
+## Valid clause combinations
 
-The following example demonstrate creating materialized views from basic
-statements, and introduces feature such as
-[partitioning](/glossary/database-partitioning/).
+| Refresh | DEFERRED | PERIOD | Valid |
+| ------- | -------- | ------ | ----- |
+| IMMEDIATE | ✓ | ✓ | ✓ |
+| MANUAL | ✓ | ✓ | ✓ |
+| EVERY interval | ✓ | ✓ | ✓ |
+| _(none specified)_ | ✗ | ✗ | ✓ (defaults to IMMEDIATE) |
 
-## Creating a view
-
-Our examples use the following base table:
+## Basic example
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
@@ -49,15 +72,11 @@ CREATE TABLE trades (
   symbol SYMBOL,
   price DOUBLE,
   amount DOUBLE
-) TIMESTAMP(timestamp)
-PARTITION BY DAY;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
-Now we can create a materialized view holding aggregated data from the base
-table:
-
-```questdb-sql title="Hourly materialized view"
-CREATE MATERIALIZED VIEW trades_hourly_prices AS
+```questdb-sql title="Materialized view with hourly aggregation"
+CREATE MATERIALIZED VIEW trades_hourly AS
 SELECT
   timestamp,
   symbol,
@@ -66,358 +85,316 @@ FROM trades
 SAMPLE BY 1h;
 ```
 
-Now, we've created a materialized view that will be automatically refreshed each
-time when the base table (`trades`) gets new data.
+The view refreshes incrementally each time `trades` receives new data.
 
-The refreshes are incremental. The view data is populated partially, and only
-for the changed parts of the base table.
+## Refresh strategies
+
+### IMMEDIATE (default)
+
+Refreshes incrementally after each base table transaction:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly
+REFRESH IMMEDIATE AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+```
+
+Best for: Real-time dashboards where data freshness matters.
+
+### EVERY interval
+
+Checks for new data and refreshes on a timer schedule:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly
+REFRESH EVERY 10m AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+```
+
+Every 10 minutes, QuestDB checks if the base table has new data and performs an
+incremental refresh if needed.
+
+With start time and timezone:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly
+REFRESH EVERY 1h START '2025-01-01T00:00:00Z' TIME ZONE 'Europe/Berlin' AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+```
+
+| Option | Description |
+| ------ | ----------- |
+| `EVERY interval` | How often to check for updates (e.g., `10m`, `1h`) |
+| `START timestamp` | When to begin the schedule |
+| `TIME ZONE` | Timezone for schedule alignment |
+
+Best for: Reducing refresh overhead when real-time accuracy isn't required.
 
 :::note
-
-Queries supported by incrementally refreshed materialized views are limited to
-`SAMPLE BY` queries without `FROM-TO` and `FILL` clauses, and `GROUP BY` queries
-with the designated timestamp as the grouping key.
-
+Minimum interval is `1m`. For faster refresh, use `IMMEDIATE`.
 :::
 
-## Alternative refresh strategies
+### MANUAL
 
-With the default `IMMEDIATE` refresh strategy, QuestDB will incrementally
-refresh the view each time new data is written to the base table. If your data
-is written rapidly in small transactions, this will trigger additional small
-writes to the view.
-
-Instead, you can use timer-based refresh, which trigger an incremental refresh
-after certain time intervals:
+Refreshes only when explicitly triggered:
 
 ```questdb-sql
-CREATE MATERIALIZED VIEW price_1h
-REFRESH EVERY 1h START '2025-05-30T00:00:00.000000Z' TIME ZONE 'Europe/Berlin'
-AS ...
+CREATE MATERIALIZED VIEW trades_hourly
+REFRESH MANUAL AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
 ```
 
-In this example, the view will start refreshing from the specified timestamp in
-Berlin time zone on an hourly schedule. The refresh itself will still be
-incremental, but will no longer be triggered on every new insert. You can omit
-the `START <timestamp>` and `TIME ZONE <timezone>` clauses in order to just
-start refreshing from `now`.
+Trigger refresh with [`REFRESH MATERIALIZED VIEW`](/docs/query/sql/refresh-mat-view/).
 
-:::tip
+Best for: Full control over refresh timing, batch processing workflows.
 
-The minimum timed interval is one minute (`1m`). If you need to refresh faster
-than this, please use the default incremental refresh.
+### DEFERRED
 
-:::
-
-In case you want to be in full control of when the incremental refresh happens,
-you can use `MANUAL` refresh:
+Skips the initial full refresh on creation. Applies to any strategy:
 
 ```questdb-sql
-CREATE MATERIALIZED VIEW price_1h
-REFRESH MANUAL
-AS ...
+CREATE MATERIALIZED VIEW trades_hourly
+REFRESH IMMEDIATE DEFERRED AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
 ```
 
-Manual strategy means that to refresh the view, you need to run the
-[`REFRESH` SQL](/docs/query/sql/refresh-mat-view/) explicitly.
+The view remains empty until:
+- `IMMEDIATE`: Next base table transaction
+- `EVERY`: Next scheduled refresh time
+- `MANUAL`: Explicit `REFRESH` command
 
-For all these strategies, the refresh itself stays incremental, i.e. the
-materialized view is only updated for base table time intervals that received
-modifications since the previous refresh.
+## PERIOD clause
 
-## Period materialized views
+For data arriving at fixed intervals (e.g., end-of-day prices), use `PERIOD` to
+define an in-flight time window that won't refresh until complete.
 
-In certain use cases, like storing trading day information, the data becomes
-available at fixed time intervals. In this case, `PERIOD` variant of
-materialized views can be used:
+### Full PERIOD syntax
 
-```questdb-sql title="Period materialized view"
-CREATE MATERIALIZED VIEW trades_hourly_prices
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_daily
 REFRESH PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
 ```
 
-The `PERIOD` clause above defines an in-flight time interval (period) in the
-`trades_daily_prices` materialized view that will not receive data until it
-finishes. In this example, the interval is one day (`LENGTH 1d`) in London time
-zone. The `DELAY 2h` clause here means that the data for the trading day may
-have 2 hour lag until it's fully written. So, in our example the current
-in-flight period in the view is considered complete and gets refreshed
-automatically each day at 2AM, London time. Since the default `IMMEDIATE`
-refresh strategy is used, all writes to older, complete periods in the base
-table lead to an immediate and asynchronous refresh in the view once the
-transaction is committed.
+| Option | Description |
+| ------ | ----------- |
+| `LENGTH` | Period duration (e.g., `1d`) |
+| `TIME ZONE` | Timezone for period boundaries |
+| `DELAY` | Grace period before period closes (e.g., `2h` for late data) |
 
-Period materialized views can be used with any supported refresh strategy, not
-only with the `IMMEDIATE` one. For instance, they can be configured for
-timer-based refresh:
+In this example, each day's data refreshes at 2AM London time.
 
-```questdb-sql title="Period materialized view with timer refresh"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH EVERY 10m PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-...
-```
+### Compact PERIOD syntax
 
-Here, the `PERIOD` refresh still takes place once a period completes, but
-refreshes for older rows take place each 10 minutes.
+Matches period to the `SAMPLE BY` interval:
 
-Period materialized views can be also configured for manual refresh:
-
-```questdb-sql title="Period materialized view with timer refresh"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH MANUAL PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-...
-```
-
-The only way to refresh data on such a materialized view is to run
-[`REFRESH` SQL](/docs/query/sql/refresh-mat-view/) explicitly. When run,
-`REFRESH` statement will refresh incrementally all recently completed periods,
-as well as all time intervals touched by the recent write transactions.
-
-Finally, there is also a compact `PERIOD` syntax. It configures the view
-to ignore writes into the latest, incomplete SAMPLE BY interval, e.g.
-incomplete hour in our example. Ignoring the latest SAMPLE BY interval
-until it ends improves materialized view refresh performance in case of
-intensive real-time ingestion into the base table since the refresh generates
-less transactions.
-
-Here is how the compact syntax looks like:
-
-```questdb-sql title="Compact syntax for period materialized views"
-CREATE MATERIALIZED VIEW trades_hour_prices
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly
 REFRESH PERIOD (SAMPLE BY INTERVAL) AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h
-ALIGN TO CALENDAR TIME ZONE 'Europe/London';
+SELECT timestamp, symbol, avg(price) FROM trades
+SAMPLE BY 1h ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
 
-The above DDL statement creates a period materialized view with single day
-period in the `Europe/London` time zone, as defined by the SAMPLE BY clause.
+Ignores the latest incomplete interval, reducing refresh transactions during
+high-velocity ingestion.
 
-## Initial refresh
+### PERIOD with other strategies
 
-As soon as a materialized view is created an asynchronous refresh is started. In
-situations when this is not desirable, `DEFERRED` keyword can be specified along
-with the refresh strategy:
+Combine `PERIOD` with `EVERY` or `MANUAL`:
 
-```questdb-sql title="Deferred manual refresh"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH MANUAL DEFERRED AS
-...
+```questdb-sql title="Period with timer refresh"
+CREATE MATERIALIZED VIEW hourly_stats
+REFRESH EVERY 15m PERIOD (LENGTH 1h DELAY 5m) AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
 ```
 
-In the above example, the view has manual refresh strategy and it does not
-refresh after creation. It will only refresh when you run the
-[`REFRESH` SQL](/docs/query/sql/refresh-mat-view/) explicitly.
+This configuration:
+- Checks for updates every 15 minutes (`EVERY 15m`)
+- Processes data in 1-hour chunks (`LENGTH 1h`)
+- Waits 5 minutes after each hour ends before refreshing it (`DELAY 5m`)
 
-The `DEFERRED` keyword can be also specified for `IMMEDIATE` and timer-based
-refresh strategies. Here is an example:
+The `DELAY` allows late-arriving data to be included before the period closes.
 
-```questdb-sql title="Deferred timer refresh"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH EVERY 1h DEFERRED START '2026-01-01T00:00:00' AS
-...
+```questdb-sql title="Period with manual refresh"
+CREATE MATERIALIZED VIEW trades_daily
+REFRESH MANUAL PERIOD (LENGTH 1d TIME ZONE 'UTC' DELAY 1h) AS
+SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
 ```
 
-In such cases, the view will be refreshed only when the corresponding event
-occurs:
+With `MANUAL`, refresh only occurs when you run
+[`REFRESH MATERIALIZED VIEW`](/docs/query/sql/refresh-mat-view/) explicitly.
 
-- After the next base table transaction in case of `IMMEDIATE` refresh strategy.
-- At the next trigger time in case of timer-based refresh strategy.
+## WITH BASE (for JOINs)
 
-Once a materialized view is created, its refresh strategy can be changed any time
-with the [`ALTER SET REFRESH`](/docs/query/sql/alter-mat-view-set-refresh/)
-command.
+When querying multiple tables, specify which table triggers refresh:
 
-## Base table
-
-Materialized views require that the base table is specified, so that the last
-base table transaction number can be saved and later on checked by the
-incremental refresh. When creating a materialized view that queries multiple
-tables, you must specify one of them as the base table.
-
-```questdb-sql title="Hourly materialized view with LT JOIN"
-CREATE MATERIALIZED VIEW trades_ext_hourly_prices
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_with_metadata
 WITH BASE trades AS
 SELECT
   t.timestamp,
   t.symbol,
-  avg(t.price) AS avg_price,
-  avg(e.price) AS avg_ext_price
+  m.description,
+  avg(t.price) AS avg_price
 FROM trades t
-LT JOIN ext_trades e ON (symbol)
-SAMPLE BY 1d;
+JOIN instruments m ON t.symbol = m.symbol
+SAMPLE BY 1h;
 ```
+
+Only changes to `trades` trigger refresh. Changes to `instruments` do not.
 
 ## Partitioning
 
-`PARTITION BY` optionally allows specifying the
-[partitioning strategy](/docs/concepts/partitions/) for the materialized view.
+Specify storage partitioning with `PARTITION BY`:
 
-Materialized views can be partitioned by one of the following:
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+) PARTITION BY DAY;
+```
 
-- `YEAR`
-- `MONTH`
-- `WEEK`
-- `DAY`
-- `HOUR`
+Options: `YEAR`, `MONTH`, `WEEK`, `DAY`, `HOUR`
 
-The partitioning strategy **cannot be changed** after the materialized view has
-been created.
+If omitted, partitioning is
+[inferred from SAMPLE BY](/docs/concepts/materialized-views/#default-partitioning).
 
-If unspecified, the `CREATE MATERIALIZED VIEW` statement will infer the
-[default partitioning strategy](/docs/concepts/materialized-views/#default-partitioning).
-
-## Time To Live (TTL)
-
-A retention policy can be set on the materialized view, bounding how much data
-is stored.
-
-Simply specify a time-to-live (TTL) using the `TTL` clause, placing it right
-after `PARTITION BY <unit>`.
-
-Follow the `TTL` keyword with a number and a time unit, one of:
-
-- `HOURS`
-- `DAYS`
-- `WEEKS`
-- `MONTHS`
-- `YEARS`
-
-Refer to the [section on TTL in Concepts](/docs/concepts/ttl/) for detailed
-information on the behavior of this feature.
-
-:::note
-
-The time-to-live (TTL) for the materialized view can differ from the base table,
-depending on your needs.
-
+:::warning
+Partitioning cannot be changed after creation.
 :::
 
-### Examples
+## TTL (Time-To-Live)
 
-```questdb-sql title="Creating a materialized view with PARTITION BY and TTL"
-CREATE MATERIALIZED VIEW trades_hourly_prices AS (
-  SELECT
-    timestamp,
-    symbol,
-    avg(price) AS avg_price
-  FROM trades
-  SAMPLE BY 1h
+Limit data retention with `TTL`:
+
+```questdb-sql
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY TTL 7 DAYS;
 ```
 
-```questdb-sql title="Creating a materialized view with one day period"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h;
-```
+Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 
-```questdb-sql title="Creating a materialized view with compact period syntax"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH PERIOD (SAMPLE BY INTERVAL) AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h
-ALIGN CALENDAR TIME ZONE 'Europe/London';
-```
+The view's TTL is independent of the base table's TTL. See
+[TTL documentation](/docs/concepts/ttl/) for details.
 
-```questdb-sql title="Creating a materialized view with timer refresh each 10 minutes"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH EVERY 10m START '2025-06-18T00:00:00.000000000' AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h;
-```
+## Complete example
 
-```questdb-sql title="Creating a materialized view with manual refresh"
-CREATE MATERIALIZED VIEW trades_hourly_prices
-REFRESH MANUAL AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 1h;
-```
+Putting it all together:
 
-## IF NOT EXISTS
-
-An optional `IF NOT EXISTS` clause may be added directly after the
-`CREATE MATERIALIZED VIEW` keywords to indicate that a new view should be
-created only if a view with the desired view name does not already exist.
-
-```questdb-sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS trades_weekly_prices AS
-SELECT
-  timestamp,
-  symbol,
-  avg(price) AS avg_price
-FROM trades
-SAMPLE BY 7d;
-```
-
-## Materialized view names
-
-Materialized view names follow the
-[same rules](/docs/query/sql/create-table/#table-name) as regular tables.
-
-## OWNED BY (Enterprise)
-
-When a user creates a new materialized view, they are automatically assigned all
-materialized view level permissions with the `GRANT` option for that view. This
-behavior can can be overridden using `OWNED BY`.
-
-If the `OWNED BY` clause is used, the permissions instead go to the user, group,
-or service account named in that clause.
-
-The `OWNED BY` clause cannot be omitted if the materialized view is created by
-an external user, as permissions cannot be granted to them.
-
-```questdb-sql
-CREATE GROUP analysts;
-CREATE MATERIALIZED VIEW trades_hourly_prices AS (
+```questdb-sql title="Fully specified materialized view"
+CREATE MATERIALIZED VIEW IF NOT EXISTS trades_hourly_stats
+WITH BASE trades
+REFRESH EVERY 15m
+  START '2025-01-01T00:00:00Z'
+  TIME ZONE 'UTC'
+  PERIOD (LENGTH 1h DELAY 5m)
+AS (
   SELECT
     timestamp,
     symbol,
-    avg(price) AS avg_price
+    avg(price) AS avg_price,
+    sum(amount) AS total_volume
   FROM trades
   SAMPLE BY 1h
-) PARTITION BY DAY
-OWNED BY analysts;
+)
+PARTITION BY DAY TTL 30 DAYS;
 ```
 
-## SYMBOL column capacity
+This creates a view that:
+- Checks for updates every 15 minutes (`EVERY 15m`)
+- Processes data in 1-hour chunks, waiting 5 minutes for late data (`PERIOD`)
+- Aggregates from `trades` table (`WITH BASE trades`)
+- Stores hourly averages and volumes (`SAMPLE BY 1h`)
+- Keeps 30 days of data (`TTL 30 DAYS`)
 
-By default, SYMBOL column capacities in a materialized view are set to the same
-values as in the base table. It is also possible to change SYMBOL capacities via
-the
-[`ALTER MATERIALIZED VIEW SYMBOL CAPACITY`](/docs/query/sql/alter-mat-view-change-symbol-capacity/)
-statement.
+## Metadata
+
+Query view metadata with `materialized_views()`:
+
+```questdb-sql
+SELECT view_name, base_table_name, view_status, last_refresh_finish_timestamp
+FROM materialized_views();
+```
+
+See [meta functions](/docs/query/functions/meta/) for all available columns.
 
 ## Query constraints
 
-There is a list of requirements for the queries that are used in materialized
-views. Refer to this
-[technical requirements](/docs/concepts/materialized-views/#technical-requirements) to learn
-about them.
+Materialized view queries must:
+
+- Use `SAMPLE BY` or `GROUP BY` with designated timestamp
+- Not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
+- Not use non-deterministic functions (`now()`, `rnd_*`)
+
+See [query constraints](/docs/concepts/materialized-views/#query-constraints)
+for the full list.
+
+## Permissions (Enterprise)
+
+Creating and managing materialized views requires specific permissions.
+
+### Required permissions
+
+| Permission | Level | Required for |
+| ---------- | ----- | ------------ |
+| `CREATE MATERIALIZED VIEW` | Database (global) | Creating a materialized view |
+| `SELECT` | Table/Column (base table) | All columns referenced in the view query |
+| `DROP MATERIALIZED VIEW` | Materialized view | Dropping the view |
+| `REFRESH MATERIALIZED VIEW` | Materialized view | Manually refreshing the view |
+
+### Owner permissions
+
+When you create a materialized view, you automatically receive all permissions on
+it (including `DROP MATERIALIZED VIEW` and `REFRESH MATERIALIZED VIEW`) with the
+`GRANT` option.
+
+### OWNED BY clause
+
+Assign ownership to a user, group, or service account:
+
+```questdb-sql
+CREATE GROUP analysts;
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+) OWNED BY analysts;
+```
+
+:::note
+External users (authenticated via external identity providers) must specify the
+`OWNED BY` clause when creating materialized views.
+:::
+
+### Permission examples
+
+```questdb-sql title="Grant permission to create materialized views"
+GRANT CREATE MATERIALIZED VIEW TO user1;
+```
+
+```questdb-sql title="Grant SELECT on base table (required to create view from it)"
+GRANT SELECT ON trades TO user1;
+```
+
+```questdb-sql title="Grant permission to refresh a specific view"
+GRANT REFRESH MATERIALIZED VIEW ON trades_hourly TO user1;
+```
+
+```questdb-sql title="Grant permission to drop a specific view"
+GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
+```
+
+## Errors
+
+| Error | Cause |
+| ----- | ----- |
+| `materialized view already exists` | View exists and `IF NOT EXISTS` not specified |
+| `base table does not exist` | Referenced table doesn't exist |
+| `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
+| `permission denied` | Missing required permission (Enterprise) |
+
+## See also
+
+- [Materialized views concept](/docs/concepts/materialized-views/)
+- [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
+- [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
+- [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
+- [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)

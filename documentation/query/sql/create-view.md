@@ -100,66 +100,73 @@ CREATE OR REPLACE VIEW price_view AS (
 
 ### Parameterized view with DECLARE
 
-```questdb-sql title="Create a parameterized view"
+By default, `DECLARE` variables are **non-overridable**. Users querying the view
+cannot change the parameter value:
+
+```questdb-sql title="Create a view with non-overridable parameter"
 CREATE VIEW filtered_trades AS (
   DECLARE @min_price := 100
   SELECT ts, symbol, price FROM trades WHERE price >= @min_price
 )
 ```
 
-Query with default parameter:
+Query uses the default parameter value:
 
 ```questdb-sql
 SELECT * FROM filtered_trades
 -- Uses @min_price = 100
 ```
 
-Override parameter at query time:
+Attempting to override a non-overridable parameter will fail:
 
 ```questdb-sql
+-- This fails with "variable is not overridable: @min_price"
 DECLARE @min_price := 500 SELECT * FROM filtered_trades
 ```
 
-### DECLARE with CONST
+### DECLARE with OVERRIDABLE
 
-```questdb-sql title="Create view with non-overridable parameter"
-CREATE VIEW secure_view AS (
-  DECLARE CONST @min_value := 0
+Use the `OVERRIDABLE` keyword to allow users to override the parameter at query
+time:
+
+```questdb-sql title="Create view with overridable parameter"
+CREATE VIEW flexible_view AS (
+  DECLARE OVERRIDABLE @min_value := 0
   SELECT * FROM trades WHERE value >= @min_value
 )
 ```
 
-Attempting to override a CONST parameter will fail:
+Users can now override the parameter:
 
 ```questdb-sql
--- This fails with "cannot override CONST variable: @min_value"
-DECLARE @min_value := -100 SELECT * FROM secure_view
+-- Override the default value
+DECLARE @min_value := 100 SELECT * FROM flexible_view
 ```
 
-### Multiple parameters
+### Multiple overridable parameters
 
-```questdb-sql title="View with multiple parameters"
+```questdb-sql title="View with multiple overridable parameters"
 CREATE VIEW price_range AS (
-  DECLARE @lo := 100, @hi := 1000
+  DECLARE OVERRIDABLE @lo := 100, OVERRIDABLE @hi := 1000
   SELECT ts, symbol, price FROM trades
   WHERE price >= @lo AND price <= @hi
 )
 
--- Override multiple parameters
+-- Override one or both parameters
 DECLARE @lo := 50, @hi := 200 SELECT * FROM price_range
 ```
 
-### Mixed CONST and non-CONST parameters
+### Mixed overridable and non-overridable parameters
 
 ```questdb-sql title="View with mixed parameter types"
 CREATE VIEW mixed_params AS (
-  DECLARE CONST @fixed := 5, @adjustable := 10
+  DECLARE @fixed := 5, OVERRIDABLE @adjustable := 10
   SELECT * FROM data WHERE a >= @fixed AND b <= @adjustable
 )
 
 -- @adjustable can be overridden, @fixed cannot
 DECLARE @adjustable := 20 SELECT * FROM mixed_params  -- OK
-DECLARE @fixed := 0 SELECT * FROM mixed_params        -- ERROR
+DECLARE @fixed := 0 SELECT * FROM mixed_params        -- ERROR: variable is not overridable: @fixed
 ```
 
 ### Unicode view name
@@ -187,7 +194,8 @@ CREATE VIEW with_timestamp AS (
 | `view already exists` | View exists and `IF NOT EXISTS` not specified |
 | `table does not exist` | Referenced table doesn't exist |
 | `Invalid column` | Column in query doesn't exist |
-| `cycle detected` | View would create circular reference |
+| `circular dependency detected` | View would create circular reference |
+| `variable is not overridable` | Attempted to override a non-`OVERRIDABLE` DECLARE variable |
 
 ## View naming
 
@@ -199,8 +207,8 @@ View names follow the same rules as table names:
 - Reserved SQL keywords require quoting
 
 ```questdb-sql title="Quoting reserved words"
-CREATE VIEW 'select' AS (...)  -- Quoted reserved word
-CREATE VIEW "My View" AS (...)  -- Quoted name with spaces
+CREATE VIEW 'select' AS (...)    -- Quoted reserved word
+CREATE VIEW 'My View' AS (...)   -- Quoted name with spaces
 ```
 
 ## OWNED BY (Enterprise)
@@ -216,7 +224,7 @@ CREATE VIEW trades_summary AS (
   FROM trades
   SAMPLE BY 1h
 )
-OWNED BY analysts;
+OWNED BY 'analysts';
 ```
 
 ## See also
