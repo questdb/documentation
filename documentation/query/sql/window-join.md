@@ -6,6 +6,12 @@ description:
   related tables in QuestDB.
 ---
 
+:::info[Public Beta]
+
+WINDOW JOIN is currently in **public beta**. The feature is available for testing and feedback. Syntax or behavior may change in future releases.
+
+:::
+
 WINDOW JOIN is a SQL join type that efficiently aggregates data from a related
 table within a time-based window around each row. It is particularly useful for
 financial time-series analysis, such as calculating rolling statistics from
