@@ -343,6 +343,51 @@ with Kafka.
 
 :::
 
+#### Environment variable expansion
+
+The `client.conf.string` configuration option supports `${VAR}` syntax for
+environment variable expansion. This allows you to inject sensitive values like
+tokens and passwords from environment variables rather than storing them
+directly in the connector configuration.
+
+This feature is particularly useful in Kubernetes environments where you can
+source secrets from Kubernetes Secrets via environment variables.
+
+Example configuration with environment variable:
+
+```properties
+client.conf.string=http::addr=questdb.default.svc.cluster.local:9000;token=${QUESTDB_TOKEN};
+```
+
+When the connector starts, `${QUESTDB_TOKEN}` will be replaced with the value of
+the `QUESTDB_TOKEN` environment variable.
+
+**Syntax rules:**
+
+| Pattern | Result |
+|---------|--------|
+| `${VAR}` | Replaced with value of environment variable `VAR` |
+| `$$` | Escaped to literal `$` |
+| `$${VAR}` | Escaped to literal `${VAR}` (not expanded) |
+| `$VAR` | Not expanded (braces are required) |
+
+**Error handling:**
+
+- If a referenced environment variable is not defined, the connector will fail
+  to start with a clear error message.
+- Empty variable names (`${}`) and malformed references (unclosed braces) will
+  cause configuration errors.
+- Variable names must start with a letter or underscore, followed by letters,
+  digits, or underscores.
+
+:::warning
+
+Environment variable values containing semicolons (`;`) will break the
+configuration string parsing, since semicolons are used as delimiters in the
+client configuration string format.
+
+:::
+
 ### Supported serialization formats
 
 The connector does not deserialize data independently. It relies on Kafka
