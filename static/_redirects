@@ -1,0 +1,8 @@
+# Window functions documentation restructure
+/docs/query/functions/window/ /docs/query/functions/window-functions/overview/ 301
+/docs/query/functions/window /docs/query/functions/window-functions/overview/ 301
+/docs/query/sql/over/ /docs/query/functions/window-functions/syntax/ 301
+/docs/query/sql/over /docs/query/functions/window-functions/syntax/ 301
+
+# Anchors from old window.md -> new reference.md
+/docs/query/functions/window/?* /docs/query/functions/window-functions/reference/:splat 301

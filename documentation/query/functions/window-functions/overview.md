@@ -1,0 +1,308 @@
+---
+title: Window Functions Overview
+sidebar_label: Overview
+description: Introduction to window functions in QuestDB - perform calculations across related rows without collapsing results.
+keywords: [window functions, over, partition by, moving average, running total, rank, row_number, lag, lead, analytics]
+---
+
+Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
+
+:::tip
+Click **Demo this query** within our query examples to see them in action in our live demo.
+:::
+
+## Quick reference
+
+| Function | Description | Respects Frame |
+|----------|-------------|----------------|
+| [`avg()`](reference.md#avg) | Average value in window | Yes |
+| [`count()`](reference.md#count) | Count rows or non-null values | Yes |
+| [`sum()`](reference.md#sum) | Sum of values in window | Yes |
+| [`min()`](reference.md#min) | Minimum value in window | Yes |
+| [`max()`](reference.md#max) | Maximum value in window | Yes |
+| [`first_value()`](reference.md#first_value) | First value in window | Yes |
+| [`last_value()`](reference.md#last_value) | Last value in window | Yes |
+| [`row_number()`](reference.md#row_number) | Sequential row number | No |
+| [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
+| [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
+| [`lag()`](reference.md#lag) | Value from previous row | No |
+| [`lead()`](reference.md#lead) | Value from following row | No |
+
+**Respects Frame**: Functions marked "Yes" use the frame clause (`ROWS`/`RANGE BETWEEN`). Functions marked "No" operate on the entire partition regardless of frame specification.
+
+## When to use window functions
+
+Window functions are essential for analytics tasks where you need to:
+
+- Calculate **running totals** or **cumulative sums**
+- Compute **moving averages** over time periods
+- Find the **maximum or minimum** value within a sequence
+- **Rank** items within categories
+- Access **previous or next row** values without self-joins
+- Compare each row to an **aggregate** of related rows
+
+### Example: Moving average
+
+```questdb-sql title="4-row moving average of price" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    avg(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS moving_avg
+FROM trades
+WHERE timestamp IN today()
+LIMIT 100;
+```
+
+This calculates a moving average over the current row plus three preceding rows, grouped by symbol.
+
+## How window functions work
+
+A window function has three key components:
+
+```
+function_name(arguments) OVER (
+    [PARTITION BY column]      -- Divide into groups
+    [ORDER BY column]          -- Order within groups
+    [frame_specification]      -- Define which rows to include
+)
+```
+
+### 1. Partitioning
+
+`PARTITION BY` divides the result set into groups. The window function operates independently on each partition:
+
+```questdb-sql
+-- Calculate running total per symbol
+sum(amount) OVER (PARTITION BY symbol ORDER BY timestamp)
+```
+
+Without `PARTITION BY`, all rows are treated as a single partition.
+
+### 2. Ordering
+
+`ORDER BY` within the `OVER` clause determines the logical order for calculations:
+
+```questdb-sql
+-- Row numbers ordered by timestamp
+row_number() OVER (ORDER BY timestamp)
+```
+
+This is independent of the query-level `ORDER BY`.
+
+:::tip Time-series optimization
+For tables with a designated timestamp, data is already ordered by time. When your window `ORDER BY` matches the designated timestamp, QuestDB skips redundant sorting—no performance penalty.
+:::
+
+### 3. Frame specification
+
+The frame defines which rows relative to the current row are included in the calculation:
+
+```questdb-sql
+-- Sum of current row plus 2 preceding rows
+sum(price) OVER (
+    ORDER BY timestamp
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+)
+```
+
+For complete frame syntax details, see [OVER Clause Syntax](syntax.md#frame-types-and-behavior).
+
+## Understanding windows: An analogy
+
+Imagine a group of cars in a race. Each car has a number, name, and finish time.
+
+- An **aggregate function** like `avg()` gives you one result: the average finish time across all cars.
+- A **window function** calculates the average finish time but displays it **on each car's row**, so you can compare each car to the average.
+
+The "window" might be:
+- All cars (no partition)
+- Cars with the same engine size (partition by engine)
+- The three cars that finished before and after each car (frame specification)
+
+Window functions let you perform calculations that consider more than just the individual row or the entire table, but a specific "window" of related rows.
+
+## ROWS vs RANGE frames
+
+QuestDB supports two frame types:
+
+### ROWS frame
+
+Based on physical row count:
+
+```questdb-sql
+ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+```
+
+Includes exactly 4 rows: current row plus 3 before it.
+
+### RANGE frame
+
+Based on values in the `ORDER BY` column (must be a timestamp):
+
+```questdb-sql
+RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
+```
+
+Includes all rows within 1 minute of the current row's timestamp.
+
+:::note
+RANGE frames have a known limitation: all rows with the same timestamp value will produce the same output. See [GitHub issue #5177](https://github.com/questdb/questdb/issues/5177) for details.
+:::
+
+For complete frame syntax, see [OVER Clause Syntax](syntax.md).
+
+## Common patterns
+
+### Running total
+
+Use the `CUMULATIVE` shorthand for running totals:
+
+```questdb-sql title="Cumulative sum" demo
+SELECT
+    timestamp,
+    amount,
+    sum(amount) OVER (
+        ORDER BY timestamp
+        CUMULATIVE
+    ) AS running_total
+FROM trades
+WHERE timestamp IN today();
+```
+
+This is equivalent to `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.
+
+### VWAP (Volume-Weighted Average Price)
+
+For high-frequency market data, VWAP is typically calculated over OHLC time series using the typical price `(high + low + close) / 3`:
+
+```questdb-sql title="VWAP over OHLC data" demo
+DECLARE @symbol := 'BTC-USD'
+
+WITH ohlc AS (
+    SELECT
+        timestamp AS ts,
+        symbol,
+        first(price) AS open,
+        max(price) AS high,
+        min(price) AS low,
+        last(price) AS close,
+        sum(amount) AS volume
+    FROM trades
+    WHERE timestamp IN '2024-05-22' AND symbol = @symbol
+    SAMPLE BY 1m ALIGN TO CALENDAR
+)
+SELECT
+    ts,
+    symbol,
+    open, high, low, close, volume,
+    sum((high + low + close) / 3 * volume) OVER (ORDER BY ts CUMULATIVE)
+        / sum(volume) OVER (ORDER BY ts CUMULATIVE) AS vwap
+FROM ohlc
+ORDER BY ts;
+```
+
+### Compare to group average
+
+```questdb-sql title="Price vs symbol average" demo
+SELECT
+    symbol,
+    price,
+    avg(price) OVER (PARTITION BY symbol) AS symbol_avg,
+    price - avg(price) OVER (PARTITION BY symbol) AS diff_from_avg
+FROM trades
+WHERE timestamp IN today();
+```
+
+### Rank within category
+
+```questdb-sql title="Rank prices per symbol" demo
+SELECT
+    symbol,
+    price,
+    rank() OVER (
+        PARTITION BY symbol
+        ORDER BY price DESC
+    ) AS price_rank
+FROM trades
+WHERE timestamp IN today();
+```
+
+### Access previous row
+
+```questdb-sql title="Calculate price change" demo
+SELECT
+    timestamp,
+    price,
+    lag(price) OVER (ORDER BY timestamp) AS prev_price,
+    price - lag(price) OVER (ORDER BY timestamp) AS price_change
+FROM trades
+WHERE timestamp IN today()
+    AND symbol = 'BTC-USD';
+```
+
+## Next steps
+
+- **[Function Reference](reference.md)**: Detailed documentation for each window function
+- **[OVER Clause Syntax](syntax.md)**: Complete syntax for partitioning, ordering, and frame specifications
+
+:::tip Looking for WINDOW JOIN?
+[WINDOW JOIN](/docs/query/sql/window-join/) is a separate feature for aggregating data from a *different table* within a time window. Use window functions (this page) for calculations within a single table; use WINDOW JOIN to correlate two time-series tables.
+:::
+
+## Common mistakes
+
+### Using window functions in WHERE
+
+Window functions cannot be used directly in `WHERE` clauses:
+
+```questdb-sql title="Incorrect - will not work"
+SELECT symbol, price
+FROM trades
+WHERE avg(price) OVER (ORDER BY timestamp) > 100;
+```
+
+Use a CTE or subquery instead:
+
+```questdb-sql title="Correct approach" demo
+WITH prices AS (
+    SELECT
+        symbol,
+        price,
+        avg(price) OVER (ORDER BY timestamp) AS moving_avg
+    FROM trades
+    WHERE timestamp IN today()
+)
+SELECT * FROM prices
+WHERE moving_avg > 100;
+```
+
+### Missing ORDER BY
+
+Without `ORDER BY`, the window includes all rows in the partition, which may not be the intended behavior:
+
+```questdb-sql title="All rows show same average"
+SELECT
+    symbol,
+    price,
+    avg(price) OVER (PARTITION BY symbol) AS avg_price  -- Same value for all rows in partition
+FROM trades;
+```
+
+Add `ORDER BY` for cumulative/moving calculations:
+
+```questdb-sql title="Running average" demo
+SELECT
+    symbol,
+    price,
+    avg(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS running_avg
+FROM trades
+WHERE timestamp IN today();
+```
