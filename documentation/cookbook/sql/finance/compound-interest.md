@@ -21,9 +21,12 @@ Combine the `POWER()` function with `FIRST_VALUE()` window function to calculate
 ```questdb-sql demo title="Calculate compound interest over 5 years"
 WITH
 year_series AS (
-    SELECT 2000 as start_year, 2000 + (x - 1) AS timestamp,
-    0.1 AS interest_rate, 1000.0 as initial_principal
-    FROM long_sequence(5)
+    DECLARE @year:=2000,
+            @rate := 0.1,
+            @principal := 1000.0
+    SELECT @year as start_year, @year + (x - 1) AS timestamp,
+    @rate AS interest_rate, @principal as initial_principal
+    FROM long_sequence(5) -- number of years
 ),
 compounded_values AS (
     SELECT
@@ -56,7 +59,7 @@ ORDER BY
 select timestamp, initial_principal, interest_rate,
 coalesce(year_principal, initial_principal) as year_principal,
 compounding_amount
-from compounding_year_before
+from compounding_year_before;
 ```
 
 **Results:**
@@ -82,23 +85,6 @@ The query uses a multi-step CTE approach:
 
 The `POWER()` function calculates the compound interest formula: `principal * (1 + rate)^periods`
 
-## Customizing the Calculation
-
-You can modify the parameters:
-- **Start year**: Change `2000` to your desired start year (appears twice in the query)
-- **Initial principal**: Change `1000.0` to your starting amount
-- **Interest rate**: Change `0.1` to your rate (0.1 = 10%)
-- **Number of periods**: Change `long_sequence(5)` to your desired number of years
-
-```questdb-sql demo title="Example with different parameters"
-WITH
-year_series AS (
-    SELECT 2025 as start_year, 2025 + (x - 1) AS timestamp,
-    0.05 AS interest_rate, 5000.0 as initial_principal
-    FROM long_sequence(10)
-),
--- ... rest of query remains the same
-```
 
 :::tip
 For more complex scenarios like monthly or quarterly compounding, adjust the time period generation and the exponent in the POWER function accordingly.
