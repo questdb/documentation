@@ -147,19 +147,45 @@ sum(price) OVER (
 
 For complete frame syntax details, see [OVER Clause Syntax](syntax.md#frame-types-and-behavior).
 
-## Understanding windows: An analogy
+## Aggregate vs window functions
 
-Imagine a group of cars in a race. Each car has a number, name, and finish time.
+The key difference: aggregate functions collapse rows into one result, while window functions keep all rows and add a computed column.
 
-- An **aggregate function** like `avg()` gives you one result: the average finish time across all cars.
-- A **window function** calculates the average finish time but displays it **on each car's row**, so you can compare each car to the average.
+**Source data:**
 
-The "window" might be:
-- All cars (no partition)
-- Cars with the same engine size (partition by engine)
-- The three cars that finished before and after each car (frame specification)
+| timestamp | symbol | price |
+|-----------|--------|-------|
+| 09:00 | BTC-USD | 100 |
+| 09:01 | BTC-USD | 102 |
+| 09:02 | BTC-USD | 101 |
 
-Window functions let you perform calculations that consider more than just the individual row or the entire table, but a specific "window" of related rows.
+**Aggregate function** — returns one row:
+
+```questdb-sql
+SELECT symbol, avg(price) AS avg_price
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol | avg_price |
+|--------|-----------|
+| BTC-USD | 101 |
+
+**Window function** — returns all rows with computed column:
+
+```questdb-sql
+SELECT timestamp, symbol, price,
+       avg(price) OVER (PARTITION BY symbol) AS avg_price
+FROM trades;
+```
+
+| timestamp | symbol | price | avg_price |
+|-----------|--------|-------|-----------|
+| 09:00 | BTC-USD | 100 | 101 |
+| 09:01 | BTC-USD | 102 | 101 |
+| 09:02 | BTC-USD | 101 | 101 |
+
+Each row keeps its original data **plus** the average—useful for comparing each price to the mean, calculating deviations, or adding running totals alongside the raw values.
 
 ## ROWS vs RANGE frames
 
