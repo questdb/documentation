@@ -7,10 +7,6 @@ keywords: [over, partition by, order by, rows, range, frame, window functions]
 
 The `OVER` clause defines the window for a window function. This page covers the complete syntax for partitioning, ordering, and frame specifications. For an introduction to window functions, see the [Overview](overview.md).
 
-:::tip
-Click **Demo this query** within our query examples to run them in our live demo.
-:::
-
 ## Syntax
 
 ```sql
