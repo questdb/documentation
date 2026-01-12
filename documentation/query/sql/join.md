@@ -441,6 +441,11 @@ For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 sec
 '1h' is 1 hour, '7d' is 7 days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not supported as
 units for the `TOLERANCE` clause.
 
+The effective precision of the `TOLERANCE` clause depends on the
+[designated timestamp resolution](/docs/concepts/designated-timestamp/#resolution)
+of the tables involved. For example, if a table uses microsecond resolution, specifying nanosecond
+tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
+
 See [`ASOF JOIN documentation`](/docs/query/sql/asof-join#tolerance-clause) for more examples with the `TOLERANCE` clause.
 
 ## SPLICE JOIN
