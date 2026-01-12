@@ -47,8 +47,8 @@ ORDER BY 1;
 This will produce a histogram with a maximum of 50 buckets. If you have enough price difference between the first and last price for the interval, and if there are enough events with different prices, then you will get the full 50 buckets. If price difference is too small or if there are buckets with no events, then you might get less than 50.
 
 :::info Related Documentation
-- [FLOOR function](/docs/reference/function/numeric/#floor)
-- [SUM aggregate](/docs/reference/function/aggregation/#sum)
-- [DECLARE variables](/docs/reference/sql/declare/)
-- [CROSS JOIN](/docs/reference/sql/join/#cross-join)
+- [FLOOR function](/docs/query/functions/numeric/#floor)
+- [SUM aggregate](/docs/query/functions/aggregation/#sum)
+- [DECLARE variables](/docs/query/sql/declare/)
+- [CROSS JOIN](/docs/query/sql/join/#cross-join)
 :::

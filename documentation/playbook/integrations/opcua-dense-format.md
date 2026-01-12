@@ -300,6 +300,6 @@ OPC-UA timestamps may have different precision than QuestDB expects. Ensure:
 :::info Related Documentation
 - [Telegraf OPC-UA plugin](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/opcua)
 - [Telegraf merge aggregator](https://github.com/influxdata/telegraf/tree/master/plugins/aggregators/merge)
-- [QuestDB ILP reference](/docs/reference/api/ilp/overview/)
-- [InfluxDB Line Protocol](/docs/reference/api/ilp/overview/)
+- [QuestDB ILP reference](/docs/ingestion/ilp/overview/)
+- [InfluxDB Line Protocol](/docs/ingestion/ilp/overview/)
 :::

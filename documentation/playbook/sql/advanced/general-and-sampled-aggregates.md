@@ -96,7 +96,7 @@ ORDER BY timeseries.time;
 Grafana will plot both series, making it easy to see when current values deviate from baseline.
 
 :::info Related Documentation
-- [CROSS JOIN](/docs/reference/sql/join/#cross-join)
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
-- [Grafana integration](/docs/third-party-tools/grafana/)
+- [CROSS JOIN](/docs/query/sql/join/#cross-join)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
+- [Grafana integration](/docs/integrations/visualization/grafana/)
 :::

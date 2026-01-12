@@ -32,6 +32,6 @@ cairo.writer.data.index.value.append.page.size=128K
 These settings should be added to your `server.conf` file or set as environment variables.
 
 :::info Related Documentation
-- [Configuration reference](/docs/configuration/)
-- [Capacity planning](/docs/operations/capacity-planning/)
+- [Configuration reference](/docs/configuration/overview/)
+- [Capacity planning](/docs/getting-started/capacity-planning/)
 :::

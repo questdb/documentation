@@ -265,6 +265,6 @@ Grafana shows a preview of what the dropdown will look like when you configure t
 :::info Related Documentation
 - [Grafana variables documentation](https://grafana.com/docs/grafana/latest/dashboards/variables/)
 - [Grafana regex filters](https://grafana.com/docs/grafana/latest/dashboards/variables/add-template-variables/#filter-variables-with-regex)
-- [concat() function](/docs/reference/function/text/#concat)
+- [concat() function](/docs/query/functions/text/#concat)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)
 :::

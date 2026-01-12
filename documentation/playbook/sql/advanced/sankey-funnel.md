@@ -116,7 +116,7 @@ This format works directly with:
 - **Grafana Flow plugin**: Source/target/value format
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/over/)
-- [LAG function](/docs/reference/function/window/#lag)
-- [Grafana integration](/docs/third-party-tools/grafana/)
+- [Window functions](/docs/query/sql/over/)
+- [LAG function](/docs/query/functions/window/#lag)
+- [Grafana integration](/docs/integrations/visualization/grafana/)
 :::

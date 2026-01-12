@@ -348,8 +348,8 @@ TCP ILP has no acknowledgments. If the connection drops, data may be lost silent
 :::
 
 :::info Related Documentation
-- [ILP reference](/docs/reference/api/ilp/overview/)
-- [ILP over HTTP](/docs/reference/api/ilp/overview/#transport-selection)
-- [ILP over TCP](/docs/reference/api/ilp/overview/#transport-selection)
+- [ILP reference](/docs/ingestion/ilp/overview/)
+- [ILP over HTTP](/docs/ingestion/ilp/overview/#transport-selection)
+- [ILP over TCP](/docs/ingestion/ilp/overview/#transport-selection)
 - [InfluxDB Ruby client](https://github.com/influxdata/influxdb-client-ruby)
 :::

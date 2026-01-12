@@ -239,12 +239,12 @@ These views are continuously updated and provide faster query performance for cr
 You can run queries against both datasets directly on [demo.questdb.io](https://demo.questdb.io). Throughout the Playbook, recipes using demo data will include a direct link to execute the query.
 
 :::tip
-The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/quick-start/) for installation instructions.
+The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/getting-started/quick-start/) for installation instructions.
 :::
 
 :::info Related Documentation
-- [SYMBOL type](/docs/concept/symbol/)
-- [Arrays in QuestDB](/docs/concept/array/)
-- [Designated timestamp](/docs/concept/designated-timestamp/)
-- [Time-series aggregations](/docs/reference/function/aggregation/)
+- [SYMBOL type](/docs/concepts/symbol/)
+- [Arrays in QuestDB](/docs/query/datatypes/array/)
+- [Designated timestamp](/docs/concepts/designated-timestamp/)
+- [Time-series aggregations](/docs/query/functions/aggregation/)
 :::

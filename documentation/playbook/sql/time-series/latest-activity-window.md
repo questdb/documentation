@@ -36,7 +36,7 @@ WHERE timestamp >= (
 QuestDB supports correlated subqueries when asking for a timestamp if the query returns a scalar value. Using `LIMIT -1` we get the latest row in the table (sorted by designated timestamp), and we apply the `dateadd` function on that date, so it needs to be executed just once. If we placed the `dateadd` on the left, the calculation would need to be applied once for each row on the main table. This query should return in just a few milliseconds, independently of table size.
 
 :::info Related Documentation
-- [LIMIT](/docs/reference/sql/select/#limit)
-- [dateadd()](/docs/reference/function/date-time/#dateadd)
-- [Designated timestamp](/docs/concept/designated-timestamp/)
+- [LIMIT](/docs/query/sql/select/#limit)
+- [dateadd()](/docs/query/functions/date-time/#dateadd)
+- [Designated timestamp](/docs/concepts/designated-timestamp/)
 :::

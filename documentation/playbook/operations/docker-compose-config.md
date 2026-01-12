@@ -93,7 +93,7 @@ services:
 ## Complete Configuration Reference
 
 For a full list of available configuration parameters, see:
-- [Server Configuration Reference](/docs/configuration/) - All configurable parameters with descriptions
+- [Server Configuration Reference](/docs/configuration/overview/) - All configurable parameters with descriptions
 - [Docker Deployment Guide](/docs/deployment/docker/) - Docker-specific setup instructions
 
 ## Verifying Configuration
@@ -131,7 +131,7 @@ If you encounter permission errors with mounted volumes, ensure the QuestDB cont
 :::
 
 :::info Related Documentation
-- [Server Configuration](/docs/configuration/)
+- [Server Configuration](/docs/configuration/overview/)
 - [Docker Deployment Guide](/docs/deployment/docker/)
-- [PostgreSQL Wire Protocol](/docs/reference/api/postgres/)
+- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/)
 :::

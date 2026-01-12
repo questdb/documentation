@@ -104,10 +104,10 @@ FROM _query_trace CROSS JOIN quantiles
 ```
 
 :::note Enable Query Tracing
-Query tracing needs to be enabled for the `_query_trace` table to be populated. See the [configuration documentation](/docs/configuration/) for details.
+Query tracing needs to be enabled for the `_query_trace` table to be populated. See the [configuration documentation](/docs/configuration/overview/) for details.
 :::
 
 :::info Related Documentation
-- [Query tracing](/docs/concept/query-tracing/)
-- [approx_percentile() function](/docs/reference/function/aggregation/#approx_percentile)
+- [Query tracing](/docs/concepts/deep-dive/query-tracing/)
+- [approx_percentile() function](/docs/query/functions/aggregation/#approx_percentile)
 :::

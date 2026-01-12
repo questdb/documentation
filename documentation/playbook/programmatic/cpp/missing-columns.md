@@ -113,5 +113,5 @@ int main()
 
 :::info Related Documentation
 - [QuestDB C++ client documentation](https://github.com/questdb/c-questdb-client)
-- [ILP reference](/docs/reference/api/ilp/overview/)
+- [ILP reference](/docs/ingestion/ilp/overview/)
 :::

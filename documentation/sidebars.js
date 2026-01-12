@@ -731,11 +731,6 @@ module.exports = {
         },
         "tutorials/influxdb-migration",
         {
-          label: "Blog Tutorials",
-          type: "link",
-          href: "https://questdb.com/blog/?tag=tutorial",
-        },
-        {
           type: "category",
           label: "Cookbook",
           collapsed: true,
@@ -865,6 +860,11 @@ module.exports = {
               ],
             },
           ],
+        },
+        {
+          label: "Blog Tutorials",
+          type: "link",
+          href: "https://questdb.com/blog/?tag=tutorial",
         },
       ],
     },

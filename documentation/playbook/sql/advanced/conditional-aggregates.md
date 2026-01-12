@@ -62,7 +62,7 @@ avg(CASE WHEN side = 'buy' THEN price END)
 - Automatically skips all other rows
 
 :::info Related Documentation
-- [CASE expressions](/docs/reference/sql/case/)
-- [Aggregate functions](/docs/reference/function/aggregation/)
-- [count()](/docs/reference/function/aggregation/#count)
+- [CASE expressions](/docs/query/sql/case/)
+- [Aggregate functions](/docs/query/functions/aggregation/)
+- [count()](/docs/query/functions/aggregation/#count)
 :::

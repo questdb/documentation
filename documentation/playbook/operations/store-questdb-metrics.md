@@ -52,6 +52,6 @@ A few things to note:
 
 :::info Related Documentation
 - [QuestDB metrics](/docs/operations/logging-metrics/)
-- [ILP ingestion](/docs/ingestion-overview/)
+- [ILP ingestion](/docs/ingestion/overview/)
 - [Telegraf documentation](https://docs.influxdata.com/telegraf/)
 :::

@@ -57,7 +57,7 @@ This query:
 The filler row ensures that gaps at the beginning of the interval carry forward the last known value rather than showing nulls.
 
 :::info Related Documentation
-- [SAMPLE BY aggregation](/docs/reference/sql/sample-by/)
-- [FILL keyword](/docs/reference/sql/sample-by/#fill-options)
-- [LIMIT keyword](/docs/reference/sql/limit/)
+- [SAMPLE BY aggregation](/docs/query/sql/sample-by/)
+- [FILL keyword](/docs/query/sql/sample-by/#fill-options)
+- [LIMIT keyword](/docs/query/sql/limit/)
 :::

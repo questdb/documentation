@@ -130,8 +130,8 @@ This is a workaround since QuestDB doesn't have `ROWS FOLLOWING` syntax yet.
 :::
 
 :::info Related Documentation
-- [LAG window function](/docs/reference/function/window/#lag)
-- [LEAD window function](/docs/reference/function/window/#lead)
-- [Window functions overview](/docs/reference/sql/over/)
-- [Window frame clauses](/docs/reference/sql/over/#frame-types-and-behavior)
+- [LAG window function](/docs/query/functions/window/#lag)
+- [LEAD window function](/docs/query/functions/window/#lead)
+- [Window functions overview](/docs/query/sql/over/)
+- [Window frame clauses](/docs/query/sql/over/#frame-types-and-behavior)
 :::

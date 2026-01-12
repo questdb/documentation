@@ -49,7 +49,7 @@ For QuestDB Enterprise, there is native TLS support, so you can connect directly
 :::
 
 :::info Related Documentation
-- [PostgreSQL wire protocol](/docs/reference/api/postgres/)
-- [QuestDB security](/docs/guides/architecture/security/)
+- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- [QuestDB security](/docs/security/tls/)
 - [PgBouncer documentation](https://www.pgbouncer.org/config.html)
 :::

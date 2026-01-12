@@ -7,7 +7,7 @@ description: Set up a read-only PostgreSQL user for Grafana dashboards while mai
 Configure a dedicated read-only user for Grafana to improve security by preventing accidental data modifications through dashboards. This allows you to maintain separate credentials for visualization (read-only) and administration (full access), following the principle of least privilege.
 
 :::note QuestDB Enterprise
-For QuestDB Enterprise, use the comprehensive [Role-Based Access Control (RBAC)](/docs/operations/rbac/) system to create granular user permissions and roles. The configuration below applies to QuestDB Open Source.
+For QuestDB Enterprise, use the comprehensive [Role-Based Access Control (RBAC)](/docs/security/rbac/) system to create granular user permissions and roles. The configuration below applies to QuestDB Open Source.
 :::
 
 ## Problem: Separate Read and Write Access
@@ -75,8 +75,8 @@ After enabling, you have two separate users:
 - Use for: Grafana dashboards, monitoring tools, analytics applications
 
 :::info Related Documentation
-- [PostgreSQL wire protocol](/docs/reference/api/postgres/)
-- [QuestDB Enterprise RBAC](/docs/operations/rbac/)
-- [Configuration reference](/docs/configuration/)
+- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- [QuestDB Enterprise RBAC](/docs/security/rbac/)
+- [Configuration reference](/docs/configuration/overview/)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)
 :::

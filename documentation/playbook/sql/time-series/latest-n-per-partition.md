@@ -260,8 +260,8 @@ The number of rows returned is `N × number_of_partitions`. If you have 100 symb
 :::
 
 :::info Related Documentation
-- [row_number() window function](/docs/reference/function/window/#row_number)
-- [LATEST ON](/docs/reference/sql/latest-on/)
-- [Window functions](/docs/reference/sql/over/)
-- [LIMIT](/docs/reference/sql/select/#limit)
+- [row_number() window function](/docs/query/functions/window/#row_number)
+- [LATEST ON](/docs/query/sql/latest-on/)
+- [Window functions](/docs/query/sql/over/)
+- [LIMIT](/docs/query/sql/select/#limit)
 :::

@@ -61,7 +61,7 @@ You would be using twice the storage temporarily, but then you can drop the init
 Read the CSV line-by-line and convert, then send via the ILP client.
 
 :::info Related Documentation
-- [CSV import](/docs/web-console/import-csv/)
-- [ILP ingestion](/docs/ingestion-overview/)
-- [read_parquet()](/docs/reference/function/parquet/)
+- [CSV import](/docs/getting-started/web-console/import-csv/)
+- [ILP ingestion](/docs/ingestion/overview/)
+- [read_parquet()](/docs/query/functions/parquet/)
 :::

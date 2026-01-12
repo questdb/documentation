@@ -22,6 +22,6 @@ Query the `SHOW PARAMETERS` command and filter by `value_source` to exclude defa
 This query returns only the parameters that have been explicitly configured, showing their current values and the source of the configuration (e.g., `conf` file or `env` variable).
 
 :::info Related Documentation
-- [SHOW PARAMETERS reference](/docs/reference/sql/show/#show-parameters)
-- [Configuration reference](/docs/configuration/)
+- [SHOW PARAMETERS reference](/docs/query/sql/show/#show-parameters)
+- [Configuration reference](/docs/configuration/overview/)
 :::

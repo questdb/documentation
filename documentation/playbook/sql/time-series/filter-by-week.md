@@ -44,8 +44,8 @@ WHERE timestamp >= @week_start
 ```
 
 :::info Related Documentation
-- [week_of_year()](/docs/reference/function/date-time/#week_of_year)
-- [dateadd()](/docs/reference/function/date-time/#dateadd)
-- [day_of_week()](/docs/reference/function/date-time/#day_of_week)
-- [DECLARE](/docs/reference/sql/declare/)
+- [week_of_year()](/docs/query/functions/date-time/#week_of_year)
+- [dateadd()](/docs/query/functions/date-time/#dateadd)
+- [day_of_week()](/docs/query/functions/date-time/#day_of_week)
+- [DECLARE](/docs/query/sql/declare/)
 :::

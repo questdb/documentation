@@ -124,7 +124,7 @@ WHERE timestamp >= dateadd('h', -1, now())
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/over/)
-- [SUM aggregate](/docs/reference/function/aggregation/#sum)
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
+- [Window functions](/docs/query/sql/over/)
+- [SUM aggregate](/docs/query/functions/aggregation/#sum)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
 :::

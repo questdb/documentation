@@ -85,8 +85,8 @@ The `TIMESTAMP()` keyword requires that the data is already sorted by the timest
 :::
 
 :::info Related Documentation
-- [Designated Timestamp concept](/docs/concept/designated-timestamp/)
-- [TIMESTAMP keyword reference](/docs/reference/sql/select/#timestamp)
-- [SAMPLE BY aggregation](/docs/reference/sql/sample-by/)
-- [Parquet functions](/docs/reference/function/parquet/)
+- [Designated Timestamp concept](/docs/concepts/designated-timestamp/)
+- [TIMESTAMP keyword reference](/docs/query/sql/select/#timestamp)
+- [SAMPLE BY aggregation](/docs/query/sql/sample-by/)
+- [Parquet functions](/docs/query/functions/parquet/)
 :::

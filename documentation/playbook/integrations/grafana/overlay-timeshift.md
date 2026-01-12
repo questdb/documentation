@@ -66,7 +66,7 @@ SELECT dateadd('d',-1,timestamp) as time, cumulative_value/cumulative_volume AS 
 This creates an overlay chart where yesterday's and today's data align on the same time axis, allowing direct comparison.
 
 :::info Related Documentation
-- [UNION ALL](/docs/reference/sql/union-except-intersect/)
-- [Window functions](/docs/reference/sql/over/)
-- [Grafana integration](/docs/third-party-tools/grafana/)
+- [UNION ALL](/docs/query/sql/union-except-intersect/)
+- [Window functions](/docs/query/sql/over/)
+- [Grafana integration](/docs/integrations/visualization/grafana/)
 :::

@@ -47,7 +47,7 @@ The format consists of:
 - **Columns** (fields): Space-separated, then comma-separated key-value pairs for numerical or string data
 - **Timestamp** (optional): Nanosecond-precision timestamp; if omitted, QuestDB uses server time
 
-For complete ILP specification, see the [ILP reference documentation](/docs/reference/api/ilp/overview/).
+For complete ILP specification, see the [ILP reference documentation](/docs/ingestion/ilp/overview/).
 
 ## ILP Over HTTP
 
@@ -351,7 +351,7 @@ TCP ILP does not provide acknowledgments for successful writes. If the connectio
 | **Recommended for** | Custom timestamps required | Ease of development, server timestamps acceptable | High-volume, loss-tolerant scenarios |
 
 :::info Related Documentation
-- [ILP reference documentation](/docs/reference/api/ilp/overview/)
-- [HTTP REST API](/docs/reference/api/rest/)
-- [Authentication and security](/docs/operations/rbac/)
+- [ILP reference documentation](/docs/ingestion/ilp/overview/)
+- [HTTP REST API](/docs/query/rest-api/)
+- [Authentication and security](/docs/security/rbac/)
 :::

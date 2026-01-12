@@ -359,8 +359,8 @@ If there are N or fewer distinct values, the "Others" row won't appear (or will 
 :::
 
 :::info Related Documentation
-- [rank() window function](/docs/reference/function/window/#rank)
-- [row_number() window function](/docs/reference/function/window/#row_number)
-- [CASE expressions](/docs/reference/sql/case/)
-- [Window functions](/docs/reference/sql/over/)
+- [rank() window function](/docs/query/functions/window/#rank)
+- [row_number() window function](/docs/query/functions/window/#row_number)
+- [CASE expressions](/docs/query/sql/case/)
+- [Window functions](/docs/query/sql/over/)
 :::

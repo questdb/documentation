@@ -48,8 +48,8 @@ FROM with_previous_vals;
 Note the use of `IGNORE NULLS` modifier on the window function to make sure we always look back for a value, rather than just over the previous row.
 
 :::info Related Documentation
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
-- [FILL keyword](/docs/reference/sql/sample-by/#fill-keywords)
-- [Window functions](/docs/reference/sql/over/)
-- [last_value()](/docs/reference/function/window/#last_value)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
+- [FILL keyword](/docs/query/sql/sample-by/#fill-keywords)
+- [Window functions](/docs/query/sql/over/)
+- [last_value()](/docs/query/functions/window/#last_value)
 :::

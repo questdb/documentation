@@ -29,7 +29,7 @@ When they match, all WAL transactions have been applied and all rows are visible
 Another viable approach is to run `SELECT count(*) FROM my_table` and verify the expected row count.
 
 :::info Related Documentation
-- [Write-Ahead Log concept](/docs/concept/write-ahead-log/)
-- [Meta functions reference](/docs/reference/function/meta/)
-- [InfluxDB Line Protocol overview](/docs/reference/api/ilp/overview/)
+- [Write-Ahead Log concept](/docs/concepts/write-ahead-log/)
+- [Meta functions reference](/docs/query/functions/meta/)
+- [InfluxDB Line Protocol overview](/docs/ingestion/ilp/overview/)
 :::

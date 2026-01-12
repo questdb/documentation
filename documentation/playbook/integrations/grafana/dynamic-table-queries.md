@@ -217,9 +217,9 @@ This pattern assumes all tables have identical schemas. If schemas differ:
 :::
 
 :::info Related Documentation
-- [ASOF JOIN](/docs/reference/sql/join/#asof-join)
-- [tables() function](/docs/reference/function/meta/#tables)
-- [string_agg()](/docs/reference/function/aggregation/#string_agg)
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
+- [ASOF JOIN](/docs/query/sql/join/#asof-join)
+- [tables() function](/docs/query/functions/meta/#tables)
+- [string_agg()](/docs/query/functions/aggregation/#string_agg)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)
 :::

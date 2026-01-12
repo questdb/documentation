@@ -94,7 +94,7 @@ For unknown or dynamic column lists, you'll need to generate the CASE statements
 :::
 
 :::info Related Documentation
-- [CASE expressions](/docs/reference/sql/case/)
-- [SAMPLE BY aggregation](/docs/reference/sql/sample-by/)
-- [Aggregation functions](/docs/reference/function/aggregation/)
+- [CASE expressions](/docs/query/sql/case/)
+- [SAMPLE BY aggregation](/docs/query/sql/sample-by/)
+- [Aggregation functions](/docs/query/functions/aggregation/)
 :::

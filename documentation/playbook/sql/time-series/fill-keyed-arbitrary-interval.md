@@ -58,7 +58,7 @@ This query:
 The boundary rows ensure that gaps are filled from the beginning to the end of your specified interval, not just between existing data points.
 
 :::info Related Documentation
-- [SAMPLE BY aggregation](/docs/reference/sql/sample-by/)
-- [FILL keyword](/docs/reference/sql/sample-by/#fill-options)
-- [Designated timestamp](/docs/concept/designated-timestamp/)
+- [SAMPLE BY aggregation](/docs/query/sql/sample-by/)
+- [FILL keyword](/docs/query/sql/sample-by/#fill-options)
+- [Designated timestamp](/docs/concepts/designated-timestamp/)
 :::

@@ -27,6 +27,6 @@ cast('[[1,2,3],[4,5,6]]' as double[][]);
 Note if you add the wrong number of brackets (for example, in this case if you try casting to `double[]` or `double[][][][]`), it will not error, but will instead convert as null.
 
 :::info Related Documentation
-- [CAST function](/docs/reference/sql/cast/)
-- [Data types](/docs/reference/sql/datatypes/)
+- [CAST function](/docs/query/sql/cast/)
+- [Data types](/docs/query/datatypes/overview/)
 :::

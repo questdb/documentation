@@ -30,10 +30,10 @@ This reads from the source instance using PostgreSQL wire protocol and writes to
 
 ## Alternative: Export Endpoint
 
-You can also use [the export endpoint](/docs/reference/api/rest/#exp---export-data) to export data to CSV or other formats.
+You can also use [the export endpoint](/docs/query/rest-api/#exp---export-data) to export data to CSV or other formats.
 
 :::info Related Documentation
-- [ILP ingestion](/docs/ingestion-overview/)
-- [PostgreSQL wire protocol](/docs/reference/api/postgres/)
-- [REST API export](/docs/reference/api/rest/#exp---export-data)
+- [ILP ingestion](/docs/ingestion/overview/)
+- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- [REST API export](/docs/query/rest-api/#exp---export-data)
 :::

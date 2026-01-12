@@ -47,7 +47,7 @@ FROM prev_volumes;
 ```
 
 :::info Related Documentation
-- [LAG window function](/docs/reference/function/window/#lag)
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
-- [CASE expressions](/docs/reference/sql/case/)
+- [LAG window function](/docs/query/functions/window/#lag)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
+- [CASE expressions](/docs/query/sql/case/)
 :::

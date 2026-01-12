@@ -171,7 +171,7 @@ GROUP BY timestamp, sensor_id;
 See the [Pivoting](/docs/playbook/sql/advanced/pivot-table/) guide for more details.
 
 :::info Related Documentation
-- [UNION](/docs/reference/sql/union-except-intersect/)
-- [CASE expressions](/docs/reference/sql/case/)
+- [UNION](/docs/query/sql/union-except-intersect/)
+- [CASE expressions](/docs/query/sql/case/)
 - [Pivoting (opposite operation)](/docs/playbook/sql/advanced/pivot-table/)
 :::

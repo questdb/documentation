@@ -22,7 +22,7 @@ SELECT
     sum(amount) AS volume
 FROM trades
 WHERE timestamp > dateadd('M', -1, now())
-SAMPLE BY 1d ALIGN TO CALENDAR;
+SAMPLE BY 1d;
 ```
 
 The question is: is there a way to only select trades where the traded amount deviates significantly from recent patterns?
@@ -55,12 +55,11 @@ FROM moving_trades
 WHERE timestamp > dateadd('M', -1, now())
   AND moving_avg_7_days IS NOT NULL
   AND ABS(moving_avg_7_days - price) > moving_avg_7_days * 0.01
-SAMPLE BY 1d ALIGN TO CALENDAR;
+SAMPLE BY 1d;
 ```
 
 :::info Related Documentation
-- [Window functions](/docs/reference/sql/over/)
-- [AVG window function](/docs/reference/function/window/#avg)
-- [SAMPLE BY](/docs/reference/sql/sample-by/)
-- [ALIGN TO CALENDAR](/docs/reference/sql/sample-by/#align-to-calendar)
+- [Window functions](/docs/query/sql/over/)
+- [AVG window function](/docs/query/functions/window/#avg)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
 :::
