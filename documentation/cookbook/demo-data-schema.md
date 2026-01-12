@@ -128,6 +128,63 @@ LIMIT -5;
 
 Each order book snapshot contains 40 bid levels and 40 ask levels.
 
+## fx_trades Table
+
+The `fx_trades` table contains simulated FX trade executions. Each row represents a trade that executed against the order book, with realistic partial fills and level walking.
+
+### Schema
+
+```sql title="fx_trades table structure"
+CREATE TABLE 'fx_trades' (
+    timestamp TIMESTAMP_NS,
+    symbol SYMBOL,
+    ecn SYMBOL,
+    trade_id UUID,
+    side SYMBOL,
+    passive BOOLEAN,
+    price DOUBLE,
+    quantity DOUBLE,
+    counterparty SYMBOL,
+    order_id UUID
+) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH WAL;
+```
+
+### Columns
+
+- **`timestamp`** - Time of trade execution with nanosecond precision (designated timestamp)
+- **`symbol`** - Currency pair (same 30 pairs as `core_price`)
+- **`ecn`** - ECN where trade executed: **LMAX**, **EBS**, **Currenex**, or **Hotspot**
+- **`trade_id`** - Unique identifier for this specific trade
+- **`side`** - Trade direction: **buy** or **sell**
+- **`passive`** - Whether this was a passive (limit) or aggressive (market) order
+- **`price`** - Execution price
+- **`quantity`** - Trade size
+- **`counterparty`** - 20-character LEI (Legal Entity Identifier) of the counterparty
+- **`order_id`** - Parent order identifier (multiple trades can share the same `order_id` for partial fills)
+
+### Sample Data
+
+```questdb-sql demo title="Recent FX trades"
+SELECT * FROM fx_trades
+WHERE timestamp IN today()
+LIMIT -10;
+```
+
+**Results:**
+
+| timestamp                      | symbol | ecn      | trade_id                             | side | passive | price   | quantity | counterparty         | order_id                             |
+| ------------------------------ | ------ | -------- | ------------------------------------ | ---- | ------- | ------- | -------- | -------------------- | ------------------------------------ |
+| 2026-01-12T12:18:57.138282586Z | EURUSD | LMAX     | d14e6e54-6c6b-495d-865d-47311a36519b | sell | false   | 1.1705  | 193615.0 | 004409EA0ED5B9FF954B | db3cd1e6-c3e7-4909-8a64-31a2b6f0f9c0 |
+| 2026-01-12T12:18:57.138912209Z | EURUSD | LMAX     | be857ed7-848f-4d23-83ff-3e5636cbc9de | sell | false   | 1.1707  | 107749.0 | 000A4FB276D1BE98F143 | db3cd1e6-c3e7-4909-8a64-31a2b6f0f9c0 |
+| 2026-01-12T12:18:57.259555330Z | GBPUSD | EBS      | 446cac16-9b25-4205-b1e1-3eda4a3bb539 | sell | false   | 1.3401  | 192701.0 | 00119FEF98D9EC079D15 | d0d74987-8929-4c48-bc18-7164b1a956e3 |
+| 2026-01-12T12:18:57.303333947Z | GBPUSD | EBS      | 27515a12-9ab6-4175-8fa3-422d4529f365 | sell | true    | 1.3404  | 66295.0  | 00363EC8480C058FD36C | 239eae98-fc45-4e1c-bd45-8933909a67fc |
+| 2026-01-12T12:18:57.334406432Z | USDTRY | EBS      | c82453b3-9961-40ea-a6ac-43c33fe0f235 | sell | true    | 43.1001 | 65849.0  | 002A80CCE4AFD37D0642 | 2ce77a03-0f21-4241-8ca7-903080848dc0 |
+| 2026-01-12T12:18:57.365445776Z | USDJPY | LMAX     | bf918a88-60c2-4a20-8f53-65298b5a10fe | buy  | false   | 156.82  | 55548.0  | 00EB428CCC1C1C240F71 | 7458b51d-65fa-4ffb-8fa8-840e88d2c316 |
+| 2026-01-12T12:18:57.479674129Z | USDJPY | EBS      | c7c902bd-7075-4952-88d1-76d39ba4c706 | buy  | false   | 156.82  | 98591.0  | 00A10D27678CC03A0161 | 5992296a-684f-4783-9e8c-7206519a85f8 |
+| 2026-01-12T12:18:57.480051522Z | USDJPY | EBS      | a20b6f91-7148-4b64-8a36-85da5bec66f9 | buy  | false   | 156.85  | 178152.0 | 00CBD8490AE2844C8554 | 5992296a-684f-4783-9e8c-7206519a85f8 |
+| 2026-01-12T12:18:57.509773474Z | GBPUSD | Currenex | ae6b771b-5abd-44c7-9e0e-3527ce6fb5b4 | sell | false   | 1.3404  | 62305.0  | 006728CF215E44412D18 | 54ff8191-1891-4a5c-8b67-d5cd961ec5e8 |
+| 2026-01-12T12:18:57.334732460Z | USDTRY | EBS      | 469637a5-6553-4aad-aad9-f7114c8a442d | sell | true    | 43.1    | 101177.0 | 002CAC92E93AB4B3D30C | 2ce77a03-0f21-4241-8ca7-903080848dc0 |
+
 ## FX Materialized Views
 
 The FX dataset includes several materialized views providing pre-aggregated data at different time intervals:
@@ -150,12 +207,18 @@ The FX dataset includes several materialized views providing pre-aggregated data
 - **`market_data_ohlc_15m`** - OHLC candlesticks at 15-minute intervals
 - **`market_data_ohlc_1d`** - OHLC candlesticks at 1-day intervals
 
+### FX Trades OHLC
+
+- **`fx_trades_ohlc_1m`** - OHLC candlesticks from trade executions at 1-minute intervals
+- **`fx_trades_ohlc_1h`** - OHLC candlesticks from trade executions at 1-hour intervals
+
 These views are continuously updated and optimized for dashboard and analytics queries on FX data.
 
 ### FX Data Volume
 
 - **`market_data`**: Approximately **160 million rows** per day (order book snapshots)
 - **`core_price`**: Approximately **73 million rows** per day (price updates across all ECNs and symbols)
+- **`fx_trades`**: Approximately **5.1 million rows** per day (trade executions)
 
 ---
 
@@ -236,7 +299,7 @@ These views are continuously updated and provide faster query performance for cr
 
 ## Using the Demo Data
 
-You can run queries against both datasets directly on [demo.questdb.io](https://demo.questdb.io). Throughout the Cookbook, recipes using demo data will include a direct link to execute the query.
+You can run queries against both datasets directly on [demo.questdb.com](https://demo.questdb.io). Throughout the Cookbook, recipes using demo data will include a direct link to execute the query.
 
 :::tip
 The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/getting-started/quick-start/) for installation instructions.
