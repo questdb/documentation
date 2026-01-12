@@ -15,9 +15,9 @@ You want to get the latest N rows for each distinct value in a column. For examp
 
 `LATEST ON` only returns one row per partition:
 
-```sql
--- Gets only 1 latest row per symbol
+```questdb-sql demo title="LATEST ON returns only 1 row per symbol"
 SELECT * FROM trades
+WHERE timestamp in today()
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
@@ -33,7 +33,7 @@ WITH ranked AS (
     *,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp in today()
 )
 SELECT timestamp, symbol, side, price, amount
 FROM ranked
@@ -98,8 +98,7 @@ ORDER BY name ASC
 ```
 
 **Dynamic N value:**
-```sql
--- Latest N trades where N is specified by user
+```questdb-sql demo title="Latest N trades with variable limit"
 DECLARE @limit := 10
 
 WITH ranked AS (
@@ -117,7 +116,7 @@ WITH ranked AS (
     *,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp in today()
     AND side = 'buy'  -- Additional filter before ranking
 )
 SELECT timestamp, symbol, side, price, amount
@@ -126,11 +125,11 @@ WHERE rn <= 5;
 ```
 
 **Show rank in results:**
-```sql
+```questdb-sql demo title="Show rank number in results"
 WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp in today()
 )
 SELECT timestamp, symbol, price, rn as rank
 FROM ranked
@@ -148,7 +147,7 @@ ORDER BY timestamp DESC
 LIMIT 100;
 ```
 
-Or more efficiently with QuestDB's negative LIMIT feature:
+Or more convenient with QuestDB's negative LIMIT feature:
 
 ```questdb-sql demo title="Latest 100 trades using negative LIMIT"
 SELECT * FROM trades
@@ -166,7 +165,7 @@ LIMIT -100;
 WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('h', -24, now())  -- Filter early
+  WHERE timestamp in today()  -- Filter early
 )
 SELECT * FROM ranked WHERE rn <= 5;
 
@@ -175,13 +174,13 @@ WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades  -- No filter
 )
-SELECT * FROM ranked WHERE rn <= 5 AND timestamp >= dateadd('h', -24, now());
+SELECT * FROM ranked WHERE rn <= 5 AND timestamp in today();
 ```
 
 **Limit partitions:**
 ```sql
 -- Process only specific symbols
-WHERE timestamp >= dateadd('d', -1, now())
+WHERE timestamp in today()
   AND symbol IN ('BTC-USDT', 'ETH-USDT', 'SOL-USDT')
 ```
 
@@ -197,7 +196,7 @@ WITH ranked AS (
     price,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp in today()
 )
 SELECT
   symbol,
@@ -216,48 +215,9 @@ GROUP BY symbol;
 |---------|-----------|----------------------|
 | **Rows per partition** | Exactly 1 | Any number (N) |
 | **Performance** | Very fast (optimized) | Moderate (requires ranking) |
-| **Flexibility** | Limited | High (custom ordering, filtering) |
+| **Flexibility** | Fast | High (custom ordering, filtering) |
 | **Use case** | Single latest value | Multiple recent values |
 
-**When to use LATEST ON:**
-```sql
--- Get current price for each symbol (1 row per symbol)
-SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol;
-```
-
-**When to use row_number():**
-```sql
--- Get latest 5 trades for each symbol (up to 5 rows per symbol)
-WITH ranked AS (
-  SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
-  FROM trades
-)
-SELECT * FROM ranked WHERE rn <= 5;
-```
-
-:::tip Combining with LATEST ON
-For very large tables, use `LATEST ON` to reduce the dataset first, then apply row_number():
-
-```sql
-WITH recent AS (
-  -- Get latest 1000 rows overall
-  SELECT * FROM trades
-  ORDER BY timestamp DESC
-  LIMIT 1000
-)
-, ranked AS (
-  SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
-  FROM recent
-)
-SELECT * FROM ranked WHERE rn <= 5;
-```
-
-This approach is faster when you only need recent data across all partitions.
-:::
-
-:::warning Row Count
-The number of rows returned is `N × number_of_partitions`. If you have 100 symbols and request top 5, you'll get up to 500 rows. Some partitions may have fewer than N rows if insufficient data exists.
-:::
 
 :::info Related Documentation
 - [row_number() window function](/docs/query/functions/window/#row_number)
