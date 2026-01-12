@@ -35,14 +35,11 @@ You want to calculate the duration of each ride.
 
 Use window functions to detect state changes, assign session IDs, then calculate durations:
 
-```questdb-sql demo title="Calculate ride duration from lock status changes"
+```questdb-sql title="Calculate ride duration from lock status changes"
 WITH prevEvents AS (
   SELECT *,
-    first_value(CASE WHEN lock_status=false THEN 0 WHEN lock_status=true THEN 1 END)
-      OVER (
-        PARTITION BY vehicle_id ORDER BY timestamp
-        ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-      ) as prev_status
+    lag(lock_status::int) -- lag doesn't support booleans, so we convert to 1 or 0
+      OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_status
   FROM vehicle_events
   WHERE timestamp IN today()
 ),
@@ -70,16 +67,13 @@ totals AS (
 ),
 prev_ts AS (
   SELECT *,
-    first_value(timestamp::long) OVER (
-      PARTITION BY vehicle_id ORDER BY timestamp
-      ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) as prev_ts
+    lag(timestamp) OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_ts
   FROM totals
 )
 SELECT
   timestamp as ride_end,
   vehicle_id,
-  (timestamp::long - prev_ts) / 1000000 as duration_seconds
+  datediff('s', prev_ts, timestamp) as duration_seconds
 FROM prev_ts
 WHERE lock_status = false AND prev_ts IS NOT NULL;
 ```
@@ -98,10 +92,10 @@ The query uses a five-step approach:
 ### 1. Get Previous Status (`prevEvents`)
 
 ```sql
-first_value(...) OVER (... ROWS 1 PRECEDING EXCLUDE CURRENT ROW)
+lag(lock_status::int) OVER (PARTITION BY vehicle_id ORDER BY timestamp)
 ```
 
-For each row, get the status from the previous row. Convert boolean to numbers (0/1) since `first_value` requires numeric types.
+For each row, get the status from the previous row. Convert boolean to integer (0/1) since `lag` doesn't support boolean types directly.
 
 ### 2. Detect State Changes (`ride_sessions`)
 
@@ -137,10 +131,10 @@ For each session, get the timestamp and status at the beginning of that session.
 ### 5. Calculate Duration (`prev_ts`)
 
 ```sql
-first_value(timestamp::long) OVER (... ROWS 1 PRECEDING)
+lag(timestamp) OVER (PARTITION BY vehicle_id ORDER BY timestamp)
 ```
 
-Get the timestamp from the previous session (for the same vehicle), then calculate duration by subtracting.
+Get the timestamp from the previous session (for the same vehicle), then use `datediff('s', prev_ts, timestamp)` to calculate duration in seconds.
 
 ### Filter for Rides
 
@@ -154,14 +148,11 @@ Only show sessions where status is `false` (unlocked), which represents complete
 
 Calculate total ride duration per vehicle per month:
 
-```questdb-sql demo title="Monthly ride duration by vehicle"
+```questdb-sql title="Monthly ride duration by vehicle"
 WITH prevEvents AS (
   SELECT *,
-    first_value(CASE WHEN lock_status=false THEN 0 WHEN lock_status=true THEN 1 END)
-      OVER (
-        PARTITION BY vehicle_id ORDER BY timestamp
-        ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-      ) as prev_status
+    lag(lock_status::int) -- lag doesn't support booleans, so we convert to 1 or 0
+      OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_status
   FROM vehicle_events
   WHERE timestamp >= dateadd('M', -3, now())
 ),
@@ -189,16 +180,13 @@ totals AS (
 ),
 prev_ts AS (
   SELECT *,
-    first_value(timestamp::long) OVER (
-      PARTITION BY vehicle_id ORDER BY timestamp
-      ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) as prev_ts
+    lag(timestamp) OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_ts
   FROM totals
 )
 SELECT
   timestamp_floor('M', timestamp) as month,
   vehicle_id,
-  SUM((timestamp::long - prev_ts) / 1000000) as total_ride_duration_seconds,
+  SUM(datediff('s', prev_ts, timestamp)) as total_ride_duration_seconds,
   COUNT(*) as ride_count
 FROM prev_ts
 WHERE lock_status = false AND prev_ts IS NOT NULL
@@ -212,16 +200,13 @@ ORDER BY month, vehicle_id;
 ```sql
 WITH prevEvents AS (
   SELECT *,
-    first_value(timestamp::long) OVER (
-      PARTITION BY user_id ORDER BY timestamp
-      ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) as prev_ts
+    lag(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp) as prev_ts
   FROM page_views
 ),
 sessions AS (
   SELECT *,
     SUM(CASE
-      WHEN datediff('h', prev_ts::timestamp, timestamp) > 1 THEN 1
+      WHEN datediff('h', prev_ts, timestamp) > 1 THEN 1
       ELSE 0
     END) OVER (PARTITION BY user_id ORDER BY timestamp) as session_id
   FROM prevEvents
@@ -242,10 +227,7 @@ GROUP BY user_id, session_id;
 -- When machine changes from 'off' to 'running' to 'off'
 WITH prevStatus AS (
   SELECT *,
-    first_value(status) OVER (
-      PARTITION BY machine_id ORDER BY timestamp
-      ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) as prev_status
+    lag(status) OVER (PARTITION BY machine_id ORDER BY timestamp) as prev_status
   FROM machine_status
 ),
 cycles AS (
@@ -266,52 +248,6 @@ WHERE status = 'running'
 GROUP BY machine_id, cycle;
 ```
 
-## Performance Considerations
-
-**Filter by timestamp first:**
-```sql
--- Good: Reduce dataset before windowing
-WHERE timestamp >= dateadd('M', -1, now())
-```
-
-**Partition by high-cardinality column:**
-```sql
--- Good: Each vehicle processed independently
-PARTITION BY vehicle_id
-
--- Avoid: All vehicles in one partition (slow)
--- (no PARTITION BY)
-```
-
-**Limit output:**
-```sql
--- For testing, limit to specific vehicles
-WHERE vehicle_id IN ('V001', 'V002', 'V003')
-```
-
-## Alternative: Using LAG (QuestDB 8.0+)
-
-With `LAG` function, the query is simpler:
-
-```sql
-WITH prevEvents AS (
-  SELECT *,
-    LAG(lock_status) OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_status,
-    LAG(timestamp) OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_timestamp
-  FROM vehicle_events
-  WHERE timestamp IN today()
-)
-SELECT
-  timestamp as ride_end,
-  vehicle_id,
-  datediff('s', prev_timestamp, timestamp) as duration_seconds
-FROM prevEvents
-WHERE lock_status = false    -- Ride ended (locked)
-  AND prev_status = true      -- Previous state was unlocked (riding)
-  AND prev_timestamp IS NOT NULL;
-```
-
-This directly accesses the previous row's values without converting to numbers.
 
 :::tip Common Session Patterns
 This pattern applies to many scenarios:
