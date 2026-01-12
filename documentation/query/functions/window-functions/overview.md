@@ -7,7 +7,7 @@ keywords: [window functions, over, partition by, moving average, running total, 
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
 
-![Window function  animation showing how a sliding window moves through rows, calculating results for each position](https://github.com/user-attachments/assets/2d4b670f-2aa6-40a9-bf61-36d722934588)
+![Window function animation showing how a sliding window moves through rows, calculating results for each position](/images/docs/window-functions/window-function-animation.svg)
 
 ## Syntax
 
