@@ -168,10 +168,10 @@ FROM sensor_readings_long
 GROUP BY timestamp, sensor_id;
 ```
 
-See the [Pivoting](/docs/playbook/sql/advanced/pivot-table/) guide for more details.
+See the [Pivoting](/docs/cookbook/sql/advanced/pivot-table/) guide for more details.
 
 :::info Related Documentation
 - [UNION](/docs/query/sql/union-except-intersect/)
 - [CASE expressions](/docs/query/sql/case/)
-- [Pivoting (opposite operation)](/docs/playbook/sql/advanced/pivot-table/)
+- [Pivoting (opposite operation)](/docs/cookbook/sql/advanced/pivot-table/)
 :::

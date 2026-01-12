@@ -1,14 +1,14 @@
 ---
-title: Playbook Overview
+title: Cookbook Overview
 sidebar_label: Overview
 description: Quick recipes and practical examples for common QuestDB tasks and queries
 ---
 
-The Playbook is a collection of **short, actionable recipes** that demonstrate how to accomplish specific tasks with QuestDB. Each recipe follows a problem-solution-result format, making it easy to find and apply solutions quickly.
+The Cookbook is a collection of **short, actionable recipes** that demonstrate how to accomplish specific tasks with QuestDB. Each recipe follows a problem-solution-result format, making it easy to find and apply solutions quickly.
 
-## What is the Playbook?
+## What is the Cookbook?
 
-Unlike comprehensive reference documentation, the Playbook focuses on practical examples for:
+Unlike comprehensive reference documentation, the Cookbook focuses on practical examples for:
 
 - **Common SQL patterns** - Window functions, pivoting, time-series aggregations
 - **Programmatic integration** - Language-specific client examples
@@ -18,7 +18,7 @@ Each recipe provides a focused solution to a specific problem, with working code
 
 ## Structure
 
-The Playbook is organized into three main sections:
+The Cookbook is organized into three main sections:
 
 - **SQL Recipes** - Common SQL patterns, window functions, and time-series queries
 - **Programmatic** - Language-specific client examples and integration patterns
@@ -30,9 +30,9 @@ The Playbook is organized into three main sections:
 
 For recipes that require write operations or specific configuration, the recipe will indicate what setup is needed.
 
-The demo instance contains live FX market data with tables for core prices and order book snapshots. See the [Demo Data Schema](/docs/playbook/demo-data-schema/) page for details about available tables and their structure.
+The demo instance contains live FX market data with tables for core prices and order book snapshots. See the [Demo Data Schema](/docs/cookbook/demo-data-schema/) page for details about available tables and their structure.
 
-## Using the Playbook
+## Using the Cookbook
 
 Each recipe follows a consistent format:
 

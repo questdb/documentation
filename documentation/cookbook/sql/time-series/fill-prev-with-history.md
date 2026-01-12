@@ -4,7 +4,7 @@ sidebar_label: FILL PREV with history
 description: Use FILL(PREV) with a filler row to carry historical values into a filtered time interval
 ---
 
-When using `FILL(PREV)` with `SAMPLE BY` on a filtered time interval, gaps at the beginning may have null values because `PREV` only uses values from within the filtered interval. This playbook shows how to carry forward the last known value from before the interval.
+When using `FILL(PREV)` with `SAMPLE BY` on a filtered time interval, gaps at the beginning may have null values because `PREV` only uses values from within the filtered interval. This recipe shows how to carry forward the last known value from before the interval.
 
 ## Problem
 

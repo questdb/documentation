@@ -4,7 +4,7 @@ sidebar_label: FILL keyed arbitrary interval
 description: Use FILL with keyed queries across arbitrary time intervals by sandwiching data with null boundary rows
 ---
 
-When using `SAMPLE BY` with `FILL` on keyed queries (queries with non-aggregated columns like symbol), the `FROM/TO` syntax doesn't work. This playbook shows how to fill gaps across an arbitrary time interval for keyed queries.
+When using `SAMPLE BY` with `FILL` on keyed queries (queries with non-aggregated columns like symbol), the `FROM/TO` syntax doesn't work. This recipe shows how to fill gaps across an arbitrary time interval for keyed queries.
 
 ## Problem
 

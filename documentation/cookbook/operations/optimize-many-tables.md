@@ -4,7 +4,7 @@ sidebar_label: Optimize for many tables
 description: Reduce memory and disk usage when running QuestDB with many tables by adjusting memory allocation and disk chunk sizes
 ---
 
-When operating QuestDB with many tables, the default settings may consume more memory and disk space than necessary. This playbook shows how to optimize these resources.
+When operating QuestDB with many tables, the default settings may consume more memory and disk space than necessary. This recipe shows how to optimize these resources.
 
 ## Problem
 

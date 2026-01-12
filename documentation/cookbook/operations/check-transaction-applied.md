@@ -4,7 +4,7 @@ sidebar_label: Check transaction applied
 description: Verify that all ingested rows to a WAL table are visible for queries in QuestDB
 ---
 
-When ingesting data to a WAL table using ILP protocol, inserts are asynchronous. This playbook shows how to ensure all ingested rows are visible for read-only queries.
+When ingesting data to a WAL table using ILP protocol, inserts are asynchronous. This recipe shows how to ensure all ingested rows are visible for read-only queries.
 
 ## Problem
 
