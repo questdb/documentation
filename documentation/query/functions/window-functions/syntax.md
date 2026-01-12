@@ -29,6 +29,22 @@ ROWS | RANGE frame_start
 CUMULATIVE
 ```
 
+And `frame_start` is one of:
+```sql
+UNBOUNDED PRECEDING
+<value> PRECEDING
+CURRENT ROW
+```
+
+And `frame_end` is one of:
+```sql
+CURRENT ROW
+<value> FOLLOWING
+UNBOUNDED FOLLOWING
+```
+
+For `ROWS` frames, `<value>` is an integer (number of rows). For `RANGE` frames, `<value>` is a time interval like `'1' MINUTE` or `'5' SECOND`.
+
 And `exclusion_clause` is:
 ```sql
 EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
@@ -156,7 +172,7 @@ LIMIT 100;
 Defines the frame based on values in the `ORDER BY` column rather than row count.
 
 :::note
-RANGE frames have a known limitation: all rows with the same timestamp value will produce the same output. See [GitHub issue #5177](https://github.com/questdb/questdb/issues/5177).
+RANGE frames have a known limitation: rows with the same ORDER BY value ("peers") do not produce identical results as required by the SQL standard. QuestDB currently processes peers as distinct rows rather than treating them as a group. See [GitHub issue #5177](https://github.com/questdb/questdb/issues/5177).
 :::
 
 **Requirements:**

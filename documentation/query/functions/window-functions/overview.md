@@ -7,6 +7,22 @@ keywords: [window functions, over, partition by, moving average, running total, 
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
 
+## Syntax
+
+```sql
+function_name(arguments) OVER (
+    [PARTITION BY column [, ...]]
+    [ORDER BY column [ASC | DESC] [, ...]]
+    [frame_clause]
+)
+```
+
+- **`PARTITION BY`**: Divides rows into groups; the function resets for each group
+- **`ORDER BY`**: Defines the order of rows within each partition
+- **`frame_clause`**: Specifies which rows relative to the current row to include (e.g., `ROWS BETWEEN 3 PRECEDING AND CURRENT ROW`)
+
+For complete syntax details including frame specifications and exclusion options, see [OVER Clause Syntax](syntax.md).
+
 :::tip
 Click **Demo this query** within our query examples to see them in action in our live demo.
 :::
@@ -151,7 +167,7 @@ RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
 Includes all rows within 1 minute of the current row's timestamp.
 
 :::note
-RANGE frames have a known limitation: all rows with the same timestamp value will produce the same output. See [GitHub issue #5177](https://github.com/questdb/questdb/issues/5177) for details.
+RANGE frames have a known limitation: rows with the same ORDER BY value ("peers") do not produce identical results as required by the SQL standard. QuestDB currently processes peers as distinct rows rather than treating them as a group. See [GitHub issue #5177](https://github.com/questdb/questdb/issues/5177) for details.
 :::
 
 For complete frame syntax, see [OVER Clause Syntax](syntax.md).
