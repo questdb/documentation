@@ -24,7 +24,7 @@ SELECT
   SQRT(AVG(POWER(price - AVG(price) OVER (PARTITION BY symbol  ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2))
        OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) AS rolling_stddev
 FROM
-  trades
+  fx_trades
 WHERE timestamp IN yesterday()
 ```
 
@@ -38,9 +38,9 @@ WITH rolling_avg_cte AS (
     price,
     AVG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg
   FROM
-    trades
+    fx_trades
   WHERE
-    timestamp IN yesterday()
+    timestamp IN yesterday() AND symbol = 'EURUSD'
 ),
 variance_cte AS (
   SELECT

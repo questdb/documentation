@@ -18,11 +18,11 @@ While QuestDB doesn't have a built-in VWAP window function, we can calculate it 
 WITH sampled AS (
     SELECT
           timestamp, symbol,
-          SUM(amount) AS volume,
-          SUM(price * amount) AS traded_value
-     FROM trades
+          SUM(quantity) AS volume,
+          SUM(price * quantity) AS traded_value
+     FROM fx_trades
      WHERE timestamp IN yesterday()
-     AND symbol = 'BTC-USDT'
+     AND symbol = 'EURUSD'
      SAMPLE BY 10m
 ), cumulative AS (
      SELECT timestamp, symbol,
@@ -32,7 +32,9 @@ WITH sampled AS (
                 OVER (ORDER BY timestamp) AS cumulative_volume
      FROM sampled
 )
-SELECT timestamp, symbol, cumulative_value/cumulative_volume AS vwap FROM cumulative;
+SELECT timestamp, symbol,
+       cumulative_value/cumulative_volume AS vwap
+     FROM cumulative;
 ```
 
 This query:
@@ -65,41 +67,48 @@ When using `SUM() OVER (ORDER BY timestamp)` without specifying a frame clause, 
 WITH sampled AS (
     SELECT
           timestamp, symbol,
-          SUM(amount) AS volume,
-          SUM(price * amount) AS traded_value
-     FROM trades
+          SUM(quantity) AS volume,
+          SUM(price * quantity) AS traded_value
+     FROM fx_trades
      WHERE timestamp IN yesterday()
-     AND symbol = 'BTC-USDT'
-     SAMPLE BY 1m  -- Changed from 10m to 1m
+     AND symbol = 'EURUSD'
+     SAMPLE BY 1m -- Changed from 10m to 1m
 ), cumulative AS (
      SELECT timestamp, symbol,
-           SUM(traded_value) OVER (ORDER BY timestamp) AS cumulative_value,
-           SUM(volume) OVER (ORDER BY timestamp) AS cumulative_volume
+           SUM(traded_value)
+                OVER (ORDER BY timestamp) AS cumulative_value,
+           SUM(volume)
+                OVER (ORDER BY timestamp) AS cumulative_volume
      FROM sampled
 )
-SELECT timestamp, symbol, cumulative_value/cumulative_volume AS vwap FROM cumulative;
+SELECT timestamp, symbol,
+       cumulative_value/cumulative_volume AS vwap
+     FROM cumulative;
 ```
 
 **Multiple symbols:**
 ```questdb-sql demo title="VWAP for multiple symbols"
+
 WITH sampled AS (
     SELECT
           timestamp, symbol,
-          SUM(amount) AS volume,
-          SUM(price * amount) AS traded_value
-     FROM trades
+          SUM(quantity) AS volume,
+          SUM(price * quantity) AS traded_value
+     FROM fx_trades
      WHERE timestamp IN yesterday()
-     AND symbol IN ('BTC-USDT', 'ETH-USDT', 'SOL-USDT')
+     AND symbol IN ('EURUSD', 'GBPUSD', 'JPYUSD')
      SAMPLE BY 10m
 ), cumulative AS (
      SELECT timestamp, symbol,
            SUM(traded_value)
-                OVER (PARTITION BY symbol ORDER BY timestamp) AS cumulative_value,
+                OVER (ORDER BY timestamp) AS cumulative_value,
            SUM(volume)
-                OVER (PARTITION BY symbol ORDER BY timestamp) AS cumulative_volume
+                OVER (ORDER BY timestamp) AS cumulative_volume
      FROM sampled
 )
-SELECT timestamp, symbol, cumulative_value/cumulative_volume AS vwap FROM cumulative;
+SELECT timestamp, symbol,
+       cumulative_value/cumulative_volume AS vwap
+     FROM cumulative;
 ```
 
 Note the addition of `PARTITION BY symbol` to calculate separate VWAP values for each symbol.
@@ -110,7 +119,7 @@ Note the addition of `PARTITION BY symbol` to calculate separate VWAP values for
 WHERE timestamp IN today()
 
 -- Specific date
-WHERE timestamp IN '2024-09-05'
+WHERE timestamp IN '2026-01-12'
 
 -- Last hour
 WHERE timestamp >= dateadd('h', -1, now())

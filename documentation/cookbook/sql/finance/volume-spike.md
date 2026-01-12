@@ -18,13 +18,13 @@ Use the `LAG` window function to retrieve the previous candle's volume, then com
 DECLARE
   @anchor_date := timestamp_floor('30s', now()),
   @start_date := dateadd('h', -7, @anchor_date),
-  @symbol := 'BTC-USDT'
+  @symbol := 'EURUSD'
 WITH candles AS (
   SELECT
     timestamp,
     symbol,
-    sum(amount) AS volume
-  FROM trades
+    sum(quantity) AS volume
+  FROM fx_trades
   WHERE timestamp >= @start_date
     AND symbol = @symbol
   SAMPLE BY 30s

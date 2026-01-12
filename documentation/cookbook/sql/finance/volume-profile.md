@@ -14,9 +14,9 @@ Group trades into price bins using `FLOOR` and a tick size parameter:
 DECLARE @tick_size := 1.0
 SELECT
   floor(price / @tick_size) * @tick_size AS price_bin,
-  round(SUM(amount), 2) AS volume
-FROM trades
-WHERE symbol = 'BTC-USDT'
+  round(SUM(quantity), 2) AS volume
+FROM fx_trades
+WHERE symbol = 'EURUSD'
   AND timestamp IN today()
 ORDER BY price_bin;
 ```
@@ -29,9 +29,9 @@ For consistent histograms across different price ranges, calculate the tick size
 
 ```questdb-sql demo title="Volume profile with dynamic 50-bin distribution"
 WITH raw_data AS (
-  SELECT price, amount
-  FROM trades
-  WHERE symbol = 'BTC-USDT' AND timestamp IN today()
+  SELECT price, quantity
+  FROM fx_trades
+  WHERE symbol = 'EURUSD' AND timestamp IN today()
 ),
 tick_size AS (
   SELECT (max(price) - min(price)) / 49 as tick_size
@@ -39,7 +39,7 @@ tick_size AS (
 )
 SELECT
   floor(price / tick_size) * tick_size AS price_bin,
-  round(SUM(amount), 2) AS volume
+  round(SUM(quantity), 2) AS volume
 FROM raw_data CROSS JOIN tick_size
 ORDER BY 1;
 ```

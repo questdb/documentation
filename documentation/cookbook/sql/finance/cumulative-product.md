@@ -32,7 +32,7 @@ You want to calculate:
 
 Since QuestDB doesn't allow functions on top of window function results, we use a mathematical trick: **the exponential of the sum of logarithms equals the product**.
 
-```questdb-sql demo title="Calculate cumulative product via logarithms"
+```questdb-sql title="Calculate cumulative product via logarithms"
 WITH ln_values AS (
     SELECT
         date,
@@ -77,13 +77,13 @@ The workaround is to use a CTE to compute the cumulative sum first, then apply `
 You can easily modify this pattern:
 
 **Different starting price:**
-```sql
+```questdb-sql
 SELECT date, return, 1000 * exp(ln_value) AS stock_price  -- Start at $1000
 FROM ln_values;
 ```
 
 **Different time granularity:**
-```sql
+```questdb-sql
 -- For hourly returns
 WITH ln_values AS (
     SELECT
@@ -96,7 +96,7 @@ SELECT timestamp, 100 * exp(ln_value) AS price FROM ln_values;
 ```
 
 **Multiple assets:**
-```sql
+```questdb-sql
 WITH ln_values AS (
     SELECT
         date,

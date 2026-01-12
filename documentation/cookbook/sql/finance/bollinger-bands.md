@@ -22,9 +22,9 @@ WITH OHLC AS (
       max(price) as high,
       min(price) as low,
       last(price) AS close,
-      sum(amount) AS volume
- FROM trades
- WHERE symbol = 'BTC-USDT' AND timestamp IN yesterday()
+      sum(quantity) AS volume
+ FROM fx_trades
+ WHERE symbol = 'EURUSD' AND timestamp IN yesterday()
  SAMPLE BY 15m
 ), stats AS (
   SELECT
@@ -118,9 +118,9 @@ WITH OHLC AS (
     timestamp, symbol,
       first(price) AS open,
       last(price) AS close,
-      sum(amount) AS volume
- FROM trades
- WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+      sum(quantity) AS volume
+ FROM fx_trades
+ WHERE symbol IN ('EURUSD', 'GBPUSD')
    AND timestamp IN yesterday()
  SAMPLE BY 15m
 ), stats AS (
