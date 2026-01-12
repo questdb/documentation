@@ -23,6 +23,8 @@ function_name(arguments) OVER (
 - **`ORDER BY`**: Defines the order of rows within each partition
 - **`frame_clause`**: Specifies which rows relative to the current row to include (e.g., `ROWS BETWEEN 3 PRECEDING AND CURRENT ROW`)
 
+Some functions (`first_value`, `last_value`, `lag`, `lead`) also support `IGNORE NULLS` or `RESPECT NULLS` before the `OVER` keyword to control null handling.
+
 For complete syntax details including frame specifications and exclusion options, see [OVER Clause Syntax](syntax.md).
 
 :::tip

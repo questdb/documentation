@@ -14,7 +14,7 @@ Click **Demo this query** within our query examples to run them in our live demo
 ## Syntax
 
 ```sql
-function_name(arguments) OVER (
+function_name(arguments) [IGNORE NULLS | RESPECT NULLS] OVER (
     [PARTITION BY column [, ...]]
     [ORDER BY column [ASC | DESC] [, ...]]
     [frame_clause]
@@ -52,6 +52,8 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 
 | Component | Description |
 |-----------|-------------|
+| `IGNORE NULLS` | Skip null values when evaluating the function |
+| `RESPECT NULLS` | Include null values (default behavior) |
 | `PARTITION BY` | Divides the result set into partitions |
 | `ORDER BY` | Orders rows within each partition |
 | `ROWS \| RANGE` | Defines the window frame relative to current row |
@@ -103,6 +105,44 @@ LIMIT 100;
 :::tip Time-series optimization
 For tables with a designated timestamp column, data is already ordered by time. When your `ORDER BY` matches the designated timestamp, QuestDB's optimizer recognizes this and skips redundant sorting. You still need to specify `ORDER BY` for cumulative calculations, but there's no performance penalty.
 :::
+
+## IGNORE NULLS / RESPECT NULLS
+
+The `IGNORE NULLS` and `RESPECT NULLS` clauses control how null values are handled by certain window functions. These clauses appear **before** the `OVER` keyword.
+
+**Supported functions:** `first_value()`, `last_value()`, `lag()`, `lead()`
+
+### RESPECT NULLS (default)
+
+By default, null values are included in the evaluation. This is equivalent to explicitly specifying `RESPECT NULLS`:
+
+```questdb-sql title="Default behavior - nulls included"
+SELECT
+    timestamp,
+    price,
+    lag(price) OVER (ORDER BY timestamp) AS prev_price
+FROM trades;
+```
+
+If the previous row has a null `price`, `prev_price` will be null.
+
+### IGNORE NULLS
+
+With `IGNORE NULLS`, the function skips over null values to find the next non-null value:
+
+```questdb-sql title="Skip null values"
+SELECT
+    timestamp,
+    price,
+    lag(price) IGNORE NULLS OVER (ORDER BY timestamp) AS prev_non_null_price
+FROM trades;
+```
+
+This returns the most recent non-null `price` value, skipping any intermediate nulls.
+
+**Common use cases:**
+- **Filling gaps**: Use `first_value() IGNORE NULLS` or `last_value() IGNORE NULLS` to carry forward/backward the last known value
+- **Sparse data**: Use `lag() IGNORE NULLS` to reference the previous actual measurement, ignoring missing readings
 
 ## Frame types and behavior
 
