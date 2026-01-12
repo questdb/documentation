@@ -404,6 +404,7 @@ The `ON` clause can also be used in combination with `LT JOIN` to join both by
 timestamp and column values.
 
 ### TOLERANCE clause
+
 The `TOLERANCE` clause enhances LT JOIN by limiting how far back in time the join should look for a match in the right
 table. The `TOLERANCE` parameter accepts a time interval value (e.g., 2s, 100ms, 1d).
 
@@ -424,7 +425,10 @@ The interval_literal must be a valid QuestDB interval string, like '5s' (5 secon
 '2m' ( 2 minutes), '3h' (3 hours), or '1d' (1 day).
 
 #### Supported Units for interval_literal
+
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
+
+- n: Nanoseconds
 - U: Microseconds
 - T: Milliseconds
 - s: Seconds
