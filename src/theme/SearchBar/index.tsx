@@ -47,13 +47,17 @@ function Hit({
 }) {
   // Transform URL once and use it in both places
   const transformUrl = (url: string) => {
-    return (url.startsWith('/docs/glossary/') || url.startsWith('/docs/blog/'))
-      ? url.replace('/docs/', '/')
-      : url;
+    return (
+        url.startsWith('/docs/glossary/') ||
+        url.startsWith('/docs/blog/') ||
+        url.startsWith('/docs/release-notes')
+      )
+        ? url.replace('/docs/', '/')
+        : url;
   };
 
   const finalUrl = transformUrl(hit.url);
-  
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     window.location.assign(finalUrl);
@@ -181,6 +185,20 @@ function DocSearch({
 
   const navigator = useRef({
     navigate({itemUrl}: {itemUrl?: string}) {
+      if (!itemUrl) return;
+
+      // Always hard navigate to the main site release notes.
+      if (itemUrl.startsWith('https://questdb.com/release-notes')) {
+        window.location.assign(itemUrl);
+        return;
+      }
+
+      // Also handle if we get (incorrect) prefixed variant defensively.
+      if (itemUrl.startsWith('https://questdb.com/docs/release-notes')) {
+        window.location.assign(itemUrl.replace('https://questdb.com/docs/', 'https://questdb.com/'));
+        return;
+      }
+
       // Algolia results could contain URL's from other domains which cannot
       // be served through history and should navigate with window.location
       if (isRegexpStringMatch(externalUrlRegex, itemUrl)) {

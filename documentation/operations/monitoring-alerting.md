@@ -9,6 +9,9 @@ expand this guide to be more helpful. If you have any recommendations, feel free
 to [create an issue](https://github.com/questdb/documentation/issues) or a PR on
 GitHub.
 
+For detailed instructions on setting up Prometheus to scrape QuestDB metrics,
+see the [Prometheus integration guide](/docs/integrations/other/prometheus/).
+
 ## Basic health check
 
 QuestDB comes with an out-of-the-box health check HTTP endpoint:
@@ -76,10 +79,56 @@ You can create an alert that detects a steadily increasing difference between
 these two numbers. It won't tell you which table is experiencing issues, but it
 is a low-impact way to detect there's a problem which needs further diagnosing.
 
+## Monitor ingestion with SQL
+
+For detailed per-table ingestion monitoring, use the [`tables()`](/docs/query/functions/meta/#tables)
+function. Unlike Prometheus metrics which provide aggregate counters, `tables()`
+returns real-time statistics for each table including WAL lag, memory pressure,
+and performance histograms. The function is lightweight and fully in-memory,
+suitable for frequent polling.
+
+Key columns for ingestion monitoring:
+
+| Column | Description |
+|--------|-------------|
+| `wal_pending_row_count` | Rows written to WAL but not yet applied to the table |
+| `table_suspended` | Whether the table is suspended (WAL apply halted) |
+| `table_memory_pressure_level` | `0` (normal), `1` (reduced parallelism), `2` (backoff) |
+| `wal_txn - table_txn` | Number of pending WAL transactions |
+| `table_write_amp_p99` | Out-of-order merge overhead (1.0 = optimal) |
+| `table_merge_rate_p99` | Slowest merge throughput in rows/second |
+
+Example health dashboard query:
+
+```questdb-sql
+SELECT
+    table_name,
+    table_row_count,
+    wal_pending_row_count,
+    CASE
+        WHEN table_suspended THEN 'SUSPENDED'
+        WHEN table_memory_pressure_level = 2 THEN 'BACKOFF'
+        WHEN table_memory_pressure_level = 1 THEN 'PRESSURE'
+        ELSE 'OK'
+    END AS status,
+    wal_txn - table_txn AS lag_txns,
+    table_write_amp_p50 AS write_amp,
+    table_merge_rate_p99 AS slowest_merge
+FROM tables()
+WHERE walEnabled
+ORDER BY
+    table_suspended DESC,
+    table_memory_pressure_level DESC,
+    wal_pending_row_count DESC;
+```
+
+See the [`tables()` reference](/docs/query/functions/meta/#tables) for the
+complete list of columns and additional example queries.
+
 ## Detect slow queries
 
 QuestDB maintains a table called `_query_trace`, which records each executed
 query and the time it took. You can query this table to find slow queries.
 
 Read more on query tracing on the
-[Concepts page](/docs/concept/query-tracing/).
+[Concepts page](/docs/concepts/deep-dive/query-tracing/).

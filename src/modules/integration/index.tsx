@@ -29,22 +29,22 @@ const integrations: Array<{
   {
     logo: { ...logos.redpanda, width: 90, svg: RedpandaLogo },
     label: "Redpanda",
-    src: "/docs/third-party-tools/redpanda/",
+    src: "/docs/ingestion/message-brokers/redpanda/",
   },
   {
     logo: { ...logos.postgres, svg: PostgresLogo },
     label: "Postgres",
-    src: "/docs/reference/api/postgres/",
+    src: "/docs/query/pgwire/overview/",
   },
   {
     logo: { ...logos.grafana, svg: GrafanaLogo },
     label: "Grafana",
-    src: "/docs/third-party-tools/grafana/",
+    src: "/docs/integrations/visualization/grafana/",
   },
   {
     logo: { ...logos.kafka, svg: KafkaLogo },
     label: "Kafka",
-    src: "/docs/third-party-tools/kafka/overview/",
+    src: "/docs/ingestion/message-brokers/kafka/",
   },
   {
     logo: { ...logos.python, svg: PythonLogo },
@@ -54,37 +54,37 @@ const integrations: Array<{
   {
     logo: { ...logos.pandas, svg: PandasLogo },
     label: "Pandas",
-    src: "/docs/third-party-tools/pandas/",
+    src: "/docs/integrations/data-processing/pandas/",
   },
   {
     logo: { ...logos.apacheSuperset, width: 120, svg: ApacheSupersetLogo },
     label: "Superset",
-    src: "/docs/third-party-tools/superset/",
+    src: "/docs/integrations/visualization/superset/",
   },
   {
     logo: { ...logos.apacheSpark, width: 75, svg: ApacheSparkLogo },
     label: "Spark",
-    src: "/docs/third-party-tools/spark/",
+    src: "/docs/integrations/data-processing/spark/",
   },
   {
     logo: { ...logos.telegraf, svg: TelegrafLogo },
     label: "Telegraf",
-    src: "/docs/third-party-tools/telegraf/",
+    src: "/docs/ingestion/message-brokers/telegraf/",
   },
   {
     logo: { ...logos.mindsDB, svg: MindsDBLogo },
     label: "MindsDB",
-    src: "/docs/third-party-tools/mindsdb",
+    src: "/docs/integrations/other/mindsdb/",
   },
   {
     logo: { ...logos.cube, svg: CubeLogo },
     label: "Cube",
-    src: "/blog/2022/04/26/time-series-data-analytics-with-questdb-and-cube/",
+    src: "/docs/integrations/other/cube/",
   },
   {
     logo: { ...logos.databento, svg: DatabentoLogo },
     label: "Databento",
-    src: "/docs/third-party-tools/databento/",
+    src: "/docs/integrations/other/databento/",
   },
 ]
 

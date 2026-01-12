@@ -32,12 +32,12 @@
   --transition-bezier: cubic-bezier(0.17, 0.67, 0.83, 0.67);
   --transition-fastest: 100ms;
 
-  --font-family-base: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu,
-    sans-serif;
+  --font-family-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 
-  --font-size-small: 15px;
-  --font-size-normal: 16px;
-  --font-size-large: 17px;
+  --font-size-small: 14px;
+  --font-size-normal: 15px;
+  --font-size-large: 16px;
   --font-size-big-1: 22px;
   --font-size-big-2: 24px;
   --font-size-big-3: 32px;
@@ -48,6 +48,8 @@
   --ifm-blockquote-color: var(--palette-pale-blue);
   --ifm-code-background: var(--palette-gray);
   --ifm-code-color: var(--palette-white);
+  --ifm-code-border-radius: 8px;
+  --ifm-code-border-color: #555;
   --ifm-code-font-size: var(--font-size-small);
   --ifm-color-emphasis-300: var(--palette-pale-blue);
   --ifm-color-primary: var(--palette-pink);
@@ -65,7 +67,7 @@
   --ifm-font-family-base: var(--font-family-base);
   --ifm-font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
-  --ifm-font-size-base: var(--font-size-small);
+  --ifm-font-size-base: var(--font-size-normal);
   --ifm-global-border-radius: 8px;
   --ifm-h1-font-size: var(--font-size-big-4);
   --ifm-h2-font-size: var(--font-size-big-2);
@@ -75,7 +77,7 @@
   --ifm-heading-margin-bottom: 1.5rem;
   --ifm-hr-border-color: var(--palette-white-20);
   /* DARK theme link color */
-  --ifm-link-color: #5089f3;
+  --ifm-link-color: #79a8ff;
   --ifm-link-hover-color: #6390e2;
   --ifm-list-paragraph-margin: 0.5rem;
   --ifm-menu-link-sublist-icon: url("/images/infima/arrow.svg");
@@ -83,7 +85,11 @@
   --ifm-navbar-shadow: 0 1px 0 0 var(--palette-white-10);
   --ifm-navbar-height: 60px;
   --ifm-pre-background: var(--palette-midnight);
-  --ifm-table-cell-padding: 0.15rem 1rem;
+  --ifm-table-cell-padding: 0.75rem 1rem;
+  --ifm-table-border-color: var(--palette-white-20);
+  --ifm-table-head-background: var(--palette-charade);
+  --ifm-table-background: transparent;
+  --ifm-table-stripe-background: var(--palette-white-03);
   --ifm-toc-border-color: var(--palette-white-10);
   --ifm-heading-line-height: 1.5;
   --ifm-footer-link-color: var(--palette-white);
@@ -172,12 +178,20 @@ html[data-theme="dark"] .DocSearch {
   );
 }
 
+/* Inter variable font for body text */
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter/InterVariable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @font-face {
   font-family: SegoeUI;
   src:
     local("Segoe UI Light"),
-    /*web storm may not recognise the fact the font will be there, but it is*/
-      url(/fonts/segoe-ui-100.woff2) format("woff2");
+    url(/fonts/segoe-ui-100.woff2) format("woff2");
   font-weight: 100;
 }
 
@@ -208,12 +222,13 @@ html[data-theme="dark"] .DocSearch {
 @font-face {
   font-family: SegoeUI;
   src:
-    local("Segoe UI Semiold"),
+    local("Segoe UI Semibold"),
     url(/fonts/segoe-ui-700.woff2) format("woff2");
   font-weight: 700;
 }
 
 .table-of-contents {
+  font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
   font-size: var(--font-size-small);
   font-weight: var(--ifm-font-weight-semibold);
   top: 100px;
@@ -224,8 +239,8 @@ html[data-theme="dark"] .DocSearch {
 
 .markdown table code {
   display: inline-block;
-  max-width: 25ch;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .markdown table td p:only-child {
@@ -311,6 +326,50 @@ html[data-theme="dark"] .DocSearch {
 .table-alternate th:nth-child(even),
 .table-alternate td:nth-child(even) {
   background: var(--color-even);
+}
+
+.config-table {
+  overflow: auto;
+}
+
+/**
+ * Documentation table styles
+ */
+.theme-doc-markdown table {
+  --table-radius: 6px;
+  --table-radius-inner: calc(var(--table-radius) - 1px);
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid var(--ifm-table-border-color);
+  border-radius: var(--table-radius);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: auto;
+}
+
+.theme-doc-markdown table th {
+  background: var(--ifm-table-head-background);
+  font-weight: 600;
+}
+
+.theme-doc-markdown table th:first-child {
+  border-top-left-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table th:last-child {
+  border-top-right-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table tr:last-child td:first-child {
+  border-bottom-left-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table tr:last-child td:last-child {
+  border-bottom-right-radius: var(--table-radius-inner);
+}
+
+.theme-doc-markdown table tr:hover {
+  background: var(--palette-white-05);
 }
 
 /* Restore default Docusaurus navbar sticky positioning */
@@ -419,4 +478,10 @@ html[data-theme="dark"] .DocSearch {
 
 .theme-doc-sidebar-item-link > a > [class^=iconExternalLink] {
   margin-left: 0.5rem !important;
+}
+
+/* Keep sidebar at original font style */
+.menu {
+  font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
+  font-size: var(--font-size-small);
 }
