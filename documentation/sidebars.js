@@ -784,7 +784,7 @@ module.exports = {
                   items: [
                     "cookbook/sql/advanced/rows-before-after-value-match",
                     "cookbook/sql/advanced/top-n-plus-others",
-                    "cookbook/sql/advanced/pivot-table",
+                    "cookbook/sql/advanced/pivot-with-others",
                     "cookbook/sql/advanced/unpivot-table",
                     "cookbook/sql/advanced/sankey-funnel",
                     "cookbook/sql/advanced/conditional-aggregates",
