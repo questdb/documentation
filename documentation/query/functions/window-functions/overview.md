@@ -27,6 +27,10 @@ Some functions (`first_value`, `last_value`, `lag`, `lead`) also support `IGNORE
 
 For complete syntax details including frame specifications and exclusion options, see [OVER Clause Syntax](syntax.md).
 
+:::info Window function arithmetic (9.3.1+)
+Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...) OVER (...)`) are supported from version 9.3.1. Earlier versions require wrapping window functions in CTEs or subqueries.
+:::
+
 :::tip
 Click **Demo this query** within our query examples to see them in action in our live demo.
 :::
