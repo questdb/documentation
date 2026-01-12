@@ -10,7 +10,7 @@ Filter time-series data by week number using either the built-in `week_of_year()
 
 There is a built-in `week_of_year()` function, so this could be solved as:
 
-```sql
+```questdb-sql demo title="Filter by week using week_of_year()"
 SELECT * FROM trades
 WHERE week_of_year(timestamp) = 24;
 ```
@@ -19,10 +19,10 @@ WHERE week_of_year(timestamp) = 24;
 
 However, depending on your table size, especially if you are not filtering by any timestamp, you might prefer this alternative, as it executes faster:
 
-```sql
+```questdb-sql demo title="Filter by week using dateadd()"
 SELECT * FROM trades
-WHERE timestamp >= dateadd('w', 23, '2024-12-30')
-  AND timestamp < dateadd('w', 24, '2024-12-30');
+WHERE timestamp >= dateadd('w', 23, '2025-01-01')
+  AND timestamp < dateadd('w', 24, '2025-01-01');
 ```
 
 You need to be careful with that query, as it will start counting time from Jan 1st 1970, which is not a Monday.

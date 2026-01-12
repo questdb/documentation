@@ -23,7 +23,7 @@ But that would give you the last 15 minutes, not the last 15 minutes of activity
 
 Use a correlated subquery to find the latest timestamp, then filter relative to it:
 
-```questdb-sql demo title="Last 15 minutes of recorded activity"
+```questdb-sql title="Last 15 minutes of recorded activity"
 SELECT *
 FROM my_table
 WHERE timestamp >= (
