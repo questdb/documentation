@@ -94,12 +94,27 @@ function_name(arguments) OVER (
 
 ### 1. Partitioning
 
-`PARTITION BY` divides the result set into groups. The window function operates independently on each partition:
+`PARTITION BY` divides rows into independent groups. The window function **resets** for each partition—calculations start fresh, as if each group were a separate table.
+
+**When to use it:** When storing multiple instruments in the same table, you typically want calculations isolated per symbol. For example:
+- Cumulative volume **per symbol** (not across all instruments)
+- Moving average price **per symbol** (not mixing BTC-USD with ETH-USD)
+- Intraday high/low **per symbol**
 
 ```questdb-sql
--- Calculate running total per symbol
-sum(amount) OVER (PARTITION BY symbol ORDER BY timestamp)
+-- Without PARTITION BY: cumulative volume across ALL symbols (mixing instruments)
+sum(volume) OVER (ORDER BY timestamp)
+
+-- With PARTITION BY: cumulative volume resets for each symbol
+sum(volume) OVER (PARTITION BY symbol ORDER BY timestamp)
 ```
+
+| timestamp | symbol | volume | cumulative (no partition) | cumulative (by symbol) |
+|-----------|--------|--------|---------------------------|------------------------|
+| 09:00 | BTC-USD | 100 | 100 | 100 |
+| 09:01 | ETH-USD | 200 | 300 | 200 |
+| 09:02 | BTC-USD | 150 | 450 | 250 |
+| 09:03 | ETH-USD | 100 | 550 | 300 |
 
 Without `PARTITION BY`, all rows are treated as a single partition.
 
