@@ -10,16 +10,16 @@ Create aggregated results showing the top N items individually, with all remaini
 
 You want to display results like:
 
-| Browser            | Count |
-|--------------------|-------|
-| Chrome             | 450   |
-| Firefox            | 380   |
-| Safari             | 320   |
-| Edge               | 280   |
-| Opera              | 190   |
-| -Others-           | 380   | ← Combined total of all other browsers
+| symbol     | total_trades |
+|------------|--------------|
+| BTC-USDT   | 15234        |
+| ETH-USDT   | 12890        |
+| SOL-USDT   | 8945         |
+| MATIC-USDT | 6723         |
+| AVAX-USDT  | 5891         |
+| -Others-   | 23456        | ← Sum of all other symbols
 
-Instead of listing all browsers (which might be dozens), show the top 5 individually and aggregate the rest.
+Instead of listing all symbols (which might be thousands), show the top 5 individually and aggregate the rest.
 
 ## Solution: Use rank() with CASE Statement
 
@@ -93,6 +93,31 @@ The query uses a three-step approach:
 
 If there are ties at the boundary (rank 5), all tied items will be included in top N.
 
+## Alternative: Using row_number()
+
+If you don't want to handle ties and always want exactly N rows in top tier:
+
+```questdb-sql demo title="Top 5 symbols, discarding extra buckets in case of a match"
+WITH totals AS (
+  SELECT symbol, count() as total
+  FROM trades
+),
+ranked AS (
+  SELECT *, row_number() OVER (ORDER BY total DESC) as rn
+  FROM totals
+)
+SELECT
+  CASE WHEN rn <= 5 THEN symbol ELSE '-Others-' END as symbol,
+  SUM(total) as total_trades
+FROM ranked
+GROUP BY 1
+ORDER BY total_trades DESC;
+```
+
+**Difference:**
+- `rank()`: May include more than N if there are ties at position N
+- `row_number()`: Always exactly N in top tier (breaks ties arbitrarily)
+
 ## Adapting the Pattern
 
 **Different top N:**
@@ -129,26 +154,6 @@ GROUP BY 1;
 
 Results in three groups: top 5 individual, ranks 6-10 combined, rest combined.
 
-**Different grouping columns:**
-```questdb-sql demo title="Top 5 ECNs plus Others from market data"
-WITH totals AS (
-  SELECT
-    ecn,
-    count() as total
-  FROM market_data
-  WHERE timestamp >= dateadd('h', -1, now())
-),
-ranked AS (
-  SELECT *, rank() OVER (ORDER BY total DESC) as ranking
-  FROM totals
-)
-SELECT
-  CASE WHEN ranking <= 5 THEN ecn ELSE '-Others-' END as ecn,
-  SUM(total) as message_count
-FROM ranked
-GROUP BY 1
-ORDER BY message_count DESC;
-```
 
 **With percentage:**
 ```questdb-sql demo title="Top 5 symbols with percentage of total"
@@ -179,36 +184,12 @@ FROM grouped CROSS JOIN summed
 ORDER BY total_trades DESC;
 ```
 
-## Alternative: Using row_number()
-
-If you don't want to handle ties and always want exactly N rows in top tier:
-
-```sql
-WITH totals AS (
-  SELECT symbol, count() as total
-  FROM trades
-),
-ranked AS (
-  SELECT *, row_number() OVER (ORDER BY total DESC) as rn
-  FROM totals
-)
-SELECT
-  CASE WHEN rn <= 5 THEN symbol ELSE '-Others-' END as symbol,
-  SUM(total) as total_trades
-FROM ranked
-GROUP BY 1
-ORDER BY total_trades DESC;
-```
-
-**Difference:**
-- `rank()`: May include more than N if there are ties at position N
-- `row_number()`: Always exactly N in top tier (breaks ties arbitrarily)
 
 ## Multiple Grouping Columns
 
 Show top N for multiple dimensions:
 
-```sql
+```questdb-sql demo title="Top 3 for each symbol and side"
 WITH totals AS (
   SELECT
     symbol,
@@ -251,108 +232,6 @@ CASE WHEN ranking <= 10 THEN symbol ELSE '-Others-' END
 ORDER BY total_trades DESC
 ```
 
-**Time series:**
-```questdb-sql demo title="Top 5 symbols over time with Others"
-WITH totals AS (
-  SELECT
-    timestamp_floor('h', timestamp) as hour,
-    symbol,
-    count() as total
-  FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
-  SAMPLE BY 1h
-),
-overall_ranks AS (
-  SELECT symbol, SUM(total) as grand_total
-  FROM totals
-  GROUP BY symbol
-),
-ranked_symbols AS (
-  SELECT symbol, rank() OVER (ORDER BY grand_total DESC) as ranking
-  FROM overall_ranks
-)
-SELECT
-  t.hour,
-  CASE WHEN rs.ranking <= 5 THEN t.symbol ELSE '-Others-' END as symbol,
-  SUM(t.total) as hourly_total
-FROM totals t
-LEFT JOIN ranked_symbols rs ON t.symbol = rs.symbol
-GROUP BY t.hour, 2
-ORDER BY t.hour, hourly_total DESC;
-```
-
-This shows how top 5 symbols trade over time, with all others combined.
-
-## Filtering Out Low Values
-
-Add a minimum threshold to exclude negligible values:
-
-```sql
-WITH totals AS (
-  SELECT symbol, count() as total
-  FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
-),
-ranked AS (
-  SELECT *, rank() OVER (ORDER BY total DESC) as ranking
-  FROM totals
-  WHERE total >= 10  -- Exclude symbols with less than 10 trades
-)
-SELECT
-  CASE WHEN ranking <= 5 THEN symbol ELSE '-Others-' END as symbol,
-  SUM(total) as total_trades
-FROM ranked
-GROUP BY 1
-ORDER BY total_trades DESC;
-```
-
-## Performance Tips
-
-**Pre-filter data:**
-```sql
--- Good: Filter before aggregation
-WITH totals AS (
-  SELECT symbol, count() as total
-  FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())  -- Filter early
-    AND symbol IN (SELECT DISTINCT symbol FROM watched_symbols)
-)
-...
-
--- Less efficient: Filter after aggregation
-WITH totals AS (
-  SELECT symbol, count() as total
-  FROM trades  -- No filter
-)
-, filtered AS (
-  SELECT * FROM totals
-  WHERE ...  -- Late filter
-)
-...
-```
-
-**Limit ranking scope:**
-```sql
--- If you only need top 5, don't rank beyond what's needed
-WITH totals AS (
-  SELECT symbol, count() as total
-  FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
-  ORDER BY total DESC
-  LIMIT 100  -- Rank only top 100, not all thousands
-)
-...
-```
-
-:::tip Custom Labels
-Customize the "Others" label for your domain:
-- `-Others-` (generic)
-- `~Rest~` (shorter)
-- `Other Symbols` (explicit)
-- `Remaining Browsers` (domain-specific)
-
-Choose a label that sorts appropriately and is clear in your context.
-:::
 
 :::warning Empty Others Row
 If there are N or fewer distinct values, the "Others" row won't appear (or will have 0 count). Handle this in your visualization logic if needed.

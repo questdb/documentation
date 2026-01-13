@@ -772,6 +772,7 @@ module.exports = {
                   collapsed: true,
                   items: [
                     "cookbook/sql/advanced/rows-before-after-value-match",
+                    "cookbook/sql/advanced/local-min-max",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
                     "cookbook/sql/advanced/unpivot-table",
