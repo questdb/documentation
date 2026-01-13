@@ -105,7 +105,7 @@ Removes rows where the price column is NULL (the opposite side).
 
 Transform multiple numeric columns to name-value pairs:
 
-```questdb-sql demo title="UNPIVOT sensor readings"
+```questdb-sql title="UNPIVOT sensor readings"
 WITH sensor_data AS (
   SELECT
     timestamp,
@@ -153,20 +153,6 @@ SELECT ... UNION SELECT ...
 
 Always use `UNION ALL` for unpivoting unless you specifically need deduplication.
 
-## Reverse: Pivot (Long to Wide)
-
-To go back from long to wide format, use aggregation with CASE:
-
-```sql
-SELECT
-  timestamp,
-  sensor_id,
-  MAX(CASE WHEN metric = 'temperature' THEN value END) as temperature,
-  MAX(CASE WHEN metric = 'humidity' THEN value END) as humidity,
-  MAX(CASE WHEN metric = 'pressure' THEN value END) as pressure
-FROM sensor_readings_long
-GROUP BY timestamp, sensor_id;
-```
 
 
 :::info Related Documentation
