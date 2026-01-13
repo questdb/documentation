@@ -102,7 +102,7 @@ ALIGN TO CALENDAR;
 
 - Leverage [timestamps](/docs/concepts/timestamps-timezones/) functions for time-series analysis
 - Explore various [aggregation functions](/docs/query/functions/aggregation/) to suit your data needs
-- Consider using powerful [window functions](/docs/query/functions/window/) to perform complex calculations
+- Consider using powerful [window functions](/docs/query/functions/window-functions/overview/) to perform complex calculations
 - For large datasets, use incremental refresh in PowerBI
 
 ## Caveats

@@ -168,8 +168,8 @@ Note the addition of `PARTITION BY symbol` to calculate separate Bollinger Bands
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
-- [AVG window function](/docs/query/functions/window/#avg)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [AVG window function](/docs/query/functions/window-functions/reference/#avg)
 - [SQRT function](/docs/query/functions/numeric/#sqrt)
-- [Window frame clauses](/docs/query/sql/over/#frame-types-and-behavior)
+- [Window frame clauses](/docs/query/functions/window-functions/syntax/#frame-types-and-behavior)
 :::

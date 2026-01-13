@@ -524,38 +524,11 @@ SELECT spread_bps(1.5760, 1.5763)
 | :------------- |
 | 1.903372140976 |
 
-## vwap
+## VWAP (Volume-Weighted Average Price)
 
-`vwap(price, quantity)` - Calculates the volume-weighted average price (VWAP)
-based on the given price and quantity columns. This is defined by the following
-formula:
+For VWAP calculations, use window functions with the typical price formula. This approach is more flexible and works well with high-frequency market data.
 
-$$
-\text{vwap} =
-\frac
-{\text{sum}\left(\text{price} \cdot \text{quantity}\right)}
-{\text{sum}\left(\text{quantity}\right)}
-$$
-
-### Parameters
-
-- `price` is any numeric price value.
-- `quantity` is any numeric quantity value.
-
-### Return value
-
-Return value type is `double`.
-
-### Examples
-
-```questdb-sql
-SELECT vwap(x, x)
-FROM (SELECT x FROM long_sequence(100));
-```
-
-| vwap |
-| :--- |
-| 67   |
+See the [VWAP example in Window Functions](/docs/query/functions/window-functions/overview#vwap-volume-weighted-average-price) for the recommended implementation using `SAMPLE BY` and `CUMULATIVE` window frames.
 
 ## wmid
 

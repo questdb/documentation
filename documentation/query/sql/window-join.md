@@ -15,6 +15,15 @@ time windows.
 It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) and shares
 many of its execution traits.
 
+:::note WINDOW JOIN vs Window Functions
+Despite the similar name, WINDOW JOIN and [window functions](/docs/query/functions/window-functions/overview/) serve different purposes:
+
+- **WINDOW JOIN**: Aggregates data from a *different table* within a time window around each row. Uses `RANGE BETWEEN` to define a time-based window relative to each row's timestamp.
+- **Window functions**: Perform calculations across rows *within the same table* using the `OVER` clause with `PARTITION BY`, `ORDER BY`, and frame specifications.
+
+Use WINDOW JOIN when you need to correlate and aggregate data across two time-series tables. Use window functions for calculations within a single table.
+:::
+
 ## Syntax
 
 ```questdb-sql
@@ -289,6 +298,45 @@ Look for these indicators in the plan:
 5. Aggregate functions cannot reference columns from both tables simultaneously
 6. WINDOW JOIN can be combined with another WINDOW JOIN, but not with other JOIN
    types
+7. **`GROUP BY` is not supported with WINDOW JOIN** - use a CTE or subquery instead
+
+### GROUP BY workaround
+
+WINDOW JOIN cannot be combined with `GROUP BY` in the same query. To aggregate WINDOW JOIN results, wrap the join in a CTE first:
+
+```questdb-sql title="Incorrect - GROUP BY with WINDOW JOIN not supported"
+-- This will NOT work:
+SELECT
+    t.counterparty,
+    count(*) AS trade_count,
+    avg(first(m.mid_price) - t.price) AS avg_slippage
+FROM trades t
+WINDOW JOIN market_data m ON (t.symbol = m.symbol)
+    RANGE BETWEEN 10 milliseconds FOLLOWING AND 10 milliseconds FOLLOWING
+GROUP BY t.counterparty;  -- ERROR: GROUP BY not supported
+```
+
+```questdb-sql title="Correct - use CTE then GROUP BY"
+WITH trades_with_future_mid AS (
+    SELECT
+        t.counterparty,
+        t.price,
+        first(m.mid_price) AS future_mid
+    FROM trades t
+    WINDOW JOIN market_data m ON (t.symbol = m.symbol)
+        RANGE BETWEEN 10 milliseconds FOLLOWING AND 10 milliseconds FOLLOWING
+        INCLUDE PREVAILING
+    WHERE t.timestamp > dateadd('d', -1, now())
+)
+SELECT
+    counterparty,
+    count(*) AS trade_count,
+    avg(future_mid - price) AS avg_slippage
+FROM trades_with_future_mid
+GROUP BY counterparty;
+```
+
+This pattern applies to any aggregation over WINDOW JOIN results - always perform the join first in a CTE, then aggregate in the outer query.
 
 ## Performance tips
 
