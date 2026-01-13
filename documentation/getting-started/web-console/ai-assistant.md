@@ -1,6 +1,7 @@
 ---
 title: QuestDB AI
 sidebar_label: QuestDB AI
+slug: /getting-started/web-console/questdb-ai
 description: Get intelligent SQL query assistance with QuestDB AI in the Web Console
 ---
 
