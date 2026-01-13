@@ -42,7 +42,7 @@ The **Code Editor** is where you write and execute SQL queries with features lik
 
 The **AI Assistant** provides intelligent query assistance directly in the Web Console using AI-powered explanations and suggestions. It helps you write, understand, and fix SQL queries while maintaining complete control over your data and API keys through a Bring Your Own Key (BYOK) model.
 
-[Learn more about AI Assistant →](/docs/getting-started/web-console/ai-assistant)
+[Learn more about AI Assistant →](/docs/getting-started/web-console/questdb-ai)
 
 ### Metrics View
 

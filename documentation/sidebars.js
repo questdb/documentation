@@ -32,7 +32,7 @@ module.exports = {
           items: [
             "getting-started/web-console/overview",
             "getting-started/web-console/code-editor",
-            "getting-started/web-console/ai-assistant",
+            "getting-started/web-console/questdb-ai",
             "getting-started/web-console/metrics-view",
             "getting-started/web-console/schema-explorer",
             "getting-started/web-console/result-grid",
