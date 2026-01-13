@@ -27,7 +27,6 @@ Let's take the below order book as an example.
 | 17   | 14.00 | 14.60 | 16   |
 | 19   | 13.90 | 14.80 | 23   |
 | 21   | 13.70 | 15.10 | 12   |
-| 18   | 13.40 |       |      |
 
 A _buy market order_ with the size of 50 would wipe out the first two price
 levels of the _Ask_ side of the book, and would also trade on the third level.
