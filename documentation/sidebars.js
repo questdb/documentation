@@ -722,7 +722,7 @@ module.exports = {
         {
           type: "category",
           label: "Cookbook",
-          collapsed: true,
+          collapsed: false,
           items: [
             "cookbook/index",
             "cookbook/demo-data-schema",
