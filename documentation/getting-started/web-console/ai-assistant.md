@@ -88,6 +88,7 @@ Access the AI Assistant through multiple methods:
   src="images/docs/console/sidebar-ai.webp"
   width={138}
   height={195}
+  shadow={false}
 />
 
 - Clicking the AI icon next to a query in the Code Editor opens a chat for that query. **An icon with a border indicates an existing chat for the query.**
@@ -95,17 +96,19 @@ Access the AI Assistant through multiple methods:
 <Screenshot
   alt="AI Icons in editor"
   src="images/docs/console/ai-gutter-icons.webp"
-  width={192}
-  height={178}
+  width={331}
+  height={277}
+  shadow={false}
 />
 
 - Clicking **Explain schema with AI** in the table context menu opens a chat with a schema explanation for the selected table, materialized view, or view.
 
 <Screenshot
   alt="Explain schema with AI"
-  src="images/docs/console/explain-schema.webp"
-  width={315}
-  height={114}
+  src="images/docs/console/explain-schema.png"
+  width={497}
+  height={166}
+  shadow={false}
 />
 
 ### Chat Interface
