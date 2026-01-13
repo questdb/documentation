@@ -1,7 +1,7 @@
 ---
 title: Remove Outliers from Candle Data
-sidebar_label: Remove outliers
-description: Filter outliers using window functions to compare against moving averages
+sidebar_label: Remove OHLC outliers
+description: Filter outliers in OHLC candles using window functions to compare against moving averages
 ---
 
 Remove outlier trades that differ significantly from recent average prices.
@@ -12,37 +12,37 @@ You have candle data from trading pairs where some markets have very low volume 
 
 Current query:
 
-```sql
+```questdb-sql demo title="Daily OHLC candles"
 SELECT
     timestamp, symbol,
     first(price) AS open,
     last(price) AS close,
     min(price),
     max(price),
-    sum(amount) AS volume
-FROM trades
-WHERE timestamp > dateadd('M', -1, now())
+    sum(quantity) AS volume
+FROM fx_trades
+WHERE symbol = 'EURUSD' AND timestamp > dateadd('d', -14, now())
 SAMPLE BY 1d;
 ```
 
-The question is: is there a way to only select trades where the traded amount deviates significantly from recent patterns?
+The question is: is there a way to only select trades where the price deviates significantly from recent patterns?
 
 ## Solution
 
-Use a window function to get the moving average for the amount, then `SAMPLE BY` in an outer query and compare the value of the sampled interval against the moving data. You can do this for the whole interval (when you don't specify `ORDER BY` and `RANGE` in the window definition), or you can make it relative to an interval in the past.
+Use a window function to calculate a moving average of price, then filter out trades where the price deviates more than a threshold (e.g., 1%) from the moving average before aggregating with `SAMPLE BY`.
 
-This query compares with the average of the past 6 days (7 days ago, but excluding the current row):
+This query excludes trades where price deviates more than 1% from the 7-day moving average:
 
 ```questdb-sql demo title="Filter outliers using 7-day moving average"
 WITH moving_trades AS (
-  SELECT timestamp, symbol, price, amount,
-    avg(amount) OVER (
+  SELECT timestamp, symbol, price, quantity,
+    avg(price) OVER (
       PARTITION BY symbol
       ORDER BY timestamp
       RANGE BETWEEN 7 days PRECEDING AND 1 day PRECEDING
-    ) moving_avg_7_days
-  FROM trades
-  WHERE timestamp > dateadd('d', -37, now())
+    ) AS moving_avg_price
+  FROM fx_trades
+  WHERE symbol = 'EURUSD' AND timestamp > dateadd('d', -21, now())
 )
 SELECT
     timestamp, symbol,
@@ -50,13 +50,17 @@ SELECT
     last(price) AS close,
     min(price),
     max(price),
-    sum(amount) AS volume
+    sum(quantity) AS volume
 FROM moving_trades
-WHERE timestamp > dateadd('M', -1, now())
-  AND moving_avg_7_days IS NOT NULL
-  AND ABS(moving_avg_7_days - price) > moving_avg_7_days * 0.01
+WHERE timestamp > dateadd('d', -14, now())
+  AND moving_avg_price IS NOT NULL
+  AND ABS(price - moving_avg_price) <= moving_avg_price * 0.01
 SAMPLE BY 1d;
 ```
+
+:::note Moving Average Window
+The CTE fetches 21 days of data (7 extra days) so the 7-day moving average window has enough history for the first rows in the 14-day result period.
+:::
 
 :::info Related Documentation
 - [Window functions](/docs/query/sql/over/)
