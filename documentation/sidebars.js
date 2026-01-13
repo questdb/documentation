@@ -32,6 +32,7 @@ module.exports = {
           items: [
             "getting-started/web-console/overview",
             "getting-started/web-console/code-editor",
+            "getting-started/web-console/questdb-ai",
             "getting-started/web-console/metrics-view",
             "getting-started/web-console/schema-explorer",
             "getting-started/web-console/result-grid",
@@ -424,7 +425,6 @@ module.exports = {
                 "query/sql/latest-on",
                 "query/sql/limit",
                 "query/sql/order-by",
-                "query/sql/over",
                 "query/sql/pivot",
                 "query/sql/sample-by",
                 "query/sql/where",
@@ -466,7 +466,15 @@ module.exports = {
             "query/functions/touch",
             "query/functions/trigonometric",
             "query/functions/uuid",
-            "query/functions/window",
+            {
+              type: "category",
+              label: "Window Functions",
+              items: [
+                "query/functions/window-functions/overview",
+                "query/functions/window-functions/reference",
+                "query/functions/window-functions/syntax",
+              ],
+            },
           ],
         },
         {
@@ -713,12 +721,144 @@ module.exports = {
     },
 
     // ===================
-    // TUTORIALS
+    // TUTORIALS & COOKBOOK
     // ===================
     {
-      label: "Tutorials",
+      label: "Tutorials & Cookbook",
       type: "category",
       items: [
+        {
+          type: "category",
+          label: "Cookbook",
+          collapsed: false,
+          items: [
+            "cookbook/index",
+            "cookbook/demo-data-schema",
+            {
+              type: "category",
+              label: "SQL Recipes",
+              collapsed: true,
+              items: [
+                {
+                  type: "category",
+                  label: "Capital Markets",
+                  collapsed: true,
+                  items: [
+                    "cookbook/sql/finance/compound-interest",
+                    "cookbook/sql/finance/cumulative-product",
+                    "cookbook/sql/finance/vwap",
+                    "cookbook/sql/finance/bollinger-bands",
+                    "cookbook/sql/finance/tick-trin",
+                    "cookbook/sql/finance/volume-profile",
+                    "cookbook/sql/finance/volume-spike",
+                    "cookbook/sql/finance/rolling-stddev",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "Time-Series Patterns",
+                  collapsed: true,
+                  items: [
+                    "cookbook/sql/time-series/force-designated-timestamp",
+                    "cookbook/sql/time-series/latest-n-per-partition",
+                    "cookbook/sql/time-series/session-windows",
+                    "cookbook/sql/time-series/latest-activity-window",
+                    "cookbook/sql/time-series/filter-by-week",
+                    "cookbook/sql/time-series/distribute-discrete-values",
+                    "cookbook/sql/time-series/epoch-timestamps",
+                    "cookbook/sql/time-series/sample-by-interval-bounds",
+                    "cookbook/sql/time-series/remove-outliers",
+                    "cookbook/sql/time-series/fill-from-one-column",
+                    "cookbook/sql/time-series/fill-prev-with-history",
+                    "cookbook/sql/time-series/fill-keyed-arbitrary-interval",
+                    "cookbook/sql/time-series/sparse-sensor-data",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "Advanced SQL",
+                  collapsed: true,
+                  items: [
+                    "cookbook/sql/advanced/rows-before-after-value-match",
+                    "cookbook/sql/advanced/local-min-max",
+                    "cookbook/sql/advanced/top-n-plus-others",
+                    "cookbook/sql/advanced/pivot-with-others",
+                    "cookbook/sql/advanced/unpivot-table",
+                    "cookbook/sql/advanced/sankey-funnel",
+                    "cookbook/sql/advanced/conditional-aggregates",
+                    "cookbook/sql/advanced/general-and-sampled-aggregates",
+                    "cookbook/sql/advanced/consistent-histogram-buckets",
+                    "cookbook/sql/advanced/array-from-string",
+                  ],
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "Integrations",
+              collapsed: true,
+              items: [
+                "cookbook/integrations/opcua-dense-format",
+                {
+                  type: "category",
+                  label: "Grafana",
+                  collapsed: true,
+                  items: [
+                    "cookbook/integrations/grafana/dynamic-table-queries",
+                    "cookbook/integrations/grafana/read-only-user",
+                    "cookbook/integrations/grafana/variable-dropdown",
+                    "cookbook/integrations/grafana/overlay-timeshift",
+                  ],
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "Programmatic",
+              collapsed: true,
+              items: [
+                "cookbook/programmatic/tls-ca-configuration",
+                {
+                  type: "category",
+                  label: "PHP",
+                  items: [
+                    "cookbook/programmatic/php/inserting-ilp",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "Ruby",
+                  items: [
+                    "cookbook/programmatic/ruby/inserting-ilp",
+                  ],
+                },
+                {
+                  type: "category",
+                  label: "C++",
+                  items: [
+                    "cookbook/programmatic/cpp/missing-columns",
+                  ],
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "Operations",
+              collapsed: true,
+              items: [
+                "cookbook/operations/docker-compose-config",
+                "cookbook/operations/store-questdb-metrics",
+                "cookbook/operations/csv-import-milliseconds",
+                "cookbook/operations/tls-pgbouncer",
+                "cookbook/operations/copy-data-between-instances",
+                "cookbook/operations/query-times-histogram",
+                "cookbook/operations/optimize-many-tables",
+                "cookbook/operations/check-transaction-applied",
+                "cookbook/operations/show-non-default-params",
+              ],
+            },
+          ],
+        },
         {
           id: "tutorials/order-book",
           label: "Order Book Analytics",
@@ -728,6 +868,11 @@ module.exports = {
           label: "Ingest L2 order book data",
           type: "link",
           href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
+        },
+        {
+          label: "OHLC with materialized views",
+          type: "link",
+          href: "https://questdb.com/blog/how-to-create-a-materialized-view/",
         },
         "tutorials/influxdb-migration",
         {

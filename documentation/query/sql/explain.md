@@ -54,7 +54,7 @@ The following list contains some plan node types:
   designated timestamp predicates. Scan endpoints are found via a binary search
   on timestamp column.
 - `CachedWindow` - container for window functions that copies data to memory and
-  sorts it, e.g. [row_number()](/docs/query/functions/window/#row_number)
+  sorts it, e.g. [row_number()](/docs/query/functions/window-functions/reference#row_number)
 - `Window` - container for window functions optimized for frames ordered by
   designated timestamp. Instead of copying the underlying dataset to memory it
   buffers just enough per-partition values to compute function result.

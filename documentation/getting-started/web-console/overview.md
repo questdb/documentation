@@ -38,6 +38,12 @@ The **Code Editor** is where you write and execute SQL queries with features lik
 
 [Learn more about Code Editor →](/docs/getting-started/web-console/code-editor)
 
+### AI Assistant
+
+The **AI Assistant** provides intelligent query assistance directly in the Web Console using AI-powered explanations and suggestions. It helps you write, understand, and fix SQL queries while maintaining complete control over your data and API keys through a Bring Your Own Key (BYOK) model.
+
+[Learn more about AI Assistant →](/docs/getting-started/web-console/questdb-ai)
+
 ### Metrics View
 
 The **Metrics View** provides real-time monitoring and telemetry capabilities for your QuestDB instance. It displays interactive charts and widgets to track database performance, WAL operations, and table-specific metrics.
