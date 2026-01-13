@@ -17,7 +17,7 @@ SELECT * FROM my_tb
 WHERE timestamp > dateadd('m', -15, now());
 ```
 
-But that would give you the last 15 minutes, not the last 15 minutes of activity in your table. Supposing the last timestamp recorded in your table was `2025-03-23T07:24:37.000000Z`, then you would like to get the data from `2025-03-23T07:09:37.000000Z` to `2025-03-23T07:24:37.000000Z`.
+But that would give you the last 15 minutes, not the last 15 minutes of activity in your table. Assuming the last timestamp recorded in your table was `2025-03-23T07:24:37.000000Z`, then you would like to get the data from `2025-03-23T07:09:37.000000Z` to `2025-03-23T07:24:37.000000Z`.
 
 ## Solution
 
