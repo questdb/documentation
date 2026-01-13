@@ -20,7 +20,9 @@ FROM trades
 WHERE timestamp BETWEEN 1746552420000000 AND 1746811620000000;
 ```
 
-**Note:** If you have epoch values in milliseconds, you need to multiply by 1000 to convert to microseconds.
+:::note  Millisecond Resolution
+If you have epoch values in milliseconds, you need to multiply by 1000 to convert to microseconds.
+:::
 
 Nanoseconds can be used when the timestamp column is of type `timestamp_ns`.
 
