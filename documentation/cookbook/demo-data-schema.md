@@ -6,6 +6,10 @@ description: Schema and structure of the FX market data and cryptocurrency trade
 
 The [QuestDB demo instance at demo.questdb.io](https://demo.questdb.io) contains two datasets that you can query directly: simulated FX market data and real cryptocurrency trades. This page describes the available tables and their structure.
 
+:::tip
+The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/getting-started/quick-start/) for installation instructions.
+:::
+
 ## Overview
 
 The demo instance provides two independent datasets:
@@ -15,15 +19,15 @@ The demo instance provides two independent datasets:
 
 ---
 
-# FX Market Data (Simulated)
+## FX Market Data (Simulated)
 
 The FX dataset contains simulated foreign exchange market data for 30 currency pairs. We fetch real reference prices from Yahoo Finance every few seconds, but all order book levels and price updates are generated algorithmically based on these reference prices.
 
-## core_price Table
+### core_price Table
 
 The `core_price` table contains individual FX price updates from various liquidity providers. Each row represents a bid/ask quote update for a specific currency pair from a specific ECN.
 
-### Schema
+#### Schema
 
 ```sql title="core_price table structure"
 CREATE TABLE 'core_price' (
@@ -40,7 +44,7 @@ CREATE TABLE 'core_price' (
 ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS WAL;
 ```
 
-### Columns
+#### Columns
 
 - **`timestamp`** - Time of the price update (designated timestamp)
 - **`symbol`** - Currency pair from the 30 tracked symbols (see list below)
@@ -54,7 +58,7 @@ CREATE TABLE 'core_price' (
 
 The table tracks **30 currency pairs**: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD, EURJPY, GBPJPY, EURGBP, AUDJPY, CADJPY, NZDJPY, EURAUD, EURNZD, AUDNZD, GBPAUD, GBPNZD, AUDCAD, NZDCAD, EURCAD, EURCHF, GBPCHF, USDNOK, USDSEK, USDZAR, USDMXN, USDSGD, USDHKD, USDTRY.
 
-### Sample Data
+#### Sample Data
 
 ```questdb-sql demo title="Recent core_price updates"
 SELECT * FROM core_price
@@ -77,11 +81,11 @@ LIMIT -10;
 | 2025-12-18T11:46:13.066700Z | CADJPY | Currenex | 113.63    | 20300827   | 114.11    | 19720915   | normal          | 0.55       |            |
 | 2025-12-18T11:46:13.071607Z | NZDJPY | Currenex | 89.95     | 35284228   | 90.46     | 30552528   | liquidity_event | 0.69       |            |
 
-## market_data Table
+### market_data Table
 
 The `market_data` table contains order book snapshots for currency pairs. Each row represents a complete view of the order book at a specific timestamp, with bid and ask prices and volumes stored as 2D arrays.
 
-### Schema
+#### Schema
 
 ```sql title="market_data table structure"
 CREATE TABLE 'market_data' (
@@ -92,7 +96,7 @@ CREATE TABLE 'market_data' (
 ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;
 ```
 
-### Columns
+#### Columns
 
 - **`timestamp`** - Time of the order book snapshot (designated timestamp)
 - **`symbol`** - Currency pair (e.g., EURUSD, GBPJPY)
@@ -105,7 +109,7 @@ The arrays are structured so that:
 - `asks[1]` contains ask prices (ascending order - lowest first)
 - `asks[2]` contains corresponding ask volumes
 
-### Sample Query
+#### Sample Query
 
 ```questdb-sql demo title="Recent order book snapshots"
 SELECT timestamp, symbol,
@@ -128,11 +132,11 @@ LIMIT -5;
 
 Each order book snapshot contains 40 bid levels and 40 ask levels.
 
-## fx_trades Table
+### fx_trades Table
 
 The `fx_trades` table contains simulated FX trade executions. Each row represents a trade that executed against the order book, with realistic partial fills and level walking.
 
-### Schema
+#### Schema
 
 ```sql title="fx_trades table structure"
 CREATE TABLE 'fx_trades' (
@@ -149,7 +153,7 @@ CREATE TABLE 'fx_trades' (
 ) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH WAL;
 ```
 
-### Columns
+#### Columns
 
 - **`timestamp`** - Time of trade execution with nanosecond precision (designated timestamp)
 - **`symbol`** - Currency pair (same 30 pairs as `core_price`)
@@ -162,7 +166,7 @@ CREATE TABLE 'fx_trades' (
 - **`counterparty`** - 20-character LEI (Legal Entity Identifier) of the counterparty
 - **`order_id`** - Parent order identifier (multiple trades can share the same `order_id` for partial fills)
 
-### Sample Data
+#### Sample Data
 
 ```questdb-sql demo title="Recent FX trades"
 SELECT * FROM fx_trades
@@ -185,29 +189,29 @@ LIMIT -10;
 | 2026-01-12T12:18:57.509773474Z | GBPUSD | Currenex | ae6b771b-5abd-44c7-9e0e-3527ce6fb5b4 | sell | false   | 1.3404  | 62305.0  | 006728CF215E44412D18 | 54ff8191-1891-4a5c-8b67-d5cd961ec5e8 |
 | 2026-01-12T12:18:57.334732460Z | USDTRY | EBS      | 469637a5-6553-4aad-aad9-f7114c8a442d | sell | true    | 43.1    | 101177.0 | 002CAC92E93AB4B3D30C | 2ce77a03-0f21-4241-8ca7-903080848dc0 |
 
-## FX Materialized Views
+### FX Materialized Views
 
 The FX dataset includes several materialized views providing pre-aggregated data at different time intervals:
 
-### Best Bid/Offer (BBO) Views
+#### Best Bid/Offer (BBO) Views
 
 - **`bbo_1s`** - Best bid and offer aggregated every 1 second
 - **`bbo_1m`** - Best bid and offer aggregated every 1 minute
 - **`bbo_1h`** - Best bid and offer aggregated every 1 hour
 - **`bbo_1d`** - Best bid and offer aggregated every 1 day
 
-### Core Price Aggregations
+#### Core Price Aggregations
 
 - **`core_price_1s`** - Core prices aggregated every 1 second
 - **`core_price_1d`** - Core prices aggregated every 1 day
 
-### Market Data OHLC
+#### Market Data OHLC
 
 - **`market_data_ohlc_1m`** - Open, High, Low, Close candlesticks at 1-minute intervals
 - **`market_data_ohlc_15m`** - OHLC candlesticks at 15-minute intervals
 - **`market_data_ohlc_1d`** - OHLC candlesticks at 1-day intervals
 
-### FX Trades OHLC
+#### FX Trades OHLC
 
 - **`fx_trades_ohlc_1m`** - OHLC candlesticks from trade executions at 1-minute intervals
 - **`fx_trades_ohlc_1h`** - OHLC candlesticks from trade executions at 1-hour intervals
@@ -222,15 +226,15 @@ These views are continuously updated and optimized for dashboard and analytics q
 
 ---
 
-# Cryptocurrency Trades (Real)
+## Cryptocurrency Trades (Real)
 
 The cryptocurrency dataset contains **real market data** streamed live from the OKX exchange using FeedHandler. These are actual executed trades, not simulated data.
 
-## trades Table
+### trades Table
 
 The `trades` table contains real cryptocurrency trade data. Each row represents an actual executed trade for a cryptocurrency pair.
 
-### Schema
+#### Schema
 
 ```sql title="trades table structure"
 CREATE TABLE 'trades' (
@@ -242,7 +246,7 @@ CREATE TABLE 'trades' (
 ) timestamp(timestamp) PARTITION BY DAY WAL;
 ```
 
-### Columns
+#### Columns
 
 - **`timestamp`** - Time when the trade was executed (designated timestamp)
 - **`symbol`** - Cryptocurrency trading pair from the 12 tracked symbols (see list below)
@@ -252,7 +256,7 @@ CREATE TABLE 'trades' (
 
 The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USD, BTC-USDT, DAI-USD, DOT-USD, ETH-BTC, ETH-USDT, LTC-USD, SOL-BTC, SOL-USD, UNI-USD, XLM-USD.
 
-### Sample Data
+#### Sample Data
 
 ```questdb-sql demo title="Recent cryptocurrency trades"
 SELECT * FROM trades
@@ -274,11 +278,11 @@ LIMIT -10;
 | ETH-USDT | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
 | ETH-USD  | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
 
-## Cryptocurrency Materialized Views
+### Cryptocurrency Materialized Views
 
 The cryptocurrency dataset includes materialized views for aggregated trade data:
 
-### Trades Aggregations
+#### Trades Aggregations
 
 - **`trades_latest_1d`** - Latest trade data aggregated daily
 - **`trades_OHLC_15m`** - OHLC candlesticks for cryptocurrency trades at 15-minute intervals
@@ -301,9 +305,7 @@ These views are continuously updated and provide faster query performance for cr
 
 You can run queries against both datasets directly on [demo.questdb.com](https://demo.questdb.io). Throughout the Cookbook, recipes using demo data will include a direct link to execute the query.
 
-:::tip
-The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/getting-started/quick-start/) for installation instructions.
-:::
+
 
 :::info Related Documentation
 - [SYMBOL type](/docs/concepts/symbol/)
