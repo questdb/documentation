@@ -48,7 +48,7 @@ This returns the minimum and maximum bid price from 1 second before to 1 second 
 | WINDOW JOIN | You need to look at both past and future data |
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [WINDOW JOIN](/docs/query/sql/window-join/)
 - [MIN/MAX aggregate functions](/docs/query/functions/aggregation/#min)
 :::

@@ -83,6 +83,6 @@ SELECT * FROM EventsFullInfo;
 ```
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
-- [LAG function](/docs/query/functions/window/#lag)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [LAG function](/docs/query/functions/window-functions/reference/#lag)
 :::
