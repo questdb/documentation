@@ -6,6 +6,10 @@ description: Configure PgBouncer to provide TLS termination for QuestDB PostgreS
 
 Configure PgBouncer to provide TLS termination for QuestDB Open Source PostgreSQL wire protocol connections.
 
+:::note QuestDB Enterprise
+For QuestDB Enterprise, there is native TLS support, so you can connect directly with TLS or use PgBouncer with full TLS end-to-end encryption.
+:::
+
 ## Solution: TLS Termination at PgBouncer
 
 QuestDB Open Source does not implement TLS on the PostgreSQL wire protocol, so TLS termination needs to be done at the PgBouncer level.
@@ -44,9 +48,7 @@ psql "host=127.0.0.1 port=5432 dbname=questdb user=admin sslmode=require"
 Traffic will be unencrypted between PgBouncer and QuestDB. This setup is only suitable when both services run on the same host or within a trusted network.
 :::
 
-:::note QuestDB Enterprise
-For QuestDB Enterprise, there is native TLS support, so you can connect directly with TLS or use PgBouncer with full TLS end-to-end encryption.
-:::
+
 
 :::info Related Documentation
 - [PostgreSQL wire protocol](/docs/query/pgwire/overview/)

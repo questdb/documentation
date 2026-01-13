@@ -6,6 +6,11 @@ description: Create histogram of query execution times using _query_trace table
 
 Create a histogram of query execution times using the `_query_trace` system table.
 
+
+:::note Enable Query Tracing
+[Query tracing](/docs/concepts/deep-dive/query-tracing/) needs to be enabled for the `_query_trace` table to be populated.
+:::
+
 ## Solution: Percentile-Based Histogram
 
 We can create a subquery that first calculates the percentiles for each bucket, in this case at 10% intervals. Then on a second query we can do a `UNION` of 10 subqueries where each is doing a `CROSS JOIN` against the calculated percentiles and finding how many queries are below the threshold for the bucket.
@@ -103,9 +108,6 @@ FROM _query_trace CROSS JOIN quantiles
 "100",1078759.0,267
 ```
 
-:::note Enable Query Tracing
-Query tracing needs to be enabled for the `_query_trace` table to be populated. See the [configuration documentation](/docs/configuration/overview/) for details.
-:::
 
 :::info Related Documentation
 - [Query tracing](/docs/concepts/deep-dive/query-tracing/)
