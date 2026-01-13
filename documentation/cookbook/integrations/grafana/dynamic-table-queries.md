@@ -114,41 +114,6 @@ WHERE table_name LIKE 'sensor_%'
   AND table_name NOT IN ('sensor_test', 'sensor_backup')
 ```
 
-**Different aggregation functions:**
-```sql
--- Maximum values
-SELECT string_agg(concat('max(', table_name, '.value)'), ',')
-
--- Sum values
-SELECT string_agg(concat('sum(', table_name, '.value)'), ',')
-
--- Last values (no aggregation needed)
-SELECT string_agg(concat(table_name, '.value'), ',')
-```
-
-**Different join strategies:**
-```sql
--- INNER JOIN (only rows with data in all tables)
-SELECT replace(names, ',', ' INNER JOIN ')
-
--- LEFT JOIN (all rows from first table)
-SELECT replace(names, ',', ' LEFT JOIN ')
-
--- Add ON clause for explicit joins
-SELECT replace(names, ',', ' LEFT JOIN ') || ' ON timestamp'
-```
-
-**Custom column names:**
-```sql
--- Cleaner column names in the chart
-SELECT string_agg(
-  concat('avg(', table_name, '.value) AS ', replace(table_name, 'sensor_', '')),
-  ','
-)
-```
-
-Output: `avg(sensor_1.value) AS 1,avg(sensor_2.value) AS 2,...`
-
 ## Programmatic Alternative
 
 If you're not using Grafana, you can achieve the same result programmatically:
