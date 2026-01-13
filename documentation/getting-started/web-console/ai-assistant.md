@@ -81,7 +81,7 @@ The Chat Window is the primary interface for interacting with the AI Assistant.
 
 Access the AI Assistant through multiple methods:
 
-- Click the AI icon in the right sidebar
+- Clicking the AI icon in the right sidebar, opens the latest chat
 
 
 <Screenshot
@@ -92,7 +92,7 @@ Access the AI Assistant through multiple methods:
 />
 
 
-- Click the AI icon next to a query in the Code Editor. **An icon with borders indicates that there is an existing chat for this query.**
+- Click the AI icon next to a query in the Code Editor opens a chat for the query. **An icon with borders indicates that there is an existing chat for this query.**
 
 
 <Screenshot
@@ -103,7 +103,7 @@ Access the AI Assistant through multiple methods:
 />
 
 
-- Click "Explain schema with AI" from the table context menu to trigger a schema explanation for a table, materialized view, or a view. This action opens a chat window for the selected table.
+- Click "Explain schema with AI" from the table context menu triggers a schema explanation for a table, materialized view, or a view. This action opens a chat window for the selected table.
 
 
 <Screenshot
@@ -157,7 +157,7 @@ When you open a chat for a query with no conversation history, you can see quick
   height={328}
 />
 
-- **Explain Query**: Useful for understanding complex queries or learning QuestDB SQL
+- **Explain Query**: Useful for understanding complex queries
 
 - **Fix Query**: Appears automatically when a query has an execution error. The AI Assistant analyzes the error and suggests a corrected version
 
@@ -173,10 +173,11 @@ The AI Assistant can provide query suggestions when you prompt it to generate, r
 />
 
 Several actions can be taken using the diff editor:
-- **Run**: Execute the suggested query using the Run icon in the diff editor header
-- **Accept**: Apply the suggestion to the editor and mark it as accepted. The AI Assistant will use the accepted query as the basis for future suggestions
-- **Reject**: Reject the suggestion and notify the model about the rejection
-- **Apply to Editor**: Insert the suggestion into your editor using the "Apply to editor" button in the diff editor header. This action is available for all queries in the history
+- **Run**: Execute the suggested query using the Run icon in the diff editor header.
+- **Accept**: Apply the suggestion to the editor and mark it as accepted. The AI Assistant will use the accepted query as the basis for future suggestions.
+- **Reject**: Reject the suggestion and notify the model about the rejection.
+- **Apply to Editor**: Insert the suggestion into your editor using the "Apply to editor" button in the diff editor header. This action is available for all queries in the history.
+- **Open in editor**: Expands the diff view to an editor tab. You can accept or reject the suggestion from editor as well.
 
 ### Status Indicators
 The AI Assistant shows its reasoning process in expandable sections. You can investigate the reviewed documentation and tables by expanding individual status indicators.
@@ -187,7 +188,7 @@ Click the red stop button during AI operations to cancel the current response. T
 
 ## Tips for Using AI Assistant
 
-- Keep conversations focused on single queries for better contextual accuracy
+- Keep conversations focused on a single query or table for better contextual accuracy
 - Use the Explain feature to understand complex SQL patterns and QuestDB-specific syntax
 - Use the Fix feature when queries fail to get immediate troubleshooting assistance
 - Enable schema access for more accurate suggestions about your specific tables
