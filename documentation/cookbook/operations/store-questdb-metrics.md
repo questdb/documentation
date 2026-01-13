@@ -44,11 +44,11 @@ This is a `telegraf.conf` configuration which works (using default ports):
 ```
 
 A few things to note:
-* I omit the hostname, so I don't end up with an extra column I don't need. If I was monitoring several QuestDB instances, it would be good to keep it.
-* I set the `url_tag` to blank because of the same reason. By default the Prometheus plugin for Telegraf adds the url as an extra column and we don't need it.
-* I am using `metric_version` 2 for the input plugin. This is to make sure I get all the metrics into a single table, rather than one table for each different metric, which I find annoying.
-* I am using the aggregator so metrics get rolled-up into a single row per data point (with multiple columns), rather than one row per metric. Without the aggregator it works fine, but you end up with a very sparse table.
-* On my config, I used a different hostname for the QuestDB output, so we can collect metrics on a different instance. For production this would be a best practice, but for development you can just use the same host you are monitoring.
+* `omit_hostname` avoids an extra column. When monitoring multiple QuestDB instances, keep it enabled.
+* `url_tag` is set to blank for the same reason - by default the Prometheus plugin adds the URL as an extra column.
+* `metric_version = 2` ensures all metrics go into a single table, rather than one table per metric.
+* The `aggregators.merge` plugin rolls up metrics into a single row per data point (with multiple columns), rather than one row per metric. Without it, the table becomes very sparse.
+* The config uses a different hostname for the QuestDB output to collect metrics on a separate instance. This is recommended for production, but for development the same host can be used.
 
 :::info Related Documentation
 - [QuestDB metrics](/docs/operations/logging-metrics/)

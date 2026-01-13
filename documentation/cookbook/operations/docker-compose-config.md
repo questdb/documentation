@@ -19,6 +19,21 @@ For example:
 - `pg.password` becomes `QDB_PG_PASSWORD`
 - `cairo.sql.copy.buffer.size` becomes `QDB_CAIRO_SQL_COPY_BUFFER_SIZE`
 
+:::tip
+Keep sensitive configuration like passwords in a `.env` file and reference them in `docker-compose.yml`:
+
+```yaml
+environment:
+  - QDB_PG_PASSWORD=${QUESTDB_PASSWORD}
+```
+
+Then create a `.env` file:
+```
+QUESTDB_PASSWORD=your_secure_password
+```
+:::
+
+
 ## Example: Custom PostgreSQL Credentials
 
 This Docker Compose file overrides the default PostgreSQL wire protocol credentials:
@@ -51,33 +66,14 @@ This configuration:
 - Persists data to `./questdb/questdb_root` on the host machine
 - Exposes all QuestDB ports (web console, HTTP, ILP, PostgreSQL wire)
 
-## Common Configuration Examples
 
-### Increase Write Buffer Size
 
-```yaml title="Increase buffer sizes for high-throughput writes"
-environment:
-  - QDB_CAIRO_SQL_COPY_BUFFER_SIZE=4194304
-  - QDB_LINE_TCP_MAINTENANCE_JOB_INTERVAL=500
-```
 
-### Configure Memory Limits
+:::warning Volume Permissions
+If you encounter permission errors with mounted volumes, ensure the QuestDB container user has write access to the host directory. You may need to set ownership with `chown -R 1000:1000 ./questdb_root` or run the container with a specific user ID.
+:::
 
-```yaml title="Set memory allocation for query execution"
-environment:
-  - QDB_CAIRO_SQL_PAGE_FRAME_MAX_ROWS=1000000
-  - QDB_CAIRO_SQL_PAGE_FRAME_MIN_ROWS=100000
-```
-
-### Enable Debug Logging
-
-```yaml title="Enable verbose logging for troubleshooting"
-environment:
-  - QDB_LOG_LEVEL=DEBUG
-  - QDB_LOG_BUFFER_SIZE=1048576
-```
-
-### Custom Data Directory Permissions
+## Custom Data Directory Permissions
 
 ```yaml title="Run with specific user/group for volume permissions"
 services:
@@ -96,39 +92,8 @@ For a full list of available configuration parameters, see:
 - [Server Configuration Reference](/docs/configuration/overview/) - All configurable parameters with descriptions
 - [Docker Deployment Guide](/docs/deployment/docker/) - Docker-specific setup instructions
 
-## Verifying Configuration
 
-After starting QuestDB with custom configuration, verify the settings:
 
-1. **Check logs**: View container logs to confirm configuration was applied:
-   ```bash
-   docker compose logs questdb
-   ```
-
-2. **Query system tables**: Connect via PostgreSQL wire protocol and query configuration:
-   ```sql
-   SELECT * FROM sys.config;
-   ```
-
-3. **Web console**: Access the web console at `http://localhost:9000` and check the "Configuration" tab
-
-:::tip
-Keep sensitive configuration like passwords in a `.env` file and reference them in `docker-compose.yml`:
-
-```yaml
-environment:
-  - QDB_PG_PASSWORD=${QUESTDB_PASSWORD}
-```
-
-Then create a `.env` file:
-```
-QUESTDB_PASSWORD=your_secure_password
-```
-:::
-
-:::warning Volume Permissions
-If you encounter permission errors with mounted volumes, ensure the QuestDB container user has write access to the host directory. You may need to set ownership with `chown -R 1000:1000 ./questdb_root` or run the container with a specific user ID.
-:::
 
 :::info Related Documentation
 - [Server Configuration](/docs/configuration/overview/)
