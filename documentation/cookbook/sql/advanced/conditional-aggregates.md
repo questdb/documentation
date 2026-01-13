@@ -1,5 +1,5 @@
 ---
-title: Multiple Conditional Aggregates
+title: Multiple conditional aggregates
 sidebar_label: Conditional aggregates
 description: Calculate multiple conditional aggregates in a single query using CASE expressions
 ---
@@ -18,7 +18,7 @@ You need to calculate various metrics from the same dataset with different condi
 
 Running separate queries is inefficient.
 
-## Solution: CASE Within Aggregate Functions
+## Solution: CASE within aggregate functions
 
 Use CASE expressions inside aggregates to calculate all metrics in one query:
 
@@ -38,9 +38,9 @@ WHERE timestamp >= dateadd('d', -1, now())
 GROUP BY symbol;
 ```
 
-## How It Works
+## How it works
 
-### CASE Returns NULL for Non-Matching Rows
+### CASE returns NULL for non-matching rows
 
 ```sql
 count(CASE WHEN side = 'buy' THEN 1 END)
@@ -51,7 +51,7 @@ count(CASE WHEN side = 'buy' THEN 1 END)
 - `count()` only counts non-NULL values
 - Result: counts only rows where side is 'buy'
 
-### Aggregate Functions Ignore NULL
+### Aggregate functions ignore NULL
 
 ```sql
 avg(CASE WHEN side = 'buy' THEN price END)

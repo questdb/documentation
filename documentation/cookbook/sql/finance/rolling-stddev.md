@@ -1,5 +1,5 @@
 ---
-title: Rolling Standard Deviation
+title: Rolling standard deviation
 sidebar_label: Rolling std dev
 description: Calculate rolling standard deviation using window functions and CTEs
 ---

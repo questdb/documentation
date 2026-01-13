@@ -1,12 +1,12 @@
 ---
-title: Insert Data from PHP Using ILP
+title: Insert data from PHP using ILP
 sidebar_label: Inserting via ILP
 description: Send time-series data from PHP to QuestDB using the InfluxDB Line Protocol
 ---
 
 QuestDB doesn't maintain an official PHP library, but since the ILP (InfluxDB Line Protocol) is text-based, you can easily send your data using PHP's built-in HTTP or socket functions, or use the official InfluxDB PHP client library.
 
-## Available Approaches
+## Available approaches
 
 This guide covers three methods for sending ILP data to QuestDB from PHP:
 
@@ -26,7 +26,7 @@ This guide covers three methods for sending ILP data to QuestDB from PHP:
    - No acknowledgments - data loss possible
    - Manual implementation required
 
-## ILP Protocol Overview
+## ILP protocol overview
 
 The ILP protocol allows you to send data to QuestDB using a simple line-based text format:
 
@@ -49,7 +49,7 @@ The format consists of:
 
 For complete ILP specification, see the [ILP reference documentation](/docs/ingestion/ilp/overview/).
 
-## ILP Over HTTP
+## ILP over HTTP
 
 QuestDB supports ILP data via HTTP or TCP. **HTTP is the recommended approach** for most use cases as it provides better reliability and easier debugging.
 
@@ -59,7 +59,7 @@ To send data via HTTP:
 3. Include ILP-formatted rows in the request body
 4. For higher throughput, batch multiple rows in a single request
 
-### HTTP Buffering Example
+### HTTP buffering example
 
 The following PHP class provides buffered insertion with automatic flushing based on either row count or elapsed time:
 
@@ -168,7 +168,7 @@ This class:
 For production use, consider adding error handling to check the HTTP response status and implement retry logic for failed requests.
 :::
 
-## Using the InfluxDB v2 PHP Client
+## Using the InfluxDB v2 PHP client
 
 Another approach is to use the official [InfluxDB PHP client library](https://github.com/influxdata/influxdb-client-php), which supports the InfluxDB v2 write API. QuestDB is compatible with this API, making the client library a convenient option.
 
@@ -201,7 +201,7 @@ When using the InfluxDB client with QuestDB:
 QuestDB only supports the **InfluxDB v2 write API** when using this client. Query operations are not supported through the InfluxDB client - use QuestDB's PostgreSQL wire protocol or REST API for queries instead.
 :::
 
-### Example Code
+### Example code
 
 ```php title="Using InfluxDB v2 PHP client with QuestDB"
 <?php
@@ -254,7 +254,7 @@ $client->close();
 ?>
 ```
 
-### Benefits and Limitations
+### Benefits and limitations
 
 The Point builder provides several advantages:
 - **Automatic ILP formatting and escaping** - No need to manually construct ILP strings
@@ -270,7 +270,7 @@ The InfluxDB PHP client **cannot be used with custom timestamps** when writing t
 **If you need client-side timestamps:** Use the raw HTTP cURL approach (documented above) where you manually format the ILP string with full control over timestamp formatting.
 :::
 
-## ILP Over TCP Socket
+## ILP over TCP socket
 
 TCP over socket provides higher throughput but is less reliable than HTTP. The message format is identical - only the transport changes.
 
@@ -279,7 +279,7 @@ Use TCP when:
 - Your application can handle potential data loss on connection failures
 - You're willing to implement your own connection management and error handling
 
-### TCP Socket Example
+### TCP socket example
 
 Here's a basic example using PHP's socket functions:
 
@@ -337,7 +337,7 @@ For production use with TCP, you should:
 TCP ILP does not provide acknowledgments for successful writes. If the connection drops, you may lose data without notification. For critical data, use HTTP ILP instead.
 :::
 
-## Choosing the Right Approach
+## Choosing the right approach
 
 | Feature | HTTP (cURL) | HTTP (InfluxDB Client) | TCP Socket |
 |---------|-------------|------------------------|------------|

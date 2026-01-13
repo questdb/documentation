@@ -1,5 +1,5 @@
 ---
-title: Volume Spike Detection
+title: Volume spike detection
 sidebar_label: Volume spikes
 description: Detect volume spikes by comparing current volume against previous volume using LAG
 ---

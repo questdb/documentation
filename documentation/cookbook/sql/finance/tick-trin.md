@@ -1,16 +1,16 @@
 ---
-title: Cumulative Tick and Trin Indicators
+title: Cumulative tick and trin indicators
 sidebar_label: Tick & Trin
 description: Calculate cumulative Tick and Trin (ARMS Index) for market sentiment analysis and breadth indicators
 ---
 
 Calculate cumulative Tick and Trin (also known as the ARMS Index) to measure market sentiment and breadth. These indicators compare advancing versus declining trades in terms of both count and volume, helping identify overbought/oversold conditions and potential market reversals.
 
-## Problem: Calculate Running Market Breadth
+## Problem: Calculate running market breadth
 
 You have a table with trade data including `side` (buy/sell) and `quantity`, and want to calculate cumulative Tick and Trin values throughout the trading day. Tick measures the ratio of upticks to downticks, while Trin (Trading Index) adjusts this ratio by volume to identify divergences between price action and volume.
 
-## Solution: Use Window Functions with CASE Statements
+## Solution: Use window functions with CASE statements
 
 Use `SUM` as a window function combined with `CASE` statements to compute running totals of upticks, downticks, and their respective volumes:
 
@@ -60,7 +60,7 @@ The first rows will have NULL values for tick and trin until there's at least on
 
 Each row shows the cumulative values from the start of the day, with Tick and Trin calculated at every trade.
 
-## How It Works
+## How it works
 
 The indicators are calculated using these formulas:
 
@@ -82,7 +82,7 @@ The query uses:
 2. **CASE statements**: Conditionally sum only trades matching the specified side
 3. **Type casting**: Using `1.0` instead of `1` ensures results are doubles, avoiding explicit casting
 
-### Interpreting the Indicators
+### Interpreting the indicators
 
 **Tick Indicator:**
 - **Tick > 1.0**: More buying pressure (bullish sentiment)
@@ -100,7 +100,7 @@ When Tick and Trin move in opposite directions, it can signal important market c
 - High Tick + High Trin: Advances lack volume confirmation (bearish divergence)
 - Low Tick + Low Trin: Declines lack volume confirmation (bullish divergence)
 
-## Adapting the Query
+## Adapting the query
 
 **Multiple symbols:**
 ```questdb-sql demo title="Tick and Trin for multiple symbols"

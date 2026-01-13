@@ -1,5 +1,5 @@
 ---
-title: Distribute Discrete Values Across Time Intervals
+title: Distribute discrete values across time intervals
 sidebar_label: Distribute discrete values
 description: Spread cumulative measurements across time intervals using sessions and window functions
 ---

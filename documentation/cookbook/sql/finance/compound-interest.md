@@ -1,5 +1,5 @@
 ---
-title: Calculate Compound Interest
+title: Calculate compound interest
 sidebar_label: Compound interest
 description: Calculate compound interest over time using POWER and window functions
 ---
@@ -10,11 +10,11 @@ Calculate compound interest over multiple periods using SQL, where each period's
 This query uses generated data from `long_sequence()` to create a time series of years, so it can run directly on the demo instance without requiring any existing tables.
 :::
 
-## Problem: Need Year-by-Year Growth
+## Problem: Need year-by-year growth
 
 You want to calculate compound interest over 5 years, starting with an initial principal of 1000, with an annual interest rate of 0.1 (10%). Each year's interest should be calculated on the previous year's ending balance.
 
-## Solution: Use POWER Function with Window Functions
+## Solution: Use POWER function with window functions
 
 Combine the `POWER()` function with `FIRST_VALUE()` window function to calculate compound interest:
 
@@ -74,7 +74,7 @@ from compounding_year_before;
 
 Each row shows how the principal grows year over year, with interest compounding on the previous year's ending balance.
 
-## How It Works
+## How it works
 
 The query uses a multi-step CTE approach:
 

@@ -1,16 +1,16 @@
 ---
-title: Bollinger Bands
+title: Bollinger bands
 sidebar_label: Bollinger Bands
 description: Calculate Bollinger Bands using window functions for volatility analysis and mean reversion trading strategies
 ---
 
 Calculate Bollinger Bands for volatility analysis and mean reversion trading. Bollinger Bands consist of a moving average with upper and lower bands set at a specified number of standard deviations above and below it. They help identify overbought/oversold conditions and measure market volatility.
 
-## Problem: Calculate Rolling Bands with Standard Deviation
+## Problem: Calculate rolling bands with standard deviation
 
 You want to calculate Bollinger Bands with a 20-period simple moving average (SMA) and bands at ±2 standard deviations. The challenge is that QuestDB doesn't support `STDDEV` as a window function, so you need a workaround using the mathematical relationship between variance and standard deviation.
 
-## Solution: Calculate Variance Using Window Functions
+## Solution: Calculate variance using window functions
 
 Since standard deviation is the square root of variance, and variance is the average of squared differences from the mean, we can calculate it using window functions:
 
@@ -58,7 +58,7 @@ This query:
 4. Computes standard deviation using the mathematical identity: `σ = √(E[X²] - E[X]²)`
 5. Adds/subtracts 2× standard deviation to create upper and lower bands
 
-## How It Works
+## How it works
 
 The mathematical relationship used here is:
 
@@ -78,11 +78,11 @@ Breaking down the calculation:
 3. **`sqrt(avg_close_sq - (sma20 * sma20))`**: Standard deviation derived from variance
 4. **Upper/Lower bands**: SMA ± (multiplier × standard deviation)
 
-### Window Frame Clause
+### Window frame clause
 
 `ROWS BETWEEN 19 PRECEDING AND CURRENT ROW` creates a sliding window of exactly 20 rows (19 previous + current), which gives us the 20-period moving calculations required for standard Bollinger Bands.
 
-## Adapting the Parameters
+## Adapting the parameters
 
 **Different period lengths:**
 ```sql

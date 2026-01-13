@@ -1,5 +1,5 @@
 ---
-title: FILL PREV with Historical Values
+title: FILL PREV with historical values
 sidebar_label: FILL PREV with history
 description: Use FILL(PREV) with a filler row to carry historical values into a filtered time interval
 ---

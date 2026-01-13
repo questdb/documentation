@@ -1,12 +1,12 @@
 ---
-title: Insert Data from Ruby Using ILP
+title: Insert data from Ruby using ILP
 sidebar_label: Inserting via ILP
 description: Send time-series data from Ruby to QuestDB using the InfluxDB Line Protocol over HTTP
 ---
 
 Send time-series data from Ruby to QuestDB using the InfluxDB Line Protocol (ILP). While QuestDB doesn't maintain an official Ruby client, you can easily use the official InfluxDB Ruby gem to send data via ILP over HTTP, which QuestDB fully supports.
 
-## Available Approaches
+## Available approaches
 
 Two methods for sending ILP data from Ruby:
 
@@ -22,7 +22,7 @@ Two methods for sending ILP data from Ruby:
    - Higher throughput, no dependencies
    - Requires: Built-in Ruby socket library
 
-## Using the InfluxDB v2 Ruby Client
+## Using the InfluxDB v2 Ruby client
 
 The InfluxDB v2 client provides a convenient Point builder API that works with QuestDB.
 
@@ -38,7 +38,7 @@ Or add to your `Gemfile`:
 gem 'influxdb-client', '~> 3.1'
 ```
 
-### Example Code
+### Example code
 
 ```ruby
 require 'influxdb-client'
@@ -85,7 +85,7 @@ write_api.write(data: points)
 client.close!
 ```
 
-### Configuration Notes
+### Configuration notes
 
 When using the InfluxDB client with QuestDB:
 
@@ -95,7 +95,7 @@ When using the InfluxDB client with QuestDB:
 - **`precision`**: Use `NANOSECOND` for compatibility (QuestDB's native precision)
 - **`use_ssl`**: Set to `false` for local development, `true` for production with TLS
 
-### Data Types
+### Data types
 
 The InfluxDB client automatically handles type conversions:
 
@@ -109,11 +109,11 @@ point = InfluxDB2::Point.new(name: 'measurements')
   .add_field('online', true)                       # BOOLEAN
 ```
 
-## TCP Socket Approach
+## TCP socket approach
 
 For maximum control and performance, send ILP messages directly via TCP sockets.
 
-### Basic TCP Example
+### Basic TCP example
 
 ```ruby
 require 'socket'
@@ -147,7 +147,7 @@ ensure
 end
 ```
 
-### ILP Message Format
+### ILP message format
 
 The ILP format is:
 
@@ -168,7 +168,7 @@ Breaking it down:
 readings,city=London,make=Omron temperature=23.5,humidity=0.343 1465839830100400000\n
 ```
 
-### Escaping Special Characters
+### Escaping special characters
 
 ILP requires escaping for certain characters:
 
@@ -188,7 +188,7 @@ escaped = escape_ilp(tag_value)  # "London\\, UK"
 s.puts "readings,city=#{escaped} temperature=23.5\n"
 ```
 
-### Batching for Performance
+### Batching for performance
 
 Send multiple rows in a single TCP write:
 
@@ -224,7 +224,7 @@ ensure
 end
 ```
 
-## Comparison: InfluxDB Client vs TCP Socket
+## Comparison: InfluxDB client vs TCP socket
 
 | Feature | InfluxDB Client | TCP Socket |
 |---------|----------------|------------|
@@ -238,9 +238,9 @@ end
 | **Escaping** | Automatic | Manual implementation required |
 | **Recommended for** | Most applications | High-throughput scenarios, custom needs |
 
-## Best Practices
+## Best practices
 
-### Connection Management
+### Connection management
 
 **InfluxDB Client:**
 ```ruby
@@ -265,7 +265,7 @@ ensure
 end
 ```
 
-### Error Handling
+### Error handling
 
 **InfluxDB Client:**
 ```ruby
@@ -290,7 +290,7 @@ rescue StandardError => e
 end
 ```
 
-### Timestamp Generation
+### Timestamp generation
 
 Use nanosecond precision for maximum compatibility:
 
@@ -312,7 +312,7 @@ timestamp = current_nanos
 timestamp = time_to_nanos(Time.parse("2024-09-05 14:30:00 UTC"))
 ```
 
-### Batching Strategy
+### Batching strategy
 
 For high-throughput scenarios:
 

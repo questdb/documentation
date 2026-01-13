@@ -1,5 +1,5 @@
 ---
-title: General and Sampled Aggregates
+title: General and sampled aggregates
 sidebar_label: General + sampled aggregates
 description: Combine overall statistics with time-bucketed aggregates using CROSS JOIN
 ---

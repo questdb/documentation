@@ -1,16 +1,16 @@
 ---
-title: Volume Weighted Average Price (VWAP)
+title: Volume weighted average price (VWAP)
 sidebar_label: VWAP
 description: Calculate cumulative volume weighted average price using window functions for intraday trading analysis
 ---
 
 Calculate the cumulative Volume Weighted Average Price (VWAP) for intraday trading analysis. VWAP is a trading benchmark that represents the average price at which an asset has traded throughout the day, weighted by volume. It's widely used by institutional traders to assess execution quality and identify trend strength.
 
-## Problem: Calculate Running VWAP
+## Problem: Calculate running VWAP
 
 You want to calculate the cumulative VWAP for a trading day, where each point shows the average price weighted by volume from market open until that moment. This helps traders determine if current prices are above or below the day's volume-weighted average.
 
-## Solution: Use Window Functions for Cumulative Sums
+## Solution: Use window functions for cumulative sums
 
 While QuestDB doesn't have a built-in VWAP window function, we can calculate it using cumulative `SUM` window functions for both traded value and volume:
 
@@ -42,7 +42,7 @@ This query:
 2. Uses window functions to compute running totals of both traded value and volume from the start of the day
 3. Divides cumulative traded value by cumulative volume to get VWAP at each timestamp
 
-## How It Works
+## How it works
 
 VWAP is calculated as:
 
@@ -56,11 +56,11 @@ The key insight is using `SUM(...) OVER (ORDER BY timestamp)` to create running 
 - `cumulative_volume`: Running sum of volume from market open
 - Final VWAP: Dividing these cumulative values gives the volume-weighted average at each point in time
 
-### Window Function Behavior
+### Window function behavior
 
 When using `SUM() OVER (ORDER BY timestamp)` without specifying a frame clause, QuestDB defaults to summing from the first row to the current row, which is exactly what we need for cumulative VWAP.
 
-## Adapting the Query
+## Adapting the query
 
 **Different time intervals:**
 ```questdb-sql demo title="VWAP with 1-minute resolution"
@@ -101,9 +101,9 @@ WITH sampled AS (
 ), cumulative AS (
      SELECT timestamp, symbol,
            SUM(traded_value)
-                OVER (ORDER BY timestamp) AS cumulative_value,
+                OVER (ORDER BY timestamp PARTITION BY symbol) AS cumulative_value,
            SUM(volume)
-                OVER (ORDER BY timestamp) AS cumulative_volume
+                OVER (ORDER BY timestamp PARTITION BY symbol) AS cumulative_volume
      FROM sampled
 )
 SELECT timestamp, symbol,

@@ -1,12 +1,12 @@
 ---
-title: Grafana Variable Dropdown with Name and Value
+title: Grafana variable dropdown with name and value
 sidebar_label: Variable dropdown
 description: Create Grafana variable dropdowns that display one value but use another in queries using regex filters
 ---
 
 Create Grafana variable dropdowns where the displayed label differs from the value used in queries. This is useful when you want to show user-friendly names in the dropdown while using different values (like IDs, prices, or technical identifiers) in your actual SQL queries.
 
-## Problem: Separate Display and Query Values
+## Problem: Separate display and query values
 
 You want a Grafana variable dropdown that:
 - **Displays:** Readable labels like `"BTC-USDT"`, `"ETH-USDT"`, `"SOL-USDT"`
@@ -22,11 +22,11 @@ For example, with this query result:
 
 You want the dropdown to show `"BTC-USDT"` but use `37779.62` in your queries.
 
-## Solution: Use Regex Variable Filters
+## Solution: Use regex variable filters
 
 When using the QuestDB data source plugin, you can use Grafana's regex variable filters to parse a concatenated string into separate `text` and `value` fields.
 
-### Step 1: Concatenate Columns in Query
+### Step 1: Concatenate columns in query
 
 First, combine both columns into a single string with a separator that doesn't appear in your data:
 
@@ -51,7 +51,7 @@ BTC-USDC#60511.1
 
 Each row is now a single string with symbol and price separated by `#`.
 
-### Step 2: Apply Regex Filter in Grafana Variable
+### Step 2: Apply regex filter in Grafana variable
 
 In your Grafana variable configuration:
 
@@ -75,7 +75,7 @@ This regex pattern:
 - `#`: Matches the separator
 - `(?<value>.*)`: Captures everything after `#` into the `value` group (the query value)
 
-### Step 3: Use Variable in Queries
+### Step 3: Use variable in queries
 
 Now you can reference the variable in your dashboard queries:
 
@@ -89,7 +89,7 @@ WHERE price = $your_variable_name
 
 When a user selects "BTC-USDT" from the dropdown, Grafana will substitute the corresponding price value (`37779.62`) into the query.
 
-## How It Works
+## How it works
 
 Grafana's regex filter with named capture groups enables the separation:
 
@@ -98,7 +98,7 @@ Grafana's regex filter with named capture groups enables the separation:
 3. **`value` group**: Becomes the interpolated value in queries
 4. **Pattern matching**: The regex must match the entire string returned by your query
 
-### Regex Pattern Breakdown
+### Regex pattern breakdown
 
 ```regex
 /(?<text>[^#]+)#(?<value>.*)/
@@ -111,7 +111,7 @@ Grafana's regex filter with named capture groups enables the separation:
 - `(?<value>.*)`: Named capture group called "value"
 - `.*`: Zero or more characters of any type (captures rest of string)
 
-## Choosing a Separator
+## Choosing a separator
 
 Pick a separator that **never** appears in your data:
 
@@ -128,9 +128,9 @@ Pick a separator that **never** appears in your data:
 - `,` - Common in CSV-like data
 - Space - Can cause parsing issues
 
-## Alternative Patterns
+## Alternative patterns
 
-### Multiple Data Fields
+### Multiple data fields
 
 If you need more than two fields, use additional separators:
 
@@ -144,7 +144,7 @@ SELECT concat(symbol, '#', price, '#', volume) FROM trades;
 
 Now you have three captured groups, though Grafana's variable system typically only uses `text` and `value`.
 
-### Numeric IDs with Descriptions
+### Numeric IDs with descriptions
 
 Common pattern for entity selection:
 
@@ -158,7 +158,7 @@ SELECT concat(name, '#', id) FROM users;
 
 Output in dropdown: User sees "John Doe", query uses `42`.
 
-### Escaping Special Characters
+### Escaping special characters
 
 If your data contains regex special characters, escape them in the pattern:
 
@@ -172,7 +172,7 @@ SELECT concat(name, ' (', id, ')', '#', id) FROM users;
 /(?<text>.*?)#(?<value>\d+)/
 ```
 
-## PostgreSQL Data Source Alternative
+## PostgreSQL data source alternative
 
 If using the PostgreSQL data source (instead of the QuestDB plugin), you can use special column aliases:
 
@@ -188,7 +188,7 @@ The PostgreSQL data source recognizes `__text` and `__value` as special column n
 
 **Note:** This works with the PostgreSQL data source plugin pointing to QuestDB, but NOT with the native QuestDB data source plugin.
 
-## Adapting the Pattern
+## Adapting the pattern
 
 **Different filter conditions:**
 ```sql

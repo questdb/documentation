@@ -1,23 +1,23 @@
 ---
-title: Query Multiple Tables Dynamically in Grafana
+title: Query multiple tables dynamically in Grafana
 sidebar_label: Dynamic table queries
 description: Use Grafana variables to dynamically query multiple tables with the same schema for time-series visualization
 ---
 
 Query multiple QuestDB tables dynamically in Grafana using dashboard variables. This is useful when you have many tables with identical schemas (e.g., sensor data, metrics from different sources) and want to visualize them together without hardcoding table names in your queries.
 
-## Problem: Visualize Many Similar Tables
+## Problem: Visualize many similar tables
 
 You have 100+ tables with the same structure (e.g., `sensor_1`, `sensor_2`, ..., `sensor_n`) and want to:
 1. Display data from all tables on a single Grafana chart
 2. Avoid manually updating queries when tables are added or removed
 3. Allow users to select which tables to visualize via dashboard controls
 
-## Solution: Use Grafana Variables with Dynamic SQL
+## Solution: Use Grafana variables with dynamic SQL
 
 Create Grafana dashboard variables that query QuestDB for table names, then use string aggregation functions to build the SQL query dynamically.
 
-### Step 1: Get Table Names
+### Step 1: Get table names
 
 First, query QuestDB to get all relevant table names:
 
@@ -28,7 +28,7 @@ WHERE table_name LIKE 'sensor_%';
 
 This returns a list of all tables matching the pattern.
 
-### Step 2: Create Grafana Variables
+### Step 2: Create Grafana variables
 
 Create two dashboard variables to construct the dynamic query:
 
@@ -59,7 +59,7 @@ WHERE table_name LIKE 'sensor_%';
 
 This creates the column selection list with aggregation functions.
 
-### Step 3: Use Variables in Dashboard Query
+### Step 3: Use variables in dashboard query
 
 Now reference these variables in your Grafana chart query:
 
@@ -77,7 +77,7 @@ FROM sensor_1 ASOF JOIN sensor_2 ASOF JOIN sensor_3 ASOF JOIN sensor_4
 SAMPLE BY 1s FROM cast(1571176800000000 as timestamp) TO cast(1571349600000000 as timestamp) FILL(PREV);
 ```
 
-## How It Works
+## How it works
 
 The solution uses three key QuestDB features:
 
@@ -99,7 +99,7 @@ Combined with Grafana's variable interpolation:
 
 This ensures that even if tables update at different rates, you get a complete dataset with the most recent known value from each table.
 
-## Adapting the Pattern
+## Adapting the pattern
 
 **Filter by different patterns:**
 ```sql
@@ -114,7 +114,7 @@ WHERE table_name LIKE 'sensor_%'
   AND table_name NOT IN ('sensor_test', 'sensor_backup')
 ```
 
-## Programmatic Alternative
+## Programmatic alternative
 
 If you're not using Grafana, you can achieve the same result programmatically:
 
@@ -142,7 +142,7 @@ If you're not using Grafana, you can achieve the same result programmatically:
    """
    ```
 
-## Handling Different Sampling Intervals
+## Handling different sampling intervals
 
 When tables have different update frequencies, use FILL to handle gaps:
 

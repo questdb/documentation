@@ -10,7 +10,7 @@ Configure PgBouncer to provide TLS termination for QuestDB Open Source PostgreSQ
 For QuestDB Enterprise, there is native TLS support, so you can connect directly with TLS or use PgBouncer with full TLS end-to-end encryption.
 :::
 
-## Solution: TLS Termination at PgBouncer
+## Solution: TLS termination at PgBouncer
 
 QuestDB Open Source does not implement TLS on the PostgreSQL wire protocol, so TLS termination needs to be done at the PgBouncer level.
 

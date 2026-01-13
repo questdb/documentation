@@ -1,5 +1,5 @@
 ---
-title: FILL on Keyed Queries with Arbitrary Intervals
+title: FILL on keyed queries with arbitrary intervals
 sidebar_label: FILL keyed arbitrary interval
 description: Use FILL with keyed queries across arbitrary time intervals by sandwiching data with null boundary rows
 ---

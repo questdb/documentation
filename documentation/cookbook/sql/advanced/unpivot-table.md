@@ -1,12 +1,12 @@
 ---
-title: Unpivoting Query Results
+title: Unpivoting query results
 sidebar_label: Unpivoting results
 description: Convert wide-format data to long format using UNION ALL
 ---
 
 Transform wide-format data (multiple columns) into long format (rows) using UNION ALL.
 
-## Problem: Wide Format to Long Format
+## Problem: Wide format to long format
 
 You have query results with multiple columns where only one column has a value per row:
 
@@ -30,7 +30,7 @@ You want to convert this to a format where side and price are explicit:
 | 08:10:00  | ETH-USDT  | buy  | 3678.01 |
 | 08:10:00  | ETH-USDT  | sell | 3678.00 |
 
-## Solution: UNION ALL with Literal Values
+## Solution: UNION ALL with literal values
 
 Use UNION ALL to stack columns as rows, then filter NULL values:
 
@@ -68,9 +68,9 @@ ORDER BY timestamp;
 | 08:10:00  | ETH-USDT  | buy  | 3678.01 |
 | 08:10:00  | ETH-USDT  | sell | 3678.00 |
 
-## How It Works
+## How it works
 
-### Step 1: Create Wide Format (if needed)
+### Step 1: Create wide format (if needed)
 
 If your data is already in narrow format, you may need to pivot first:
 
@@ -101,7 +101,7 @@ WHERE price IS NOT NULL
 
 Removes rows where the price column is NULL (the opposite side).
 
-## Unpivoting Multiple Columns
+## Unpivoting multiple columns
 
 Transform multiple numeric columns to name-value pairs:
 
@@ -140,7 +140,7 @@ ORDER BY timestamp, sensor_id, metric;
 | 10:00:00  | S001      | pressure    | 1013.2|
 | 10:00:00  | S001      | temperature | 22.5  |
 
-## Performance Considerations
+## Performance considerations
 
 **UNION ALL vs UNION:**
 ```sql
