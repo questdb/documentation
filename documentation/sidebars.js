@@ -720,17 +720,6 @@ module.exports = {
       type: "category",
       items: [
         {
-          id: "tutorials/order-book",
-          label: "Order Book Analytics",
-          type: "doc",
-        },
-        {
-          label: "Ingest L2 order book data",
-          type: "link",
-          href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
-        },
-        "tutorials/influxdb-migration",
-        {
           type: "category",
           label: "Cookbook",
           collapsed: true,
@@ -861,6 +850,22 @@ module.exports = {
             },
           ],
         },
+        {
+          id: "tutorials/order-book",
+          label: "Order Book Analytics",
+          type: "doc",
+        },
+        {
+          label: "Ingest L2 order book data",
+          type: "link",
+          href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
+        },
+        {
+          label: "OHLC with materialized views",
+          type: "link",
+          href: "https://questdb.com/blog/how-to-create-a-materialized-view/",
+        },
+        "tutorials/influxdb-migration",
         {
           label: "Blog Tutorials",
           type: "link",
