@@ -20,7 +20,7 @@ FROM trades
 WHERE timestamp BETWEEN 1746552420000000 AND 1746811620000000;
 ```
 
-:::note  Millisecond Resolution
+:::info  Millisecond Resolution
 If you have epoch values in milliseconds, you need to multiply by 1000 to convert to microseconds.
 :::
 
@@ -32,7 +32,7 @@ FROM fx_trades
 WHERE timestamp BETWEEN 1768303754000000000 AND 1778303754000000000;
 ```
 
-:::note
+:::note If the query does not return any data
 Since the `fx_trades` table has a TTL, the query above may return empty results. To find valid epoch values with data, run:
 
 `select timestamp::long as from_epoch, dateadd('s', -10, timestamp)::long as to_epoch from fx_trades limit -1;`

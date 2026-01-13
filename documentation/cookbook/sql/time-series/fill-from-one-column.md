@@ -10,11 +10,11 @@ Fill missing intervals using the previous value from a specific column to popula
 
 You have a query like this:
 
-```sql
+```questdb-sql demo title="SAMPLE BY with FILL(PREV)"
 SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
 FROM core_price
 WHERE symbol = 'EURUSD' AND timestamp IN today()
-SAMPLE BY 1s FILL(PREV, PREV);
+SAMPLE BY 100T FILL(PREV, PREV);
 ```
 
 But when there is an interpolation, instead of getting the PREV value for `bid_price` and previous for `ask_price`, you want both prices to show the PREV known value for the `ask_price`. Imagine this SQL was valid:
@@ -23,7 +23,7 @@ But when there is an interpolation, instead of getting the PREV value for `bid_p
 SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
 FROM core_price
 WHERE symbol = 'EURUSD' AND timestamp IN today()
-SAMPLE BY 1s FILL(PREV(ask_price), PREV);
+SAMPLE BY 100T FILL(PREV(ask_price), PREV);
 ```
 
 ## Solution
@@ -35,17 +35,37 @@ WITH sampled AS (
   SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
   FROM core_price
   WHERE symbol = 'EURUSD' AND timestamp IN today()
-  SAMPLE BY 1s FILL(null)
+  SAMPLE BY 100T FILL(null)
 ), with_previous_vals AS (
   SELECT *,
     last_value(ask_price) IGNORE NULLS OVER(PARTITION BY symbol ORDER BY timestamp) as filler
   FROM sampled
 )
-SELECT timestamp, symbol, coalesce(bid_price, filler) as bid_price, coalesce(ask_price, filler) as ask_price
+SELECT timestamp, symbol, coalesce(bid_price, filler) as bid_price,
+       coalesce(ask_price, filler) as ask_price
 FROM with_previous_vals;
 ```
 
 Note the use of `IGNORE NULLS` modifier on the window function to make sure we always look back for a value, rather than just over the previous row.
+
+You can mark which rows were filled by adding a column that flags interpolated values:
+
+```questdb-sql demo title="Show which rows were filled"
+WITH sampled AS (
+  SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
+  FROM core_price
+  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  SAMPLE BY 100T FILL(null)
+), with_previous_vals AS (
+  SELECT *,
+    last_value(ask_price) IGNORE NULLS OVER(PARTITION BY symbol ORDER BY timestamp) as filler
+  FROM sampled
+)
+SELECT timestamp, symbol, coalesce(bid_price, filler) as bid_price,
+       coalesce(ask_price, filler) as ask_price,
+       case when bid_price is NULL then true END as filled
+FROM with_previous_vals;
+```
 
 :::info Related Documentation
 - [SAMPLE BY](/docs/query/sql/sample-by/)
