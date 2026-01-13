@@ -43,6 +43,7 @@ RANGE BETWEEN <value> <unit> FOLLOWING AND <value> <unit> FOLLOWING  -- future w
 
 Supported time units:
 
+- `nanoseconds`
 - `microseconds`
 - `milliseconds`
 - `seconds`
