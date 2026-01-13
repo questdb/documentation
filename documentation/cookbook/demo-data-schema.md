@@ -4,7 +4,7 @@ sidebar_label: Demo data schema
 description: Schema and structure of the FX market data and cryptocurrency trades available on demo.questdb.io
 ---
 
-The [QuestDB demo instance at demo.questdb.io](https://demo.questdb.io) contains two datasets that you can query directly: simulated FX market data and real cryptocurrency trades. This page describes the available tables and their structure.
+The [QuestDB demo instance at demo.questdb.com](https://demo.questdb.io) contains two datasets that you can query directly: simulated FX market data and real cryptocurrency trades. This page describes the available tables and their structure.
 
 :::tip
 The demo instance is read-only. For testing write operations (INSERT, UPDATE, DELETE), you'll need to run QuestDB locally. See the [Quick Start guide](/docs/getting-started/quick-start/) for installation instructions.
