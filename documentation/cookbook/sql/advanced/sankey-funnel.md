@@ -14,7 +14,7 @@ Your issue is that you only capture a flat table with events, with no concept of
 
 Your simplified table schema:
 
-```sql
+```questdb-sql
 CREATE TABLE events (
     visitor_id SYMBOL,
     pathname SYMBOL,
@@ -35,22 +35,19 @@ By combining window functions and `CASE` statements:
 
 With that, you can count page hits for the next page from current, identify elapsed time between hits or since the start of the session, count sessions per user, or power navigation funnels and Sankey diagrams.
 
-```questdb-sql demo title="Sessionize events and track page flows"
+```questdb-sql title="Sessionize events and track page flows"
 WITH PrevEvents AS (
   SELECT
     visitor_id,
     pathname,
     timestamp,
-    first_value(timestamp::long) OVER (
-    PARTITION BY visitor_id ORDER BY timestamp
-    ROWS 1 PRECEDING EXCLUDE CURRENT ROW
-    ) AS prev_ts
+    lag(timestamp) OVER (PARTITION BY visitor_id ORDER BY timestamp) AS prev_ts
   FROM
     events WHERE timestamp > dateadd('d', -7, now())
     AND metric_name = 'page_view'
 ), VisitorSessions AS (
   SELECT *,
-    SUM(CASE WHEN datediff('h', timestamp, prev_ts::timestamp)>1 THEN 1 END)
+    SUM(CASE WHEN datediff('h', timestamp, prev_ts) > 1 THEN 1 END)
     OVER(
       PARTITION BY visitor_id
       ORDER BY timestamp
@@ -75,7 +72,7 @@ WITH PrevEvents AS (
   SELECT e1.session_id, e1.session_ts::timestamp as session_ts, e1.visitor_id,
     e1.timestamp, e1.pathname, e1.session_sequence,
     CASE WHEN e1.session_sequence = 1 THEN true END is_entry_page,
-    e2.pathname as next_pathname, datediff('T', e1.timestamp, e1.prev_ts::timestamp)::double as elapsed,
+    e2.pathname as next_pathname, datediff('T', e1.timestamp, e1.prev_ts)::double as elapsed,
     e2.reverse_session_sequence,
     CASE WHEN e2.reverse_session_sequence = 1 THEN true END is_exit_page
   FROM EventSequences e1
@@ -85,38 +82,7 @@ WITH PrevEvents AS (
 SELECT * FROM EventsFullInfo;
 ```
 
-## Visualizing in Grafana
-
-Format output for Sankey diagram tools:
-
-```questdb-sql demo title="Sankey diagram data format"
-WITH transitions AS (
-  SELECT
-    pathname as current_state,
-    lag(pathname) OVER (PARTITION BY visitor_id ORDER BY timestamp) as previous_state
-  FROM events
-  WHERE timestamp >= dateadd('d', -1, now())
-    AND metric_name = 'page_view'
-)
-SELECT
-  previous_state as source,
-  current_state as target,
-  count(*) as value
-FROM transitions
-WHERE previous_state IS NOT NULL
-  AND previous_state != current_state
-GROUP BY previous_state, current_state
-HAVING count(*) >= 10
-ORDER BY value DESC;
-```
-
-This format works directly with:
-- **Plotly**: `go.Sankey(node=[...], link=[source, target, value])`
-- **D3.js**: Standard Sankey input format
-- **Grafana Flow plugin**: Source/target/value format
-
 :::info Related Documentation
 - [Window functions](/docs/query/sql/over/)
 - [LAG function](/docs/query/functions/window/#lag)
-- [Grafana integration](/docs/integrations/visualization/grafana/)
 :::
