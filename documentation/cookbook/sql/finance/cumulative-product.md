@@ -28,9 +28,11 @@ You want to calculate:
 | 2024-09-07 | 1.50            | 102.49      |
 | 2024-09-08 | -3.00           | 99.42       |
 
-## Solution: Use logarithm mathematics trick
+## Solution: Use logarithms to convert multiplication to addition
 
-Since QuestDB doesn't allow functions on top of window function results, we use a mathematical trick: **the exponential of the sum of logarithms equals the product**.
+Use the mathematical identity: **exp(sum(ln(x))) = product(x)**
+
+This converts the cumulative product into a cumulative sum, which window functions handle naturally:
 
 ```questdb-sql title="Calculate cumulative product via logarithms"
 WITH ln_values AS (
@@ -65,12 +67,6 @@ Breaking it down:
 - `SUM(...) OVER (ORDER BY date)` creates a cumulative sum
 - `exp(ln_value)` converts the cumulative sum back to a cumulative product
 - Multiply by 100 to apply the starting price of $100
-
-### Why this works
-
-QuestDB doesn't support direct window functions like `PRODUCT() OVER()`, and attempting `exp(SUM(ln(1 + return)) OVER ())` fails with a "dangling literal" error because you can't nest functions around window functions.
-
-The workaround is to use a CTE to compute the cumulative sum first, then apply `exp()` in the outer query where it's operating on a regular column, not a window function result.
 
 ## Adapting to your data
 
