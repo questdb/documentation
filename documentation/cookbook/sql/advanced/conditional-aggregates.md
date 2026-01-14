@@ -38,6 +38,15 @@ WHERE timestamp >= dateadd('d', -1, now())
 GROUP BY symbol;
 ```
 
+Which returns:
+
+
+| symbol   | buy_count | sell_count | avg_buy_price     | avg_sell_price     | large_trade_volume | small_trade_volume | total_volume       |
+| -------- | --------- | ---------- | ----------------- | ------------------ | ------------------ | ------------------ | ------------------ |
+| ETH-USDT | 262870    | 212163     | 3275.286678129868 | 3273.6747631773655 | 152042.02150799974 | 51934.917160999976 | 203976.93866900489 |
+| BTC-USDT | 789959    | 712152     | 94286.52121793582 | 94304.92124321847  | 1713.1241887299993 | 8803.505760999722  | 10516.629949730019 |
+
+
 ## How it works
 
 ### CASE returns NULL for non-matching rows
