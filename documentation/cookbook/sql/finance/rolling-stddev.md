@@ -1,73 +1,46 @@
 ---
 title: Rolling standard deviation
 sidebar_label: Rolling std dev
-description: Calculate rolling standard deviation using window functions and CTEs
+description: Calculate rolling standard deviation using window functions
 ---
 
 Calculate rolling standard deviation to measure price volatility over time.
 
 ## Problem
 
-You want to calculate the standard deviation in a time window. QuestDB supports stddev as an aggregate function, but not as a window function.
+You want to calculate rolling standard deviation. QuestDB supports `stddev` as an aggregate function, but not as a window function.
 
 ## Solution
 
-The standard deviation can be calculated from the variance, which is the average of the square differences from the mean.
+Use the mathematical identity: `Var(X) = E[X²] - E[X]²`
 
-In general we could write it in SQL like this:
-
-```sql
-SELECT
-  symbol,
-  price,
-  AVG(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rolling_mean,
-  SQRT(AVG(POWER(price - AVG(price) OVER (PARTITION BY symbol  ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2))
-       OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) AS rolling_stddev
-FROM
-  fx_trades
-WHERE timestamp IN yesterday()
-```
-
-But in QuestDB we cannot do any operations on the return value of a window function, so we need to do this using CTEs:
+Compute both `AVG(price)` and `AVG(price * price)` as window functions, then derive the standard deviation:
 
 ```questdb-sql demo title="Calculate rolling standard deviation"
-WITH rolling_avg_cte AS (
+WITH stats AS (
   SELECT
     timestamp,
     symbol,
     price,
-    AVG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg
-  FROM
-    fx_trades
-  WHERE
-    timestamp IN yesterday() AND symbol = 'EURUSD'
-),
-variance_cte AS (
-  SELECT
-    timestamp,
-    symbol,
-    price,
-    rolling_avg,
-    AVG(POWER(price - rolling_avg, 2)) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_variance
-  FROM
-    rolling_avg_cte
+    AVG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg,
+    AVG(price * price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg_sq
+  FROM fx_trades
+  WHERE timestamp IN yesterday() AND symbol = 'EURUSD'
 )
 SELECT
   timestamp,
   symbol,
   price,
   rolling_avg,
-  rolling_variance,
-  SQRT(rolling_variance) AS rolling_stddev
-FROM
-  variance_cte;
+  SQRT(rolling_avg_sq - rolling_avg * rolling_avg) AS rolling_stddev
+FROM stats
+LIMIT 10;
 ```
 
-I first get the rolling average/mean, then from that I get the variance, and then I can do the `sqrt` to get the standard deviation as requested.
+The key insight is that both window functions are computed in the same CTE, then combined in the final SELECT. This works because QuestDB doesn't allow operations on window function results directly within the same query level.
 
-:::info Related Documentation
+:::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [AVG window function](/docs/query/functions/window-functions/reference/#avg)
-- [POWER function](/docs/query/functions/numeric/#power)
 - [SQRT function](/docs/query/functions/numeric/#sqrt)
 :::
