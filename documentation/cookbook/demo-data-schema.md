@@ -32,16 +32,16 @@ The `core_price` table contains individual FX price updates from various liquidi
 ```sql title="core_price table structure"
 CREATE TABLE 'core_price' (
     timestamp TIMESTAMP,
-    symbol SYMBOL CAPACITY 16384 CACHE,
-    ecn SYMBOL CAPACITY 256 CACHE,
+    symbol SYMBOL,
+    ecn SYMBOL,
     bid_price DOUBLE,
     bid_volume LONG,
     ask_price DOUBLE,
     ask_volume LONG,
-    reason SYMBOL CAPACITY 256 CACHE,
+    reason SYMBOL,
     indicator1 DOUBLE,
     indicator2 DOUBLE
-) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS WAL;
+) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;
 ```
 
 #### Columns
@@ -150,7 +150,7 @@ CREATE TABLE 'fx_trades' (
     quantity DOUBLE,
     counterparty SYMBOL,
     order_id UUID
-) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH WAL;
+) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH;
 ```
 
 #### Columns
@@ -243,7 +243,7 @@ CREATE TABLE 'trades' (
     price DOUBLE,
     amount DOUBLE,
     timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL;
+) timestamp(timestamp) PARTITION BY DAY;
 ```
 
 #### Columns
