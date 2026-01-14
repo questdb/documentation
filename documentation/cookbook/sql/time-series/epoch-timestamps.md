@@ -1,5 +1,5 @@
 ---
-title: Query with Epoch Timestamps
+title: Query with epoch timestamps
 sidebar_label: Epoch timestamps
 description: Use epoch timestamps for timestamp filtering in QuestDB
 ---

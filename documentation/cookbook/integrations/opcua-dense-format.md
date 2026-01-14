@@ -1,12 +1,12 @@
 ---
-title: Collect OPC-UA Data with Telegraf in Dense Format
+title: Collect OPC-UA data with Telegraf in dense format
 sidebar_label: OPC-UA dense format
 description: Configure Telegraf to merge sparse OPC-UA metrics into dense rows for efficient storage and querying in QuestDB
 ---
 
 Configure Telegraf to collect OPC-UA industrial automation data and insert it into QuestDB in a dense format. By default, Telegraf creates one row per metric with sparse columns, but for QuestDB it's more efficient to merge all metrics from the same timestamp into a single dense row.
 
-## Problem: Sparse Data Format
+## Problem: Sparse data format
 
 When using Telegraf's OPC-UA input plugin with the default configuration, each metric value generates a separate row. Even when multiple metrics are collected at the same timestamp, they arrive as individual sparse rows:
 
@@ -26,14 +26,14 @@ This wastes storage space and makes queries more complex.
 |------------------------------|------------|-----------|----------|
 | 2024-01-15T10:00:00.000000Z | 45.2       | 8192.0    | 1250.5   |
 
-## Solution: Use Telegraf's Merge Aggregator
+## Solution: Use Telegraf's merge aggregator
 
 Configure Telegraf to merge metrics with matching timestamps and tags before sending to QuestDB. This requires two key changes:
 
 1. Add a common tag to all metrics
 2. Use the `merge` aggregator to combine rows
 
-### Complete Configuration
+### Complete configuration
 
 ```toml
 [agent]
@@ -82,9 +82,9 @@ Configure Telegraf to merge metrics with matching timestamps and tags before sen
   content_encoding = "identity"
 ```
 
-### Key Configuration Elements
+### Key configuration elements
 
-**1. Common Tag**
+**1. Common tag**
 
 ```toml
 default_tags = { source="opcua_merge" }
@@ -92,7 +92,7 @@ default_tags = { source="opcua_merge" }
 
 Adds the same tag value (`source="opcua_merge"`) to all metrics. The merge aggregator uses this to identify which metrics should be combined.
 
-**2. Merge Aggregator**
+**2. Merge aggregator**
 
 ```toml
 [[aggregators.merge]]
@@ -103,7 +103,7 @@ Adds the same tag value (`source="opcua_merge"`) to all metrics. The merge aggre
 - `drop_original = true`: Discards the original sparse rows after merging
 - `tags = ["source"]`: Merges metrics with matching `source` tag values and the same timestamp
 
-**3. QuestDB Output**
+**3. QuestDB output**
 
 ```toml
 [[outputs.influxdb_v2]]
@@ -114,7 +114,7 @@ Adds the same tag value (`source="opcua_merge"`) to all metrics. The merge aggre
 - Uses the InfluxDB Line Protocol (ILP) over HTTP
 - `content_encoding = "identity"`: Disables gzip compression (QuestDB doesn't require it)
 
-## How It Works
+## How it works
 
 The data flow is:
 
@@ -123,7 +123,7 @@ The data flow is:
 3. **Merge aggregator** → Combines rows with matching timestamp + `source` tag
 4. **QuestDB output** → Sends merged dense rows via ILP
 
-### Merging Logic
+### Merging logic
 
 The merge aggregator combines metrics when:
 - **Timestamps match**: Metrics collected at the same moment
@@ -131,11 +131,11 @@ The merge aggregator combines metrics when:
 
 If metrics have different timestamps or tag values, they won't be merged.
 
-## Handling Tag Conflicts
+## Handling tag conflicts
 
 If your OPC-UA nodes have additional tags with **different** values, those tags will prevent merging. Solutions:
 
-### Remove Conflicting Tags
+### Remove conflicting tags
 
 Use the `override` processor to remove unwanted tags:
 
@@ -146,7 +146,7 @@ Use the `override` processor to remove unwanted tags:
     namespace = ""  # Removes the 'namespace' tag
 ```
 
-### Convert Tags to Fields
+### Convert tags to fields
 
 Use the `converter` processor to convert tags to fields (fields don't affect merging):
 
@@ -158,7 +158,7 @@ Use the `converter` processor to convert tags to fields (fields don't affect mer
 
 This converts the tags to string fields, which won't interfere with the merge aggregator.
 
-### Remove the Common Tag After Merging
+### Remove the common tag after merging
 
 If you don't want the `source` tag in your final QuestDB table:
 
@@ -169,7 +169,7 @@ If you don't want the `source` tag in your final QuestDB table:
     source = ""  # Removes the 'source' tag
 ```
 
-## Environment Variables
+## Environment variables
 
 Use environment variables for sensitive configuration:
 
@@ -225,7 +225,7 @@ If you see sparse rows, check:
 - The merge aggregator is configured correctly
 - Timestamps are identical (not just close)
 
-## Alternative: TCP Output
+## Alternative: TCP output
 
 For higher throughput, use TCP instead of HTTP:
 
@@ -248,7 +248,7 @@ Choose HTTP when:
 - You need error feedback
 - You're sending over the internet
 
-## Multiple OPC-UA Sources
+## Multiple OPC-UA sources
 
 To collect from multiple OPC-UA servers into separate tables:
 

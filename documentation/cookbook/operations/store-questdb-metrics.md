@@ -1,12 +1,12 @@
 ---
-title: Store QuestDB Metrics in QuestDB
+title: Store QuestDB metrics in QuestDB
 sidebar_label: Store QuestDB metrics
 description: Scrape QuestDB Prometheus metrics using Telegraf and store them in QuestDB
 ---
 
 Store QuestDB's operational metrics in QuestDB itself by scraping Prometheus metrics using Telegraf.
 
-## Solution: Telegraf Configuration
+## Solution: Telegraf configuration
 
 You could use Prometheus to scrape those metrics, but you can also use any server agent that understands the Prometheus format. It turns out Telegraf has input plugins for Prometheus and output plugins for QuestDB, so you can use it to get the metrics from the endpoint and insert them into a QuestDB table.
 

@@ -1,5 +1,5 @@
 ---
-title: Fill Missing Intervals with Value from Another Column
+title: Fill missing intervals with value from another column
 sidebar_label: Fill from one column
 description: Use window functions to propagate values from one column to fill multiple columns in SAMPLE BY queries
 ---
@@ -70,6 +70,6 @@ FROM with_previous_vals;
 :::info Related Documentation
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 - [FILL keyword](/docs/query/sql/sample-by/#fill-keywords)
-- [Window functions](/docs/query/sql/over/)
-- [last_value()](/docs/query/functions/window/#last_value)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [last_value()](/docs/query/functions/window-functions/reference/#last_value)
 :::

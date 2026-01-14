@@ -1,5 +1,5 @@
 ---
-title: Demo Data Schema
+title: Demo data schema
 sidebar_label: Demo data schema
 description: Schema and structure of the FX market data and cryptocurrency trades available on demo.questdb.io
 ---
@@ -19,11 +19,11 @@ The demo instance provides two independent datasets:
 
 ---
 
-## FX Market Data (Simulated)
+## FX market data (simulated)
 
 The FX dataset contains simulated foreign exchange market data for 30 currency pairs. We fetch real reference prices from Yahoo Finance every few seconds, but all order book levels and price updates are generated algorithmically based on these reference prices.
 
-### core_price Table
+### core_price table
 
 The `core_price` table contains individual FX price updates from various liquidity providers. Each row represents a bid/ask quote update for a specific currency pair from a specific ECN.
 
@@ -32,16 +32,16 @@ The `core_price` table contains individual FX price updates from various liquidi
 ```sql title="core_price table structure"
 CREATE TABLE 'core_price' (
     timestamp TIMESTAMP,
-    symbol SYMBOL CAPACITY 16384 CACHE,
-    ecn SYMBOL CAPACITY 256 CACHE,
+    symbol SYMBOL,
+    ecn SYMBOL,
     bid_price DOUBLE,
     bid_volume LONG,
     ask_price DOUBLE,
     ask_volume LONG,
-    reason SYMBOL CAPACITY 256 CACHE,
+    reason SYMBOL,
     indicator1 DOUBLE,
     indicator2 DOUBLE
-) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS WAL;
+) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;
 ```
 
 #### Columns
@@ -58,7 +58,7 @@ CREATE TABLE 'core_price' (
 
 The table tracks **30 currency pairs**: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD, EURJPY, GBPJPY, EURGBP, AUDJPY, CADJPY, NZDJPY, EURAUD, EURNZD, AUDNZD, GBPAUD, GBPNZD, AUDCAD, NZDCAD, EURCAD, EURCHF, GBPCHF, USDNOK, USDSEK, USDZAR, USDMXN, USDSGD, USDHKD, USDTRY.
 
-#### Sample Data
+#### Sample data
 
 ```questdb-sql demo title="Recent core_price updates"
 SELECT * FROM core_price
@@ -81,7 +81,7 @@ LIMIT -10;
 | 2025-12-18T11:46:13.066700Z | CADJPY | Currenex | 113.63    | 20300827   | 114.11    | 19720915   | normal          | 0.55       |            |
 | 2025-12-18T11:46:13.071607Z | NZDJPY | Currenex | 89.95     | 35284228   | 90.46     | 30552528   | liquidity_event | 0.69       |            |
 
-### market_data Table
+### market_data table
 
 The `market_data` table contains order book snapshots for currency pairs. Each row represents a complete view of the order book at a specific timestamp, with bid and ask prices and volumes stored as 2D arrays.
 
@@ -109,7 +109,7 @@ The arrays are structured so that:
 - `asks[1]` contains ask prices (ascending order - lowest first)
 - `asks[2]` contains corresponding ask volumes
 
-#### Sample Query
+#### Sample query
 
 ```questdb-sql demo title="Recent order book snapshots"
 SELECT timestamp, symbol,
@@ -132,7 +132,7 @@ LIMIT -5;
 
 Each order book snapshot contains 40 bid levels and 40 ask levels.
 
-### fx_trades Table
+### fx_trades table
 
 The `fx_trades` table contains simulated FX trade executions. Each row represents a trade that executed against the order book, with realistic partial fills and level walking.
 
@@ -150,7 +150,7 @@ CREATE TABLE 'fx_trades' (
     quantity DOUBLE,
     counterparty SYMBOL,
     order_id UUID
-) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH WAL;
+) timestamp(timestamp) PARTITION BY HOUR TTL 1 MONTH;
 ```
 
 #### Columns
@@ -166,7 +166,7 @@ CREATE TABLE 'fx_trades' (
 - **`counterparty`** - 20-character LEI (Legal Entity Identifier) of the counterparty
 - **`order_id`** - Parent order identifier (multiple trades can share the same `order_id` for partial fills)
 
-#### Sample Data
+#### Sample data
 
 ```questdb-sql demo title="Recent FX trades"
 SELECT * FROM fx_trades
@@ -189,36 +189,36 @@ LIMIT -10;
 | 2026-01-12T12:18:57.509773474Z | GBPUSD | Currenex | ae6b771b-5abd-44c7-9e0e-3527ce6fb5b4 | sell | false   | 1.3404  | 62305.0  | 006728CF215E44412D18 | 54ff8191-1891-4a5c-8b67-d5cd961ec5e8 |
 | 2026-01-12T12:18:57.334732460Z | USDTRY | EBS      | 469637a5-6553-4aad-aad9-f7114c8a442d | sell | true    | 43.1    | 101177.0 | 002CAC92E93AB4B3D30C | 2ce77a03-0f21-4241-8ca7-903080848dc0 |
 
-### FX Materialized Views
+### FX materialized views
 
 The FX dataset includes several materialized views providing pre-aggregated data at different time intervals:
 
-#### Best Bid/Offer (BBO) Views
+#### Best bid/offer (BBO) views
 
 - **`bbo_1s`** - Best bid and offer aggregated every 1 second
 - **`bbo_1m`** - Best bid and offer aggregated every 1 minute
 - **`bbo_1h`** - Best bid and offer aggregated every 1 hour
 - **`bbo_1d`** - Best bid and offer aggregated every 1 day
 
-#### Core Price Aggregations
+#### Core price aggregations
 
 - **`core_price_1s`** - Core prices aggregated every 1 second
 - **`core_price_1d`** - Core prices aggregated every 1 day
 
-#### Market Data OHLC
+#### Market data OHLC
 
 - **`market_data_ohlc_1m`** - Open, High, Low, Close candlesticks at 1-minute intervals
 - **`market_data_ohlc_15m`** - OHLC candlesticks at 15-minute intervals
 - **`market_data_ohlc_1d`** - OHLC candlesticks at 1-day intervals
 
-#### FX Trades OHLC
+#### FX trades OHLC
 
 - **`fx_trades_ohlc_1m`** - OHLC candlesticks from trade executions at 1-minute intervals
 - **`fx_trades_ohlc_1h`** - OHLC candlesticks from trade executions at 1-hour intervals
 
 These views are continuously updated and optimized for dashboard and analytics queries on FX data.
 
-### FX Data Volume
+### FX data volume
 
 - **`market_data`**: Approximately **160 million rows** per day (order book snapshots)
 - **`core_price`**: Approximately **73 million rows** per day (price updates across all ECNs and symbols)
@@ -226,11 +226,11 @@ These views are continuously updated and optimized for dashboard and analytics q
 
 ---
 
-## Cryptocurrency Trades (Real)
+## Cryptocurrency trades (real)
 
 The cryptocurrency dataset contains **real market data** streamed live from the OKX exchange using FeedHandler. These are actual executed trades, not simulated data.
 
-### trades Table
+### trades table
 
 The `trades` table contains real cryptocurrency trade data. Each row represents an actual executed trade for a cryptocurrency pair.
 
@@ -243,7 +243,7 @@ CREATE TABLE 'trades' (
     price DOUBLE,
     amount DOUBLE,
     timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL;
+) timestamp(timestamp) PARTITION BY DAY;
 ```
 
 #### Columns
@@ -254,9 +254,9 @@ CREATE TABLE 'trades' (
 - **`price`** - Execution price of the trade
 - **`amount`** - Trade size (volume in base currency)
 
-The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USD, BTC-USDT, DAI-USD, DOT-USD, ETH-BTC, ETH-USDT, LTC-USD, SOL-BTC, SOL-USD, UNI-USD, XLM-USD.
+The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USDT, BTC-USDT, DAI-USDT, DOT-USDT, ETH-BTC, ETH-USDT, LTC-USDT, SOL-BTC, SOL-USDT, UNI-USDT, XLM-USDT.
 
-#### Sample Data
+#### Sample data
 
 ```questdb-sql demo title="Recent cryptocurrency trades"
 SELECT * FROM trades
@@ -268,40 +268,40 @@ LIMIT -10;
 | symbol   | side | price   | amount     | timestamp                   |
 | -------- | ---- | ------- | ---------- | --------------------------- |
 | BTC-USDT | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
-| BTC-USD  | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
+| BTC-USDT | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
 | BTC-USDT | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
 | BTC-USDT | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
 | BTC-USDT | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
 | ETH-USDT | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
-| ETH-USD  | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
+| ETH-USDT | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
 
-### Cryptocurrency Materialized Views
+### Cryptocurrency materialized views
 
 The cryptocurrency dataset includes materialized views for aggregated trade data:
 
-#### Trades Aggregations
+#### Trades aggregations
 
 - **`trades_latest_1d`** - Latest trade data aggregated daily
 - **`trades_OHLC_15m`** - OHLC candlesticks for cryptocurrency trades at 15-minute intervals
 
 These views are continuously updated and provide faster query performance for cryptocurrency trade analysis.
 
-### Cryptocurrency Data Volume
+### Cryptocurrency data volume
 
 - **`trades`**: Approximately **3.7 million rows** per day (real cryptocurrency trades)
 
 ---
 
-## Data Retention
+## Data retention
 
 **FX tables** (`core_price` and `market_data`) use a **3-day TTL (Time To Live)**, meaning data older than 3 days is automatically removed. This keeps the demo instance responsive while providing sufficient recent data.
 
 **Cryptocurrency trades table** has **no retention policy** and contains historical data dating back to **March 8, 2022**. This provides over 3 years of real cryptocurrency trade history for long-term analysis and backtesting.
 
-## Using the Demo Data
+## Using the demo data
 
 You can run queries against both datasets directly on [demo.questdb.com](https://demo.questdb.io). Throughout the Cookbook, recipes using demo data will include a direct link to execute the query.
 

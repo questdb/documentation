@@ -1,5 +1,5 @@
 ---
-title: Create Arrays from String Literals
+title: Create arrays from string literals
 sidebar_label: Array from string literal
 description: Cast string literals to array types in QuestDB
 ---

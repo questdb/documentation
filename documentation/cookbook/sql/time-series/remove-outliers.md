@@ -1,5 +1,5 @@
 ---
-title: Remove Outliers from Candle Data
+title: Remove outliers from candle data
 sidebar_label: Remove OHLC outliers
 description: Filter outliers in OHLC candles using window functions to compare against moving averages
 ---
@@ -63,7 +63,7 @@ The CTE fetches 21 days of data (7 extra days) so the 7-day moving average windo
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
-- [AVG window function](/docs/query/functions/window/#avg)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [AVG window function](/docs/query/functions/window-functions/reference/#avg)
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 :::

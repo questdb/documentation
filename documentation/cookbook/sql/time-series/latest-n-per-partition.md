@@ -1,12 +1,12 @@
 ---
-title: Get Latest N Records Per Partition
+title: Get latest N records per partition
 sidebar_label: Latest N per partition
 description: Retrieve the most recent N rows for each distinct value using window functions and filtering
 ---
 
 Retrieve the most recent N rows for each distinct partition value (e.g., latest 5 trades per symbol, last 10 readings per sensor). While `LATEST ON` returns only the single most recent row per partition, this pattern extends it to get multiple recent rows per partition.
 
-## Problem: Need Multiple Recent Rows Per Group
+## Problem: Need multiple recent rows per group
 
 You want to get the latest N rows for each distinct value in a column. For example:
 - Latest 5 trades for each trading symbol
@@ -23,7 +23,7 @@ LATEST ON timestamp PARTITION BY symbol;
 
 But you need multiple rows per symbol.
 
-## Solution: Use ROW_NUMBER() Window Function
+## Solution: Use ROW_NUMBER() window function
 
 Use `row_number()` to rank rows within each partition, then filter to keep only the top N:
 
@@ -43,7 +43,7 @@ ORDER BY symbol, timestamp DESC;
 
 This returns up to 5 most recent trades for each symbol from the last day.
 
-## How It Works
+## How it works
 
 The query uses a two-step approach:
 
@@ -71,7 +71,7 @@ The query uses a two-step approach:
 
 With `WHERE rn <= 3`, we keep rows 1-3 for each symbol.
 
-## Adapting the Query
+## Adapting the query
 
 **Different partition columns:**
 ```sql
@@ -136,7 +136,7 @@ FROM ranked
 WHERE rn <= 5;
 ```
 
-## Alternative: Use Negative LIMIT
+## Alternative: Use negative LIMIT
 
 For a simpler approach when you need the latest N rows **total** (not per partition), use negative LIMIT:
 
@@ -157,7 +157,7 @@ LIMIT -100;
 
 **But this doesn't work per partition** - it returns 100 total rows, not 100 per symbol.
 
-## Performance Optimization
+## Performance optimization
 
 **Filter by timestamp first:**
 ```sql
@@ -184,7 +184,7 @@ WHERE timestamp in today()
   AND symbol IN ('BTC-USDT', 'ETH-USDT', 'SOL-USDT')
 ```
 
-## Top N with Aggregates
+## Top N with aggregates
 
 Combine with aggregates to get summary statistics for top N:
 
@@ -220,8 +220,8 @@ GROUP BY symbol;
 
 
 :::info Related Documentation
-- [row_number() window function](/docs/query/functions/window/#row_number)
+- [row_number() window function](/docs/query/functions/window-functions/reference/#row_number)
 - [LATEST ON](/docs/query/sql/latest-on/)
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [LIMIT](/docs/query/sql/select/#limit)
 :::

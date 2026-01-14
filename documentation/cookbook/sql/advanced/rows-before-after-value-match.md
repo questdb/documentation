@@ -1,5 +1,5 @@
 ---
-title: Access Rows Before and After Current Row
+title: Access rows before and after current row
 sidebar_label: Rows before/after
 description: Use LAG and LEAD window functions to access values from surrounding rows
 ---
@@ -30,7 +30,7 @@ FROM core_price
 WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
 ```
 
-## How It Works
+## How it works
 
 - **`LAG(column, N)`** - Gets the value from N rows **before** the current row (earlier in time)
 - **`LEAD(column, N)`** - Gets the value from N rows **after** the current row (later in time)
@@ -38,7 +38,7 @@ WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
 Both functions return `NULL` for rows where the offset goes beyond the dataset boundaries (e.g., `LAG(5)` returns `NULL` for the first 5 rows).
 
 :::info Related Documentation
-- [LAG window function](/docs/query/functions/window/#lag)
-- [LEAD window function](/docs/query/functions/window/#lead)
-- [Window functions overview](/docs/query/sql/over/)
+- [LAG window function](/docs/query/functions/window-functions/reference/#lag)
+- [LEAD window function](/docs/query/functions/window-functions/reference/#lead)
+- [Window functions overview](/docs/query/functions/window-functions/syntax/)
 :::

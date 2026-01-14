@@ -1,5 +1,5 @@
 ---
-title: Distribute Discrete Values Across Time Intervals
+title: Distribute discrete values across time intervals
 sidebar_label: Distribute discrete values
 description: Spread cumulative measurements across time intervals using sessions and window functions
 ---
@@ -87,6 +87,6 @@ The final query divides the `wh` reported in the session by the number of `attri
 :::info Related Documentation
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 - [FILL](/docs/query/sql/select/#fill)
-- [Window functions](/docs/query/sql/over/)
-- [FIRST_VALUE](/docs/query/functions/window/#first_value)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [FIRST_VALUE](/docs/query/functions/window-functions/reference/#first_value)
 :::

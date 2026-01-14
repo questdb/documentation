@@ -1,5 +1,5 @@
 ---
-title: Find Local Minimum and Maximum
+title: Find local minimum and maximum
 sidebar_label: Local min and max
 description: Find the minimum and maximum values within a time range around each row
 ---
@@ -10,7 +10,7 @@ Find the minimum and maximum values within a time window around each row to dete
 
 You want to find the local minimum and maximum bid price within a time range of each row - for example, the min/max within 1 second before and after each data point.
 
-## Solution 1: Window Function (Past Only)
+## Solution 1: Window function (past only)
 
 If you only need to look at **past data**, use a window function with `RANGE`:
 
@@ -24,7 +24,7 @@ WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
 
 This returns the minimum and maximum bid price from the 1 second preceding each row.
 
-## Solution 2: WINDOW JOIN (Past and Future)
+## Solution 2: WINDOW JOIN (past and future)
 
 If you need to look at **both past and future data**, use a `WINDOW JOIN`. QuestDB window functions don't support `FOLLOWING`, but WINDOW JOIN allows bidirectional lookback:
 
@@ -40,7 +40,7 @@ WHERE p.timestamp >= dateadd('m', -1, now()) AND p.symbol = 'EURUSD';
 
 This returns the minimum and maximum bid price from 1 second before to 1 second after each row.
 
-## When to Use Each Approach
+## When to use each approach
 
 | Approach | Use When |
 |----------|----------|
@@ -48,7 +48,7 @@ This returns the minimum and maximum bid price from 1 second before to 1 second 
 | WINDOW JOIN | You need to look at both past and future data |
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [WINDOW JOIN](/docs/query/sql/window-join/)
 - [MIN/MAX aggregate functions](/docs/query/functions/aggregation/#min)
 :::

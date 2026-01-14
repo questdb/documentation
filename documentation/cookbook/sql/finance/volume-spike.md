@@ -1,5 +1,5 @@
 ---
-title: Volume Spike Detection
+title: Volume spike detection
 sidebar_label: Volume spikes
 description: Detect volume spikes by comparing current volume against previous volume using LAG
 ---
@@ -47,7 +47,7 @@ FROM prev_volumes;
 ```
 
 :::info Related Documentation
-- [LAG window function](/docs/query/functions/window/#lag)
+- [LAG window function](/docs/query/functions/window-functions/reference/#lag)
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 - [CASE expressions](/docs/query/sql/case/)
 :::

@@ -1,12 +1,12 @@
 ---
-title: Top N Plus Others Row
+title: Top N plus others row
 sidebar_label: Top N + Others
 description: Group query results into top N rows plus an aggregated "Others" row using rank() and CASE expressions
 ---
 
 Create aggregated results showing the top N items individually, with all remaining items combined into a single "Others" row. This pattern is useful for dashboards and reports where you want to highlight the most important items while still showing the total.
 
-## Problem: Show Top Items Plus Remainder
+## Problem: Show top items plus remainder
 
 You want to display results like:
 
@@ -21,7 +21,7 @@ You want to display results like:
 
 Instead of listing all symbols (which might be thousands), show the top 5 individually and aggregate the rest.
 
-## Solution: Use rank() with CASE Statement
+## Solution: Use rank() with CASE statement
 
 Use `rank()` to identify top N rows, then use `CASE` to group remaining rows:
 
@@ -61,7 +61,7 @@ ORDER BY total_trades DESC;
 | AVAX-USDT  | 5891         |
 | -Others-   | 23456        | ← Sum of all other symbols
 
-## How It Works
+## How it works
 
 The query uses a three-step approach:
 
@@ -118,7 +118,7 @@ ORDER BY total_trades DESC;
 - `rank()`: May include more than N if there are ties at position N
 - `row_number()`: Always exactly N in top tier (breaks ties arbitrarily)
 
-## Adapting the Pattern
+## Adapting the pattern
 
 **Different top N:**
 ```sql
@@ -185,7 +185,7 @@ ORDER BY total_trades DESC;
 ```
 
 
-## Multiple Grouping Columns
+## Multiple grouping columns
 
 Show top N for multiple dimensions:
 
@@ -215,7 +215,7 @@ ORDER BY side, total_trades DESC;
 
 This shows top 3 symbols separately for buy and sell sides.
 
-## Visualization Considerations
+## Visualization considerations
 
 This pattern is particularly useful for charts:
 
@@ -238,8 +238,8 @@ If there are N or fewer distinct values, the "Others" row won't appear (or will 
 :::
 
 :::info Related Documentation
-- [rank() window function](/docs/query/functions/window/#rank)
-- [row_number() window function](/docs/query/functions/window/#row_number)
+- [rank() window function](/docs/query/functions/window-functions/reference/#rank)
+- [row_number() window function](/docs/query/functions/window-functions/reference/#row_number)
 - [CASE expressions](/docs/query/sql/case/)
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 :::

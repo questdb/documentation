@@ -1,5 +1,5 @@
 ---
-title: Join Strategies for Sparse Sensor Data
+title: Join strategies for sparse sensor data
 sidebar_label: Sparse sensor data
 description: Compare CROSS JOIN, LEFT JOIN, and ASOF JOIN strategies for combining data from sensors stored in separate tables
 ---
@@ -28,7 +28,7 @@ LIMIT 100000;
 
 This works, but it is not super fast (1sec for 10 million rows, in a table with 120 sensor columns and with 10k different vehicle_ids), and it is also not very efficient because `null` columns take some bytes on disk.
 
-## Solution: Multiple Narrow Tables with Joins
+## Solution: Multiple narrow tables with joins
 
 A single table works, but there is a more efficient (although a bit more cumbersome if you compose queries by hand) way to do this.
 

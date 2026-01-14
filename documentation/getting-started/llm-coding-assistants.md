@@ -9,7 +9,7 @@ LLM-powered coding assistants like <a href="https://claude.ai/code" target="_bla
 
 These tools work with QuestDB out of the box. The REST API is useful for connecting, interacting with the web console, and prototyping queries via HTTP. For production workloads, ingestion is done via the official QuestDB clients and queries via the PostgreSQL wire protocol (PGWire).
 
-## Try it now
+## Try it with Claude Code
 
 No setup required. Use the public QuestDB demo with Claude Code:
 
