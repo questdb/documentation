@@ -254,7 +254,7 @@ CREATE TABLE 'trades' (
 - **`price`** - Execution price of the trade
 - **`amount`** - Trade size (volume in base currency)
 
-The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USD, BTC-USDT, DAI-USD, DOT-USD, ETH-BTC, ETH-USDT, LTC-USD, SOL-BTC, SOL-USD, UNI-USD, XLM-USD.
+The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USDT, BTC-USDT, DAI-USDT, DOT-USDT, ETH-BTC, ETH-USDT, LTC-USDT, SOL-BTC, SOL-USDT, UNI-USDT, XLM-USDT.
 
 #### Sample data
 
@@ -268,15 +268,15 @@ LIMIT -10;
 | symbol   | side | price   | amount     | timestamp                   |
 | -------- | ---- | ------- | ---------- | --------------------------- |
 | BTC-USDT | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
-| BTC-USD  | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
+| BTC-USDT | buy  | 85721.6 | 0.00045714 | 2025-12-18T19:31:11.203000Z |
 | BTC-USDT | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85726.6 | 0.00001501 | 2025-12-18T19:31:11.206000Z |
 | BTC-USDT | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85726.9 | 0.000887   | 2025-12-18T19:31:11.206000Z |
 | BTC-USDT | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
-| BTC-USD  | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
+| BTC-USDT | buy  | 85731.3 | 0.00004393 | 2025-12-18T19:31:11.206000Z |
 | ETH-USDT | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
-| ETH-USD  | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
+| ETH-USDT | sell | 2827.54 | 0.006929   | 2025-12-18T19:31:11.595000Z |
 
 ### Cryptocurrency materialized views
 
