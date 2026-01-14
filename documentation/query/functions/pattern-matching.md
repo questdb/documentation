@@ -96,27 +96,27 @@ SELECT 'QUEST' ILIKE '_ues_';
 
 ```questdb-sql
 SELECT * FROM trades
-WHERE symbol LIKE '%-USD'
+WHERE symbol LIKE '%-USDT'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| symbol  | side | price    | amount     | timestamp                   |
-| ------- | ---- | -------- | ---------- | --------------------------- |
-| ETH-USD | sell | 1348.13  | 3.22455108 | 2022-10-04T15:25:58.834362Z |
-| BTC-USD | sell | 20082.08 | 0.16591219 | 2022-10-04T15:25:59.742552Z |
+| symbol   | side | price    | amount     | timestamp                   |
+| -------- | ---- | -------- | ---------- | --------------------------- |
+| ETH-USDT | sell | 1348.13  | 3.22455108 | 2022-10-04T15:25:58.834362Z |
+| BTC-USDT | sell | 20082.08 | 0.16591219 | 2022-10-04T15:25:59.742552Z |
 
 #### ILIKE
 
 ```questdb-sql
 SELECT * FROM trades
-WHERE symbol ILIKE '%-usd'
+WHERE symbol ILIKE '%-usdt'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| symbol  | side | price    | amount     | timestamp                   |
-| ------- | ---- | -------- | ---------- | --------------------------- |
-| ETH-USD | sell | 1348.13  | 3.22455108 | 2022-10-04T15:25:58.834362Z |
-| BTC-USD | sell | 20082.08 | 0.16591219 | 2022-10-04T15:25:59.742552Z |
+| symbol   | side | price    | amount     | timestamp                   |
+| -------- | ---- | -------- | ---------- | --------------------------- |
+| ETH-USDT | sell | 1348.13  | 3.22455108 | 2022-10-04T15:25:58.834362Z |
+| BTC-USDT | sell | 20082.08 | 0.16591219 | 2022-10-04T15:25:59.742552Z |
 
 ## regexp_replace
 

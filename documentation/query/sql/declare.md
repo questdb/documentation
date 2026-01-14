@@ -4,7 +4,7 @@ sidebar_label: DECLARE
 description: DECLARE SQL keyword reference documentation.
 ---
 
-`DECLARE` specifies a series of variable bindings used throughout your query. 
+`DECLARE` specifies a series of variable bindings used throughout your query.
 
 This syntax is supported within `SELECT` queries.
 
@@ -38,7 +38,7 @@ You should see an error message like this:
 The above example declares a single binding, which states that the variable `@x` is replaced with the constant integer `5`.
 
 The variables are resolved at parse-time, meaning that the variable is no longer present
-when the query is compiled. 
+when the query is compiled.
 
 So the above example reduces to this simple query:
 
@@ -56,7 +56,7 @@ SELECT 5;
 To declare multiple variables, set the bind expressions with commas `,`:
 
 ```questdb-sql title="Multiple variable bindings" demo
-DECLARE 
+DECLARE
     @x := 5,
     @y := 2
 SELECT @x + @y;
@@ -68,7 +68,7 @@ SELECT @x + @y;
 
 ### Variables as functions
 
-A variable need not be just a constant. It could also be a function call, 
+A variable need not be just a constant. It could also be a function call,
 and variables with function values can be nested:
 
 ```questdb-sql title="declaring function variable" demo
@@ -86,7 +86,7 @@ SELECT @today = interval(@start, @end);
 
 ### Declarations in subqueries
 
-Declarations made in parent queries are available in subqueries. 
+Declarations made in parent queries are available in subqueries.
 
 ```questdb-sql title="variable shadowing" demo
 DECLARE
@@ -97,13 +97,13 @@ SELECT y FROM (
 ```
 
 | y |
-|---| 
+|---|
 | 5 |
 
 #### Shadowing
 
 If a subquery declares a variable of the same name, then the variable is shadowed
-and takes on the new value. 
+and takes on the new value.
 
 However, any queries above this subquery are unaffected - the
 variable bind is not globally mutated.
@@ -123,7 +123,7 @@ SELECT @x + y FROM (
 
 ### Declarations as subqueries
 
-Declarations themselves can be subqueries. 
+Declarations themselves can be subqueries.
 
 We suggest that this is not overused, as removing the subquery definition from its execution
 location may make queries harder to debug.
@@ -151,7 +151,7 @@ SELECT * FROM @subquery;
 Naturally, `DECLARE` also works with CTEs:
 
 ```questdb-sql title="declarations inside CTEs" demo
-DECLARE 
+DECLARE
   @x := 5
 WITH first AS (
   DECLARE @x := 10
@@ -159,7 +159,7 @@ WITH first AS (
 ),
 second AS (
   DECLARE @y := 4
-  SELECT 
+  SELECT
     @x + @y as b, -- b = 5 + 4 = 9
     a -- a = 10
     FROM first
@@ -179,7 +179,7 @@ FROM second;
 does not perform syntax validation that rejects the `DECLARE` syntax:
 
 ```questdb-sql
-DECLARE @x := ?, @y := ? 
+DECLARE @x := ?, @y := ?
 SELECT @x::int + @y::int;
 
 -- Then bind the following values: (1, 2)
@@ -189,9 +189,9 @@ SELECT @x::int + @y::int;
 |--------|
 | 3      |
 
-This can be useful to minimise repeated bind variables. 
+This can be useful to minimise repeated bind variables.
 
-For example, rather than passing the same value to multiple positional arguments, 
+For example, rather than passing the same value to multiple positional arguments,
 you could instead use a declared variable and send a single bind variable:
 
 
@@ -206,16 +206,16 @@ SELECT @name as name, id FROM users WHERE name = @name;
 Or for repeating columns:
 
 ```questdb-sql
-DECLARE 
+DECLARE
     @col = ?,
     @symbol = ?
-SELECT avg(@col), min(@col), max(@col) 
-FROM trades 
+SELECT avg(@col), min(@col), max(@col)
+FROM trades
 WHERE symbol = @symbol;
 ```
 ## Limitations
 
-Most basic expressions are supported, and we provide examples later in this document. 
+Most basic expressions are supported, and we provide examples later in this document.
 
 We suggest you use variables to simplify repeated constants within your code, and minimise
 how many places you need to update the constant.
@@ -228,7 +228,7 @@ However, not all expressions are supported. The following are explicitly disallo
 
 ```questdb-sql title="bracket lists are not allowed"
 DECLARE
-    @symbols := ('BTC-USD', 'ETH-USD')
+    @symbols := ('BTC-USDT', 'ETH-USDT')
 SELECT timestamp, price, symbol
 FROM trades
 WHERE symbol IN @symbols;
@@ -256,7 +256,7 @@ In this case, you should use an alternate API to splice in identifiers, for exam
 cur.execute(
     sql.SQL("""
         DECLARE @col := {}
-        SELECT max(@col), min(@col), avg(price) 
+        SELECT max(@col), min(@col), avg(price)
         FROM btc_trades;
     """).format(sql.Identifier('price')))
 ```
@@ -266,36 +266,36 @@ cur.execute(
 ### SAMPLE BY
 
 ```questdb-sql title="DECLARE with SAMPLE BY" demo
-DECLARE 
+DECLARE
     @period := 1m,
     @window := '2024-11-25',
-    @symbol := 'ETH-USD'
-SELECT 
-   timestamp, symbol, side, sum(amount) as volume 
+    @symbol := 'ETH-USDT'
+SELECT
+   timestamp, symbol, side, sum(amount) as volume
 FROM trades
-WHERE side = 'sell' 
-AND timestamp IN @window 
+WHERE side = 'sell'
+AND timestamp IN @window
 AND symbol = @symbol
-SAMPLE BY @period 
+SAMPLE BY @period
 FILL(NULL);
 ```
 
-| timestamp                   | symbol  | side | volume           |
-|-----------------------------|---------|------|------------------|
-| 2024-11-25T00:00:00.000000Z | ETH-USD | sell | 153.470574999999 | 
-| 2024-11-25T00:01:00.000000Z | ETH-USD | sell | 298.927738       |
-| 2024-11-25T00:02:00.000000Z | ETH-USD | sell | 66.253058        |
-| ...                         | ...     | ...  | ...              |
+| timestamp                   | symbol   | side | volume           |
+|-----------------------------|----------|------|------------------|
+| 2024-11-25T00:00:00.000000Z | ETH-USDT | sell | 153.470574999999 |
+| 2024-11-25T00:01:00.000000Z | ETH-USDT | sell | 298.927738       |
+| 2024-11-25T00:02:00.000000Z | ETH-USDT | sell | 66.253058        |
+| ...                         | ...      | ...  | ...              |
 
 ### INSERT INTO SELECT
 
 ```questdb-sql
-INSERT INTO trades (timestamp, symbol) 
-SELECT * FROM 
+INSERT INTO trades (timestamp, symbol)
+SELECT * FROM
 (
-    DECLARE 
-        @x := now(), 
-        @y := 'ETH-USD' 
+    DECLARE
+        @x := now(),
+        @y := 'ETH-USDT'
     SELECT @x as timestamp, @y as symbol
 );
 ```
@@ -304,9 +304,9 @@ SELECT * FROM
 
 ```questdb-sql
 CREATE TABLE trades AS (
-    DECLARE 
-        @x := now(), 
-        @y := 'ETH-USD' 
+    DECLARE
+        @x := now(),
+        @y := 'ETH-USDT'
     SELECT @x as timestamp, @y as symbol, 123 as price
 );
 ```
