@@ -24,6 +24,9 @@ all_queries.sql
 failed_queries.sql
 query_validation_report.txt
 
+# PDF generator output
+scripts/pdf-generator/output/
+
 # Misc
 .DS_Store
 .env.local

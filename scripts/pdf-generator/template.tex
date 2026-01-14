@@ -1,0 +1,108 @@
+% QuestDB Cookbook PDF Template
+% Minimal template for pandoc + XeLaTeX
+
+\documentclass[11pt,a4paper]{report}
+
+% Page geometry
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+
+% Font setup (XeLaTeX)
+\usepackage{fontspec}
+\setmainfont{Helvetica Neue}
+\setmonofont{Menlo}[Scale=0.85]
+
+% Colors
+\usepackage{xcolor}
+\definecolor{questdb-purple}{RGB}{100,75,160}
+
+% Headers and footers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{questdb-purple}{\textbf{QuestDB Cookbook}}}
+\fancyhead[R]{\textcolor{gray}{\leftmark}}
+\fancyfoot[C]{\thepage}
+
+% Hyperlinks
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=questdb-purple,urlcolor=blue}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{calc}
+
+% Graphics
+\usepackage{graphicx}
+
+% Pandoc requirements
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% Code blocks (Shaded environment for pandoc)
+\usepackage{fancyvrb}
+\newenvironment{Shaded}{}{}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},fontsize=\small}
+\newcommand{\KeywordTok}[1]{\textbf{#1}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\StringTok}[1]{#1}
+\newcommand{\CommentTok}[1]{\textit{#1}}
+\newcommand{\OtherTok}[1]{#1}
+\newcommand{\FunctionTok}[1]{#1}
+\newcommand{\VariableTok}[1]{#1}
+\newcommand{\ControlFlowTok}[1]{\textbf{#1}}
+\newcommand{\OperatorTok}[1]{#1}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{#1}
+\newcommand{\DataTypeTok}[1]{#1}
+\newcommand{\DecValTok}[1]{#1}
+\newcommand{\BaseNTok}[1]{#1}
+\newcommand{\FloatTok}[1]{#1}
+\newcommand{\ConstantTok}[1]{#1}
+\newcommand{\CharTok}[1]{#1}
+\newcommand{\SpecialStringTok}[1]{#1}
+\newcommand{\VerbatimStringTok}[1]{#1}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\DocumentationTok}[1]{\textit{#1}}
+\newcommand{\AnnotationTok}[1]{#1}
+\newcommand{\CommentVarTok}[1]{\textit{#1}}
+\newcommand{\PreprocessorTok}[1]{#1}
+\newcommand{\AttributeTok}[1]{#1}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\InformationTok}[1]{#1}
+\newcommand{\WarningTok}[1]{#1}
+\newcommand{\AlertTok}[1]{#1}
+\newcommand{\ErrorTok}[1]{#1}
+
+
+% Title variables
+$if(title)$
+\title{$title$}
+$endif$
+$if(date)$
+\date{$date$}
+$endif$
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+\centering
+\vspace*{4cm}
+{\Huge\bfseries\textcolor{questdb-purple}{QuestDB Cookbook}\par}
+\vspace{1cm}
+{\Large SQL Recipes for Time-Series Data\par}
+\vfill
+$if(date)$
+{\large $date$\par}
+$endif$
+\end{titlepage}
+
+% Table of contents
+\tableofcontents
+\newpage
+
+$body$
+
+\end{document}
