@@ -8,11 +8,11 @@ Calculate rolling standard deviation to measure price volatility over time.
 
 ## Problem
 
-You want to calculate rolling standard deviation. QuestDB supports `stddev` as an aggregate function, but not as a window function.
+You want to calculate rolling standard deviation.
 
 ## Solution
 
-Use the mathematical identity: `Var(X) = E[X²] - E[X]²`
+Use the mathematical identity: `σ = √(E[X²] - E[X]²)`
 
 Compute both `AVG(price)` and `AVG(price * price)` as window functions, then derive the standard deviation:
 
@@ -37,7 +37,19 @@ FROM stats
 LIMIT 10;
 ```
 
-The key insight is that both window functions are computed in the same CTE, then combined in the final SELECT. This works because QuestDB doesn't allow operations on window function results directly within the same query level.
+## How it works
+
+The mathematical relationship used here is:
+
+```
+Variance(X) = E[X²] - (E[X])²
+StdDev(X) = √(E[X²] - (E[X])²)
+```
+
+Where:
+- `E[X]` is the average (SMA) of prices
+- `E[X²]` is the average of squared prices
+- `√` is the square root function
 
 :::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)

@@ -4,11 +4,11 @@ sidebar_label: CSV import with milliseconds
 description: Import CSV files with epoch millisecond timestamps into QuestDB
 ---
 
-Import CSV files containing epoch timestamps in milliseconds into QuestDB, which expects microseconds.
+Import CSV files containing epoch timestamps in milliseconds into QuestDB.
 
 ## Problem
 
-QuestDB does not support flags for timestamp conversion during CSV import.
+QuestDB expects either date/timestamp literals, or epochs in microseconds or nanoseconds.
 
 ## Solution options
 

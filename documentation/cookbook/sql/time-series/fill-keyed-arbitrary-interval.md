@@ -1,20 +1,25 @@
 ---
 title: FILL on keyed queries with arbitrary intervals
-sidebar_label: FILL keyed arbitrary interval
-description: Use FILL with keyed queries across arbitrary time intervals by sandwiching data with null boundary rows
+sidebar_label: FILL arbitrary intervals
+description: Use FILL with keyed queries and any FILL strategy across arbitrary time intervals by sandwiching data with null boundary rows
 ---
 
-When using `SAMPLE BY` with `FILL` on keyed queries (queries with non-aggregated columns like symbol), the `FROM/TO` syntax doesn't work. This recipe shows how to fill gaps across an arbitrary time interval for keyed queries.
+You want to sample data and fill any potential gaps with interpolated values, using a time interval defined by a starting
+and ending timestamp, not only between the first and last existing row in the filtered results.
+
 
 ## Problem
 
-Keyed queries - queries that include non-aggregated columns beyond the timestamp - do not support the `SAMPLE BY FROM x TO y` syntax when using `FILL`. Without this feature, gaps are only filled between the first and last existing row in the filtered results, not across your desired time interval.
+QuestDB has a built-in [`SAMPLE BY .. FROM/TO`](/docs/query/sql/sample-by/#from-to) syntax available for non-keyed queries (queries that include only aggregated columns beyond the timestamp), and for the `NULL` FILL strategy.
 
-For example, if you want to sample by symbol and timestamp bucket with `FILL` for a specific time range, standard approaches will not fill gaps at the beginning or end of your interval.
+If you use `FROM/TO` in a keyed query (for example, an OHLC with timestamp, symbol, and aggregations) you will get the
+following error: _FROM-TO intervals are not supported for keyed SAMPLE BY queries_.
+
 
 ## Solution
 
-"Sandwich" your data by adding artificial boundary rows at the start and end of your time interval using `UNION ALL`. These rows contain your target timestamps with nulls for all other columns:
+"Sandwich" your data by adding artificial boundary rows at the start and end of your time interval using `UNION ALL`. These rows contain your target timestamps with nulls for all other columns. Then you can use `FILL` without the `FROM/TO` keywords and get results
+for every sampled interval within those arbitrary dates.
 
 ```questdb-sql demo title="FILL arbitrary interval with keyed SAMPLE BY"
 
