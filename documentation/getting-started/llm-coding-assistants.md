@@ -26,7 +26,7 @@ You: "What's the total volume traded per symbol, sampled by 1 hour? Use SAMPLE B
 
 Claude Code: [Writes and executes SAMPLE BY 1h query grouped by symbol]
 
-You: "Plot the price of BTC-USD over the last 30 days"
+You: "Plot the price of BTC-USDT over the last 30 days"
 
 Claude Code: [Queries data and generates a chart using matplotlib]
 ```

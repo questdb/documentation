@@ -292,7 +292,7 @@ If partitioning of `NONE` is used, then a single parquet file will be generated 
 Export the results of a query:
 
 ```questdb-sql title="Export filtered data"
-COPY (SELECT * FROM trades WHERE timestamp IN today() AND symbol = 'BTC-USD')
+COPY (SELECT * FROM trades WHERE timestamp IN today() AND symbol = 'BTC-USDT')
 TO 'btc_today'
 WITH FORMAT PARQUET;
 ```
@@ -313,9 +313,9 @@ The underlying table does not already need to be partitioned. Likewise, you can 
 
 ```questdb-sql title=Export queries with partitions
 COPY (
-    SELECT generate_series as date 
+    SELECT generate_series as date
     FROM generate_series('2025-01-01', '2025-02-01', '1d')
-) 
+)
 TO 'dates'
 WITH FORMAT PARQUET
 PARTITION_BY DAY;
