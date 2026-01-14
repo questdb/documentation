@@ -1,18 +1,17 @@
 ---
-title: Bollinger Bands
+title: Bollinger bands
 sidebar_label: Bollinger Bands
 description: Calculate Bollinger Bands using window functions for volatility analysis and mean reversion trading strategies
 ---
 
 Calculate Bollinger Bands for volatility analysis and mean reversion trading. Bollinger Bands consist of a moving average with upper and lower bands set at a specified number of standard deviations above and below it. They help identify overbought/oversold conditions and measure market volatility.
 
-## Problem: Calculate Rolling Bands with Standard Deviation
 
-You want to calculate Bollinger Bands with a 20-period simple moving average (SMA) and bands at ±2 standard deviations. The challenge is that QuestDB doesn't support `STDDEV` as a window function, so you need a workaround using the mathematical relationship between variance and standard deviation.
+## Solution: Calculate variance using window functions
 
-## Solution: Calculate Variance Using Window Functions
-
-Since standard deviation is the square root of variance, and variance is the average of squared differences from the mean, we can calculate it using window functions:
+Since standard deviation is the square root of variance, and variance is the average of squared differences from the mean,
+we can calculate everything in SQL using window functions. This query will compute Bollinger Bands with a 20-period
+simple moving average (SMA) and bands at ±2 standard deviations:
 
 ```questdb-sql demo title="Calculate Bollinger Bands with 20-period SMA"
 WITH OHLC AS (
@@ -32,11 +31,11 @@ WITH OHLC AS (
     close,
     AVG(close) OVER (
       ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+      ROWS 19 PRECEDING
     ) AS sma20,
     AVG(close * close) OVER (
       ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+      ROWS 19 PRECEDING
     ) AS avg_close_sq
   FROM OHLC
 )
@@ -58,37 +57,19 @@ This query:
 4. Computes standard deviation using the mathematical identity: `σ = √(E[X²] - E[X]²)`
 5. Adds/subtracts 2× standard deviation to create upper and lower bands
 
-## How It Works
+## How it works
 
-The mathematical relationship used here is:
+The core of the Bollinger Bands calculation is the rolling standard deviation. Please check our
+[rolling standard deviation recipe](../rolling-stddev/) in the cookbook for an explanation about the mathematical formula.
 
-```
-Variance(X) = E[X²] - (E[X])²
-StdDev(X) = √(E[X²] - (E[X])²)
-```
 
-Where:
-- `E[X]` is the average (SMA) of closing prices
-- `E[X²]` is the average of squared closing prices
-- `√` is the square root function
-
-Breaking down the calculation:
-1. **`AVG(close)`**: Simple moving average over 20 periods
-2. **`AVG(close * close)`**: Average of squared prices over 20 periods
-3. **`sqrt(avg_close_sq - (sma20 * sma20))`**: Standard deviation derived from variance
-4. **Upper/Lower bands**: SMA ± (multiplier × standard deviation)
-
-### Window Frame Clause
-
-`ROWS BETWEEN 19 PRECEDING AND CURRENT ROW` creates a sliding window of exactly 20 rows (19 previous + current), which gives us the 20-period moving calculations required for standard Bollinger Bands.
-
-## Adapting the Parameters
+## Adapting the parameters
 
 **Different period lengths:**
 ```sql
 -- 10-period Bollinger Bands (change 19 to 9)
-AVG(close) OVER (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS sma10,
-AVG(close * close) OVER (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS avg_close_sq
+AVG(close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS sma10,
+AVG(close * close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS avg_close_sq
 ```
 
 **Different band multipliers:**
@@ -131,12 +112,12 @@ WITH OHLC AS (
     AVG(close) OVER (
       PARTITION BY symbol
       ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+      ROWS 19 PRECEDING
     ) AS sma20,
     AVG(close * close) OVER (
       PARTITION BY symbol
       ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+      ROWS 19 PRECEDING
     ) AS avg_close_sq
   FROM OHLC
 )
@@ -152,20 +133,6 @@ ORDER BY symbol, timestamp;
 ```
 
 Note the addition of `PARTITION BY symbol` to calculate separate Bollinger Bands for each symbol.
-
-:::tip Trading Signals
-- **Bollinger Squeeze**: When bands narrow, it indicates low volatility and often precedes significant price moves
-- **Band Walk**: Price consistently touching the upper band suggests strong uptrend; lower band suggests downtrend
-- **Mean Reversion**: Price touching or exceeding bands often signals potential reversals back to the mean
-- **Volatility Measure**: Width between bands indicates market volatility - wider bands mean higher volatility
-:::
-
-:::tip Parameter Selection
-- **Standard settings**: 20-period SMA with 2σ bands (captures ~95% of price action)
-- **Day trading**: Use shorter periods (10 or 15) for more responsive bands
-- **Swing trading**: Use standard 20-period or longer (50-period) for smoother signals
-- **Volatility adjustment**: Use 2.5σ or 3σ bands in highly volatile markets
-:::
 
 :::info Related Documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)

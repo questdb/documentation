@@ -6,7 +6,7 @@ description: Override QuestDB configuration parameters using environment variabl
 
 You can override any QuestDB configuration parameter using environment variables in Docker Compose. This is useful for setting custom ports, authentication credentials, memory limits, and other operational settings without modifying configuration files.
 
-## Environment Variable Format
+## Environment variable format
 
 To override configuration parameters via environment variables:
 
@@ -34,7 +34,7 @@ QUESTDB_PASSWORD=your_secure_password
 :::
 
 
-## Example: Custom PostgreSQL Credentials
+## Example: Custom PostgreSQL credentials
 
 This Docker Compose file overrides the default PostgreSQL wire protocol credentials:
 
@@ -73,7 +73,7 @@ This configuration:
 If you encounter permission errors with mounted volumes, ensure the QuestDB container user has write access to the host directory. You may need to set ownership with `chown -R 1000:1000 ./questdb_root` or run the container with a specific user ID.
 :::
 
-## Custom Data Directory Permissions
+## Custom data directory permissions
 
 ```yaml title="Run with specific user/group for volume permissions"
 services:
@@ -86,7 +86,7 @@ services:
       - ./questdb_data:/var/lib/questdb
 ```
 
-## Complete Configuration Reference
+## Complete configuration reference
 
 For a full list of available configuration parameters, see:
 - [Server Configuration Reference](/docs/configuration/overview/) - All configurable parameters with descriptions

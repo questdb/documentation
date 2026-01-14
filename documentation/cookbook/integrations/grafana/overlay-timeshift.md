@@ -1,5 +1,5 @@
 ---
-title: Overlay Two Time Series with Time Shift
+title: Overlay two time series with time shift
 sidebar_label: Overlay with timeshift
 description: Overlay yesterday's and today's data on the same Grafana chart using time shift
 ---

@@ -1,5 +1,5 @@
 ---
-title: Fill Missing Intervals with Value from Another Column
+title: Fill missing intervals with value from another column
 sidebar_label: Fill from one column
 description: Use window functions to propagate values from one column to fill multiple columns in SAMPLE BY queries
 ---

@@ -1,5 +1,5 @@
 ---
-title: Consistent Histogram Buckets
+title: Consistent histogram buckets
 sidebar_label: Histogram buckets
 description: Generate histogram data with fixed bucket boundaries for consistent distribution analysis
 ---
@@ -10,7 +10,7 @@ Create histograms with consistent bucket boundaries for distribution analysis. D
 
 A fixed bucket size works well for some data but poorly for others. For example, a bucket size of 0.5 produces a nice histogram for BTC trade amounts, but may produce just one or two buckets for assets with smaller typical values.
 
-## Solution 1: Fixed Bucket Size
+## Solution 1: Fixed bucket size
 
 When you know your data range, use a fixed bucket size:
 
@@ -25,7 +25,7 @@ GROUP BY bucket
 ORDER BY bucket;
 ```
 
-### How It Works
+### How it works
 
 ```sql
 floor(amount / 0.5) * 0.5
@@ -44,7 +44,7 @@ Examples:
 You must tune `@bucket_size` for your data range. A size that works for one symbol may not work for another.
 :::
 
-## Solution 2: Fixed Bucket Count (Dynamic Size)
+## Solution 2: Fixed bucket count (dynamic size)
 
 To always get approximately N buckets regardless of the data range, calculate the bucket size dynamically:
 
@@ -72,7 +72,7 @@ This calculates `(max - min) / 49` to create 50 evenly distributed buckets. The 
 If there are fewer distinct values than requested buckets, or if some buckets have no data, you'll get fewer than 50 results.
 :::
 
-## Solution 3: Logarithmic Buckets
+## Solution 3: Logarithmic buckets
 
 For data spanning multiple orders of magnitude:
 
@@ -90,7 +90,7 @@ ORDER BY bucket;
 
 Each bucket covers one order of magnitude (0.001-0.01, 0.01-0.1, 0.1-1.0, etc.).
 
-## Solution 4: Manual Buckets
+## Solution 4: Manual buckets
 
 For simple categorical grouping:
 
@@ -108,7 +108,7 @@ WHERE symbol = 'BTC-USDT' AND timestamp IN today()
 GROUP BY bucket;
 ```
 
-## Time-Series Histogram
+## Time-series histogram
 
 Track distribution changes over time by combining with `SAMPLE BY`:
 

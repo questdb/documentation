@@ -1,5 +1,5 @@
 ---
-title: Calculate Compound Interest
+title: Calculate compound interest
 sidebar_label: Compound interest
 description: Calculate compound interest over time using POWER and window functions
 ---
@@ -10,13 +10,13 @@ Calculate compound interest over multiple periods using SQL, where each period's
 This query uses generated data from `long_sequence()` to create a time series of years, so it can run directly on the demo instance without requiring any existing tables.
 :::
 
-## Problem: Need Year-by-Year Growth
+## Problem: Need year-by-year growth
 
 You want to calculate compound interest over 5 years, starting with an initial principal of 1000, with an annual interest rate of 0.1 (10%). Each year's interest should be calculated on the previous year's ending balance.
 
-## Solution: Use POWER Function with Window Functions
+## Solution: Use POWER function with window functions
 
-Combine the `POWER()` function with `FIRST_VALUE()` window function to calculate compound interest:
+The compound interest formula is `principal * (1 + rate)^periods`. Use `POWER()` to calculate the exponential part:
 
 ```questdb-sql demo title="Calculate compound interest over 5 years"
 WITH
@@ -45,11 +45,7 @@ SELECT
     timestamp,
     initial_principal,
     interest_rate,
-    FIRST_VALUE(cv.compounding)
-        OVER (
-              ORDER BY timestamp
-              ROWS between 1 preceding and 1 preceding
-              ) AS year_principal,
+    LAG(cv.compounding) OVER (ORDER BY timestamp) AS year_principal,
     cv.compounding as compounding_amount
 FROM
     compounded_values cv
@@ -74,16 +70,14 @@ from compounding_year_before;
 
 Each row shows how the principal grows year over year, with interest compounding on the previous year's ending balance.
 
-## How It Works
+## How it works
 
 The query uses a multi-step CTE approach:
 
 1. **Generate year series**: Use `long_sequence(5)` to create 5 rows representing years 2000-2004
 2. **Calculate compound amount**: Use `POWER(1 + interest_rate, years)` to compute the ending balance for each year
-3. **Get previous year's balance**: Use `FIRST_VALUE()` with window frame `ROWS between 1 preceding and 1 preceding` to access the previous row's compounding amount
+3. **Get previous year's balance**: Use `LAG()` to access the previous row's compounding amount
 4. **Handle first year**: Use `COALESCE()` to show the initial principal for the first year
-
-The `POWER()` function calculates the compound interest formula: `principal * (1 + rate)^periods`
 
 
 :::tip
@@ -93,6 +87,6 @@ For more complex scenarios like monthly or quarterly compounding, adjust the tim
 :::info Related Documentation
 - [POWER function](/docs/query/functions/numeric/#power)
 - [Window functions](/docs/query/functions/window-functions/syntax/)
-- [FIRST_VALUE window function](/docs/query/functions/window-functions/reference/#first_value)
+- [LAG window function](/docs/query/functions/window-functions/reference/#lag)
 - [long_sequence](/docs/query/functions/row-generator/#long_sequence)
 :::

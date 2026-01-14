@@ -1,12 +1,12 @@
 ---
-title: Cumulative Product for Random Walk
+title: Cumulative product for random walk
 sidebar_label: Cumulative product
 description: Calculate cumulative product to simulate stock price paths from daily returns
 ---
 
 Calculate the cumulative product of daily returns to simulate a stock's price path (random walk). This is useful for financial modeling, backtesting trading strategies, and portfolio analysis where you need to compound returns over time.
 
-## Problem: Compound Daily Returns
+## Problem: Compound daily returns
 
 You have a table with daily returns for a stock and want to calculate the cumulative price starting from an initial value (e.g., $100). Each day's price is calculated by multiplying the previous price by `(1 + return)`.
 
@@ -28,9 +28,11 @@ You want to calculate:
 | 2024-09-07 | 1.50            | 102.49      |
 | 2024-09-08 | -3.00           | 99.42       |
 
-## Solution: Use Logarithm Mathematics Trick
+## Solution: Use logarithms to convert multiplication to addition
 
-Since QuestDB doesn't allow functions on top of window function results, we use a mathematical trick: **the exponential of the sum of logarithms equals the product**.
+Use the mathematical identity: **exp(sum(ln(x))) = product(x)**
+
+This converts the cumulative product into a cumulative sum, which window functions handle naturally:
 
 ```questdb-sql title="Calculate cumulative product via logarithms"
 WITH ln_values AS (
@@ -52,7 +54,7 @@ This query:
 2. Uses a cumulative `SUM` window function to add up the logarithms
 3. Applies `exp()` to convert back to the product
 
-## How It Works
+## How it works
 
 The mathematical identity used here is:
 
@@ -66,13 +68,7 @@ Breaking it down:
 - `exp(ln_value)` converts the cumulative sum back to a cumulative product
 - Multiply by 100 to apply the starting price of $100
 
-### Why This Works
-
-QuestDB doesn't support direct window functions like `PRODUCT() OVER()`, and attempting `exp(SUM(ln(1 + return)) OVER ())` fails with a "dangling literal" error because you can't nest functions around window functions.
-
-The workaround is to use a CTE to compute the cumulative sum first, then apply `exp()` in the outer query where it's operating on a regular column, not a window function result.
-
-## Adapting to Your Data
+## Adapting to your data
 
 You can easily modify this pattern:
 

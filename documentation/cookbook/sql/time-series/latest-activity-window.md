@@ -1,5 +1,5 @@
 ---
-title: Query Last N Minutes of Activity
+title: Query last N minutes of activity
 sidebar_label: Latest activity window
 description: Get rows from the last N minutes of recorded activity using subqueries with LIMIT -1
 ---

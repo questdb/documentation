@@ -1,5 +1,5 @@
 ---
-title: Sankey and Funnel Diagrams
+title: Sankey and funnel diagrams
 sidebar_label: Sankey/funnel diagrams
 description: Create session-based analytics for Sankey diagrams and conversion funnels
 ---
@@ -23,7 +23,7 @@ CREATE TABLE events (
 ) TIMESTAMP(timestamp) PARTITION BY MONTH WAL;
 ```
 
-## Solution: Session Window Functions
+## Solution: Session window functions
 
 By combining window functions and `CASE` statements:
 

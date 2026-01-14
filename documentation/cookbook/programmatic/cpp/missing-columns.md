@@ -1,5 +1,5 @@
 ---
-title: Handle Missing Columns in C++ Client
+title: Handle missing columns in C++ client
 sidebar_label: Missing columns
 description: Send rows with optional columns using the QuestDB C++ client by conditionally calling column methods
 ---

@@ -1,5 +1,5 @@
 ---
-title: Configure Read-Only User for Grafana
+title: Configure read-only user for Grafana
 sidebar_label: Read-only user
 description: Set up a read-only PostgreSQL user for Grafana dashboards while maintaining admin access for DDL operations
 ---
@@ -10,7 +10,7 @@ Configure a dedicated read-only user for Grafana to improve security by preventi
 For QuestDB Enterprise, use the comprehensive [Role-Based Access Control (RBAC)](/docs/security/rbac/) system to create granular user permissions and roles. The configuration below applies to QuestDB Open Source.
 :::
 
-## Problem: Separate Read and Write Access
+## Problem: Separate read and write access
 
 You want to:
 1. Connect Grafana with read-only credentials
@@ -19,7 +19,7 @@ You want to:
 
 However, QuestDB's PostgreSQL wire protocol doesn't support standard PostgreSQL user management commands like `CREATE USER` or `GRANT`.
 
-## Solution: Enable the Read-Only User
+## Solution: Enable the read-only user
 
 QuestDB Open Source supports a built-in read-only user that can be enabled via configuration. This gives you two users:
 - **Admin user** (default: `admin`): Full access for DDL and DML operations
@@ -58,7 +58,7 @@ docker run \
   questdb/questdb:latest
 ```
 
-### Using the Read-Only User
+### Using the read-only user
 
 After enabling, you have two separate users:
 

@@ -1,5 +1,5 @@
 ---
-title: Pivot with "Others" Column
+title: Pivot with "Others" column
 sidebar_label: Pivot with Others
 description: Pivot specific values into columns while aggregating remaining values into an "Others" column using CASE statements
 ---
@@ -72,7 +72,7 @@ LIMIT 5;
 
 Each timestamp now has a single row with specific symbols as columns, plus an "Others" column aggregating all remaining symbols.
 
-## When to Use This Pattern
+## When to use this pattern
 
 Use `CASE` statements instead of `PIVOT` when you need:
 - An "Others" or "Else" column to catch unspecified values

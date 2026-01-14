@@ -1,5 +1,5 @@
 ---
-title: Optimize Disk and Memory Usage with Many Tables
+title: Optimize disk and memory usage with many tables
 sidebar_label: Optimize for many tables
 description: Reduce memory and disk usage when running QuestDB with many tables by adjusting memory allocation and disk chunk sizes
 ---

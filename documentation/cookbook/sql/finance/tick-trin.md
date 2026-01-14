@@ -1,185 +1,129 @@
 ---
-title: Cumulative Tick and Trin Indicators
-sidebar_label: Tick & Trin
-description: Calculate cumulative Tick and Trin (ARMS Index) for market sentiment analysis and breadth indicators
+title: TICK and TRIN indicators
+sidebar_label: TICK & TRIN
+description: Calculate TICK and TRIN (ARMS Index) based on price direction for market breadth analysis
 ---
 
-Calculate cumulative Tick and Trin (also known as the ARMS Index) to measure market sentiment and breadth. These indicators compare advancing versus declining trades in terms of both count and volume, helping identify overbought/oversold conditions and potential market reversals.
+Calculate TICK and TRIN (Trading Index, also known as the ARMS Index) to measure market breadth. These indicators classify each time period as advancing or declining based on price movement.
 
-## Problem: Calculate Running Market Breadth
+## Problem: Measure market breadth by price direction
 
-You have a table with trade data including `side` (buy/sell) and `quantity`, and want to calculate cumulative Tick and Trin values throughout the trading day. Tick measures the ratio of upticks to downticks, while Trin (Trading Index) adjusts this ratio by volume to identify divergences between price action and volume.
+You want to calculate TICK and TRIN indicators using traditional definitions:
+- **Uptick**: Current price > previous price
+- **Downtick**: Current price < previous price
+- **TICK** = upticks - downticks
+- **TRIN** = (upticks / downticks) / (uptick_volume / downtick_volume)
 
-## Solution: Use Window Functions with CASE Statements
+## Solution: Use LAG to compare consecutive prices
 
-Use `SUM` as a window function combined with `CASE` statements to compute running totals of upticks, downticks, and their respective volumes:
+### Per-symbol TICK and TRIN
 
-```questdb-sql demo title="Calculate cumulative Tick and Trin indicators"
-WITH tick_vol AS (
-    SELECT
-        timestamp,
-        side,
-        quantity,
-        SUM(CASE WHEN side = 'sell' THEN 1.0 END) OVER (ORDER BY timestamp) as downtick,
-        SUM(CASE WHEN side = 'buy' THEN 1.0 END) OVER (ORDER BY timestamp) as uptick,
-        SUM(CASE WHEN side = 'sell' THEN quantity END) OVER (ORDER BY timestamp) as downvol,
-        SUM(CASE WHEN side = 'buy' THEN quantity END) OVER (ORDER BY timestamp) as upvol
-    FROM fx_trades
-    WHERE timestamp IN yesterday() AND symbol = 'EURUSD'
+Calculate separate indicators for each currency pair:
+
+```questdb-sql demo title="TICK and TRIN per symbol"
+WITH candles AS (
+  SELECT timestamp, symbol, last(price) AS close, sum(quantity) AS total_volume
+  FROM fx_trades
+  WHERE timestamp IN yesterday()
+    AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
+  SAMPLE BY 10m
+),
+prev_prices AS (
+  SELECT timestamp, symbol, close, total_volume,
+    LAG(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
+  FROM candles
+),
+classified AS (
+  SELECT *,
+    CASE WHEN close > prev_close THEN 1 ELSE 0 END AS is_uptick,
+    CASE WHEN close < prev_close THEN 1 ELSE 0 END AS is_downtick,
+    CASE WHEN close > prev_close THEN total_volume ELSE 0 END AS uptick_vol,
+    CASE WHEN close < prev_close THEN total_volume ELSE 0 END AS downtick_vol
+  FROM prev_prices
+  WHERE prev_close IS NOT NULL
+),
+aggregated AS (
+  SELECT symbol,
+    SUM(is_uptick) AS upticks,
+    SUM(is_downtick) AS downticks,
+    SUM(is_uptick) - SUM(is_downtick) AS tick,
+    SUM(uptick_vol) AS uptick_vol,
+    SUM(downtick_vol) AS downtick_vol
+  FROM classified
 )
-SELECT
-    timestamp,
-    side,
-    quantity,
-    uptick,
-    downtick,
-    upvol,
-    downvol,
-    uptick / downtick as tick,
-    (uptick / downtick) / (upvol / downvol) as trin
-FROM tick_vol
-LIMIT -8;
+SELECT symbol,
+  upticks,
+  downticks,
+  tick,
+  upticks::double / downticks AS advance_decline_ratio,
+  uptick_vol::double / downtick_vol AS upside_downside_ratio,
+  (upticks::double / downticks) / (uptick_vol::double / downtick_vol) AS trin
+FROM aggregated;
 ```
 
-**Results:**
+### Market-wide TICK and TRIN
 
-| timestamp                      | side | quantity | uptick   | downtick | upvol         | downvol       | tick               | trin               |
-| ------------------------------ | ---- | -------- | -------- | -------- | ------------- | ------------- | ------------------ | ------------------ |
-| 2026-01-11T23:59:58.997072039Z | sell | 98659.0  | 342395.0 | 343426.0 | 45996256659.0 | 46085483999.0 | 0.9969978976548077 | 0.9989319565729681 |
-| 2026-01-11T23:59:59.084976043Z | buy  | 99311.0  | 342396.0 | 343426.0 | 45996355970.0 | 46085483999.0 | 0.997000809490254  | 0.9989327172509304 |
-| 2026-01-11T23:59:59.085326995Z | buy  | 57591.0  | 342397.0 | 343426.0 | 45996413561.0 | 46085483999.0 | 0.9970037213257005 | 0.9989343839854824 |
-| 2026-01-11T23:59:59.085700555Z | buy  | 119667.0 | 342398.0 | 343426.0 | 45996533228.0 | 46085483999.0 | 0.9970066331611468 | 0.9989347025717739 |
-| 2026-01-11T23:59:59.642850139Z | sell | 57695.0  | 342398.0 | 343427.0 | 45996533228.0 | 46085541694.0 | 0.9970037300503455 | 0.9989330444221086 |
-| 2026-01-11T23:59:59.643380840Z | sell | 130834.0 | 342398.0 | 343428.0 | 45996533228.0 | 46085672528.0 | 0.9970008269564509 | 0.9989329716112184 |
-| 2026-01-11T23:59:59.643482764Z | sell | 119573.0 | 342398.0 | 343429.0 | 45996533228.0 | 46085792101.0 | 0.9969979238794627 | 0.9989326547129301 |
-| 2026-01-11T23:59:59.643517597Z | sell | 33928.0  | 342398.0 | 343430.0 | 45996533228.0 | 46085826029.0 | 0.996995020819381  | 0.9989304814235689 |
+Aggregate across all symbols for a single market breadth reading:
 
-:::warning Handling NULL Values
-The first rows will have NULL values for tick and trin until there's at least one trade on each side (buy and sell). You can filter these out with `WHERE uptick IS NOT NULL AND downtick IS NOT NULL` if needed.
+```questdb-sql demo title="Market-wide TICK and TRIN"
+WITH candles AS (
+  SELECT timestamp, symbol, last(price) AS close, sum(quantity) AS total_volume
+  FROM fx_trades
+  WHERE timestamp IN yesterday()
+    AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
+  SAMPLE BY 10m
+),
+prev_prices AS (
+  SELECT timestamp, symbol, close, total_volume,
+    LAG(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
+  FROM candles
+),
+classified AS (
+  SELECT *,
+    CASE WHEN close > prev_close THEN 1 ELSE 0 END AS is_uptick,
+    CASE WHEN close < prev_close THEN 1 ELSE 0 END AS is_downtick,
+    CASE WHEN close > prev_close THEN total_volume ELSE 0 END AS uptick_vol,
+    CASE WHEN close < prev_close THEN total_volume ELSE 0 END AS downtick_vol
+  FROM prev_prices
+  WHERE prev_close IS NOT NULL
+),
+aggregated AS (
+  SELECT
+    SUM(is_uptick) AS upticks,
+    SUM(is_downtick) AS downticks,
+    SUM(is_uptick) - SUM(is_downtick) AS tick,
+    SUM(uptick_vol) AS uptick_vol,
+    SUM(downtick_vol) AS downtick_vol
+  FROM classified
+)
+SELECT
+  upticks,
+  downticks,
+  tick,
+  upticks::double / downticks AS advance_decline_ratio,
+  uptick_vol::double / downtick_vol AS upside_downside_ratio,
+  (upticks::double / downticks) / (uptick_vol::double / downtick_vol) AS trin
+FROM aggregated;
+```
+
+## Interpreting the indicators
+
+**TICK:**
+- **Positive**: More upticks than downticks (bullish)
+- **Negative**: More downticks than upticks (bearish)
+- **Near zero**: Balanced market
+
+**TRIN (ARMS Index):**
+- **< 1.0**: Volume favoring advances (bullish)
+- **> 1.0**: Volume favoring declines (bearish)
+- **= 1.0**: Neutral
+
+:::note TRIN limitations
+TRIN can produce counterintuitive results. For example, if advances outnumber declines 2:1 and advancing volume also leads 2:1, TRIN equals 1.0 (neutral) despite bullish conditions. The query includes separate **advance_decline_ratio** and **upside_downside_ratio** columns to help identify such cases.
 :::
 
-Each row shows the cumulative values from the start of the day, with Tick and Trin calculated at every trade.
-
-## How It Works
-
-The indicators are calculated using these formulas:
-
-```
-Tick = Upticks / Downticks
-
-Trin = (Upticks / Downticks) / (Upvol / Downvol)
-     = Tick / Volume Ratio
-```
-
-Where:
-- **Upticks**: Cumulative count of buy transactions
-- **Downticks**: Cumulative count of sell transactions
-- **Upvol**: Cumulative volume of buy transactions
-- **Downvol**: Cumulative volume of sell transactions
-
-The query uses:
-1. **Window functions**: `SUM(...) OVER (ORDER BY timestamp)` creates running totals from the start of the period
-2. **CASE statements**: Conditionally sum only trades matching the specified side
-3. **Type casting**: Using `1.0` instead of `1` ensures results are doubles, avoiding explicit casting
-
-### Interpreting the Indicators
-
-**Tick Indicator:**
-- **Tick > 1.0**: More buying pressure (bullish sentiment)
-- **Tick < 1.0**: More selling pressure (bearish sentiment)
-- **Tick = 1.0**: Neutral market (equal buying and selling)
-
-**Trin (ARMS Index):**
-- **Trin < 1.0**: Strong market (volume flowing into advancing trades)
-- **Trin > 1.0**: Weak market (volume flowing into declining trades)
-- **Trin = 1.0**: Balanced market
-- **Extreme readings**: Trin > 2.0 suggests oversold conditions; Trin < 0.5 suggests overbought
-
-**Divergences:**
-When Tick and Trin move in opposite directions, it can signal important market conditions:
-- High Tick + High Trin: Advances lack volume confirmation (bearish divergence)
-- Low Tick + Low Trin: Declines lack volume confirmation (bullish divergence)
-
-## Adapting the Query
-
-**Multiple symbols:**
-```questdb-sql demo title="Tick and Trin for multiple symbols"
-WITH tick_vol AS (
-    SELECT
-        timestamp,
-        symbol,
-        side,
-        quantity,
-        SUM(CASE WHEN side = 'sell' THEN 1.0 END)
-            OVER (PARTITION BY symbol ORDER BY timestamp) as downtick,
-        SUM(CASE WHEN side = 'buy' THEN 1.0 END)
-            OVER (PARTITION BY symbol ORDER BY timestamp) as uptick,
-        SUM(CASE WHEN side = 'sell' THEN quantity END)
-            OVER (PARTITION BY symbol ORDER BY timestamp) as downvol,
-        SUM(CASE WHEN side = 'buy' THEN quantity END)
-            OVER (PARTITION BY symbol ORDER BY timestamp) as upvol
-    FROM fx_trades
-    WHERE timestamp IN yesterday()
-)
-SELECT
-    timestamp,
-    symbol,
-    uptick / downtick as tick,
-    (uptick / downtick) / (upvol / downvol) as trin
-FROM tick_vol;
-```
-
-**Intraday periods (reset at intervals):**
-```questdb-sql demo title="Tick and Trin reset every hour"
-WITH tick_vol AS (
-    SELECT
-        timestamp,
-        side,
-        quantity,
-        SUM(CASE WHEN side = 'sell' THEN 1.0 END)
-            OVER (PARTITION BY timestamp_floor('h', timestamp) ORDER BY timestamp) as downtick,
-        SUM(CASE WHEN side = 'buy' THEN 1.0 END)
-            OVER (PARTITION BY timestamp_floor('h', timestamp) ORDER BY timestamp) as uptick,
-        SUM(CASE WHEN side = 'sell' THEN quantity END)
-            OVER (PARTITION BY timestamp_floor('h', timestamp) ORDER BY timestamp) as downvol,
-        SUM(CASE WHEN side = 'buy' THEN quantity END)
-            OVER (PARTITION BY timestamp_floor('h', timestamp) ORDER BY timestamp) as upvol
-    FROM fx_trades
-    WHERE timestamp IN yesterday() AND symbol = 'EURUSD'
-)
-SELECT
-    timestamp,
-    uptick / downtick as tick,
-    (uptick / downtick) / (upvol / downvol) as trin
-FROM tick_vol;
-```
-
-**Daily summary values only:**
-```questdb-sql demo title="Tick and Trin daily summary"
-WITH tick_vol AS (
-    SELECT
-        SUM(CASE WHEN side = 'sell' THEN 1.0 END) as downtick,
-        SUM(CASE WHEN side = 'buy' THEN 1.0 END) as uptick,
-        SUM(CASE WHEN side = 'sell' THEN quantity END) as downvol,
-        SUM(CASE WHEN side = 'buy' THEN quantity END) as upvol
-    FROM fx_trades
-    WHERE timestamp IN yesterday() AND symbol = 'EURUSD'
-)
-SELECT
-    uptick / downtick as tick,
-    (uptick / downtick) / (upvol / downvol) as trin
-FROM tick_vol;
-```
-
-:::tip Market Analysis Applications
-- **Intraday momentum**: Track Tick throughout the day to identify accumulation/distribution patterns
-- **Overbought/oversold**: Extreme Trin readings often precede short-term reversals
-- **Market breadth**: Persistently high/low values indicate broad market strength or weakness
-- **Divergence trading**: When price makes new highs/lows but Trin doesn't confirm, it suggests weakening momentum
-:::
-
-:::info Related Documentation
+:::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)
-- [SUM aggregate](/docs/query/functions/aggregation/#sum)
+- [LAG function](/docs/query/functions/window-functions/reference/#lag)
 - [CASE expressions](/docs/query/sql/case/)
 :::

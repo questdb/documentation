@@ -1,5 +1,5 @@
 ---
-title: Show Parameters with Non-Default Values
+title: Show parameters with non-default values
 sidebar_label: Show non-default params
 description: List all QuestDB configuration parameters that have been modified from their default values
 ---
