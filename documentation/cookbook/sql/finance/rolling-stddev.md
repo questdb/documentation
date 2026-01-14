@@ -66,8 +66,8 @@ FROM
 I first get the rolling average/mean, then from that I get the variance, and then I can do the `sqrt` to get the standard deviation as requested.
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
-- [AVG window function](/docs/query/functions/window/#avg)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
+- [AVG window function](/docs/query/functions/window-functions/reference/#avg)
 - [POWER function](/docs/query/functions/numeric/#power)
 - [SQRT function](/docs/query/functions/numeric/#sqrt)
 :::

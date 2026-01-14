@@ -38,7 +38,7 @@ WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
 Both functions return `NULL` for rows where the offset goes beyond the dataset boundaries (e.g., `LAG(5)` returns `NULL` for the first 5 rows).
 
 :::info Related Documentation
-- [LAG window function](/docs/query/functions/window/#lag)
-- [LEAD window function](/docs/query/functions/window/#lead)
-- [Window functions overview](/docs/query/sql/over/)
+- [LAG window function](/docs/query/functions/window-functions/reference/#lag)
+- [LEAD window function](/docs/query/functions/window-functions/reference/#lead)
+- [Window functions overview](/docs/query/functions/window-functions/syntax/)
 :::

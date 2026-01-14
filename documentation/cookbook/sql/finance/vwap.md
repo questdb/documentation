@@ -103,7 +103,7 @@ WHERE timestamp >= dateadd('h', -1, now())
 :::
 
 :::info Related documentation
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [SUM aggregate](/docs/query/functions/aggregation/#sum)
 - [Materialized views](/docs/query/sql/create-materialized-view/)
 :::

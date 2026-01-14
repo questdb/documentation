@@ -179,7 +179,7 @@ FROM tick_vol;
 :::
 
 :::info Related Documentation
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [SUM aggregate](/docs/query/functions/aggregation/#sum)
 - [CASE expressions](/docs/query/sql/case/)
 :::

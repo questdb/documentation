@@ -220,8 +220,8 @@ GROUP BY symbol;
 
 
 :::info Related Documentation
-- [row_number() window function](/docs/query/functions/window/#row_number)
+- [row_number() window function](/docs/query/functions/window-functions/reference/#row_number)
 - [LATEST ON](/docs/query/sql/latest-on/)
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [LIMIT](/docs/query/sql/select/#limit)
 :::

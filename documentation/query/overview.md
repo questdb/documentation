@@ -414,7 +414,7 @@ To brush up and learn what's unique in QuestDB, consider the following:
 
 And to learn about some of our favourite, most powerful syntax:
 
-- [Window functions](/docs/query/functions/window/) are a powerful analysis
+- [Window functions](/docs/query/functions/window-functions/overview/) are a powerful analysis
   tool
 - [Aggregate functions](/docs/query/functions/aggregation/) - aggregations
   are key!

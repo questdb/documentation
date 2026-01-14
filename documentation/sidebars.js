@@ -32,6 +32,7 @@ module.exports = {
           items: [
             "getting-started/web-console/overview",
             "getting-started/web-console/code-editor",
+            "getting-started/web-console/questdb-ai",
             "getting-started/web-console/metrics-view",
             "getting-started/web-console/schema-explorer",
             "getting-started/web-console/result-grid",
@@ -424,7 +425,6 @@ module.exports = {
                 "query/sql/latest-on",
                 "query/sql/limit",
                 "query/sql/order-by",
-                "query/sql/over",
                 "query/sql/pivot",
                 "query/sql/sample-by",
                 "query/sql/where",
@@ -466,7 +466,15 @@ module.exports = {
             "query/functions/touch",
             "query/functions/trigonometric",
             "query/functions/uuid",
-            "query/functions/window",
+            {
+              type: "category",
+              label: "Window Functions",
+              items: [
+                "query/functions/window-functions/overview",
+                "query/functions/window-functions/reference",
+                "query/functions/window-functions/syntax",
+              ],
+            },
           ],
         },
         {

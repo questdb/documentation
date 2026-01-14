@@ -263,8 +263,8 @@ The first row in each partition will have `NULL` for previous values. Always fil
 :::
 
 :::info Related Documentation
-- [first_value() window function](/docs/query/functions/window/#first_value)
-- [LAG window function](/docs/query/functions/window/#lag)
-- [Window functions](/docs/query/sql/over/)
+- [first_value() window function](/docs/query/functions/window-functions/reference/#first_value)
+- [LAG window function](/docs/query/functions/window-functions/reference/#lag)
+- [Window functions](/docs/query/functions/window-functions/syntax/)
 - [datediff()](/docs/query/functions/date-time/#datediff)
 :::
