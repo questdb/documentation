@@ -74,12 +74,16 @@ def transform_code_blocks(content: str) -> str:
 
 
 def transform_admonitions(content: str) -> str:
-    """Transform Docusaurus admonitions to PDF-friendly format."""
+    """Transform Docusaurus admonitions to PDF-friendly format. Remove info boxes with 'Related' in title."""
 
     def replace_admonition(match):
         adm_type = match.group(1)
         title = match.group(2) or adm_type.upper()
         body = match.group(3).strip()
+
+        # Remove "Related Documentation" info boxes entirely
+        if adm_type == 'info' and 'Related' in title:
+            return ''
 
         labels = {
             'note': 'NOTE',
@@ -150,6 +154,11 @@ def format_category_name(name: str) -> str:
     return name_map.get(name, name.replace('-', ' ').title())
 
 
+def get_online_url(rel_path: str) -> str:
+    """Generate the questdb.com URL for a cookbook page."""
+    return f"https://questdb.com/docs/{rel_path}/"
+
+
 def parse_path_structure(rel_path: str) -> tuple[str, str | None, str]:
     """Parse a path like cookbook/sql/finance/compound-interest into (category, subcategory, recipe)."""
     parts = rel_path.replace('cookbook/', '').split('/')
@@ -215,7 +224,7 @@ def main():
     # Generate content with proper hierarchy
     for category, subcategories in structure.items():
         category_name = format_category_name(category)
-        combined.append(f"\\part{{{category_name}}}\n\n")
+        combined.append(f"\\sectionpage{{{category_name}}}\n\n")
         print(f"\nPart: {category_name}")
 
         for subcategory, recipes in subcategories.items():
@@ -228,8 +237,9 @@ def main():
                         continue
 
                     title, body = process_file(filepath, header_level=1)
+                    online_url = get_online_url(rel_path)
                     print(f"  Chapter: {title}")
-                    combined.append(f"# {title}\n\n{body}\n\n\\newpage\n\n")
+                    combined.append(f"# {title}\n\n{body}\n\n[View this recipe online]({online_url})\n\n\\newpage\n\n")
             else:
                 # Subcategory as chapter
                 subcategory_name = format_category_name(subcategory)
@@ -243,8 +253,9 @@ def main():
                         continue
 
                     title, body = process_file(filepath, header_level=2)
+                    online_url = get_online_url(rel_path)
                     print(f"    Section: {title}")
-                    combined.append(f"## {title}\n\n{body}\n\n---\n\n")
+                    combined.append(f"\\newpage\n\n## {title}\n\n{body}\n\n[View this recipe online]({online_url})\n\n")
 
                 combined.append("\\newpage\n\n")
 
@@ -253,7 +264,8 @@ def main():
     if demo_schema_path.exists():
         print("\nAppendix: Demo Data Schema")
         title, body = process_file(demo_schema_path, header_level=1)
-        combined.append(f"\\part{{Appendix}}\n\n# Demo Data Schema\n\n{body}\n\n")
+        online_url = get_online_url("cookbook/demo-data-schema")
+        combined.append(f"\\sectionpage{{Appendix}}\n\n# Demo Data Schema\n\n{body}\n\n[See the schema page online]({online_url})\n\n")
 
     # Write output
     output_path.parent.mkdir(parents=True, exist_ok=True)

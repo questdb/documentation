@@ -23,6 +23,21 @@
 \fancyhead[R]{\textcolor{gray}{\leftmark}}
 \fancyfoot[C]{\thepage}
 
+% Disable section numbering (cleaner for cookbook)
+\setcounter{secnumdepth}{0}
+
+% Custom centered section page command
+\newcommand{\sectionpage}[1]{%
+  \clearpage
+  \thispagestyle{empty}
+  \vspace*{\fill}
+  \begin{center}
+    {\Huge\bfseries\textcolor{questdb-purple}#1}
+  \end{center}
+  \vspace*{\fill}
+  \clearpage
+}
+
 % Hyperlinks
 \usepackage{hyperref}
 \hypersetup{colorlinks=true,linkcolor=questdb-purple,urlcolor=blue}
