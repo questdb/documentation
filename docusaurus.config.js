@@ -219,14 +219,14 @@ const config = {
           className: "mobile-only",
         },
         {
-          to: "https://questdb.com//blog/",
+          to: "https://questdb.com/blog/",
           label: "Blog",
           position: "left",
           className: "mobile-only",
         },
         {
           to: "https://questdb.com/enterprise/",
-          label: "Enterprise",
+          label: "QuestDB Enterprise",
           position: "left",
           className: "mobile-only",
         },
@@ -307,8 +307,8 @@ const config = {
       {
         blog: false,
         docs: {
-          include: ["**/*!(.partial).{md,mdx}"],
-          exclude: ["/glossary/"],
+          include: ["**/*.{md,mdx}"],
+          exclude: ["**/*.partial.mdx"],
           path: "documentation",
           routeBasePath: "/",
           editUrl: ({ docPath }) => {

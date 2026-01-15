@@ -7,7 +7,7 @@ description:
 
 You should back up QuestDB to be prepared for the case where your original
 database or data is lost, or if your database or table is corrupted. Backups are
-also required to create [replica instances](/docs/operations/replication/) in
+also required to create [replica instances](/docs/high-availability/setup/) in
 QuestDB Enterprise.
 
 ## Overview
@@ -540,10 +540,10 @@ QuestDB supports the following filesystems:
 
 Other file systems are untested and while they may work, we do not officially
 support them. See the
-[filesystem compatibility](/docs/operations/capacity-planning/#supported-filesystems)
+[filesystem compatibility](/docs/getting-started/capacity-planning/#supported-filesystems)
 section for more information.
 
 ## Further reading
 
-- [`BACKUP` SQL reference](/docs/reference/sql/backup/) - Enterprise backup command syntax
-- [`CHECKPOINT` SQL reference](/docs/reference/sql/checkpoint/) - OSS checkpoint command syntax
+- [`BACKUP` SQL reference](/docs/query/sql/backup/) - Enterprise backup command syntax
+- [`CHECKPOINT` SQL reference](/docs/query/sql/checkpoint/) - OSS checkpoint command syntax

@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+  <defs>
+    <style>
+      .title { font: 14px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .label { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #d9d9d9; }
+      .cell { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .table-outline { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .header { fill: #32343e; }
+      .grid { stroke: #3b3d4a; stroke-width: 1; }
+      .window { fill: #e289a4; opacity: 0.35; }
+      .current { fill: none; stroke: #0cc0df; stroke-width: 2; }
+      .result-highlight { fill: #e289a4; opacity: 0.45; }
+      .pointer { fill: #0cc0df; }
+      .link-line { stroke: #0cc0df; stroke-width: 2; fill: none; }
+      .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+    </style>
+    <marker id="link-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0,0 10,4 0,8" fill="#0cc0df"/>
+    </marker>
+  </defs>
+
+  <text class="title" x="60" y="32">
+    SELECT timestamp, price, <tspan fill="#e289a4">avg(price) OVER (ORDER BY timestamp</tspan>
+    <tspan x="60" dy="18"><tspan fill="#e289a4">ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)</tspan> moving_avg</tspan>
+    <tspan x="60" dy="18">FROM trades LIMIT 10;</tspan>
+  </text>
+  <text class="note" x="60" y="90">QuestDB pink window shows the frame used for each moving average.</text>
+
+  <!-- Left table: trades -->
+  <rect class="table-outline" x="60" y="120" width="420" height="356"/>
+  <rect class="header" x="60" y="120" width="420" height="36"/>
+  <line class="grid" x1="320" y1="120" x2="320" y2="476"/>
+  <line class="grid" x1="60" y1="156" x2="480" y2="156"/>
+  <line class="grid" x1="60" y1="188" x2="480" y2="188"/>
+  <line class="grid" x1="60" y1="220" x2="480" y2="220"/>
+  <line class="grid" x1="60" y1="252" x2="480" y2="252"/>
+  <line class="grid" x1="60" y1="284" x2="480" y2="284"/>
+  <line class="grid" x1="60" y1="316" x2="480" y2="316"/>
+  <line class="grid" x1="60" y1="348" x2="480" y2="348"/>
+  <line class="grid" x1="60" y1="380" x2="480" y2="380"/>
+  <line class="grid" x1="60" y1="412" x2="480" y2="412"/>
+  <line class="grid" x1="60" y1="444" x2="480" y2="444"/>
+
+  <text class="label" x="72" y="144">timestamp</text>
+  <text class="label" x="408" y="144" text-anchor="end">price</text>
+
+  <text class="cell" x="72" y="177">09:30:00</text>
+  <text class="cell" x="408" y="177" text-anchor="end">100</text>
+  <text class="cell" x="72" y="209">09:30:01</text>
+  <text class="cell" x="408" y="209" text-anchor="end">101</text>
+  <text class="cell" x="72" y="241">09:30:02</text>
+  <text class="cell" x="408" y="241" text-anchor="end">103</text>
+  <text class="cell" x="72" y="273">09:30:03</text>
+  <text class="cell" x="408" y="273" text-anchor="end">102</text>
+  <text class="cell" x="72" y="305">09:30:04</text>
+  <text class="cell" x="408" y="305" text-anchor="end">104</text>
+  <text class="cell" x="72" y="337">09:30:05</text>
+  <text class="cell" x="408" y="337" text-anchor="end">105</text>
+  <text class="cell" x="72" y="369">09:30:06</text>
+  <text class="cell" x="408" y="369" text-anchor="end">103</text>
+  <text class="cell" x="72" y="401">09:30:07</text>
+  <text class="cell" x="408" y="401" text-anchor="end">106</text>
+  <text class="cell" x="72" y="433">09:30:08</text>
+  <text class="cell" x="408" y="433" text-anchor="end">108</text>
+  <text class="cell" x="72" y="465">09:30:09</text>
+  <text class="cell" x="408" y="465" text-anchor="end">107</text>
+
+  <!-- Window highlight on left table -->
+  <rect class="window" x="60" y="156" width="420" height="32">
+    <animate attributeName="y" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="156;156;156;156;188;220;252;284;316;348"/>
+    <animate attributeName="height" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="32;64;96;128;128;128;128;128;128;128"/>
+  </rect>
+
+  <!-- Current row outline + pointer -->
+  <rect class="current" x="60" y="156" width="420" height="32">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0 0;0 32;0 64;0 96;0 128;0 160;0 192;0 224;0 256;0 288"/>
+  </rect>
+  <polygon class="pointer" points="44,172 54,166 54,178">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0 0;0 32;0 64;0 96;0 128;0 160;0 192;0 224;0 256;0 288"/>
+  </polygon>
+
+  <!-- Link between current input row and output row -->
+  <line class="link-line" x1="490" y1="172" x2="690" y2="172" marker-end="url(#link-arrow)">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0 0;0 32;0 64;0 96;0 128;0 160;0 192;0 224;0 256;0 288"/>
+  </line>
+
+  <!-- Right table: results -->
+  <rect class="table-outline" x="700" y="120" width="420" height="356"/>
+  <rect class="header" x="700" y="120" width="420" height="36"/>
+  <line class="grid" x1="880" y1="120" x2="880" y2="476"/>
+  <line class="grid" x1="1000" y1="120" x2="1000" y2="476"/>
+  <line class="grid" x1="700" y1="156" x2="1120" y2="156"/>
+  <line class="grid" x1="700" y1="188" x2="1120" y2="188"/>
+  <line class="grid" x1="700" y1="220" x2="1120" y2="220"/>
+  <line class="grid" x1="700" y1="252" x2="1120" y2="252"/>
+  <line class="grid" x1="700" y1="284" x2="1120" y2="284"/>
+  <line class="grid" x1="700" y1="316" x2="1120" y2="316"/>
+  <line class="grid" x1="700" y1="348" x2="1120" y2="348"/>
+  <line class="grid" x1="700" y1="380" x2="1120" y2="380"/>
+  <line class="grid" x1="700" y1="412" x2="1120" y2="412"/>
+  <line class="grid" x1="700" y1="444" x2="1120" y2="444"/>
+
+  <text class="label" x="712" y="144">timestamp</text>
+  <text class="label" x="988" y="144" text-anchor="end">price</text>
+  <text class="label" x="1108" y="144" text-anchor="end">moving_avg</text>
+
+  <g class="result-row">
+    <text class="cell" x="712" y="177">09:30:00</text>
+    <text class="cell" x="988" y="177" text-anchor="end">100</text>
+    <text class="cell" x="1108" y="177" text-anchor="end">100.00</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;1;1;1;1;1;1;1;1;1"/>
+    <text class="cell" x="712" y="209">09:30:01</text>
+    <text class="cell" x="988" y="209" text-anchor="end">101</text>
+    <text class="cell" x="1108" y="209" text-anchor="end">100.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;1;1;1;1;1;1;1;1"/>
+    <text class="cell" x="712" y="241">09:30:02</text>
+    <text class="cell" x="988" y="241" text-anchor="end">103</text>
+    <text class="cell" x="1108" y="241" text-anchor="end">101.33</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;1;1;1;1;1;1;1"/>
+    <text class="cell" x="712" y="273">09:30:03</text>
+    <text class="cell" x="988" y="273" text-anchor="end">102</text>
+    <text class="cell" x="1108" y="273" text-anchor="end">101.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;1;1;1;1;1;1"/>
+    <text class="cell" x="712" y="305">09:30:04</text>
+    <text class="cell" x="988" y="305" text-anchor="end">104</text>
+    <text class="cell" x="1108" y="305" text-anchor="end">102.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;1;1;1;1;1"/>
+    <text class="cell" x="712" y="337">09:30:05</text>
+    <text class="cell" x="988" y="337" text-anchor="end">105</text>
+    <text class="cell" x="1108" y="337" text-anchor="end">103.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;1;1;1;1"/>
+    <text class="cell" x="712" y="369">09:30:06</text>
+    <text class="cell" x="988" y="369" text-anchor="end">103</text>
+    <text class="cell" x="1108" y="369" text-anchor="end">103.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;0;1;1;1"/>
+    <text class="cell" x="712" y="401">09:30:07</text>
+    <text class="cell" x="988" y="401" text-anchor="end">106</text>
+    <text class="cell" x="1108" y="401" text-anchor="end">104.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;0;0;1;1"/>
+    <text class="cell" x="712" y="433">09:30:08</text>
+    <text class="cell" x="988" y="433" text-anchor="end">108</text>
+    <text class="cell" x="1108" y="433" text-anchor="end">105.50</text>
+  </g>
+  <g class="result-row" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;0;0;0;1"/>
+    <text class="cell" x="712" y="465">09:30:09</text>
+    <text class="cell" x="988" y="465" text-anchor="end">107</text>
+    <text class="cell" x="1108" y="465" text-anchor="end">106.00</text>
+  </g>
+
+  <!-- Highlight current result cell -->
+  <rect class="result-highlight" x="1000" y="156" width="120" height="32">
+    <animate attributeName="y" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="156;188;220;252;284;316;348;380;412;444"/>
+  </rect>
+</svg>

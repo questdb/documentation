@@ -4,4 +4,6 @@
   margin-bottom: var(--ifm-leading);
   box-shadow: var(--ifm-global-shadow-lw);
   border-radius: var(--ifm-code-border-radius);
+  border: 1px solid var(--ifm-code-border-color);
+  overflow: hidden;
 }

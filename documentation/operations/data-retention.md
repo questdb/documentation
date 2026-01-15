@@ -12,7 +12,7 @@ achieved in QuestDB by removing data partitions from a table.
 
 QuestDB offers two approaches for data retention:
 
-- **Automatic**: Use [Time To Live (TTL)](/docs/concept/ttl/) to automatically
+- **Automatic**: Use [Time To Live (TTL)](/docs/concepts/ttl/) to automatically
   drop partitions when data ages beyond a specified threshold. This is the
   simplest approach for most use cases.
 - **Manual**: Use `DROP PARTITION` commands as described on this page for
@@ -20,13 +20,13 @@ QuestDB offers two approaches for data retention:
 
 This page provides a high-level overview of partitioning with examples to drop
 data by date. For more details on partitioning, see the
-[partitioning](/docs/concept/partitions/) page.
+[partitioning](/docs/concepts/partitions/) page.
 
 ## Manual partition management
 
 This section covers the manual approach to removing stale data by dropping
 partitions. A table must have a
-[designated timestamp](/docs/concept/designated-timestamp/) assigned and a
+[designated timestamp](/docs/concepts/designated-timestamp/) assigned and a
 partitioning strategy specified during a `CREATE TABLE` operation to achieve
 this.
 
@@ -59,7 +59,7 @@ partitions**.
 :::
 
 To drop partitions, users can use the
-[ALTER TABLE DROP PARTITION](/docs/reference/sql/alter-table-drop-partition/)
+[ALTER TABLE DROP PARTITION](/docs/query/sql/alter-table-drop-partition/)
 syntax. Partitions may be dropped by:
 
 - `DROP PARTITION LIST` - specifying a comma-separated list of partitions to
@@ -98,7 +98,7 @@ syntax. Partitions may be dropped by:
   dataset, it may not be desirable to have gaps caused by dropped partitions.
 - Unlike TTL, `DROP PARTITION` commands must be triggered manually or via
   external scheduling (e.g., cron jobs). For fully automated retention, consider
-  using [TTL](/docs/concept/ttl/) instead.
+  using [TTL](/docs/concepts/ttl/) instead.
 
 ### Example
 
@@ -118,9 +118,9 @@ FROM long_sequence(120);
 
 For reference, the following functions are used to generate the example data:
 
-- [timestamp sequence](/docs/reference/function/timestamp-generator/#timestamp_sequence)
+- [timestamp sequence](/docs/query/functions/timestamp-generator/#timestamp_sequence)
   with 1 hour stepping
-- [row generator](/docs/reference/function/row-generator/#long_sequence) with
+- [row generator](/docs/query/functions/row-generator/#long_sequence) with
   `long_sequence()` function which creates a `x:long` column
 
 The result of partitioning is visible when listing as directories on disk:

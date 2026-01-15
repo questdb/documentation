@@ -2,8 +2,8 @@
 title: Introduction
 slug: /
 description:
-  The official QuestDB documentation. Learn how to accelerate your time-series,
-  capital markets, and heavy industry use cases.
+  Official QuestDB documentation covering installation, data ingestion, SQL
+  reference, and operations for both open source and Enterprise editions.
 custom_edit_url: null
 ---
 
@@ -12,70 +12,33 @@ import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
 
-QuestDB is a top performance database that specializes in time-series.
-
-It offers **category-leading ingestion throughput** and **fast SQL queries**
-with operational simplicity.
-
-Given its effiency, QuestDB **reduces operational costs**, all while overcoming
-ingestion bottlenecks.
-
-As a result, QuestDB amplifies intensive **time-series**, **capital markets**,
-and **heavy industry** use cases.
+QuestDB is an open source time-series database engineered for low latency. It uses a column-oriented, time-partitioned storage engine with memory-mapped files and vectorized (SIMD) execution to support high-throughput ingestion and millisecond-level analytical queries. The system is built from scratch with a zero-GC Java core and focused C++/Rust components, in a compact codebase optimized for cache locality and predictable tail latency. SQL is extended with time-series operators such as `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, and `WINDOW JOIN`. See [Architecture](https://questdb.com/docs/architecture/questdb-architecture/) for details.
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
-  <DocButton href="/quick-start" arrow="right" style={{ marginRight: '20px' }}>
+  <DocButton href="/docs/getting-started/quick-start/" arrow="right" style={{ marginRight: '20px' }}>
     <>Quick start</>
   </DocButton>
 
-{" "}
-<DocButton
-  href="/docs/ingestion-overview/#first-party-clients"
-  variant="outline"
-  style={{ marginRight: "20px" }}
->
-  <>Explore clients</>
-</DocButton>
-
-{" "}
-<DocButton
-  href="/docs/why-questdb/"
-  variant="outline"
-  style={{ marginRight: "20px" }}
->
-  <>Why QuestDB?</>
-</DocButton>
-
   <DocButton href="https://demo.questdb.io" variant="outline" style={{ marginRight: '20px' }}>
-    <>Try live demo</>
+    <>Live demo</>
   </DocButton>
 </div>
 
-## Ingest your data
+## About this documentation
 
-Once running, the next step is to get your data into QuestDB.
+This documentation covers both **QuestDB Open Source** and **QuestDB Enterprise**.
 
-We've got a range of first-party clients, protocols and methods for ingestion.
+QuestDB Enterprise builds on top of QuestDB Open Source, using it as its core
+library. Everything in open source works in Enterprise, but not the other way
+around. Enterprise adds features like high availability, advanced security, RBAC,
+automated backups, and multi-tier storage with seamless object storage integration.
 
-Whether you're using first-party clients or interfacing with a third-party tool
-or library, we've got you covered.
+## Get started
 
-<div className="not-prose">
-  <DocButton href="/docs/ingestion-overview/" variant="text" arrow="right">
-    <>Read the ingestion overview</>
-  </DocButton>
-</div>
-
-## QuestDB Enterprise
-
-QuestDB Enterprise offers everything from open source, plus additional features
-for running QuestDB at greater scale or significance.
-
-<div className="not-prose">
-  <DocButton href="/enterprise/" absolute variant="text" arrow="right">
-    <>Learn more</>
-  </DocButton>
-</div>
+1. **[Quick start](/docs/getting-started/quick-start/)** - Install and run QuestDB
+2. **[Schema design](/docs/schema-design-essentials/)** - Design your tables
+3. **[Ingest data](/docs/ingestion/overview/)** - Bring your data using QuestDB clients
+4. **[Query data](/docs/query/overview/)** - Analyze with SQL
 
 ## Guides
 

@@ -14,7 +14,7 @@ This page outlines logging in QuestDB. It covers how to configure logs via `log.
 ## Log location
 
 QuestDB creates the following file structure in its
-[root_directory](/docs/concept/root-directory-structure/):
+[root_directory](/docs/concepts/deep-dive/root-directory-structure/):
 
 ```filestructure
 questdb
@@ -209,7 +209,7 @@ The following configuration options can be set in your `server.conf`:
 :::warning
 
 On systems with
-[8 Cores and less](/docs/operations/capacity-planning/#cpu-cores), contention
+[8 Cores and less](/docs/getting-started/capacity-planning/#cpu-cores), contention
 for threads might increase the latency of health check service responses. If you
 use a load balancer, and it thinks the QuestDB service is dead with nothing
 apparent in the QuestDB logs, you may need to configure a dedicated thread pool
@@ -290,7 +290,7 @@ example configuration, enable it in within your `server.conf`:
 | metrics.enabled | false   | Enable or disable metrics endpoint. |
 
 For an example on how to setup Prometheus, see the
-[QuestDB and Prometheus documentation](/docs/third-party-tools/prometheus/).
+[QuestDB and Prometheus documentation](/docs/integrations/other/prometheus/).
 
 ### Prometheus Alertmanager
 

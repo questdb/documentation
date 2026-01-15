@@ -40,7 +40,7 @@ and cheaper, alternative.
 QuestDB supports `S3` as its replication object-store in the Enterprise edition.
 
 This requires very little provisioning - simply create a bucket or virtual subdirectory and follow
-the [Enterprise Quick Start](/docs/guides/enterprise-quick-start/) steps to configure replication.
+the [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to configure replication.
 
 ### Minimum specification
 
@@ -101,7 +101,7 @@ software vendors that runs on AWS. This guide describes how to launch QuestDB
 via the AWS Marketplace using the official listing. This document also describes
 usage instructions after you have launched the instance, including hints for
 authentication, the available interfaces, and tips for accessing the REST API
-and [Web Console](/docs/web-console/).
+and [Web Console](/docs/getting-started/web-console/overview/).
 
 The QuestDB listing can be found in the AWS Marketplace under the databases
 category. To launch a QuestDB instance:
@@ -127,11 +127,11 @@ configuration file is at the following location on the AMI:
 ```
 
 For details on the server properties and using this file, see the
-[server configuration documentation](/docs/configuration/).
+[server configuration documentation](/docs/configuration/overview/).
 
 The default ports used by QuestDB interfaces are as follows:
 
-- [Web Console](/docs/web-console/) &amp; REST API is available on port `9000`
+- [Web Console](/docs/getting-started/web-console/overview/) &amp; REST API is available on port `9000`
 - PostgreSQL wire protocol available on `8812`
 - InfluxDB line protocol `9009` (TCP and UDP)
 - Health monitoring &amp; Prometheus `/metrics` `9003`
@@ -165,7 +165,7 @@ The credentials for InfluxDB line protocol can be found at
 ```
 
 For details on authentication using this protocol, see the
-[InfluxDB line protocol authentication guide](/docs/reference/api/ilp/overview/#authentication).
+[InfluxDB line protocol authentication guide](/docs/ingestion/ilp/overview/#authentication).
 
 ### Disabling authentication
 
