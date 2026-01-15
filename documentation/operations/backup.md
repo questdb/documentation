@@ -31,16 +31,27 @@ creates a checkpoint internally, builds a manifest of tables and partitions, and
 uploads only the changed data. Progress and errors are tracked in an index stored
 alongside the backup data.
 
-### Configure
+:::note
 
-At minimum, configure an object store and enable backups. See
-[object store URLs](/docs/operations/replication/#setup-object-storage) for how
-to build the connection string.
+See [Limitations](#limitations) before running your first backup.
+
+:::
+
+### Quick start
+
+Minimal configuration to enable backups:
 
 ```conf
 backup.enabled=true
 backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
 ```
+
+Then run `BACKUP DATABASE;` in SQL. See [Run a backup](#run-a-backup) for details.
+
+### Configure
+
+See [object store URLs](/docs/operations/replication/#setup-object-storage) for
+how to build the connection string.
 
 #### Scheduled backups
 
@@ -51,6 +62,65 @@ below runs a backup every day at midnight UTC.
 backup.schedule.cron=0 0 * * *
 backup.schedule.tz=UTC
 ```
+
+#### Backup retention
+
+Control how many backups to keep before automatic cleanup removes older ones:
+
+```conf
+backup.cleanup.keep.latest.n=7
+```
+
+#### Filesystem backups
+
+For local testing or air-gapped environments, you can back up to a local
+filesystem path instead of cloud object storage:
+
+```conf
+backup.object.store=fs::root=/mnt/backups;atomic_write_dir=/mnt/backups/atomic;
+```
+
+The `atomic_write_dir` parameter is required for filesystem backends and
+specifies a directory for atomic write operations during backup.
+
+#### Configuration reference
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `backup.enabled` | Enable backup functionality | `false` |
+| `backup.object.store` | Object store connection string | None (required) |
+| `backup.schedule.cron` | Cron expression for scheduled backups | None (manual only) |
+| `backup.schedule.tz` | Timezone for cron schedule | `UTC` |
+| `backup.cleanup.keep.latest.n` | Number of backups to retain | `5` |
+| `backup.compression.level` | Compression level (1-22) | `5` |
+| `backup.compression.threads` | Threads for compression | CPU count |
+
+### Performance characteristics
+
+Backup is designed to prioritize database availability over backup speed. Key
+characteristics:
+
+- **Pressure-sensitive**: Backup automatically throttles itself to avoid
+  overwhelming the database instance during normal operations
+- **Batch uploads**: Data uploads in batches rather than continuously - you may
+  see surges of activity followed by quieter periods in logs
+- **Compressed**: Data is compressed before upload to reduce transfer time and
+  storage costs
+- **Multi-threaded**: Backup uses multiple threads but is deliberately
+  throttled to maintain instance reliability
+
+Backup duration depends on data size. Large databases (1TB+) may take several
+hours for a full initial backup. Subsequent incremental backups are faster as
+only changed data is uploaded.
+
+### Limitations
+
+- **One backup at a time**: Only one backup can run at any given time. Starting
+  a new backup while one is running will return an error.
+- **Primary and replica backups are separate**: Each QuestDB instance has its
+  own `backup_instance_name`, so backing up both a primary and its replica
+  creates two separate backup sets in the object store. Typically, backing up
+  the primary is sufficient since replicas sync from the same data.
 
 ### Run a backup
 
@@ -76,9 +146,26 @@ SELECT * FROM backups();
 
 Example output:
 
-| status          | progress_percent | start_ts                    | end_ts                      | backup_error | cleanup_error |
-| --------------- | ---------------- | --------------------------- | --------------------------- | ------------ | ------------- |
-| backup complete | 100              | 2025-12-23T13:15:26.690440Z | 2025-12-23T13:15:26.944184Z | null         | null          |
+| status              | progress_percent | start_ts                    | end_ts                      | backup_error     | cleanup_error |
+|---------------------|------------------|-----------------------------|-----------------------------|------------------|---------------|
+| backup complete     | 100              | 2025-07-30T12:49:30.554262Z | 2025-07-30T16:19:48.554262Z |                  |               |
+| backup complete     | 100              | 2025-08-06T14:15:22.882130Z | 2025-08-06T17:09:57.882130Z |                  |               |
+| backup failed       | 35               | 2025-08-20T11:58:03.675219Z | 2025-08-20T12:14:07.675219Z | connection error |               |
+| backup in progress  | 10               | 2025-08-27T15:42:18.281907Z |                             |                  |               |
+| cleanup in progress | 100              | 2025-08-13T13:37:41.103729Z | 2025-08-13T16:44:25.103729Z |                  |               |
+
+Status values:
+
+| Status                | Meaning                          | Action                          |
+|-----------------------|----------------------------------|---------------------------------|
+| `backup in progress`  | Backup is currently running      | Wait or run `BACKUP ABORT`      |
+| `backup complete`     | Backup finished successfully     | None required                   |
+| `backup failed`       | Backup encountered an error      | Check `backup_error` column     |
+| `cleanup in progress` | Old backup data is being removed | Wait for completion             |
+| `cleanup complete`    | Cleanup finished successfully    | None required                   |
+| `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column    |
+
+To abort a running backup:
 
 ```questdb-sql title="Abort backup"
 BACKUP ABORT;
@@ -86,28 +173,127 @@ BACKUP ABORT;
 
 ### Restore
 
-To restore, create a `_backup_restore` file in the QuestDB install root. It is a
-properties file with the object store configuration and optional selector
-fields. On startup, QuestDB reads this file, selects the requested backup
-timestamp (or the latest available), downloads the backup data, and reconstructs
-the local database state.
+:::caution
 
-```
+Enterprise backup restore uses a different trigger file (`_backup_restore`) than
+OSS checkpoint restore (`_restore`). Do not confuse these two mechanisms.
+
+:::
+
+To restore from an object store backup, create a `_backup_restore` file in the
+QuestDB install root. This is a properties file with the object store
+configuration and optional selector fields. On startup, QuestDB reads this file,
+selects the requested backup timestamp (or the latest available), downloads the
+backup data, and reconstructs the local database state.
+
+```conf
 backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
 backup.instance.name=gentle-forest-orchid
 backup.restore.timestamp=2024-08-24T12:34:56.789123Z
 ```
 
-Notes:
+Parameters:
 
-- `backup.object.store` is required unless a default object store is already
-  configured.
-- `backup.instance.name` is required when multiple instance names exist in the
-  bucket.
-- `backup.restore.timestamp` is optional; omit it to restore the latest backup.
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `backup.object.store` | Yes* | Object store connection string (*not required if already in `server.conf`) |
+| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket |
+| `backup.restore.timestamp` | No | Specific backup to restore; omit for latest |
 
-Restart QuestDB. If restore succeeds, `_backup_restore` is removed
-automatically. Restore fails if the target database is not empty.
+#### Finding your instance name
+
+Each QuestDB instance has an auto-generated backup instance name (three random
+words like `gentle-forest-orchid`). This name organizes backups in the object
+store under `_backup/<instance-name>/`.
+
+To find your instance name:
+
+- **File system**: Read `<install_root>/db/.backup_instance_name`
+- **Object store**: List directories under `_backup/` in your bucket
+- **Error message**: If you omit `backup.instance.name` when multiple instances
+  exist, the error message lists available options
+
+The `backup.instance.name` parameter is only required when multiple QuestDB
+instances share the same object store. If only one instance exists, it is
+detected automatically.
+
+:::warning
+
+Restore requires an empty database directory. If the target database already
+has data (indicated by the presence of `db/.data_id`), restore fails with:
+"The local database is not empty." Use a fresh installation directory for
+restore operations.
+
+:::
+
+Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
+
+#### Restore failure recovery
+
+If restore fails, QuestDB creates artifacts to help diagnose and recover:
+
+| Artifact | Purpose |
+|----------|---------|
+| `.restore_failed/` | Directory containing tables that failed to restore |
+| `_restore_failed` | File listing the names of failed tables |
+
+To recover from a failed restore:
+
+1. Check the `.restore_failed/` directory and `_restore_failed` file for details
+2. Investigate and fix the underlying issue (connectivity, permissions, etc.)
+3. Remove both `.restore_failed/` directory and `_restore_failed` file
+4. Restart QuestDB to retry the restore
+
+If you see the error "Failed restore directory found", a previous restore
+attempt failed. Remove the artifacts listed above before restarting.
+
+### Create a replica from a backup
+
+You can use a backup to bootstrap a new replica instance instead of relying
+solely on WAL replay from the object store. This is faster when the backup is
+more recent than the oldest available WAL data.
+
+1. **Ensure the primary is running and has replication configured**
+
+   The primary must have `replication.role=primary` and a configured
+   `replication.object.store`.
+
+2. **Create a `_backup_restore` file on the new replica machine**
+
+   Point it to the same backup location used by the primary:
+
+   ```conf
+   backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
+   backup.instance.name=gentle-forest-orchid
+   ```
+
+3. **Configure the replica**
+
+   Set `replication.role=replica` and ensure `replication.object.store` points
+   to the same object store as the primary.
+
+4. **Start the replica**
+
+   QuestDB restores from the backup first, then switches to WAL replay to catch
+   up with the primary.
+
+For more details on replication setup, see the
+[replication guide](/docs/operations/replication/).
+
+### Troubleshooting
+
+If you encounter errors during backup or restore:
+
+- **ER007 - Data ID mismatch**: The local database and object store have
+  different Data IDs. See [error code ER007](/docs/troubleshooting/error-codes/#er007)
+  for resolution steps.
+- **Backup stuck at 0%**: Check network connectivity to the object store and
+  verify credentials are correct.
+- **"Failed restore directory found"**: A previous restore attempt failed.
+  Remove the `.restore_failed/` directory and `_restore_failed` file, then
+  restart. See [Restore failure recovery](#restore-failure-recovery).
+- **"The local database is not empty"**: Restore requires an empty database
+  directory. Use a fresh installation or remove the existing `db/` directory.
 
 ## QuestDB OSS: manual backups with checkpoints
 
@@ -138,15 +324,7 @@ space, the safer it is to enter the checkpoint mode.
 
 #### Determine backup frequency
 
-We recommend daily backups.
-
-If you are using QuestDB Enterprise replication, the frequency of backups
-impacts the time it takes to create a new
-[replica instance](/docs/operations/replication/).
-Creating replicas involves choosing a backup and having the replica replay WAL
-files until it has caught up. The older the backup, the more WAL files the
-replica will have to replay, and thus there is a longer time-frame. For these
-reasons, we recommend a daily backup schedule to keep the process rapid.
+We recommend daily backups for disaster recovery purposes.
 
 #### Choose your data copy method
 
@@ -165,7 +343,7 @@ If you're using cloud disks, such as EBS on AWS, SSD on Azure, or similar, we
 strongly recommend using their existing cloud _snapshot_ infrastructure. The
 advantages of this approach are that:
 
-- Cloud snapshots minimizes the time QuestDB spends in checkpoint mode
+- Cloud snapshots minimize the time QuestDB spends in checkpoint mode
 - Cloud snapshots are differential and can be restored cleanly
 
 See the following guides for volume snapshot creation on the following cloud
@@ -184,7 +362,7 @@ steps:
 1. Take a snapshot
 2. Back up the snapshot
 
-**Exit the `CHECKPOINT` mode as soon the snapshoting stage is complete.**
+**Exit the `CHECKPOINT` mode as soon as the snapshotting stage is complete.**
 
 Specifically, exit checkpoint mode at the following snapshot stage:
 
@@ -196,9 +374,9 @@ Specifically, exit checkpoint mode at the following snapshot stage:
 
 ##### Volume snapshots
 
-When the database is on-prem, we recommend using the existing file system backup
-tools. Volume snapshots by, for example, can be taken via LVM:
-([LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/logical_volume_manager_administration/lvm_overview)).
+When the database is on-prem, we recommend using existing file system backup
+tools. For example, volume snapshots can be taken via
+[LVM](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/logical_volume_manager_administration/lvm_overview).
 
 ##### File copy
 
@@ -273,7 +451,14 @@ Now, with our additional copy, we're ready to restore QuestDB.
 
 ### Restore to a saved checkpoint
 
-Restoring to a checkpoint will restore the entire database.
+Restoring from a local checkpoint will restore the entire database.
+
+:::caution
+
+OSS checkpoint restore uses the `_restore` trigger file. This is different from
+Enterprise backup restore which uses `_backup_restore`.
+
+:::
 
 Follow these steps:
 
@@ -293,6 +478,24 @@ the same major version number, for example: `8.1.0` and `8.1.1` are compatible.
 When using cloud tools, create a new disk from the snapshot. The entire disk
 contents of the original database will be available when the compute instance
 starts.
+
+:::warning
+
+**AWS EBS lazy loading**: By default, EBS volumes created from snapshots load
+data lazily (on first access), which can cause slow reads after restore. To
+mitigate this:
+
+- **Option 1**: Enable [Fast Snapshot Restore (FSR)](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-fast-snapshot-restore.html)
+  on the snapshot before creating the volume
+- **Option 2**: Pre-warm the volume by reading all blocks after restore:
+  ```bash
+  sudo fio --filename=/dev/nvme1n1 --rw=read --bs=1M --iodepth=32 \
+    --ioengine=libaio --direct=1 --name=volume-initialize
+  ```
+
+This issue may also affect other cloud providers with similar snapshot behavior.
+
+:::
 
 If you are not using cloud tools, you have to make sure that you restore the
 root from the backup using your own tools of choice!
@@ -342,5 +545,5 @@ section for more information.
 
 ## Further reading
 
-To learn more, see the
-[`CHECKPOINT` SQL reference documentation](/docs/reference/sql/checkpoint/).
+- [`BACKUP` SQL reference](/docs/reference/sql/backup/) - Enterprise backup command syntax
+- [`CHECKPOINT` SQL reference](/docs/reference/sql/checkpoint/) - OSS checkpoint command syntax

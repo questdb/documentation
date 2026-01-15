@@ -255,6 +255,11 @@ module.exports = {
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
+            {
+              id: "reference/sql/backup",
+              type: "doc",
+              customProps: { tag: "Enterprise" },
+            },
             "reference/sql/cancel-query",
             "reference/sql/checkpoint",
             "reference/sql/copy",
