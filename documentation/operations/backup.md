@@ -131,9 +131,10 @@ only changed data is uploaded.
 - **One backup at a time**: Only one backup can run at any given time. Starting
   a new backup while one is running will return an error.
 - **Primary and replica backups are separate**: Each QuestDB instance has its
-  own `backup_instance_name`, so backing up both a primary and its replica
-  creates two separate backup sets in the object store. Typically, backing up
-  the primary is sufficient since replicas sync from the same data.
+  own [`backup_instance_name`](#finding-your-instance-name), so backing up both
+  a primary and its replica creates two separate backup sets in the object
+  store. Typically, backing up the primary is sufficient since replicas sync
+  from the same data.
 
 ### Run a backup
 
