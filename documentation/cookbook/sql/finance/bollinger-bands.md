@@ -6,6 +6,9 @@ description: Calculate Bollinger Bands using window functions for volatility ana
 
 Calculate Bollinger Bands for volatility analysis and mean reversion trading. Bollinger Bands consist of a moving average with upper and lower bands set at a specified number of standard deviations above and below it. They help identify overbought/oversold conditions and measure market volatility.
 
+:::note
+Bollinger Bands can be calculated using either population standard deviation (stddev) or sample standard deviation (stddev_samp), producing slightly different results. This recipe uses stddev.
+:::
 
 ## Solution: Calculate variance using window functions
 
