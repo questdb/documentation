@@ -307,8 +307,8 @@ const config = {
       {
         blog: false,
         docs: {
-          include: ["**/*!(.partial).{md,mdx}"],
-          exclude: ["/glossary/"],
+          include: ["**/*.{md,mdx}"],
+          exclude: ["**/*.partial.mdx"],
           path: "documentation",
           routeBasePath: "/",
           editUrl: ({ docPath }) => {
