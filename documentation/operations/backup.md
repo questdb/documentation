@@ -14,14 +14,17 @@ QuestDB Enterprise.
 
 QuestDB supports two backup methods:
 
-- **Built-in incremental backup** (Enterprise only): Uses `BACKUP DATABASE` to
-  upload data to object storage and a trigger file (`_backup_restore`) for
-  restore. No manual checkpoints required.
-- **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)** (OSS and Enterprise): Uses
-  `CHECKPOINT CREATE/RELEASE` with external snapshot or file copy tools.
+- **Built-in incremental backup** (Enterprise only): Fully automated—configure
+  once, set a schedule, and backups run automatically. Provides point-in-time
+  recovery out of the box with no manual steps required.
 
-If you are running **QuestDB Enterprise**, we recommend using the built-in
-backup system for its simplicity and incremental upload capabilities.
+- **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)**
+  (OSS and Enterprise): Relies on external tools to copy data. Requires manual
+  coordination: `CHECKPOINT CREATE` → copy data with external tools →
+  `CHECKPOINT RELEASE`. Works well with cloud disk snapshots (AWS EBS, Azure
+  disks, etc.) where you simply trigger a snapshot. For on-premises environments
+  without snapshot capabilities, you'll need external tools or custom scripts
+  (e.g., rsync), which do not provide point-in-time recovery.
 
 ## QuestDB Enterprise: built-in backup and restore
 
@@ -49,8 +52,8 @@ Then run `BACKUP DATABASE;` in SQL. See [Run a backup](#run-a-backup) for detail
 
 ### Configure
 
-See [object store URLs](/docs/high-availability/setup/#1-configure-object-storage) for
-how to build the connection string.
+See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
+for connection string format.
 
 #### Scheduled backups
 
@@ -206,7 +209,7 @@ Parameters:
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `backup.object.store` | Yes* | Object store connection string (*not required if already in `server.conf`) |
+| `backup.object.store` | Sometimes | Object store connection string; required unless already specified in `server.conf` |
 | `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket |
 | `backup.restore.timestamp` | No | Specific backup to restore; omit for latest |
 
@@ -214,12 +217,12 @@ Parameters:
 
 Each QuestDB instance has an auto-generated backup instance name (three random
 words like `gentle-forest-orchid`). This name organizes backups in the object
-store under `_backup/<instance-name>/`.
+store under `backup/<backup_instance_name>/`.
 
 To find your instance name:
 
 - **File system**: Read `<install_root>/db/.backup_instance_name`
-- **Object store**: List directories under `_backup/` in your bucket
+- **Object store**: List directories under `backup/` in your bucket
 - **Error message**: If you omit `backup.instance.name` when multiple instances
   exist, the error message lists available options
 
