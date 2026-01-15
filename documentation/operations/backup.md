@@ -12,24 +12,23 @@ QuestDB Enterprise.
 
 ## Overview
 
-QuestDB provides two different backup workflows:
+QuestDB supports two backup methods:
 
-- **QuestDB Enterprise**: built-in incremental backups to object storage using
-  `BACKUP DATABASE` and a restore trigger file (`_backup_restore`). No manual
-  checkpoints are required.
-- **QuestDB OSS**: manual backups using `CHECKPOINT CREATE/RELEASE` and external
-  snapshot or file copy tools.
+- **Built-in incremental backup** (Enterprise only): Uses `BACKUP DATABASE` to
+  upload data to object storage and a trigger file (`_backup_restore`) for
+  restore. No manual checkpoints required.
+- **Manual checkpoint backup** (OSS and Enterprise): Uses
+  `CHECKPOINT CREATE/RELEASE` with external snapshot or file copy tools.
 
-If you are running **QuestDB Enterprise**, follow the Enterprise section below
-and do not use the manual checkpoint workflow.
+If you are running **QuestDB Enterprise**, we recommend using the built-in
+backup system for its simplicity and incremental upload capabilities.
 
 ## QuestDB Enterprise: built-in backup and restore
 
-QuestDB Enterprise provides an incremental backup system that uploads database
-metadata and partition data to object storage. When you run a backup, QuestDB
-creates a checkpoint internally, builds a manifest of tables and partitions, and
-uploads only the changed data. Progress and errors are tracked in an index stored
-alongside the backup data.
+QuestDB Enterprise provides an incremental backup system that stores your data
+in object storage. Backups are incremental—only changed data is uploaded—making
+them fast and bandwidth-efficient. You can monitor progress and check for errors
+while backups run.
 
 :::note
 

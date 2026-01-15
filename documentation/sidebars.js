@@ -322,11 +322,7 @@ module.exports = {
               type: "doc",
               customProps: { tag: "Enterprise" },
             },
-            {
-              id: "query/sql/backup",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+            "query/sql/backup",
             "query/sql/cancel-query",
             "query/sql/checkpoint",
             "query/sql/compile-view",

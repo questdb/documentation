@@ -17,12 +17,10 @@ _Looking for a detailed guide on backup creation and restoration? Check out our
 
 ## Syntax
 
-```
-BACKUP DATABASE
-  ::= 'BACKUP' 'DATABASE'
+```questdb-sql
+BACKUP DATABASE;
 
-BACKUP ABORT
-  ::= 'BACKUP' 'ABORT'
+BACKUP ABORT;
 ```
 
 ### BACKUP DATABASE
