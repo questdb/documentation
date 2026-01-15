@@ -17,7 +17,7 @@ QuestDB supports two backup methods:
 - **Built-in incremental backup** (Enterprise only): Uses `BACKUP DATABASE` to
   upload data to object storage and a trigger file (`_backup_restore`) for
   restore. No manual checkpoints required.
-- **Manual checkpoint backup** (OSS and Enterprise): Uses
+- **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)** (OSS and Enterprise): Uses
   `CHECKPOINT CREATE/RELEASE` with external snapshot or file copy tools.
 
 If you are running **QuestDB Enterprise**, we recommend using the built-in
@@ -62,6 +62,17 @@ backup.schedule.cron=0 0 * * *
 backup.schedule.tz=UTC
 ```
 
+The `backup.schedule.tz` property accepts any valid
+<a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone name</a>
+(e.g., `America/New_York`, `Europe/London`) or `UTC`.
+
+These settings can be modified in `server.conf` and hot-reloaded without
+restarting the server:
+
+```questdb-sql
+SELECT reload_config();
+```
+
 #### Backup retention
 
 Control how many backups to keep before automatic cleanup removes older ones:
@@ -89,7 +100,7 @@ specifies a directory for atomic write operations during backup.
 | `backup.enabled` | Enable backup functionality | `false` |
 | `backup.object.store` | Object store connection string | None (required) |
 | `backup.schedule.cron` | Cron expression for scheduled backups | None (manual only) |
-| `backup.schedule.tz` | Timezone for cron schedule | `UTC` |
+| `backup.schedule.tz` | <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone</a> for cron schedule | `UTC` |
 | `backup.cleanup.keep.latest.n` | Number of backups to retain | `5` |
 | `backup.compression.level` | Compression level (1-22) | `5` |
 | `backup.compression.threads` | Threads for compression | CPU count |
