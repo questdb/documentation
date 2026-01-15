@@ -50,7 +50,7 @@ Then run `BACKUP DATABASE;` in SQL. See [Run a backup](#run-a-backup) for detail
 
 ### Configure
 
-See [object store URLs](/docs/operations/replication/#setup-object-storage) for
+See [object store URLs](/docs/high-availability/setup/#1-configure-object-storage) for
 how to build the connection string.
 
 #### Scheduled backups
@@ -278,7 +278,7 @@ more recent than the oldest available WAL data.
    up with the primary.
 
 For more details on replication setup, see the
-[replication guide](/docs/operations/replication/).
+[replication guide](/docs/high-availability/setup/).
 
 ### Troubleshooting
 
