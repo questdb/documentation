@@ -159,9 +159,6 @@ and it's available under the following coordinates:
 </dependency>
 ```
 
-The latest version is:
-[![a badge with the latest connector version in Maven Central](https://maven-badges.herokuapp.com/maven-central/org.questdb/flink-questdb-connector/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.questdb/flink-questdb-connector)
-
 ## FAQ
 
 Q: Why is QuestDB client not repackaged into a different Java package?<br/> A:

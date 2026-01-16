@@ -1,5 +1,5 @@
 ---
-title: Multiple Conditional Aggregates
+title: Multiple conditional aggregates
 sidebar_label: Conditional aggregates
 description: Calculate multiple conditional aggregates in a single query using CASE expressions
 ---
@@ -18,7 +18,7 @@ You need to calculate various metrics from the same dataset with different condi
 
 Running separate queries is inefficient.
 
-## Solution: CASE Within Aggregate Functions
+## Solution: CASE within aggregate functions
 
 Use CASE expressions inside aggregates to calculate all metrics in one query:
 
@@ -38,9 +38,18 @@ WHERE timestamp >= dateadd('d', -1, now())
 GROUP BY symbol;
 ```
 
-## How It Works
+Which returns:
 
-### CASE Returns NULL for Non-Matching Rows
+
+| symbol   | buy_count | sell_count | avg_buy_price     | avg_sell_price     | large_trade_volume | small_trade_volume | total_volume       |
+| -------- | --------- | ---------- | ----------------- | ------------------ | ------------------ | ------------------ | ------------------ |
+| ETH-USDT | 262870    | 212163     | 3275.286678129868 | 3273.6747631773655 | 152042.02150799974 | 51934.917160999976 | 203976.93866900489 |
+| BTC-USDT | 789959    | 712152     | 94286.52121793582 | 94304.92124321847  | 1713.1241887299993 | 8803.505760999722  | 10516.629949730019 |
+
+
+## How it works
+
+### CASE returns NULL for non-matching rows
 
 ```sql
 count(CASE WHEN side = 'buy' THEN 1 END)
@@ -51,7 +60,7 @@ count(CASE WHEN side = 'buy' THEN 1 END)
 - `count()` only counts non-NULL values
 - Result: counts only rows where side is 'buy'
 
-### Aggregate Functions Ignore NULL
+### Aggregate functions ignore NULL
 
 ```sql
 avg(CASE WHEN side = 'buy' THEN price END)

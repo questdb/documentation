@@ -1,5 +1,5 @@
 ---
-title: Configure TLS Certificate Authorities
+title: Configure TLS certificate authorities
 sidebar_label: TLS CA configuration
 description: Configure TLS certificate authority validation for QuestDB clients
 ---
@@ -16,7 +16,7 @@ When using the PostgreSQL wire interface, you can insert data passing `sslmode=r
 
 QuestDB clients support the `tls_ca` parameter, which has multiple values to configure certificate authority validation:
 
-### Option 1: Use WebPKI and OS Certificate Roots (Recommended for Production)
+### Option 1: Use WebPKI and OS certificate roots (recommended for production)
 
 If you want to accept both the webpki-root certificates plus whatever you have on the OS, pass `tls_ca=webpki_and_os_roots`:
 
@@ -26,7 +26,7 @@ https::addr=localhost:9000;username=admin;password=quest;tls_ca=webpki_and_os_ro
 
 This will work with certificates signed by standard certificate authorities.
 
-### Option 2: Use a Custom PEM File
+### Option 2: Use a custom PEM file
 
 Point to a PEM-encoded certificate file for self-signed or custom CA certificates:
 
@@ -36,7 +36,7 @@ https::addr=localhost:9000;username=admin;password=quest;tls_ca=pem_file;tls_roo
 
 This is useful for self-signed certificates or internal CAs.
 
-### Option 3: Skip Verification (Development Only)
+### Option 3: Skip verification (development only)
 
 For development environments with self-signed certificates, you might be tempted to disable verification by passing `tls_verify=unsafe_off`:
 
@@ -50,7 +50,7 @@ This is a very bad idea for production and should only be used for testing on a 
 
 **Note:** Some clients require enabling an optional feature (like `insecure-skip-verify` in Rust) before the `tls_verify=unsafe_off` parameter will work. Check your client's documentation for details.
 
-## Available tls_ca Values
+## Available tls_ca values
 
 | Value | Description |
 |-------|-------------|
@@ -59,7 +59,7 @@ This is a very bad idea for production and should only be used for testing on a 
 | `webpki_and_os_roots` | Both WebPKI and OS roots (recommended) |
 | `pem_file` | Load from a PEM file (requires `tls_roots` parameter) |
 
-## Example: Rust Client
+## Example: Rust client
 
 ```rust
 use questdb::ingress::{Sender, SenderBuilder};

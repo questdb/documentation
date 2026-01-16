@@ -749,6 +749,7 @@ module.exports = {
                     "cookbook/sql/finance/vwap",
                     "cookbook/sql/finance/bollinger-bands",
                     "cookbook/sql/finance/tick-trin",
+                    "cookbook/sql/finance/aggressor-volume-imbalance",
                     "cookbook/sql/finance/volume-profile",
                     "cookbook/sql/finance/volume-spike",
                     "cookbook/sql/finance/rolling-stddev",

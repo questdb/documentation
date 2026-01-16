@@ -1,5 +1,5 @@
 ---
-title: Filter Data by Week Number
+title: Filter data by week number
 sidebar_label: Filter by week
 description: Query data by ISO week number using week_of_year() or dateadd() for better performance
 ---
@@ -15,7 +15,7 @@ SELECT * FROM trades
 WHERE week_of_year(timestamp) = 24;
 ```
 
-## Solution 2: Using dateadd() (Faster)
+## Solution 2: Using dateadd() (faster)
 
 However, depending on your table size, especially if you are not filtering by any timestamp, you might prefer this alternative, as it executes faster:
 
@@ -27,7 +27,7 @@ WHERE timestamp >= dateadd('w', 23, '2025-01-01')
 
 You need to be careful with that query, as it will start counting time from Jan 1st 1970, which is not a Monday.
 
-## Solution 3: Start at First Monday of Year
+## Solution 3: Start at first Monday of year
 
 This alternative would start at the Monday of the week that includes January 1st:
 

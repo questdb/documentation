@@ -1,5 +1,5 @@
 ---
-title: Remove Outliers from Candle Data
+title: Remove outliers from candle data
 sidebar_label: Remove OHLC outliers
 description: Filter outliers in OHLC candles using window functions to compare against moving averages
 ---

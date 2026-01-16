@@ -1,5 +1,5 @@
 ---
-title: Check Transaction Applied After Ingestion
+title: Check transaction applied after ingestion
 sidebar_label: Check transaction applied
 description: Verify that all ingested rows to a WAL table are visible for queries in QuestDB
 ---

@@ -1,5 +1,5 @@
 ---
-title: Volume Profile
+title: Volume profile
 sidebar_label: Volume profile
 description: Calculate volume profile by grouping trades into price bins
 ---
@@ -23,7 +23,7 @@ ORDER BY price_bin;
 
 Since QuestDB does an implicit GROUP BY on all non-aggregated columns, you can omit the explicit GROUP BY clause.
 
-## Dynamic Tick Size
+## Dynamic tick size
 
 For consistent histograms across different price ranges, calculate the tick size dynamically to always produce approximately 50 bins:
 

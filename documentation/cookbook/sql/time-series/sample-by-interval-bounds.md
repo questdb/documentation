@@ -1,5 +1,5 @@
 ---
-title: Right Interval Bound with SAMPLE BY
+title: Right interval bound with SAMPLE BY
 sidebar_label: Interval bounds
 description: Shift SAMPLE BY timestamps to use right interval bound instead of left bound
 ---
