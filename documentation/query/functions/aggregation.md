@@ -126,30 +126,6 @@ is documented in each function's description.
 
 :::
 
-:::note Nested aggregates not supported
-
-QuestDB does not support using aggregate functions as arguments to other
-functions. For example, this is not allowed:
-
-```questdb-sql
-SELECT datediff('d', min(timestamp), max(timestamp)) FROM trades;
-```
-
-Running it will result in the following error:
-
-`Aggregate function cannot be passed as an argument`
-
-You can work around this limitation by using CTEs or subqueries:
-
-```questdb-sql title="CTE workaround"
-WITH minmax AS (
-  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
-)
-SELECT datediff('d', min_date, max_date) FROM minmax;
-```
-
-:::
-
 ---
 
 ## approx_count_distinct
