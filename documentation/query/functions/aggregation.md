@@ -89,42 +89,9 @@ calculations. Functions are organized by category below.
 
 ---
 
-## Usage notes
-
-:::note Implicit GROUP BY
-
-QuestDB supports implicit `GROUP BY`. When you use aggregate functions alongside
-non-aggregated columns, QuestDB automatically groups by the non-aggregated
-columns. These two queries are equivalent:
-
-```questdb-sql
--- Explicit GROUP BY (standard SQL)
-SELECT symbol, avg(price) FROM trades GROUP BY symbol;
-
--- Implicit GROUP BY (QuestDB shorthand)
-SELECT symbol, avg(price) FROM trades;
-```
-
-Examples in this documentation often use implicit `GROUP BY` for brevity.
-
-:::
-
-:::note NULL value handling
-
-Most aggregate functions ignore `NULL` values during computation. For example,
-`sum(column)` adds only non-NULL values, and `avg(column)` calculates the mean
-of non-NULL values only.
-
-Exceptions and special cases:
-- `count(*)` counts all rows including those with NULL values
-- `count(column)` counts only non-NULL values in the specified column
-- `first()` and `last()` may return NULL if the first/last row contains NULL
-- `first_not_null()` and `last_not_null()` skip NULL values
-
-For functions with multiple arguments (like `arg_min`, `arg_max`), NULL handling
-is documented in each function's description.
-
-:::
+QuestDB supports implicit `GROUP BY`. When aggregate functions are used with
+non-aggregated columns, QuestDB automatically groups by those columns. Examples
+in this documentation often omit `GROUP BY` for brevity.
 
 ---
 
