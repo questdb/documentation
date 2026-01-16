@@ -320,7 +320,9 @@ module.exports = {
             {
               id: "query/sql/acl/assume-service-account",
               type: "doc",
-                },
+              customProps: { tag: "Enterprise" },
+            },
+            "query/sql/backup",
             "query/sql/cancel-query",
             "query/sql/checkpoint",
             "query/sql/compile-view",
