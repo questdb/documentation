@@ -1,8 +1,8 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, count, rank, row_number, lag, lead, and more.
-keywords: [window functions, avg, sum, count, rank, row_number, lag, lead, first_value, last_value, min, max]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, rank, row_number, lag, lead, EMA, VWEMA, and more.
+keywords: [window functions, avg, sum, ksum, count, rank, row_number, lag, lead, first_value, last_value, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
@@ -13,15 +13,25 @@ These functions respect the frame clause and calculate values over the specified
 
 ### avg()
 
-Calculates the average of values over the window frame.
+Calculates the average of values over the window frame. Supports standard arithmetic average, Exponential Moving Average (EMA), and Volume-Weighted Exponential Moving Average (VWEMA).
 
 **Syntax:**
 ```questdb-sql
+-- Standard average
 avg(value) OVER (window_definition)
+
+-- Exponential Moving Average (EMA)
+avg(value, kind, param) OVER (window_definition)
+
+-- Volume-Weighted Exponential Moving Average (VWEMA)
+avg(value, kind, param, volume) OVER (window_definition)
 ```
 
 **Arguments:**
 - `value`: Numeric column to calculate the average of
+- `kind` (EMA/VWEMA): Smoothing mode - `'alpha'`, `'period'`, or a time unit (`'second'`, `'minute'`, `'hour'`, `'day'`, `'week'`)
+- `param` (EMA/VWEMA): Parameter for the smoothing mode (see below)
+- `volume` (VWEMA only): Numeric column representing volume weights
 
 **Return value:**
 - The average of `value` for rows in the window frame
@@ -44,6 +54,115 @@ SELECT
 FROM trades
 WHERE timestamp IN today();
 ```
+
+#### Exponential Moving Average (EMA)
+
+The EMA variant applies exponential smoothing, giving more weight to recent values. It supports three smoothing modes:
+
+| Mode | `kind` | `param` | Description |
+|------|--------|---------|-------------|
+| Direct alpha | `'alpha'` | 0 < α ≤ 1 | Use smoothing factor directly |
+| Period-based | `'period'` | N | N-period EMA where α = 2 / (N + 1) |
+| Time-weighted | `'second'`, `'minute'`, `'hour'`, `'day'`, `'week'` | τ (tau) | Time-weighted decay where α = 1 - exp(-Δt / τ) |
+
+**EMA formula:**
+```
+EMA = α × current_value + (1 - α) × previous_EMA
+```
+
+**Examples:**
+```questdb-sql title="EMA with direct alpha"
+SELECT
+    symbol,
+    price,
+    avg(price, 'alpha', 0.2) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS ema_alpha
+FROM trades;
+```
+
+```questdb-sql title="10-period EMA"
+SELECT
+    symbol,
+    price,
+    avg(price, 'period', 10) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS ema_10
+FROM trades;
+```
+
+```questdb-sql title="Time-weighted EMA with 5-minute decay"
+SELECT
+    symbol,
+    price,
+    avg(price, 'minute', 5) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS ema_5min
+FROM trades;
+```
+
+:::note EMA behavior
+- NULL values are skipped; the previous EMA value is preserved
+- The first non-NULL value initializes the EMA
+- Works with both `TIMESTAMP` and `TIMESTAMP_NS` precision
+- EMA ignores the frame clause and operates cumulatively from the first row
+:::
+
+#### Volume-Weighted Exponential Moving Average (VWEMA)
+
+VWEMA combines exponential smoothing with volume weighting, useful for financial analysis where trading volume affects price significance.
+
+**VWEMA formula:**
+```
+numerator   = α × price × volume + (1 - α) × prev_numerator
+denominator = α × volume + (1 - α) × prev_denominator
+VWEMA       = numerator / denominator
+```
+
+For time-weighted mode: `α = 1 - exp(-Δt / τ)`
+
+**Examples:**
+```questdb-sql title="VWEMA with direct alpha"
+SELECT
+    symbol,
+    price,
+    avg(price, 'alpha', 0.1, volume) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS vwema_alpha
+FROM trades;
+```
+
+```questdb-sql title="10-period VWEMA"
+SELECT
+    symbol,
+    price,
+    avg(price, 'period', 10, amount) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS vwema_10
+FROM trades;
+```
+
+```questdb-sql title="Time-weighted VWEMA with 1-hour decay"
+SELECT
+    symbol,
+    price,
+    avg(price, 'hour', 1, amount) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS vwema_1h
+FROM trades;
+```
+
+:::note VWEMA behavior
+- Rows with NULL price, NULL volume, or zero volume are skipped
+- When timestamps are identical (Δt = 0), the row is skipped in time-weighted mode
+- VWEMA ignores the frame clause and operates cumulatively from the first row
+:::
 
 ---
 
@@ -106,6 +225,53 @@ SELECT
     ) AS cumulative_amount
 FROM trades
 WHERE timestamp IN today();
+```
+
+---
+
+### ksum()
+
+Calculates the sum of values over the window frame using the Kahan summation algorithm for improved floating-point precision. This is particularly useful when summing many floating-point values where standard summation might accumulate rounding errors.
+
+**Syntax:**
+```questdb-sql
+ksum(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column to sum
+
+**Return value:**
+- The sum of `value` for rows in the window frame with improved precision
+
+**Description:**
+
+`ksum()` uses the [Kahan summation algorithm](https://en.wikipedia.org/wiki/Kahan_summation_algorithm) which maintains a running compensation for lost low-order bits. This is useful when summing many floating-point numbers where the standard `sum()` function might accumulate significant rounding errors.
+
+**Example:**
+```questdb-sql title="Cumulative sum with Kahan precision" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    ksum(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS cumulative_price
+FROM trades
+WHERE timestamp IN today();
+```
+
+```questdb-sql title="Sliding window sum with precision"
+SELECT
+    symbol,
+    price,
+    ksum(price) OVER (
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS rolling_sum
+FROM trades;
 ```
 
 ---

@@ -2,7 +2,7 @@
 title: Window Functions Overview
 sidebar_label: Overview
 description: Introduction to window functions in QuestDB - perform calculations across related rows without collapsing results.
-keywords: [window functions, over, partition by, moving average, running total, rank, row_number, lag, lead, analytics]
+keywords: [window functions, over, partition by, moving average, running total, rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average]
 ---
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
@@ -35,9 +35,10 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 
 | Function | Description | Respects Frame |
 |----------|-------------|----------------|
-| [`avg()`](reference.md#avg) | Average value in window | Yes |
+| [`avg()`](reference.md#avg) | Average value in window (also supports EMA and VWEMA) | Yes (standard) / No (EMA/VWEMA) |
 | [`count()`](reference.md#count) | Count rows or non-null values | Yes |
 | [`sum()`](reference.md#sum) | Sum of values in window | Yes |
+| [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Yes |
 | [`min()`](reference.md#min) | Minimum value in window | Yes |
 | [`max()`](reference.md#max) | Maximum value in window | Yes |
 | [`first_value()`](reference.md#first_value) | First value in window | Yes |
