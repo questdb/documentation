@@ -1,129 +1,138 @@
 ---
 title: TICK and TRIN indicators
 sidebar_label: TICK & TRIN
-description: Calculate TICK and TRIN (ARMS Index) based on price direction for market breadth analysis
+description: Calculate TICK and TRIN (ARMS Index) for market breadth analysis
 ---
 
-Calculate TICK and TRIN (Trading Index, also known as the ARMS Index) to measure market breadth. These indicators classify each time period as advancing or declining based on price movement.
+Calculate TICK and TRIN (Trading Index, also known as the ARMS Index) to measure market breadth. These indicators count how many symbols are advancing versus declining across a market.
 
-## Problem: Measure market breadth by price direction
+## TICK
 
-You want to calculate TICK and TRIN indicators using traditional definitions:
-- **Uptick**: Current price > previous price
-- **Downtick**: Current price < previous price
-- **TICK** = upticks - downticks
-- **TRIN** = (upticks / downticks) / (uptick_volume / downtick_volume)
+**TICK** measures market direction by counting symbols:
+- For each symbol, check if its last trade price > previous trade price (uptick) or < (downtick)
+- TICK = number of symbols on uptick - number of symbols on downtick
+- Positive TICK = more symbols rising, negative = more falling
 
-## Solution: Use LAG to compare consecutive prices
+### TICK snapshot
 
-### Per-symbol TICK and TRIN
+Calculate a single market-wide TICK value. For each symbol, compare the last trade price to the previous trade price to determine if it's on an uptick or downtick. The final result is one row showing how many symbols are rising versus falling.
 
-Calculate separate indicators for each currency pair:
-
-```questdb-sql demo title="TICK and TRIN per symbol"
-WITH candles AS (
-  SELECT timestamp, symbol, last(price) AS close, sum(quantity) AS total_volume
+```questdb-sql demo title="TICK - market breadth snapshot"
+WITH with_previous AS (
+  SELECT timestamp, symbol, price,
+    LAG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_price
   FROM fx_trades
-  WHERE timestamp IN yesterday()
-    AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
-  SAMPLE BY 10m
-),
-prev_prices AS (
-  SELECT timestamp, symbol, close, total_volume,
-    LAG(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
-  FROM candles
+  WHERE timestamp IN today()
 ),
 classified AS (
-  SELECT *,
-    CASE WHEN close > prev_close THEN 1 ELSE 0 END AS is_uptick,
-    CASE WHEN close < prev_close THEN 1 ELSE 0 END AS is_downtick,
-    CASE WHEN close > prev_close THEN total_volume ELSE 0 END AS uptick_vol,
-    CASE WHEN close < prev_close THEN total_volume ELSE 0 END AS downtick_vol
-  FROM prev_prices
-  WHERE prev_close IS NOT NULL
-),
-aggregated AS (
-  SELECT symbol,
-    SUM(is_uptick) AS upticks,
-    SUM(is_downtick) AS downticks,
-    SUM(is_uptick) - SUM(is_downtick) AS tick,
-    SUM(uptick_vol) AS uptick_vol,
-    SUM(downtick_vol) AS downtick_vol
-  FROM classified
-)
-SELECT symbol,
-  upticks,
-  downticks,
-  tick,
-  upticks::double / downticks AS advance_decline_ratio,
-  uptick_vol::double / downtick_vol AS upside_downside_ratio,
-  (upticks::double / downticks) / (uptick_vol::double / downtick_vol) AS trin
-FROM aggregated;
-```
-
-### Market-wide TICK and TRIN
-
-Aggregate across all symbols for a single market breadth reading:
-
-```questdb-sql demo title="Market-wide TICK and TRIN"
-WITH candles AS (
-  SELECT timestamp, symbol, last(price) AS close, sum(quantity) AS total_volume
-  FROM fx_trades
-  WHERE timestamp IN yesterday()
-    AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
-  SAMPLE BY 10m
-),
-prev_prices AS (
-  SELECT timestamp, symbol, close, total_volume,
-    LAG(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
-  FROM candles
-),
-classified AS (
-  SELECT *,
-    CASE WHEN close > prev_close THEN 1 ELSE 0 END AS is_uptick,
-    CASE WHEN close < prev_close THEN 1 ELSE 0 END AS is_downtick,
-    CASE WHEN close > prev_close THEN total_volume ELSE 0 END AS uptick_vol,
-    CASE WHEN close < prev_close THEN total_volume ELSE 0 END AS downtick_vol
-  FROM prev_prices
-  WHERE prev_close IS NOT NULL
-),
-aggregated AS (
-  SELECT
-    SUM(is_uptick) AS upticks,
-    SUM(is_downtick) AS downticks,
-    SUM(is_uptick) - SUM(is_downtick) AS tick,
-    SUM(uptick_vol) AS uptick_vol,
-    SUM(downtick_vol) AS downtick_vol
-  FROM classified
+  SELECT  symbol,
+    CASE WHEN price > prev_price THEN 1 ELSE 0 END AS is_uptick,
+    CASE WHEN price < prev_price THEN 1 ELSE 0 END AS is_downtick
+  FROM with_previous
+  WHERE prev_price IS NOT NULL
+  LATEST ON timestamp PARTITION BY symbol -- use only the latest entry per symbol, together with the previous price
 )
 SELECT
-  upticks,
-  downticks,
-  tick,
-  upticks::double / downticks AS advance_decline_ratio,
-  uptick_vol::double / downtick_vol AS upside_downside_ratio,
-  (upticks::double / downticks) / (uptick_vol::double / downtick_vol) AS trin
-FROM aggregated;
+  SUM(is_uptick) AS uptick_symbols,
+  SUM(is_downtick) AS downtick_symbols,
+  SUM(is_uptick) - SUM(is_downtick) AS tick
+FROM classified;
 ```
 
-## Interpreting the indicators
+### Interpreting TICK
 
-**TICK:**
-- **Positive**: More upticks than downticks (bullish)
-- **Negative**: More downticks than upticks (bearish)
+- **Positive**: More symbols on uptick (bullish)
+- **Negative**: More symbols on downtick (bearish)
 - **Near zero**: Balanced market
 
-**TRIN (ARMS Index):**
+## TRIN
+
+**TRIN** (ARMS Index) adds volume weighting:
+- TRIN = (advancing symbols / declining symbols) / (advancing volume / declining volume)
+- TRIN < 1.0 = volume favoring advances (bullish)
+- TRIN > 1.0 = volume favoring declines (bearish)
+- TRIN = 1.0 = neutral
+
+### TRIN snapshot
+
+Calculate a single market-wide TRIN value. For each symbol, aggregate intraday volume and classify it as advancing or declining based on whether the current price is above or below the day's open. The final result is one row showing overall market breadth.
+
+```questdb-sql demo title="TRIN - daily breadth snapshot"
+WITH daily_stats AS (
+  SELECT symbol,
+    first(price) AS open_price,
+    last(price) AS current_price,
+    sum(quantity) AS total_volume
+  FROM fx_trades
+  WHERE timestamp IN today()
+  SAMPLE BY 1d
+),
+classified AS (
+  SELECT *,
+    CASE WHEN current_price > open_price THEN 1 ELSE 0 END AS is_advancing,
+    CASE WHEN current_price < open_price THEN 1 ELSE 0 END AS is_declining
+  FROM daily_stats
+)
+SELECT
+  SUM(is_advancing) AS advancing,
+  SUM(is_declining) AS declining,
+  SUM(CASE WHEN is_advancing = 1 THEN total_volume ELSE 0 END) AS advancing_volume,
+  SUM(CASE WHEN is_declining = 1 THEN total_volume ELSE 0 END) AS declining_volume,
+  (SUM(is_advancing)::double / NULLIF(SUM(is_declining), 0)) /
+  (SUM(CASE WHEN is_advancing = 1 THEN total_volume ELSE 0 END)::double /
+   NULLIF(SUM(CASE WHEN is_declining = 1 THEN total_volume ELSE 0 END), 0)) AS trin
+FROM classified;
+```
+
+### TRIN time-series
+
+Track how market breadth evolves throughout the day. For each candle interval, compare each symbol's close to its previous close to classify it as advancing or declining. Each row returns the market-wide TRIN at that point in time.
+
+```questdb-sql demo title="TRIN time-series with 5-minute candles"
+WITH candles AS (
+  SELECT timestamp, symbol,
+    last(price) AS close_price,
+    sum(quantity) AS total_volume
+  FROM fx_trades
+  WHERE timestamp IN today()
+  SAMPLE BY 5m
+),
+with_previous AS (
+  SELECT timestamp, symbol, total_volume, close_price,
+    LAG(close_price) OVER (PARTITION BY symbol ORDER BY timestamp) AS last_close
+  FROM candles
+),
+classified AS (
+  SELECT timestamp, symbol, total_volume,
+    CASE WHEN close_price > last_close THEN 1 ELSE 0 END AS is_advancing,
+    CASE WHEN close_price < last_close THEN 1 ELSE 0 END AS is_declining
+  FROM with_previous
+  WHERE last_close IS NOT NULL
+)
+SELECT
+  timestamp,
+  SUM(is_advancing) AS advancing,
+  SUM(is_declining) AS declining,
+  SUM(CASE WHEN is_advancing = 1 THEN total_volume ELSE 0 END) AS advancing_volume,
+  SUM(CASE WHEN is_declining = 1 THEN total_volume ELSE 0 END) AS declining_volume,
+  (SUM(is_advancing)::double / NULLIF(SUM(is_declining), 0)) /
+  (SUM(CASE WHEN is_advancing = 1 THEN total_volume ELSE 0 END)::double /
+   NULLIF(SUM(CASE WHEN is_declining = 1 THEN total_volume ELSE 0 END), 0)) AS trin
+FROM classified;
+```
+
+### Interpreting TRIN
+
 - **< 1.0**: Volume favoring advances (bullish)
 - **> 1.0**: Volume favoring declines (bearish)
 - **= 1.0**: Neutral
 
-:::note TRIN limitations
-TRIN can produce counterintuitive results. For example, if advances outnumber declines 2:1 and advancing volume also leads 2:1, TRIN equals 1.0 (neutral) despite bullish conditions. The query includes separate **advance_decline_ratio** and **upside_downside_ratio** columns to help identify such cases.
+:::note
+TRIN can produce counterintuitive results. If advances outnumber declines 2:1 and advancing volume also leads 2:1, TRIN equals 1.0 (neutral) despite bullish conditions. Always consider TRIN alongside the raw advancing/declining counts.
 :::
 
 :::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [LAG function](/docs/query/functions/window-functions/reference/#lag)
-- [CASE expressions](/docs/query/sql/case/)
+- [SAMPLE BY](/docs/query/sql/sample-by/)
 :::

@@ -51,6 +51,8 @@ Where:
 - `E[X²]` is the average of squared prices
 - `√` is the square root function
 
+This query calculates an expanding standard deviation from the beginning of the period to the current row. For a fixed rolling window, add a [frame clause](/docs/query/functions/window-functions/syntax/#frame-types-and-behavior) to both window functions using `ROWS` (fixed number of rows) or `RANGE` (time-based window).
+
 :::info Related documentation
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [AVG window function](/docs/query/functions/window-functions/reference/#avg)
