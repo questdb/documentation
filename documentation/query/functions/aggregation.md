@@ -16,6 +16,7 @@ calculations. Functions are organized by category below.
 | [count](#count) | Count rows or non-NULL values |
 | [sum](#sum) | Sum of values |
 | [avg](#avg) | Arithmetic mean |
+| [geomean](#geomean) | Geometric mean |
 | [min](#min) | Minimum value |
 | [max](#max) | Maximum value |
 
@@ -57,6 +58,21 @@ calculations. Functions are organized by category below.
 | :------- | :---------- |
 | [string_agg](#string_agg) | Concatenate values with delimiter |
 | [string_distinct_agg](#string_distinct_agg) | Concatenate distinct values with delimiter |
+
+### Boolean aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [bool_and](#bool_and) | True if all values are true |
+| [bool_or](#bool_or) | True if any value is true |
+
+### Bitwise aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [bit_and](#bit_and) | Bitwise AND of all non-NULL values |
+| [bit_or](#bit_or) | Bitwise OR of all non-NULL values |
+| [bit_xor](#bit_xor) | Bitwise XOR of all non-NULL values |
 
 ### Specialized aggregates
 
@@ -487,6 +503,213 @@ SELECT payment_type, avg(amount) FROM transactions;
 - [sum](#sum) - Sum of values
 - [weighted_avg](#weighted_avg) - Weighted arithmetic mean
 
+## bit_and
+
+`bit_and(value)` returns the bitwise AND of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise AND of all status flags"
+SELECT bit_and(flags) FROM events;
+```
+
+| bit_and |
+| :------ |
+| 4       |
+
+```questdb-sql title="Bitwise AND of status flags by category"
+SELECT category, bit_and(status_flags) FROM items;
+```
+
+| category | bit_and |
+| :------- | :------ |
+| A        | 1       |
+| B        | 0       |
+| C        | 5       |
+
+#### See also
+
+- [bit_or](#bit_or) - Bitwise OR of all non-NULL values
+- [bit_xor](#bit_xor) - Bitwise XOR of all non-NULL values
+
+## bit_or
+
+`bit_or(value)` returns the bitwise OR of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise OR of all permissions"
+SELECT bit_or(permissions) FROM users;
+```
+
+| bit_or |
+| :----- |
+| 15     |
+
+```questdb-sql title="Bitwise OR of permissions by role"
+SELECT role, bit_or(permissions) FROM users;
+```
+
+| role    | bit_or |
+| :------ | :----- |
+| admin   | 255    |
+| editor  | 31     |
+| viewer  | 1      |
+
+#### See also
+
+- [bit_and](#bit_and) - Bitwise AND of all non-NULL values
+- [bit_xor](#bit_xor) - Bitwise XOR of all non-NULL values
+
+## bit_xor
+
+`bit_xor(value)` returns the bitwise XOR of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise XOR of all checksums"
+SELECT bit_xor(checksum) FROM data;
+```
+
+| bit_xor |
+| :------ |
+| 42      |
+
+```questdb-sql title="Bitwise XOR by partition"
+SELECT partition_id, bit_xor(value) FROM records;
+```
+
+| partition_id | bit_xor |
+| :----------- | :------ |
+| 1            | 170     |
+| 2            | 85      |
+
+#### See also
+
+- [bit_and](#bit_and) - Bitwise AND of all non-NULL values
+- [bit_or](#bit_or) - Bitwise OR of all non-NULL values
+
+## bool_and
+
+`bool_and(value)` returns `true` if all non-NULL values in the group are `true`,
+otherwise returns `false`. This function is useful for checking if a condition
+holds across all rows in a group.
+
+#### Parameters
+
+- `value` is a boolean column or expression.
+
+#### Return value
+
+Return value type is `boolean`.
+
+#### Examples
+
+```questdb-sql title="Check if all orders are fulfilled"
+SELECT bool_and(is_fulfilled) FROM orders;
+```
+
+| bool_and |
+| :------- |
+| false    |
+
+```questdb-sql title="Check if all items passed QA by batch"
+SELECT batch_id, bool_and(passed_qa) FROM items;
+```
+
+| batch_id | bool_and |
+| :------- | :------- |
+| 1        | true     |
+| 2        | false    |
+| 3        | true     |
+
+```questdb-sql title="Check if all prices are above threshold"
+SELECT symbol, bool_and(price > 100) FROM trades;
+```
+
+| symbol  | bool_and |
+| :------ | :------- |
+| BTC-USD | true     |
+| ETH-USD | false    |
+
+#### See also
+
+- [bool_or](#bool_or) - True if any value is true
+
+## bool_or
+
+`bool_or(value)` returns `true` if any non-NULL value in the group is `true`,
+otherwise returns `false`. This function is useful for checking if a condition
+holds for at least one row in a group.
+
+#### Parameters
+
+- `value` is a boolean column or expression.
+
+#### Return value
+
+Return value type is `boolean`.
+
+#### Examples
+
+```questdb-sql title="Check if any order has errors"
+SELECT bool_or(has_error) FROM orders;
+```
+
+| bool_or |
+| :------ |
+| true    |
+
+```questdb-sql title="Check if any item failed QA by batch"
+SELECT batch_id, bool_or(failed_qa) FROM items;
+```
+
+| batch_id | bool_or |
+| :------- | :------ |
+| 1        | false   |
+| 2        | true    |
+| 3        | false   |
+
+```questdb-sql title="Check if any trade exceeded volume threshold"
+SELECT symbol, bool_or(volume > 1000000) FROM trades;
+```
+
+| symbol  | bool_or |
+| :------ | :------ |
+| BTC-USD | true    |
+| ETH-USD | true    |
+
+#### See also
+
+- [bool_and](#bool_and) - True if all values are true
+
 ## corr
 
 `corr(arg0, arg1)` is a function that measures how closely two sets of numbers
@@ -872,6 +1095,67 @@ SELECT first_not_null(symbol) FROM trades_unordered;
 
 - [first](#first) - First value (may be NULL)
 - [last_not_null](#last_not_null) - Last non-NULL value
+
+## geomean
+
+`geomean(value)` calculates the geometric mean of a set of positive values. The
+geometric mean is computed using the formula `exp(avg(ln(x)))`, which prevents
+overflow issues with large products by using logarithms.
+
+The geometric mean is useful for calculating average growth rates, ratios, and
+other multiplicative quantities.
+
+#### Parameters
+
+- `value` is a `double` column or expression. Other numeric types are implicitly
+  converted to `double`.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Null and edge case handling
+
+| Input           | Result | Reason                           |
+| :-------------- | :----- | :------------------------------- |
+| Negative values | `NULL` | Geometric mean undefined         |
+| Zero values     | `NULL` | `ln(0)` is undefined             |
+| NULL values     | Skipped | Standard aggregate behavior     |
+| Empty group     | `NULL` | Standard aggregate behavior      |
+
+#### Examples
+
+```questdb-sql title="Geometric mean of growth rates"
+SELECT geomean(growth_rate) FROM quarterly_data;
+```
+
+| geomean |
+| :------ |
+| 1.12    |
+
+```questdb-sql title="Geometric mean of returns by asset"
+SELECT asset, geomean(return_factor) FROM portfolio;
+```
+
+| asset  | geomean |
+| :----- | :------ |
+| stocks | 1.08    |
+| bonds  | 1.03    |
+| crypto | 1.25    |
+
+```questdb-sql title="Comparing arithmetic and geometric means"
+SELECT avg(return_factor) AS arithmetic_mean,
+       geomean(return_factor) AS geometric_mean
+FROM investments;
+```
+
+| arithmetic_mean | geometric_mean |
+| :-------------- | :------------- |
+| 1.15            | 1.12           |
+
+#### See also
+
+- [avg](#avg) - Arithmetic mean
 
 ## haversine_dist_deg
 
