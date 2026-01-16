@@ -1,20 +1,122 @@
 ---
 title: Aggregate functions
 sidebar_label: Aggregate
-description: Aggregate functions reference documentation.
+description: SQL aggregate functions for summarizing data including count, sum, avg, min, max, statistical functions, and more.
 ---
 
 This page describes the available functions to assist with performing aggregate
-calculations.
+calculations. Functions are organized by category below.
 
+## Function categories
 
-:::note
+### Basic aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [count](#count) | Count rows or non-NULL values |
+| [sum](#sum) | Sum of values |
+| [avg](#avg) | Arithmetic mean |
+| [min](#min) | Minimum value |
+| [max](#max) | Maximum value |
+
+### Positional aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [first](#first) | First value (by designated timestamp or insertion order) |
+| [first_not_null](#first_not_null) | First non-NULL value |
+| [last](#last) | Last value (by designated timestamp or insertion order) |
+| [last_not_null](#last_not_null) | Last non-NULL value |
+| [arg_min](#arg_min) | Value at the row where another column is minimum |
+| [arg_max](#arg_max) | Value at the row where another column is maximum |
+
+### Statistical aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
+| [stddev_pop](#stddev_pop) | Population standard deviation |
+| [variance / var_samp](#variance--var_samp) | Sample variance |
+| [var_pop](#var_pop) | Population variance |
+| [corr](#corr) | Pearson correlation coefficient |
+| [covar_pop](#covar_pop) | Population covariance |
+| [covar_samp](#covar_samp) | Sample covariance |
+| [mode](#mode) | Most frequent value |
+
+### Approximate aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [approx_count_distinct](#approx_count_distinct) | Estimated distinct count using HyperLogLog |
+| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
+| [approx_median](#approx_median) | Approximate median (50th percentile) |
+
+### String aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [string_agg](#string_agg) | Concatenate values with delimiter |
+| [string_distinct_agg](#string_distinct_agg) | Concatenate distinct values with delimiter |
+
+### Specialized aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [count_distinct](#count_distinct) | Exact count of distinct values |
+| [ksum](#ksum) | Kahan compensated sum (for floating-point precision) |
+| [nsum](#nsum) | Neumaier sum (for floating-point precision) |
+| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
+| [weighted_avg](#weighted_avg) | Weighted arithmetic mean |
+| [weighted_stddev](#weighted_stddev) | Weighted standard deviation (reliability weights) |
+| [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
+| [weighted_stddev_rel](#weighted_stddev_rel) | Weighted standard deviation (reliability weights) |
+
+---
+
+## Usage notes
+
+:::note Implicit GROUP BY
+
+QuestDB supports implicit `GROUP BY`. When you use aggregate functions alongside
+non-aggregated columns, QuestDB automatically groups by the non-aggregated
+columns. These two queries are equivalent:
+
+```questdb-sql
+-- Explicit GROUP BY (standard SQL)
+SELECT symbol, avg(price) FROM trades GROUP BY symbol;
+
+-- Implicit GROUP BY (QuestDB shorthand)
+SELECT symbol, avg(price) FROM trades;
+```
+
+Examples in this documentation often use implicit `GROUP BY` for brevity.
+
+:::
+
+:::note NULL value handling
+
+Most aggregate functions ignore `NULL` values during computation. For example,
+`sum(column)` adds only non-NULL values, and `avg(column)` calculates the mean
+of non-NULL values only.
+
+Exceptions and special cases:
+- `count(*)` counts all rows including those with NULL values
+- `count(column)` counts only non-NULL values in the specified column
+- `first()` and `last()` may return NULL if the first/last row contains NULL
+- `first_not_null()` and `last_not_null()` skip NULL values
+
+For functions with multiple arguments (like `arg_min`, `arg_max`), NULL handling
+is documented in each function's description.
+
+:::
+
+:::note Nested aggregates not supported
 
 QuestDB does not support using aggregate functions as arguments to other
 functions. For example, this is not allowed:
 
 ```questdb-sql
-SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
+SELECT datediff('d', min(timestamp), max(timestamp)) FROM trades;
 ```
 
 Running it will result in the following error:
@@ -24,21 +126,15 @@ Running it will result in the following error:
 You can work around this limitation by using CTEs or subqueries:
 
 ```questdb-sql title="CTE workaround"
--- CTE
 WITH minmax AS (
   SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
 )
 SELECT datediff('d', min_date, max_date) FROM minmax;
-
--- Subquery
-SELECT datediff('d', min_date, max_date)
-FROM (
-  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
-);
-
 ```
 
 :::
+
+---
 
 ## approx_count_distinct
 
@@ -83,8 +179,6 @@ SELECT approx_count_distinct(symbol, 5) FROM trades;
 | :-------------------- |
 | 1234567               |
 
-
-
 ```questdb-sql title="Estimate count of distinct user_id (int) values by date"
 SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
 ```
@@ -94,8 +188,6 @@ SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
 | 2023-01-01 | 2358                  |
 | 2023-01-02 | 2491                  |
 | ...        | ...                   |
-
-
 
 ```questdb-sql title="Estimate count of distinct product_id values by region"
 SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
@@ -108,8 +200,6 @@ SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
 | East   | 1675                  |
 | West   | 1543                  |
 
-
-
 ```questdb-sql title="Estimate count of distinct order_ids with precision 8"
 SELECT approx_count_distinct(order_id, 8) FROM orders;
 ```
@@ -117,8 +207,6 @@ SELECT approx_count_distinct(order_id, 8) FROM orders;
 | approx_count_distinct |
 | :-------------------- |
 | 3456789               |
-
-
 
 ```questdb-sql title="Estimate count of distinct transaction_ids by store_id"
 SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP BY store_id;
@@ -165,6 +253,10 @@ SELECT approx_percentile(price, 0.99) FROM trades;
 | approx_percentile |
 | :---------------- |
 | 101.5             |
+
+#### See also
+
+- [approx_median](#approx_median) - Shorthand for 50th percentile
 
 ## approx_median
 
@@ -213,6 +305,150 @@ GROUP BY symbol;
 | BTC-USD | 39265.312    |
 | ETH-USD | 2615.459     |
 
+#### See also
+
+- [approx_percentile](#approx_percentile) - Approximate percentile for any quantile
+
+## arg_max
+
+`arg_max(value, key)` returns the value of the first argument at the row where
+the second argument reaches its maximum value. This function is useful for
+finding values at extreme points in time-series and grouped data.
+
+#### Parameters
+
+- `value` is the column or expression whose value to return.
+- `key` is the column or expression used to determine which row to select (the
+  row with the maximum key value).
+
+#### Return value
+
+Return value type matches the type of the `value` argument.
+
+#### Null handling
+
+- Rows where `key` is `NULL` are ignored during aggregation.
+- If the value at the maximum key row is `NULL`, the result is `NULL`.
+- If all keys in a group are `NULL`, the result is `NULL`.
+
+#### Supported type combinations
+
+The function supports the following type combinations for `value` and `key`:
+
+| Value Type | Key Types                   |
+| :--------- | :-------------------------- |
+| double     | double, long, timestamp     |
+| long       | double, timestamp           |
+| timestamp  | double, long, uuid          |
+| uuid       | timestamp                   |
+
+#### Examples
+
+```questdb-sql title="Find the timestamp when the highest price occurred"
+SELECT arg_max(timestamp, price) AS peak_time FROM trades;
+```
+
+| peak_time                   |
+| :-------------------------- |
+| 2024-03-14T09:32:15.000000Z |
+
+```questdb-sql title="Find when each symbol hit its all-time high"
+SELECT symbol, arg_max(timestamp, price) AS ath_time
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol  | ath_time                    |
+| :------ | :-------------------------- |
+| BTC-USD | 2024-03-14T09:32:15.000000Z |
+| ETH-USD | 2024-03-12T14:05:22.000000Z |
+
+```questdb-sql title="Find the order_id of the largest trade for each symbol"
+SELECT symbol, arg_max(order_id, amount) AS largest_order
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol  | largest_order                        |
+| :------ | :----------------------------------- |
+| BTC-USD | 550e8400-e29b-41d4-a716-446655440000 |
+| ETH-USD | 6ba7b810-9dad-11d1-80b4-00c04fd430c8 |
+
+#### See also
+
+- [arg_min](#arg_min) - Value at the row where another column is minimum
+- [max](#max) - Returns the maximum value itself
+- [last](#last) - Returns the last value by timestamp order
+
+## arg_min
+
+`arg_min(value, key)` returns the value of the first argument at the row where
+the second argument reaches its minimum value. This function is useful for
+finding values at extreme points in time-series and grouped data.
+
+#### Parameters
+
+- `value` is the column or expression whose value to return.
+- `key` is the column or expression used to determine which row to select (the
+  row with the minimum key value).
+
+#### Return value
+
+Return value type matches the type of the `value` argument.
+
+#### Null handling
+
+- Rows where `key` is `NULL` are ignored during aggregation.
+- If the value at the minimum key row is `NULL`, the result is `NULL`.
+- If all keys in a group are `NULL`, the result is `NULL`.
+
+#### Supported type combinations
+
+The function supports the following type combinations for `value` and `key`:
+
+| Value Type | Key Types                   |
+| :--------- | :-------------------------- |
+| double     | double, long, timestamp     |
+| long       | double, timestamp           |
+| timestamp  | double, long, uuid          |
+| uuid       | timestamp                   |
+
+#### Examples
+
+```questdb-sql title="Find the timestamp when the lowest price occurred"
+SELECT arg_min(timestamp, price) AS bottom_time FROM trades;
+```
+
+| bottom_time                 |
+| :-------------------------- |
+| 2024-01-15T04:23:00.000000Z |
+
+```questdb-sql title="Find when each symbol hit its all-time low"
+SELECT symbol, arg_min(timestamp, price) AS atl_time
+FROM trades
+GROUP BY symbol;
+```
+
+| symbol  | atl_time                    |
+| :------ | :-------------------------- |
+| BTC-USD | 2024-01-15T04:23:00.000000Z |
+| ETH-USD | 2024-01-22T08:15:33.000000Z |
+
+```questdb-sql title="Find the sensor_id that recorded the coldest temperature"
+SELECT arg_min(sensor_id, temperature) AS coldest_sensor
+FROM weather_data;
+```
+
+| coldest_sensor |
+| :------------- |
+| 47             |
+
+#### See also
+
+- [arg_max](#arg_max) - Value at the row where another column is maximum
+- [min](#min) - Returns the minimum value itself
+- [first](#first) - Returns the first value by timestamp order
+
 ## avg
 
 `avg(value)` calculates simple average of values ignoring missing data (e.g
@@ -245,6 +481,11 @@ SELECT payment_type, avg(amount) FROM transactions;
 | cash         | 22.1  |
 | card         | 27.4  |
 | NULL         | 18.02 |
+
+#### See also
+
+- [sum](#sum) - Sum of values
+- [weighted_avg](#weighted_avg) - Weighted arithmetic mean
 
 ## corr
 
@@ -284,7 +525,7 @@ SELECT corr(price, quantity) FROM transactions;
 SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_type;
 ```
 
-| payment_type | avg  |
+| payment_type | corr |
 | :----------- | :--- |
 | cash         | 0.85 |
 | card         | 0.92 |
@@ -372,6 +613,11 @@ SELECT payment_type, count(amount) FROM transactions;
 
 :::
 
+#### See also
+
+- [count_distinct](#count_distinct) - Exact count of distinct values
+- [approx_count_distinct](#approx_count_distinct) - Estimated distinct count for large datasets
+
 ## count_distinct
 
 `count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
@@ -406,6 +652,11 @@ SELECT payment_type, count_distinct(counterparty) FROM transactions;
 | cash         | 3              |
 | card         | 23             |
 | NULL         | 5              |
+
+#### See also
+
+- [count](#count) - Count all rows or non-NULL values
+- [approx_count_distinct](#approx_count_distinct) - Estimated distinct count for large datasets
 
 ## covar_pop
 
@@ -554,6 +805,12 @@ SELECT first(symbol) FROM trades_unordered;
 | :---- |
 | AAPL  |
 
+#### See also
+
+- [first_not_null](#first_not_null) - First non-NULL value
+- [last](#last) - Last value by timestamp order
+- [arg_min](#arg_min) - Value at the row where another column is minimum
+
 ## first_not_null
 
 - `first_not_null(column_name)` - returns the first non-NULL value of a column.
@@ -611,6 +868,11 @@ SELECT first_not_null(symbol) FROM trades_unordered;
 | :------------- |
 | MSFT           |
 
+#### See also
+
+- [first](#first) - First value (may be NULL)
+- [last_not_null](#last_not_null) - Last non-NULL value
+
 ## haversine_dist_deg
 
 `haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
@@ -630,7 +892,7 @@ Return value type is `double`.
 
 ```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
 SELECT car_id, haversine_dist_deg(lat, lon, k)
-  FROM table rides
+FROM rides;
 ```
 
 ## ksum
@@ -718,6 +980,11 @@ SELECT last(symbol) FROM trades_unordered;
 | :---- |
 | GOOGL |
 
+#### See also
+
+- [last_not_null](#last_not_null) - Last non-NULL value
+- [first](#first) - First value by timestamp order
+- [arg_max](#arg_max) - Value at the row where another column is maximum
 
 ## last_not_null
 
@@ -776,8 +1043,10 @@ SELECT last_not_null(symbol) FROM trades_unordered;
 | :------------ |
 | GOOGL         |
 
+#### See also
 
-
+- [last](#last) - Last value (may be NULL)
+- [first_not_null](#first_not_null) - First non-NULL value
 
 ## max
 
@@ -806,11 +1075,16 @@ SELECT max(amount) FROM transactions;
 SELECT payment_type, max(amount) FROM transactions;
 ```
 
-| payment_type | amount |
-| :----------- | :----- |
-| cash         | 31.5   |
-| card         | 55.3   |
-| NULL         | 29.2   |
+| payment_type | max  |
+| :----------- | :--- |
+| cash         | 31.5 |
+| card         | 55.3 |
+| NULL         | 29.2 |
+
+#### See also
+
+- [min](#min) - Returns the minimum value
+- [arg_max](#arg_max) - Returns another column's value at the row where this column is maximum
 
 ## min
 
@@ -845,6 +1119,10 @@ SELECT payment_type, min(amount) FROM transactions;
 | card         | 15.3 |
 | NULL         | 22.2 |
 
+#### See also
+
+- [max](#max) - Returns the maximum value
+- [arg_min](#arg_min) - Returns another column's value at the row where this column is minimum
 
 ## mode
 
@@ -908,7 +1186,6 @@ ORDER BY symbol ASC;
 | BTC-USD   | sell       |
 | BTC-USDT  | sell       |
 | ...       | ...        |
-
 
 ## nsum
 
@@ -989,7 +1266,7 @@ SELECT stddev_pop(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp       |
+| stddev_pop        |
 | :---------------- |
 | 28.86607004772212 |
 
@@ -1043,8 +1320,8 @@ Return value type is `string`.
 
 #### Examples
 
-Suppose we want to find all the distinct sky cover types observed in the weather
-tablein our public demo:
+Suppose we want to find all the distinct symbols observed in the trades
+table in our public demo:
 
 ```questdb-sql title="string_distinct_agg example" demo
 SELECT string_distinct_agg(symbol, ',') AS distinct_symbols
@@ -1078,7 +1355,6 @@ WHERE timestamp in today();
 | buy  | BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,ADA-USDT,ADA-USD,SOL-USDT,SOL-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,DOT-USDT,DOT-USD,XLM-USDT,XLM-USD,SOL-BTC,AVAX-USDT,AVAX-USD,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
 | sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
 
-
 Note we don't need to add `GROUP BY side` as it is implicit. But you can add it,
 if you prefer that syntax.
 
@@ -1108,10 +1384,10 @@ SELECT sum(quantity) FROM transactions;
 SELECT item, sum(quantity) FROM transactions;
 ```
 
-| item   | count |
-| :----- | :---- |
-| apple  | 53    |
-| orange | 47    |
+| item   | sum |
+| :----- | :-- |
+| apple  | 53  |
+| orange | 47  |
 
 #### Overflow
 
@@ -1119,8 +1395,14 @@ SELECT item, sum(quantity) FROM transactions;
 argument to wider type.
 
 ```questdb-sql title="Cast as long to avoid overflow"
-SELECT sum(cast(a AS LONG)) FROM table;
+SELECT sum(cast(a AS LONG)) FROM my_table;
 ```
+
+#### See also
+
+- [ksum](#ksum) - Kahan compensated sum for floating-point precision
+- [nsum](#nsum) - Neumaier sum for floating-point precision
+- [avg](#avg) - Arithmetic mean
 
 ## variance / var_samp
 
@@ -1147,7 +1429,7 @@ SELECT var_samp(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp      |
+| var_samp         |
 | :--------------- |
 | 841.666666666666 |
 
@@ -1174,9 +1456,9 @@ SELECT var_pop(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp |
-| :---------- |
-| 833.25      |
+| var_pop |
+| :------ |
+| 833.25  |
 
 ## weighted_avg
 
