@@ -229,8 +229,11 @@ Returns a `table` with the following columns:
 | Column | Type | Description |
 |--------|------|-------------|
 | `table_suspended` | BOOLEAN | Whether a WAL table is suspended (`false` for non-WAL tables) |
+| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view) |
 | `table_row_count` | LONG | Approximate row count at last tracked write |
-| `table_max_timestamp` | TIMESTAMP | Approximate timestamp of last TableWriter commit |
+| `table_min_timestamp` | TIMESTAMP | Minimum timestamp of data in the table (updated on WAL merge) |
+| `table_max_timestamp` | TIMESTAMP | Maximum timestamp of data in the table (updated on WAL merge) |
+| `table_last_write_timestamp` | TIMESTAMP | Approximate timestamp of last TableWriter commit |
 | `table_txn` | LONG | TableWriter transaction number at last tracked write |
 | `table_memory_pressure_level` | INT | Memory pressure: `0` (none), `1` (reduced parallelism), `2` (backoff). `null` for non-WAL |
 | `table_write_amp_count` | LONG | Total write amplification samples recorded |
@@ -258,7 +261,7 @@ Merge rate P99 shows the *lowest* throughput (worst performance), not the highes
 | Column | Type | Description |
 |--------|------|-------------|
 | `wal_pending_row_count` | LONG | Rows written to WAL but not yet applied to table |
-| `dedup_row_count_since_start` | LONG | Cumulative rows removed by deduplication (since server start) |
+| `wal_dedup_row_count_since_start` | LONG | Cumulative rows removed by deduplication (since server start) |
 | `wal_txn` | LONG | WAL sequencer transaction number (WAL tables only) |
 | `wal_max_timestamp` | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only) |
 | `wal_tx_count` | LONG | Total WAL transactions recorded (since server start) |
@@ -287,16 +290,16 @@ On primary instances, these columns will be `0` or `false`.
 These values are approximations, not precise real-time metrics:
 
 - **Null when not tracked**: Values are `null` for tables not written to since server start, or evicted from the tracker
-- **Writer stats updated on pool return**: `table_row_count`, `table_max_timestamp`, `table_txn` are captured when TableWriter returns to the pool, not on every commit. A writer held for a long time won't update these columns until released.
+- **Writer stats updated on pool return**: `table_row_count`, `table_last_write_timestamp`, `table_txn` are captured when TableWriter returns to the pool, not on every commit. A writer held for a long time won't update these columns until released.
 - **WAL stats updated in real-time**:
   - On WAL commit: `wal_pending_row_count` (incremented), `wal_txn`, `wal_max_timestamp`, `wal_tx_size_*` histogram
-  - On WAL apply: `wal_pending_row_count` (decremented), `dedup_row_count_since_start`, `table_write_amp_*`, `table_merge_rate_*`
+  - On WAL apply: `wal_pending_row_count` (decremented), `wal_dedup_row_count_since_start`, `table_min_timestamp`, `table_max_timestamp`, `table_write_amp_*`, `table_merge_rate_*`
 - **LRU eviction**: Tracker maintains bounded memory (default 1000 tables). Least recently written tables are evicted when capacity is exceeded
 - **Startup hydration**: Values are hydrated from table metadata (`TxReader`) on startup, but diverge as writes occur
 
-**Non-WAL tables**: `wal_txn`, `wal_max_timestamp`, `wal_pending_row_count`, `dedup_row_count_since_start`, `table_memory_pressure_level`, and histogram columns are `null` or `0`.
+**Non-WAL tables**: `wal_txn`, `wal_max_timestamp`, `wal_pending_row_count`, `wal_dedup_row_count_since_start`, `table_min_timestamp`, `table_max_timestamp`, `table_memory_pressure_level`, and histogram columns are `null` or `0`.
 
-**WAL tables**: All columns populated when tracked. `wal_max_timestamp` reflects the max data timestamp from the WAL transaction, not wall-clock time.
+**WAL tables**: All columns populated when tracked. `wal_max_timestamp` reflects the max data timestamp from the WAL transaction, not wall-clock time. `table_min_timestamp` and `table_max_timestamp` reflect the actual data range in the table after WAL merge.
 
 ### Configuration
 
@@ -327,7 +330,15 @@ tables() WHERE partitionBy = 'DAY';
 | 1   | my_table   | ts                  | DAY         | true       | my_table      | false | 0        | HOUR    | false   |
 
 ```questdb-sql title="Recently written tables"
-SELECT table_name, table_row_count, table_max_timestamp
+SELECT table_name, table_row_count, table_last_write_timestamp
+FROM tables()
+WHERE table_last_write_timestamp IS NOT NULL
+ORDER BY table_last_write_timestamp DESC
+LIMIT 10;
+```
+
+```questdb-sql title="Tables with most recent data"
+SELECT table_name, table_min_timestamp, table_max_timestamp
 FROM tables()
 WHERE table_max_timestamp IS NOT NULL
 ORDER BY table_max_timestamp DESC
@@ -360,11 +371,11 @@ ORDER BY table_memory_pressure_level DESC;
 ```
 
 ```questdb-sql title="Deduplication activity"
-SELECT table_name, dedup_row_count_since_start, wal_tx_count,
-       dedup_row_count_since_start * 100.0 / NULLIF(wal_tx_count, 0) AS dedup_ratio
+SELECT table_name, wal_dedup_row_count_since_start, wal_tx_count,
+       wal_dedup_row_count_since_start * 100.0 / NULLIF(wal_tx_count, 0) AS dedup_ratio
 FROM tables()
-WHERE dedup_row_count_since_start > 0
-ORDER BY dedup_row_count_since_start DESC;
+WHERE wal_dedup_row_count_since_start > 0
+ORDER BY wal_dedup_row_count_since_start DESC;
 ```
 
 ```questdb-sql title="Large transactions"
