@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <defs>
+    <style>
+      .title { font: 14px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .label { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #d9d9d9; }
+      .cell { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .cell-dim { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #888888; }
+      .table-outline { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .header { fill: #32343e; }
+      .grid { stroke: #3b3d4a; stroke-width: 1; }
+      .window { fill: #e289a4; opacity: 0.35; }
+      .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .file-box { fill: #32343e; stroke: #51535f; stroke-width: 1; }
+      .file-label { font: 11px "IBM Plex Mono", Menlo, monospace; fill: #0cc0df; }
+      .file-label-dim { font: 11px "IBM Plex Mono", Menlo, monospace; fill: #888888; }
+      .time-arrow { stroke: #51535f; stroke-width: 2; fill: none; }
+      .time-label { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .partition-info { font: 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#51535f"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="350" y="28" text-anchor="middle">trades/</text>
+  <text class="note" x="350" y="48" text-anchor="middle">table directory · PARTITION BY DAY</text>
+
+  <!-- Time arrow on left side -->
+  <line class="time-arrow" x1="30" y1="95" x2="30" y2="380" marker-end="url(#arrow)"/>
+  <text class="time-label" x="30" y="80" text-anchor="middle">Time</text>
+
+  <!-- Partition 1: 2024-01-15 -->
+  <g>
+    <rect class="table-outline" x="60" y="70" width="600" height="145"/>
+    <rect class="header" x="60" y="70" width="600" height="32"/>
+    <text class="title" x="85" y="91">2024-01-15/</text>
+    <text class="partition-info" x="600" y="91" text-anchor="end">1.44M rows · 68 MiB</text>
+
+    <!-- Column files -->
+    <g transform="translate(80, 115)">
+      <rect class="file-box" x="0" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label" x="37" y="20" text-anchor="middle">ts.d</text>
+
+      <rect class="file-box" x="85" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="122" y="20" text-anchor="middle">symbol.d</text>
+
+      <rect class="file-box" x="170" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="207" y="20" text-anchor="middle">symbol.k</text>
+
+      <rect class="file-box" x="255" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="292" y="20" text-anchor="middle">symbol.v</text>
+
+      <rect class="file-box" x="340" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="377" y="20" text-anchor="middle">price.d</text>
+
+      <rect class="file-box" x="425" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="462" y="20" text-anchor="middle">amount.d</text>
+    </g>
+
+    <!-- Sample rows -->
+    <g transform="translate(80, 160)">
+      <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
+      <text class="cell" x="10" y="13">2024-01-15T00:00:00.000000Z</text>
+      <text class="cell-dim" x="250" y="13">BTC-USD</text>
+      <text class="cell-dim" x="350" y="13">42150.00</text>
+      <text class="cell-dim" x="440" y="13">1.5</text>
+
+      <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
+      <text class="cell" x="10" y="35">2024-01-15T00:00:00.000001Z</text>
+      <text class="cell-dim" x="250" y="35">ETH-USD</text>
+      <text class="cell-dim" x="350" y="35">2250.50</text>
+      <text class="cell-dim" x="440" y="35">10.0</text>
+
+      <text class="note" x="520" y="28">...</text>
+    </g>
+  </g>
+
+  <!-- Partition 2: 2024-01-16 -->
+  <g>
+    <rect class="table-outline" x="60" y="230" width="600" height="145"/>
+    <rect class="header" x="60" y="230" width="600" height="32"/>
+    <text class="title" x="85" y="251">2024-01-16/</text>
+    <text class="partition-info" x="600" y="251" text-anchor="end">750K rows · 35 MiB</text>
+
+    <!-- Column files -->
+    <g transform="translate(80, 275)">
+      <rect class="file-box" x="0" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label" x="37" y="20" text-anchor="middle">ts.d</text>
+
+      <rect class="file-box" x="85" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="122" y="20" text-anchor="middle">symbol.d</text>
+
+      <rect class="file-box" x="170" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="207" y="20" text-anchor="middle">symbol.k</text>
+
+      <rect class="file-box" x="255" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="292" y="20" text-anchor="middle">symbol.v</text>
+
+      <rect class="file-box" x="340" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="377" y="20" text-anchor="middle">price.d</text>
+
+      <rect class="file-box" x="425" y="0" width="75" height="32" rx="3"/>
+      <text class="file-label-dim" x="462" y="20" text-anchor="middle">amount.d</text>
+    </g>
+
+    <!-- Sample rows -->
+    <g transform="translate(80, 320)">
+      <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
+      <text class="cell" x="10" y="13">2024-01-16T00:00:00.000000Z</text>
+      <text class="cell-dim" x="250" y="13">BTC-USD</text>
+      <text class="cell-dim" x="350" y="13">42890.00</text>
+      <text class="cell-dim" x="440" y="13">2.3</text>
+
+      <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
+      <text class="cell" x="10" y="35">2024-01-16T00:00:00.000001Z</text>
+      <text class="cell-dim" x="250" y="35">ETH-USD</text>
+      <text class="cell-dim" x="350" y="35">2310.25</text>
+      <text class="cell-dim" x="440" y="35">5.0</text>
+
+      <text class="note" x="520" y="28">...</text>
+    </g>
+  </g>
+
+  <!-- Ellipsis for more partitions -->
+  <text class="note" x="350" y="400" text-anchor="middle">...</text>
+</svg>

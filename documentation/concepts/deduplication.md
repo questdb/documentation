@@ -6,8 +6,17 @@ description:
   when reloading data.
 ---
 
+import Screenshot from "@theme/Screenshot"
+
 Deduplication ensures that only one row exists for a given set of key columns.
 When a new row matches an existing row's keys, the old row is replaced.
+
+<Screenshot
+  alt="Animation showing how deduplication handles incoming rows - inserting new keys, replacing duplicates, and skipping identical rows"
+  src="images/docs/concepts/deduplication.svg"
+  width={700}
+  forceTheme="dark"
+/>
 
 ## When to use deduplication
 
