@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 320" width="650" height="320">
+  <defs>
+    <style>
+      .title { font: 14px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .label { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #d9d9d9; }
+      .cell { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .table-outline { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .header { fill: #32343e; }
+      .grid { stroke: #3b3d4a; stroke-width: 1; }
+      .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .time-axis { stroke: #51535f; stroke-width: 2; }
+      .time-label { font: 12px "IBM Plex Mono", Menlo, monospace; fill: #888888; }
+      .partition-active { fill: #1b1c26; stroke: #0cc0df; stroke-width: 2; }
+      .partition-dropped { fill: #1b1c26; stroke: #555555; stroke-width: 2; stroke-dasharray: 4 2; opacity: 0.5; }
+      .partition-label { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .partition-label-dim { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #666666; }
+      .ttl-window { fill: rgba(226, 137, 164, 0.15); stroke: #e289a4; stroke-width: 2; stroke-dasharray: 6 3; }
+      .ttl-label { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #e289a4; }
+      .now-line { stroke: #0cc0df; stroke-width: 2; }
+      .now-label { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #0cc0df; }
+      .drop-arrow { stroke: #ef4444; stroke-width: 2; fill: none; }
+      .drop-label { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #ef4444; }
+      .annotation { font: 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .key-point { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #0cc0df; }
+    </style>
+    <marker id="drop-arrow-head" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="60" y="25">ALTER TABLE trades SET TTL 1 HOUR;</text>
+  <text class="note" x="60" y="45">Wall-clock time: 10:00 · PARTITION BY HOUR</text>
+
+  <!-- Time axis -->
+  <line class="time-axis" x1="50" y1="180" x2="620" y2="180"/>
+
+  <!-- Time markers -->
+  <line class="time-axis" x1="100" y1="175" x2="100" y2="185"/>
+  <text class="time-label" x="100" y="200" text-anchor="middle">08:00</text>
+
+  <line class="time-axis" x1="240" y1="175" x2="240" y2="185"/>
+  <text class="time-label" x="240" y="200" text-anchor="middle">09:00</text>
+
+  <line class="time-axis" x1="380" y1="175" x2="380" y2="185"/>
+  <text class="time-label" x="380" y="200" text-anchor="middle">10:00</text>
+
+  <line class="time-axis" x1="520" y1="175" x2="520" y2="185"/>
+  <text class="time-label" x="520" y="200" text-anchor="middle">11:00</text>
+
+  <!-- TTL window (1 hour back from now=10:00, so 09:00 to 10:00+) -->
+  <rect class="ttl-window" x="240" y="70" width="370" height="100" rx="4"/>
+  <text class="ttl-label" x="425" y="62">← TTL window (1 hour) →</text>
+
+  <!-- Now line -->
+  <line class="now-line" x1="380" y1="65" x2="380" y2="185"/>
+  <text class="now-label" x="380" y="215" text-anchor="middle">now</text>
+
+  <!-- Partition 1: 08:00-09:00 (DROPPED - outside TTL window) -->
+  <g>
+    <rect class="partition-dropped" x="100" y="110" width="140" height="60" rx="4"/>
+    <text class="partition-label-dim" x="170" y="145" text-anchor="middle">08:00-09:00</text>
+
+    <!-- Drop indicator -->
+    <path class="drop-arrow" d="M 170 175 L 170 240" marker-end="url(#drop-arrow-head)"/>
+    <text class="drop-label" x="170" y="260" text-anchor="middle">DROPPED</text>
+    <text class="annotation" x="170" y="278" text-anchor="middle">partition end (09:00)</text>
+    <text class="annotation" x="170" y="293" text-anchor="middle">is outside TTL window</text>
+  </g>
+
+  <!-- Partition 2: 09:00-10:00 (KEPT - end is at TTL boundary) -->
+  <g>
+    <rect class="partition-active" x="240" y="110" width="140" height="60" rx="4"/>
+    <text class="partition-label" x="310" y="145" text-anchor="middle">09:00-10:00</text>
+  </g>
+
+  <!-- Partition 3: 10:00-11:00 (KEPT - current partition) -->
+  <g>
+    <rect class="partition-active" x="380" y="110" width="140" height="60" rx="4"/>
+    <text class="partition-label" x="450" y="145" text-anchor="middle">10:00-11:00</text>
+  </g>
+
+  <!-- Key insight callout -->
+  <text class="key-point" x="450" y="250" text-anchor="middle">Partition dropped when:</text>
+  <text class="annotation" x="450" y="268" text-anchor="middle">partition_end &lt; wall_clock - TTL</text>
+  <text class="annotation" x="450" y="286" text-anchor="middle">09:00 &lt; 10:00 - 1h ✓</text>
+</svg>

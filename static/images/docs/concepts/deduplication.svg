@@ -1,0 +1,220 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <defs>
+    <style>
+      .title { font: 14px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .label { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #d9d9d9; }
+      .cell { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .table-outline { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .header { fill: #32343e; }
+      .header-key { fill: #e289a4; }
+      .header-text { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #ffffff; }
+      .grid { stroke: #3b3d4a; stroke-width: 1; }
+      .window { fill: #e289a4; opacity: 0.35; }
+      .current { fill: none; stroke: #0cc0df; stroke-width: 2; }
+      .pointer { fill: #0cc0df; }
+      .link-line { stroke: #0cc0df; stroke-width: 2; fill: none; }
+      .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .action-insert { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #4ade80; }
+      .action-replace { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #f59e0b; }
+      .action-skip { font: 600 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .arrow { stroke: #0cc0df; stroke-width: 2; fill: none; }
+      .arrow-skip { stroke: #555555; stroke-width: 2; fill: none; stroke-dasharray: 4 2; }
+      .skip-x { stroke: #ef4444; stroke-width: 3; stroke-linecap: round; }
+      .keys-label { font: 12px "IBM Plex Mono", Menlo, monospace; fill: #e289a4; }
+      .legend-box { fill: #32343e; stroke: #51535f; stroke-width: 1; }
+    </style>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#0cc0df"/>
+    </marker>
+    <marker id="arrowhead-dim" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555555"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="60" y="28">
+    CREATE TABLE prices (...) DEDUP UPSERT KEYS(<tspan fill="#e289a4">ts, ticker</tspan>);
+  </text>
+  <text class="note" x="60" y="50">Last write wins for matching keys</text>
+
+  <!-- Left side: Incoming Data -->
+  <text class="label" x="145" y="80">Incoming rows</text>
+
+  <rect class="table-outline" x="30" y="90" width="230" height="168"/>
+  <rect class="header" x="30" y="90" width="230" height="32"/>
+
+  <!-- Header row with key columns highlighted -->
+  <rect class="header-key" x="30" y="90" width="75" height="32"/>
+  <rect class="header-key" x="105" y="90" width="60" height="32"/>
+
+  <line class="grid" x1="105" y1="90" x2="105" y2="258"/>
+  <line class="grid" x1="165" y1="90" x2="165" y2="258"/>
+  <line class="grid" x1="30" y1="122" x2="260" y2="122"/>
+  <line class="grid" x1="30" y1="156" x2="260" y2="156"/>
+  <line class="grid" x1="30" y1="190" x2="260" y2="190"/>
+  <line class="grid" x1="30" y1="224" x2="260" y2="224"/>
+
+  <text class="header-text" x="67" y="110" text-anchor="middle">ts</text>
+  <text class="header-text" x="135" y="110" text-anchor="middle">ticker</text>
+  <text class="header-text" x="212" y="110" text-anchor="middle">price</text>
+
+  <!-- Incoming rows -->
+  <!-- Row 1: 10:00:00, AAPL, 185.50 -->
+  <g>
+    <rect class="window" x="30" y="122" width="230" height="34" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0.35;0;0;0;0;0;0;0;0;0"/>
+    </rect>
+    <text class="cell" x="67" y="144" text-anchor="middle">10:00:00</text>
+    <text class="cell" x="135" y="144" text-anchor="middle">AAPL</text>
+    <text class="cell" x="212" y="144" text-anchor="middle">185.50</text>
+  </g>
+
+  <!-- Row 2: 10:00:00, AAPL, 186.00 -->
+  <g>
+    <rect class="window" x="30" y="156" width="230" height="34" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0.35;0;0;0;0;0;0;0"/>
+    </rect>
+    <text class="cell" x="67" y="178" text-anchor="middle">10:00:00</text>
+    <text class="cell" x="135" y="178" text-anchor="middle">AAPL</text>
+    <text class="cell" x="212" y="178" text-anchor="middle">186.00</text>
+  </g>
+
+  <!-- Row 3: 10:00:01, GOOG, 142.30 -->
+  <g>
+    <rect class="window" x="30" y="190" width="230" height="34" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0;0;0.35;0;0;0;0;0"/>
+    </rect>
+    <text class="cell" x="67" y="212" text-anchor="middle">10:00:01</text>
+    <text class="cell" x="135" y="212" text-anchor="middle">GOOG</text>
+    <text class="cell" x="212" y="212" text-anchor="middle">142.30</text>
+  </g>
+
+  <!-- Row 4: 10:00:01, GOOG, 142.30 (identical) -->
+  <g>
+    <rect class="window" x="30" y="224" width="230" height="34" opacity="0">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0;0;0;0;0.35;0;0;0"/>
+    </rect>
+    <text class="cell" x="67" y="246" text-anchor="middle">10:00:01</text>
+    <text class="cell" x="135" y="246" text-anchor="middle">GOOG</text>
+    <text class="cell" x="212" y="246" text-anchor="middle">142.30</text>
+  </g>
+
+  <!-- Arrow area with animated indicators -->
+  <!-- Arrow 1: Insert -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="1;0;0;0;0;0;0;0;0;0"/>
+    <line class="arrow" x1="270" y1="139" x2="360" y2="139" marker-end="url(#arrowhead)"/>
+    <text class="action-insert" x="315" y="130">INSERT</text>
+  </g>
+
+  <!-- Arrow 2: Replace -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;1;0;0;0;0;0;0;0"/>
+    <line class="arrow" x1="270" y1="173" x2="360" y2="139" marker-end="url(#arrowhead)"/>
+    <text class="action-replace" x="315" y="165">REPLACE</text>
+  </g>
+
+  <!-- Arrow 3: Insert -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;1;0;0;0;0;0"/>
+    <line class="arrow" x1="270" y1="207" x2="360" y2="173" marker-end="url(#arrowhead)"/>
+    <text class="action-insert" x="315" y="199">INSERT</text>
+  </g>
+
+  <!-- Arrow 4: Skip (with X) -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;1;0;0;0"/>
+    <line class="arrow-skip" x1="270" y1="241" x2="330" y2="200" marker-end="url(#arrowhead-dim)"/>
+    <line class="skip-x" x1="320" y1="195" x2="340" y2="215"/>
+    <line class="skip-x" x1="340" y1="195" x2="320" y2="215"/>
+    <text class="action-skip" x="315" y="258">SKIP</text>
+    <text class="note" x="315" y="273" text-anchor="middle" font-size="10">(identical)</text>
+  </g>
+
+  <!-- Right side: Table State -->
+  <text class="label" x="520" y="80">Table state</text>
+
+  <rect class="table-outline" x="375" y="90" width="230" height="134"/>
+  <rect class="header" x="375" y="90" width="230" height="32"/>
+
+  <!-- Header row with key columns highlighted -->
+  <rect class="header-key" x="375" y="90" width="75" height="32"/>
+  <rect class="header-key" x="450" y="90" width="60" height="32"/>
+
+  <line class="grid" x1="450" y1="90" x2="450" y2="224"/>
+  <line class="grid" x1="510" y1="90" x2="510" y2="224"/>
+  <line class="grid" x1="375" y1="122" x2="605" y2="122"/>
+  <line class="grid" x1="375" y1="156" x2="605" y2="156"/>
+  <line class="grid" x1="375" y1="190" x2="605" y2="190"/>
+
+  <text class="header-text" x="412" y="110" text-anchor="middle">ts</text>
+  <text class="header-text" x="480" y="110" text-anchor="middle">ticker</text>
+  <text class="header-text" x="557" y="110" text-anchor="middle">price</text>
+
+  <!-- Table row 1: AAPL - value changes from 185.50 to 186.00 -->
+  <g>
+    <!-- Initial value 185.50 -->
+    <g>
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;1;1;0;0;0;0;0;0;0"/>
+      <rect class="window" x="375" y="122" width="230" height="34"/>
+      <text class="cell" x="412" y="144" text-anchor="middle">10:00:00</text>
+      <text class="cell" x="480" y="144" text-anchor="middle">AAPL</text>
+      <text class="cell" x="557" y="144" text-anchor="middle">185.50</text>
+    </g>
+    <!-- Updated value 186.00 -->
+    <g>
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0;1;1;1;1;1;1;1"/>
+      <text class="cell" x="412" y="144" text-anchor="middle">10:00:00</text>
+      <text class="cell" x="480" y="144" text-anchor="middle">AAPL</text>
+      <text class="cell" x="557" y="144" text-anchor="middle">186.00</text>
+    </g>
+  </g>
+
+  <!-- Table row 2: GOOG -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;1;1;1;1;1"/>
+    <text class="cell" x="412" y="178" text-anchor="middle">10:00:01</text>
+    <text class="cell" x="480" y="178" text-anchor="middle">GOOG</text>
+    <text class="cell" x="557" y="178" text-anchor="middle">142.30</text>
+  </g>
+
+  <!-- Row highlight for updates -->
+  <rect class="window" x="375" y="122" width="230" height="34" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0.35;0;0.35;0;0;0;0;0;0"/>
+  </rect>
+  <rect class="window" x="375" y="156" width="230" height="34" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0.35;0;0;0;0"/>
+  </rect>
+
+  <!-- Keys label -->
+  <text class="keys-label" x="350" y="310" text-anchor="middle">UPSERT KEYS: (ts, ticker)</text>
+
+  <!-- Legend -->
+  <g transform="translate(120, 340)">
+    <rect width="14" height="14" fill="#4ade80" rx="2"/>
+    <text class="note" x="22" y="12">New row inserted</text>
+  </g>
+  <g transform="translate(280, 340)">
+    <rect width="14" height="14" fill="#f59e0b" rx="2"/>
+    <text class="note" x="22" y="12">Existing row replaced</text>
+  </g>
+  <g transform="translate(470, 340)">
+    <rect width="14" height="14" fill="#555555" rx="2"/>
+    <text class="note" x="22" y="12">Identical row skipped</text>
+  </g>
+
+  <text class="note" x="350" y="390" text-anchor="middle">Full-row comparison: identical rows skip disk I/O entirely</text>
+</svg>
