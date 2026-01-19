@@ -62,14 +62,14 @@
     <g transform="translate(80, 160)">
       <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
       <text class="cell" x="10" y="13">2026-01-15T00:00:00.000000Z</text>
-      <text class="cell-dim" x="250" y="13">BTC-USD</text>
-      <text class="cell-dim" x="350" y="13">42150.00</text>
+      <text class="cell-dim" x="250" y="13">EURUSD</text>
+      <text class="cell-dim" x="350" y="13">1.0842</text>
       <text class="cell-dim" x="440" y="13">1.5</text>
 
       <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
       <text class="cell" x="10" y="35">2026-01-15T00:00:00.000001Z</text>
-      <text class="cell-dim" x="250" y="35">ETH-USD</text>
-      <text class="cell-dim" x="350" y="35">2250.50</text>
+      <text class="cell-dim" x="250" y="35">GBPUSD</text>
+      <text class="cell-dim" x="350" y="35">1.2650</text>
       <text class="cell-dim" x="440" y="35">10.0</text>
 
       <text class="note" x="520" y="28">...</text>
@@ -108,14 +108,14 @@
     <g transform="translate(80, 320)">
       <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
       <text class="cell" x="10" y="13">2026-01-16T00:00:00.000000Z</text>
-      <text class="cell-dim" x="250" y="13">BTC-USD</text>
-      <text class="cell-dim" x="350" y="13">42890.00</text>
+      <text class="cell-dim" x="250" y="13">EURUSD</text>
+      <text class="cell-dim" x="350" y="13">1.0856</text>
       <text class="cell-dim" x="440" y="13">2.3</text>
 
       <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
       <text class="cell" x="10" y="35">2026-01-16T00:00:00.000001Z</text>
-      <text class="cell-dim" x="250" y="35">ETH-USD</text>
-      <text class="cell-dim" x="350" y="35">2310.25</text>
+      <text class="cell-dim" x="250" y="35">GBPUSD</text>
+      <text class="cell-dim" x="350" y="35">1.2673</text>
       <text class="cell-dim" x="440" y="35">5.0</text>
 
       <text class="note" x="520" y="28">...</text>
