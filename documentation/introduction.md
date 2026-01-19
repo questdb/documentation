@@ -22,6 +22,10 @@ QuestDB is an open source time-series database engineered for low latency. It us
   <DocButton href="https://demo.questdb.io" variant="outline" style={{ marginRight: '20px' }}>
     <>Live demo</>
   </DocButton>
+
+  <DocButton href="https://questdb.com/quiz/" variant="outline">
+    <>Test your skills</>
+  </DocButton>
 </div>
 
 ## About this documentation
