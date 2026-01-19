@@ -21,7 +21,7 @@ different domains:
 
 | Use case | Function | Coordinate system |
 | :------- | :------- | :---------------- |
-| LIDAR point clouds, robotics, local coordinates | `geo_within_box`, `geo_within_radius` | Euclidean (meters, feet, or any unit) |
+| LIDAR point clouds, robotics, local coordinates | `within_box`, `within_radius` | Euclidean (meters, feet, or any unit) |
 | GPS tracking, delivery radius, store locator | `geo_within_radius_latlon`, `geo_distance_meters` | Geographic (lat/lon in degrees) |
 | Spatial indexing, prefix-based area queries | `make_geohash` + `within` operator | Geohash-encoded |
 
@@ -61,15 +61,14 @@ CREATE TABLE lidar_scans (
   robot_id SYMBOL,
   pose_x DOUBLE,
   pose_y DOUBLE,
-  pose_z DOUBLE,
   point_count INT,
   scan VARCHAR -- reference to scan data, e.g. 's3://my-bucket/lidar/scan_001.laz'
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
-### geo_within_box
+### within_box
 
-`geo_within_box(x, y, min_x, min_y, max_x, max_y)` - Returns `true` if a point
+`within_box(x, y, min_x, min_y, max_x, max_y)` - Returns `true` if a point
 lies within a rectangular bounding box (inclusive).
 
 Use this function to filter points within axis-aligned rectangular regions.
@@ -109,7 +108,7 @@ INSERT INTO lidar_scans VALUES
 ```questdb-sql title="Find scans within a rectangular region"
 SELECT ts, robot_id, pose_x, pose_y, scan
 FROM lidar_scans
-WHERE geo_within_box(pose_x, pose_y, 10.0, 5.0, 20.0, 15.0);
+WHERE within_box(pose_x, pose_y, 10.0, 5.0, 20.0, 15.0);
 ```
 
 | ts                          | robot_id | pose_x | pose_y | scan                        |
@@ -133,7 +132,7 @@ INSERT INTO zones VALUES
 
 SELECT s.ts, s.robot_id, s.scan
 FROM lidar_scans s
-JOIN zones z ON geo_within_box(s.pose_x, s.pose_y, z.min_x, z.min_y, z.max_x, z.max_y)
+JOIN zones z ON within_box(s.pose_x, s.pose_y, z.min_x, z.min_y, z.max_x, z.max_y)
 WHERE z.zone_name = 'loading_dock';
 ```
 
@@ -143,9 +142,9 @@ WHERE z.zone_name = 'loading_dock';
 | 2024-01-15T09:00:05.000000Z | robot-1  | s3://warehouse/scan_002.laz |
 | 2024-01-15T09:00:10.000000Z | robot-1  | s3://warehouse/scan_003.laz |
 
-### geo_within_radius
+### within_radius
 
-`geo_within_radius(x, y, center_x, center_y, radius)` - Returns `true` if a
+`within_radius(x, y, center_x, center_y, radius)` - Returns `true` if a
 point lies within a specified Euclidean distance from a center point
 (inclusive).
 
@@ -175,7 +174,7 @@ Invalid inputs (such as `NaN` or negative radius) produce an error.
 ```questdb-sql title="Find scans within 10 meters of a point of interest"
 SELECT ts, robot_id, pose_x, pose_y, scan
 FROM lidar_scans
-WHERE geo_within_radius(pose_x, pose_y, 15.0, 10.0, 10.0);
+WHERE within_radius(pose_x, pose_y, 15.0, 10.0, 10.0);
 ```
 
 | ts                          | robot_id | pose_x | pose_y | scan                        |
@@ -198,7 +197,7 @@ INSERT INTO zones_circular VALUES
 
 SELECT s.ts, s.robot_id, s.scan
 FROM lidar_scans s
-JOIN zones_circular z ON geo_within_radius(s.pose_x, s.pose_y, z.center_x, z.center_y, z.radius)
+JOIN zones_circular z ON within_radius(s.pose_x, s.pose_y, z.center_x, z.center_y, z.radius)
 WHERE z.zone_name = 'workstation_A';
 ```
 
