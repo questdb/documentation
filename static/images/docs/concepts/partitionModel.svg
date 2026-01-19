@@ -30,11 +30,11 @@
   <line class="time-arrow" x1="30" y1="95" x2="30" y2="380" marker-end="url(#arrow)"/>
   <text class="time-label" x="30" y="80" text-anchor="middle">Time</text>
 
-  <!-- Partition 1: 2024-01-15 -->
+  <!-- Partition 1: 2026-01-15 -->
   <g>
     <rect class="table-outline" x="60" y="70" width="600" height="145"/>
     <rect class="header" x="60" y="70" width="600" height="32"/>
-    <text class="title" x="85" y="91">2024-01-15/</text>
+    <text class="title" x="85" y="91">2026-01-15/</text>
     <text class="partition-info" x="600" y="91" text-anchor="end">1.44M rows · 68 MiB</text>
 
     <!-- Column files -->
@@ -61,13 +61,13 @@
     <!-- Sample rows -->
     <g transform="translate(80, 160)">
       <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
-      <text class="cell" x="10" y="13">2024-01-15T00:00:00.000000Z</text>
+      <text class="cell" x="10" y="13">2026-01-15T00:00:00.000000Z</text>
       <text class="cell-dim" x="250" y="13">BTC-USD</text>
       <text class="cell-dim" x="350" y="13">42150.00</text>
       <text class="cell-dim" x="440" y="13">1.5</text>
 
       <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
-      <text class="cell" x="10" y="35">2024-01-15T00:00:00.000001Z</text>
+      <text class="cell" x="10" y="35">2026-01-15T00:00:00.000001Z</text>
       <text class="cell-dim" x="250" y="35">ETH-USD</text>
       <text class="cell-dim" x="350" y="35">2250.50</text>
       <text class="cell-dim" x="440" y="35">10.0</text>
@@ -76,11 +76,11 @@
     </g>
   </g>
 
-  <!-- Partition 2: 2024-01-16 -->
+  <!-- Partition 2: 2026-01-16 -->
   <g>
     <rect class="table-outline" x="60" y="230" width="600" height="145"/>
     <rect class="header" x="60" y="230" width="600" height="32"/>
-    <text class="title" x="85" y="251">2024-01-16/</text>
+    <text class="title" x="85" y="251">2026-01-16/</text>
     <text class="partition-info" x="600" y="251" text-anchor="end">750K rows · 35 MiB</text>
 
     <!-- Column files -->
@@ -107,13 +107,13 @@
     <!-- Sample rows -->
     <g transform="translate(80, 320)">
       <rect class="window" x="0" y="22" width="500" height="18" rx="2"/>
-      <text class="cell" x="10" y="13">2024-01-16T00:00:00.000000Z</text>
+      <text class="cell" x="10" y="13">2026-01-16T00:00:00.000000Z</text>
       <text class="cell-dim" x="250" y="13">BTC-USD</text>
       <text class="cell-dim" x="350" y="13">42890.00</text>
       <text class="cell-dim" x="440" y="13">2.3</text>
 
       <rect class="window" x="0" y="0" width="500" height="18" rx="2"/>
-      <text class="cell" x="10" y="35">2024-01-16T00:00:00.000001Z</text>
+      <text class="cell" x="10" y="35">2026-01-16T00:00:00.000001Z</text>
       <text class="cell-dim" x="250" y="35">ETH-USD</text>
       <text class="cell-dim" x="350" y="35">2310.25</text>
       <text class="cell-dim" x="440" y="35">5.0</text>

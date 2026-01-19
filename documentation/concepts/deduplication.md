@@ -47,15 +47,15 @@ DEDUP UPSERT KEYS(ts, ticker);
 With this configuration, each `(ts, ticker)` combination can have only one row:
 
 ```questdb-sql
-INSERT INTO prices VALUES ('2024-01-15T10:00:00', 'AAPL', 185.50);
-INSERT INTO prices VALUES ('2024-01-15T10:00:00', 'AAPL', 186.00);  -- replaces previous
+INSERT INTO prices VALUES ('2026-01-15T10:00:00', 'AAPL', 185.50);
+INSERT INTO prices VALUES ('2026-01-15T10:00:00', 'AAPL', 186.00);  -- replaces previous
 
 SELECT * FROM prices;
 ```
 
 | ts | ticker | price |
 |----|--------|-------|
-| 2024-01-15T10:00:00 | AAPL | 186.00 |
+| 2026-01-15T10:00:00 | AAPL | 186.00 |
 
 Only the last value is kept.
 

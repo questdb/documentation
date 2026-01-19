@@ -90,11 +90,11 @@ CREATE TABLE trades (
 
 | Interval | Directory format | Example |
 |----------|------------------|---------|
-| `HOUR` | `YYYY-MM-DDTHH` | `2024-01-15T09` |
-| `DAY` | `YYYY-MM-DD` | `2024-01-15` |
-| `WEEK` | `YYYY-Www` | `2024-W03` |
-| `MONTH` | `YYYY-MM` | `2024-01` |
-| `YEAR` | `YYYY` | `2024` |
+| `HOUR` | `YYYY-MM-DDTHH` | `2026-01-15T09` |
+| `DAY` | `YYYY-MM-DD` | `2026-01-15` |
+| `WEEK` | `YYYY-Www` | `2026-W03` |
+| `MONTH` | `YYYY-MM` | `2026-01` |
+| `YEAR` | `YYYY` | `2026` |
 
 ## Inspecting partitions
 
@@ -106,8 +106,8 @@ SHOW PARTITIONS FROM trades;
 
 | index | partitionBy | name | minTimestamp | maxTimestamp | numRows | diskSizeHuman |
 |-------|-------------|------|--------------|--------------|---------|---------------|
-| 0 | DAY | 2024-01-15 | 2024-01-15T00:00:00Z | 2024-01-15T23:59:59Z | 1440000 | 68.0 MiB |
-| 1 | DAY | 2024-01-16 | 2024-01-16T00:00:00Z | 2024-01-16T12:30:00Z | 750000 | 35.2 MiB |
+| 0 | DAY | 2026-01-15 | 2026-01-15T00:00:00Z | 2026-01-15T23:59:59Z | 1440000 | 68.0 MiB |
+| 1 | DAY | 2026-01-16 | 2026-01-16T00:00:00Z | 2026-01-16T12:30:00Z | 750000 | 35.2 MiB |
 
 The `table_partitions()` function returns the same data and can be used in
 queries with `WHERE`, `JOIN`, or `UNION`:
@@ -124,14 +124,14 @@ A partitioned table's directory structure:
 
 ```
 db/trades/
-├── 2024-01-15/           # Partition directory
+├── 2026-01-15/           # Partition directory
 │   ├── ts.d              # Timestamp column data
 │   ├── symbol.d          # Symbol column data
 │   ├── symbol.k          # Symbol column index
 │   ├── symbol.v          # Symbol column values
 │   ├── price.d           # Price column data
 │   └── amount.d          # Amount column data
-├── 2024-01-16/
+├── 2026-01-16/
 │   ├── ts.d
 │   ├── ...
 └── _txn                  # Transaction metadata
@@ -151,8 +151,8 @@ Split partitions appear with timestamp suffixes in `SHOW PARTITIONS`:
 
 | name | numRows |
 |------|---------|
-| 2024-01-15 | 1259999 |
-| 2024-01-15T205959-880001 | 60002 |
+| 2026-01-15 | 1259999 |
+| 2026-01-15T205959-880001 | 60002 |
 
 QuestDB automatically squashes splits:
 - Non-active partitions: squashed at end of each commit
