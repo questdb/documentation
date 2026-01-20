@@ -1,117 +1,134 @@
 ---
 title: Time To Live (TTL)
 sidebar_label: Time To Live (TTL)
-description: Conceptual overview of the time-to-live feature in QuestDB. Use it to limit data size.
+description: Automatic data retention in QuestDB - configure TTL to automatically drop old partitions.
 ---
 
-If you're interested in storing and analyzing only recent data with QuestDB, you
-can configure a time-to-live (TTL) for the table data. Both the `CREATE TABLE`
-and `ALTER TABLE` commands support the `TTL` clause.
+TTL (Time To Live) automatically drops old partitions based on data age. Set a
+retention period, and QuestDB removes partitions that fall entirely outside that
+window - no cron jobs or manual cleanup required.
 
-TTL provides automatic data retention by dropping old partitions without manual
-intervention. For manual control over partition removal, see
-[Data Retention](/docs/operations/data-retention/) which covers the
-`DROP PARTITION` command.
+import Screenshot from "@theme/Screenshot"
 
-This feature works as follows:
+<Screenshot
+  alt="Timeline showing how TTL drops partitions when their entire time range falls outside the retention window"
+  src="images/docs/concepts/ttl.svg"
+  width={650}
+  forceTheme="dark"
+/>
 
-1. The age of the data is measured by the most recent timestamp stored in the table
-2. As you keep inserting time-series data, the age of the oldest data starts
-   exceeding its TTL limit
-3. When **all** the data in a partition becomes stale, the partition as a whole
-   becomes eligible to be dropped
-4. QuestDB detects a stale partition and drops it as a part of the commit
-   operation
+## Requirements
 
-To be more precise, the latest timestamp stored in a given partition does not
-matter. Instead, QuestDB considers the entire time period for which a partition
-is responsible. As a result, it will drop the partition only when the end of
-that period falls behind the TTL limit. This is a compromise that favors a low
-overhead of the TTL enforcement procedure.
+TTL requires:
+- A [designated timestamp](/docs/concepts/designated-timestamp/) column
+- [Partitioning](/docs/concepts/partitions/) enabled
 
-To demonstrate, assume we have created a table partitioned by hour, with TTL set
-to one hour:
+These are standard for time-series tables in QuestDB.
+
+## Setting TTL
+
+### At table creation
 
 ```questdb-sql
-CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1 HOUR;
--- or:
-CREATE TABLE tango (ts TIMESTAMP) timestamp (ts) PARTITION BY HOUR TTL 1H;
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY TTL 7 DAYS;
 ```
 
-1\. Insert the first row at 8:00 AM. This is the very beginning of the "8 AM"
-partition:
+### On existing tables
 
 ```questdb-sql
-INSERT INTO tango VALUES ('2025-01-01T08:00:00');
+ALTER TABLE trades SET TTL 7 DAYS;
 ```
 
-| ts |
-|----|
-| 2025-01-01 08:00:00.000000 |
-
-2\. Insert the second row one hour later, at 9:00 AM:
+Supported units: `HOUR`/`H`, `DAY`/`D`, `WEEK`/`W`, `MONTH`/`M`, `YEAR`/`Y`.
 
 ```questdb-sql
-INSERT INTO tango VALUES ('2025-01-01T09:00:00');
+-- These are equivalent
+ALTER TABLE trades SET TTL 2 WEEKS;
+ALTER TABLE trades SET TTL 2w;
 ```
 
-| ts |
-|----|
-| 2025-01-01 08:00:00.000000 |
-| 2025-01-01 09:00:00.000000 |
+For full syntax, see [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/).
 
-The 8:00 AM row remains.
+## How TTL works
 
-3\. Insert one more row at 9:59:59 AM:
+TTL drops partitions based on the **partition's time range**, not individual row
+timestamps. A partition is dropped only when its **entire period** falls outside
+the TTL window.
 
-```questdb-sql
-INSERT INTO tango VALUES ('2025-01-01T09:59:59');
+**Key rule**: A partition is dropped when `partition_end_time < reference_time - TTL`.
+
+### Reference time
+
+By default, TTL uses wall-clock time as the reference, not the maximum timestamp
+in the table. This protects against accidental data loss if a row with a
+far-future timestamp is inserted (which would otherwise cause all existing data
+to appear "expired").
+
+The reference time is: `min(max_timestamp_in_table, wall_clock_time)`
+
+To restore legacy behavior (using only max timestamp), set in `server.conf`:
+
+```ini
+cairo.ttl.use.wall.clock=false
 ```
 
-| ts |
-|----|
-| 2025-01-01 08:00:00.000000 |
-| 2025-01-01 09:00:00.000000 |
-| 2025-01-01 09:59:59.000000 |
+:::caution
+Disabling wall-clock protection means inserting a row with a future timestamp
+(e.g., year 2100) will immediately drop all partitions that fall outside the TTL
+window relative to that future time.
+:::
 
-The 8:00 AM data is still there, because the "8 AM" partition ends at 9:00 AM.
+### Example
 
-4\. Insert a row at 10:00 AM:
+Table partitioned by `HOUR` with `TTL 1 HOUR`:
 
-```questdb-sql
-INSERT INTO tango VALUES ('2025-01-01T10:00:00');
-```
+| Wall-clock time | Action | Partitions remaining |
+|-----------------|--------|---------------------|
+| 08:00 | Insert row at 08:00 | `08:00-09:00` |
+| 09:00 | Insert row at 09:00 | `08:00-09:00`, `09:00-10:00` |
+| 09:59 | Insert row at 09:59 | `08:00-09:00`, `09:00-10:00` |
+| 10:00 | Insert row at 10:00 | `09:00-10:00`, `10:00-11:00` |
 
-| ts |
-|----|
-| 2025-01-01 09:00:00.000000 |
-| 2025-01-01 09:59:59.000000 |
-| 2025-01-01 10:00:00.000000 |
+The `08:00-09:00` partition survives until 10:00 because its **end time** (09:00)
+must be more than 1 hour behind the reference time. At 10:00, the partition end
+(09:00) is exactly 1 hour old, so it's dropped.
 
-Now the whole "8 AM" partition is outside its TTL limit, and has been dropped.
-
-## Managing TTL
-
-### Setting TTL on existing tables
-
-Use `ALTER TABLE SET TTL` to add or change TTL on an existing table:
-
-```questdb-sql
-ALTER TABLE my_table SET TTL 3 WEEKS;
-
--- Shorthand syntax also supported
-ALTER TABLE my_table SET TTL 12h;
-```
-
-For full syntax details, see the
-[ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/) reference.
-
-### Checking current TTL settings
-
-Use the `tables()` function to view TTL configuration for all tables:
+## Checking TTL settings
 
 ```questdb-sql
 SELECT table_name, ttlValue, ttlUnit FROM tables();
 ```
 
-A `ttlValue` of `0` indicates TTL is not configured for that table.
+| table_name | ttlValue | ttlUnit |
+|------------|----------|---------|
+| trades | 7 | DAY |
+| metrics | 0 | *null* |
+
+A `ttlValue` of `0` means TTL is not configured.
+
+## Removing TTL
+
+To disable automatic retention and keep all data:
+
+```questdb-sql
+ALTER TABLE trades SET TTL 0;
+```
+
+## Guidelines
+
+| Data type | Typical TTL | Rationale |
+|-----------|-------------|-----------|
+| Real-time metrics | 1-7 days | High volume, recent data most valuable |
+| Trading data | 30-90 days | Compliance requirements vary |
+| Aggregated data | 1-2 years | Lower volume, longer analysis windows |
+| Audit logs | Per compliance | Often legally mandated retention |
+
+**Tips:**
+- Match TTL to your longest typical query range plus a buffer
+- TTL should be significantly larger than your partition interval
+- For manual control instead of automatic TTL, see
+  [Data Retention](/docs/operations/data-retention/)

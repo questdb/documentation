@@ -151,7 +151,7 @@ into 2 parts:
 - Suffix (including the merged row):`2023-01-01T75959-999999.2` with 1,001 rows
 
 See
-[Splitting and squashing time partitions](/docs/concepts/partitions/#splitting-and-squashing-time-partitions)
+[Splitting and squashing time partitions](/docs/concepts/partitions/#partition-splitting-and-squashing)
 for more information.
 
 ## CPU and RAM configuration
