@@ -8,7 +8,7 @@ Merges partition parts back into the physical partition.
 
 This SQL keyword is designed to use for downgrading QuestDB to a version earlier
 than 7.2, when
-[partition split](/docs/concepts/partitions/#splitting-and-squashing-time-partitions)
+[partition split](/docs/concepts/partitions/#partition-splitting-and-squashing)
 is introduced. Squashing partition parts makes the database compatible with
 earlier QuestDB versions.
 

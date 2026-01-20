@@ -5,6 +5,8 @@ description:
   Why every QuestDB table should have a designated timestamp and how to set one.
 ---
 
+import Screenshot from "@theme/Screenshot"
+
 Every table in QuestDB should have a designated timestamp. This column defines
 the time axis for your data and unlocks QuestDB's core time-series capabilities
 including partitioning, time-series joins, and optimized interval scans.
@@ -12,6 +14,13 @@ including partitioning, time-series joins, and optimized interval scans.
 Without a designated timestamp, a table behaves like a generic append-only
 store - you lose partitioning, efficient time-range queries, and most
 time-series SQL features.
+
+<Screenshot
+  alt="Animation showing how the designated timestamp determines which partition stores each row"
+  src="images/docs/concepts/designatedTimestamp.svg"
+  width={650}
+  forceTheme="dark"
+/>
 
 ## Why it matters
 
