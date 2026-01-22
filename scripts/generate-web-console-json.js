@@ -11,7 +11,8 @@ const DOCS_CATEGORIES = {
   functions: path.join(DOCS_DIR, 'query', 'functions'),
   operators: path.join(DOCS_DIR, 'query', 'operators'),
   sql: path.join(DOCS_DIR, 'query', 'sql'),
-  concepts: path.join(DOCS_DIR, 'concepts')
+  concepts: path.join(DOCS_DIR, 'concepts'),
+  cookbook: path.join(DOCS_DIR, 'cookbook', 'sql')
 }
 
 const SINGLE_FILE_CATEGORIES = {
@@ -45,13 +46,14 @@ function extractFrontmatterAndContent(raw) {
   if (match) {
     try {
       frontmatter = yaml.load(match[1]) || {}
-    } catch (_) {}
+    } catch (_) { }
     mainContent = match[2]
   }
 
   return {
     title: frontmatter.title || null,
     slug: frontmatter.slug || null,
+    description: frontmatter.description || null,
     content: mainContent
   }
 }
@@ -120,7 +122,7 @@ function processMarkdownFile(filePath, categoryPath) {
   const content = readFileIfExists(filePath)
   if (!content) return null
 
-  const { title, slug, content: mainContent } = extractFrontmatterAndContent(content)
+  const { title, slug, description, content: mainContent } = extractFrontmatterAndContent(content)
   const headers = extractHeaders(mainContent)
 
   // Get relative path from DOCS_DIR
@@ -130,6 +132,7 @@ function processMarkdownFile(filePath, categoryPath) {
   return {
     path: relativePath,
     title: title || path.basename(filePath, '.md'),
+    description: description,
     headers: headers,
     url: url
   }
@@ -188,13 +191,15 @@ function generateTocList(allMetadata) {
     const items = new Set()
 
     metadata.forEach(file => {
-      // Add document title
-      items.add(file.title)
-
-      // Add headers (prefixed with document title for context)
-      file.headers.forEach(header => {
-        items.add(`${file.title} - ${header}`)
-      })
+      if (category === 'cookbook') {
+        const desc = file.description ? ` :: ${file.description}` : ''
+        items.add(`${file.title}${desc}`)
+      } else {
+        items.add(file.title)
+        file.headers.forEach(header => {
+          items.add(`${file.title} - ${header}`)
+        })
+      }
     })
 
     tocList[category] = Array.from(items).sort()
