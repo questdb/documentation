@@ -463,7 +463,6 @@ module.exports = {
             "query/functions/row-generator",
             "query/functions/spatial",
             "query/functions/text",
-            "query/functions/timestamp-generator",
             "query/functions/timestamp",
             "query/functions/touch",
             "query/functions/trigonometric",
