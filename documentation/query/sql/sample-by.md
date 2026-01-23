@@ -44,6 +44,7 @@ Where the unit for sampled groups may be one of the following:
 
 | unit | description |
 | ---- | ----------- |
+| `n`  | nanosecond  |
 | `U`  | microsecond |
 | `T`  | millisecond |
 | `s`  | second      |
