@@ -755,6 +755,8 @@ module.exports = {
                     "cookbook/sql/finance/volume-profile",
                     "cookbook/sql/finance/volume-spike",
                     "cookbook/sql/finance/rolling-stddev",
+                    "cookbook/sql/finance/liquidity-comparison",
+                    "cookbook/sql/finance/ohlc",
                   ],
                 },
                 {
