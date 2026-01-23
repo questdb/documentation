@@ -231,6 +231,7 @@ renderText={(release) => (
   -p 9000:9000 -p 9009:9009 -p 8812:8812 -p 9003:9003 \\
   -v "/questdb/qdbroot:/var/lib/questdb" \\
   -e JVM_PREPEND="-Xmx12g" \\
+  --log-driver local \\
   questdb/questdb:${release.name}`}
 </CodeBlock>
 )}
@@ -255,6 +256,16 @@ In the example command above for a CPX41 (16GB RAM) instance we allocate ~12GB t
 - For 16GB server: Use `-Xmx12g` 
 - For 32GB server: Use `-Xmx24g`
 - For 64GB server: Use `-Xmx48g`
+
+**Docker log driver configuration:**
+
+The command above uses `--log-driver local` to prevent unbounded log file growth. Docker's default [`json-file`](https://docs.docker.com/engine/logging/drivers/json-file/) driver has no automatic log rotation or size limits, which can lead to disk space exhaustion on the host.
+
+The [`local`](https://docs.docker.com/engine/logging/drivers/local/) driver provides automatic log rotation with sensible defaults:
+- **Maximum log size**: 100MB total
+- **Log files**: 5 files of 20MB each
+
+These limits can be customized using `--log-opt`. Consult the [`local`](https://docs.docker.com/engine/logging/drivers/local/) driver documentation for details.
 
 ### Verification
 
