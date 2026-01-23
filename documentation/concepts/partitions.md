@@ -48,19 +48,33 @@ column is stored as a separate file (`.d` for data, plus index files for
 
 Available intervals: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`, or `NONE`.
 
-| Interval | Best for | Typical row count per partition |
-|----------|----------|--------------------------------|
-| `HOUR` | High-frequency data (>1M rows/day) | 100K - 10M |
-| `DAY` | Most time-series workloads | 1M - 100M |
-| `WEEK` | Lower-frequency data | 5M - 500M |
-| `MONTH` | Aggregated or sparse data | 10M - 1B |
-| `YEAR` | Very sparse or archival data | 100M+ |
+**Target 30-80 million rows per partition** for tables with average-sized rows.
+Tables with many columns should aim for the lower end; tables with few columns can
+go higher.
 
-**Guidelines:**
-- Target partitions with 1-100 million rows each
-- Smaller partitions = faster out-of-order writes, more directories to manage
-- Larger partitions = fewer directories, but slower writes for late data
-- Match your most common query patterns (if you query by day, partition by day)
+Choose your interval based on how much data you ingest:
+
+| Your data volume | Recommended interval |
+|------------------|---------------------|
+| >1 billion rows/day | `HOUR` |
+| 30-500 million rows/day | `DAY` |
+| 5-30 million rows/day | `WEEK` |
+| 1-5 million rows/day | `MONTH` |
+| <1 million rows/day | `YEAR` |
+
+**Why this matters:**
+
+- **Too many small partitions** increases syscall overhead. Each partition is a
+  directory, and operations like queries and compaction must interact with many
+  filesystem objects.
+- **Too few large partitions** can hurt out-of-order write performance. When late
+  data arrives, QuestDB may need to rewrite portions of the partition. Smaller
+  partitions limit how much data gets rewritten in worst-case scenarios.
+
+**Other considerations:**
+- Match your most common query patterns (if you typically query by day, `DAY`
+  partitions align well)
+- You can change partitioning later, but it requires recreating the table
 
 For ILP (InfluxDB Line Protocol) ingestion, the default is `DAY`. Change it via
 `line.default.partition.by` in `server.conf`.
