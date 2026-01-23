@@ -486,6 +486,7 @@ module.exports = {
             "query/operators/bitwise",
             "query/operators/comparison",
             "query/operators/date-time",
+            "query/operators/tick",
             "query/operators/ipv4",
             "query/operators/logical",
             "query/operators/misc",

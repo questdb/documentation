@@ -58,13 +58,16 @@ CREATE TABLE trades (
 DEDUP UPSERT KEYS(timestamp, symbol);
 ```
 
-This is a basic yet robust table. It applies [SYMBOL](/docs/concepts/symbol/)s
-for ticker and side, a price, and a
-[designated timestamp](/docs/concepts/designated-timestamp/). It's
-[partitioned by day](/docs/concepts/partitions/) and
-[deduplicates](/docs/concepts/deduplication/) the timestamp and ticker columns.
-As the links above show, there's lots to unpack in this table! Feel free to
-learn more about the nuances.
+This table uses QuestDB's key time-series features:
+
+- **`TIMESTAMP(timestamp)`** — Designates the time column. QuestDB physically
+  sorts data by this column, enabling sub-millisecond time-range queries.
+- **`PARTITION BY DAY`** — Splits data into daily partitions for efficient
+  queries and data lifecycle management.
+- **`SYMBOL`** — Optimized type for repeated strings like tickers.
+- **`DEDUP UPSERT KEYS`** — Prevents duplicate rows.
+
+For a deeper understanding, see [Schema design](/docs/schema-design-essentials/).
 
 We've done all of this to match the nature of how we'll query this data. We're
 focused on a the flow of the market, the pulse of the market's day-to-day, hence
@@ -137,17 +140,16 @@ AS(
         rnd_long(0, 10000, 0) instrument_id
     FROM long_sequence(10000000) x)
 TIMESTAMP(ts)
-PARTITION BY MONTH DEDUP UPSERT KEYS(ts);
+PARTITION BY MONTH DEDUP UPSERT KEYS(ts, instrument_id);
 ```
 
-For our table, we've again hit the following key notes:
+This table uses the same time-series features:
 
-- `TIMESTAMP(ts)` elects the `ts` column as a
-  [designated timestamp](/docs/concepts/designated-timestamp/) for partitioning
-  over time.
-- `PARTITION BY MONTH` creates a monthly partition, where the stored data is
-  effectively sharded by month.
-- `DEDUP UPSERT KEYS(ts)` deduplicates the timestamp column
+- **`TIMESTAMP(ts)`** — Designates the time column for fast time-range queries.
+- **`PARTITION BY MONTH`** — Monthly partitions (use larger partitions for
+  lower-volume data).
+- **`DEDUP UPSERT KEYS(ts, instrument_id)`** — One quote per timestamp per
+  instrument.
 
 The generated data will look like the following:
 
@@ -173,10 +175,9 @@ AS(
     FROM long_sequence(10000) x)
 ```
 
-Note that we've not included a timestamp in this instruments table. This is one
-of the rare examples where we're not including it, and thus not taking advantage
-of time-series optimization. As we have a timestamp in the paired `quotes`
-table, it's helpful to demonstrate them as a pair.
+This `instruments` table has no designated timestamp — it's a static lookup
+table with no time dimension. This is the exception; most QuestDB tables should
+have a designated timestamp to enable time-series optimizations.
 
 With these two new tables, and our prior financial market data table, we've got
 a lot of useful queries we can test.

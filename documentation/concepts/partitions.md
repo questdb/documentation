@@ -167,3 +167,11 @@ ALTER TABLE trades SQUASH PARTITIONS;
 
 Partition operations (`ATTACH`, `DETACH`, `DROP`) treat all splits of a
 partition as a single unit.
+
+## See also
+
+- [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for partitioning
+- [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) — Remove old partitions
+- [DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/) — Move to cold storage
+- [ATTACH PARTITION](/docs/query/sql/alter-table-attach-partition/) — Restore detached data
+- [TTL](/docs/concepts/ttl/) — Automatic partition cleanup by age
