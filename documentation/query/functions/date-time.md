@@ -14,8 +14,8 @@ combination of letters representing a date or time component, as defined by the
 table below. The letters used to form a unit are case-sensitive.
 
 See
-[Timestamps in QuestDB](/docs/concepts/timestamps-timezones/#timestamps-in-questdb)
-for more examples of how the units are used to parse inputs.
+[Working with time zones](/docs/concepts/timestamps-timezones/)
+for more on timestamp handling in QuestDB.
 
 | Unit   | Date or Time Component                                                                                         | Presentation       | Examples                              |
 | ------ | -------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
