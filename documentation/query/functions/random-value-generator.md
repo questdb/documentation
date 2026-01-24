@@ -4,17 +4,33 @@ sidebar_label: Random value generator
 description: Random value generator function reference documentation.
 ---
 
-The following functions have been created to help with our test suite. They are
-also useful for users testing QuestDB on specific workloads in order to quickly
-generate large test datasets that mimic the structure of their actual data.
+These functions generate random values for creating test datasets that mimic the
+structure of real data. They are used together with
+[row generators](/docs/query/functions/row-generator/) like `long_sequence()`.
+
+## Quick start
+
+```questdb-sql title="Generate 1 million rows of time series data"
+SELECT
+    timestamp_sequence('2024-01-01', 100000L) AS ts,
+    rnd_symbol('AAPL', 'GOOGL', 'MSFT', 'AMZN') AS ticker,
+    rnd_symbol('BUY', 'SELL') AS side,
+    rnd_double() * 1000 AS price,
+    rnd_int(1, 10000, 0) AS quantity
+FROM long_sequence(1000000);
+```
+
+This generates trades with monotonically increasing timestamps (100ms apart).
+For timestamp generation options, see
+[timestamp_sequence](/docs/query/functions/row-generator/#timestamp_sequence).
 
 Values can be generated either:
 
-- Pseudo randomly
-- [Deterministically](/docs/query/functions/row-generator/#long_sequence)
-  when specifying a `seed`
+- Pseudo-randomly
+- [Deterministically](/docs/query/functions/row-generator/#long_sequence) when
+  specifying a `seed` to `long_sequence()`
 
-QuestDB supports the following random generation functions:
+## Function reference
 
 - [rnd_boolean](#rnd_boolean)
 - [rnd_byte](#rnd_byte)
@@ -28,6 +44,8 @@ QuestDB supports the following random generation functions:
 - [rnd_timestamp](#rnd_timestamp)
 - [rnd_char](#rnd_char)
 - [rnd_symbol](#rnd_symbol)
+- [rnd_symbol_zipf](#rnd_symbol_zipf)
+- [rnd_symbol_weighted](#rnd_symbol_weighted)
 - [rnd_varchar](#rnd_varchar)
 - [rnd_str](#rnd_str)
 - [rnd_bin](#rnd_bin)
@@ -38,27 +56,41 @@ QuestDB supports the following random generation functions:
 
 ## Usage
 
-Random functions should be used for populating test tables only. They do not
-hold values in memory and calculations should not be performed at the same time
-as the random numbers are generated.
+:::warning
 
-For example, running
-`SELECT round(a,2), a FROM (SELECT rnd_double() a FROM long_sequence(10));` is
-bad practice and will return inconsistent results.
+Random functions generate a new value **every time they are evaluated**, not
+once per row. This causes unexpected results when the same column is referenced
+multiple times in a query.
 
-A better approach would be to populate a table and then run the query. So for
-example
+:::
 
-1. **create** - `CREATE TABLE test(val double);`
-2. **populate** -
-   `INSERT INTO test SELECT * FROM (SELECT rnd_double() FROM long_sequence(10));`
-3. **query** - `SELECT round(val,2) FROM test;`
+For example, this query filters on `val` and also returns it:
 
-## Generating sequences
+```questdb-sql title="Problematic: val is evaluated twice with different results"
+SELECT val FROM (
+    SELECT rnd_int(1, 100, 0) AS val FROM long_sequence(10)
+) WHERE val > 50;
+```
 
-This page describes the functions to generate values. To generate sequences of
-values, please refer the page about
-[row generators](/docs/query/functions/row-generator/).
+The `val` in the `WHERE` clause is a **different random value** than the `val`
+in the `SELECT`. This means rows may be included or excluded based on one value,
+but display a completely different value.
+
+**Solution:** Persist data to a table first, then query it:
+
+```questdb-sql title="Correct: persist first, then query"
+CREATE TABLE test AS (
+    SELECT
+        timestamp_sequence('2024-01-01', 100000L) AS ts,
+        rnd_int(1, 100, 0) AS val
+    FROM long_sequence(10)
+) TIMESTAMP(ts);
+
+SELECT * FROM test WHERE val > 50;
+```
+
+This also applies to calculations like `SELECT round(a, 2), a FROM ...` where
+`a` would be rounded and displayed as different values.
 
 ## rnd_boolean
 
@@ -215,7 +247,7 @@ SELECT rnd_long(1,4,1) FROM long_sequence(5);
 SELECT rnd_long(-10000000,10000000,2) FROM long_sequence(5);
 ```
 
-```questdb-sql
+```
 1,4,3,1,2
 null,null,null,null,null
 -164567594, -323331140, 26846334, -892982893, -351053301
@@ -253,9 +285,9 @@ SELECT rnd_long256() FROM long_sequence(5);
 **Arguments:**
 
 - `nanRate` is an `int` defining the frequency of occurrence of `NaN` values:
-- `0`: No `NaN` will be returned.
-- `1`: Will only return `NaN`.
-- `N > 1`: On average, one in N generated values will be `NaN`.
+  - `0`: No `NaN` will be returned.
+  - `1`: Will only return `NaN`.
+  - `N > 1`: On average, one in N generated values will be `NaN`.
 
 **Return value:**
 
@@ -282,9 +314,9 @@ SELECT rnd_float(2) FROM long_sequence(6);
 **Arguments:**
 
 - `nanRate` is an `int` defining the frequency of occurrence of `NaN` values:
-- `0`: No `NaN` will be returned.
-- `1`: Will only return `NaN`.
-- `N > 1`: On average, one in N generated values will be `NaN`.
+  - `0`: No `NaN` will be returned.
+  - `1`: Will only return `NaN`.
+  - `N > 1`: On average, one in N generated values will be `NaN`.
 
 **Return value:**
 
@@ -302,13 +334,13 @@ SELECT rnd_double(2) FROM long_sequence(5);
 0.99115364871, null, null, 0.53938281731, 0.89820403511
 ```
 
-## rnd_date()
+## rnd_date
 
-- `rnd_date()` generates a random date between `start` and `end` dates (both
-  inclusive). IT will also generate `NaN` values at a frequency defined by
-  `nanRate`. When `start` or `end` are invalid dates, or when `start` is
-  superior to `end`, it will return `invalid range` error. When `nanRate` is
-  inferior to 0, it will return `invalid NAN rate` error.
+- `rnd_date(start, end, nanRate)` - generates a random date between `start` and
+  `end` dates (both inclusive). It will also generate `NaN` values at a
+  frequency defined by `nanRate`. When `start` or `end` are invalid dates, or
+  when `start` is superior to `end`, it will return `invalid range` error. When
+  `nanRate` is inferior to 0, it will return `invalid NAN rate` error.
 
 **Arguments:**
 
@@ -333,15 +365,15 @@ SELECT rnd_date(
 FROM long_sequence(5);
 ```
 
-```questdb-sql
+```
 2015-01-29T18:00:17.402Z, 2015-11-15T20:22:14.112Z,
 2015-12-08T09:26:04.483Z, 2015-05-28T02:22:47.022Z,
 2015-10-13T19:16:37.034Z
 ```
 
-## rnd_timestamp()
+## rnd_timestamp
 
-- `rnd_timestamp(start, end, nanRate)` generates a random timestamp between
+- `rnd_timestamp(start, end, nanRate)` - generates a random timestamp between
   `start` and `end` timestamps (both inclusive). It will also generate `NaN`
   values at a frequency defined by `nanRate`. When `start` or `end` are invalid
   timestamps, or when `start` is superior to `end`, it will return
@@ -373,16 +405,18 @@ SELECT rnd_timestamp(
 FROM long_sequence(5);
 ```
 
-```questdb-sql
+```
 2015-01-29T18:00:17.402762Z, 2015-11-15T20:22:14.112744Z,
 2015-12-08T09:26:04.483039Z, 2015-05-28T02:22:47.022680Z,
 2015-10-13T19:16:37.034203Z
 ```
 
-#### Sequences
+:::tip
 
-To generate increasing timestamps, please refer the page about
+To generate increasing timestamps, refer to the page about
 [row generators](/docs/query/functions/row-generator/).
+
+:::
 
 ## rnd_char
 
@@ -406,14 +440,13 @@ G, P, E, W, K
 
 ## rnd_symbol
 
-- `rnd_symbol(symbolList)` is used to choose a random `symbol` from a list
-  defined by the user. It is useful when looking to generate specific symbols
-  from a finite list (e.g `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`.
-  Symbols are randomly chosen from the list with equal probability. When only
-  one symbol is provided in the list, this symbol will be chosen with 100%
-  probability, in which case it is more efficient to use
-  `cast('your_symbol' as symbol`
-- `rnd_symbol(list_size, minLength, maxLength, nullRate)` generated a finite
+- `rnd_symbol(symbolList)` - chooses a random `symbol` from a list defined by
+  the user. It is useful when looking to generate specific symbols from a finite
+  list (e.g., `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`). Symbols are
+  randomly chosen from the list with equal probability. When only one symbol is
+  provided in the list, this symbol will be chosen with 100% probability, in
+  which case it is more efficient to use `cast('your_symbol' as symbol)`.
+- `rnd_symbol(list_size, minLength, maxLength, nullRate)` - generates a finite
   list of distinct random symbols and chooses one symbol from the list at
   random. The finite list is of size `list_size`. The generated symbols length
   is between `minLength` and `maxLength` (both inclusive). The function will
@@ -424,11 +457,11 @@ G, P, E, W, K
 - `symbolList` is a variable-length list of possible `symbol` values expressed
   as a comma-separated list of strings. For example,
   `'a', 'bcd', 'efg123', '行'`
-- `list_size` is the number of distinct `symbol` values to generated
-- `minLength` is an `int` defining the minimum length for of a generated symbol
-  (inclusive)
-- `maxLength` is an `int` defining the maximum length for of a generated symbol
-  (inclusive)
+- `list_size` is the number of distinct `symbol` values to generate.
+- `minLength` is an `int` defining the minimum length of a generated symbol
+  (inclusive).
+- `maxLength` is an `int` defining the maximum length of a generated symbol
+  (inclusive).
 - `nullRate` is an `int` defining the frequency of occurrence of `null` values:
   - `0`: No `null` will be returned.
   - `1`: Will only return `null`.
@@ -458,26 +491,172 @@ FROM long_sequence(5);
 'ABC', 'DEFG', 'ABC', 'DEFG', 'DEFG'
 ```
 
+## rnd_symbol_zipf
+
+Generates random symbols following a Zipf (Power Law) distribution. This is
+useful for creating test data that mimics real-world scenarios where some values
+occur much more frequently than others (e.g., stock tickers, user IDs, product
+categories).
+
+- `rnd_symbol_zipf(symbol1, symbol2, ..., alpha)` - chooses symbols from a
+  provided list with Zipf distribution. The probability of each symbol decays
+  from left to right based on the `alpha` parameter. Higher alpha values create
+  more skewed distributions where the first symbols appear much more frequently.
+- `rnd_symbol_zipf(count, alpha)` - generates `count` distinct auto-generated
+  symbols (named `S0`, `S1`, `S2`, etc.) with Zipf distribution. Useful for
+  testing with high-cardinality symbols that have skewed row distribution.
+
+:::note
+
+QuestDB distinguishes between these two forms by checking if the first argument
+is an integer. If calling `rnd_symbol_zipf(5, 2.0)`, it generates 5 auto-named
+symbols. To select from a list starting with a number-like symbol, use explicit
+string syntax: `rnd_symbol_zipf('5', '10', '15', 2.0)`.
+
+:::
+
+**Arguments:**
+
+For the list form (`rnd_symbol_zipf(symbol1, symbol2, ..., alpha)`):
+
+- `symbol1, symbol2, ...` is a variable-length list of `string` or `symbol`
+  values. The first symbol has the highest probability of being selected.
+- `alpha` is a positive `double` controlling the distribution skew. Higher
+  values create steeper probability decay. Must be greater than `0`.
+
+For the count form (`rnd_symbol_zipf(count, alpha)`):
+
+- `count` is an `int` specifying how many distinct symbols to generate. Must be
+  positive.
+- `alpha` is a positive `double` controlling the distribution skew. Must be
+  greater than `0`.
+
+**Return value:**
+
+Return value type is `symbol`.
+
+**Examples:**
+
+```questdb-sql title="Zipf distribution from a list of symbols"
+SELECT rnd_symbol_zipf('AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 2.0) AS ticker
+FROM long_sequence(5);
+```
+
+```
+AAPL
+AAPL
+MSFT
+AAPL
+AAPL
+```
+
+```questdb-sql title="Verify Zipf distribution (alpha=2.0)"
+SELECT
+    ticker,
+    count() AS cnt
+FROM (
+    SELECT rnd_symbol_zipf('AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 2.0) AS ticker
+    FROM long_sequence(100000)
+)
+GROUP BY ticker
+ORDER BY cnt DESC;
+```
+
+| ticker | cnt   |
+| ------ | ----- |
+| AAPL   | 60654 |
+| MSFT   | 15265 |
+| GOOGL  | 6823  |
+| TSLA   | 3838  |
+| AMZN   | 2420  |
+
+```questdb-sql title="High-cardinality auto-generated symbols"
+SELECT rnd_symbol_zipf(1000, 1.5) AS sym
+FROM long_sequence(5);
+```
+
+```
+S0
+S2
+S0
+S1
+S0
+```
+
+## rnd_symbol_weighted
+
+Generates random symbols with explicit weights. Each symbol is paired with a
+weight that determines its relative probability of being selected.
+
+- `rnd_symbol_weighted(symbol1, weight1, symbol2, weight2, ...)` - takes
+  symbol-weight pairs. Weights are relative, so `('A', 50, 'B', 50)` and
+  `('A', 1, 'B', 1)` produce the same 50/50 distribution.
+
+**Arguments:**
+
+- Arguments must be provided in pairs: a symbol followed by its weight.
+- `symbol` is a `string` or `symbol` value.
+- `weight` is a non-negative number (`int` or `double`) representing the
+  relative weight. A weight of `0` means the symbol will never be selected.
+
+**Return value:**
+
+Return value type is `symbol`.
+
+**Examples:**
+
+```questdb-sql title="Weighted symbol distribution"
+SELECT rnd_symbol_weighted('AAPL', 50, 'MSFT', 30, 'GOOGL', 15, 'TSLA', 5) AS ticker
+FROM long_sequence(5);
+```
+
+```
+AAPL
+MSFT
+AAPL
+AAPL
+GOOGL
+```
+
+```questdb-sql title="Verify weighted distribution"
+SELECT
+    ticker,
+    count() AS cnt
+FROM (
+    SELECT rnd_symbol_weighted('AAPL', 50, 'MSFT', 30, 'GOOGL', 15, 'TSLA', 5) AS ticker
+    FROM long_sequence(100000)
+)
+GROUP BY ticker
+ORDER BY cnt DESC;
+```
+
+| ticker | cnt   |
+| ------ | ----- |
+| AAPL   | 50021 |
+| MSFT   | 29894 |
+| GOOGL  | 15052 |
+| TSLA   | 5033  |
+
 ## rnd_varchar
 
-- `rnd_varchar(stringList)` chooses a random `varchar` string from a list
+- `rnd_varchar(stringList)` - chooses a random `varchar` string from a list
   defined by the user. It is useful when looking to generate specific strings
-  from a finite list (e.g `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`.
+  from a finite list (e.g., `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`).
   Strings are randomly chosen from the list with equal probability. When only
   one string is provided in the list, this string will be chosen with 100%
   probability.
-- `rnd_varchar(minLength, maxLength, nullRate)` generates strings of a length
-  between between `minLength` and `maxLength` (both inclusive). The function
+- `rnd_varchar(minLength, maxLength, nullRate)` - generates strings of a length
+  between `minLength` and `maxLength` (both inclusive). The function
   will also generate `null` values at a rate defined by `nullRate`.
 
 **Arguments:**
 
-- `strList` is a variable-length list of possible `string` values expressed as a
-  comma-separated list of strings. For example, `'a', 'bcd', 'efg123', '行'`
-- `minLength` is an `int` defining the minimum length for of a generated string
-  (inclusive)
-- `maxLength` is an `int` defining the maximum length for of a generated string
-  (inclusive)
+- `stringList` is a variable-length list of possible `string` values expressed
+  as a comma-separated list of strings. For example, `'a', 'bcd', 'efg123', '行'`
+- `minLength` is an `int` defining the minimum length of a generated string
+  (inclusive).
+- `maxLength` is an `int` defining the maximum length of a generated string
+  (inclusive).
 - `nullRate` is an `int` defining the frequency of occurrence of `null` values:
   - `0`: No `null` will be returned.
   - `1`: Will only return `null`.
@@ -509,28 +688,27 @@ FROM long_sequence(4);
 
 ## rnd_str
 
-- `rnd_str(stringList)` is used to choose a random `string` from a list defined
-  by the user. It is useful when looking to generate specific strings from a
-  finite list (e.g `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`. Strings are
+- `rnd_str(stringList)` - chooses a random `string` from a list defined by the
+  user. It is useful when looking to generate specific strings from a finite
+  list (e.g., `BUY, SELL` or `AUTUMN, WINTER, SPRING, SUMMER`). Strings are
   randomly chosen from the list with equal probability. When only one string is
   provided in the list, this string will be chosen with 100% probability.
-- `rnd_str(minLength, maxLength, nullRate)` generates strings of a length
-  between between `minLength` and `maxLength` (both inclusive). The function
-  will also generate `null` values at a rate defined by `nullRate`.
-- `rnd_str(list_size, minLength, maxLength, nullRate)` generates a finite list
-  of distinct random string and chooses one string from the list at random. The
-  finite list is of size `list_size`, which is optional.
+- `rnd_str(minLength, maxLength, nullRate)` - generates strings of a length
+  between `minLength` and `maxLength` (both inclusive). The function will also
+  generate `null` values at a rate defined by `nullRate`.
+- `rnd_str(list_size, minLength, maxLength, nullRate)` - generates a finite list
+  of distinct random strings and chooses one string from the list at random.
 
 **Arguments:**
 
-- `strList` is a variable-length list of possible `string` values expressed as a
-  comma-separated list of strings. For example, `'a', 'bcd', 'efg123', '行'`
-- `list_size` is an optional field declaring the number of distinct `string`
+- `stringList` is a variable-length list of possible `string` values expressed
+  as a comma-separated list of strings. For example, `'a', 'bcd', 'efg123', '行'`
+- `list_size` is an optional `int` declaring the number of distinct `string`
   values to generate.
-- `minLength` is an `int` defining the minimum length for of a generated string
-  (inclusive)
-- `maxLength` is an `int` defining the maximum length for of a generated string
-  (inclusive)
+- `minLength` is an `int` defining the minimum length of a generated string
+  (inclusive).
+- `maxLength` is an `int` defining the maximum length of a generated string
+  (inclusive).
 - `nullRate` is an `int` defining the frequency of occurrence of `null` values:
   - `0`: No `null` will be returned.
   - `1`: Will only return `null`.
@@ -577,10 +755,10 @@ SELECT rnd_str(3, 2, 2, 0) FROM long_sequence(5);
 
 **Arguments:**
 
-- `minBytes` is a `long` defining the minimum size in bytes for of a generated
-  binary (inclusive)
-- `maxBytes` is a `long` defining the maximum size in bytes for of a generated
-  binary (inclusive)
+- `minBytes` is a `long` defining the minimum size in bytes of a generated
+  binary (inclusive).
+- `maxBytes` is a `long` defining the maximum size in bytes of a generated
+  binary (inclusive).
 - `nullRate` is an `int` defining the frequency of occurrence of `null` values:
   - `0`: No `null` will be returned.
   - `1`: Will only return `null`.
@@ -614,7 +792,7 @@ Return value type is `uuid`.
 
 **Examples:**
 
-```questdb-sql title="Random char"
+```questdb-sql title="Random UUID"
 SELECT rnd_uuid4() FROM long_sequence(3);
 ```
 
@@ -624,50 +802,77 @@ deca0b0b-b14b-4d39-b891-9e1e786a48e7
 6eddd24a-8889-4345-8001-822cc2d41951
 ```
 
-## rnd_ipv4()
+## rnd_ipv4
 
-Random address generator for a single address.
+- `rnd_ipv4()` - generates a random IPv4 address between `0.0.0.1` and
+  `255.255.255.255`.
+- `rnd_ipv4(subnet, nullRate)` - generates a random IPv4 address within the
+  bounds of a given subnet.
 
-Returns a single IPv4 address.
+**Arguments:**
 
-Useful for testing.
+- `subnet` is a `string` defining the subnet in CIDR notation (e.g.,
+  `'192.168.1.0/24'`).
+- `nullRate` is an `int` defining the frequency of occurrence of `null` values:
+  - `0`: No `null` will be returned.
+  - `1`: Will only return `null`.
+  - `N > 1`: On average, one in N generated values will be `null`.
+
+**Return value:**
+
+Return value type is `ipv4`.
 
 **Examples:**
 
-```sql
-rnd_ipv4()
-/* Return address between 0.0.0.1 - 255.255.255.255 */
+```questdb-sql title="Random IPv4 address"
+SELECT rnd_ipv4() FROM long_sequence(3);
+```
+
+```
 97.29.14.22
+182.43.9.117
+45.192.88.3
 ```
 
-## rnd_ipv4(string, int)
+```questdb-sql title="Random IPv4 within a subnet"
+SELECT rnd_ipv4('22.43.0.0/16', 0) FROM long_sequence(3);
+```
 
-Generates a random ip address within the bounds of a given subnet.
-
-The integer argument dictates how many null values will be generated.
-
-Returns an IPv4 address within specified range.
-
-**Examples:**
-
-```sql
-rnd_ipv4('22.43.200.9/16', 0)
-/* Return address between 22.43.0.0 - 22.43.255.25 */
+```
 22.43.200.12
+22.43.55.189
+22.43.101.7
 ```
 
-## rnd_double_array()
+## rnd_double_array
 
-Generates a `DOUBLE` array with random elements. There are two main forms:
+Generates a `double` array with random elements.
 
-1. `rnd_double_array(nDims, [ nanRate, [ maxDimLength ] ])` — generates an array
-   with the specified dimensionality and random dimension lengths, as well as
-   random elements. `nanRate` and `maxDimLength` are optional parameters. The
-   default `nanRate` is zero and the default `maxDimLength` is 16.
+- `rnd_double_array(nDims)` - generates an array with the specified
+  dimensionality, random dimension lengths (up to 16), and random elements.
+- `rnd_double_array(nDims, nanRate)` - same as above, with `NaN` values at the
+  specified rate.
+- `rnd_double_array(nDims, nanRate, maxDimLength)` - same as above, with a
+  custom maximum dimension length.
+- `rnd_double_array(nDims, nanRate, 0, dim1Len, dim2Len, ...)` - generates an
+  array of fixed size with random elements. The `0` is a placeholder needed to
+  disambiguate from other forms.
 
-2. `rnd_double_array(nDims, nanRate, 0, dim1Len, dim2Len, dim3Len, ...)` —
-   generates an array of fixed size with random elements. Note the dummy
-   argument 0, its is needed to disambiguate from other forms.
+**Arguments:**
+
+- `nDims` is an `int` specifying the number of dimensions.
+- `nanRate` is an `int` defining the frequency of `NaN` values (default: `0`):
+  - `0`: No `NaN` will be returned.
+  - `1`: Will only return `NaN`.
+  - `N > 1`: On average, one in N generated values will be `NaN`.
+- `maxDimLength` is an `int` specifying the maximum length of each dimension
+  (default: `16`).
+- `dim1Len, dim2Len, ...` are `int` values specifying exact lengths for each
+  dimension when using fixed-size form.
+
+**Return value:**
+
+Return value type is `double[]` (array).
 
 **Examples:**
 
@@ -700,15 +905,17 @@ SELECT rnd_double_array(2, 0, 0, 2, 5);
 ## rnd_decimal
 
 - `rnd_decimal(precision, scale, nanRate)` - generates a random **positive**
-  `decimal` between 0 and the maximum value representable by the given precision
-  and scale.
+  `decimal` between `0` and the maximum value representable by the given
+  precision and scale.
 
 **Arguments:**
 
+- `precision` is an `int` defining the total number of digits.
+- `scale` is an `int` defining the number of digits after the decimal point.
 - `nanRate` is an `int` defining the frequency of occurrence of `NaN` values:
-- `0`: No `NaN` will be returned.
-- `1`: Will only return `NaN`.
-- `N > 1`: On average, one in N generated values will be `NaN`.
+  - `0`: No `NaN` will be returned.
+  - `1`: Will only return `NaN`.
+  - `N > 1`: On average, one in N generated values will be `NaN`.
 
 **Return value:**
 
