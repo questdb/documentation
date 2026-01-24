@@ -17,7 +17,7 @@ netmasks:
   [Strict IP address contained by](/docs/query/operators/ipv4/#-left-strict-ip-address-contained-by)
 - `<<=`
   [IP address contained by or equal](/docs/query/operators/ipv4/#-left-ip-address-contained-by-or-equal)
-- [rnd_ipv4(string, int)](/docs/query/functions/random-value-generator/#rnd_ipv4string-int)
+- [rnd_ipv4()](/docs/query/functions/random-value-generator/#rnd_ipv4)
 - [netmask()](/docs/query/operators/ipv4/#return-netmask---netmaskstring)
 
 ## `<` Less than
