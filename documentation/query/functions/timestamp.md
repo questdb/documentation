@@ -21,7 +21,7 @@ description: Timestamp function reference documentation.
   [meta functions](/docs/query/functions/meta/) documentation page.
 
 - There are two timestamp resolutions available in QuestDB: microseconds and nanoseconds. See
-  [Timestamps in QuestDB](/docs/concepts/timestamps-timezones/#timestamps-in-questdb)
+  [Timestamp resolution](/docs/concepts/designated-timestamp/#timestamp-resolution)
   for more details.
 :::
 
