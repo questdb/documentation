@@ -60,7 +60,7 @@ Choose your interval based on how much data you ingest:
 | 30-500 million rows/day | `DAY` |
 | 5-30 million rows/day | `WEEK` |
 | 1-5 million rows/day | `MONTH` |
-| <1 million rows/day | `YEAR` |
+| \<1 million rows/day | `YEAR` |
 
 **Why this matters:**
 
