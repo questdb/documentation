@@ -50,5 +50,5 @@ The squeeze signals that *something* is about to happen, but not which direction
 
 :::info Related documentation
 - [Bollinger Bands recipe](/docs/cookbook/sql/finance/bollinger-bands/)
-- [Window functions](/docs/query/sql/over/)
+- [Window functions](/docs/query/functions/window-functions/overview/)
 :::
