@@ -1,6 +1,6 @@
 ---
 title: Monitoring and alerting
-description: Shows you how to set up to monitor your database for potential issues, and how to raise alerts
+description: Monitor QuestDB health and detect table issues like suspended WAL, memory pressure, and slow queries.
 ---
 
 There are many variables to consider when monitoring an active production
@@ -48,57 +48,15 @@ w.alert.level=CRITICAL
 For more details, see the
 [Logging and metrics page](/docs/operations/logging-metrics/#prometheus-alertmanager).
 
-## Detect suspended tables
+## Detect table health issues
 
-QuestDB exposes a Prometheus gauge called `questdb_suspended_tables`. You can set up
-to alert whenever this gauge shows an above-zero value.
-
-## Detect slow ingestion
-
-QuestDB ingests data in two stages: first it records everything to the
-Write-Ahead Log. This step is optimized for throughput and usually isn't the
-bottleneck. The next step is inserting the data to the table, and this can
-take longer if the data is out of order, or touches different time partitions.
-You can monitor the overall performance of this process of applying the WAL
-data to tables. QuestDB exposes two Prometheus counters for this:
-
-1. `questdb_wal_apply_seq_txn`: sum of all committed transaction sequence numbers
-2. `questdb_wal_apply_writer_txn`: sum of all transaction sequence numbers applied to tables
-
-Both of these numbers are continuously growing as the data is ingested. When
-they are equal, all WAL data has been applied to the tables. While data is being
-actively ingested, the second counter will lag behind the first one. A steady
-difference between them is a sign of healthy rate of WAL application, the
-database keeping up with the demand. However, if the difference continuously
-rises, this indicates that either a table has become suspended and WAL can't be
-applied to it, or QuestDB is not able to keep up with the ingestion rate. All of
-the data is still safely stored, but a growing portion of it is not yet visible
-to queries.
-
-You can create an alert that detects a steadily increasing difference between
-these two numbers. It won't tell you which table is experiencing issues, but it
-is a low-impact way to detect there's a problem which needs further diagnosing.
-
-## Monitor ingestion with SQL
-
-For detailed per-table ingestion monitoring, use the [`tables()`](/docs/query/functions/meta/#tables)
-function. Unlike Prometheus metrics which provide aggregate counters, `tables()`
-returns real-time statistics for each table including WAL lag, memory pressure,
+This section covers monitoring and troubleshooting table health issues. For
+detailed per-table monitoring, use the [`tables()`](/docs/query/functions/meta/#tables)
+function which returns real-time statistics including WAL status, memory pressure,
 and performance histograms. The function is lightweight and fully in-memory,
 suitable for frequent polling.
 
-Key columns for ingestion monitoring:
-
-| Column | Description |
-|--------|-------------|
-| `wal_pending_row_count` | Rows written to WAL but not yet applied to the table |
-| `table_suspended` | Whether the table is suspended (WAL apply halted) |
-| `table_memory_pressure_level` | `0` (normal), `1` (reduced parallelism), `2` (backoff) |
-| `wal_txn - table_txn` | Number of pending WAL transactions |
-| `table_write_amp_p99` | Out-of-order merge overhead (1.0 = optimal) |
-| `table_merge_rate_p99` | Slowest merge throughput in rows/second |
-
-Example health dashboard query:
+### Health dashboard query
 
 ```questdb-sql
 SELECT
@@ -121,6 +79,213 @@ ORDER BY
     table_memory_pressure_level DESC,
     wal_pending_row_count DESC;
 ```
+
+### Detect suspended tables
+
+A WAL table becomes suspended when an error occurs during WAL apply, such as
+disk full, corrupted WAL segment, or kernel limits reached. While suspended,
+new data continues to be written to WAL but is not applied to the table.
+
+**Detection:**
+
+```questdb-sql
+SELECT table_name FROM tables() WHERE table_suspended;
+```
+
+**Resolution:**
+
+Resume from the failed transaction:
+
+```questdb-sql
+ALTER TABLE my_table RESUME WAL;
+```
+
+If the transaction is corrupted, skip it by specifying the next transaction:
+
+```questdb-sql
+-- Find the last applied transaction
+SELECT writerTxn FROM wal_tables() WHERE name = 'my_table';
+
+-- Resume from the next transaction
+ALTER TABLE my_table RESUME WAL FROM TXN <next_txn>;
+```
+
+For corrupted WAL segments (common after disk full errors), you may need to skip
+multiple transactions. Query `wal_transactions()` to find all transactions in
+the corrupted segment, then resume from the first transaction after that segment.
+
+See [ALTER TABLE RESUME WAL](/docs/query/sql/alter-table-resume-wal/) for
+detailed recovery procedures including corrupted segment handling.
+
+### Detect invalid materialized views
+
+Materialized views become invalid when their base table is modified in
+incompatible ways: dropping referenced columns, dropping partitions, renaming
+the table, or running TRUNCATE/UPDATE operations.
+
+**Detection:**
+
+```questdb-sql
+SELECT view_name, invalidation_reason
+FROM materialized_views()
+WHERE view_status = 'invalid';
+```
+
+**Resolution:**
+
+Perform a full refresh to rebuild the view:
+
+```questdb-sql
+REFRESH MATERIALIZED VIEW my_view FULL;
+```
+
+This deletes existing data and rebuilds from the base table. For large tables,
+this may take significant time.
+
+See [Materialized view invalidation](/docs/concepts/materialized-views/#view-invalidation)
+for more details on causes and prevention.
+
+### Detect memory pressure
+
+Memory pressure indicates the system is running low on memory for out-of-order
+(O3) operations. Level 1 reduces parallelism to conserve memory. Level 2 enters
+backoff mode, which can significantly impact throughput.
+
+**Detection:**
+
+```questdb-sql
+SELECT table_name,
+       CASE table_memory_pressure_level
+           WHEN 1 THEN 'PRESSURE'
+           WHEN 2 THEN 'BACKOFF'
+       END AS status
+FROM tables()
+WHERE table_memory_pressure_level > 0;
+```
+
+**Resolution:**
+
+Reduce O3 memory allocation per column. The default of 256K actually uses 512K
+(2x the configured size). Reducing this frees memory for other operations:
+
+```ini title="server.conf"
+cairo.o3.column.memory.size=128K
+```
+
+Other options:
+
+- Add more RAM to the server
+- Reduce concurrent ingestion load
+- Reduce the number of tables with active O3 writes
+
+See [Capacity planning](/docs/getting-started/capacity-planning/#memory-page-size-configuration)
+and [Optimize for many tables](/docs/cookbook/operations/optimize-many-tables/)
+for detailed configuration guidance.
+
+### Detect small transactions
+
+Small transaction sizes may indicate that the client is sending individual rows
+instead of batching. Larger batch sizes reduce transaction overhead and improve
+ingestion throughput.
+
+**Detection:**
+
+```questdb-sql
+SELECT table_name, wal_tx_size_p50, wal_tx_size_p90, wal_tx_size_max
+FROM tables()
+WHERE walEnabled
+  AND wal_tx_size_p90 > 0
+  AND wal_tx_size_p90 < 100;
+```
+
+**Resolution:**
+
+- Use the [official client libraries](/docs/ingestion/overview/#first-party-clients)
+  which handle batching automatically
+- For custom ILP clients, configure auto-flush by row count or time interval
+  rather than flushing after each row
+- For HTTP/PostgreSQL ingestion, send multiple rows per request
+
+### Detect high write amplification
+
+Write amplification measures how many times data is rewritten during ingestion.
+A value of 1.0 is ideal, meaning each row is written exactly once. Higher values
+indicate O3 merge overhead from out-of-order data being merged into existing
+partitions.
+
+| Value | Interpretation |
+|-------|----------------|
+| 1.0 – 1.5 | Excellent – minimal rewrites |
+| 1.5 – 3.0 | Normal for moderate out-of-order data |
+| 3.0 – 5.0 | Consider reducing partition size |
+| > 5.0 | High – reduce partition size or investigate ingestion patterns |
+
+**Detection:**
+
+```questdb-sql
+SELECT table_name,
+       table_write_amp_p50,
+       table_write_amp_p99,
+       table_merge_rate_p99 AS slowest_merge
+FROM tables()
+WHERE walEnabled
+  AND table_write_amp_p50 > 3.0
+ORDER BY table_write_amp_p99 DESC;
+```
+
+**Resolution:**
+
+Reduce partition size to limit the scope of O3 merges. For example, a table
+with `PARTITION BY DAY` experiencing high amplification may benefit from
+`PARTITION BY HOUR`:
+
+```questdb-sql
+-- Recreate with smaller partitions
+CREATE TABLE trades_new (
+    ...
+) TIMESTAMP(ts) PARTITION BY HOUR;
+```
+
+Other options:
+
+- Reduce `cairo.writer.data.append.page.size` in server.conf
+- Enable [deduplication](/docs/concepts/deduplication/) if data can be replayed
+- Investigate client-side to reduce out-of-order data at the source
+
+See [Write amplification](/docs/getting-started/capacity-planning/#write-amplification)
+for detailed guidance.
+
+### Detect transaction lag and pending rows
+
+When `wal_txn - table_txn` (pending transactions) or `wal_pending_row_count`
+(pending rows) continuously grows, the WAL apply process cannot keep up with
+ingestion. The data is safely stored in WAL but not yet visible to queries.
+
+A continuously rising difference indicates that either a table has become
+suspended and WAL can't be applied to it, or QuestDB is not able to keep up
+with the ingestion rate.
+
+**Detection:**
+
+```questdb-sql
+SELECT table_name,
+       wal_txn - table_txn AS pending_txns,
+       wal_pending_row_count
+FROM tables()
+WHERE walEnabled
+  AND (wal_txn - table_txn > 10 OR wal_pending_row_count > 1000000)
+ORDER BY wal_pending_row_count DESC;
+```
+
+**Resolution:**
+
+- Check if the table is suspended and resume it. See
+  [Detect suspended tables](#detect-suspended-tables).
+- Check for memory pressure which limits parallelism. See
+  [Detect memory pressure](#detect-memory-pressure).
+- Check for high write amplification which slows merges. See
+  [Detect high write amplification](#detect-high-write-amplification).
+- Temporarily reduce ingestion rate to allow the backlog to clear.
 
 See the [`tables()` reference](/docs/query/functions/meta/#tables) for the
 complete list of columns and additional example queries.

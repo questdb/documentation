@@ -16,7 +16,8 @@ const DOCS_CATEGORIES = {
 }
 
 const SINGLE_FILE_CATEGORIES = {
-  schema: [path.join(DOCS_DIR, 'schema-design-essentials.md')]
+  schema: [path.join(DOCS_DIR, 'schema-design-essentials.md')],
+  monitoring: [path.join(DOCS_DIR, 'operations', 'monitoring-alerting.md')]
 }
 
 /**
