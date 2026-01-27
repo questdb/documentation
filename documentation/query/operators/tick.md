@@ -21,7 +21,7 @@ each starting at 9:30 AM New York time and lasting 6 hours 30 minutes.
 
 :::tip Key Points
 - TICK = declarative syntax for complex time intervals in `WHERE ts IN '...'`
-- **Syntax order:** `date@timezone#dayFilter;duration`
+- **Syntax order:** `date [T time] @timezone #dayFilter ;duration`
 - Each generated interval uses optimized [interval scan](/docs/concepts/deep-dive/interval-scan/) (binary search)
 - Use `[a,b,c]` for values, `[a..b]` for ranges, `#workday` for day filters
 - Overlapping intervals are automatically merged
@@ -33,7 +33,7 @@ each starting at 9:30 AM New York time and lasting 6 hours 30 minutes.
 TICK_EXPR     = DATE_PART [TIME] [TIMEZONE] [FILTER] [DURATION]
 
 DATE_PART     = literal_date                    -- '2024-01-15'
-              | date_list                       -- '[2024-01-15, 2024-01-20]'
+              | date_list                       -- '[2024-01-15, 2024-03-20]'
               | date_variable                   -- '$today', '$now - 2h'
               | bracket_expansion               -- '2024-01-[10..15]'
               | iso_week                        -- '2024-W01-1'
@@ -49,8 +49,22 @@ FILTER        = '#workday' | '#weekend'         -- business day filters
 
 DURATION      = ';' duration_value              -- ';6h30m'
 
+-- Bracket expansion: generates multiple values from a single field
+bracket_expansion = '[' expansion_item (',' expansion_item)* ']'
+expansion_item    = value                       -- single: [10]
+                  | value '..' value            -- range:  [10..15]
+                  -- mixed example: [5,10..12,20] = 5, 10, 11, 12, 20
+
+-- Date list: multiple complete dates (can nest bracket expansions)
+date_list    = '[' date_entry (',' date_entry)* ']'
+date_entry   = literal_date                     -- '2024-01-15'
+             | date_variable                    -- '$today'
+             | literal_date with brackets       -- '2024-01-[01..05]'
+
+-- Date variable with optional arithmetic and ranges
 date_variable = '$today' | '$yesterday' | '$tomorrow' | '$now'
               | date_variable ('+' | '-') amount unit
+              | date_variable '..' date_variable   -- '$now - 2h..$now'
 
 unit          = 'y' | 'M' | 'w' | 'd' | 'bd' | 'h' | 'm' | 's' | 'T' | 'u' | 'n'
               --  ↑    ↑         ↑    ↑
@@ -93,7 +107,7 @@ WHERE ts IN '$now - 30m..$now'
 WHERE ts IN '$today'
 
 -- Last 5 business days
-WHERE ts IN '$today-5bd..$today-1bd'
+WHERE ts IN '$today - 5bd..$today - 1bd'
 
 -- Workdays only with time window
 WHERE ts IN '2024-01-[01..31]T09:00#workday;8h'
@@ -110,12 +124,13 @@ WHERE ts IN '2024-01-15T09:30@America/New_York;6h30m'
 Components must appear in this order:
 
 ```
-date @ timezone # dayFilter ; duration
- │       │          │           │
- │       │          │           └─ interval length (e.g., ;6h30m)
- │       │          └─ day filter (e.g., #workday)
- │       └─ timezone (e.g., @America/New_York)
- └─ date/time with optional brackets (e.g., 2024-01-[01..31]T09:30)
+date [T time] @ timezone # dayFilter ; duration
+ │       │         │          │           │
+ │       │         │          │           └─ interval length (e.g., ;6h30m)
+ │       │         │          └─ day filter (e.g., #workday)
+ │       │         └─ timezone (e.g., @America/New_York)
+ │       └─ time component (e.g., T09:30)
+ └─ date with optional brackets (e.g., 2024-01-[01..31])
 ```
 
 **Examples showing the order:**
@@ -149,12 +164,16 @@ date @ timezone # dayFilter ; duration
 
 ### Whitespace
 
-Whitespace inside brackets is allowed and ignored:
+Whitespace is flexible in TICK expressions:
 
 ```questdb-sql
--- These are equivalent:
+-- Inside brackets - spaces are ignored:
 '2024-01-[10,15,20]'
 '2024-01-[ 10 , 15 , 20 ]'
+
+-- Around arithmetic operators - spaces are optional:
+'$now - 2h..$now'
+'$now-2h..$now'
 ```
 
 ### Interval merging
@@ -169,30 +188,163 @@ When expanded intervals overlap, they are automatically merged:
 
 This ensures efficient query execution without duplicate scans.
 
-### Optional brackets
+### Optional brackets for date variables
 
-Date variable expressions can be written with or without brackets:
+Single date variables can omit brackets, even with suffixes:
 
 ```questdb-sql
--- These are equivalent:
-WHERE ts IN '[$today]'
+-- Single variable - brackets optional:
 WHERE ts IN '$today'
-
--- Ranges work without brackets:
-WHERE ts IN '$today..$today+5d'
-WHERE ts IN '$now - 1h..$now'
-
--- Suffixes work as expected:
-WHERE ts IN '$todayT09:30'         -- time suffix
-WHERE ts IN '$now - 1h;30m'        -- duration suffix
-WHERE ts IN '$today@Europe/London' -- timezone suffix
+WHERE ts IN '$now;1h'
+WHERE ts IN '$todayT09:30'
+WHERE ts IN '$today@Europe/London'
 ```
 
-Brackets are still required for comma-separated lists:
+Ranges can also omit brackets when used alone:
 
 ```questdb-sql
--- Brackets required for lists:
+-- Range without suffixes - brackets optional:
+WHERE ts IN '$now - 2h..$now'
+WHERE ts IN '$today..$today + 5d'
+```
+
+Brackets are **required** for:
+
+```questdb-sql
+-- Ranges with suffixes - brackets required:
+WHERE ts IN '[$now - 2h..$now]@America/New_York'
+WHERE ts IN '[$today..$today + 5d]#workday;8h'
+
+-- Lists - brackets required:
 WHERE ts IN '[$today, $yesterday, 2024-01-15]'
+```
+
+## Date variables
+
+Use dynamic date references that resolve at query time:
+
+| Variable | Description | Interval type | Example value (Jan 22, 2026 at 14:35:22) |
+|----------|-------------|---------------|------------------------------------------|
+| `$today` | Current day | Full day | `2026-01-22T00:00:00` to `2026-01-22T23:59:59.999999` |
+| `$yesterday` | Previous day | Full day | `2026-01-21T00:00:00` to `2026-01-21T23:59:59.999999` |
+| `$tomorrow` | Next day | Full day | `2026-01-23T00:00:00` to `2026-01-23T23:59:59.999999` |
+| `$now` | Current timestamp | Point-in-time | `2026-01-22T14:35:22.123456` (exact moment) |
+
+:::info Interval vs point-in-time
+
+- **`$today`**, **`$yesterday`**, **`$tomorrow`** produce **full day intervals** (midnight to midnight)
+- **`$now`** produces a **point-in-time** (exact moment with microsecond precision)
+
+Without a duration suffix, `$now` matches only the exact microsecond. Add a duration or use a range to create a useful window:
+
+```questdb-sql
+-- Point-in-time: matches only the exact microsecond (rarely useful alone)
+WHERE ts IN '$now'
+
+-- 1-hour window starting at current moment (extends forward)
+WHERE ts IN '$now;1h'
+
+-- Last 2 hours (from 2h ago until now)
+WHERE ts IN '$now - 2h..$now'
+```
+
+:::
+
+Variables are case-insensitive: `$TODAY`, `$Today`, and `$today` are equivalent.
+
+### Date arithmetic
+
+Add or subtract time from date variables using any [time unit](#time-units).
+All units except `bd` (business days) work in both duration and arithmetic contexts.
+
+```questdb-sql
+-- Calendar day arithmetic
+'$today + 5d'      -- 5 days from today
+'$today - 3d'      -- 3 days ago
+
+-- Business day arithmetic (skips weekends) - arithmetic only
+'$today + 1bd'     -- next business day
+'$today - 5bd'     -- 5 business days ago
+
+-- Hour/minute/second arithmetic (typically with $now)
+'$now - 2h'        -- 2 hours ago
+'$now - 30m'       -- 30 minutes ago
+'$now - 90s'       -- 90 seconds ago
+
+-- Sub-second precision
+'$now - 500T'      -- 500 milliseconds ago
+'$now - 100u'      -- 100 microseconds ago
+
+-- Calendar-aware units (handle varying month lengths, leap years)
+'$today + 1M'      -- same day next month
+'$today + 1y'      -- same day next year
+'$today + 2w'      -- 2 weeks from today
+```
+
+### Date variable ranges
+
+Generate multiple intervals from start to end:
+
+```questdb-sql
+-- Next 5 calendar days
+'$today..$today + 5d'
+
+-- Next 5 business days (weekdays only)
+'$today..$today + 5bd'
+
+-- Last work week
+'$today - 5bd..$today - 1bd'
+
+-- Last 2 hours
+'$now - 2h..$now'
+
+-- Last 30 minutes
+'$now - 30m..$now'
+
+-- Next 3 months
+'$today..$today + 3M'
+```
+
+:::note Ranges vs durations
+
+**Ranges** (`$start..$end`) create a single continuous interval from start to end:
+
+```questdb-sql
+-- Single interval: from 2 hours ago until now
+'$now - 2h..$now'
+
+-- Single interval: from 3 days ago until today (end of day)
+'$today - 3d..$today'
+```
+
+**Durations** (`;Nh`) extend from a point by the specified amount:
+
+```questdb-sql
+-- Single interval: starting at $now, lasting 2 hours forward
+'$now;2h'
+```
+
+For multiple discrete intervals, use a list with duration:
+
+```questdb-sql
+-- Three separate 1-hour intervals
+'[$now - 3h, $now - 2h, $now - 1h];1h'
+```
+:::
+
+### Mixed date lists
+
+Combine variables with static dates (brackets required for lists):
+
+```questdb-sql
+-- Today, yesterday, and a specific date
+SELECT * FROM trades WHERE ts IN '[$today, $yesterday, 2024-01-15]';
+
+-- Compare today vs same day last week
+SELECT * FROM trades WHERE ts IN '[$today, $today - 7d]T09:30;6h30m';
+
+-- Hourly windows starting 4 hours ago
+SELECT * FROM trades WHERE ts IN '[$now - 4h, $now - 3h, $now - 2h, $now - 1h, $now]';
 ```
 
 ## Bracket expansion
@@ -445,134 +597,6 @@ SELECT * FROM trades WHERE ts IN '2024-W[01..04]-[1,5]';
 | 6 | Saturday |
 | 7 | Sunday |
 
-## Date variables
-
-Use dynamic date references that resolve at query time:
-
-| Variable | Description | Interval type | Example value (Jan 22, 2026 at 14:35:22) |
-|----------|-------------|---------------|------------------------------------------|
-| `$today` | Current day | Full day | `2026-01-22T00:00:00` to `2026-01-22T23:59:59.999999` |
-| `$yesterday` | Previous day | Full day | `2026-01-21T00:00:00` to `2026-01-21T23:59:59.999999` |
-| `$tomorrow` | Next day | Full day | `2026-01-23T00:00:00` to `2026-01-23T23:59:59.999999` |
-| `$now` | Current timestamp | Point-in-time | `2026-01-22T14:35:22.123456` (exact moment) |
-
-:::info Interval vs point-in-time
-
-- **`$today`**, **`$yesterday`**, **`$tomorrow`** produce **full day intervals** (midnight to midnight)
-- **`$now`** produces a **point-in-time** (exact moment with microsecond precision)
-
-Without a duration suffix, `$now` matches only the exact microsecond. Add a duration to create a window:
-
-```questdb-sql
--- Point-in-time: matches only the exact microsecond (rarely useful alone)
-WHERE ts IN '$now'
-
--- Practical: 1-hour window ending at current moment
-WHERE ts IN '$now;1h'
-
--- Range: last 2 hours
-WHERE ts IN '$now - 2h..$now'
-```
-
-:::
-
-Variables are case-insensitive: `$TODAY`, `$Today`, and `$today` are equivalent.
-
-### Date arithmetic
-
-Add or subtract time from date variables using any [time unit](#time-units).
-All units except `bd` (business days) work in both duration and arithmetic contexts.
-
-```questdb-sql
--- Calendar day arithmetic
-'$today + 5d'      -- 5 days from today
-'$today - 3d'      -- 3 days ago
-
--- Business day arithmetic (skips weekends) - arithmetic only
-'$today + 1bd'     -- next business day
-'$today - 5bd'     -- 5 business days ago
-
--- Hour/minute/second arithmetic (typically with $now)
-'$now - 2h'        -- 2 hours ago
-'$now - 30m'       -- 30 minutes ago
-'$now - 90s'       -- 90 seconds ago
-
--- Sub-second precision
-'$now - 500T'      -- 500 milliseconds ago
-'$now - 100u'      -- 100 microseconds ago
-
--- Calendar-aware units (handle varying month lengths, leap years)
-'$today + 1M'      -- same day next month
-'$today + 1y'      -- same day next year
-'$today + 2w'      -- 2 weeks from today
-```
-
-### Date variable ranges
-
-Generate multiple intervals from start to end:
-
-```questdb-sql
--- Next 5 calendar days
-'$today..$today+5d'
-
--- Next 5 business days (weekdays only)
-'$today..$today+5bd'
-
--- Last work week
-'$today-5bd..$today-1bd'
-
--- Last 2 hours
-'$now - 2h..$now'
-
--- Last 30 minutes
-'$now - 30m..$now'
-
--- Next 3 months
-'$today..$today+3M'
-```
-
-:::note Ranges vs durations
-
-**Ranges** (`$start..$end`) create a single continuous interval from start to end:
-
-```questdb-sql
--- Single interval: from 2 hours ago until now
-'$now - 2h..$now'
-
--- Single interval: from 3 days ago until today (end of day)
-'$today - 3d..$today'
-```
-
-**Durations** (`;Nh`) extend from a point by the specified amount:
-
-```questdb-sql
--- Single interval: starting at $now, lasting 2 hours forward
-'$now;2h'
-```
-
-For multiple discrete intervals, use a list with duration:
-
-```questdb-sql
--- Three separate 1-hour intervals
-'[$now - 3h, $now - 2h, $now - 1h];1h'
-```
-:::
-
-### Mixed date lists
-
-Combine variables with static dates (brackets required for lists):
-
-```questdb-sql
--- Today, yesterday, and a specific date
-SELECT * FROM trades WHERE ts IN '[$today, $yesterday, 2024-01-15]';
-
--- Compare today vs same day last week
-SELECT * FROM trades WHERE ts IN '[$today, $today - 7d]T09:30;6h30m';
-
--- Hourly windows starting 4 hours ago
-SELECT * FROM trades WHERE ts IN '[$now - 4h, $now - 3h, $now - 2h, $now - 1h, $now]';
-```
-
 ## Complete examples
 
 ### Trading hours
@@ -604,11 +628,11 @@ WHERE ts IN '2024-W[02,04,06,08,10,12]-5T14:00;2h';
 ```questdb-sql
 -- Last 5 trading days at market open
 SELECT * FROM prices
-WHERE ts IN '$today-5bd..$today-1bd T09:30@America/New_York;1m';
+WHERE ts IN '[$today - 5bd..$today - 1bd]T09:30@America/New_York;1m';
 
 -- Same hour comparison across recent days
 SELECT * FROM metrics
-WHERE ts IN '[$today-2d,$yesterday,$today]T14:00;1h';
+WHERE ts IN '[$today - 2d, $yesterday, $today]T14:00;1h';
 ```
 
 ### Real-time monitoring
