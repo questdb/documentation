@@ -6,6 +6,10 @@ description: Calculate Bollinger Bands using window functions for volatility ana
 
 Calculate Bollinger Bands for volatility analysis and mean reversion trading. Bollinger Bands consist of a moving average with upper and lower bands set at a specified number of standard deviations above and below it. They help identify overbought/oversold conditions and measure market volatility.
 
+:::tip Measuring band width
+To objectively measure when bands are contracting (a "squeeze"), see the [Bollinger BandWidth recipe](/docs/cookbook/sql/finance/bollinger-bandwidth/) which calculates band width as a percentage and compares it to historical levels.
+:::
+
 :::note
 Bollinger Bands can be calculated using either population standard deviation (stddev) or sample standard deviation (stddev_samp), producing slightly different results. This recipe uses stddev.
 :::
@@ -137,7 +141,8 @@ ORDER BY symbol, timestamp;
 
 Note the addition of `PARTITION BY symbol` to calculate separate Bollinger Bands for each symbol.
 
-:::info Related Documentation
+:::info Related documentation
+- [Bollinger BandWidth recipe](/docs/cookbook/sql/finance/bollinger-bandwidth/)
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [AVG window function](/docs/query/functions/window-functions/reference/#avg)
 - [SQRT function](/docs/query/functions/numeric/#sqrt)
