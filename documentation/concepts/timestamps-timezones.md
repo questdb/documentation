@@ -1,219 +1,122 @@
 ---
-title: Timestamps and time zones
+title: Working with time zones
+sidebar_label: Time zones
 description:
-  This document describes how to work with time zones in QuestDB, including
-  hints how to convert timestamps to UTC, to a specific time zone or by a UTC
-  offset value.
+  How to filter and convert timestamps by time zone in QuestDB using TICK
+  syntax and conversion functions.
 ---
 
-When working with timestamped data, it may be necessary to convert timestamp
-values to or from UTC, or to offset timestamp values by a fixed duration. The
-following sections describe how QuestDB handles timestamps natively, how to use
-built-in functions for working with time zone conversions, and general hints for
-working with time zones in QuestDB.
+QuestDB stores all timestamps in UTC without time zone information. To query
+data at your local time, use [TICK syntax](/docs/query/operators/tick/). To
+display results in local time, use conversion functions.
 
-## Timestamps in QuestDB
+:::tip Key Points
+- All timestamps are stored in UTC — no time zone information is preserved
+- Use [TICK syntax](/docs/query/operators/tick/) with `@timezone` to query data at your local time
+- Prefer full time zone names (`America/New_York`) over abbreviations (`EST`)
+- Use `to_timezone()` only when displaying local time in results
+:::
 
-When using the `timestamp` type, QuestDB will store it as a Unix timestamp in microsecond resolution. Although timestamps in nanoseconds will be parsed, the output will be truncated to microseconds. If the `timestamp_ns` type is used, QuestDB
-will store it as a Unix timestamp in nanosecond resolution, and there will be no precision loss. QuestDB does not store time zone information
-alongside timestamp values and therefore it should be assumed that all
-timestamps are in UTC.
+## How to refer to time zones
 
-The following example shows how a Unix timestamp in microseconds may be passed
-into a timestamp column directly:
+QuestDB uses the [IANA tz database](https://en.wikipedia.org/wiki/Tz_database).
+Specify time zones by geographic region or UTC offset:
 
-```questdb-sql
-CREATE TABLE my_table (ts timestamp, col1 int) timestamp(ts);
-INSERT INTO my_table VALUES(1623167145123456, 12);
-SELECT * FROM my_table;
-```
+| Format | Example | Recommended? |
+|--------|---------|--------------|
+| Geographic region | `America/New_York` | ✅ Best |
+| UTC offset | `+02:00`, `-05:00` | ✅ Good |
+| Abbreviation | `EST`, `CST` | ⚠️ Avoid |
 
-| ts                          | col1 |
-| :-------------------------- | :--- |
-| 2021-06-08T15:45:45.123456Z | 12   |
+**Avoid abbreviations** — the same abbreviation often maps to multiple time
+zones. For example, `CST` could mean U.S. Central Standard Time or China
+Standard Time. QuestDB can only recognize one, leading to unexpected results.
 
-Timestamps may also be inserted as strings in the following way:
-
-```questdb-sql
-INSERT INTO my_table VALUES('2021-06-08T16:45:45.123456Z', 13);
-SELECT * FROM my_table;
-```
-
-| ts                          | col1 |
-| :-------------------------- | :--- |
-| 2021-06-08T15:45:45.123456Z | 12   |
-| 2021-06-08T16:45:45.123456Z | 13   |
-
-When inserting timestamps into a table, it is also possible to use
-[timestamp units](/docs/query/functions/date-time/#timestamp-format)
-to define the timestamp format, in order to process trailing zeros in exported
-data sources such as PostgreSQL:
-
-```questdb-sql
-INSERT INTO my_table VALUES(to_timestamp('2021-06-09T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.N+'), 14);
--- Passing 9-digit nanosecond into QuestDB, this is equal to:
-
-INSERT INTO my_table VALUES(to_timestamp('2021-06-10T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.SSSUUUN'), 14);
-
-SELECT * FROM my_table;
-```
-
-The output maintains microsecond resolution:
-
-| ts                          | col1 |
-| :-------------------------- | :--- |
-| 2021-06-08T15:45:45.123456Z | 12   |
-| 2021-06-08T16:45:45.123456Z | 13   |
-| 2021-06-09T16:45:46.123456Z | 14   |
-
-If you want to have nanosecond resolution, you can create the table as
-
-```questdb-sql
-CREATE TABLE my_table (ts timestamp_ns, col1 int) timestamp(ts);
-```
-
-If you now insert data with nanosecond precision using any of the methods
-seen above, the full nanosecond precision will be retained in the table. Note
-we had to use `to_timestamp_ns` rather than `to_timestamp` to get the desired
-results.
-
-```questdb-sql
-INSERT INTO my_table VALUES(1623167145123456000, 12);
-INSERT INTO my_table VALUES('2021-06-08T16:45:45.123456123Z', 13);
-INSERT INTO my_table VALUES(to_timestamp_ns('2021-06-09T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.N+'), 14);
-INSERT INTO my_table VALUES(to_timestamp_ns('2021-06-10T16:45:46.123456789', 'yyyy-MM-ddTHH:mm:ss.SSSUUUN'), 14);
-
-SELECT * FROM my_table;
-```
-
-| ts                             | col1 |
-| ------------------------------ | ---- |
-| 2021-06-08T15:45:45.123456000Z | 12   |
-| 2021-06-08T16:45:45.123456123Z | 13   |
-| 2021-06-09T16:45:46.123456789Z | 14   |
-| 2021-06-10T16:45:46.123456789Z | 14   |
-
-
-## QuestDB's internal time zone database
-
-In order to simplify working with time zones, QuestDB uses
-[the tz time zone database](https://en.wikipedia.org/wiki/Tz_database) which is
-standard in the Java ecosystem. This time zone database is used internally in
-time zone lookup and in operations relating to timestamp value conversion to and
-from time zones.
-
-For this reason, a time zone may be referenced by abbreviated name, by full time
-zone name or by UTC offset:
-
-| Abbreviation | Time zone name   | UTC offset |
-| :----------- | :--------------- | :--------- |
-| EST          | America/New_York | -05:00     |
-
-### Referring to time zones
-
-It's strongly advised **not to use the three-letter ID** or abbreviation for
-time zones for the following reason:
-
-> The same abbreviation is often used for multiple time zones (for example,
-> "CST" could be U.S. "Central Standard Time" and "China Standard Time"), and
-> the Java platform can then only recognize one of them
-
-Therefore, choosing a geographic region which observes a time zone
-(`"America/New_York"`, `"Europe/Prague"`) or a UTC offset value (`"+02:00"`) is
-more reliable when referring to time zones. Instructions for converting to and
-from time zones are described in the
-[Converting timestamps to and from time zones](#converting-timestamps-to-and-from-time-zones)
-section below.
-
-The current QuestDB time zone database uses the **English locale** but support
-for additional locales may be added in future. Referring to time zones which are
-outdated or not recognized results in a `invalid timezone name` error. The
-following resources may be used for hints how to refer to time zones by ID or
-offset:
-
-- The [official list maintained by IANA](https://www.iana.org/time-zones)
-- Java's
-  [getAvailableZoneIds](https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html#getAvailableZoneIds--)
-  method
-- [Wiki entry on tz database time zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
-  (this is a convenient reference, but may not be 100% accurate)
+For valid time zone names, see the
+[IANA time zone database](https://www.iana.org/time-zones).
 
 :::note
 
-Users should be aware that the time zone database contains both **current and
-historic transitions** for various time zones. Therefore time zone conversions
-must take the historic time zone transitions into account based on the timestamp
-values.
+The tz database includes historic transitions. QuestDB applies the correct
+offset based on the timestamp value, accounting for historical daylight saving
+time changes.
 
 :::
 
-### Updates to the time zone database
+## Querying by local time
 
-The upstream project updates past time zones as new information becomes
-available. These changes are typically related to daylight saving time (DST)
-start and end date transitions and, on rare occasions, time zone name changes.
+You're in New York and want trades from 9am your time. Use
+[TICK syntax](/docs/query/operators/tick/) with `@timezone`:
 
-The tz database version used by QuestDB is determined by the JDK version used at
-build time and therefore updates to the time zone database are directly
-influenced by this JDK version. To find the JDK version used by a QuestDB build,
-run the following SQL:
-
-```questdb-sql title="Get JDK Version" demo
-SELECT build();
+```questdb-sql
+SELECT * FROM trades
+WHERE ts IN '2024-01-15T09:00@America/New_York;1h';
 ```
 
-| build                                                                                              |
-| -------------------------------------------------------------------------------------------------- |
-| Build Information: QuestDB 7.4.0, JDK 11.0.8, Commit Hash b9776a8a09f7db35955530bff64de488a029f1ce |
+TICK converts your local time to UTC intervals, enabling efficient
+[interval scans](/docs/concepts/deep-dive/interval-scan/). More examples:
 
-## Converting timestamps to and from time zones
+```questdb-sql
+-- London business hours (09:00-17:00) for January workdays
+SELECT * FROM trades
+WHERE ts IN '2024-01-[01..31]T09:00@Europe/London#wd;8h';
 
-For convenience, QuestDB includes two functions for time zone conversions on
-timestamp values.
+-- NYSE trading hours (09:30-16:00 Eastern)
+SELECT * FROM trades
+WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#wd;6h30m';
 
-- [to_timezone()](/docs/query/functions/date-time/#to_timezone)
-- [to_utc()](/docs/query/functions/date-time/#to_utc)
-
-These functions are used to convert a Unix timestamp, or a string equivalent
-cast to timestamp as follows:
-
-```questdb-sql title="to_timezone" demo
-SELECT to_timezone(1623167145000000, 'Europe/Berlin');
+-- Last 5 business days, Tokyo morning session
+SELECT * FROM trades
+WHERE ts IN '[$today-5bd..$today-1bd]T09:00@Asia/Tokyo;2h30m';
 ```
 
-| to_timezone                 |
-| :-------------------------- |
-| 2021-06-08T17:45:45.000000Z |
+TICK handles DST transitions automatically — a 9 AM start time in New York
+maps to different UTC times in winter vs summer.
 
-```questdb-sql title="to_utc" demo
-SELECT to_utc(1623167145000000, 'Europe/Berlin');
+### Why TICK instead of conversion functions
+
+TICK generates UTC intervals at query planning time, enabling binary search.
+Converting each row forces a full table scan:
+
+```questdb-sql
+-- Efficient: interval scan (sub-millisecond on billions of rows)
+WHERE ts IN '2024-01-[01..31]T09:00@Europe/London;8h'
+
+-- Inefficient: full table scan (must read every row)
+WHERE extract(hour FROM to_timezone(ts, 'Europe/London')) BETWEEN 9 AND 17
 ```
 
-| to_utc                      |
-| :-------------------------- |
-| 2021-06-08T13:45:45.000000Z |
+## Converting timestamps for display
 
-### Using UTC offset for conversions
+When you need local time in query results (not filtering), use `to_timezone()`:
 
-The [to_timezone()](/docs/query/functions/date-time/#to_timezone) and
-[to_utc()](/docs/query/functions/date-time/#to_utc) functions may use UTC
-offset for converting timestamp values. In some cases, this can be more reliable
-than string or time zone ID conversion given historic changes to time zone names
-or transitions. The following example takes a Unix timestamp in microseconds and
-converts it to a time zone `+2` hours offset from UTC:
-
-```questdb-sql title="to_timezone with Offset" demo
-SELECT to_timezone(1213086329000000, '+02:00');
+```questdb-sql
+SELECT
+    to_timezone(ts, 'Europe/Berlin') as local_time,
+    symbol,
+    price
+FROM trades
+WHERE ts IN '2024-01-15';
 ```
 
-| to_timezone                 |
-| :-------------------------- |
-| 2008-06-10T10:25:29.000000Z |
+| local_time                  | symbol  | price |
+|-----------------------------|---------|-------|
+| 2024-01-15T10:30:00.000000Z | BTC-USD | 42000 |
 
-```questdb-sql title="to_utc with Offset" demo
-SELECT to_utc('2008-06-10T10:25:29.000000Z', '+02:00');
+### to_utc() for ingestion
+
+If source data arrives in local time, convert to UTC before storing:
+
+```questdb-sql
+INSERT INTO trades
+SELECT to_utc(local_ts, 'America/New_York'), symbol, price
+FROM source_data;
 ```
 
-| to_utc                      |
-| :-------------------------- |
-| 2008-06-10T08:25:29.000000Z |
+This ensures consistent ordering and avoids ambiguity during DST transitions.
+
+## See also
+
+- [TICK intervals](/docs/query/operators/tick/) — Complete `@timezone` syntax reference
+- [Designated timestamp](/docs/concepts/designated-timestamp/) — How timestamps define table structure
+- [Date/time functions](/docs/query/functions/date-time/) — `to_timestamp()`, `to_utc()`, `to_timezone()`

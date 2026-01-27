@@ -442,7 +442,7 @@ For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 sec
 units for the `TOLERANCE` clause.
 
 The effective precision of the `TOLERANCE` clause depends on the
-[designated timestamp resolution](/docs/concepts/designated-timestamp/#resolution)
+[designated timestamp resolution](/docs/concepts/designated-timestamp/#timestamp-resolution)
 of the tables involved. For example, if a table uses microsecond resolution, specifying nanosecond
 tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
 

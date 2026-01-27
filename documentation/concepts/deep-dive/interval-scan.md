@@ -2,156 +2,189 @@
 title: Interval Scan
 sidebar_label: Interval scan
 description:
-  Explains how interval scans work in QuestDB, and provides examples on how to
-  check when a query is using them.
+  Deep dive into interval scans - how to verify they're being used and
+  edge cases to be aware of.
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-When a query includes a condition on the
-[designated timestamp](/docs/concepts/designated-timestamp), QuestDB performs an
-**Interval Scan**.
+An **interval scan** is QuestDB's optimized method for querying time ranges.
+Instead of scanning all rows, QuestDB uses binary search on the
+[designated timestamp](/docs/concepts/designated-timestamp/) column to jump
+directly to relevant data.
 
-For a breakdown of interval syntax in time-based queries, see the
-[`WHERE` clause reference](/docs/query/sql/where/).
+For how interval scans work and their performance impact, see
+[Designated timestamp: Performance impact](/docs/concepts/designated-timestamp/#performance-impact).
 
-## How Interval Scan works
+For complex multi-interval patterns, see [TICK interval syntax](/docs/query/operators/tick/).
 
-This process involves:
-
-1. **Analyzing the condition**: QuestDB examines the query to identify the
-   conditions applied to the designated timestamp.
-2. **Extracting a list of timestamp intervals**: Based on the condition, QuestDB
-   determines the specific intervals of time that need to be scanned.
-3. **Performing a binary search for each interval's scan boundaries in the
-   designated timestamp column**: For each identified interval, QuestDB uses a
-   binary search to quickly find the start and end points of the interval in the
-   timestamp column. A binary search is a fast search algorithm that finds the
-   position of a target value within a sorted array, which in this case is a
-   sorted timestamp column.
-4. **Scanning table data only within the found boundaries:** QuestDB then scans
-   only the rows of the table that fall within these boundaries, significantly
-   reducing the amount of data that needs to be processed.
-
-The **Interval Scan** is possible because tables with a designated timestamp
-store data in timestamp order. This allows QuestDB to efficiently skip over data
-that falls outside the relevant intervals. However, it's important to note that
-**Interval Scan** does not apply to the results of sub-queries, as the data
-returned from a sub-query is not guaranteed to be in timestamp order.
+## How it looks
 
 <Screenshot
-  alt="Interval scan."
+  alt="Interval scan using binary search to find row boundaries"
   height={433}
   src="images/blog/2023-04-25/intervalScan.webp"
   width={650}
 />
 
-## EXPLAIN Interval Scan
+The query engine:
+1. Prunes partitions outside the time range
+2. Binary searches within relevant partitions to find exact row boundaries
+3. Reads only rows within those boundaries
 
-You can determine whether an **Interval Scan** is used to execute a query using
-the [EXPLAIN](/docs/query/sql/explain/) command.
+## Verifying interval scan with EXPLAIN
 
-For example, consider the `trades` table with a `timestamp` designated
-timestamp. The following query:
+Use [EXPLAIN](/docs/query/sql/explain/) to confirm a query uses interval scan:
 
-```questdb-sql title="SELECT a full day interval" demo
-EXPLAIN
-SELECT * FROM trades
-WHERE timestamp IN '2023-01-20';
+```questdb-sql title="Check for interval scan" demo
+EXPLAIN SELECT * FROM trades
+WHERE timestamp IN '2024-01-20';
 ```
 
-Produces this query plan:
+**Good** - Interval scan is being used:
 
-| QUERY PLAN                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------- |
-| DataFrame                                                                                                      |
-| &nbsp;&nbsp;&nbsp;&nbsp;Row forward scan                                                                       |
-| &nbsp;&nbsp;&nbsp;&nbsp;Interval forward scan on: trades                                                       |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intervals: [("2023-01-20T00:00:00.000000Z","2023-01-20T23:59:59.999999Z")] |
-
-The query optimizer reduces scanning to a single interval related to the
-`2023-01-20` day.
-
-## Examples
-
-The following three queries all produce the same **Interval Scan** plan because
-they all specify the same time range for the `timestamp` column, just in
-different ways:
-
-```questdb-sql title="Different ways of getting the data for an interval: using IN" demo
-EXPLAIN
-SELECT * FROM trades
-WHERE timestamp IN '2023-01-20';
+```
+| QUERY PLAN                                                    |
+|---------------------------------------------------------------|
+| DataFrame                                                     |
+|     Row forward scan                                          |
+|     Interval forward scan on: trades                          |
+|       intervals: [("2024-01-20T00:00:00.000000Z",             |
+|                    "2024-01-20T23:59:59.999999Z")]            |
 ```
 
-```questdb-sql title="Different ways of getting the data for an interval: using BETWEEN" demo
-EXPLAIN
-SELECT * FROM trades
-WHERE timestamp between '2023-01-20T00:00:00.000000Z' and '2023-01-20T23:59:59.999999Z';
+**Not optimal** - Full scan with async filter:
+
+```
+| QUERY PLAN                                                    |
+|---------------------------------------------------------------|
+| Async Filter                                                  |
+|     workers: 4                                                |
+|     filter: timestamp IN '2024-01-20'                         |
+|     DataFrame                                                 |
+|         Full scan on: trades                                  |
 ```
 
-```questdb-sql title="Different ways of getting the data for an interval: using Operators" demo
-EXPLAIN
-SELECT * FROM trades
-WHERE timestamp >= '2023-01-20T00:00:00.000000Z' and timestamp <= '2023-01-20T23:59:59.999999Z';
+If you see `Async Filter` or `Full scan` instead of `Interval forward scan`,
+the query is not using the designated timestamp optimization.
+
+## Equivalent query forms
+
+These queries all produce the same interval scan plan:
+
+```questdb-sql title="Using IN"
+SELECT * FROM trades WHERE timestamp IN '2024-01-20';
 ```
 
-The **Interval Scan** plan looks like this:
-
-| QUERY PLAN                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------- |
-| DataFrame                                                                                                      |
-| &nbsp;&nbsp;&nbsp;&nbsp;Row forward scan                                                                       |
-| &nbsp;&nbsp;&nbsp;&nbsp;Interval forward scan on: trades                                                       |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intervals: [("2023-01-20T00:00:00.000000Z","2023-01-20T23:59:59.999999Z")] |
-
-If need to scan more than one interval, you can use the
-[timestamp IN operator](/docs/query/operators/date-time):
-
-```questdb-sql title="Scanning more than one interval with the IN operator" demo
-EXPLAIN
+```questdb-sql title="Using BETWEEN"
 SELECT * FROM trades
-WHERE timestamp IN '2023-01-01;1d;1y;2';
+WHERE timestamp BETWEEN '2024-01-20T00:00:00.000000Z'
+                    AND '2024-01-20T23:59:59.999999Z';
 ```
 
-This query results in an **Interval Scan** plan that includes two intervals:
+```questdb-sql title="Using comparison operators"
+SELECT * FROM trades
+WHERE timestamp >= '2024-01-20T00:00:00.000000Z'
+  AND timestamp <= '2024-01-20T23:59:59.999999Z';
+```
 
-| QUERY PLAN                                                                                                                                                            |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DataFrame                                                                                                                                                             |
-| &nbsp;&nbsp;&nbsp;&nbsp;Row forward scan                                                                                                                              |
-| &nbsp;&nbsp;&nbsp;&nbsp;Interval forward scan on: trades                                                                                                              |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intervals: [(2023-01-01T00:00:00.000000Z,2023-01-02T23:59:59.999999Z), (2024-01-01T00:00:00.000000Z,2024-01-02T23:59:59.999999Z)] |
+All three produce:
 
-The table scan is limited to these two intervals:
+```
+Interval forward scan on: trades
+  intervals: [("2024-01-20T00:00:00.000000Z","2024-01-20T23:59:59.999999Z")]
+```
 
-- `<2023-01-01T00:00:00.000000Z,2023-01-02T23:59:59.999999Z>`
-- `<2024-01-01T00:00:00.000000Z,2024-01-02T23:59:59.999999Z>`
+Use whichever form is most readable for your use case. `IN` with partial
+timestamps is typically the most concise.
 
-If a table doesn't have a designated timestamp, you can declare one using the
-`timestamp(columnName)` function.
+## Multiple intervals
 
-For example, the following query results in a full scan with an **Async
-Filter**, which is a process that scans the entire table without taking
-advantage of the designated timestamp:
+For multiple time ranges, use [TICK syntax](/docs/query/operators/tick/):
 
 ```questdb-sql
-EXPLAIN
-SELECT * FROM trades_nodts
-WHERE timestamp IN '2023-01-20'
+EXPLAIN SELECT * FROM trades
+WHERE timestamp IN '2024-01-[15,16,17]';
 ```
 
-However, if you declare a designated timestamp:
+```
+Interval forward scan on: trades
+  intervals: [("2024-01-15T00:00:00.000000Z","2024-01-15T23:59:59.999999Z"),
+              ("2024-01-16T00:00:00.000000Z","2024-01-16T23:59:59.999999Z"),
+              ("2024-01-17T00:00:00.000000Z","2024-01-17T23:59:59.999999Z")]
+```
+
+Each interval uses binary search independently—complex patterns perform as
+fast as simple queries.
+
+## Edge cases
+
+### Tables without designated timestamp
+
+Tables without a designated timestamp cannot use interval scan. Queries fall
+back to full table scan with async filter.
+
+To enable interval scan, recreate the table with a designated timestamp:
 
 ```questdb-sql
-EXPLAIN
-SELECT * FROM trades_nodts timestamp(timestamp)
-WHERE timestamp IN '2023-01-20'
+CREATE TABLE trades_new (
+    ts TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+INSERT INTO trades_new SELECT * FROM trades_old ORDER BY ts;
 ```
 
-It results in an **Interval Forward Scan**.
+### Declaring timestamp on query results
 
-Note that declaring a designated timestamp only works if the data is truly
-ordered. For example, if data are sorted in ascending order by the timestamp.
-Otherwise the result is undefined, meaning that the query may not return the
-expected results.
+For subqueries or tables without a designated timestamp, you can declare one
+using `TIMESTAMP(columnName)`:
+
+```questdb-sql
+EXPLAIN SELECT * FROM trades_nodts TIMESTAMP(ts)
+WHERE ts IN '2024-01-20';
+```
+
+This enables interval scan on the result.
+
+:::warning
+
+`TIMESTAMP(columnName)` only works if the data is **actually ordered** by that
+column. If the data is not in timestamp order, query results will be incorrect.
+
+For unordered data, add `ORDER BY` first:
+
+```questdb-sql
+SELECT * FROM (SELECT * FROM unordered_table ORDER BY ts) TIMESTAMP(ts)
+WHERE ts IN '2024-01-20';
+```
+
+:::
+
+### Subqueries lose designated timestamp
+
+Subquery results don't inherit the designated timestamp from the source table:
+
+```questdb-sql
+-- This does NOT use interval scan on the subquery result:
+SELECT * FROM (SELECT * FROM trades WHERE symbol = 'BTC-USD')
+WHERE timestamp IN '2024-01-20';
+```
+
+To restore interval scan, explicitly declare the timestamp:
+
+```questdb-sql
+-- This uses interval scan:
+SELECT * FROM (SELECT * FROM trades WHERE symbol = 'BTC-USD') TIMESTAMP(timestamp)
+WHERE timestamp IN '2024-01-20';
+```
+
+See [Designated timestamp: Troubleshooting](/docs/concepts/designated-timestamp/#troubleshooting)
+for more scenarios where designated timestamp is lost.
+
+## See also
+
+- [Designated timestamp](/docs/concepts/designated-timestamp/) — Why interval scan works
+- [TICK intervals](/docs/query/operators/tick/) — Complex multi-interval patterns
+- [EXPLAIN](/docs/query/sql/explain/) — Query plan analysis
