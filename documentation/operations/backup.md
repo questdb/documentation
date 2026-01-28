@@ -15,8 +15,8 @@ QuestDB Enterprise.
 QuestDB supports two backup methods:
 
 - **Built-in incremental backup** (Enterprise only): Fully automated—configure
-  once, set a schedule, and backups run automatically. Provides point-in-time
-  recovery out of the box with no manual steps required.
+  once, set a schedule, and backups run automatically. Supports point-in-time
+  recovery to any backup timestamp.
 
 - **[Manual checkpoint backup](#questdb-oss-manual-backups-with-checkpoints)**
   (OSS and Enterprise): Relies on external tools to copy data. Requires manual
@@ -33,11 +33,44 @@ in object storage. Backups are incremental—only changed data is uploaded—mak
 them fast and bandwidth-efficient. You can monitor progress and check for errors
 while backups run.
 
-:::note
+### Prerequisites
 
-See [Limitations](#limitations) before running your first backup.
+#### License
 
-:::
+Built-in backup requires QuestDB Enterprise. This feature is not available in
+the open source version. See
+[QuestDB Enterprise](/enterprise/) for licensing information.
+
+#### Supported storage backends
+
+Backup supports the following storage backends:
+
+- **Amazon S3** and S3-compatible storage (MinIO, etc.)
+- **Azure Blob Storage**
+- **Google Cloud Storage (GCS)**
+- **Filesystem** - Local or network-attached storage (NFS, etc.). Backup is not
+  sensitive to the underlying filesystem type.
+
+See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
+for connection string formats.
+
+#### Permissions
+
+The backup process requires write access to the target storage. Authentication
+is optional—you can use instance credentials (IAM roles, managed identities) or
+provide explicit credentials in the connection string.
+
+#### Network
+
+Network requirements depend on your chosen storage backend. Ensure QuestDB can
+reach the storage endpoint on the appropriate port (typically HTTPS/443 for
+cloud storage).
+
+#### Storage capacity
+
+Plan your backup storage before starting. A safe estimate is **2× your
+uncompressed database size**. See
+[Estimate backup storage](#estimate-backup-storage) for detailed calculations.
 
 ### Quick start
 
@@ -51,9 +84,6 @@ backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secr
 Then run `BACKUP DATABASE;` in SQL. See [Run a backup](#run-a-backup) for details.
 
 ### Configure
-
-See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
-for connection string format.
 
 #### Scheduled backups
 
@@ -107,34 +137,8 @@ specifies a directory for atomic write operations during backup.
 | `backup.cleanup.keep.latest.n` | Number of backups to retain | `5` |
 | `backup.compression.level` | Compression level (1-22) | `5` |
 | `backup.compression.threads` | Threads for compression | CPU count |
-
-### Performance characteristics
-
-Backup is designed to prioritize database availability over backup speed. Key
-characteristics:
-
-- **Pressure-sensitive**: Backup automatically throttles itself to avoid
-  overwhelming the database instance during normal operations
-- **Batch uploads**: Data uploads in batches rather than continuously - you may
-  see surges of activity followed by quieter periods in logs
-- **Compressed**: Data is compressed before upload to reduce transfer time and
-  storage costs
-- **Multi-threaded**: Backup uses multiple threads but is deliberately
-  throttled to maintain instance reliability
-
-Backup duration depends on data size. Large databases (1TB+) may take several
-hours for a full initial backup. Subsequent incremental backups are faster as
-only changed data is uploaded.
-
-### Limitations
-
-- **One backup at a time**: Only one backup can run at any given time. Starting
-  a new backup while one is running will return an error.
-- **Primary and replica backups are separate**: Each QuestDB instance has its
-  own [`backup_instance_name`](#finding-your-instance-name), so backing up both
-  a primary and its replica creates two separate backup sets in the object
-  store. Typically, backing up the primary is sufficient since replicas sync
-  from the same data.
+| `backup.enable.partition.hashes` | Compute BLAKE3 hashes during backup | `false` |
+| `backup.verify.partition.hashes` | Verify hashes during restore | `false` |
 
 ### Run a backup
 
@@ -149,6 +153,9 @@ Example output:
 | backup_timestamp              |
 | ----------------------------- |
 | 2024-08-24T12:34:56.789123Z   |
+
+The backup captures the committed database state at the moment the command
+executes. In-flight transactions are not included.
 
 ### Monitor and abort
 
@@ -185,7 +192,144 @@ To abort a running backup:
 BACKUP ABORT;
 ```
 
+### Backup instance name
+
+Each QuestDB instance has a backup instance name (three random words like
+`gentle-forest-orchid`). This name is generated on the first backup and
+organizes backups in the object store under `backup/<backup_instance_name>/`.
+
+To find your instance name, run:
+
+```questdb-sql
+SELECT backup_instance_name;
+```
+
+Returns `null` if no backup has been run yet.
+
+### Performance characteristics
+
+Backup is designed to prioritize database availability over backup speed. Key
+characteristics:
+
+- **Pressure-sensitive**: Backup automatically throttles itself to avoid
+  overwhelming the database instance during normal operations
+- **Batch uploads**: Data uploads in batches rather than continuously - you may
+  see surges of activity followed by quieter periods in logs
+- **Compressed**: Data is compressed before upload to reduce transfer time and
+  storage costs
+- **Multi-threaded**: Backup uses multiple threads but is deliberately
+  throttled to maintain instance reliability
+
+Backup duration depends on data size. Large databases (1TB+) may take several
+hours for a full initial backup. Subsequent incremental backups are faster as
+only changed data is uploaded.
+
+### Estimate backup storage
+
+A safe estimate for total backup storage is **2× your uncompressed database
+size on disk**. This provides headroom for the full backup plus incremental
+history and edge cases.
+
+#### How storage accumulates
+
+| Backup type | What's uploaded | Estimated size |
+|-------------|-----------------|----------------|
+| Initial (full) | Entire database | DB size ÷ 4 (default compression) |
+| Incremental | Changed partitions only | Changed data ÷ 4 |
+
+Total storage = full backup + (average incremental × retention count)
+
+The default compression level (5) achieves approximately 4× reduction. Higher
+`backup.compression.level` values (up to 22) improve compression at the cost
+of CPU time.
+
+#### Partition-level granularity
+
+Partitions are the smallest backup unit. Any modification to a partition—even
+a single row or column update—causes the entire partition to be re-uploaded in
+the next incremental backup.
+
+This means:
+
+- **Append-only workloads** (typical time-series): Very efficient. Only the
+  latest partition changes between backups.
+- **Cross-partition updates**: Less efficient. An `UPDATE` without a
+  constraining `WHERE` clause touches all partitions, causing them all to be
+  re-uploaded.
+- **Schema changes**: Column type changes cause affected partitions to be
+  re-uploaded.
+
+#### Example calculation
+
+A 500 GB database with daily backups, 7-day retention, and ~5% daily change:
+
+| Component | Calculation | Size |
+|-----------|-------------|------|
+| Full backup | 500 GB ÷ 4 | 125 GB |
+| Daily incremental | 25 GB ÷ 4 | ~6 GB |
+| 7 incrementals | 6 GB × 7 | ~42 GB |
+| **Total** | | **~170 GB** |
+
+In this example, actual usage (~170 GB) is well under the 2× planning estimate
+(1 TB). The 2× rule is intentionally conservative—use it for initial capacity
+planning before you know your actual change patterns, then refine based on
+observed usage.
+
+#### Check actual usage
+
+To verify your estimates against actual storage, browse your backup data in
+the object store. Backups are stored under `backup/<backup_instance_name>/`.
+
+To find your instance name, see [Backup instance name](#backup-instance-name).
+
+### Limitations
+
+- **Database-wide only**: Backup captures the entire database. You cannot
+  exclude tables or backup selected tables individually. Every backup includes
+  all user tables, materialized views, and metadata.
+- **One backup at a time**: Only one backup can run at any given time. Starting
+  a new backup while one is running will return an error.
+- **Primary and replica backups are separate**: Each QuestDB instance has its
+  own [`backup_instance_name`](#backup-instance-name), so backing up both
+  a primary and its replica creates two separate backup sets in the object
+  store. Typically, backing up the primary is sufficient since replicas sync
+  from the same data.
+
+### Backup validation
+
+Backup integrity is verified during restore, not as a standalone operation.
+
+#### Verification during restore
+
+QuestDB performs the following checks when restoring:
+
+- **Transaction log verification**: Header, hash, and size validation of
+  transaction log entries (always enabled)
+- **Partition hash verification**: Optional BLAKE3 hash comparison for each
+  file in every partition
+- **Manifest validation**: Version compatibility and path safety checks
+
+To enable partition hash verification, set these properties in `server.conf`:
+
+```conf
+backup.enable.partition.hashes=true    # Compute hashes during backup
+backup.verify.partition.hashes=true    # Verify hashes during restore
+```
+
+If verification fails, restore stops immediately with an error such as:
+`hash mismatch [path=col1.d, expected=..., actual=...]`
+
+#### What's not available
+
+- No standalone `VALIDATE BACKUP` command
+- No dry-run restore option
+- Object store integrity relies on the storage provider (e.g., S3's built-in
+  checksums)
+
 ### Restore
+
+Restore is fast—approximately 1.8 TiB can be restored in under 20 minutes,
+depending on network bandwidth and storage performance.
 
 :::caution
 
@@ -211,25 +355,25 @@ Parameters:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `backup.object.store` | Sometimes | Object store connection string; required unless already specified in `server.conf` |
-| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket |
-| `backup.restore.timestamp` | No | Specific backup to restore; omit for latest |
+| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
+| `backup.restore.timestamp` | No | Timestamp for point-in-time recovery; omit for latest backup |
 
-#### Finding your instance name
+#### Point-in-time recovery
 
-Each QuestDB instance has an auto-generated backup instance name (three random
-words like `gentle-forest-orchid`). This name organizes backups in the object
-store under `backup/<backup_instance_name>/`.
+Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
+finds the most recent successful backup at or before the specified timestamp.
 
-To find your instance name:
+To find available backup timestamps, query the source instance:
 
-- **File system**: Read `<install_root>/db/.backup_instance_name`
-- **Object store**: List directories under `backup/` in your bucket
-- **Error message**: If you omit `backup.instance.name` when multiple instances
-  exist, the error message lists available options
+```questdb-sql
+SELECT start_ts FROM backups() WHERE status = 'backup complete';
+```
 
-The `backup.instance.name` parameter is only required when multiple QuestDB
-instances share the same object store. If only one instance exists, it is
-detected automatically.
+You can also specify an arbitrary timestamp (e.g., just before an accidental
+deletion). QuestDB restores from the nearest available backup before that time.
+
+If no backup exists at or before the specified timestamp, QuestDB fails to start
+with the error: `backup restore error: No backup timestamp found that is <=`.
 
 :::warning
 
@@ -239,6 +383,9 @@ has data (indicated by the presence of `db/.data_id`), restore fails with:
 restore operations.
 
 :::
+
+The QuestDB version performing the restore must have the same major version as
+the version that created the backup (e.g., 8.1.0 and 8.1.1 are compatible).
 
 Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
 
@@ -399,12 +546,6 @@ method to back up the QuestDB server root directory. We recommend using a copy
 tool that can skip copying files based on the modification date. One such
 popular tool to accomplish this is [rsync](https://linux.die.net/man/1/rsync).
 
-Leaving this step, you should know:
-
-- Whether your method is cloud or file-system snapshot-based, or file copy-based
-- When to enter and exit checkpoint mode
-- How to perform your snapshot/backup method
-
 ### Steps in the backup procedure
 
 While explaining the steps, we'll assume the database root directory is
@@ -540,22 +681,6 @@ possible outcomes:
 - Restore fails: the database exits and the `_restore` file remains in place. An
   error message appears in `stderr`. If it can be resolved, starting the
   database again will retry the restore procedure
-
-## Supported filesystems
-
-QuestDB supports the following filesystems:
-
-- APFS
-- EXT4
-- NTFS
-- OVERLAYFS (used by Docker)
-- XFS
-- ZFS
-
-Other file systems are untested and while they may work, we do not officially
-support them. See the
-[filesystem compatibility](/docs/getting-started/capacity-planning/#supported-filesystems)
-section for more information.
 
 ## Further reading
 

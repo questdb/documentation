@@ -11,7 +11,7 @@ This page provides detailed documentation for each window function. For an intro
 
 These functions respect the frame clause and calculate values over the specified window frame.
 
-### avg() / EMA / VWEMA
+### avg() / EMA / VWEMA {#avg}
 
 Calculates the average of values over the window frame. Supports standard arithmetic average, Exponential Moving Average (EMA), and Volume-Weighted Exponential Moving Average (VWEMA).
 
