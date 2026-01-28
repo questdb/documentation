@@ -2,7 +2,7 @@
 title: Window Functions Overview
 sidebar_label: Overview
 description: Introduction to window functions in QuestDB - perform calculations across related rows without collapsing results.
-keywords: [window functions, over, partition by, moving average, running total, rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average]
+keywords: [window functions, over, partition by, moving average, running total, rank, dense_rank, percent_rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average]
 ---
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
@@ -46,6 +46,7 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`row_number()`](reference.md#row_number) | Sequential row number | No |
 | [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
 | [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
+| [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
 | [`lag()`](reference.md#lag) | Value from previous row | No |
 | [`lead()`](reference.md#lead) | Value from following row | No |
 
@@ -75,7 +76,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS moving_avg
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -99,23 +100,23 @@ function_name(arguments) OVER (
 
 **When to use it:** When storing multiple instruments in the same table, you typically want calculations isolated per symbol. For example:
 - Cumulative volume **per symbol** (not across all instruments)
-- Moving average price **per symbol** (not mixing BTC-USD with ETH-USD)
+- Moving average price **per symbol** (not mixing BTC-USDT with ETH-USDT)
 - Intraday high/low **per symbol**
 
 ```questdb-sql
 -- Without PARTITION BY: cumulative volume across ALL symbols (mixing instruments)
-sum(volume) OVER (ORDER BY timestamp)
+sum(amount) OVER (ORDER BY timestamp)
 
 -- With PARTITION BY: cumulative volume resets for each symbol
-sum(volume) OVER (PARTITION BY symbol ORDER BY timestamp)
+sum(amount) OVER (PARTITION BY symbol ORDER BY timestamp)
 ```
 
-| timestamp | symbol | volume | cumulative (no partition) | cumulative (by symbol) |
+| timestamp | symbol | amount | cumulative (no partition) | cumulative (by symbol) |
 |-----------|--------|--------|---------------------------|------------------------|
-| 09:00 | BTC-USD | 100 | 100 | 100 |
-| 09:01 | ETH-USD | 200 | 300 | 200 |
-| 09:02 | BTC-USD | 150 | 450 | 250 |
-| 09:03 | ETH-USD | 100 | 550 | 300 |
+| 09:00 | BTC-USDT | 100 | 100 | 100 |
+| 09:01 | ETH-USDT | 200 | 300 | 200 |
+| 09:02 | BTC-USDT | 150 | 450 | 250 |
+| 09:03 | ETH-USDT | 100 | 550 | 300 |
 
 Without `PARTITION BY`, all rows are treated as a single partition.
 
@@ -156,9 +157,9 @@ The key difference: aggregate functions collapse rows into one result, while win
 
 | timestamp | symbol | price |
 |-----------|--------|-------|
-| 09:00 | BTC-USD | 100 |
-| 09:01 | BTC-USD | 102 |
-| 09:02 | BTC-USD | 101 |
+| 09:00 | BTC-USDT | 100 |
+| 09:01 | BTC-USDT | 102 |
+| 09:02 | BTC-USDT | 101 |
 
 **Aggregate function** — returns one row:
 
@@ -170,7 +171,7 @@ GROUP BY symbol;
 
 | symbol | avg_price |
 |--------|-----------|
-| BTC-USD | 101 |
+| BTC-USDT | 101 |
 
 **Window function** — returns all rows with computed column:
 
@@ -182,9 +183,9 @@ FROM trades;
 
 | timestamp | symbol | price | avg_price |
 |-----------|--------|-------|-----------|
-| 09:00 | BTC-USD | 100 | 101 |
-| 09:01 | BTC-USD | 102 | 101 |
-| 09:02 | BTC-USD | 101 | 101 |
+| 09:00 | BTC-USDT | 100 | 101 |
+| 09:01 | BTC-USDT | 102 | 101 |
+| 09:02 | BTC-USDT | 101 | 101 |
 
 Each row keeps its original data **plus** the average—useful for comparing each price to the mean, calculating deviations, or adding running totals alongside the raw values.
 
@@ -233,7 +234,7 @@ SELECT
         CUMULATIVE
     ) AS running_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 This is equivalent to `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.
@@ -243,7 +244,7 @@ This is equivalent to `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.
 For high-frequency market data, VWAP is typically calculated over OHLC time series using the typical price `(high + low + close) / 3`:
 
 ```questdb-sql title="VWAP over OHLC data" demo
-DECLARE @symbol := 'BTC-USD'
+DECLARE @symbol := 'BTC-USDT'
 
 WITH ohlc AS (
     SELECT
@@ -274,10 +275,11 @@ ORDER BY ts;
 SELECT
     symbol,
     price,
+    timestamp,
     avg(price) OVER (PARTITION BY symbol) AS symbol_avg,
     price - avg(price) OVER (PARTITION BY symbol) AS diff_from_avg
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 ### Rank within category
@@ -286,12 +288,13 @@ WHERE timestamp IN today();
 SELECT
     symbol,
     price,
+    timestamp,
     rank() OVER (
         PARTITION BY symbol
         ORDER BY price DESC
     ) AS price_rank
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 ### Access previous row
@@ -303,8 +306,8 @@ SELECT
     lag(price) OVER (ORDER BY timestamp) AS prev_price,
     price - lag(price) OVER (ORDER BY timestamp) AS price_change
 FROM trades
-WHERE timestamp IN today()
-    AND symbol = 'BTC-USD';
+WHERE timestamp IN '[$today]'
+    AND symbol = 'BTC-USDT';
 ```
 
 ## Next steps
@@ -337,7 +340,7 @@ WITH prices AS (
         price,
         avg(price) OVER (ORDER BY timestamp) AS moving_avg
     FROM trades
-    WHERE timestamp IN today()
+    WHERE timestamp IN '[$today]'
 )
 SELECT * FROM prices
 WHERE moving_avg > 100;
@@ -347,12 +350,14 @@ WHERE moving_avg > 100;
 
 Without `ORDER BY`, the window includes all rows in the partition, which may not be the intended behavior:
 
-```questdb-sql title="All rows show same average"
+```questdb-sql title="All rows show same average" demo
 SELECT
     symbol,
     price,
+    timestamp,
     avg(price) OVER (PARTITION BY symbol) AS avg_price  -- Same value for all rows in partition
-FROM trades;
+FROM trades
+WHERE timestamp IN '[$today]';
 ```
 
 Add `ORDER BY` for cumulative/moving calculations:
@@ -361,10 +366,11 @@ Add `ORDER BY` for cumulative/moving calculations:
 SELECT
     symbol,
     price,
+    timestamp,
     avg(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS running_avg
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```

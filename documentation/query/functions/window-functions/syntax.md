@@ -64,9 +64,10 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 SELECT
     symbol,
     price,
+    timestamp,
     avg(price) OVER (PARTITION BY symbol) AS avg_price_per_symbol
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -87,13 +88,13 @@ SELECT
         ORDER BY timestamp
     ) AS seq
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
 **Important:**
 - This is independent of the query-level `ORDER BY`
-- Required for ranking functions (`row_number`, `rank`, `dense_rank`)
+- Required for ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`)
 - Required for `RANGE` frames
 - Required for `CUMULATIVE`
 - Without `ORDER BY`, all rows in the partition are peers
@@ -199,7 +200,7 @@ SELECT
         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
     ) AS moving_avg_3
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -267,7 +268,7 @@ SELECT
         RANGE BETWEEN '2' SECOND PRECEDING AND CURRENT ROW
     ) AS volume_2sec
 FROM market_data
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -296,7 +297,7 @@ SELECT
         CUMULATIVE
     ) AS running_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 This is equivalent to:
@@ -311,7 +312,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS running_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 **VWAP example:**
@@ -319,7 +320,7 @@ WHERE timestamp IN today();
 For high-frequency data, VWAP is typically calculated over OHLC using typical price:
 
 ```questdb-sql title="Volume-weighted average price over OHLC" demo
-DECLARE @symbol := 'BTC-USD'
+DECLARE @symbol := 'BTC-USDT'
 
 WITH ohlc AS (
     SELECT
@@ -361,7 +362,7 @@ SELECT
     sum(price) OVER (ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS sum2,
     sum(price) OVER (ORDER BY timestamp CUMULATIVE) AS sum3
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 ## Frame boundaries
@@ -451,7 +452,7 @@ SELECT
         EXCLUDE CURRENT ROW
     ) AS cumulative_sum_excluding_current
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -484,7 +485,7 @@ WITH prices_and_avg AS (
         avg(price) OVER (ORDER BY timestamp) AS moving_avg_price,
         timestamp
     FROM trades
-    WHERE timestamp IN today()
+    WHERE timestamp IN '[$today]'
 )
 SELECT * FROM prices_and_avg
 WHERE moving_avg_price > 100;
@@ -494,14 +495,15 @@ WHERE moving_avg_price > 100;
 
 Without `ORDER BY`, the function operates on the entire partition. All rows show the same value:
 
-```questdb-sql title="Empty OVER - same value for all rows"
+```questdb-sql title="Empty OVER - same value for all rows" demo
 -- Potential issue: all rows show the same sum
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER () AS total_sum
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 With `PARTITION BY` but no `ORDER BY`, all rows within each partition show the same value:
@@ -511,9 +513,10 @@ With `PARTITION BY` but no `ORDER BY`, all rows within each partition show the s
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER (PARTITION BY symbol) AS symbol_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 For cumulative or moving calculations, you need both `PARTITION BY` and `ORDER BY`:
@@ -522,26 +525,12 @@ For cumulative or moving calculations, you need both `PARTITION BY` and `ORDER B
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS cumulative_sum
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
-### Syntax error in WHERE clause
-
-Note the placement of `WHERE` - it should not have a semicolon before it:
-
-```questdb-sql title="Incorrect - syntax error"
-SELECT symbol, price
-FROM trades;
-WHERE timestamp IN today();
-```
-
-```questdb-sql title="Correct"
-SELECT symbol, price
-FROM trades
-WHERE timestamp IN today();
-```
