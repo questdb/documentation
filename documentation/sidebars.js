@@ -745,19 +745,47 @@ module.exports = {
                   type: "category",
                   label: "Capital Markets",
                   collapsed: true,
+                  link: {
+                    type: "doc",
+                    id: "cookbook/sql/finance/index",
+                  },
                   items: [
-                    "cookbook/sql/finance/compound-interest",
-                    "cookbook/sql/finance/cumulative-product",
+                    {
+                      type: "doc",
+                      id: "cookbook/sql/finance/index",
+                      label: "Overview",
+                    },
+                    // Price-Based Indicators
+                    "cookbook/sql/finance/ohlc",
                     "cookbook/sql/finance/vwap",
                     "cookbook/sql/finance/bollinger-bands",
                     "cookbook/sql/finance/bollinger-bandwidth",
-                    "cookbook/sql/finance/tick-trin",
-                    "cookbook/sql/finance/aggressor-volume-imbalance",
+                    // Momentum Indicators
+                    "cookbook/sql/finance/rsi",
+                    "cookbook/sql/finance/macd",
+                    "cookbook/sql/finance/stochastic",
+                    "cookbook/sql/finance/rate-of-change",
+                    // Volatility Indicators
+                    "cookbook/sql/finance/atr",
+                    "cookbook/sql/finance/rolling-stddev",
+                    "cookbook/sql/finance/donchian-channels",
+                    "cookbook/sql/finance/keltner-channels",
+                    "cookbook/sql/finance/realized-volatility",
+                    // Volume & Order Flow
+                    "cookbook/sql/finance/obv",
                     "cookbook/sql/finance/volume-profile",
                     "cookbook/sql/finance/volume-spike",
-                    "cookbook/sql/finance/rolling-stddev",
+                    "cookbook/sql/finance/aggressor-volume-imbalance",
+                    // Risk Metrics
+                    "cookbook/sql/finance/maximum-drawdown",
+                    // Market Microstructure
+                    "cookbook/sql/finance/bid-ask-spread",
                     "cookbook/sql/finance/liquidity-comparison",
-                    "cookbook/sql/finance/ohlc",
+                    // Market Breadth
+                    "cookbook/sql/finance/tick-trin",
+                    // Math Utilities
+                    "cookbook/sql/finance/compound-interest",
+                    "cookbook/sql/finance/cumulative-product",
                   ],
                 },
                 {
