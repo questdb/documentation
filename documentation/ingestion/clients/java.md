@@ -11,8 +11,6 @@ import TabItem from "@theme/TabItem"
 
 import CodeBlock from "@theme/CodeBlock"
 
-import InterpolateReleaseData from "../../../src/components/InterpolateReleaseData"
-
 import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
 :::note
@@ -25,7 +23,8 @@ For embedded QuestDB, please check our
 
 :::
 
-The QuestDB Java client is baked right into the QuestDB binary.
+The QuestDB Java client is distributed as a separate Maven artifact
+(`org.questdb:client`).
 
 The client provides the following benefits:
 
@@ -58,31 +57,27 @@ Here is a list of known incompatible JDKs:
 
 ## Quick start
 
-Add QuestDB as a dependency in your project's build configuration file.
+Add the QuestDB Java client as a dependency in your project's build configuration file.
 
 <Tabs defaultValue="maven" values={[ { label: "Maven", value: "maven" },
 { label: "Gradle", value: "gradle" }, ]}
 
 >   <TabItem value="maven">
 
-    <InterpolateReleaseData
-      renderText={(release) => (
-        <CodeBlock className="language-xml">
-          {`<dependency>
+    <CodeBlock className="language-xml">
+      {`<dependency>
   <groupId>org.questdb</groupId>
-  <artifactId>questdb</artifactId>
-  <version>${release.name}</version>
+  <artifactId>client</artifactId>
+  <version>1.0.0</version>
 </dependency>`}
-        </CodeBlock>
-      )}
-    />
+    </CodeBlock>
   </TabItem>
   <TabItem value="gradle">
-    <InterpolateReleaseData
-      renderText={(release) => (
-        <CodeBlock className="language-text">
-          {`compile group: 'org.questdb', name: 'questdb', version: '${release.name}'`}
-</CodeBlock> )} /> </TabItem> </Tabs>
+    <CodeBlock className="language-text">
+      {`implementation 'org.questdb:client:1.0.0'`}
+    </CodeBlock>
+  </TabItem>
+</Tabs>
 
 The code below creates a client instance configured to use HTTP transport to
 connect to a QuestDB server running on localhost, port 9000. It then sends two

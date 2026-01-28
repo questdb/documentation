@@ -1,15 +1,10 @@
 import React from "react"
-import InterpolateReleaseData from "../InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
-import { Release } from "../../utils"
 
 const InsertDataJava = () => {
   return (
-    <InterpolateReleaseData
-      renderText={(release: Release) => {
-        return (
-          <CodeBlock className="language-java">
-            {`
+    <CodeBlock className="language-java">
+      {`
 import io.questdb.cutlass.line.LineTcpSender;
 import io.questdb.network.Net;
 import io.questdb.std.Os;
@@ -20,13 +15,13 @@ public class LineTCPSenderMain {
 
             <dependency>
                 <groupId>org.questdb</groupId>
-                <artifactId>questdb</artifactId>
-                <version>${release.name}</version>
+                <artifactId>client</artifactId>
+                <version>1.0.0</version>
             </dependency>
 
         Gradle:
 
-            compile group: 'org.questdb', name: 'questdb', version: '${release.name}'
+            implementation 'org.questdb:client:1.0.0'
 
      */
     public static void main(String[] args) {
@@ -51,10 +46,7 @@ public class LineTCPSenderMain {
     }
 }
       `}
-          </CodeBlock>
-        )
-      }}
-    />
+    </CodeBlock>
   )
 }
 
