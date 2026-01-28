@@ -64,15 +64,23 @@ trades,instrument=MI,side=B price=99348,quantity=8450 1571270400400
 
 ## length
 
-`length(string)` - reads length of `string` value type (result is `int`)
+`length(value)` - reads length of the given value.
 
-`length(symbol)` - reads length of `symbol` value type (result is `int`)
+**Arguments:**
 
-`length(blob)` - reads length of `binary` value type (result is `long`)
+- `value` is a value of one of the following types:
+  - `varchar` - length is measured in characters (result is `int`)
+  - `string` - length is measured in characters (result is `int`)
+  - `symbol` - length is measured in characters (result is `int`)
+  - `binary` blob - length is measured in bytes (result is `long`)
 
-- a `string`
-- a `symbol`
-- a `binary` blob
+**Return value:**
+
+Returns an integer representing the length. For character types (`varchar`,
+`string`, `symbol`), returns the number of characters. For `binary`, returns the
+number of bytes. Returns `-1` if the input is `null`.
+
+**Examples:**
 
 ```questdb-sql title="Example"
 SELECT name a, length(name) b FROM names limit 4
@@ -83,6 +91,33 @@ SELECT name a, length(name) b FROM names limit 4
 | AARON  | 5   |
 | AMELIE | 6   |
 | TOM    | 3   |
+| null   | -1  |
+
+## length_bytes
+
+`length_bytes(varchar)` - reads length of a `varchar` value in bytes.
+
+**Arguments:**
+
+- `varchar` is a varchar value to return byte length for.
+
+**Return value:**
+
+Returns an `int` representing the byte length of the varchar. This is useful for
+multi-byte character encodings (e.g., UTF-8) where the byte length may differ
+from the character length. Returns `-1` if the input is `null`.
+
+**Examples:**
+
+```questdb-sql title="Example"
+SELECT name a, length_bytes(name) b FROM names limit 4
+```
+
+| a      | b   |
+| ------ | --- |
+| AARON  | 5   |
+| AMELIE | 6   |
+| ДЖЕК   | 8   |
 | null   | -1  |
 
 ## left

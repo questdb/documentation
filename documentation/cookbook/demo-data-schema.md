@@ -215,6 +215,7 @@ The FX dataset includes several materialized views providing pre-aggregated data
 
 - **`fx_trades_ohlc_1m`** - OHLC candlesticks from trade executions at 1-minute intervals
 - **`fx_trades_ohlc_1h`** - OHLC candlesticks from trade executions at 1-hour intervals
+- **`fx_trades_ohlc_1d`** - OHLC candlesticks from trade executions at 1-day intervals
 
 These views are continuously updated and optimized for dashboard and analytics queries on FX data.
 
