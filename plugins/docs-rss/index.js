@@ -4,9 +4,40 @@ const { execSync } = require("child_process")
 const matter = require("gray-matter")
 
 const FEED_ITEMS_COUNT = 20
+const GITHUB_REPO = "questdb/documentation"
 
 /**
- * Get the last git commit date for a file
+ * Get the last commit date for a file using GitHub API
+ */
+async function getGitHubLastModified(filePath, docsDir) {
+  const relativePath = path.relative(path.dirname(docsDir), filePath).replace(/\\/g, "/")
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/commits?path=${encodeURIComponent(relativePath)}&per_page=1`
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "questdb-docs-rss"
+      }
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const commits = await response.json()
+    if (commits && commits.length > 0 && commits[0].commit) {
+      return new Date(commits[0].commit.committer.date)
+    }
+  } catch (err) {
+    console.warn(`[docs-rss] GitHub API error for ${relativePath}:`, err.message)
+  }
+
+  return null
+}
+
+/**
+ * Get the last git commit date for a file (local fallback)
  */
 function getGitLastModified(filePath) {
   try {
@@ -24,25 +55,16 @@ function getGitLastModified(filePath) {
  * Extract excerpt from markdown content
  */
 function extractExcerpt(content, maxLength = 200) {
-  // Remove MDX imports and components
   let text = content
     .replace(/^import\s+.*$/gm, "")
     .replace(/<[^>]+>/g, "")
-    // Remove code blocks
     .replace(/```[\s\S]*?```/g, "")
-    // Remove inline code
     .replace(/`[^`]+`/g, "")
-    // Remove headers
     .replace(/^#{1,6}\s+.*$/gm, "")
-    // Remove links but keep text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    // Remove images
     .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-    // Remove admonitions
     .replace(/^:::\w+[\s\S]*?^:::/gm, "")
-    // Remove HTML comments
     .replace(/<!--[\s\S]*?-->/g, "")
-    // Normalize whitespace
     .replace(/\s+/g, " ")
     .trim()
 
@@ -124,59 +146,43 @@ ${itemsXml}
 /**
  * Generate RSS feed items from documentation
  */
-function generateFeedItems(docsDir, siteConfig) {
+async function generateFeedItems(docsDir, siteConfig, useGitHubApi) {
   const markdownFiles = getAllMarkdownFiles(docsDir)
   const items = []
 
+  // Process files to get metadata (without dates yet)
+  const fileData = []
   for (const filePath of markdownFiles) {
     try {
       const fileContent = fs.readFileSync(filePath, "utf-8")
       const { data: frontmatter, content } = matter(fileContent)
 
-      // Skip drafts and pages excluded from changelog
       if (frontmatter.draft === true || frontmatter.changelog === false) {
         continue
       }
 
-      // Get title from frontmatter or first heading
       let title = frontmatter.title
       if (!title) {
         const headingMatch = content.match(/^#\s+(.+)$/m)
         title = headingMatch ? headingMatch[1] : path.basename(filePath, path.extname(filePath))
       }
 
-      // Get description from frontmatter or extract from content
       const excerpt = frontmatter.description || extractExcerpt(content)
 
-      // Get last modified date from git
-      const lastModified = getGitLastModified(filePath)
-      if (!lastModified) {
-        continue
-      }
-
-      // Build URL from file path, respecting custom slug if defined
       const relativePath = path.relative(docsDir, filePath).replace(/\\/g, "/")
       const dirPath = path.dirname(relativePath)
 
       let urlPath
       if (frontmatter.slug) {
         if (frontmatter.slug.startsWith("/")) {
-          // Absolute slug from docs root
           urlPath = frontmatter.slug.slice(1)
         } else {
-          // Relative slug within the doc's directory
-          urlPath = dirPath === "."
-            ? frontmatter.slug
-            : `${dirPath}/${frontmatter.slug}`
+          urlPath = dirPath === "." ? frontmatter.slug : `${dirPath}/${frontmatter.slug}`
         }
       } else {
-        // Build from file path
-        urlPath = relativePath
-          .replace(/\.mdx?$/, "")
-          .replace(/\/index$/, "")
+        urlPath = relativePath.replace(/\.mdx?$/, "").replace(/\/index$/, "")
       }
 
-      // Ensure trailing slash
       if (urlPath && !urlPath.endsWith("/")) {
         urlPath += "/"
       }
@@ -186,14 +192,42 @@ function generateFeedItems(docsDir, siteConfig) {
         : siteConfig.baseUrl + "/"
       const url = siteConfig.url + baseUrl + urlPath
 
-      items.push({
-        title,
-        url,
-        date: lastModified,
-        excerpt,
-      })
+      fileData.push({ filePath, title, url, excerpt })
     } catch (err) {
       console.warn(`[docs-rss] Error processing ${filePath}:`, err.message)
+    }
+  }
+
+  // Get dates - use GitHub API or git log
+  if (useGitHubApi) {
+    console.log("[docs-rss] Using GitHub API for file dates...")
+    // Fetch dates in parallel with concurrency limit
+    const CONCURRENCY = 10
+    for (let i = 0; i < fileData.length; i += CONCURRENCY) {
+      const batch = fileData.slice(i, i + CONCURRENCY)
+      const dates = await Promise.all(
+        batch.map(f => getGitHubLastModified(f.filePath, docsDir))
+      )
+      batch.forEach((f, idx) => {
+        f.date = dates[idx]
+      })
+    }
+  } else {
+    console.log("[docs-rss] Using local git for file dates...")
+    for (const f of fileData) {
+      f.date = getGitLastModified(f.filePath)
+    }
+  }
+
+  // Filter out files without dates and build final items
+  for (const f of fileData) {
+    if (f.date) {
+      items.push({
+        title: f.title,
+        url: f.url,
+        date: f.date,
+        excerpt: f.excerpt,
+      })
     }
   }
 
@@ -202,11 +236,25 @@ function generateFeedItems(docsDir, siteConfig) {
   return items.slice(0, FEED_ITEMS_COUNT)
 }
 
+/**
+ * Detect if we're in a shallow git clone
+ */
+function isShallowClone() {
+  try {
+    const result = execSync("git rev-parse --is-shallow-repository", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"]
+    }).trim()
+    return result === "true"
+  } catch {
+    return false
+  }
+}
+
 module.exports = function docsRssPlugin(context) {
   return {
     name: "docs-rss",
 
-    // Generate RSS feed to static directory (gets copied to build output)
     async loadContent() {
       const { siteConfig } = context
       const docsDir = path.join(context.siteDir, "documentation")
@@ -219,21 +267,25 @@ module.exports = function docsRssPlugin(context) {
 
       console.log("[docs-rss] Generating RSS feed...")
 
-      const recentItems = generateFeedItems(docsDir, siteConfig)
+      // Use GitHub API if in shallow clone (e.g., Netlify)
+      const useGitHubApi = isShallowClone()
+      if (useGitHubApi) {
+        console.log("[docs-rss] Shallow clone detected, using GitHub API")
+      }
+
+      const recentItems = await generateFeedItems(docsDir, siteConfig, useGitHubApi)
       const rssXml = generateRssXml(recentItems, siteConfig)
       const rssPath = path.join(staticDir, "rss.xml")
       fs.writeFileSync(rssPath, rssXml, "utf-8")
 
       console.log(`[docs-rss] Generated RSS feed with ${recentItems.length} items`)
 
-      // Return items for use in contentLoaded
       return recentItems.map((item) => ({
         ...item,
         date: item.date.toISOString(),
       }))
     },
 
-    // Expose changelog data as global data
     async contentLoaded({ content, actions }) {
       const { setGlobalData } = actions
       setGlobalData({ changelog: content || [] })
