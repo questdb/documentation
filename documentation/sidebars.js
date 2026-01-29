@@ -793,6 +793,7 @@ module.exports = {
                   label: "Time-Series Patterns",
                   collapsed: true,
                   items: [
+                    "cookbook/sql/time-series/elapsed-time",
                     "cookbook/sql/time-series/force-designated-timestamp",
                     "cookbook/sql/time-series/latest-n-per-partition",
                     "cookbook/sql/time-series/session-windows",

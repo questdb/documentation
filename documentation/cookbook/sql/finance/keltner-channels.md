@@ -12,10 +12,10 @@ You want volatility bands that adapt to market conditions but are smoother than 
 
 ## Solution
 
-```questdb-sql demo title="Calculate Keltner Channels with 20 EMA and 2x ATR"
+```questdb-sql demo title="Calculate Keltner Channels (20-period EMA ± 2× ATR)"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH with_prev AS (
   SELECT
@@ -27,7 +27,7 @@ WITH with_prev AS (
     lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 with_tr AS (
   SELECT
@@ -50,7 +50,7 @@ with_indicators AS (
     symbol,
     close,
     avg(close, 'period', 20) OVER (PARTITION BY symbol ORDER BY timestamp) AS ema20,
-    avg(tr, 'period', 10) OVER (PARTITION BY symbol ORDER BY timestamp) AS atr
+    avg(tr, 'period', 20) OVER (PARTITION BY symbol ORDER BY timestamp) AS atr
   FROM with_tr
 )
 SELECT
@@ -66,7 +66,7 @@ ORDER BY timestamp;
 
 The query:
 1. Calculates True Range accounting for gaps
-2. Applies EMA smoothing to both price (20-period) and ATR (10-period)
+2. Applies 20-period EMA smoothing to both price and ATR
 3. Creates bands at ±2 ATR from the EMA
 
 ## Interpreting results

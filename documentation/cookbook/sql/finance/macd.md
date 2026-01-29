@@ -15,7 +15,7 @@ You want to identify trend changes and momentum shifts. Simple moving averages l
 ```questdb-sql demo title="Calculate MACD with signal line and histogram"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH ema AS (
   SELECT
@@ -26,7 +26,7 @@ WITH ema AS (
     avg(close, 'period', 26) OVER (PARTITION BY symbol ORDER BY timestamp) AS ema26
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 macd_line AS (
   SELECT

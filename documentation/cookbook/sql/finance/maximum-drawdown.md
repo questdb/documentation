@@ -15,7 +15,7 @@ You want to measure downside risk beyond simple volatility. Standard deviation t
 ```questdb-sql demo title="Calculate rolling maximum drawdown"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH with_peak AS (
   SELECT
@@ -29,7 +29,7 @@ WITH with_peak AS (
     ) AS running_peak
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 with_drawdown AS (
   SELECT

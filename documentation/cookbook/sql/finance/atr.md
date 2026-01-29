@@ -15,7 +15,7 @@ You want to measure volatility to set appropriate stop-losses or position sizes.
 ```questdb-sql demo title="Calculate 14-period ATR"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH with_prev AS (
   SELECT
@@ -27,7 +27,7 @@ WITH with_prev AS (
     lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_close
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 true_range AS (
   SELECT
@@ -82,6 +82,10 @@ entry_price - 2 * atr AS stop_loss
 -- Risk 1% of account, sized by ATR
 (account_size * 0.01) / atr AS position_size
 ```
+
+:::note EMA vs Wilder's smoothing
+This recipe uses standard EMA smoothing via `avg(value, 'period', 14)` where α = 2/(N+1). Wilder's original ATR uses α = 1/N, which is more gradual. For exact Wilder smoothing with a 14-period lookback, use `avg(value, 'period', 27)`. Most modern platforms offer both variants.
+:::
 
 :::info Related documentation
 - [EMA window function](/docs/query/functions/window-functions/reference/#avg)

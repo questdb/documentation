@@ -15,7 +15,7 @@ You want to measure market liquidity and transaction costs. Narrow spreads indic
 ```questdb-sql demo title="Calculate bid-ask spread metrics"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('h', -1, now())
+  @lookback := '$now - 1h..$now'
 
 SELECT
   timestamp,
@@ -27,7 +27,7 @@ SELECT
   round((bid_price + ask_price) / 2, 5) AS mid_price
 FROM core_price
 WHERE symbol = @symbol
-  AND timestamp > @lookback
+  AND timestamp IN @lookback
 ORDER BY timestamp;
 ```
 
@@ -41,7 +41,7 @@ The query calculates:
 ```questdb-sql demo title="Average spread by time period"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('d', -1, now())
+  @lookback := '$now - 1d..$now'
 
 SELECT
   timestamp,
@@ -52,7 +52,7 @@ SELECT
   count() AS quote_count
 FROM core_price
 WHERE symbol = @symbol
-  AND timestamp > @lookback
+  AND timestamp IN @lookback
 SAMPLE BY 1h
 ORDER BY timestamp;
 ```

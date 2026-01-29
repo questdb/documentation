@@ -15,22 +15,22 @@ You want to confirm price trends with volume or spot divergences where volume do
 ```questdb-sql demo title="Calculate On-Balance Volume"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH with_direction AS (
   SELECT
     timestamp,
     symbol,
     close,
-    quantity AS volume,
+    total_volume AS volume,
     CASE
-      WHEN close > lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN quantity
-      WHEN close < lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN -quantity
+      WHEN close > lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN total_volume
+      WHEN close < lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN -total_volume
       ELSE 0
     END AS directed_volume
   FROM fx_trades_ohlc_1m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 )
 SELECT
   timestamp,

@@ -15,7 +15,7 @@ You want to identify when an asset may be overbought or oversold based on recent
 ```questdb-sql demo title="Calculate 14-period RSI with EMA smoothing"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH changes AS (
   SELECT
@@ -25,7 +25,7 @@ WITH changes AS (
     close - lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) AS change
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 gains_losses AS (
   SELECT
@@ -68,8 +68,8 @@ The query:
 - **RSI = 50**: Neutral momentum
 - **Divergence**: When price makes new highs but RSI doesn't, it may signal weakening momentum
 
-:::note RSI smoothing
-Traditional RSI uses Wilder's smoothing (equivalent to EMA with period 2N-1). The `avg(value, 'period', 14)` function uses standard EMA where α = 2/(14+1). For exact Wilder smoothing, use `avg(value, 'period', 27)` for a 14-period RSI.
+:::note EMA vs Wilder's smoothing
+This recipe uses standard EMA smoothing via `avg(value, 'period', 14)` where α = 2/(N+1). Traditional RSI (Wilder's) uses α = 1/N, which is more gradual. For exact Wilder smoothing with a 14-period lookback, use `avg(value, 'period', 27)`. Most modern platforms offer both variants.
 :::
 
 :::info Related documentation

@@ -15,7 +15,7 @@ You want a simple momentum indicator that shows how fast price is changing. Raw 
 ```questdb-sql demo title="Calculate 12-period Rate of Change"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 SELECT
   timestamp,
@@ -29,7 +29,7 @@ SELECT
   ) AS roc
 FROM market_data_ohlc_15m
 WHERE symbol = @symbol
-  AND timestamp > @lookback
+  AND timestamp IN @lookback
 ORDER BY timestamp;
 ```
 

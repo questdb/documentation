@@ -15,7 +15,7 @@ You want to identify overbought and oversold conditions based on where price is 
 ```questdb-sql demo title="Calculate Stochastic %K and %D"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := dateadd('M', -1, now())
+  @lookback := '$now - 1M..$now'
 
 WITH ranges AS (
   SELECT
@@ -34,7 +34,7 @@ WITH ranges AS (
     ) AS highest_high
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @lookback
+    AND timestamp IN @lookback
 ),
 with_k AS (
   SELECT
@@ -72,8 +72,8 @@ The query:
 - **%K crosses below %D**: Bearish signal
 - **Divergence**: Price makes new high but %K doesn't, signals potential reversal
 
-:::note Slow vs Fast Stochastic
-This is the "slow" stochastic where %K is already smoothed by using a 3-period %D. The "fast" stochastic uses raw %K values, which are noisier.
+:::note Fast vs Slow Stochastic
+This recipe shows the **Fast Stochastic** (raw %K with 3-period %D). For the **Slow Stochastic**, you would first smooth %K with a 3-period SMA, then apply another 3-period SMA for %D. The Slow version is less noisy but more lagging.
 :::
 
 :::info Related documentation
