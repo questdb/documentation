@@ -911,5 +911,14 @@ module.exports = {
       type: "link",
       href: "https://questdb.com/release-notes",
     },
+
+    // ===================
+    // CHANGELOG
+    // ===================
+    {
+      id: "changelog",
+      type: "doc",
+      label: "Documentation Changelog",
+    },
   ].filter(Boolean),
 }

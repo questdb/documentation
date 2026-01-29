@@ -41,6 +41,17 @@ const config = {
       crossorigin: "anonymous",
     },
   ],
+  headTags: [
+    {
+      tagName: "link",
+      attributes: {
+        rel: "alternate",
+        type: "application/rss+xml",
+        title: "QuestDB Documentation RSS Feed",
+        href: "/docs/rss.xml",
+      },
+    },
+  ],
   scripts: [
     {
       src: "https://widget.kapa.ai/kapa-widget.bundle.js",
@@ -161,6 +172,7 @@ const config = {
     require.resolve("./plugins/raw-markdown/index"),
 
     require.resolve("./plugins/tailwind/index"),
+    require.resolve("./plugins/docs-rss/index"),
     [
       "@docusaurus/plugin-pwa",
       {
