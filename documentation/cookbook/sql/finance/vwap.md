@@ -28,30 +28,27 @@ WITH sampled AS (
     total_volume,
     ((high + low + close) / 3) * total_volume AS traded_value
   FROM fx_trades_ohlc_1m
-  WHERE timestamp IN yesterday() AND symbol = 'EURUSD'
-),
-cumulative AS (
-  SELECT
-    timestamp, symbol,
-    SUM(traded_value) OVER (ORDER BY timestamp) AS cumulative_value,
-    SUM(total_volume) OVER (ORDER BY timestamp) AS cumulative_volume
-  FROM sampled
+  WHERE timestamp IN '$yesterday' AND symbol = 'EURUSD'
 )
-SELECT timestamp, symbol, cumulative_value / cumulative_volume AS vwap
-FROM cumulative;
+SELECT
+  timestamp, symbol,
+  SUM(traded_value) OVER (ORDER BY timestamp) /
+    SUM(total_volume) OVER (ORDER BY timestamp) AS vwap
+FROM sampled;
 ```
 
 This query:
 1. Reads 1-minute OHLC candles and calculates typical price × volume for each candle
-2. Uses window functions to compute running totals of both traded value and volume
-3. Divides cumulative traded value by cumulative volume to get VWAP at each timestamp
+2. Divides cumulative traded value by cumulative volume using window functions
 
 ## How it works
 
-The key insight is using `SUM(...) OVER (ORDER BY timestamp)` to create running totals:
-- `cumulative_value`: Running sum of (typical price × volume) from market open
-- `cumulative_volume`: Running sum of volume from market open
-- Final VWAP: Dividing these cumulative values gives the volume-weighted average at each point
+The key insight is using `SUM(...) OVER (ORDER BY timestamp)` to create running totals, then dividing them directly:
+
+```sql
+SUM(traded_value) OVER (ORDER BY timestamp) /
+  SUM(total_volume) OVER (ORDER BY timestamp) AS vwap
+```
 
 When using `SUM() OVER (ORDER BY timestamp)` without specifying a frame clause, QuestDB defaults to summing from the first row to the current row, which is exactly what we need for cumulative VWAP.
 
@@ -66,33 +63,29 @@ WITH sampled AS (
     total_volume,
     ((high + low + close) / 3) * total_volume AS traded_value
   FROM fx_trades_ohlc_1m
-  WHERE timestamp IN yesterday()
+  WHERE timestamp IN '$yesterday'
     AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
-),
-cumulative AS (
-  SELECT
-    timestamp, symbol,
-    SUM(traded_value) OVER (PARTITION BY symbol ORDER BY timestamp) AS cumulative_value,
-    SUM(total_volume) OVER (PARTITION BY symbol ORDER BY timestamp) AS cumulative_volume
-  FROM sampled
 )
-SELECT timestamp, symbol, cumulative_value / cumulative_volume AS vwap
-FROM cumulative;
+SELECT
+  timestamp, symbol,
+  SUM(traded_value) OVER (PARTITION BY symbol ORDER BY timestamp) /
+    SUM(total_volume) OVER (PARTITION BY symbol ORDER BY timestamp) AS vwap
+FROM sampled;
 ```
 
-The `PARTITION BY symbol` ensures each symbol's VWAP is calculated independently, resetting the cumulative sums for each symbol.
+The `PARTITION BY symbol` ensures each symbol's VWAP is calculated independently.
 
 ## Different time ranges
 
 ```sql
 -- Current trading day
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 
 -- Specific date
 WHERE timestamp IN '2026-01-12'
 
 -- Last hour
-WHERE timestamp >= dateadd('h', -1, now())
+WHERE timestamp IN '$now - 1h..$now'
 ```
 
 :::tip Trading use cases

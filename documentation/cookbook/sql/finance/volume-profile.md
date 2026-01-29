@@ -17,7 +17,7 @@ SELECT
   round(SUM(quantity), 2) AS volume
 FROM fx_trades
 WHERE symbol = 'EURUSD'
-  AND timestamp IN today()
+  AND timestamp IN '$today'
 ORDER BY price_bin;
 ```
 
@@ -31,7 +31,7 @@ For consistent histograms across different price ranges, calculate the tick size
 WITH raw_data AS (
   SELECT price, quantity
   FROM fx_trades
-  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 ),
 tick_size AS (
   SELECT (max(price) - min(price)) / 49 as tick_size

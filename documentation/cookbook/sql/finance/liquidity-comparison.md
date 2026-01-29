@@ -18,7 +18,7 @@ You have order book snapshots for multiple instruments and want to compare which
 WITH latest_books AS (
   SELECT timestamp, symbol, bids, asks
   FROM market_data
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
   LATEST ON timestamp PARTITION BY symbol
 )
 SELECT
@@ -49,7 +49,7 @@ SELECT
   last((L2PRICE(100_000, asks[2], asks[1]) - L2PRICE(100_000, bids[2], bids[1])) /
     ((L2PRICE(100_000, asks[2], asks[1]) + L2PRICE(100_000, bids[2], bids[1])) / 2)) * 10_000 AS spread_bps
 FROM market_data
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
   AND symbol IN ('EURUSD', 'GBPUSD', 'USDJPY')
 SAMPLE BY 1h
 ORDER BY timestamp, symbol;
@@ -63,7 +63,7 @@ See how execution costs scale with order size:
 WITH latest_books AS (
   SELECT symbol, bids, asks
   FROM market_data
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
   LATEST ON timestamp PARTITION BY symbol
 )
 SELECT
