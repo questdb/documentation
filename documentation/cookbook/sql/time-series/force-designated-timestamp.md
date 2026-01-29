@@ -18,7 +18,7 @@ SELECT
   bid_price
 FROM
   core_price
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 LIMIT 10;
 ```
 
@@ -38,7 +38,7 @@ WITH t AS (
       bid_price
     FROM
       core_price
-    WHERE timestamp >= dateadd('h', -1, now())
+    WHERE timestamp IN '$now - 1h..$now'
     ORDER BY time
   ) TIMESTAMP (time)
 )
@@ -57,9 +57,9 @@ You can restore the designated timestamp by applying `ORDER BY` and then using `
 (
   SELECT * FROM
   (
-    SELECT timestamp, symbol FROM core_price WHERE timestamp >= dateadd('m', -1, now())
+    SELECT timestamp, symbol FROM core_price WHERE timestamp IN '$now - 1m..$now'
     UNION ALL
-    SELECT timestamp, symbol FROM core_price WHERE timestamp >= dateadd('m', -1, now())
+    SELECT timestamp, symbol FROM core_price WHERE timestamp IN '$now - 1m..$now'
   ) ORDER BY timestamp
 )
 TIMESTAMP(timestamp)

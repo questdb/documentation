@@ -62,7 +62,7 @@ The table tracks **30 currency pairs**: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, 
 
 ```questdb-sql demo title="Recent core_price updates"
 SELECT * FROM core_price
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 LIMIT -10;
 ```
 
@@ -116,7 +116,7 @@ SELECT timestamp, symbol,
        array_count(bids[1]) as bid_levels,
        array_count(asks[1]) as ask_levels
 FROM market_data
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 LIMIT -5;
 ```
 
@@ -170,7 +170,7 @@ CREATE TABLE 'fx_trades' (
 
 ```questdb-sql demo title="Recent FX trades"
 SELECT * FROM fx_trades
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 LIMIT -10;
 ```
 

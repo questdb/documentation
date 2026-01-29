@@ -25,8 +25,8 @@ When BandWidth drops to historically low levels, the bands are in a "squeeze". P
 ```questdb-sql demo title="Calculate Bollinger BandWidth with range position"
 DECLARE
   @symbol := 'BTC-USDT',
-  @history_start := dateadd('M', -6, now()),
-  @display_start := dateadd('M', -1, now())
+  @history := '$now - 6M..$now',
+  @display := '$now - 1M..$now'
 
 WITH daily_ohlc AS (
   SELECT
@@ -38,7 +38,7 @@ WITH daily_ohlc AS (
     last(close) AS close
   FROM trades_ohlc_15m
   WHERE symbol = @symbol
-    AND timestamp > @history_start
+    AND timestamp IN @history
   SAMPLE BY 1d
 ),
 bands AS (
@@ -102,11 +102,11 @@ SELECT
   round(bandwidth, 4) AS bandwidth,
   round((bandwidth - min_bw) / (max_bw - min_bw) * 100, 1) AS range_position
 FROM with_range
-WHERE timestamp > @display_start
+WHERE timestamp IN @display
 ORDER BY timestamp;
 ```
 
-The query first aggregates 15-minute candles into daily OHLC, then calculates standard 20-day Bollinger Bands. This matches the traditional approach where SMA20 represents roughly one month of trading. The 6-month lookback (`@history_start`) establishes the historical range, while `@display_start` limits output to the last month. Standard deviation uses the variance formula `sqrt(avg(x²) - avg(x)²)`.
+The query first aggregates 15-minute candles into daily OHLC, then calculates standard 20-day Bollinger Bands. This matches the traditional approach where SMA20 represents roughly one month of trading. The 6-month lookback (`@history`) establishes the historical range, while `@display` limits output to the last month. Standard deviation uses the variance formula `sqrt(avg(x²) - avg(x)²)`.
 
 The `range_position` shows where current BandWidth falls within the 6-month range: 0% means at the historical minimum, 100% at the maximum. This works well for identifying squeeze conditions since you're comparing against historical extremes.
 

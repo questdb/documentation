@@ -27,7 +27,7 @@ SELECT timestamp, bid_price,
   LEAD(bid_price, 4) OVER () AS next_4,
   LEAD(bid_price, 5) OVER () AS next_5
 FROM core_price
-WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
+WHERE timestamp IN '$now - 1m..$now' AND symbol = 'EURUSD';
 ```
 
 ## How it works
