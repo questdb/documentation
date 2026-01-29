@@ -1,4 +1,5 @@
 [build]
+  # Fetch full git history so docs-rss plugin can get accurate file modification dates
   command = "git fetch --unshallow || true && yarn build"
   publish = "build"
 
