@@ -13,7 +13,7 @@ You have a query like this:
 ```questdb-sql demo title="SAMPLE BY with FILL(PREV)"
 SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
 FROM core_price
-WHERE symbol = 'EURUSD' AND timestamp IN today()
+WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 SAMPLE BY 100T FILL(PREV, PREV);
 ```
 
@@ -22,7 +22,7 @@ But when there is an interpolation, instead of getting the PREV value for `bid_p
 ```sql
 SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
 FROM core_price
-WHERE symbol = 'EURUSD' AND timestamp IN today()
+WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 SAMPLE BY 100T FILL(PREV(ask_price), PREV);
 ```
 
@@ -34,7 +34,7 @@ The only way to do this is in multiple steps within a single query: first get th
 WITH sampled AS (
   SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
   FROM core_price
-  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  WHERE symbol = 'EURUSD' AND timestamp IN '$today'
   SAMPLE BY 100T FILL(null)
 ), with_previous_vals AS (
   SELECT *,
@@ -54,7 +54,7 @@ You can mark which rows were filled by adding a column that flags interpolated v
 WITH sampled AS (
   SELECT timestamp, symbol, avg(bid_price) as bid_price, avg(ask_price) as ask_price
   FROM core_price
-  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  WHERE symbol = 'EURUSD' AND timestamp IN '$today'
   SAMPLE BY 100T FILL(null)
 ), with_previous_vals AS (
   SELECT *,

@@ -22,7 +22,7 @@ SELECT
   last(price) AS close,
   sum(quantity) AS total_volume
 FROM fx_trades
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 SAMPLE BY 1m;
 ```
 

@@ -19,7 +19,7 @@ SELECT timestamp, bid_price,
   min(bid_price) OVER (ORDER BY timestamp RANGE 1 second PRECEDING) AS min_price,
   max(bid_price) OVER (ORDER BY timestamp RANGE 1 second PRECEDING) AS max_price
 FROM core_price
-WHERE timestamp >= dateadd('m', -1, now()) AND symbol = 'EURUSD';
+WHERE timestamp IN '$now - 1m..$now' AND symbol = 'EURUSD';
 ```
 
 This returns the minimum and maximum bid price from the 1 second preceding each row.
@@ -35,7 +35,7 @@ SELECT p.timestamp, p.bid_price,
 FROM core_price p
 WINDOW JOIN core_price pp ON symbol
   RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
-WHERE p.timestamp >= dateadd('m', -1, now()) AND p.symbol = 'EURUSD';
+WHERE p.timestamp IN '$now - 1m..$now' AND p.symbol = 'EURUSD';
 ```
 
 This returns the minimum and maximum bid price from 1 second before to 1 second after each row.

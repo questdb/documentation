@@ -30,7 +30,7 @@ WITH OHLC AS (
       last(price) AS close,
       sum(quantity) AS volume
  FROM fx_trades
- WHERE symbol = 'EURUSD' AND timestamp IN yesterday()
+ WHERE symbol = 'EURUSD' AND timestamp IN '$yesterday'
  SAMPLE BY 15m
 ), stats AS (
   SELECT
@@ -109,7 +109,7 @@ WITH OHLC AS (
       sum(quantity) AS volume
  FROM fx_trades
  WHERE symbol IN ('EURUSD', 'GBPUSD')
-   AND timestamp IN yesterday()
+   AND timestamp IN '$yesterday'
  SAMPLE BY 15m
 ), stats AS (
   SELECT
