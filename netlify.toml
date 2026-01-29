@@ -1,6 +1,7 @@
 [build]
   # Fetch full git history so docs-rss plugin can get accurate file modification dates
-  command = "git fetch --unshallow || true && yarn build"
+  # Netlify uses shallow clones by default
+  command = "git fetch --prune --unshallow || git fetch --depth=500 && yarn build"
   publish = "build"
 
 [build.environment]
