@@ -597,6 +597,9 @@ that converts arrays of structs into arrays of arrays. This is useful for order
 book data or any tabular data stored as a list of rows that you want to pivot
 into columnar form before writing to QuestDB.
 
+For a practical guide on querying order book data stored as arrays in QuestDB,
+see [Order book analytics using arrays](/docs/tutorials/order-book/).
+
 Given a Kafka message like this:
 
 ```json
