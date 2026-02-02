@@ -590,6 +590,90 @@ Alternatively, you can use SQL to explicitly create the target table with the
 correct column types instead of relying on the connector to infer them. See the
 paragraph below.
 
+### Array transpose transformation (OrderBookToArray)
+
+The connector ships with an `OrderBookToArray` Single Message Transform (SMT)
+that converts arrays of structs into arrays of arrays. This is useful for order
+book data or any tabular data stored as a list of rows that you want to pivot
+into columnar form before writing to QuestDB.
+
+Given a Kafka message like this:
+
+```json
+{
+  "symbol": "BTC-USD",
+  "buy_entries": [
+    { "price": 100.5, "size": 10.0 },
+    { "price": 99.8, "size": 25.0 }
+  ]
+}
+```
+
+The SMT transposes `buy_entries` into a target field `bids` with one inner array
+per struct field:
+
+```json
+{
+  "symbol": "BTC-USD",
+  "bids": [
+    [100.5, 99.8],
+    [10.0, 25.0]
+  ]
+}
+```
+
+The first inner array contains all `price` values and the second contains all
+`size` values. The source field (`buy_entries`) is removed from the output and
+replaced by the target field (`bids`).
+
+#### Configuration
+
+Add the transform to your connector configuration:
+
+```properties
+transforms=orderbook
+transforms.orderbook.type=io.questdb.kafka.OrderBookToArray$Value
+transforms.orderbook.mappings=buy_entries:bids:price,size;sell_entries:asks:price,size
+```
+
+The `mappings` option is a semicolon-separated list of mappings. Each mapping
+has three colon-separated parts:
+
+```
+sourceField:targetField:structField1,structField2,...
+```
+
+| Part | Description |
+|------|-------------|
+| `sourceField` | Name of the array-of-structs field in the input message |
+| `targetField` | Name of the array-of-arrays field in the output message |
+| `structField1,structField2,...` | Comma-separated struct fields to extract. Each becomes one inner array in the output |
+
+Multiple mappings can be specified in a single `mappings` value, separated by
+semicolons. For example, to transpose both buy and sell sides of an order book:
+
+```properties
+transforms.orderbook.mappings=buy_entries:bids:price,size;sell_entries:asks:price,size
+```
+
+Use `OrderBookToArray$Value` to transform message values or
+`OrderBookToArray$Key` to transform message keys.
+
+#### Behavior
+
+- All extracted values are converted to `double`. Integer and float fields are
+  coerced automatically.
+- If a source field is missing from the input, the corresponding target field
+  is omitted from the output (no error).
+- If a source array is present but empty, the target field contains one empty
+  inner array per struct field.
+- Null values inside struct entries are not supported and will cause the
+  connector to fail with a descriptive error.
+- If the target field name matches an existing field in the input, the existing
+  field is replaced.
+- The SMT works with both schema-based (e.g., Avro, JSON with schemas) and
+  schemaless (e.g., plain JSON) messages.
+
 ### Target table considerations
 
 #### Table name
