@@ -668,14 +668,24 @@ Use `OrderBookToArray$Value` to transform message values or
   coerced automatically.
 - If a source field is missing from the input, the corresponding target field
   is omitted from the output (no error).
-- If a source array is present but empty, the target field contains one empty
-  inner array per struct field.
+- If a source array is present but empty, the corresponding target field is
+  skipped (treated the same as a missing or null source field).
 - Null values inside struct entries are not supported and will cause the
   connector to fail with a descriptive error.
 - If the target field name matches an existing field in the input, the existing
   field is replaced.
 - The SMT works with both schema-based (e.g., Avro, JSON with schemas) and
   schemaless (e.g., plain JSON) messages.
+
+:::note
+
+QuestDB requires all inner arrays to have the same length (jagged arrays are
+not supported). The OrderBookToArray SMT naturally satisfies this constraint:
+each inner array is built from the same source entries, so they always have
+equal length. However, if you chain additional transforms that modify the
+output arrays, ensure they preserve uniform lengths.
+
+:::
 
 ### Target table considerations
 
