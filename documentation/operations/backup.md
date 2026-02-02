@@ -91,24 +91,23 @@ You can configure automatic scheduled backups using cron syntax. The example
 below runs a backup every day at midnight UTC.
 
 ```conf
-backup.schedule.cron=0 0 0 * * *
+backup.schedule.cron=0 0 * * *
 backup.schedule.tz=UTC
 ```
 
 ##### Cron format
 
-QuestDB uses a **6-field cron format** with mandatory seconds:
+QuestDB uses the standard **5-field cron format**:
 
 ```text
-                FIELD            VALUES             SPECIAL CHARS
-┌────────────── second ───────── 0-59 ───────────── * , - /
-│ ┌──────────── minute ───────── 0-59 ───────────── * , - /
-│ │ ┌────────── hour ─────────── 0-23 ───────────── * , - /
-│ │ │ ┌──────── day of month ─── 1-31 ───────────── * , - / L W
-│ │ │ │ ┌────── month ────────── 1-12 or JAN-DEC ── * , - /
-│ │ │ │ │ ┌──── day of week ──── 0-7 or SUN-SAT ─── * , - / L #
-│ │ │ │ │ │
-* * * * * *
+              FIELD            VALUES             SPECIAL CHARS
+┌──────────── minute ───────── 0-59 ───────────── * , - /
+│ ┌────────── hour ─────────── 0-23 ───────────── * , - /
+│ │ ┌──────── day of month ─── 1-31 ───────────── * , - / L W
+│ │ │ ┌────── month ────────── 1-12 or JAN-DEC ── * , - /
+│ │ │ │ ┌──── day of week ──── 0-7 or SUN-SAT ─── * , - / L #
+│ │ │ │ │
+* * * * *
 ```
 
 Special character meanings:
@@ -123,22 +122,8 @@ Special character meanings:
 
 For day-of-week, 0 and 7 both represent Sunday; 1-6 represent Monday through Saturday.
 
-##### Converting from standard 5-field cron
-
-Most cron tools and references (such as [crontab.guru](https://crontab.guru/))
-use the traditional 5-field format without seconds. To convert a 5-field
-expression to QuestDB's 6-field format, add a leading `0 ` (zero and space):
-
-| 5-field (standard)            | 6-field (QuestDB)               | Description              |
-|-------------------------------|---------------------------------|--------------------------|
-| `0 0 * * *`                   | `0 0 0 * * *`                   | Daily at midnight        |
-| `0 */6 * * *`                 | `0 0 */6 * * *`                 | Every 6 hours            |
-| `30 2 * * 0`                  | `0 30 2 * * 0`                  | Sundays at 02:30         |
-| `0 3 1 * *`                   | `0 0 3 1 * *`                   | 1st of month at 03:00    |
-
 :::tip
-Design your schedule in [crontab.guru](https://crontab.guru/), then prefix the
-result with `0 ` to get the QuestDB-compatible expression.
+Use [crontab.guru](https://crontab.guru/) to build and validate your cron expressions.
 :::
 
 ##### Timezone
