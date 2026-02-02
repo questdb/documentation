@@ -91,20 +91,82 @@ You can configure automatic scheduled backups using cron syntax. The example
 below runs a backup every day at midnight UTC.
 
 ```conf
-backup.schedule.cron=0 0 * * *
+backup.schedule.cron=0 0 0 * * *
 backup.schedule.tz=UTC
 ```
+
+##### Cron format
+
+QuestDB uses a **6-field cron format** with mandatory seconds:
+
+```text
+┌──────────────── second (0-59)
+│ ┌────────────── minute (0-59)
+│ │ ┌──────────── hour (0-23)
+│ │ │ ┌────────── day of month (1-31)
+│ │ │ │ ┌──────── month (1-12 or JAN-DEC)
+│ │ │ │ │ ┌────── day of week (0-7 or SUN-SAT)
+│ │ │ │ │ │
+* * * * * *
+```
+
+| Field        | Required | Allowed values       | Special characters   |
+|--------------|----------|----------------------|----------------------|
+| Seconds      | Yes      | 0-59                 | `* , - /`            |
+| Minutes      | Yes      | 0-59                 | `* , - /`            |
+| Hours        | Yes      | 0-23                 | `* , - /`            |
+| Day of Month | Yes      | 1-31                 | `* , - / L W`        |
+| Month        | Yes      | 1-12 or JAN-DEC      | `* , - /`            |
+| Day of Week  | Yes      | 0-7 or SUN-SAT       | `* , - / L #`        |
+
+Special character meanings:
+
+- `*` — matches any value
+- `,` — separates multiple values (e.g., `1,15` for 1st and 15th)
+- `-` — defines a range (e.g., `1-5` for Monday through Friday)
+- `/` — specifies intervals (e.g., `*/15` for every 15 units)
+- `L` — last day of the month, or last specific weekday (e.g., `5L` = last Friday)
+- `W` — nearest weekday to the given day (e.g., `15W` = nearest weekday to the 15th)
+- `#` — nth weekday of the month (e.g., `5#3` = third Friday)
+
+For day-of-week, 0 and 7 both represent Sunday; 1-6 represent Monday through Saturday.
+
+##### Converting from standard 5-field cron
+
+Most cron tools and references (such as [crontab.guru](https://crontab.guru/))
+use the traditional 5-field format without seconds. To convert a 5-field
+expression to QuestDB's 6-field format, add a leading `0 ` (zero and space):
+
+| 5-field (standard)            | 6-field (QuestDB)               | Description              |
+|-------------------------------|---------------------------------|--------------------------|
+| `0 0 * * *`                   | `0 0 0 * * *`                   | Daily at midnight        |
+| `0 */6 * * *`                 | `0 0 */6 * * *`                 | Every 6 hours            |
+| `30 2 * * 0`                  | `0 30 2 * * 0`                  | Sundays at 02:30         |
+| `0 3 1 * *`                   | `0 0 3 1 * *`                   | 1st of month at 03:00    |
+
+:::tip
+Design your schedule in [crontab.guru](https://crontab.guru/), then prefix the
+result with `0 ` to get the QuestDB-compatible expression.
+:::
+
+##### Timezone
 
 The `backup.schedule.tz` property accepts any valid
 <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone name</a>
 (e.g., `America/New_York`, `Europe/London`) or `UTC`.
 
-These settings can be modified in `server.conf` and hot-reloaded without
+If `backup.schedule.tz` not specified, the default is `UTC`.
+
+##### Resetting schedule without restart
+
+The `backup.schedule.cron` and `backup.schedule.tz` settings can be modified in `server.conf` and hot-reloaded without
 restarting the server:
 
 ```questdb-sql
 SELECT reload_config();
 ```
+
+You can also use this to enable and disable the schedule by adding or commenting out the `backup.schedule.cron` config setting.
 
 #### Backup retention
 
