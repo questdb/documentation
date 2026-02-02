@@ -261,6 +261,8 @@ the connector configuration options:
 | <sub>timestamp.kafka.native</sub>  | `boolean` | true                                                        | false              | Use Kafka timestamps as designated timestamps               |
 | <sub>timestamp.string.fields</sub> | `string`  | creation_time,pickup_time                                   | N/A                | String fields with textual timestamps                       |
 | <sub>timestamp.string.format</sub> | `string`  | yyyy-MM-dd HH:mm:ss.SSSUUU z                                | N/A                | Timestamp format, used when parsing timestamp string fields |
+| <sub>timestamp.composed.fields</sub> | `string` | date,time                                                  | N/A                | Ordered list of fields to concatenate into a designated timestamp |
+| <sub>timestamp.composed.format</sub> | `string` | yyyyMMddHHmmssSSS                                          | N/A                | Format for parsing the concatenated composed timestamp value |
 | include.key                        | `boolean` | false                                                       | true               | Include message key in target table                         |
 | symbols                            | `string`  | instrument,stock                                            | N/A                | Comma separated list of columns that should be symbol type  |
 | doubles                            | `string`  | volume,price                                                | N/A                | Comma separated list of columns that should be double type  |
@@ -401,13 +403,15 @@ using `key.converter` and `value.converter` options, both are included in the
 The connector supports
 [designated timestamps](/docs/concepts/designated-timestamp/).
 
-There are three distinct strategies for designated timestamp handling:
+There are four distinct strategies for designated timestamp handling:
 
 1. QuestDB server assigns a timestamp when it receives data from the connector.
    (Default)
 2. The connector extracts the timestamp from the Kafka message payload.
 3. The connector extracts timestamps from
    [Kafka message metadata.](https://cwiki.apache.org/confluence/display/KAFKA/KIP-32+-+Add+timestamps+to+Kafka+message)
+4. The connector composes the timestamp from multiple fields in the message
+   payload. See [Composed timestamps](#composed-timestamps).
 
 Kafka messages carry various metadata, one of which is a timestamp. To use the
 Kafka message metadata timestamp as a QuestDB designated timestamp, set
@@ -430,8 +434,9 @@ which supports the following values:
 - `seconds`
 - `auto` (default)
 
-Note: These 3 strategies are mutually exclusive. Cannot set both
-`timestamp.kafka.native=true` and `timestamp.field.name`.
+Note: These 4 strategies are mutually exclusive. Cannot set both
+`timestamp.kafka.native=true` and `timestamp.field.name`, and
+`timestamp.composed.fields` cannot be combined with either of them.
 
 ### Textual timestamps parsing
 
@@ -468,6 +473,57 @@ timestamp set the following properties in your QuestDB connector configuration:
 1. `timestamp.string.format=yyyy-MM-dd HH:mm:ss.SSSUUU z` - set the timestamp
    format. Please note the correct format for microseconds is `SSSUUU` (3 digits
    for milliseconds and 3 digits for microseconds).
+
+### Composed timestamps
+
+Some data sources split a timestamp across multiple fields. For example, a
+message might have separate `date` and `time` fields:
+
+```json
+{
+  "firstname": "John",
+  "lastname": "Doe",
+  "date": "20260202",
+  "time": "135010207"
+}
+```
+
+The connector can concatenate these fields into a single string and parse the
+result as a designated timestamp. Use `timestamp.composed.fields` to specify the
+ordered list of fields to concatenate, and `timestamp.composed.format` to specify
+the format of the concatenated value.
+
+#### Configuration
+
+```properties
+timestamp.composed.fields=date,time
+timestamp.composed.format=yyyyMMddHHmmssSSS
+```
+
+| Option | Description |
+|--------|-------------|
+| `timestamp.composed.fields` | Ordered, comma-separated list of field names to concatenate |
+| `timestamp.composed.format` | Format pattern for parsing the concatenated value. See the [QuestDB timestamp](/docs/query/functions/date-time/#timestamp-format) documentation for format details |
+
+In the example above, the fields `date` and `time` are concatenated into
+`20260202135010207`, which is then parsed using the format `yyyyMMddHHmmssSSS`
+to produce the timestamp `2026-02-02T13:50:10.207000Z`.
+
+#### Behavior
+
+- The composed result is always the **designated timestamp**. Setting
+  `timestamp.composed.fields` implies the composed value is the designated
+  timestamp — there is no need to also set `timestamp.field.name`.
+- `timestamp.composed.fields` is mutually exclusive with `timestamp.field.name`
+  and `timestamp.kafka.native`. The connector will reject configurations that
+  combine these options.
+- `timestamp.composed.format` is required when `timestamp.composed.fields` is
+  set.
+- The source fields (`date`, `time` in the example) are consumed — they do not
+  appear as columns in QuestDB output.
+- The fields are concatenated in the order specified by
+  `timestamp.composed.fields`. All listed fields must be present in each message;
+  a missing field causes an error.
 
 ### Fault Tolerance
 
