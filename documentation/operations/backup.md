@@ -100,24 +100,16 @@ backup.schedule.tz=UTC
 QuestDB uses a **6-field cron format** with mandatory seconds:
 
 ```text
-┌──────────────── second (0-59)
-│ ┌────────────── minute (0-59)
-│ │ ┌──────────── hour (0-23)
-│ │ │ ┌────────── day of month (1-31)
-│ │ │ │ ┌──────── month (1-12 or JAN-DEC)
-│ │ │ │ │ ┌────── day of week (0-7 or SUN-SAT)
+                FIELD            VALUES             SPECIAL CHARS
+┌────────────── second ───────── 0-59 ───────────── * , - /
+│ ┌──────────── minute ───────── 0-59 ───────────── * , - /
+│ │ ┌────────── hour ─────────── 0-23 ───────────── * , - /
+│ │ │ ┌──────── day of month ─── 1-31 ───────────── * , - / L W
+│ │ │ │ ┌────── month ────────── 1-12 or JAN-DEC ── * , - /
+│ │ │ │ │ ┌──── day of week ──── 0-7 or SUN-SAT ─── * , - / L #
 │ │ │ │ │ │
 * * * * * *
 ```
-
-| Field        | Required | Allowed values       | Special characters   |
-|--------------|----------|----------------------|----------------------|
-| Seconds      | Yes      | 0-59                 | `* , - /`            |
-| Minutes      | Yes      | 0-59                 | `* , - /`            |
-| Hours        | Yes      | 0-23                 | `* , - /`            |
-| Day of Month | Yes      | 1-31                 | `* , - / L W`        |
-| Month        | Yes      | 1-12 or JAN-DEC      | `* , - /`            |
-| Day of Week  | Yes      | 0-7 or SUN-SAT       | `* , - / L #`        |
 
 Special character meanings:
 
