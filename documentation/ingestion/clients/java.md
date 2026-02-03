@@ -67,8 +67,8 @@ Add the QuestDB Java client as a dependency in your project's build configuratio
     <CodeBlock className="language-xml">
       {`<dependency>
   <groupId>org.questdb</groupId>
-  <artifactId>client</artifactId>
-  <version>1.0.0</version>
+  <artifactId>questdb-client</artifactId>
+  <version>1.0.1</version>
 </dependency>`}
     </CodeBlock>
   </TabItem>

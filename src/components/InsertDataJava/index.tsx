@@ -15,8 +15,8 @@ public class LineTCPSenderMain {
 
             <dependency>
                 <groupId>org.questdb</groupId>
-                <artifactId>client</artifactId>
-                <version>1.0.0</version>
+                <artifactId>questdb-client</artifactId>
+                <version>1.0.1</version>
             </dependency>
 
         Gradle:
