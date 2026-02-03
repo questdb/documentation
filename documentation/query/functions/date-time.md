@@ -139,36 +139,47 @@ lengths:
 - For nanosecond timestamps: use `.SSSUUUNNN` or `.N+`
 - For millisecond-only data: use `.SSS` or `.S`
 
-## Timestamp to Date conversion
+## Timestamp and date types
 
-As described at the [data types section](/docs/query/datatypes/overview), the
-only difference between `TIMESTAMP`, `TIMESTAMP_NS`, and `DATE` in QuestDB type
-system is the resolution. Whilst `TIMESTAMP` stores resolution as an offset from Unix epoch in
-microseconds, `TIMESTAMP_NS` stores it as an offset in nanoseconds, and `DATE` stores the
-offset in milliseconds.
+QuestDB has three temporal types with different precision:
 
-Since the three types are backed by a signed long, this means the `DATE` type has a
-wider range. A `DATE` column can store about ±2.9 million years from the Unix
-epoch, whereas a `TIMESTAMP` has an approximate range of ±290,000 years, and a
-`TIMESTAMP_NS` has an approximate range of ±2262 years.
+| Type | Precision | Approximate Range |
+| :--- | :-------- | :---------------- |
+| `DATE` | milliseconds | ±2.9 million years |
+| `TIMESTAMP` | microseconds | ±290,000 years |
+| `TIMESTAMP_NS` | nanoseconds | ±2,920 years |
 
-For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of
-functions whilst still being 8 bytes in size.
+All three are stored as signed 64-bit integers representing offsets from the
+Unix epoch. `TIMESTAMP` is recommended for most use cases as it offers the
+best balance of precision and function support.
 
-Be aware that, when using a `TIMESTAMP` or `TIMESTAMP_NS` as the designated
-timestamp, you cannot set it to any value before the Unix epoch (`1970-01-01T00:00:00.000000Z`).
+For details on all data types, see the [data types overview](/docs/query/datatypes/overview).
 
-To explicitly convert from `TIMESTAMP` to `DATE` or `TIMESTAMP_NS`, you can use
-`CAST(ts_column AS DATE)` or `CAST(ts_column AS TIMESTAMP_NS)`. To convert from
-`DATE` or `TIMESTAMP_NS` to `TIMESTAMP` you can `CAST(column AS TIMESTAMP)`.
+:::note Designated timestamp restriction
+When used as a [designated timestamp](/docs/concepts/designated-timestamp/),
+`TIMESTAMP` and `TIMESTAMP_NS` values cannot be before the Unix epoch
+(`1970-01-01T00:00:00.000000Z`).
+:::
 
-### Programmatically convert from language-specific datetimes into QuestDB timestamps
+### Converting between types
 
-Different programming languages use different types of objects to represent the
-`DATE` type. To learn how to convert from the `DATE` type into a `TIMESTAMP`
-object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
-our [Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
-reference.
+Use `CAST` to convert between temporal types:
+
+```questdb-sql
+-- Reduce precision
+SELECT CAST(ts_column AS DATE) FROM my_table;
+
+-- Increase precision
+SELECT CAST(date_column AS TIMESTAMP) FROM my_table;
+SELECT CAST(ts_column AS TIMESTAMP_NS) FROM my_table;
+```
+
+### Converting from programming languages
+
+To convert language-specific datetime objects (Python `datetime`, Java
+`Instant`, etc.) into QuestDB timestamps, see the
+[Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
+reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 ---
 
