@@ -20,16 +20,18 @@ This single expression generates interval scans for every weekday in January,
 each starting at 9:30 AM New York time and lasting 6 hours 30 minutes.
 
 :::tip Key Points
+
 - TICK = declarative syntax for complex time intervals in `WHERE ts IN '...'`
 - **Syntax order:** `date [T time] @timezone #dayFilter ;duration`
-- Each generated interval uses optimized [interval scan](/docs/concepts/deep-dive/interval-scan/) (binary search)
+- Each generated interval uses optimized
+  [interval scan](/docs/concepts/deep-dive/interval-scan/) (binary search)
 - Use `[a,b,c]` for values, `[a..b]` for ranges, `#workday` for day filters
 - Overlapping intervals are automatically merged
 :::
 
 ## Grammar summary
 
-```
+```text
 TICK_EXPR     = DATE_PART [TIME] [TIMEZONE] [FILTER] [DURATION]
 
 DATE_PART     = literal_date                    -- '2024-01-15'
@@ -74,6 +76,7 @@ unit          = 'y' | 'M' | 'w' | 'd' | 'bd' | 'h' | 'm' | 's' | 'T' | 'u' | 'n'
 ## Why TICK
 
 Traditional approaches to complex time queries require:
+
 - Multiple `UNION ALL` statements
 - Application-side date generation
 - Complex `BETWEEN` logic with many `OR` clauses
@@ -82,6 +85,7 @@ TICK replaces all of these with a declarative syntax that generates multiple
 optimized interval scans from a single expression.
 
 **Use TICK when:**
+
 - Querying relative time windows (`$now - 1h..$now`, `$today`)
 - Building rolling windows with business day calculations
 - Working with schedules (workdays, weekends, specific days)
@@ -89,6 +93,7 @@ optimized interval scans from a single expression.
 - Querying multiple non-contiguous dates or time windows
 
 **Use simple `IN` or `BETWEEN` when:**
+
 - Single continuous time range with absolute dates (`WHERE ts IN '2024-01-15'`)
 - Simple date/time literals without patterns or variables
 
@@ -123,7 +128,7 @@ WHERE ts IN '2024-01-15T09:30@America/New_York;6h30m'
 
 Components must appear in this order:
 
-```
+```text
 date [T time] @ timezone # dayFilter ; duration
  │       │         │          │           │
  │       │         │          │           └─ interval length (e.g., ;6h30m)
@@ -136,7 +141,7 @@ date [T time] @ timezone # dayFilter ; duration
 **Examples showing the order:**
 
 | Expression | Components used |
-|------------|-----------------|
+| ---------- | --------------- |
 | `'2024-01-15'` | date only |
 | `'2024-01-15T09:30'` | date + time |
 | `'2024-01-15T09:30@UTC'` | date + time + timezone |
@@ -147,7 +152,7 @@ date [T time] @ timezone # dayFilter ; duration
 ## Quick reference
 
 | Feature | Syntax | Example |
-|---------|--------|---------|
+| ------- | ------ | ------- |
 | Bracket expansion | `[a,b,c]` | `'2024-01-[10,15,20]'` |
 | Range expansion | `[a..b]` | `'2024-01-[10..15]'` |
 | Date list | `[date1,date2]` | `'[2024-01-15,2024-03-20]'` |
@@ -224,7 +229,7 @@ WHERE ts IN '[$today, $yesterday, 2024-01-15]'
 Use dynamic date references that resolve at query time:
 
 | Variable | Description | Interval type | Example value (Jan 22, 2026 at 14:35:22) |
-|----------|-------------|---------------|------------------------------------------|
+| -------- | ----------- | ------------- | ---------------------------------------- |
 | `$today` | Current day | Full day | `2026-01-22T00:00:00` to `2026-01-22T23:59:59.999999` |
 | `$yesterday` | Previous day | Full day | `2026-01-21T00:00:00` to `2026-01-21T23:59:59.999999` |
 | `$tomorrow` | Next day | Full day | `2026-01-23T00:00:00` to `2026-01-23T23:59:59.999999` |
@@ -232,10 +237,13 @@ Use dynamic date references that resolve at query time:
 
 :::info Interval vs point-in-time
 
-- **`$today`**, **`$yesterday`**, **`$tomorrow`** produce **full day intervals** (midnight to midnight)
-- **`$now`** produces a **point-in-time** (exact moment with microsecond precision)
+- **`$today`**, **`$yesterday`**, **`$tomorrow`** produce **full day intervals**
+  (midnight to midnight)
+- **`$now`** produces a **point-in-time** (exact moment with microsecond
+  precision)
 
-Without a duration suffix, `$now` matches only the exact microsecond. Add a duration or use a range to create a useful window:
+Without a duration suffix, `$now` matches only the exact microsecond. Add a
+duration or use a range to create a useful window:
 
 ```questdb-sql
 -- Point-in-time: matches only the exact microsecond (rarely useful alone)
@@ -254,8 +262,8 @@ Variables are case-insensitive: `$TODAY`, `$Today`, and `$today` are equivalent.
 
 ### Date arithmetic
 
-Add or subtract time from date variables using any [time unit](#time-units).
-All units except `bd` (business days) work in both duration and arithmetic contexts.
+Add or subtract time from date variables using any [time unit](#time-units). All
+units except `bd` (business days) work in both duration and arithmetic contexts.
 
 ```questdb-sql
 -- Calendar day arithmetic
@@ -307,7 +315,8 @@ Generate multiple intervals from start to end:
 
 :::note Ranges vs durations
 
-**Ranges** (`$start..$end`) create a single continuous interval from start to end:
+**Ranges** (`$start..$end`) create a single continuous interval from start to
+end:
 
 ```questdb-sql
 -- Single interval: from 2 hours ago until now
@@ -330,6 +339,7 @@ For multiple discrete intervals, use a list with duration:
 -- Three separate 1-hour intervals
 '[$now - 3h, $now - 2h, $now - 1h];1h'
 ```
+
 :::
 
 ### Mixed date lists
@@ -377,7 +387,7 @@ SELECT * FROM trades WHERE ts IN '2024-[01,06]-[10,15]';
 Brackets work in any numeric field:
 
 | Field | Example | Result |
-|-------|---------|--------|
+| ----- | ------- | ------ |
 | Month | `'2024-[01,06]-15'` | Jan 15, Jun 15 |
 | Day | `'2024-01-[10,15]'` | 10th, 15th |
 | Hour | `'2024-01-10T[09,14]:30'` | 09:30, 14:30 |
@@ -423,7 +433,7 @@ SELECT * FROM metrics WHERE ts IN '2024-01-15T[08:00,12:00,18:00];30m';
 The presence of `:` inside the bracket determines the mode:
 
 | Syntax | Mode | Expands to |
-|--------|------|------------|
+| ------ | ---- | ---------- |
 | `T[09,14]:30` | Numeric expansion (hour field) | 09:30 and 14:30 |
 | `T[09:00,14:30]` | Time list (complete times) | 09:00 and 14:30 |
 
@@ -450,7 +460,7 @@ SELECT * FROM trades WHERE ts IN '2024-01-15T09:30@UTC';
 ### Supported timezone formats
 
 | Format | Example |
-|--------|---------|
+| ------ | ------- |
 | IANA name | `@America/New_York`, `@Europe/London` |
 | Offset | `@+03:00`, `@-05:00` |
 | Compact offset | `@+0300`, `@-0500` |
@@ -489,7 +499,7 @@ SELECT * FROM attendance WHERE ts IN '2024-01-[01..31]#Mon,Wed,Fri';
 ### Available filters
 
 | Filter | Days included |
-|--------|---------------|
+| ------ | ------------- |
 | `#workday` or `#wd` | Monday - Friday |
 | `#weekend` | Saturday, Sunday |
 | `#Mon`, `#Tue`, etc. | Specific day |
@@ -526,7 +536,7 @@ SELECT * FROM hft_data WHERE ts IN '2024-01-15T09:30:00;1s500T';
 ### Time units
 
 | Unit | Name | Description | Duration | Arithmetic |
-|------|------|-------------|:--------:|:----------:|
+| ---- | ---- | ----------- | :------: | :--------: |
 | `y` | Years | Calendar years (handles leap years) | Yes | Yes |
 | `M` | Months | Calendar months (handles varying lengths) | Yes | Yes |
 | `w` | Weeks | 7 days | Yes | Yes |
@@ -539,8 +549,8 @@ SELECT * FROM hft_data WHERE ts IN '2024-01-15T09:30:00;1s500T';
 | `u` | Microseconds | 1,000 nanoseconds | Yes | Yes |
 | `n` | Nanoseconds | Base unit | Yes | Yes |
 
-Units are case-sensitive: `M` = months, `m` = minutes, `T` = milliseconds.
-The `d` unit also accepts uppercase `D` for backward compatibility.
+Units are case-sensitive: `M` = months, `m` = minutes, `T` = milliseconds. The
+`d` unit also accepts uppercase `D` for backward compatibility.
 
 ### Multi-unit durations
 
@@ -588,7 +598,7 @@ SELECT * FROM trades WHERE ts IN '2024-W[01..04]-[1,5]';
 ### Day-of-week values
 
 | Value | Day |
-|-------|-----|
+| ----- | --- |
 | 1 | Monday |
 | 2 | Tuesday |
 | 3 | Wednesday |
@@ -694,7 +704,7 @@ WHERE ts IN '2024-01-[15,16,17]T09:00;1h';
 ## Error messages
 
 | Error | Cause |
-|-------|-------|
+| ----- | ----- |
 | `Unclosed '[' in interval` | Missing closing bracket |
 | `Empty bracket expansion` | Nothing inside brackets |
 | `Range must be ascending: 15..10` | End before start in range |
@@ -704,7 +714,10 @@ WHERE ts IN '2024-01-[15,16,17]T09:00;1h';
 
 ## See also
 
-- [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for interval scan optimization
-- [Interval scan](/docs/concepts/deep-dive/interval-scan/) — How QuestDB optimizes time queries
+- [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for
+  interval scan optimization
+- [Interval scan](/docs/concepts/deep-dive/interval-scan/) — How QuestDB
+  optimizes time queries
 - [WHERE clause](/docs/query/sql/where/) — Full WHERE syntax reference
-- [Date/time operators](/docs/query/operators/date-time/) — Additional timestamp operators
+- [Date/time operators](/docs/query/operators/date-time/) — Additional timestamp
+  operators
