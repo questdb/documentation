@@ -13,11 +13,11 @@ most use cases.
 
 There are three ways to get data from Kafka into QuestDB:
 
-| Strategy | Recommended for | Complexity |
-|----------|-----------------|------------|
-| [QuestDB Kafka connector](#questdb-kafka-connector) | Most users | Low |
-| [Stream processing (Flink)](#stream-processing) | Complex transformations | Medium |
-| [Custom program](#custom-program) | Special requirements | High |
+| Strategy                                                    | Recommended for         | Complexity |
+|-------------------------------------------------------------|-------------------------|------------|
+| [QuestDB Kafka connector](#questdb-kafka-connect-connector) | Most users              | Low        |
+| [Stream processing (Flink)](#stream-processing)             | Complex transformations | Medium     |
+| [Custom program](#custom-program)                           | Special requirements    | High       |
 
 **For most users, the QuestDB Kafka connector is the best choice.** It provides
 excellent performance (100,000+ rows/second), handles fault tolerance
