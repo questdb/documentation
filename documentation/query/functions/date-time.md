@@ -13,7 +13,7 @@ Format patterns tell QuestDB how to interpret string timestamps. They are used
 in multiple contexts:
 
 - **SQL functions**: [`to_timestamp()`](#to_timestamp) and [`to_timestamp_ns()`](#to_timestamp_ns) for parsing text into native timestamp values
-- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/reference/sql/copy/) and the REST API
+- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/query/sql/copy/) and the REST API
 - **Kafka connector**: The `timestamp.string.format` configuration property
 
 A format pattern combines units (letter codes for date/time components) with
