@@ -256,13 +256,11 @@ the connector configuration options:
 | value.prefix                       | `string`  | from_value                                                  | N/A                | Prefix for value fields                                     |
 | allowed.lag                        | `int`     | 250                                                         | 1000               | Allowed lag when there are no new events                    |
 | <sub>skip.unsupported.types</sub>  | `boolean` | false                                                       | false              | Skip unsupported types                                      |
-| <sub>timestamp.field.name</sub>    | `string`  | pickup_time                                                 | N/A                | Designated timestamp field name                             |
+| <sub>timestamp.field.name</sub>    | `string`  | pickup_time                                                 | N/A                | Designated timestamp field name. Use comma-separated names (e.g. `date,time`) to concatenate multiple fields |
 | timestamp.units                    | `string`  | micros                                                      | auto               | Designated timestamp field units                            |
 | <sub>timestamp.kafka.native</sub>  | `boolean` | true                                                        | false              | Use Kafka timestamps as designated timestamps               |
 | <sub>timestamp.string.fields</sub> | `string`  | creation_time,pickup_time                                   | N/A                | String fields with textual timestamps                       |
-| <sub>timestamp.string.format</sub> | `string`  | yyyy-MM-dd HH:mm:ss.SSSUUU z                                | N/A                | Timestamp format, used when parsing timestamp string fields |
-| <sub>timestamp.composed.fields</sub> | `string` | date,time                                                  | N/A                | Ordered list of fields to concatenate into a designated timestamp |
-| <sub>timestamp.composed.format</sub> | `string` | yyyyMMddHHmmssSSS                                          | N/A                | Format for parsing the concatenated composed timestamp value |
+| <sub>timestamp.string.format</sub> | `string`  | yyyy-MM-dd HH:mm:ss.SSSUUU z                                | <sub>yyyy-MM-ddTHH:mm:ss.SSSUUUZ</sub> | Timestamp format for parsing string timestamps and composed timestamps |
 | include.key                        | `boolean` | false                                                       | true               | Include message key in target table                         |
 | symbols                            | `string`  | instrument,stock                                            | N/A                | Comma separated list of columns that should be symbol type  |
 | doubles                            | `string`  | volume,price                                                | N/A                | Comma separated list of columns that should be double type  |
@@ -434,9 +432,8 @@ which supports the following values:
 - `seconds`
 - `auto` (default)
 
-Note: These 4 strategies are mutually exclusive. Cannot set both
-`timestamp.kafka.native=true` and `timestamp.field.name`, and
-`timestamp.composed.fields` cannot be combined with either of them.
+Note: These strategies are mutually exclusive. You cannot set both
+`timestamp.kafka.native=true` and `timestamp.field.name`.
 
 ### Textual timestamps parsing
 
@@ -477,7 +474,7 @@ timestamp set the following properties in your QuestDB connector configuration:
 ### Composed timestamps
 
 Some data sources split a timestamp across multiple fields. For example, a
-message might have separate `date` and `time` fields:
+message might have separate `date` and `time` fields (common with KDB-style data):
 
 ```json
 {
@@ -489,21 +486,21 @@ message might have separate `date` and `time` fields:
 ```
 
 The connector can concatenate these fields into a single string and parse the
-result as a designated timestamp. Use `timestamp.composed.fields` to specify the
-ordered list of fields to concatenate, and `timestamp.composed.format` to specify
-the format of the concatenated value.
+result as a designated timestamp. Use `timestamp.field.name` with comma-separated
+field names, and `timestamp.string.format` to specify the format of the
+concatenated value.
 
 #### Configuration
 
 ```properties
-timestamp.composed.fields=date,time
-timestamp.composed.format=yyyyMMddHHmmssSSS
+timestamp.field.name=date,time
+timestamp.string.format=yyyyMMddHHmmssSSS
 ```
 
 | Option | Description |
 |--------|-------------|
-| `timestamp.composed.fields` | Ordered, comma-separated list of field names to concatenate |
-| `timestamp.composed.format` | Format pattern for parsing the concatenated value. See the [QuestDB timestamp](/docs/query/functions/date-time/#timestamp-format) documentation for format details |
+| `timestamp.field.name` | Comma-separated list of field names to concatenate (e.g. `date,time`) |
+| `timestamp.string.format` | Format pattern for parsing the concatenated value. See the [QuestDB timestamp](/docs/query/functions/date-time/#timestamp-format) documentation for format details |
 
 In the example above, the fields `date` and `time` are concatenated into
 `20260202135010207`, which is then parsed using the format `yyyyMMddHHmmssSSS`
@@ -511,19 +508,14 @@ to produce the timestamp `2026-02-02T13:50:10.207000Z`.
 
 #### Behavior
 
-- The composed result is always the **designated timestamp**. Setting
-  `timestamp.composed.fields` implies the composed value is the designated
-  timestamp — there is no need to also set `timestamp.field.name`.
-- `timestamp.composed.fields` is mutually exclusive with `timestamp.field.name`
-  and `timestamp.kafka.native`. The connector will reject configurations that
-  combine these options.
-- `timestamp.composed.format` is required when `timestamp.composed.fields` is
-  set.
-- The source fields (`date`, `time` in the example) are consumed — they do not
+- When `timestamp.field.name` contains a comma, the connector treats it as a
+  composed timestamp configuration.
+- The composed result is always the **designated timestamp**.
+- The source fields (`date`, `time` in the example) are consumed - they do not
   appear as columns in QuestDB output.
-- The fields are concatenated in the order specified by
-  `timestamp.composed.fields`. All listed fields must be present in each message;
-  a missing field causes an error.
+- Fields are concatenated in the order specified. All listed fields must be
+  present in each message; a missing or null field causes an error.
+- Empty field names and duplicates are rejected at configuration time.
 
 ### Fault Tolerance
 
