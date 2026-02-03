@@ -6,6 +6,8 @@ description:
   complex temporal intervals in QuestDB queries.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
 TICK (Temporal Interval Calendar Kit) is a syntax for expressing complex
 temporal intervals in a single string. Use it with the `IN` operator to query
 multiple time ranges, schedules, and patterns efficiently.
@@ -13,11 +15,26 @@ multiple time ranges, schedules, and patterns efficiently.
 ```questdb-sql
 -- NYSE trading hours on workdays for January
 SELECT * FROM trades
-WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#workday;6h30m';
+WHERE ts IN '2025-01-[02..8,10..19,21..31]T09:30@America/New_York#workday;6h30m';
 ```
 
-This single expression generates interval scans for every weekday in January,
-each starting at 9:30 AM New York time and lasting 6 hours 30 minutes.
+This single expression generates interval scans for every weekday except
+holidays in January, each starting at 9:30 AM New York time and lasting 6 hours
+30 minutes.
+
+<EnterpriseNote>
+  With [exchange calendars](/docs/query/operators/exchange-calendars/), TICK
+  directly understands exchange schedules including holidays, early closes, and
+  lunch breaks. Here's an expression equivalent to the one above (XNYS is the
+  ISO 10383 MIC code of NYSE):
+
+```questdb-sql
+-- NYSE trading hours for January, holidays excluded automatically
+SELECT * FROM trades
+WHERE ts IN '2025-01-[01..31]#XNYS';
+```
+
+</EnterpriseNote>
 
 :::tip Key Points
 
@@ -48,6 +65,7 @@ TIMEZONE      = '@' iana_name                   -- '@America/New_York'
 
 FILTER        = '#workday' | '#weekend'         -- business day filters
               | '#' day_list                    -- '#Mon,Wed,Fri'
+              | '#' exchange_code              -- '#XNYS' (exchange calendar, Enterprise)
 
 DURATION      = ';' duration_value              -- ';6h30m'
 
@@ -72,6 +90,10 @@ unit          = 'y' | 'M' | 'w' | 'd' | 'bd' | 'h' | 'm' | 's' | 'T' | 'u' | 'n'
               --  ↑    ↑         ↑    ↑
               -- 'bd' (business days) valid only in date arithmetic, not duration
 ```
+
+The `exchange_code` filter uses an ISO 10383 MIC code (e.g., `#XNYS`) to apply
+real exchange trading schedules. See
+[exchange calendars](/docs/query/operators/exchange-calendars/) for details.
 
 ## Why TICK
 
