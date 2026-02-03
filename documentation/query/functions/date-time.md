@@ -172,6 +172,99 @@ reference.
 
 ---
 
+## Function categories
+
+### Current time
+
+| Function | Description |
+| :------- | :---------- |
+| [now](#now) | Current timestamp (stable within query) |
+| [now_ns](#now_ns) | Current timestamp with nanosecond precision (stable within query) |
+| [systimestamp](#systimestamp) | Current timestamp (changes per row) |
+| [systimestamp_ns](#systimestamp_ns) | Current timestamp with nanosecond precision (changes per row) |
+| [sysdate](#sysdate) | Current date with millisecond precision |
+| [today](#today-tomorrow-yesterday) | Interval for current day |
+| [tomorrow](#today-tomorrow-yesterday) | Interval for next day |
+| [yesterday](#today-tomorrow-yesterday) | Interval for previous day |
+
+### Extraction
+
+| Function | Description |
+| :------- | :---------- |
+| [extract](#extract) | Extract any time unit from timestamp |
+| [year](#year) | Extract year from timestamp |
+| [month](#month) | Extract month (1-12) |
+| [day](#day) | Extract day of month (1-31) |
+| [hour](#hour) | Extract hour (0-23) |
+| [minute](#minute) | Extract minute (0-59) |
+| [second](#second) | Extract second (0-59) |
+| [millis](#millis) | Extract milliseconds (0-999) |
+| [micros](#micros) | Extract microseconds (0-999) |
+| [nanos](#nanos) | Extract nanoseconds (0-999) |
+| [day_of_week](#day_of_week) | Day number (1=Monday to 7=Sunday) |
+| [day_of_week_sunday_first](#day_of_week_sunday_first) | Day number (1=Sunday to 7=Saturday) |
+| [days_in_month](#days_in_month) | Number of days in the month |
+| [week_of_year](#week_of_year) | Week number in year |
+| [is_leap_year](#is_leap_year) | Check if year is a leap year |
+
+### Arithmetic
+
+| Function | Description |
+| :------- | :---------- |
+| [dateadd](#dateadd) | Add time period to timestamp |
+| [datediff](#datediff) | Difference between timestamps |
+| [date_trunc](#date_trunc) | Truncate timestamp to specified precision |
+| [timestamp_ceil](#timestamp_ceil) | Round timestamp up to unit boundary |
+| [timestamp_floor](#timestamp_floor) | Round timestamp down to unit/interval boundary |
+
+### Conversion
+
+| Function | Description |
+| :------- | :---------- |
+| [to_timestamp](#to_timestamp) | Parse string to timestamp (microsecond) |
+| [to_timestamp_ns](#to_timestamp_ns) | Parse string to timestamp (nanosecond) |
+| [to_date](#to_date) | Parse string to date |
+| [to_str](#to_str) | Format timestamp as string |
+| [to_timezone](#to_timezone) | Convert timestamp to timezone |
+| [to_utc](#to_utc) | Convert timestamp to UTC |
+
+### Interval construction
+
+| Function | Description |
+| :------- | :---------- |
+| [interval](#interval) | Create interval from two timestamps |
+| [interval_start](#interval_start) | Extract interval lower bound |
+| [interval_end](#interval_end) | Extract interval upper bound |
+
+### Utilities
+
+| Function | Description |
+| :------- | :---------- |
+| [timestamp_shuffle](#timestamp_shuffle) | Generate random timestamp in range |
+| [pg_postmaster_start_time](#pg_postmaster_start_time) | Server start time (PostgreSQL compatibility) |
+
+---
+
+:::tip Filtering vs projection
+
+**For filtering (WHERE clause)**: Use [TICK syntax](/docs/query/operators/tick/)
+for optimized interval scans:
+```questdb-sql
+SELECT * FROM trades WHERE ts IN '$today'
+SELECT * FROM trades WHERE ts IN '$now - 1h..$now'
+```
+
+**For projection (SELECT clause)**: Use these functions for computed values:
+```questdb-sql
+SELECT dateadd('h', 2, ts) as shifted_time FROM trades
+SELECT year(ts), month(ts) FROM trades
+```
+
+TICK syntax leverages [interval scans](/docs/concepts/deep-dive/interval-scan/)
+for efficient filtering. Functions are for transformations and calculations.
+:::
+
+---
 
 ## date_trunc
 
@@ -221,6 +314,10 @@ date_trunc('year','2022-03-11T22:00:30.555555555Z') year2;
 
 `dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`,
 optionally respecting timezone DST transitions.
+
+Use in projections (SELECT clause) to shift timestamps. For filtering relative
+time windows in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(e.g., `$now - 1h..$now`) for optimized interval scans.
 
 :::tip
 
@@ -303,6 +400,11 @@ FROM long_sequence(1);
 | systimestamp                | dateadd                     |
 | :-------------------------- | :-------------------------- |
 | 2020-04-17T00:30:51.380499Z | 2020-06-17T00:30:51.380499Z |
+
+#### See also
+
+- [datediff](#datediff) - Difference between timestamps
+- [TICK syntax](/docs/query/operators/tick/) - For filtering with optimized interval scans
 
 ## datediff
 
@@ -497,6 +599,7 @@ timestamp.
   - `second`
   - `microseconds`
   - `milliseconds`
+  - `nanoseconds`
 
 - `timestamp` is any `timestamp`, `timestamp_ns`, `date`, or date literal string value.
 
@@ -519,6 +622,10 @@ extract(second from '2023-03-11T22:00:30.555555Z') second;
 | millennium | year | month | week | hour | second |
 |------------|------|-------|------|------|--------|
 | 3          | 2023 | 3     | 10   | 22   | 30     |
+
+#### See also
+
+- [year](#year), [month](#month), [day](#day), [hour](#hour), [minute](#minute), [second](#second) - Individual extraction functions
 
 ## hour
 
@@ -561,6 +668,16 @@ SELECT hour(ts), count() FROM transactions;
 `interval(start_timestamp, end_timestamp)` - creates a time interval from two
 timestamps.
 
+Intervals are **runtime-only values** that cannot be stored in tables. Use this
+function for:
+- Checking if a timestamp falls within a range: `ts IN interval(start, end)`
+- Extracting bounds with `interval_start()` and `interval_end()`
+- Working with intervals returned by `today()`, `tomorrow()`, `yesterday()`
+
+For filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(e.g., `$today`, `$now - 1h..$now`) which enables
+[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
+
 **Arguments:**
 
 - `start_timestamp` is a timestamp.
@@ -580,9 +697,17 @@ SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
 | :------------------------------------------------------- |
 | ('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z') |
 
+#### See also
+
+- [interval_start](#interval_start) - Extract interval lower bound
+- [interval_end](#interval_end) - Extract interval upper bound
+- [TICK syntax](/docs/query/operators/tick/) - For filtering with optimized interval scans
+
 ## interval_start
 
 `interval_start(interval)` - extracts the lower bound of the interval.
+
+Use to extract bounds from intervals returned by functions or stored in columns.
 
 **Arguments:**
 
@@ -608,6 +733,8 @@ SELECT
 ## interval_end
 
 `interval_end(interval)` - extracts the upper bound of the interval.
+
+Use to extract bounds from intervals returned by functions or stored in columns.
 
 **Arguments:**
 
@@ -898,6 +1025,38 @@ SELECT * FROM trades
 WHERE timestamp > now() - 60000000L;
 ```
 
+## now_ns
+
+`now_ns()` - offset from UTC Epoch in nanoseconds.
+
+Calculates `UTC timestamp` using system's real time clock with nanosecond
+precision. Like `now()`, it does not change within the query execution timeframe.
+
+**Arguments:**
+
+- `now_ns()` does not accept arguments.
+
+**Return value:**
+
+Return value type is `timestamp_ns`.
+
+**Examples:**
+
+```questdb-sql title="Query returns same timestamp in every row"
+SELECT now_ns() FROM long_sequence(3)
+```
+
+| now_ns                         |
+| :----------------------------- |
+| 2021-02-01T21:51:34.443726123Z |
+| 2021-02-01T21:51:34.443726123Z |
+| 2021-02-01T21:51:34.443726123Z |
+
+#### See also
+
+- [now](#now) - Current timestamp with microsecond precision
+- [systimestamp_ns](#systimestamp_ns) - Current timestamp with nanosecond precision (changes per row)
+
 ## pg_postmaster_start_time
 
 `pg_postmaster_start_time()` - returns the time when the server started.
@@ -942,7 +1101,7 @@ FROM long_sequence(1);
 
 | second |
 | :----- |
-| 43     |
+| 21     |
 
 ```questdb-sql title="Using in an aggregation"
 SELECT second(ts), count() FROM transactions;
@@ -965,6 +1124,11 @@ SELECT second(ts), count() FROM transactions;
 - `yesterday()` - returns an interval representing the previous day.
 
 Interval is in the UTC/GMT+0 timezone.
+
+These functions return intervals for use in projections or comparisons. For
+filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(`$today`, `$tomorrow`, `$yesterday`) which enables
+[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
 
 **Arguments:**
 
@@ -1015,6 +1179,10 @@ interval that corresponds to their 'day'.
 
 In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM`
 `UTC` the day before.
+
+#### See also
+
+- [TICK syntax](/docs/query/operators/tick/) - Use `$today`, `$tomorrow`, `$yesterday` for optimized filtering
 
 ## sysdate
 
@@ -1148,6 +1316,7 @@ A unit must be provided to specify which granularity to perform rounding.
 - `m` minutes
 - `h` hours
 - `d` days
+- `w` weeks
 - `M` months
 - `y` year
 
@@ -1176,15 +1345,18 @@ SELECT
   FROM t
 ```
 
-| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute | c_hour | c_day | c_month | c_year |
-| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | -------- | ------ | ----- | ------- | ------ |
-| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862146000Z | 2016-02-10T16:18:22.863000000Z | 2016-02-10T16:18:23.000000000Z |
-
+| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute                       | c_hour                         | c_day                          | c_month                        | c_year                         |
+| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
+| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862146000Z | 2016-02-10T16:18:22.863000000Z | 2016-02-10T16:18:23.000000000Z | 2016-02-10T16:19:00.000000000Z | 2016-02-10T17:00:00.000000000Z | 2016-02-11T00:00:00.000000000Z | 2016-03-01T00:00:00.000000000Z | 2017-01-01T00:00:00.000000000Z |
 
 ## timestamp_floor
 
 `timestamp_floor(interval, timestamp)` - performs a floor calculation on a
 timestamp by given interval expression.
+
+Use for custom time bucketing in projections. For time-series aggregation,
+consider [SAMPLE BY](/docs/query/sql/sample-by/) which provides optimized
+grouping with fill options.
 
 An interval expression must be provided to specify which granularity to perform
 rounding for.
@@ -1203,6 +1375,7 @@ suffices:
 - `m` minutes
 - `h` hours
 - `d` days
+- `w` weeks
 - `M` months
 - `y` year
 
@@ -1245,10 +1418,9 @@ SELECT
 
 Gives:
 
-| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute | c_hour | c_day | c_month | c_year |
-|--------------------------------|--------------------------------|--------------------------------|--------------------------------|--------------------------------|----------|--------|-------|---------|--------|
-| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145000Z | 2016-02-10T16:18:22.862000000Z | 2016-02-10T16:18:22.000000000Z |
-
+| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute                       | c_hour                         | c_day                          | c_month                        | c_year                         |
+| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
+| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145000Z | 2016-02-10T16:18:22.862000000Z | 2016-02-10T16:18:22.000000000Z | 2016-02-10T16:18:00.000000000Z | 2016-02-10T16:00:00.000000000Z | 2016-02-10T00:00:00.000000000Z | 2016-02-01T00:00:00.000000000Z | 2016-01-01T00:00:00.000000000Z |
 
 #### timestamp_floor with offset
 
@@ -1500,6 +1672,11 @@ converts `string` to `timestamp` if it is a partial or full form of
 offset, `+01:00` or `Z`. See more examples in
 [Native timestamp](/docs/query/sql/where/#native-timestamp-format)
 
+#### See also
+
+- [to_timestamp_ns](#to_timestamp_ns) - Parse string to timestamp with nanosecond precision
+- [to_str](#to_str) - Format timestamp as string
+- [Timestamp format](#timestamp-format) - Format pattern reference
 
 ## to_timestamp_ns
 
@@ -1692,3 +1869,16 @@ SELECT year(ts), count() FROM transactions;
 | 2015 | 2323  |
 | 2016 | 9876  |
 | 2017 | 2567  |
+
+#### See also
+
+- [extract](#extract) - Extract any time unit from timestamp
+
+---
+
+## See also
+
+- [TICK interval syntax](/docs/query/operators/tick/) - Declarative time intervals for filtering
+- [Timestamps and timezones](/docs/concepts/timestamps-timezones/) - Working with time zones
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+- [Designated timestamp](/docs/concepts/designated-timestamp/) - Required for interval scan optimization
