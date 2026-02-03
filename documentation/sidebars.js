@@ -486,11 +486,7 @@ module.exports = {
             "query/operators/comparison",
             "query/operators/date-time",
             "query/operators/tick",
-            {
-              id: "query/operators/exchange-calendars",
-              type: "doc",
-              customProps: { tag: "Enterprise" },
-            },
+            "query/operators/exchange-calendars",
             "query/operators/ipv4",
             "query/operators/logical",
             "query/operators/misc",
