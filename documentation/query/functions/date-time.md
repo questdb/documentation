@@ -7,138 +7,6 @@ description: Timestamp, date and time functions reference documentation.
 This page describes the available functions to assist with performing time-based
 calculations using timestamps.
 
-## Timestamp format
-
-Format patterns tell QuestDB how to interpret string timestamps. They are used
-in multiple contexts:
-
-- **SQL functions**: [`to_timestamp()`](#to_timestamp) and [`to_timestamp_ns()`](#to_timestamp_ns) for parsing text into native timestamp values
-- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/query/sql/copy/) and the REST API
-- **Kafka connector**: The `timestamp.string.format` configuration property
-
-A format pattern combines units (letter codes for date/time components) with
-literal characters that match your input. For example, `yyyy-MM-dd HH:mm:ss`
-parses `2024-03-15 14:30:45`. Units are case-sensitive.
-
-See [Working with time zones](/docs/concepts/timestamps-timezones/) for more on
-timestamp handling in QuestDB.
-
-| Unit   | Date or Time Component                                                     | Presentation       | Examples                              |
-| ------ |----------------------------------------------------------------------------| ------------------ | ------------------------------------- |
-| `G`    | Era designator                                                             | Text               | AD                                    |
-| `y`    | `y` single digit or greedy year, depending on the number of digits in input | Year               | 1996; 96; 999; 3                      |
-| `yy`   | Two digit year of the current century                                      | Year               | 96 (interpreted as 2096)              |
-| `yyy`  | Three-digit year                                                           | Year               | 999                                   |
-| `yyyy` | Four-digit year                                                            | Year               | 1996                                  |
-| `M`    | Month in year, numeric, greedy                                             | Month              | 7; 07; 007; etc.                      |
-| `MM`   | Month in year, two-digit                                                   | Month              | 07                                    |
-| `MMM`  | Month in year, name                                                        | Month              | Jul; July                             |
-| `w`    | Week in year                                                               | Number             | 2                                     |
-| `ww`   | ISO week of year (two-digit)                                               | Number             | 02                                    |
-| `D`    | Day in year                                                                | Number             | 189                                   |
-| `d`    | Day in month                                                               | Number             | 10                                    |
-| `F`    | Day of week in month                                                       | Number             | 2                                     |
-| `E`    | Day name in week                                                           | Text               | Tuesday; Tue                          |
-| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                           | Number             | 1                                     |
-| `a`    | Am/pm marker                                                               | Text               | PM                                    |
-| `H`    | Hour in day (0-23)                                                         | Number             | 0                                     |
-| `k`    | Hour in day (1-24)                                                         | Number             | 24                                    |
-| `K`    | Hour in am/pm (0-11)                                                       | Number             | 0                                     |
-| `h`    | Hour in am/pm (1-12)                                                       | Number             | 12                                    |
-| `m`    | Minute in hour                                                             | Number             | 30                                    |
-| `s`    | Second in minute                                                           | Number             | 55                                    |
-| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)         | Number             | 978                                   |
-| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 900                                   |
-| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)         | Number             | 456                                   |
-| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 456                                   |
-| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)  | Number             | 123456                                |
-| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)   | Number             | 900                                   |
-| `N+`   | Nanosecond up to 9 digits (see explanation below for fraction-of-second)   | Number             | 123456789                             |
-| `z`    | Time zone                                                                  | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
-| `Z`    | Time zone                                                                  | RFC 822 time zone  | -0800                                 |
-| `x`    | Time zone                                                                  | ISO 8601 time zone | -08; -0800; -08:00                    |
-
-### Common format patterns
-
-Here are practical examples of complete format strings for common use cases:
-
-| Format pattern                  | Example input                   | Description                              |
-|---------------------------------|---------------------------------|------------------------------------------|
-| `yyyy-MM-ddTHH:mm:ss.SSSUUUZ`   | `2024-03-15T14:30:45.123456Z`   | ISO 8601 with microseconds               |
-| `yyyy-MM-ddTHH:mm:ss.SSSUUUNNN` | `2024-03-15T14:30:45.123456789` | With nanoseconds                         |
-| `yyyy-MM-dd HH:mm:ss`           | `2024-03-15 14:30:45`           | Standard datetime with space separator   |
-| `yyyy-MM-dd`                    | `2024-03-15`                    | Date only                                |
-| `yyyy-MM-ddTHH:mm:ssZ`          | `2024-03-15T14:30:45Z`          | ISO 8601 without fractional seconds      |
-| `yyyy-MM-dd HH:mm:ss.SSS`       | `2024-03-15 14:30:45.123`       | Datetime with milliseconds               |
-| `dd/MM/yyyy HH:mm:ss`           | `15/03/2024 14:30:45`           | European date format                     |
-| `MM/dd/yyyy HH:mm:ss`           | `03/15/2024 14:30:45`           | US date format                           |
-| `yyyyMMdd-HHmmss`               | `20240315-143045`               | Compact format (often used in filenames) |
-| `yyyy-MM-ddTHH:mm:ss.SSSz`      | `2024-03-15T14:30:45.123PST`    | With timezone abbreviation               |
-
-
-```questdb-sql title="Parsing common formats"
-SELECT
-  to_timestamp('2024-03-15T14:30:45.123456Z', 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ') as iso,
-  to_timestamp('2024-03-15 14:30:45', 'yyyy-MM-dd HH:mm:ss') as standard,
-  to_timestamp('15/03/2024 14:30:45', 'dd/MM/yyyy HH:mm:ss') as european
-FROM long_sequence(1);
-```
-
-### Variable-width year parsing with `y`
-
-Use `y` when your input data has years of varying lengths. Unlike `yyyy` which
-expects exactly 4 digits, `y` reads all consecutive digits until it encounters
-a non-digit character (such as `-` or `/`).
-
-**Special case for 2-digit years:** When the input contains exactly 2 digits,
-QuestDB interprets it as a year in the current century (2000-2099). All other
-lengths are interpreted literally.
-
-| Input      | Format | Result                        | Explanation                                  |
-| ---------- | ------ | ----------------------------- | -------------------------------------------- |
-| `5-03`     | `y-M`  | `0005-03-01T00:00:00.000000Z` | 1 digit → literal year 5                     |
-| `05-03`    | `y-M`  | `2005-03-01T00:00:00.000000Z` | 2 digits → current century (20xx)            |
-| `005-03`   | `y-M`  | `0005-03-01T00:00:00.000000Z` | 3 digits → literal year 5                    |
-| `0005-03`  | `y-M`  | `0005-03-01T00:00:00.000000Z` | 4 digits → literal year 5                    |
-| `2024-03`  | `y-M`  | `2024-03-01T00:00:00.000000Z` | 4 digits → literal year 2024                 |
-
-For most use cases, prefer `yyyy` for explicit 4-digit year matching.
-
-### Parsing fractions of a second
-
-Sub-second precision uses three unit types, each representing 3 decimal places:
-
-| Unit  | Represents   | Position in fraction |
-| ----- | ------------ | -------------------- |
-| `S`   | Milliseconds | Digits 1-3 (`.XXX`)  |
-| `U`   | Microseconds | Digits 4-6 (`.___XXX`) |
-| `N`   | Nanoseconds  | Digits 7-9 (`.______XXX`) |
-
-**Fixed-width formats** use repeated letters (`SSS`, `UUU`, `NNN`) and expect
-an exact number of digits:
-
-| Format       | Digits | Example input | Parsed value          |
-| ------------ | ------ | ------------- | --------------------- |
-| `.SSS`       | 3      | `.123`        | 123 ms                |
-| `.SSSUUU`    | 6      | `.123456`     | 123 ms + 456 µs       |
-| `.SSSUUUNNN` | 9      | `.123456789`  | 123 ms + 456 µs + 789 ns |
-
-**Variable-width formats** use a single letter or `+` suffix to accept varying
-lengths:
-
-| Format   | Digits | Example input | Parsed value              |
-| -------- | ------ | ------------- | ------------------------- |
-| `.S`     | 1-3    | `.12`         | 120 ms                    |
-| `.SSSU`  | 4-6    | `.1234`       | 123 ms + 400 µs           |
-| `.SSSUUUN` | 7-9  | `.1234567`    | 123 ms + 456 µs + 700 ns  |
-| `.U+`    | 1-6    | `.12345`      | 123 ms + 450 µs           |
-| `.N+`    | 1-9    | `.12`         | 120 ms (pads with zeros)  |
-
-**Practical recommendations:**
-- For microsecond timestamps (QuestDB default): use `.SSSUUU` or `.U+`
-- For nanosecond timestamps: use `.SSSUUUNNN` or `.N+`
-- For millisecond-only data: use `.SSS` or `.S`
-
 ## Timestamp and date types
 
 QuestDB has three temporal types with different precision:
@@ -1884,6 +1752,139 @@ SELECT year(ts), count() FROM transactions;
 #### See also
 
 - [extract](#extract) - Extract any time unit from timestamp
+
+---
+
+## Appendix: Timestamp format patterns {#timestamp-format}
+Format patterns tell QuestDB how to interpret string timestamps. They are used
+in multiple contexts:
+
+- **SQL functions**: [`to_timestamp()`](#to_timestamp) and [`to_timestamp_ns()`](#to_timestamp_ns) for parsing text into native timestamp values
+- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/query/sql/copy/) and the REST API
+- **Kafka connector**: The `timestamp.string.format` configuration property
+
+A format pattern combines units (letter codes for date/time components) with
+literal characters that match your input. For example, `yyyy-MM-dd HH:mm:ss`
+parses `2024-03-15 14:30:45`. Units are case-sensitive.
+
+See [Working with time zones](/docs/concepts/timestamps-timezones/) for more on
+timestamp handling in QuestDB.
+
+| Unit   | Date or Time Component                                                     | Presentation       | Examples                              |
+| ------ |----------------------------------------------------------------------------| ------------------ | ------------------------------------- |
+| `G`    | Era designator                                                             | Text               | AD                                    |
+| `y`    | `y` single digit or greedy year, depending on the number of digits in input | Year               | 1996; 96; 999; 3                      |
+| `yy`   | Two digit year of the current century                                      | Year               | 96 (interpreted as 2096)              |
+| `yyy`  | Three-digit year                                                           | Year               | 999                                   |
+| `yyyy` | Four-digit year                                                            | Year               | 1996                                  |
+| `M`    | Month in year, numeric, greedy                                             | Month              | 7; 07; 007; etc.                      |
+| `MM`   | Month in year, two-digit                                                   | Month              | 07                                    |
+| `MMM`  | Month in year, name                                                        | Month              | Jul; July                             |
+| `w`    | Week in year                                                               | Number             | 2                                     |
+| `ww`   | ISO week of year (two-digit)                                               | Number             | 02                                    |
+| `D`    | Day in year                                                                | Number             | 189                                   |
+| `d`    | Day in month                                                               | Number             | 10                                    |
+| `F`    | Day of week in month                                                       | Number             | 2                                     |
+| `E`    | Day name in week                                                           | Text               | Tuesday; Tue                          |
+| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                           | Number             | 1                                     |
+| `a`    | Am/pm marker                                                               | Text               | PM                                    |
+| `H`    | Hour in day (0-23)                                                         | Number             | 0                                     |
+| `k`    | Hour in day (1-24)                                                         | Number             | 24                                    |
+| `K`    | Hour in am/pm (0-11)                                                       | Number             | 0                                     |
+| `h`    | Hour in am/pm (1-12)                                                       | Number             | 12                                    |
+| `m`    | Minute in hour                                                             | Number             | 30                                    |
+| `s`    | Second in minute                                                           | Number             | 55                                    |
+| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)         | Number             | 978                                   |
+| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 900                                   |
+| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)         | Number             | 456                                   |
+| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 456                                   |
+| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)  | Number             | 123456                                |
+| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)   | Number             | 900                                   |
+| `N+`   | Nanosecond up to 9 digits (see explanation below for fraction-of-second)   | Number             | 123456789                             |
+| `z`    | Time zone                                                                  | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
+| `Z`    | Time zone                                                                  | RFC 822 time zone  | -0800                                 |
+| `x`    | Time zone                                                                  | ISO 8601 time zone | -08; -0800; -08:00                    |
+
+### Common format patterns
+
+Here are practical examples of complete format strings for common use cases:
+
+| Format pattern                  | Example input                   | Description                              |
+|---------------------------------|---------------------------------|------------------------------------------|
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUZ`   | `2024-03-15T14:30:45.123456Z`   | ISO 8601 with microseconds               |
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUNNN` | `2024-03-15T14:30:45.123456789` | With nanoseconds                         |
+| `yyyy-MM-dd HH:mm:ss`           | `2024-03-15 14:30:45`           | Standard datetime with space separator   |
+| `yyyy-MM-dd`                    | `2024-03-15`                    | Date only                                |
+| `yyyy-MM-ddTHH:mm:ssZ`          | `2024-03-15T14:30:45Z`          | ISO 8601 without fractional seconds      |
+| `yyyy-MM-dd HH:mm:ss.SSS`       | `2024-03-15 14:30:45.123`       | Datetime with milliseconds               |
+| `dd/MM/yyyy HH:mm:ss`           | `15/03/2024 14:30:45`           | European date format                     |
+| `MM/dd/yyyy HH:mm:ss`           | `03/15/2024 14:30:45`           | US date format                           |
+| `yyyyMMdd-HHmmss`               | `20240315-143045`               | Compact format (often used in filenames) |
+| `yyyy-MM-ddTHH:mm:ss.SSSz`      | `2024-03-15T14:30:45.123PST`    | With timezone abbreviation               |
+
+
+```questdb-sql title="Parsing common formats"
+SELECT
+  to_timestamp('2024-03-15T14:30:45.123456Z', 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ') as iso,
+  to_timestamp('2024-03-15 14:30:45', 'yyyy-MM-dd HH:mm:ss') as standard,
+  to_timestamp('15/03/2024 14:30:45', 'dd/MM/yyyy HH:mm:ss') as european
+FROM long_sequence(1);
+```
+
+### Variable-width year parsing with `y`
+
+Use `y` when your input data has years of varying lengths. Unlike `yyyy` which
+expects exactly 4 digits, `y` reads all consecutive digits until it encounters
+a non-digit character (such as `-` or `/`).
+
+**Special case for 2-digit years:** When the input contains exactly 2 digits,
+QuestDB interprets it as a year in the current century (2000-2099). All other
+lengths are interpreted literally.
+
+| Input      | Format | Result                        | Explanation                                  |
+| ---------- | ------ | ----------------------------- | -------------------------------------------- |
+| `5-03`     | `y-M`  | `0005-03-01T00:00:00.000000Z` | 1 digit → literal year 5                     |
+| `05-03`    | `y-M`  | `2005-03-01T00:00:00.000000Z` | 2 digits → current century (20xx)            |
+| `005-03`   | `y-M`  | `0005-03-01T00:00:00.000000Z` | 3 digits → literal year 5                    |
+| `0005-03`  | `y-M`  | `0005-03-01T00:00:00.000000Z` | 4 digits → literal year 5                    |
+| `2024-03`  | `y-M`  | `2024-03-01T00:00:00.000000Z` | 4 digits → literal year 2024                 |
+
+For most use cases, prefer `yyyy` for explicit 4-digit year matching.
+
+### Parsing fractions of a second
+
+Sub-second precision uses three unit types, each representing 3 decimal places:
+
+| Unit  | Represents   | Position in fraction |
+| ----- | ------------ | -------------------- |
+| `S`   | Milliseconds | Digits 1-3 (`.XXX`)  |
+| `U`   | Microseconds | Digits 4-6 (`.___XXX`) |
+| `N`   | Nanoseconds  | Digits 7-9 (`.______XXX`) |
+
+**Fixed-width formats** use repeated letters (`SSS`, `UUU`, `NNN`) and expect
+an exact number of digits:
+
+| Format       | Digits | Example input | Parsed value          |
+| ------------ | ------ | ------------- | --------------------- |
+| `.SSS`       | 3      | `.123`        | 123 ms                |
+| `.SSSUUU`    | 6      | `.123456`     | 123 ms + 456 µs       |
+| `.SSSUUUNNN` | 9      | `.123456789`  | 123 ms + 456 µs + 789 ns |
+
+**Variable-width formats** use a single letter or `+` suffix to accept varying
+lengths:
+
+| Format   | Digits | Example input | Parsed value              |
+| -------- | ------ | ------------- | ------------------------- |
+| `.S`     | 1-3    | `.12`         | 120 ms                    |
+| `.SSSU`  | 4-6    | `.1234`       | 123 ms + 400 µs           |
+| `.SSSUUUN` | 7-9  | `.1234567`    | 123 ms + 456 µs + 700 ns  |
+| `.U+`    | 1-6    | `.12345`      | 123 ms + 450 µs           |
+| `.N+`    | 1-9    | `.12`         | 120 ms (pads with zeros)  |
+
+**Practical recommendations:**
+- For microsecond timestamps (QuestDB default): use `.SSSUUU` or `.U+`
+- For nanosecond timestamps: use `.SSSUUUNNN` or `.N+`
+- For millisecond-only data: use `.SSS` or `.S`
 
 ---
 
