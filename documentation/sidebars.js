@@ -750,6 +750,7 @@ module.exports = {
                     "cookbook/sql/finance/cumulative-product",
                     "cookbook/sql/finance/vwap",
                     "cookbook/sql/finance/bollinger-bands",
+                    "cookbook/sql/finance/bollinger-bandwidth",
                     "cookbook/sql/finance/tick-trin",
                     "cookbook/sql/finance/aggressor-volume-imbalance",
                     "cookbook/sql/finance/volume-profile",

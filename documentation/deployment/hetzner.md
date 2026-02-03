@@ -232,6 +232,7 @@ renderText={(release) => (
   -v "/questdb/qdbroot:/var/lib/questdb" \\
   -e JVM_PREPEND="-Xmx12g" \\
   --log-driver local \\
+  --ulimit nofile=1048576:1048576 \\
   questdb/questdb:${release.name}`}
 </CodeBlock>
 )}
@@ -266,6 +267,10 @@ The [`local`](https://docs.docker.com/engine/logging/drivers/local/) driver prov
 - **Log files**: 5 files of 20MB each
 
 These limits can be customized using `--log-opt`. Consult the [`local`](https://docs.docker.com/engine/logging/drivers/local/) driver documentation for details.
+
+**Open file limit**
+The recommended "maximum open file" limit in QuestDB is 1048576 ([ref](https://questdb.com/docs/getting-started/capacity-planning/#maximum-open-files)).
+By default `dockerd` has this limit configured to 524287 (`cat /proc/$(pidof dockerd)/limits | grep "Max open files"`), so the recommended limit is explicitly specified with `--ulimit nofile=1048576:1048576`.
 
 ### Verification
 
