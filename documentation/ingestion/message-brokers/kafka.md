@@ -23,6 +23,8 @@ There are three ways to get data from Kafka into QuestDB:
 excellent performance (100,000+ rows/second), handles fault tolerance
 automatically, and requires minimal configuration.
 
+<!-- Legacy anchor kept for inbound links from other docs pages -->
+<a id="questdb-kafka-connect-connector"></a>
 ## QuestDB Kafka connector
 
 The [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
