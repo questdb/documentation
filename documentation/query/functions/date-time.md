@@ -17,40 +17,40 @@ See
 [Working with time zones](/docs/concepts/timestamps-timezones/)
 for more on timestamp handling in QuestDB.
 
-| Unit   | Date or Time Component                                                                                         | Presentation       | Examples                              |
-| ------ | -------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
-| `G`    | Era designator                                                                                                 | Text               | AD                                    |
-| `y`    | `y` single digit or greedy year, depending on the number of digits in input                                    | Year               | 1996; 96; 999; 3                      |
-| `yy`   | Two digit year of the current century                                                                          | Year               | 96 (interpreted as 2096)              |
-| `yyy`  | Three-digit year                                                                                               | Year               | 999                                   |
-| `yyyy` | Four-digit year                                                                                                | Year               | 1996                                  |
-| `M`    | Month in year, numeric, greedy                                                                                 | Month              | 7; 07; 007; etc.                      |
-| `MM`   | Month in year, two-digit                                                                                       | Month              | 07                                    |
-| `MMM`  | Month in year, name                                                                                            | Month              | Jul; July                             |
-| `w`    | Week in year                                                                                                   | Number             | 2                                     |
-| `ww`   | ISO week of year (two-digit)                                                                                   | Number             | 02                                    |
-| `D`    | Day in year                                                                                                    | Number             | 189                                   |
-| `d`    | Day in month                                                                                                   | Number             | 10                                    |
-| `F`    | Day of week in month                                                                                           | Number             | 2                                     |
-| `E`    | Day name in week                                                                                               | Text               | Tuesday; Tue                          |
-| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                                                               | Number             | 1                                     |
-| `a`    | Am/pm marker                                                                                                   | Text               | PM                                    |
-| `H`    | Hour in day (0-23)                                                                                             | Number             | 0                                     |
-| `k`    | Hour in day (1-24)                                                                                             | Number             | 24                                    |
-| `K`    | Hour in am/pm (0-11)                                                                                           | Number             | 0                                     |
-| `h`    | Hour in am/pm (1-12)                                                                                           | Number             | 12                                    |
-| `m`    | Minute in hour                                                                                                 | Number             | 30                                    |
-| `s`    | Second in minute                                                                                               | Number             | 55                                    |
-| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)                                             | Number             | 978                                   |
-| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 900                                   |
-| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)                                             | Number             | 456                                   |
-| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 456                                   |
-| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)                                      | Number             | 123456                                |
-| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)                                       | Number             | 900                                   |
-| `N+`   | Microsecond up to 9 digits (see explanation below for fraction-of-second)                                      | Number             | 123456789                             |
-| `z`    | Time zone                                                                                                      | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
-| `Z`    | Time zone                                                                                                      | RFC 822 time zone  | -0800                                 |
-| `x`    | Time zone                                                                                                      | ISO 8601 time zone | -08; -0800; -08:00                    |
+| Unit   | Date or Time Component                                                     | Presentation       | Examples                              |
+| ------ |----------------------------------------------------------------------------| ------------------ | ------------------------------------- |
+| `G`    | Era designator                                                             | Text               | AD                                    |
+| `y`    | `y` single digit or greedy year, depending on the number of digits in input | Year               | 1996; 96; 999; 3                      |
+| `yy`   | Two digit year of the current century                                      | Year               | 96 (interpreted as 2096)              |
+| `yyy`  | Three-digit year                                                           | Year               | 999                                   |
+| `yyyy` | Four-digit year                                                            | Year               | 1996                                  |
+| `M`    | Month in year, numeric, greedy                                             | Month              | 7; 07; 007; etc.                      |
+| `MM`   | Month in year, two-digit                                                   | Month              | 07                                    |
+| `MMM`  | Month in year, name                                                        | Month              | Jul; July                             |
+| `w`    | Week in year                                                               | Number             | 2                                     |
+| `ww`   | ISO week of year (two-digit)                                               | Number             | 02                                    |
+| `D`    | Day in year                                                                | Number             | 189                                   |
+| `d`    | Day in month                                                               | Number             | 10                                    |
+| `F`    | Day of week in month                                                       | Number             | 2                                     |
+| `E`    | Day name in week                                                           | Text               | Tuesday; Tue                          |
+| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                           | Number             | 1                                     |
+| `a`    | Am/pm marker                                                               | Text               | PM                                    |
+| `H`    | Hour in day (0-23)                                                         | Number             | 0                                     |
+| `k`    | Hour in day (1-24)                                                         | Number             | 24                                    |
+| `K`    | Hour in am/pm (0-11)                                                       | Number             | 0                                     |
+| `h`    | Hour in am/pm (1-12)                                                       | Number             | 12                                    |
+| `m`    | Minute in hour                                                             | Number             | 30                                    |
+| `s`    | Second in minute                                                           | Number             | 55                                    |
+| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)         | Number             | 978                                   |
+| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 900                                   |
+| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)         | Number             | 456                                   |
+| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 456                                   |
+| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)  | Number             | 123456                                |
+| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)   | Number             | 900                                   |
+| `N+`   | Nanosecond up to 9 digits (see explanation below for fraction-of-second)   | Number             | 123456789                             |
+| `z`    | Time zone                                                                  | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
+| `Z`    | Time zone                                                                  | RFC 822 time zone  | -0800                                 |
+| `x`    | Time zone                                                                  | ISO 8601 time zone | -08; -0800; -08:00                    |
 
 ### Examples for greedy year format `y`
 
@@ -104,7 +104,7 @@ timestamp, you cannot set it to any value before the Unix epoch (`1970-01-01T00:
 
 To explicitly convert from `TIMESTAMP` to `DATE` or `TIMESTAMP_NS`, you can use
 `CAST(ts_column AS DATE)` or `CAST(ts_column AS TIMESTAMP_NS)`. To convert from
-`DATE` or `TIMESTAMP_NS` to `TIMESTAMP` you can `CAST(column AS TIMESTAMP_NS)`.
+`DATE` or `TIMESTAMP_NS` to `TIMESTAMP` you can `CAST(column AS TIMESTAMP)`.
 
 ### Programmatically convert from language-specific datetimes into QuestDB timestamps
 
@@ -153,12 +153,12 @@ of type `timestamp_ns` or if the date passed as a string contains nanoseconds re
 ```questdb-sql
 SELECT date_trunc('hour', '2022-03-11T22:00:30.555555Z') hour,
 date_trunc('month', '2022-03-11T22:00:30.555555Z') month,
-date_trunc('year','2022-03-11T22:00:30.555555Z') year;
-date_trunc('year','2022-03-11T22:00:30.555555000Z') year;
+date_trunc('year','2022-03-11T22:00:30.555555Z') year,
+date_trunc('year','2022-03-11T22:00:30.555555555Z') year2;
 ```
 
-| hour (timestamp_ns)         | month (timestamp_ns)        | year (timestamp_ns)         | year (timestamp_ns)            |
-| --------------------------- | --------------------------- | --------------------------- | ------------------------------ |
+| hour (timestamp_ns)         | month (timestamp_ns)        | year (timestamp)            | year2 (timestamp_ns)           |
+|-----------------------------|-----------------------------|-----------------------------|--------------------------------|
 | 2022-03-11T22:00:00.000000Z | 2022-03-01T00:00:00.000000Z | 2022-01-01T00:00:00.000000Z | 2022-01-01T00:00:00.000000000Z |
 
 ## dateadd
@@ -202,7 +202,7 @@ timezone-aware calculations, use the timezone parameter.
 **Return value:**
 
 Return value type defaults to `timestamp`, but it will return a `timestamp_ns` if the `startDate`
-argument is a `timetamp_ns`.
+argument is a `timestamp_ns`.
 
 **Examples:**
 
@@ -455,18 +455,18 @@ Return value type is `integer`.
 SELECT extract(millennium from '2023-03-11T22:00:30.555555Z') millennium,
 extract(year from '2023-03-11T22:00:30.555555Z') year,
 extract(month from '2023-03-11T22:00:30.555555Z') month,
-extract(week from '2023-03-11T22:00:30.555555Z') quarter,
+extract(week from '2023-03-11T22:00:30.555555Z') week,
 extract(hour from '2023-03-11T22:00:30.555555Z') hour,
 extract(second from '2023-03-11T22:00:30.555555Z') second;
 ```
 
-| millennium | year | month | quarter | hour | second |
-| ---------- | ---- | ----- | ------- | ---- | ------ |
-| 3          | 2023 | 3     | 10      | 22   | 30     |
+| millennium | year | month | week | hour | second |
+|------------|------|-------|------|------|--------|
+| 3          | 2023 | 3     | 10   | 22   | 30     |
 
 ## hour
 
-`hour(value)` - returns the `hour` of day for a given timestamp from `0` to
+`hour(timestamp)` - returns the `hour` of day for a given timestamp from `0` to
 `23`.
 
 **Arguments:**
@@ -485,8 +485,8 @@ FROM long_sequence(1);
 ```
 
 | hour |
-| :--- |
-| 12   |
+|:-----|
+| 15   |
 
 ```questdb-sql title="Using in an aggregation"
 SELECT hour(ts), count() FROM transactions;
@@ -624,8 +624,8 @@ SELECT micros(to_timestamp('2020-03-01:15:43:21.123456', 'yyyy-MM-dd:HH:mm:ss.SS
 FROM long_sequence(1);
 ```
 
-| millis |
-| :----- |
+| micros |
+|:-------|
 | 456    |
 
 ```questdb-sql title="Parsing 3 digits when no unit is added after U"
@@ -633,7 +633,7 @@ SELECT micros(to_timestamp('2020-03-01:15:43:21.123456', 'yyyy-MM-dd:HH:mm:ss.SS
 FROM long_sequence(1);
 ```
 
-| millis |
+| micros |
 | :----- |
 | 456    |
 
@@ -641,7 +641,7 @@ FROM long_sequence(1);
 SELECT micros(ts), count() FROM transactions;
 ```
 
-| second | count |
+| micros | count |
 | :----- | :---- |
 | 0      | 2323  |
 | 1      | 6548  |
@@ -687,8 +687,8 @@ FROM long_sequence(1);
 SELECT millis(ts), count() FROM transactions;
 ```
 
-| second | count |
-| :----- | :---- |
+| millis | count |
+|:-------| :---- |
 | 0      | 2323  |
 | 1      | 6548  |
 | ...    | ...   |
@@ -1190,7 +1190,7 @@ SELECT
 Gives:
 
 | ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute | c_hour | c_day | c_month | c_year |
-| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | -------- | ------ | ----- | ------- | ------ |
+|--------------------------------|--------------------------------|--------------------------------|--------------------------------|--------------------------------|----------|--------|-------|---------|--------|
 | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145000Z | 2016-02-10T16:18:22.862000000Z | 2016-02-10T16:18:22.000000000Z |
 
 
@@ -1628,7 +1628,7 @@ FROM long_sequence(1);
 | 2020 |
 
 ```questdb-sql title="Using in an aggregation"
-SELECT month(ts), count() FROM transactions;
+SELECT year(ts), count() FROM transactions;
 ```
 
 | year | count |
