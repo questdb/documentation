@@ -52,36 +52,86 @@ for more on timestamp handling in QuestDB.
 | `Z`    | Time zone                                                                  | RFC 822 time zone  | -0800                                 |
 | `x`    | Time zone                                                                  | ISO 8601 time zone | -08; -0800; -08:00                    |
 
-### Examples for greedy year format `y`
+### Common format patterns
 
-The interpretation of `y` depends on the number of digits in the input text:
+Here are practical examples of complete format strings for common use cases:
 
-- If the input year is a two-digit number, the output timestamp assumes the
-  current century.
-- Otherwise, the number is interpreted as it is.
+| Format pattern                  | Example input                   | Description                              |
+|---------------------------------|---------------------------------|------------------------------------------|
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUZ`   | `2024-03-15T14:30:45.123456Z`   | ISO 8601 with microseconds               |
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUNNN` | `2024-03-15T14:30:45.123456789` | With nanoseconds                         |
+| `yyyy-MM-dd HH:mm:ss`           | `2024-03-15 14:30:45`           | Standard datetime with space separator   |
+| `yyyy-MM-dd`                    | `2024-03-15`                    | Date only                                |
+| `yyyy-MM-ddTHH:mm:ssZ`          | `2024-03-15T14:30:45Z`          | ISO 8601 without fractional seconds      |
+| `yyyy-MM-dd HH:mm:ss.SSS`       | `2024-03-15 14:30:45.123`       | Datetime with milliseconds               |
+| `dd/MM/yyyy HH:mm:ss`           | `15/03/2024 14:30:45`           | European date format                     |
+| `MM/dd/yyyy HH:mm:ss`           | `03/15/2024 14:30:45`           | US date format                           |
+| `yyyyMMdd-HHmmss`               | `20240315-143045`               | Compact format (often used in filenames) |
+| `yyyy-MM-ddTHH:mm:ss.SSSz`      | `2024-03-15T14:30:45.123PST`    | With timezone abbreviation               |
 
-| Input year | Timestamp value interpreted by `y-M` | Notes                                                |
-| ---------- | ------------------------------------ | ---------------------------------------------------- |
-| `5-03`     | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
-| `05-03`    | `2005-03-01T00:00:00.000000Z`        | Greedily parsing the number assuming current century |
-| `005-03`   | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
-| `0005-03`  | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
 
-### Examples for fractions of a second
+```questdb-sql title="Parsing common formats"
+SELECT
+  to_timestamp('2024-03-15T14:30:45.123456Z', 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ') as iso,
+  to_timestamp('2024-03-15 14:30:45', 'yyyy-MM-dd HH:mm:ss') as standard,
+  to_timestamp('15/03/2024 14:30:45', 'dd/MM/yyyy HH:mm:ss') as european
+FROM long_sequence(1);
+```
 
-In a basic example, `y-M-dTHH:mm:ss.S` specifies to parse 1, 2, or 3 decimals.
-Here are more examples, showing just the last part starting with the `.`:
+### Variable-width year parsing with `y`
 
-| format       | number of decimals | example input | parsed fraction of second |
-| ------------ | ------------------ | ------------- | ------------------------- |
-| `.S`         | 1-3                | `.12`         | 12 milliseconds           |
-| `.SSS`       | 3                  | `.123`        | 123 milliseconds          |
-| `.SSSU`      | 4-6                | `.1234`       | 123,400 microseconds      |
-| `.SSSUUU`    | 6                  | `.123456`     | 123,456 microseconds      |
-| `.U+`        | 1-6                | `.12345`      | 123,450 microseconds      |
-| `.SSSUUUN`   | 7-9                | `.1234567`    | 123,456,700 nanoseconds   |
-| `.SSSUUUNNN` | 9                  | `.123456789`  | 123,456,789 nanoseconds   |
-| `.N+`        | 1-9                | `.12`         | 120,000,000 nanoseconds   |
+Use `y` when your input data has years of varying lengths. Unlike `yyyy` which
+expects exactly 4 digits, `y` reads all consecutive digits until it encounters
+a non-digit character (such as `-` or `/`).
+
+**Special case for 2-digit years:** When the input contains exactly 2 digits,
+QuestDB interprets it as a year in the current century (2000-2099). All other
+lengths are interpreted literally.
+
+| Input      | Format | Result                        | Explanation                                  |
+| ---------- | ------ | ----------------------------- | -------------------------------------------- |
+| `5-03`     | `y-M`  | `0005-03-01T00:00:00.000000Z` | 1 digit → literal year 5                     |
+| `05-03`    | `y-M`  | `2005-03-01T00:00:00.000000Z` | 2 digits → current century (20xx)            |
+| `005-03`   | `y-M`  | `0005-03-01T00:00:00.000000Z` | 3 digits → literal year 5                    |
+| `0005-03`  | `y-M`  | `0005-03-01T00:00:00.000000Z` | 4 digits → literal year 5                    |
+| `2024-03`  | `y-M`  | `2024-03-01T00:00:00.000000Z` | 4 digits → literal year 2024                 |
+
+For most use cases, prefer `yyyy` for explicit 4-digit year matching.
+
+### Parsing fractions of a second
+
+Sub-second precision uses three unit types, each representing 3 decimal places:
+
+| Unit  | Represents   | Position in fraction |
+| ----- | ------------ | -------------------- |
+| `S`   | Milliseconds | Digits 1-3 (`.XXX`)  |
+| `U`   | Microseconds | Digits 4-6 (`.___XXX`) |
+| `N`   | Nanoseconds  | Digits 7-9 (`.______XXX`) |
+
+**Fixed-width formats** use repeated letters (`SSS`, `UUU`, `NNN`) and expect
+an exact number of digits:
+
+| Format       | Digits | Example input | Parsed value          |
+| ------------ | ------ | ------------- | --------------------- |
+| `.SSS`       | 3      | `.123`        | 123 ms                |
+| `.SSSUUU`    | 6      | `.123456`     | 123 ms + 456 µs       |
+| `.SSSUUUNNN` | 9      | `.123456789`  | 123 ms + 456 µs + 789 ns |
+
+**Variable-width formats** use a single letter or `+` suffix to accept varying
+lengths:
+
+| Format   | Digits | Example input | Parsed value              |
+| -------- | ------ | ------------- | ------------------------- |
+| `.S`     | 1-3    | `.12`         | 120 ms                    |
+| `.SSSU`  | 4-6    | `.1234`       | 123 ms + 400 µs           |
+| `.SSSUUUN` | 7-9  | `.1234567`    | 123 ms + 456 µs + 700 ns  |
+| `.U+`    | 1-6    | `.12345`      | 123 ms + 450 µs           |
+| `.N+`    | 1-9    | `.12`         | 120 ms (pads with zeros)  |
+
+**Practical recommendations:**
+- For microsecond timestamps (QuestDB default): use `.SSSUUU` or `.U+`
+- For nanosecond timestamps: use `.SSSUUUNNN` or `.N+`
+- For millisecond-only data: use `.SSS` or `.S`
 
 ## Timestamp to Date conversion
 
