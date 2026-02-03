@@ -24,8 +24,7 @@ excellent performance (100,000+ rows/second), handles fault tolerance
 automatically, and requires minimal configuration.
 
 <!-- Legacy anchor kept for inbound links from other docs pages -->
-<a id="questdb-kafka-connect-connector"></a>
-## QuestDB Kafka connector
+## QuestDB Kafka connector {#questdb-kafka-connect-connector}
 
 The [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
 is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
