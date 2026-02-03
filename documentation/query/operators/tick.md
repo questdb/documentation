@@ -4,6 +4,17 @@ sidebar_label: TICK intervals
 description:
   TICK (Temporal Interval Calendar Kit) - a powerful syntax for expressing
   complex temporal intervals in QuestDB queries.
+keywords:
+  - time filter
+  - date range
+  - time range
+  - business days
+  - trading hours
+  - workday
+  - $today
+  - $now
+  - timestamp interval
+  - WHERE IN
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"

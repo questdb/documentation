@@ -5,6 +5,18 @@ description:
   Exchange calendars filter TICK intervals to real exchange trading sessions,
   handling holidays, early closes, lunch breaks, and DST automatically.
   QuestDB Enterprise feature.
+keywords:
+  - NYSE
+  - NASDAQ
+  - trading hours
+  - market hours
+  - exchange schedule
+  - XNYS
+  - XNAS
+  - MIC code
+  - stock exchange
+  - trading session
+  - market holiday
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
