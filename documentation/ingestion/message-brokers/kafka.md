@@ -94,16 +94,19 @@ include.key=false
 
 #### Step 3: Start the services
 
-Run these commands from your Kafka installation directory:
+Run these commands from your Kafka installation directory (single-node KRaft):
 
 ```shell
-# Start Zookeeper
-bin/zookeeper-server-start.sh config/zookeeper.properties
+# Generate a unique cluster ID
+KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
 
-# Start Kafka (in a new terminal)
+# Format storage directories (run once)
+bin/kafka-storage.sh format --standalone -t $KAFKA_CLUSTER_ID -c config/server.properties
+
+# Start Kafka
 bin/kafka-server-start.sh config/server.properties
 
-# Start the connector (in a new terminal)
+# Start the connector (from another terminal)
 bin/connect-standalone.sh config/connect-standalone.properties config/questdb-connector.properties
 ```
 
@@ -118,7 +121,7 @@ bin/kafka-console-producer.sh --topic example-topic --bootstrap-server localhost
 Enter this JSON (as a single line):
 
 ```json
-{"firstname": "Arthur", "lastname": "Dent", "age": 42}
+{"symbol": "AAPL", "price": 192.34, "volume": 1200}
 ```
 
 Verify the data in QuestDB:
@@ -130,9 +133,11 @@ curl -G --data-urlencode "query=select * from 'example_table'" http://localhost:
 Expected output:
 
 ```csv
-"firstname","age","lastname","timestamp"
-"Arthur",42,"Dent","2022-11-01T13:11:55.558108Z"
+"symbol","price","volume","timestamp"
+"AAPL",192.34,1200,"2026-02-03T15:10:00.000000Z"
 ```
+
+The timestamp is assigned by QuestDB on ingestion, so the value you see will match your local ingest time.
 
 ### Configuration reference
 
