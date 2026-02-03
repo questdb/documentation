@@ -9,13 +9,19 @@ calculations using timestamps.
 
 ## Timestamp format
 
-The timestamp format is formed by units and arbitrary text. A unit is a
-combination of letters representing a date or time component, as defined by the
-table below. The letters used to form a unit are case-sensitive.
+Format patterns tell QuestDB how to interpret string timestamps. They are used
+in multiple contexts:
 
-See
-[Working with time zones](/docs/concepts/timestamps-timezones/)
-for more on timestamp handling in QuestDB.
+- **SQL functions**: [`to_timestamp()`](#to_timestamp) and [`to_timestamp_ns()`](#to_timestamp_ns) for parsing text into native timestamp values
+- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/reference/sql/copy/) and the REST API
+- **Kafka connector**: The `timestamp.string.format` configuration property
+
+A format pattern combines units (letter codes for date/time components) with
+literal characters that match your input. For example, `yyyy-MM-dd HH:mm:ss`
+parses `2024-03-15 14:30:45`. Units are case-sensitive.
+
+See [Working with time zones](/docs/concepts/timestamps-timezones/) for more on
+timestamp handling in QuestDB.
 
 | Unit   | Date or Time Component                                                     | Presentation       | Examples                              |
 | ------ |----------------------------------------------------------------------------| ------------------ | ------------------------------------- |
