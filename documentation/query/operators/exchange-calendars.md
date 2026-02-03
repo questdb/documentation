@@ -204,9 +204,20 @@ WHERE ts IN '[2025-01-24#XNYS, 2025-02-03]#XHKG'
 
 ## Custom calendars
 
-QuestDB Enterprise ships with built-in schedules for major exchanges. You can
-customize these schedules — or define entirely new ones — through the
-`_tick_calendars_custom` system table.
+### Built-in schedules
+
+QuestDB Enterprise ships with a Parquet file inside the JAR containing
+pre-configured schedules for major exchanges. On every startup, this file is
+extracted to:
+
+```text
+<dbRoot>/import/.questdb-internal/tick_calendars.parquet
+```
+
+The file is **overwritten on each restart**, so any manual edits to it are lost.
+To customize schedules, use the `_tick_calendars_custom` table described below.
+Custom entries are merged with the built-in data at query time, and take
+precedence when both define the same session.
 
 ### Setup
 
