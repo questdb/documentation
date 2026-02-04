@@ -4,13 +4,13 @@ sidebar_label: BACKUP
 description: "BACKUP SQL keyword reference documentation. Applies to QuestDB Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Object storage backups with incremental and point-in-time recovery support.
+</EnterpriseNote>
+
 `BACKUP` - start and abort incremental backups to object storage.
-
-:::note
-
-Backup operations are only available in QuestDB Enterprise.
-
-:::
 
 _Looking for a detailed guide on backup creation and restoration? Check out our
 [Backup and Restore](/docs/operations/backup/) guide!_
