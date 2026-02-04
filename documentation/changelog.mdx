@@ -1,0 +1,155 @@
+---
+title: Documentation changelog
+sidebar_label: Changelog
+description: Recent updates and improvements to the QuestDB documentation.
+---
+
+# Documentation changelog
+
+This page tracks significant updates to the QuestDB documentation.
+
+## January 2026
+
+### Releases
+
+- [9.3.2](https://questdb.com/release-notes/) - Released January 28, 2026
+- [9.3.1](https://questdb.com/release-notes/) - Released January 14, 2026
+- [9.3.0](https://questdb.com/release-notes/) - Released January 9, 2026
+
+### New
+
+- [Cookbook](/docs/cookbook/) - Collection of 40+ recipes for common SQL patterns, integrations, and operations
+- Capital markets recipes - Financial calculations including VWAP, Bollinger Bands, TICK/TRIN, volume analysis, and more
+- [TICK syntax](/docs/query/operators/tick/) - New DSL for expressing time intervals with intuitive syntax like `'$now - 1h..$now'`
+- [AI Assistant reference](/docs/getting-started/web-console/questdb-ai/) - Documentation for the QuestDB AI Assistant
+- [PIVOT](/docs/query/sql/pivot/) - SQL keyword for rotating rows into columns
+
+### Updated
+
+- [Window functions](/docs/query/functions/window-functions/overview/) - Restructured into dedicated section with improved navigation, added EMA, VWEMA, and ksum() functions
+- [Views and materialized views](/docs/concepts/views/) - Comprehensive documentation overhaul with improved examples and clearer explanations
+- [Designated timestamp](/docs/concepts/designated-timestamp/) - Consolidated timestamp documentation with TICK syntax examples
+- [Enterprise backup](/docs/operations/backup/) - Improved documentation with clearer instructions
+
+### Reference
+
+- Added [`percent_rank()`](/docs/query/functions/window-functions/reference/#percent_rank) window function
+- Added [`arg_min()`](/docs/query/functions/aggregation/#arg_min) and [`arg_max()`](/docs/query/functions/aggregation/#arg_max) aggregation functions
+- Added [`length_bytes()`](/docs/query/functions/text/#length_bytes) function for byte-length of strings
+- Added [`rnd_symbol_zipf()`](/docs/query/functions/random-value-generator/#rnd_symbol_zipf) and weighted random generators
+- Added [Euclidean and geographic geo functions](/docs/query/functions/spatial/)
+- Extended [date arithmetic](/docs/query/operators/tick/) with sub-day units
+
+## December 2025
+
+### Releases
+
+- [9.2.3](https://questdb.com/release-notes/) - Released December 18, 2025
+- [9.2.2](https://questdb.com/release-notes/) - Released December 1, 2025
+
+### New
+
+- [Builtin profiler](/docs/troubleshooting/profiling/) - Documentation for QuestDB's built-in query profiler
+- [WINDOW JOIN](/docs/query/sql/window-join/) - SQL reference for window joins with time-based lookups
+
+### Updated
+
+- [Materialized views](/docs/concepts/materialized-views/) - Added `REFRESH PERIOD (SAMPLE BY INTERVAL)` compact syntax documentation
+- [Time-series optimizations](/docs/architecture/time-series-optimizations/) - Improved explanations
+
+### Reference
+
+- Added [`weighted_avg()`](/docs/query/functions/aggregation/#weighted_avg), [`weighted_stddev_rel()`](/docs/query/functions/aggregation/#weighted_stddev_rel), [`weighted_stddev_freq()`](/docs/query/functions/aggregation/#weighted_stddev_freq) functions
+- Documented compact period syntax in [SAMPLE BY](/docs/query/sql/sample-by/)
+
+## November 2025
+
+### Releases
+
+- [9.2.1](https://questdb.com/release-notes/) - Released November 25, 2025
+- [9.2.0](https://questdb.com/release-notes/) - Released November 13, 2025
+- [9.1.1](https://questdb.com/release-notes/) - Released November 3, 2025
+
+### New
+
+- [Hetzner deployment](/docs/deployment/hetzner/) - Step-by-step guide for deploying QuestDB on Hetzner Cloud
+- [DECIMAL datatype](/docs/query/datatypes/decimal/) - Documentation for precise decimal arithmetic
+- [PGWire OIDC integration](/docs/security/oidc/) - Authentication via OpenID Connect
+
+### Updated
+
+- [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
+- [Shared pool configuration](/docs/configuration/overview/#shared-worker) - Updated with network, query, and write shared pool options
+- [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
+
+### Reference
+
+- Added `first()` and `last()` support for additional datatypes
+- Added `first_not_null()` and `last_not_null()` array support
+
+## October 2025
+
+### Releases
+
+- [9.1.0](https://questdb.com/release-notes/) - Released October 3, 2025
+
+### New
+
+- [PGWire for C/C++](/docs/query/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
+- [Table and column naming rules](/docs/query/sql/create-table/#table-name) - Guidelines for valid identifiers
+
+### Updated
+
+- [Architecture guide](/docs/architecture/questdb-architecture/) - Refreshed with current implementation details
+- [Nanoseconds](/docs/query/datatypes/overview/#timestamp-and-date-considerations) - Added nanosecond timestamp precision documentation
+- [`TRUNCATE TABLE`](/docs/query/sql/truncate/) - Added `IF EXISTS` clause
+
+### Reference
+
+- Added `w` (week) unit to [SAMPLE BY](/docs/query/sql/sample-by/) reference
+
+## September 2025
+
+### Updated
+
+- [Partitioning](/docs/concepts/partitions/) - Improved formatting and explanations
+- [Go client examples](/docs/ingestion/clients/go/) - Updated to v4 API
+
+## August 2025
+
+### Releases
+
+- [9.0.3](https://questdb.com/release-notes/) - Released August 29, 2025
+- [9.0.2](https://questdb.com/release-notes/) - Released August 15, 2025
+
+### New
+
+- [Array functions](/docs/query/functions/array/) - Documentation for array manipulation functions
+
+### Updated
+
+- [`to_timestamp()`](/docs/query/functions/date-time/#to_timestamp) - Improved documentation with more examples
+- [Web Console](/docs/getting-started/web-console/overview/) - Updated documentation for latest console features
+
+## July 2025
+
+### Releases
+
+- [9.0.1](https://questdb.com/release-notes/) - Released July 23, 2025
+- [9.0.0](https://questdb.com/release-notes/) - Released July 11, 2025
+
+### New
+
+- [N-dimensional arrays](/docs/query/datatypes/array/) - Comprehensive guide to multi-dimensional arrays
+- [Order book analytics](/docs/tutorials/order-book/) - Guide for processing order book data
+- [Period materialized views](/docs/concepts/materialized-views/#period-refresh) - Time-based refresh for materialized views
+- [ASOF JOIN TOLERANCE](/docs/query/sql/asof-join/#tolerance-clause) - Limit lookback window in temporal joins
+
+### Updated
+
+- [ILP clients](/docs/ingestion/overview/) - Array support added to Python, C++, Rust, Java, and .NET clients
+- [WAL metrics](/docs/operations/monitoring-alerting/) - Added metrics for detecting WAL apply lag
+
+## Earlier updates
+
+For documentation changes before July 2025, see the [git commit history](https://github.com/questdb/questdb.io/commits/main/documentation).
