@@ -332,13 +332,13 @@ WITH ohlc AS (
         sum(amount) AS volume
     FROM trades
     WHERE timestamp IN '2024-05-22' AND symbol = @symbol
-    SAMPLE BY 1m ALIGN TO CALENDAR
+    SAMPLE BY 1m
 )
 SELECT
     ts, open, high, low, close, volume,
-    sum((high + low + close) / 3 * volume) OVER (ORDER BY ts CUMULATIVE)
-        / sum(volume) OVER (ORDER BY ts CUMULATIVE) AS vwap
-FROM ohlc;
+    sum((high + low + close) / 3 * volume) OVER w / sum(volume) OVER w AS vwap
+FROM ohlc
+WINDOW w AS (ORDER BY ts CUMULATIVE);
 ```
 
 ### Frame shorthand syntax
@@ -462,6 +462,96 @@ LIMIT 100;
 - **Partitioning** improves performance by processing smaller data chunks
 - Consider **index usage** when ordering by timestamp columns
 - Narrow windows process less data than wide windows
+
+## Named windows (WINDOW clause)
+
+When multiple window functions share the same window definition, you can define the window once and reference it by name. This reduces repetition and improves readability.
+
+**Syntax:**
+```sql
+SELECT
+    columns,
+    window_function() OVER window_name,
+    another_function() OVER window_name
+FROM table
+ORDER BY column
+WINDOW window_name AS (window_definition) [, ...]
+LIMIT n;
+```
+
+The `WINDOW` clause appears after `ORDER BY` and before `LIMIT`.
+
+**Example:**
+```questdb-sql title="Named window for repeated definitions" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w AS avg_price,
+    min(price) OVER w AS min_price,
+    max(price) OVER w AS max_price
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Multiple named windows
+
+You can define multiple windows in a single `WINDOW` clause:
+
+```questdb-sql title="Multiple named windows" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER short_window AS avg_10,
+    avg(price) OVER long_window AS avg_50
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW
+    short_window AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),
+    long_window AS (ORDER BY timestamp ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Mixing inline and named windows
+
+You can use both named windows and inline `OVER (...)` definitions in the same query:
+
+```questdb-sql title="Mixed inline and named windows" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w AS moving_avg,
+    row_number() OVER (PARTITION BY symbol ORDER BY timestamp) AS seq
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Works with CTEs and subqueries
+
+Named windows work within CTEs and subqueries:
+
+```questdb-sql title="Named window in CTE" demo
+WITH price_stats AS (
+    SELECT
+        timestamp,
+        symbol,
+        price,
+        avg(price) OVER w AS moving_avg,
+        price - avg(price) OVER w AS deviation
+    FROM trades
+    WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+    WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)
+)
+SELECT * FROM price_stats
+WHERE deviation > 10
+LIMIT 100;
+```
 
 ## Common pitfalls
 

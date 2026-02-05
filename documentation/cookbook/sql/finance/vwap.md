@@ -32,9 +32,9 @@ WITH sampled AS (
 )
 SELECT
   timestamp, symbol,
-  SUM(traded_value) OVER (ORDER BY timestamp) /
-    SUM(total_volume) OVER (ORDER BY timestamp) AS vwap
-FROM sampled;
+  SUM(traded_value) OVER w / SUM(total_volume) OVER w AS vwap
+FROM sampled
+WINDOW w AS (ORDER BY timestamp);
 ```
 
 This query:
@@ -68,9 +68,9 @@ WITH sampled AS (
 )
 SELECT
   timestamp, symbol,
-  SUM(traded_value) OVER (PARTITION BY symbol ORDER BY timestamp) /
-    SUM(total_volume) OVER (PARTITION BY symbol ORDER BY timestamp) AS vwap
-FROM sampled;
+  SUM(traded_value) OVER w / SUM(total_volume) OVER w AS vwap
+FROM sampled
+WINDOW w AS (PARTITION BY symbol ORDER BY timestamp);
 ```
 
 The `PARTITION BY symbol` ensures each symbol's VWAP is calculated independently.

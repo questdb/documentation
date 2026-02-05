@@ -25,7 +25,15 @@ function_name(arguments) OVER (
 
 Some functions (`first_value`, `last_value`, `lag`, `lead`) also support `IGNORE NULLS` or `RESPECT NULLS` before the `OVER` keyword to control null handling.
 
-For complete syntax details including frame specifications and exclusion options, see [OVER Clause Syntax](syntax.md).
+When multiple window functions share the same definition, use the `WINDOW` clause to define it once:
+
+```sql
+SELECT avg(price) OVER w, sum(amount) OVER w
+FROM trades
+WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
+```
+
+For complete syntax details including frame specifications, exclusion options, and named windows, see [OVER Clause Syntax](syntax.md).
 
 :::info Window function arithmetic (9.3.1+)
 Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...) OVER (...)`) are supported from version 9.3.1. Earlier versions require wrapping window functions in CTEs or subqueries.
@@ -257,16 +265,16 @@ WITH ohlc AS (
         sum(amount) AS volume
     FROM trades
     WHERE timestamp IN '2024-05-22' AND symbol = @symbol
-    SAMPLE BY 1m ALIGN TO CALENDAR
+    SAMPLE BY 1m
 )
 SELECT
     ts,
     symbol,
     open, high, low, close, volume,
-    sum((high + low + close) / 3 * volume) OVER (ORDER BY ts CUMULATIVE)
-        / sum(volume) OVER (ORDER BY ts CUMULATIVE) AS vwap
+    sum((high + low + close) / 3 * volume) OVER w / sum(volume) OVER w AS vwap
 FROM ohlc
-ORDER BY ts;
+ORDER BY ts
+WINDOW w AS (ORDER BY ts CUMULATIVE);
 ```
 
 ### Compare to group average
@@ -276,10 +284,11 @@ SELECT
     symbol,
     price,
     timestamp,
-    avg(price) OVER (PARTITION BY symbol) AS symbol_avg,
-    price - avg(price) OVER (PARTITION BY symbol) AS diff_from_avg
+    avg(price) OVER w AS symbol_avg,
+    price - avg(price) OVER w AS diff_from_avg
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '[$today]'
+WINDOW w AS (PARTITION BY symbol);
 ```
 
 ### Rank within category
@@ -303,11 +312,11 @@ WHERE timestamp IN '[$today]';
 SELECT
     timestamp,
     price,
-    lag(price) OVER (ORDER BY timestamp) AS prev_price,
-    price - lag(price) OVER (ORDER BY timestamp) AS price_change
+    lag(price) OVER w AS prev_price,
+    price - lag(price) OVER w AS price_change
 FROM trades
-WHERE timestamp IN '[$today]'
-    AND symbol = 'BTC-USDT';
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp);
 ```
 
 ## Next steps

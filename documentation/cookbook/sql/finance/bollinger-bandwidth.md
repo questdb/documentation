@@ -46,17 +46,10 @@ bands AS (
     timestamp,
     symbol,
     close,
-    AVG(close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS sma20,
-    AVG(close * close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS avg_close_sq
+    AVG(close) OVER w AS sma20,
+    AVG(close * close) OVER w AS avg_close_sq
   FROM daily_ohlc
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)
 ),
 bollinger AS (
   SELECT

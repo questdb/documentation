@@ -36,15 +36,10 @@ WITH OHLC AS (
   SELECT
     timestamp,
     close,
-    AVG(close) OVER (
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS sma20,
-    AVG(close * close) OVER (
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS avg_close_sq
+    AVG(close) OVER w AS sma20,
+    AVG(close * close) OVER w AS avg_close_sq
   FROM OHLC
+  WINDOW w AS (ORDER BY timestamp ROWS 19 PRECEDING)
 )
 SELECT
   timestamp,
@@ -74,9 +69,11 @@ The core of the Bollinger Bands calculation is the rolling standard deviation. P
 
 **Different period lengths:**
 ```sql
--- 10-period Bollinger Bands (change 19 to 9)
-AVG(close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS sma10,
-AVG(close * close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS avg_close_sq
+-- 10-period Bollinger Bands (change ROWS 19 to ROWS 9)
+AVG(close) OVER w AS sma10,
+AVG(close * close) OVER w AS avg_close_sq
+...
+WINDOW w AS (ORDER BY timestamp ROWS 9 PRECEDING)
 ```
 
 **Different band multipliers:**
@@ -116,17 +113,10 @@ WITH OHLC AS (
     timestamp,
     symbol,
     close,
-    AVG(close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS sma20,
-    AVG(close * close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS avg_close_sq
+    AVG(close) OVER w AS sma20,
+    AVG(close * close) OVER w AS avg_close_sq
   FROM OHLC
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS 19 PRECEDING)
 )
 SELECT
   timestamp,
