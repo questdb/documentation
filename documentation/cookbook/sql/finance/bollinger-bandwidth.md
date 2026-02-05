@@ -49,7 +49,7 @@ bands AS (
     AVG(close) OVER w AS sma20,
     AVG(close * close) OVER w AS avg_close_sq
   FROM daily_ohlc
-  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS 19 PRECEDING)
 ),
 bollinger AS (
   SELECT
@@ -81,9 +81,10 @@ with_range AS (
     upper_band,
     lower_band,
     bandwidth,
-    min(bandwidth) OVER (PARTITION BY symbol) AS min_bw,
-    max(bandwidth) OVER (PARTITION BY symbol) AS max_bw
+    min(bandwidth) OVER w AS min_bw,
+    max(bandwidth) OVER w AS max_bw
   FROM with_bandwidth
+  WINDOW w AS (PARTITION BY symbol)
 )
 SELECT
   timestamp,
