@@ -56,6 +56,10 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 | `CUMULATIVE` | Shorthand for `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
 | `EXCLUDE` | Optionally excludes rows from the frame |
 
+:::tip Reusing window definitions
+If multiple window functions in the same query share the same frame clause, you can define it once using a [named window](#named-windows-window-clause) instead of repeating it.
+:::
+
 ## PARTITION BY
 
 `PARTITION BY` divides the result set into groups. The window function operates independently on each partition.
@@ -474,12 +478,12 @@ SELECT
     window_function() OVER window_name,
     another_function() OVER window_name
 FROM table
-ORDER BY column
 WINDOW window_name AS (window_definition) [, ...]
+ORDER BY column
 LIMIT n;
 ```
 
-The `WINDOW` clause appears after `ORDER BY` and before `LIMIT`.
+The `WINDOW` clause appears after `WHERE` and before `ORDER BY`.
 
 **Example:**
 ```questdb-sql title="Named window for repeated definitions" demo

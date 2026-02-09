@@ -273,8 +273,8 @@ SELECT
     open, high, low, close, volume,
     sum((high + low + close) / 3 * volume) OVER w / sum(volume) OVER w AS vwap
 FROM ohlc
-ORDER BY ts
-WINDOW w AS (ORDER BY ts CUMULATIVE);
+WINDOW w AS (ORDER BY ts CUMULATIVE)
+ORDER BY ts;
 ```
 
 ### Compare to group average
