@@ -161,9 +161,10 @@ use of `WHERE 1 != 1` means that no rows are inserted, only the table schema is
 prepared:
 
 ```questdb-sql
-CREATE TABLE new_table AS
-(SELECT cast(null AS geohash(4c)) gh4c)
+CREATE TABLE new_table AS (
+SELECT cast(null AS geohash(4c)) gh4c
 FROM source_table WHERE 1 != 1
+)
 ```
 
 Geohash types can be cast from higher to lower precision, but not from lower to
