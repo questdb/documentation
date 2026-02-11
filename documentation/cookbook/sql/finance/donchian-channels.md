@@ -17,32 +17,33 @@ DECLARE
   @symbol := 'EURUSD',
   @lookback := '$now - 1M..$now'
 
+WITH channels AS (
+  SELECT
+    timestamp,
+    symbol,
+    close,
+    max(high) OVER (
+      PARTITION BY symbol
+      ORDER BY timestamp
+      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+    ) AS upper_channel,
+    min(low) OVER (
+      PARTITION BY symbol
+      ORDER BY timestamp
+      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+    ) AS lower_channel
+  FROM market_data_ohlc_15m
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+)
 SELECT
   timestamp,
   symbol,
   round(close, 5) AS close,
-  round(max(high) OVER (
-    PARTITION BY symbol
-    ORDER BY timestamp
-    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-  ), 5) AS upper_channel,
-  round(min(low) OVER (
-    PARTITION BY symbol
-    ORDER BY timestamp
-    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-  ), 5) AS lower_channel,
-  round((max(high) OVER (
-    PARTITION BY symbol
-    ORDER BY timestamp
-    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-  ) + min(low) OVER (
-    PARTITION BY symbol
-    ORDER BY timestamp
-    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-  )) / 2, 5) AS middle_channel
-FROM market_data_ohlc_15m
-WHERE symbol = @symbol
-  AND timestamp IN @lookback
+  round(upper_channel, 5) AS upper_channel,
+  round(lower_channel, 5) AS lower_channel,
+  round((upper_channel + lower_channel) / 2, 5) AS middle_channel
+FROM channels
 ORDER BY timestamp;
 ```
 

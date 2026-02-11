@@ -17,19 +17,24 @@ DECLARE
   @symbol := 'EURUSD',
   @lookback := '$now - 1M..$now'
 
+WITH with_lag AS (
+  SELECT
+    timestamp,
+    symbol,
+    close,
+    lag(close, 12) OVER (PARTITION BY symbol ORDER BY timestamp) AS close_12_ago
+  FROM market_data_ohlc_15m
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+)
 SELECT
   timestamp,
   symbol,
   round(close, 5) AS close,
-  round(lag(close, 12) OVER (PARTITION BY symbol ORDER BY timestamp), 5) AS close_12_ago,
-  round(
-    (close - lag(close, 12) OVER (PARTITION BY symbol ORDER BY timestamp)) /
-    lag(close, 12) OVER (PARTITION BY symbol ORDER BY timestamp) * 100,
-    4
-  ) AS roc
-FROM market_data_ohlc_15m
-WHERE symbol = @symbol
-  AND timestamp IN @lookback
+  round(close_12_ago, 5) AS close_12_ago,
+  round((close - close_12_ago) / close_12_ago * 100, 4) AS roc
+FROM with_lag
+WHERE close_12_ago IS NOT NULL
 ORDER BY timestamp;
 ```
 
