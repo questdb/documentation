@@ -66,7 +66,7 @@ The `within` operator can be used to filter results by geohash:
 ```questdb-sql
 SELECT * FROM pos
 WHERE g8c within(#ezz, #u33d8)
-LATEST ON ts PARTITON BY uuid;
+LATEST ON ts PARTITION BY uuid;
 ```
 
 This yields the following results:
@@ -82,7 +82,7 @@ exist within a larger grid:
 ```questdb-sql
 SELECT * FROM pos
 WHERE g8c within(#u33)
-LATEST ON ts PARTITON BY uuid;
+LATEST ON ts PARTITION BY uuid;
 ```
 
 | ts                          | device_id | g1c | g8c      |

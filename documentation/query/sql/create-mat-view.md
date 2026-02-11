@@ -96,7 +96,7 @@ Refreshes incrementally after each base table transaction:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH IMMEDIATE AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Best for: Real-time dashboards where data freshness matters.
@@ -108,7 +108,7 @@ Checks for new data and refreshes on a timer schedule:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH EVERY 10m AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Every 10 minutes, QuestDB checks if the base table has new data and performs an
@@ -119,7 +119,7 @@ With start time and timezone:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH EVERY 1h START '2025-01-01T00:00:00Z' TIME ZONE 'Europe/Berlin' AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 | Option | Description |
@@ -141,7 +141,7 @@ Refreshes only when explicitly triggered:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH MANUAL AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Trigger refresh with [`REFRESH MATERIALIZED VIEW`](/docs/query/sql/refresh-mat-view/).
@@ -155,7 +155,7 @@ Skips the initial full refresh on creation. Applies to any strategy:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH IMMEDIATE DEFERRED AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 The view remains empty until:
@@ -173,7 +173,7 @@ define an in-flight time window that won't refresh until complete.
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_daily
 REFRESH PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1d;
 ```
 
 | Option | Description |
@@ -191,7 +191,7 @@ Matches period to the `SAMPLE BY` interval:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH PERIOD (SAMPLE BY INTERVAL) AS
-SELECT timestamp, symbol, avg(price) FROM trades
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades
 SAMPLE BY 1h ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
 
@@ -205,7 +205,7 @@ Combine `PERIOD` with `EVERY` or `MANUAL`:
 ```questdb-sql title="Period with timer refresh"
 CREATE MATERIALIZED VIEW hourly_stats
 REFRESH EVERY 15m PERIOD (LENGTH 1h DELAY 5m) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 This configuration:
@@ -218,7 +218,7 @@ The `DELAY` allows late-arriving data to be included before the period closes.
 ```questdb-sql title="Period with manual refresh"
 CREATE MATERIALIZED VIEW trades_daily
 REFRESH MANUAL PERIOD (LENGTH 1d TIME ZONE 'UTC' DELAY 1h) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1d;
 ```
 
 With `MANUAL`, refresh only occurs when you run
@@ -249,7 +249,7 @@ Specify storage partitioning with `PARTITION BY`:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY;
 ```
 
@@ -268,7 +268,7 @@ Limit data retention with `TTL`:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY TTL 7 DAYS;
 ```
 
@@ -355,7 +355,7 @@ Assign ownership to a user, group, or service account:
 ```questdb-sql
 CREATE GROUP analysts;
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) OWNED BY analysts;
 ```
 
