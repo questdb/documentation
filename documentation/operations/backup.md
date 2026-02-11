@@ -85,27 +85,6 @@ Then run `BACKUP DATABASE;` in SQL. See [Run a backup](#run-a-backup) for detail
 
 ### Configure
 
-#### Scheduled backups
-
-You can configure automatic scheduled backups using cron syntax. The example
-below runs a backup every day at midnight UTC.
-
-```conf
-backup.schedule.cron=0 0 * * *
-backup.schedule.tz=UTC
-```
-
-The `backup.schedule.tz` property accepts any valid
-<a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone name</a>
-(e.g., `America/New_York`, `Europe/London`) or `UTC`.
-
-These settings can be modified in `server.conf` and hot-reloaded without
-restarting the server:
-
-```questdb-sql
-SELECT reload_config();
-```
-
 #### Backup retention
 
 Control how many backups to keep before automatic cleanup removes older ones:
@@ -132,8 +111,8 @@ specifies a directory for atomic write operations during backup.
 |----------|-------------|---------|
 | `backup.enabled` | Enable backup functionality | `false` |
 | `backup.object.store` | Object store connection string | None (required) |
-| `backup.schedule.cron` | Cron expression for scheduled backups | None (manual only) |
-| `backup.schedule.tz` | <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone</a> for cron schedule | `UTC` |
+| `backup.schedule.cron` | Cron expression for [scheduled backups](#scheduled-backups) | None (manual only) |
+| `backup.schedule.tz` | <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone</a> for cron [schedule](#scheduled-backups) | `UTC` |
 | `backup.cleanup.keep.latest.n` | Number of backups to retain | `5` |
 | `backup.compression.level` | Compression level (1-22) | `5` |
 | `backup.compression.threads` | Threads for compression | CPU count |
@@ -191,6 +170,67 @@ To abort a running backup:
 ```questdb-sql title="Abort backup"
 BACKUP ABORT;
 ```
+
+### Scheduled backups
+
+You can configure automatic scheduled backups using cron syntax. The example
+below runs a backup every day at midnight UTC.
+
+```conf
+backup.schedule.cron=0 0 * * *
+backup.schedule.tz=UTC
+```
+
+#### Cron format
+
+QuestDB uses the standard **5-field cron format**:
+
+```text
+              FIELD            VALUES             SPECIAL CHARS
+┌──────────── minute ───────── 0-59 ───────────── * , - /
+│ ┌────────── hour ─────────── 0-23 ───────────── * , - /
+│ │ ┌──────── day of month ─── 1-31 ───────────── * , - / L W
+│ │ │ ┌────── month ────────── 1-12 or JAN-DEC ── * , - /
+│ │ │ │ ┌──── day of week ──── 0-7 or SUN-SAT ─── * , - / L #
+│ │ │ │ │
+* * * * *
+```
+
+Special character meanings:
+
+- `*` — matches any value
+- `,` — separates multiple values (e.g., `1,15` for 1st and 15th)
+- `-` — defines a range (e.g., `1-5` for Monday through Friday)
+- `/` — specifies intervals (e.g., `*/15` for every 15 units)
+- `L` — last day of the month, or last specific weekday (e.g., `5L` = last Friday)
+- `W` — nearest weekday to the given day (e.g., `15W` = nearest weekday to the 15th)
+- `#` — nth weekday of the month (e.g., `5#3` = third Friday)
+
+For day-of-week, 0 and 7 both represent Sunday; 1-6 represent Monday through Saturday.
+
+:::tip
+Use [crontab.guru](https://crontab.guru/) to build and validate your cron expressions.
+:::
+
+#### Timezone
+
+The `backup.schedule.tz` property accepts any valid
+<a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">IANA timezone name</a>
+(e.g., `America/New_York`, `Europe/London`) or `UTC`.
+
+If `backup.schedule.tz` not specified, the default is `UTC`.
+
+#### Resetting schedule without restart
+
+The `backup.schedule.cron` and `backup.schedule.tz` settings can be modified in `server.conf` and hot-reloaded without
+restarting the server:
+
+```questdb-sql
+SELECT reload_config();
+```
+
+You can also use this to enable and disable the schedule by adding or commenting out the `backup.schedule.cron` config setting.
+
 
 ### Backup instance name
 

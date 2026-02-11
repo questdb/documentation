@@ -17,7 +17,7 @@ You want to get the latest N rows for each distinct value in a column. For examp
 
 ```questdb-sql demo title="LATEST ON returns only 1 row per symbol"
 SELECT * FROM trades
-WHERE timestamp in today()
+WHERE timestamp IN '$today'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
@@ -33,7 +33,7 @@ WITH ranked AS (
     *,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
 )
 SELECT timestamp, symbol, side, price, amount
 FROM ranked
@@ -104,7 +104,7 @@ DECLARE @limit := 10
 WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp IN '$now - 1d..$now'
 )
 SELECT * FROM ranked WHERE rn <= @limit;
 ```
@@ -116,7 +116,7 @@ WITH ranked AS (
     *,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
     AND side = 'buy'  -- Additional filter before ranking
 )
 SELECT timestamp, symbol, side, price, amount
@@ -129,7 +129,7 @@ WHERE rn <= 5;
 WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
 )
 SELECT timestamp, symbol, price, rn as rank
 FROM ranked
@@ -165,7 +165,7 @@ LIMIT -100;
 WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp in today()  -- Filter early
+  WHERE timestamp IN '$today'  -- Filter early
 )
 SELECT * FROM ranked WHERE rn <= 5;
 
@@ -174,13 +174,13 @@ WITH ranked AS (
   SELECT *, row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades  -- No filter
 )
-SELECT * FROM ranked WHERE rn <= 5 AND timestamp in today();
+SELECT * FROM ranked WHERE rn <= 5 AND timestamp IN '$today';
 ```
 
 **Limit partitions:**
 ```sql
 -- Process only specific symbols
-WHERE timestamp in today()
+WHERE timestamp IN '$today'
   AND symbol IN ('BTC-USDT', 'ETH-USDT', 'SOL-USDT')
 ```
 
@@ -196,7 +196,7 @@ WITH ranked AS (
     price,
     row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
   FROM trades
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
 )
 SELECT
   symbol,

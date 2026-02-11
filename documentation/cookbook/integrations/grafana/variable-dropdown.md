@@ -193,7 +193,7 @@ The PostgreSQL data source recognizes `__text` and `__value` as special column n
 **Different filter conditions:**
 ```sql
 -- Filter by time range
-WHERE timestamp IN yesterday()
+WHERE timestamp IN '$yesterday'
 
 -- Filter by multiple criteria
 WHERE symbol LIKE '%USDT' AND price > 1000

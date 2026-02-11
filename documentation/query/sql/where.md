@@ -258,6 +258,27 @@ SELECT scores WHERE ts = '2010-01-12T00:02:26.000000Z';
 
 Returns results within a defined range.
 
+:::tip Recommended: TICK syntax
+
+For complex timestamp filtering, use [TICK interval syntax](/docs/query/operators/tick/).
+TICK handles date ranges, business days, timezones, and schedules in a single
+expression:
+
+```questdb-sql
+-- Last 5 business days, 9:30 AM New York time, 6.5 hour windows
+WHERE ts IN '[$today-5bd..$today-1bd]T09:30@America/New_York#workday;6h30m'
+```
+
+With [exchange calendars](/docs/query/operators/exchange-calendars/) (Enterprise),
+you can filter by real exchange schedules including holidays and early closes:
+
+```questdb-sql
+-- NYSE trading hours for January, holidays excluded automatically
+WHERE ts IN '2025-01-[01..31]#XNYS'
+```
+
+:::
+
 #### Syntax
 
 ![Flow chart showing the syntax of the WHERE clause with a partial timestamp comparison](/images/docs/diagrams/whereTimestampPartial.svg)

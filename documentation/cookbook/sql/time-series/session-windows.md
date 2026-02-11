@@ -41,7 +41,7 @@ WITH prevEvents AS (
     lag(lock_status::int) -- lag doesn't support booleans, so we convert to 1 or 0
       OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_status
   FROM vehicle_events
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
 ),
 ride_sessions AS (
   SELECT *,
@@ -154,7 +154,7 @@ WITH prevEvents AS (
     lag(lock_status::int) -- lag doesn't support booleans, so we convert to 1 or 0
       OVER (PARTITION BY vehicle_id ORDER BY timestamp) as prev_status
   FROM vehicle_events
-  WHERE timestamp >= dateadd('M', -3, now())
+  WHERE timestamp IN '$now - 3M..$now'
 ),
 ride_sessions AS (
   SELECT *,

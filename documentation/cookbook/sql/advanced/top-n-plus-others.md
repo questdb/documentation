@@ -31,7 +31,7 @@ WITH totals AS (
     symbol,
     count() as total
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp IN '$now - 1d..$now'
 ),
 ranked AS (
   SELECT
@@ -160,7 +160,7 @@ Results in three groups: top 5 individual, ranks 6-10 combined, rest combined.
 WITH totals AS (
   SELECT symbol, count() as total
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp IN '$now - 1d..$now'
 ),
 ranked AS (
   SELECT *, rank() OVER (ORDER BY total DESC) as ranking
@@ -196,7 +196,7 @@ WITH totals AS (
     side,
     count() as total
   FROM trades
-  WHERE timestamp >= dateadd('d', -1, now())
+  WHERE timestamp IN '$now - 1d..$now'
 ),
 ranked AS (
   SELECT

@@ -298,7 +298,7 @@ Look for these indicators in the plan:
 5. Aggregate functions cannot reference columns from both tables simultaneously
 6. WINDOW JOIN can be combined with another WINDOW JOIN, but not with other JOIN
    types
-7. **`GROUP BY` is not supported with WINDOW JOIN** - use a CTE or subquery instead
+7. **`GROUP BY` and window functions are not supported with WINDOW JOIN** - use a CTE or subquery instead
 
 ### GROUP BY workaround
 
