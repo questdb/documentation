@@ -1,8 +1,6 @@
 ---
 title: Java Client Documentation
-description:   "Dive into QuestDB using the Java ingestion client for high-performance,
-insert-only operations. Unlock peak time series data ingestion and analysis
-efficiency."
+description: "Reference for the questdb-client Maven artifact — the Java ILP ingestion client for QuestDB, covering setup, configuration, authentication, and error handling."
 ---
 
 import Tabs from "@theme/Tabs"
@@ -24,7 +22,7 @@ For embedded QuestDB, please check our
 :::
 
 The QuestDB Java client is distributed as a separate Maven artifact
-(`org.questdb:client`).
+(`org.questdb:questdb-client`).
 
 The client provides the following benefits:
 
@@ -45,16 +43,6 @@ for **writing** data to QuestDB. For retrieving data, we recommend using a
 
 :::
 
-## Compatible JDKs
-
-The client relies on some JDK internal libraries, which certain specialised JDK
-offerings may not support.
-
-Here is a list of known incompatible JDKs:
-
-- Azul Zing 17
-  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
-
 ## Quick start
 
 Add the QuestDB Java client as a dependency in your project's build configuration file.
@@ -64,18 +52,22 @@ Add the QuestDB Java client as a dependency in your project's build configuratio
 
 >   <TabItem value="maven">
 
-    <CodeBlock className="language-xml">
-      {`<dependency>
+    <InterpolateJavaClientVersion renderText={(release) => (
+      <CodeBlock className="language-xml">
+        {`<dependency>
   <groupId>org.questdb</groupId>
   <artifactId>questdb-client</artifactId>
-  <version>1.0.1</version>
+  <version>${release.name}</version>
 </dependency>`}
-    </CodeBlock>
+      </CodeBlock>
+    )} />
   </TabItem>
   <TabItem value="gradle">
-    <CodeBlock className="language-text">
-      {`implementation 'org.questdb:client:1.0.0'`}
-    </CodeBlock>
+    <InterpolateJavaClientVersion renderText={(release) => (
+      <CodeBlock className="language-text">
+        {`implementation 'org.questdb:questdb-client:${release.name}'`}
+      </CodeBlock>
+    )} />
   </TabItem>
 </Tabs>
 
@@ -87,27 +79,10 @@ time.
 
 <RemoteRepoExample name="ilp-http" lang="java" header={false} />
 
-Configure the client using a configuration string. It follows this general
-format:
-
-```text
-<protocol>::<key>=<value>;<key>=<value>;...;
-```
-
-[Transport protocol](/docs/ingestion/ilp/overview/#transport-selection)
-can be one of these:
-
-- `http` — ILP/HTTP
-- `https` — ILP/HTTP with TLS encryption
-- `tcp` — ILP/TCP
-- `tcps` — ILP/TCP with TLS encryption
-
-The key `addr` sets the hostname and port of the QuestDB server. Port defaults
-to 9000 for HTTP(S) and 9009 for TCP(S).
-
-The minimum configuration includes the transport and the address. For a complete
-list of options, refer to the [Configuration Options](#configuration-options)
-section.
+The client is configured using a configuration string. See
+[Ways to create the client](#ways-to-create-the-client) for all configuration
+methods, and [Configuration options](#configuration-options) for available
+settings.
 
 ## Authenticate and encrypt
 
@@ -127,9 +102,24 @@ There are three ways to create a client instance:
 
 1. **From a configuration string.** This is the most common way to create a
    client instance. It describes the entire client configuration in a single
-   string. See [Configuration options](#configuration-options) for all available
-   options. It allows sharing the same configuration across clients in different
-   languages.
+   string, and allows sharing the same configuration across clients in different
+   languages. The general format is:
+
+   ```text
+   <protocol>::<key>=<value>;<key>=<value>;...;
+   ```
+
+   [Transport protocol](/docs/ingestion/ilp/overview/#transport-selection)
+   can be one of these:
+
+   - `http` — ILP/HTTP
+   - `https` — ILP/HTTP with TLS encryption
+   - `tcp` — ILP/TCP
+   - `tcps` — ILP/TCP with TLS encryption
+
+   The key `addr` sets the hostname and port of the QuestDB server. Port
+   defaults to 9000 for HTTP(S) and 9009 for TCP(S). The minimum configuration
+   includes the transport and the address.
 
    ```java
    try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;")) {
@@ -137,10 +127,13 @@ There are three ways to create a client instance:
    }
    ```
 
+   For all available options, see
+   [Configuration options](#configuration-options).
+
 2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
    is used to set the configuration string. Moving configuration parameters to
    an environment variable allows you to avoid hard-coding sensitive information
-   such as tokens and password in your code.
+   such as tokens and passwords in your code.
 
    ```bash
    export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
@@ -164,7 +157,7 @@ There are three ways to create a client instance:
    }
    ```
    
-## Configuring multiple urls
+## Configuring multiple URLs
 
 :::note
 
@@ -172,8 +165,8 @@ This feature requires QuestDB OSS 9.1.0+ or Enterprise 3.0.4+.
 
 :::
 
-The ILP client can be configured with multiple _possible_ endpoints to send your data to. Only one will be sent to at
-any one time.
+The ILP client can be configured with multiple _possible_ endpoints to send your data to. Only one endpoint is used at
+a time.
 
 To configure this feature, simply provide multiple `addr` entries. For example:
 
@@ -188,10 +181,10 @@ On initialisation, if `protocol_version=auto`, the sender will identify the firs
 any subsequent data to it.
 
 In the event that the instance becomes unavailable for writes, the client will retry the other possible endpoints, and when it finds 
-a new writeable instance, will _stick_ to it instead. This unvailability is characterised by failures to connect or locate the instance, 
+a new writeable instance, will _stick_ to it instead. This unavailability is characterised by failures to connect or locate the instance,
 or the instance returning an error code due to it being read-only.
 
-By configuring multiple addresses, you can continue allowing you to continue to capture data if your primary instance
+By configuring multiple addresses, you can continue to capture data if your primary instance
 fails, without having to reconfigure the clients. This backup instance can be hot or cold, and so long as it is assigned a known address, it will be written to as soon as it is started.
 
 Enterprise users can leverage this feature to transparently handle replication failover, without the need to introduce a load-balancer or
@@ -212,7 +205,7 @@ to `30s` or higher.
 1. Create a client instance via `Sender.fromConfig()`.
 2. Use `table(CharSequence)` to select a table for inserting a new row.
 3. Use `symbol(CharSequence, CharSequence)` to add all symbols. You must add
-   symbols before adding other column type.
+   symbols before adding other column types.
 4. Use the following options to add all the remaining columns:
 
    - `stringColumn(CharSequence, CharSequence)`
@@ -238,7 +231,7 @@ precision and scale.
    set a designated timestamp.
 6. Optionally: You can use `flush()` to send locally buffered data into a
    server.
-7. Go to the step no. 2 to start a new row.
+7. Repeat from step 2 to start a new row.
 8. Use `close()` to dispose the Sender after you no longer need it.
 
 ## Ingest arrays
@@ -288,7 +281,7 @@ You can configure the client to not use automatic flushing, and issue explicit
 flush requests by calling `sender.flush()`:
 
 ```java
- try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush=off")) {
+try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush=off")) {
     sender.table("trades")
           .symbol("symbol", "ETH-USD")
           .symbol("side", "sell")
@@ -296,7 +289,7 @@ flush requests by calling `sender.flush()`:
           .doubleColumn("amount", 0.00044)
           .atNow();
     sender.table("trades")
-          .symbol("symbol", "TC-USD")
+          .symbol("symbol", "BTC-USD")
           .symbol("side", "sell")
           .doubleColumn("price", 39269.98)
           .doubleColumn("amount", 0.001)
@@ -338,16 +331,15 @@ closing the client.
 
 ## Error handling
 
+HTTP automatically retries failed, recoverable requests: network errors, some
+server errors, and timeouts. Non-recoverable errors include invalid data,
+authentication errors, and other client-side errors.
 
 :::note
 
 If you have configured multiple addresses, retries will be run against different instances.
 
 :::
-
-HTTP automatically retries failed, recoverable requests: network errors, some
-server errors, and timeouts. Non-recoverable errors include invalid data,
-authentication errors, and other client-side errors.
 
 Retrying is especially useful during transient network issues or when the server
 goes offline for a short period. Configure the retrying behavior through the
@@ -359,9 +351,9 @@ it hits the timeout without success, the client throws a `LineSenderException`.
 The client won't retry requests while it's being closed and attempting to flush
 the data left over in the buffer.
 
- The TCP transport has no mechanism to notify the client it encountered an
- error; instead it just disconnects. When the client detects this, it throws a
- `LineSenderException` and becomes unusable.
+The TCP transport has no mechanism to notify the client it encountered an
+error; instead it just disconnects. When the client detects this, it throws a
+`LineSenderException` and becomes unusable.
 
 ## Recover after a client-side error
 
@@ -378,7 +370,7 @@ rows were accepted by the server.
 
 Error handling behaviour changed with the release of QuestDB 9.1.0.
 
-Previously, failing all retries would cause the code to except and release the buffered data.
+Previously, failing all retries would cause an exception and release the buffered data.
 
 Now the buffer will not be released. If you wish to re-use the same sender with fresh data, you must call the
 new `reset()` function.
@@ -469,6 +461,16 @@ method.
 
 For a breakdown of available options, see the
 [Configuration string](/docs/ingestion/clients/configuration-string/) page.
+
+## Compatible JDKs
+
+The client relies on some JDK internal libraries, which certain specialised JDK
+offerings may not support.
+
+Here is a list of known incompatible JDKs:
+
+- Azul Zing 17
+  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
 
 ## Other considerations
 
