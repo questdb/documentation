@@ -1,21 +1,27 @@
 ---
-title: OVER Clause Syntax
-sidebar_label: OVER Syntax
-description: Complete syntax reference for the OVER clause in window functions - partitioning, ordering, and frame specifications.
-keywords: [over, partition by, order by, rows, range, frame, window functions]
+title: Window Function Syntax
+sidebar_label: Syntax
+description: Complete syntax reference for window functions including the OVER clause, named windows with the WINDOW clause, and window inheritance.
+keywords: [over, partition by, order by, rows, range, frame, window functions, window clause, named windows]
 ---
 
-The `OVER` clause defines the window for a window function. This page covers the complete syntax for partitioning, ordering, and frame specifications. For an introduction to window functions, see the [Overview](overview.md).
+The `OVER` clause defines the window for a window function. The `WINDOW` clause lets you define reusable named windows and build on them with inheritance. This page covers the complete syntax for both. For an introduction to window functions, see the [Overview](overview.md).
 
 ## Syntax
 
 ```sql
+-- Inline window definition
 function_name(arguments) [IGNORE NULLS | RESPECT NULLS] OVER (
     [PARTITION BY column [, ...]]
     [ORDER BY column [ASC | DESC] [, ...]]
     [frame_clause]
     [exclusion_clause]
 )
+
+-- Named window definition
+function_name(arguments) OVER window_name
+...
+WINDOW window_name AS ([base_window_name] [window_definition]) [, ...]
 ```
 
 Where `frame_clause` is one of:
@@ -56,9 +62,7 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 | `CUMULATIVE` | Shorthand for `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
 | `EXCLUDE` | Optionally excludes rows from the frame |
 
-:::tip Reusing window definitions
-If multiple window functions in the same query share the same frame clause, you can define it once using a [named window](#named-windows-window-clause) instead of repeating it.
-:::
+Multiple window functions can share a definition using the [`WINDOW` clause](#named-windows-window-clause).
 
 ## PARTITION BY
 
@@ -460,13 +464,6 @@ WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
-## Performance considerations
-
-- **ROWS frames** typically perform better than RANGE frames for large datasets
-- **Partitioning** improves performance by processing smaller data chunks
-- Consider **index usage** when ordering by timestamp columns
-- Narrow windows process less data than wide windows
-
 ## Named windows (WINDOW clause)
 
 When multiple window functions share the same window definition, you can define the window once and reference it by name. This reduces repetition and improves readability.
@@ -556,6 +553,65 @@ SELECT * FROM price_stats
 WHERE deviation > 10
 LIMIT 100;
 ```
+
+### Window inheritance
+
+A named window can reference another named window as its base, inheriting its `PARTITION BY`, `ORDER BY`, and frame clauses. The child window can then add or override clauses on top.
+
+```questdb-sql title="Inheriting from a base window" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w1 AS symbol_avg,
+    avg(price) OVER w2 AS moving_avg
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW
+    w1 AS (ORDER BY timestamp),
+    w2 AS (w1 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+Here `w2` inherits `ORDER BY timestamp` from `w1` and adds a frame clause.
+
+Chained inheritance is supported — a window can inherit from a window that itself inherits from another:
+
+```questdb-sql title="Chained inheritance" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w3 AS moving_avg
+FROM trades
+WHERE timestamp IN '[$today]'
+WINDOW
+    w1 AS (PARTITION BY symbol),
+    w2 AS (w1 ORDER BY timestamp),
+    w3 AS (w2 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+**Merge rules** follow the SQL standard:
+
+| Clause | Behavior |
+| --- | --- |
+| `PARTITION BY` | Always inherited from the base. The child **cannot** specify its own. |
+| `ORDER BY` | Child's takes precedence if specified, otherwise inherited from the base. |
+| Frame | Child's takes precedence if specified, otherwise inherited from the base. |
+
+**Restrictions:**
+
+- The base window must be defined **earlier** in the `WINDOW` clause (no forward references).
+- A child window that references a base **cannot** include its own `PARTITION BY`.
+- Circular and self-references are not allowed.
+
+## Performance considerations
+
+- **ROWS frames** typically perform better than RANGE frames for large datasets
+- **Partitioning** improves performance by processing smaller data chunks
+- Consider **index usage** when ordering by timestamp columns
+- Narrow windows process less data than wide windows
 
 ## Common pitfalls
 
