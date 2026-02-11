@@ -373,7 +373,7 @@ WITH FORMAT PARQUET;
 Check all recent exports:
 
 ```questdb-sql title="View export history"
-SELECT ts, table, destination, status, rows_exported
+SELECT ts, "table", destination, status, rows_exported
 FROM sys.copy_export_log
 WHERE ts > dateadd('d', -1, now())
 ORDER BY ts DESC;
