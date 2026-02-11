@@ -24,8 +24,8 @@ WITH with_direction AS (
     close,
     total_volume AS volume,
     CASE
-      WHEN close > lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN total_volume
-      WHEN close < lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN -total_volume
+      WHEN close > lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN volume
+      WHEN close < lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN -volume
       ELSE 0
     END AS directed_volume
   FROM fx_trades_ohlc_1m
