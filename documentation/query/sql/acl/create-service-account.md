@@ -6,18 +6,17 @@ description:
   in QuestDB Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 To create a new service account in the database, the `CREATE SERVICE ACCOUNT`
 keywords are used.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
-
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
 
 ---
 

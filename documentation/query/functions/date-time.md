@@ -7,115 +7,143 @@ description: Timestamp, date and time functions reference documentation.
 This page describes the available functions to assist with performing time-based
 calculations using timestamps.
 
-## Timestamp format
+## Timestamp and date types
 
-The timestamp format is formed by units and arbitrary text. A unit is a
-combination of letters representing a date or time component, as defined by the
-table below. The letters used to form a unit are case-sensitive.
+QuestDB has three temporal types with different precision:
 
-See
-[Working with time zones](/docs/concepts/timestamps-timezones/)
-for more on timestamp handling in QuestDB.
+| Type | Precision | Approximate Range |
+| :--- | :-------- | :---------------- |
+| `DATE` | milliseconds | ±2.9 million years |
+| `TIMESTAMP` | microseconds | ±290,000 years |
+| `TIMESTAMP_NS` | nanoseconds | ±2,920 years |
 
-| Unit   | Date or Time Component                                                                                         | Presentation       | Examples                              |
-| ------ | -------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
-| `G`    | Era designator                                                                                                 | Text               | AD                                    |
-| `y`    | `y` single digit or greedy year, depending on the number of digits in input                                    | Year               | 1996; 96; 999; 3                      |
-| `yy`   | Two digit year of the current century                                                                          | Year               | 96 (interpreted as 2096)              |
-| `yyy`  | Three-digit year                                                                                               | Year               | 999                                   |
-| `yyyy` | Four-digit year                                                                                                | Year               | 1996                                  |
-| `M`    | Month in year, numeric, greedy                                                                                 | Month              | 7; 07; 007; etc.                      |
-| `MM`   | Month in year, two-digit                                                                                       | Month              | 07                                    |
-| `MMM`  | Month in year, name                                                                                            | Month              | Jul; July                             |
-| `w`    | Week in year                                                                                                   | Number             | 2                                     |
-| `ww`   | ISO week of year (two-digit)                                                                                   | Number             | 02                                    |
-| `D`    | Day in year                                                                                                    | Number             | 189                                   |
-| `d`    | Day in month                                                                                                   | Number             | 10                                    |
-| `F`    | Day of week in month                                                                                           | Number             | 2                                     |
-| `E`    | Day name in week                                                                                               | Text               | Tuesday; Tue                          |
-| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                                                               | Number             | 1                                     |
-| `a`    | Am/pm marker                                                                                                   | Text               | PM                                    |
-| `H`    | Hour in day (0-23)                                                                                             | Number             | 0                                     |
-| `k`    | Hour in day (1-24)                                                                                             | Number             | 24                                    |
-| `K`    | Hour in am/pm (0-11)                                                                                           | Number             | 0                                     |
-| `h`    | Hour in am/pm (1-12)                                                                                           | Number             | 12                                    |
-| `m`    | Minute in hour                                                                                                 | Number             | 30                                    |
-| `s`    | Second in minute                                                                                               | Number             | 55                                    |
-| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)                                             | Number             | 978                                   |
-| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 900                                   |
-| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)                                             | Number             | 456                                   |
-| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)                                      | Number             | 456                                   |
-| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)                                      | Number             | 123456                                |
-| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)                                       | Number             | 900                                   |
-| `N+`   | Microsecond up to 9 digits (see explanation below for fraction-of-second)                                      | Number             | 123456789                             |
-| `z`    | Time zone                                                                                                      | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
-| `Z`    | Time zone                                                                                                      | RFC 822 time zone  | -0800                                 |
-| `x`    | Time zone                                                                                                      | ISO 8601 time zone | -08; -0800; -08:00                    |
+All three are stored as signed 64-bit integers representing offsets from the
+Unix epoch. `TIMESTAMP` is recommended for most use cases as it offers the
+best balance of precision and function support.
 
-### Examples for greedy year format `y`
+For details on all data types, see the [data types overview](/docs/query/datatypes/overview).
 
-The interpretation of `y` depends on the number of digits in the input text:
+:::note Designated timestamp restriction
+When used as a [designated timestamp](/docs/concepts/designated-timestamp/),
+`TIMESTAMP` and `TIMESTAMP_NS` values cannot be before the Unix epoch
+(`1970-01-01T00:00:00.000000Z`).
+:::
 
-- If the input year is a two-digit number, the output timestamp assumes the
-  current century.
-- Otherwise, the number is interpreted as it is.
+### Converting between types
 
-| Input year | Timestamp value interpreted by `y-M` | Notes                                                |
-| ---------- | ------------------------------------ | ---------------------------------------------------- |
-| `5-03`     | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
-| `05-03`    | `2005-03-01T00:00:00.000000Z`        | Greedily parsing the number assuming current century |
-| `005-03`   | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
-| `0005-03`  | `0005-03-01T00:00:00.000000Z`        | Greedily parsing the number as it is                 |
+Use `CAST` to convert between temporal types:
 
-### Examples for fractions of a second
+```questdb-sql
+-- Reduce precision
+SELECT CAST(ts_column AS DATE) FROM my_table;
 
-In a basic example, `y-M-dTHH:mm:ss.S` specifies to parse 1, 2, or 3 decimals.
-Here are more examples, showing just the last part starting with the `.`:
+-- Increase precision
+SELECT CAST(date_column AS TIMESTAMP) FROM my_table;
+SELECT CAST(ts_column AS TIMESTAMP_NS) FROM my_table;
+```
 
-| format       | number of decimals | example input | parsed fraction of second |
-| ------------ | ------------------ | ------------- | ------------------------- |
-| `.S`         | 1-3                | `.12`         | 12 milliseconds           |
-| `.SSS`       | 3                  | `.123`        | 123 milliseconds          |
-| `.SSSU`      | 4-6                | `.1234`       | 123,400 microseconds      |
-| `.SSSUUU`    | 6                  | `.123456`     | 123,456 microseconds      |
-| `.U+`        | 1-6                | `.12345`      | 123,450 microseconds      |
-| `.SSSUUUN`   | 7-9                | `.1234567`    | 123,456,700 nanoseconds   |
-| `.SSSUUUNNN` | 9                  | `.123456789`  | 123,456,789 nanoseconds   |
-| `.N+`        | 1-9                | `.12`         | 120,000,000 nanoseconds   |
+### Converting from programming languages
 
-## Timestamp to Date conversion
-
-As described at the [data types section](/docs/query/datatypes/overview), the
-only difference between `TIMESTAMP`, `TIMESTAMP_NS`, and `DATE` in QuestDB type
-system is the resolution. Whilst `TIMESTAMP` stores resolution as an offset from Unix epoch in
-microseconds, `TIMESTAMP_NS` stores it as an offset in nanoseconds, and `DATE` stores the
-offset in milliseconds.
-
-Since the three types are backed by a signed long, this means the `DATE` type has a
-wider range. A `DATE` column can store about ±2.9 million years from the Unix
-epoch, whereas a `TIMESTAMP` has an approximate range of ±290,000 years, and a
-`TIMESTAMP_NS` has an approximate range of ±2262 years.
-
-For most purposes a `TIMESTAMP` is preferred, as it offers a wider range of
-functions whilst still being 8 bytes in size.
-
-Be aware that, when using a `TIMESTAMP` or `TIMESTAMP_NS` as the designated
-timestamp, you cannot set it to any value before the Unix epoch (`1970-01-01T00:00:00.000000Z`).
-
-To explicitly convert from `TIMESTAMP` to `DATE` or `TIMESTAMP_NS`, you can use
-`CAST(ts_column AS DATE)` or `CAST(ts_column AS TIMESTAMP_NS)`. To convert from
-`DATE` or `TIMESTAMP_NS` to `TIMESTAMP` you can `CAST(column AS TIMESTAMP_NS)`.
-
-### Programmatically convert from language-specific datetimes into QuestDB timestamps
-
-Different programming languages use different types of objects to represent the
-`DATE` type. To learn how to convert from the `DATE` type into a `TIMESTAMP`
-object in Python, Go, Java, JavaScript, C/C++, Rust, or C#/.NET, please visit
-our [Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
-reference.
+To convert language-specific datetime objects (Python `datetime`, Java
+`Instant`, etc.) into QuestDB timestamps, see the
+[Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
+reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 ---
 
+## Function categories
+
+### Current time
+
+| Function | Description |
+| :------- | :---------- |
+| [now](#now) | Current timestamp (stable within query) |
+| [now_ns](#now_ns) | Current timestamp with nanosecond precision (stable within query) |
+| [systimestamp](#systimestamp) | Current timestamp (changes per row) |
+| [systimestamp_ns](#systimestamp_ns) | Current timestamp with nanosecond precision (changes per row) |
+| [sysdate](#sysdate) | Current date with millisecond precision |
+| [today](#today-tomorrow-yesterday) | Interval for current day |
+| [tomorrow](#today-tomorrow-yesterday) | Interval for next day |
+| [yesterday](#today-tomorrow-yesterday) | Interval for previous day |
+
+### Extraction
+
+| Function | Description |
+| :------- | :---------- |
+| [extract](#extract) | Extract any time unit from timestamp |
+| [year](#year) | Extract year from timestamp |
+| [month](#month) | Extract month (1-12) |
+| [day](#day) | Extract day of month (1-31) |
+| [hour](#hour) | Extract hour (0-23) |
+| [minute](#minute) | Extract minute (0-59) |
+| [second](#second) | Extract second (0-59) |
+| [millis](#millis) | Extract milliseconds (0-999) |
+| [micros](#micros) | Extract microseconds (0-999) |
+| [nanos](#nanos) | Extract nanoseconds (0-999) |
+| [day_of_week](#day_of_week) | Day number (1=Monday to 7=Sunday) |
+| [day_of_week_sunday_first](#day_of_week_sunday_first) | Day number (1=Sunday to 7=Saturday) |
+| [days_in_month](#days_in_month) | Number of days in the month |
+| [week_of_year](#week_of_year) | Week number in year |
+| [is_leap_year](#is_leap_year) | Check if year is a leap year |
+
+### Arithmetic
+
+| Function | Description |
+| :------- | :---------- |
+| [dateadd](#dateadd) | Add time period to timestamp |
+| [datediff](#datediff) | Difference between timestamps |
+| [date_trunc](#date_trunc) | Truncate timestamp to specified precision |
+| [timestamp_ceil](#timestamp_ceil) | Round timestamp up to unit boundary |
+| [timestamp_floor](#timestamp_floor) | Round timestamp down to unit/interval boundary |
+
+### Conversion
+
+| Function | Description |
+| :------- | :---------- |
+| [to_timestamp](#to_timestamp) | Parse string to timestamp (microsecond) |
+| [to_timestamp_ns](#to_timestamp_ns) | Parse string to timestamp (nanosecond) |
+| [to_date](#to_date) | Parse string to date |
+| [to_str](#to_str) | Format timestamp as string |
+| [to_timezone](#to_timezone) | Convert timestamp to timezone |
+| [to_utc](#to_utc) | Convert timestamp to UTC |
+
+### Interval construction
+
+| Function | Description |
+| :------- | :---------- |
+| [interval](#interval) | Create interval from two timestamps |
+| [interval_start](#interval_start) | Extract interval lower bound |
+| [interval_end](#interval_end) | Extract interval upper bound |
+
+### Utilities
+
+| Function | Description |
+| :------- | :---------- |
+| [timestamp_shuffle](#timestamp_shuffle) | Generate random timestamp in range |
+| [pg_postmaster_start_time](#pg_postmaster_start_time) | Server start time (PostgreSQL compatibility) |
+
+---
+
+:::tip Filtering vs projection
+
+**For filtering (WHERE clause)**: Use [TICK syntax](/docs/query/operators/tick/)
+for optimized interval scans:
+```questdb-sql
+SELECT * FROM trades WHERE ts IN '$today'
+SELECT * FROM trades WHERE ts IN '$now - 1h..$now'
+```
+
+**For projection (SELECT clause)**: Use these functions for computed values:
+```questdb-sql
+SELECT dateadd('h', 2, ts) as shifted_time FROM trades
+SELECT year(ts), month(ts) FROM trades
+```
+
+TICK syntax leverages [interval scans](/docs/concepts/deep-dive/interval-scan/)
+for efficient filtering. Functions are for transformations and calculations.
+:::
+
+---
 
 ## date_trunc
 
@@ -153,18 +181,22 @@ of type `timestamp_ns` or if the date passed as a string contains nanoseconds re
 ```questdb-sql
 SELECT date_trunc('hour', '2022-03-11T22:00:30.555555Z') hour,
 date_trunc('month', '2022-03-11T22:00:30.555555Z') month,
-date_trunc('year','2022-03-11T22:00:30.555555Z') year;
-date_trunc('year','2022-03-11T22:00:30.555555000Z') year;
+date_trunc('year','2022-03-11T22:00:30.555555Z') year,
+date_trunc('year','2022-03-11T22:00:30.555555555Z') year2;
 ```
 
-| hour (timestamp_ns)         | month (timestamp_ns)        | year (timestamp_ns)         | year (timestamp_ns)            |
-| --------------------------- | --------------------------- | --------------------------- | ------------------------------ |
+| hour (timestamp_ns)         | month (timestamp_ns)        | year (timestamp)            | year2 (timestamp_ns)           |
+|-----------------------------|-----------------------------|-----------------------------|--------------------------------|
 | 2022-03-11T22:00:00.000000Z | 2022-03-01T00:00:00.000000Z | 2022-01-01T00:00:00.000000Z | 2022-01-01T00:00:00.000000000Z |
 
 ## dateadd
 
 `dateadd(period, n, startDate[, timezone])` - adds `n` `period` to `startDate`,
 optionally respecting timezone DST transitions.
+
+Use in projections (SELECT clause) to shift timestamps. For filtering relative
+time windows in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(e.g., `$now - 1h..$now`) for optimized interval scans.
 
 :::tip
 
@@ -202,7 +234,7 @@ timezone-aware calculations, use the timezone parameter.
 **Return value:**
 
 Return value type defaults to `timestamp`, but it will return a `timestamp_ns` if the `startDate`
-argument is a `timetamp_ns`.
+argument is a `timestamp_ns`.
 
 **Examples:**
 
@@ -247,6 +279,11 @@ FROM long_sequence(1);
 | systimestamp                | dateadd                     |
 | :-------------------------- | :-------------------------- |
 | 2020-04-17T00:30:51.380499Z | 2020-06-17T00:30:51.380499Z |
+
+#### See also
+
+- [datediff](#datediff) - Difference between timestamps
+- [TICK syntax](/docs/query/operators/tick/) - For filtering with optimized interval scans
 
 ## datediff
 
@@ -441,6 +478,7 @@ timestamp.
   - `second`
   - `microseconds`
   - `milliseconds`
+  - `nanoseconds`
 
 - `timestamp` is any `timestamp`, `timestamp_ns`, `date`, or date literal string value.
 
@@ -455,18 +493,22 @@ Return value type is `integer`.
 SELECT extract(millennium from '2023-03-11T22:00:30.555555Z') millennium,
 extract(year from '2023-03-11T22:00:30.555555Z') year,
 extract(month from '2023-03-11T22:00:30.555555Z') month,
-extract(week from '2023-03-11T22:00:30.555555Z') quarter,
+extract(week from '2023-03-11T22:00:30.555555Z') week,
 extract(hour from '2023-03-11T22:00:30.555555Z') hour,
 extract(second from '2023-03-11T22:00:30.555555Z') second;
 ```
 
-| millennium | year | month | quarter | hour | second |
-| ---------- | ---- | ----- | ------- | ---- | ------ |
-| 3          | 2023 | 3     | 10      | 22   | 30     |
+| millennium | year | month | week | hour | second |
+|------------|------|-------|------|------|--------|
+| 3          | 2023 | 3     | 10   | 22   | 30     |
+
+#### See also
+
+- [year](#year), [month](#month), [day](#day), [hour](#hour), [minute](#minute), [second](#second) - Individual extraction functions
 
 ## hour
 
-`hour(value)` - returns the `hour` of day for a given timestamp from `0` to
+`hour(timestamp)` - returns the `hour` of day for a given timestamp from `0` to
 `23`.
 
 **Arguments:**
@@ -485,8 +527,8 @@ FROM long_sequence(1);
 ```
 
 | hour |
-| :--- |
-| 12   |
+|:-----|
+| 15   |
 
 ```questdb-sql title="Using in an aggregation"
 SELECT hour(ts), count() FROM transactions;
@@ -504,6 +546,16 @@ SELECT hour(ts), count() FROM transactions;
 
 `interval(start_timestamp, end_timestamp)` - creates a time interval from two
 timestamps.
+
+Intervals are **runtime-only values** that cannot be stored in tables. Use this
+function for:
+- Checking if a timestamp falls within a range: `ts IN interval(start, end)`
+- Extracting bounds with `interval_start()` and `interval_end()`
+- Working with intervals returned by `today()`, `tomorrow()`, `yesterday()`
+
+For filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(e.g., `$today`, `$now - 1h..$now`) which enables
+[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
 
 **Arguments:**
 
@@ -524,9 +576,17 @@ SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
 | :------------------------------------------------------- |
 | ('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z') |
 
+#### See also
+
+- [interval_start](#interval_start) - Extract interval lower bound
+- [interval_end](#interval_end) - Extract interval upper bound
+- [TICK syntax](/docs/query/operators/tick/) - For filtering with optimized interval scans
+
 ## interval_start
 
 `interval_start(interval)` - extracts the lower bound of the interval.
+
+Use to extract bounds from intervals returned by functions or stored in columns.
 
 **Arguments:**
 
@@ -552,6 +612,8 @@ SELECT
 ## interval_end
 
 `interval_end(interval)` - extracts the upper bound of the interval.
+
+Use to extract bounds from intervals returned by functions or stored in columns.
 
 **Arguments:**
 
@@ -624,8 +686,8 @@ SELECT micros(to_timestamp('2020-03-01:15:43:21.123456', 'yyyy-MM-dd:HH:mm:ss.SS
 FROM long_sequence(1);
 ```
 
-| millis |
-| :----- |
+| micros |
+|:-------|
 | 456    |
 
 ```questdb-sql title="Parsing 3 digits when no unit is added after U"
@@ -633,7 +695,7 @@ SELECT micros(to_timestamp('2020-03-01:15:43:21.123456', 'yyyy-MM-dd:HH:mm:ss.SS
 FROM long_sequence(1);
 ```
 
-| millis |
+| micros |
 | :----- |
 | 456    |
 
@@ -641,7 +703,7 @@ FROM long_sequence(1);
 SELECT micros(ts), count() FROM transactions;
 ```
 
-| second | count |
+| micros | count |
 | :----- | :---- |
 | 0      | 2323  |
 | 1      | 6548  |
@@ -687,8 +749,8 @@ FROM long_sequence(1);
 SELECT millis(ts), count() FROM transactions;
 ```
 
-| second | count |
-| :----- | :---- |
+| millis | count |
+|:-------| :---- |
 | 0      | 2323  |
 | 1      | 6548  |
 | ...    | ...   |
@@ -842,6 +904,38 @@ SELECT * FROM trades
 WHERE timestamp > now() - 60000000L;
 ```
 
+## now_ns
+
+`now_ns()` - offset from UTC Epoch in nanoseconds.
+
+Calculates `UTC timestamp` using system's real time clock with nanosecond
+precision. Like `now()`, it does not change within the query execution timeframe.
+
+**Arguments:**
+
+- `now_ns()` does not accept arguments.
+
+**Return value:**
+
+Return value type is `timestamp_ns`.
+
+**Examples:**
+
+```questdb-sql title="Query returns same timestamp in every row"
+SELECT now_ns() FROM long_sequence(3)
+```
+
+| now_ns                         |
+| :----------------------------- |
+| 2021-02-01T21:51:34.443726123Z |
+| 2021-02-01T21:51:34.443726123Z |
+| 2021-02-01T21:51:34.443726123Z |
+
+#### See also
+
+- [now](#now) - Current timestamp with microsecond precision
+- [systimestamp_ns](#systimestamp_ns) - Current timestamp with nanosecond precision (changes per row)
+
 ## pg_postmaster_start_time
 
 `pg_postmaster_start_time()` - returns the time when the server started.
@@ -886,7 +980,7 @@ FROM long_sequence(1);
 
 | second |
 | :----- |
-| 43     |
+| 21     |
 
 ```questdb-sql title="Using in an aggregation"
 SELECT second(ts), count() FROM transactions;
@@ -909,6 +1003,11 @@ SELECT second(ts), count() FROM transactions;
 - `yesterday()` - returns an interval representing the previous day.
 
 Interval is in the UTC/GMT+0 timezone.
+
+These functions return intervals for use in projections or comparisons. For
+filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(`$today`, `$tomorrow`, `$yesterday`) which enables
+[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
 
 **Arguments:**
 
@@ -959,6 +1058,10 @@ interval that corresponds to their 'day'.
 
 In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM`
 `UTC` the day before.
+
+#### See also
+
+- [TICK syntax](/docs/query/operators/tick/) - Use `$today`, `$tomorrow`, `$yesterday` for optimized filtering
 
 ## sysdate
 
@@ -1092,6 +1195,7 @@ A unit must be provided to specify which granularity to perform rounding.
 - `m` minutes
 - `h` hours
 - `d` days
+- `w` weeks
 - `M` months
 - `y` year
 
@@ -1120,15 +1224,18 @@ SELECT
   FROM t
 ```
 
-| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute | c_hour | c_day | c_month | c_year |
-| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | -------- | ------ | ----- | ------- | ------ |
-| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862146000Z | 2016-02-10T16:18:22.863000000Z | 2016-02-10T16:18:23.000000000Z |
-
+| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute                       | c_hour                         | c_day                          | c_month                        | c_year                         |
+| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
+| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862146000Z | 2016-02-10T16:18:22.863000000Z | 2016-02-10T16:18:23.000000000Z | 2016-02-10T16:19:00.000000000Z | 2016-02-10T17:00:00.000000000Z | 2016-02-11T00:00:00.000000000Z | 2016-03-01T00:00:00.000000000Z | 2017-01-01T00:00:00.000000000Z |
 
 ## timestamp_floor
 
 `timestamp_floor(interval, timestamp)` - performs a floor calculation on a
 timestamp by given interval expression.
+
+Use for custom time bucketing in projections. For time-series aggregation,
+consider [SAMPLE BY](/docs/query/sql/sample-by/) which provides optimized
+grouping with fill options.
 
 An interval expression must be provided to specify which granularity to perform
 rounding for.
@@ -1147,6 +1254,7 @@ suffices:
 - `m` minutes
 - `h` hours
 - `d` days
+- `w` weeks
 - `M` months
 - `y` year
 
@@ -1189,10 +1297,9 @@ SELECT
 
 Gives:
 
-| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute | c_hour | c_day | c_month | c_year |
-| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | -------- | ------ | ----- | ------- | ------ |
-| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145000Z | 2016-02-10T16:18:22.862000000Z | 2016-02-10T16:18:22.000000000Z |
-
+| ts                             | c_nano                         | c_micro                        | c_milli                        | c_second                       | c_minute                       | c_hour                         | c_day                          | c_month                        | c_year                         |
+| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
+| 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145333Z | 2016-02-10T16:18:22.862145000Z | 2016-02-10T16:18:22.862000000Z | 2016-02-10T16:18:22.000000000Z | 2016-02-10T16:18:00.000000000Z | 2016-02-10T16:00:00.000000000Z | 2016-02-10T00:00:00.000000000Z | 2016-02-01T00:00:00.000000000Z | 2016-01-01T00:00:00.000000000Z |
 
 #### timestamp_floor with offset
 
@@ -1444,6 +1551,11 @@ converts `string` to `timestamp` if it is a partial or full form of
 offset, `+01:00` or `Z`. See more examples in
 [Native timestamp](/docs/query/sql/where/#native-timestamp-format)
 
+#### See also
+
+- [to_timestamp_ns](#to_timestamp_ns) - Parse string to timestamp with nanosecond precision
+- [to_str](#to_str) - Format timestamp as string
+- [Timestamp format](#timestamp-format) - Format pattern reference
 
 ## to_timestamp_ns
 
@@ -1628,7 +1740,7 @@ FROM long_sequence(1);
 | 2020 |
 
 ```questdb-sql title="Using in an aggregation"
-SELECT month(ts), count() FROM transactions;
+SELECT year(ts), count() FROM transactions;
 ```
 
 | year | count |
@@ -1636,3 +1748,149 @@ SELECT month(ts), count() FROM transactions;
 | 2015 | 2323  |
 | 2016 | 9876  |
 | 2017 | 2567  |
+
+#### See also
+
+- [extract](#extract) - Extract any time unit from timestamp
+
+---
+
+## Appendix: Timestamp format patterns {#timestamp-format}
+Format patterns tell QuestDB how to interpret string timestamps. They are used
+in multiple contexts:
+
+- **SQL functions**: [`to_timestamp()`](#to_timestamp) and [`to_timestamp_ns()`](#to_timestamp_ns) for parsing text into native timestamp values
+- **CSV import**: The `timestamp` parameter in [`COPY`](/docs/query/sql/copy/) and the REST API
+- **Kafka connector**: The `timestamp.string.format` configuration property
+
+A format pattern combines units (letter codes for date/time components) with
+literal characters that match your input. For example, `yyyy-MM-dd HH:mm:ss`
+parses `2024-03-15 14:30:45`. Units are case-sensitive.
+
+See [Working with time zones](/docs/concepts/timestamps-timezones/) for more on
+timestamp handling in QuestDB.
+
+| Unit   | Date or Time Component                                                     | Presentation       | Examples                              |
+| ------ |----------------------------------------------------------------------------| ------------------ | ------------------------------------- |
+| `G`    | Era designator                                                             | Text               | AD                                    |
+| `y`    | `y` single digit or greedy year, depending on the number of digits in input | Year               | 1996; 96; 999; 3                      |
+| `yy`   | Two digit year of the current century                                      | Year               | 96 (interpreted as 2096)              |
+| `yyy`  | Three-digit year                                                           | Year               | 999                                   |
+| `yyyy` | Four-digit year                                                            | Year               | 1996                                  |
+| `M`    | Month in year, numeric, greedy                                             | Month              | 7; 07; 007; etc.                      |
+| `MM`   | Month in year, two-digit                                                   | Month              | 07                                    |
+| `MMM`  | Month in year, name                                                        | Month              | Jul; July                             |
+| `w`    | Week in year                                                               | Number             | 2                                     |
+| `ww`   | ISO week of year (two-digit)                                               | Number             | 02                                    |
+| `D`    | Day in year                                                                | Number             | 189                                   |
+| `d`    | Day in month                                                               | Number             | 10                                    |
+| `F`    | Day of week in month                                                       | Number             | 2                                     |
+| `E`    | Day name in week                                                           | Text               | Tuesday; Tue                          |
+| `u`    | Day number of week (1 = Monday, ..., 7 = Sunday)                           | Number             | 1                                     |
+| `a`    | Am/pm marker                                                               | Text               | PM                                    |
+| `H`    | Hour in day (0-23)                                                         | Number             | 0                                     |
+| `k`    | Hour in day (1-24)                                                         | Number             | 24                                    |
+| `K`    | Hour in am/pm (0-11)                                                       | Number             | 0                                     |
+| `h`    | Hour in am/pm (1-12)                                                       | Number             | 12                                    |
+| `m`    | Minute in hour                                                             | Number             | 30                                    |
+| `s`    | Second in minute                                                           | Number             | 55                                    |
+| `SSS`  | 3-digit millisecond (see explanation below for fraction-of-second)         | Number             | 978                                   |
+| `S`    | Millisecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 900                                   |
+| `UUU`  | 3-digit microsecond (see explanation below for fraction-of-second)         | Number             | 456                                   |
+| `U`    | Microsecond up to 3 digits (see explanation below for fraction-of-second)  | Number             | 456                                   |
+| `U+`   | Microsecond up to 6 digits (see explanation below for fraction-of-second)  | Number             | 123456                                |
+| `N`    | Nanosecond up to 3 digits (see explanation below for fraction-of-second)   | Number             | 900                                   |
+| `N+`   | Nanosecond up to 9 digits (see explanation below for fraction-of-second)   | Number             | 123456789                             |
+| `z`    | Time zone                                                                  | General time zone  | Pacific Standard Time; PST; GMT-08:00 |
+| `Z`    | Time zone                                                                  | RFC 822 time zone  | -0800                                 |
+| `x`    | Time zone                                                                  | ISO 8601 time zone | -08; -0800; -08:00                    |
+
+### Common format patterns
+
+Here are practical examples of complete format strings for common use cases:
+
+| Format pattern                  | Example input                   | Description                              |
+|---------------------------------|---------------------------------|------------------------------------------|
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUZ`   | `2024-03-15T14:30:45.123456Z`   | ISO 8601 with microseconds               |
+| `yyyy-MM-ddTHH:mm:ss.SSSUUUNNN` | `2024-03-15T14:30:45.123456789` | With nanoseconds                         |
+| `yyyy-MM-dd HH:mm:ss`           | `2024-03-15 14:30:45`           | Standard datetime with space separator   |
+| `yyyy-MM-dd`                    | `2024-03-15`                    | Date only                                |
+| `yyyy-MM-ddTHH:mm:ssZ`          | `2024-03-15T14:30:45Z`          | ISO 8601 without fractional seconds      |
+| `yyyy-MM-dd HH:mm:ss.SSS`       | `2024-03-15 14:30:45.123`       | Datetime with milliseconds               |
+| `dd/MM/yyyy HH:mm:ss`           | `15/03/2024 14:30:45`           | European date format                     |
+| `MM/dd/yyyy HH:mm:ss`           | `03/15/2024 14:30:45`           | US date format                           |
+| `yyyyMMdd-HHmmss`               | `20240315-143045`               | Compact format (often used in filenames) |
+| `yyyy-MM-ddTHH:mm:ss.SSSz`      | `2024-03-15T14:30:45.123PST`    | With timezone abbreviation               |
+
+
+```questdb-sql title="Parsing common formats"
+SELECT
+  to_timestamp('2024-03-15T14:30:45.123456Z', 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ') as iso,
+  to_timestamp('2024-03-15 14:30:45', 'yyyy-MM-dd HH:mm:ss') as standard,
+  to_timestamp('15/03/2024 14:30:45', 'dd/MM/yyyy HH:mm:ss') as european
+FROM long_sequence(1);
+```
+
+### Variable-width year parsing with `y`
+
+Use `y` when your input data has years of varying lengths. Unlike `yyyy` which
+expects exactly 4 digits, `y` reads all consecutive digits until it encounters
+a non-digit character (such as `-` or `/`).
+
+**Special case for 2-digit years:** When the input contains exactly 2 digits,
+QuestDB interprets it as a year in the current century (2000-2099). All other
+lengths are interpreted literally.
+
+| Input      | Format | Result                        | Explanation                                  |
+| ---------- | ------ | ----------------------------- | -------------------------------------------- |
+| `5-03`     | `y-M`  | `0005-03-01T00:00:00.000000Z` | 1 digit → literal year 5                     |
+| `05-03`    | `y-M`  | `2005-03-01T00:00:00.000000Z` | 2 digits → current century (20xx)            |
+| `005-03`   | `y-M`  | `0005-03-01T00:00:00.000000Z` | 3 digits → literal year 5                    |
+| `0005-03`  | `y-M`  | `0005-03-01T00:00:00.000000Z` | 4 digits → literal year 5                    |
+| `2024-03`  | `y-M`  | `2024-03-01T00:00:00.000000Z` | 4 digits → literal year 2024                 |
+
+For most use cases, prefer `yyyy` for explicit 4-digit year matching.
+
+### Parsing fractions of a second
+
+Sub-second precision uses three unit types, each representing 3 decimal places:
+
+| Unit  | Represents   | Position in fraction |
+| ----- | ------------ | -------------------- |
+| `S`   | Milliseconds | Digits 1-3 (`.XXX`)  |
+| `U`   | Microseconds | Digits 4-6 (`.___XXX`) |
+| `N`   | Nanoseconds  | Digits 7-9 (`.______XXX`) |
+
+**Fixed-width formats** use repeated letters (`SSS`, `UUU`, `NNN`) and expect
+an exact number of digits:
+
+| Format       | Digits | Example input | Parsed value          |
+| ------------ | ------ | ------------- | --------------------- |
+| `.SSS`       | 3      | `.123`        | 123 ms                |
+| `.SSSUUU`    | 6      | `.123456`     | 123 ms + 456 µs       |
+| `.SSSUUUNNN` | 9      | `.123456789`  | 123 ms + 456 µs + 789 ns |
+
+**Variable-width formats** use a single letter or `+` suffix to accept varying
+lengths:
+
+| Format   | Digits | Example input | Parsed value              |
+| -------- | ------ | ------------- | ------------------------- |
+| `.S`     | 1-3    | `.12`         | 120 ms                    |
+| `.SSSU`  | 4-6    | `.1234`       | 123 ms + 400 µs           |
+| `.SSSUUUN` | 7-9  | `.1234567`    | 123 ms + 456 µs + 700 ns  |
+| `.U+`    | 1-6    | `.12345`      | 123 ms + 450 µs           |
+| `.N+`    | 1-9    | `.12`         | 120 ms (pads with zeros)  |
+
+**Practical recommendations:**
+- For microsecond timestamps (QuestDB default): use `.SSSUUU` or `.U+`
+- For nanosecond timestamps: use `.SSSUUUNNN` or `.N+`
+- For millisecond-only data: use `.SSS` or `.S`
+
+---
+
+## See also
+
+- [TICK interval syntax](/docs/query/operators/tick/) - Declarative time intervals for filtering
+- [Timestamps and timezones](/docs/concepts/timestamps-timezones/) - Working with time zones
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+- [Designated timestamp](/docs/concepts/designated-timestamp/) - Required for interval scan optimization

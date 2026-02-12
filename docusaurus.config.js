@@ -156,6 +156,7 @@ const config = {
       },
     }),
     require.resolve("./plugins/fetch-latest-release/index"),
+    require.resolve("./plugins/fetch-java-client-release/index"),
     require.resolve("./plugins/fetch-repo/index"),
     require.resolve("./plugins/remote-repo-example/index"),
     require.resolve("./plugins/raw-markdown/index"),

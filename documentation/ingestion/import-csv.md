@@ -497,7 +497,7 @@ TRUNCATE TABLE table_name;
 or import into another empty table and then use `INSERT INTO SELECT`:
 
 ```questdb-sql
-INSERT INTO table_name batch 100000
+INSERT BATCH 100000 INTO table_name
 SELECT * FROM other_table;
 ```
 
