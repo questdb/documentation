@@ -59,16 +59,20 @@ ORDER BY timestamp;
 
 ## Interpreting results
 
-- **Tight spread (< 1 bps for FX majors)**: Highly liquid, low transaction costs
+- **Tight spread**: Highly liquid market conditions and lower immediate transaction costs
 - **Wide spread**: Illiquid or volatile period, higher transaction costs
 - **Spread widening**: Often precedes or accompanies volatility
 - **Intraday patterns**: Spreads typically widen during off-hours and narrow during active sessions
 
-:::note Spread conventions
-- FX majors: typically 0.1-1.0 basis points
-- FX minors: 1-5 basis points
-- Crypto: varies widely, 1-50+ basis points
-- Equities: often quoted in cents rather than bps
+:::note Spread conventions (venue-dependent)
+Typical spreads vary a lot by venue, instrument, and session:
+
+- FX majors: often around sub-pip to a few pips in liquid hours (roughly sub-1 to several bps)
+- FX minors/emerging pairs: typically wider than majors
+- Crypto: can range from tight to very wide depending on pair and exchange
+- Equities: often quoted in ticks/cents rather than bps
+
+Treat these as rough guidelines, not fixed thresholds.
 :::
 
 :::info Related documentation

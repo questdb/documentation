@@ -51,7 +51,6 @@ SELECT
   round(close, 5) AS close,
   round(100 - (100 / (1 + avg_gain / avg_loss)), 2) AS rsi
 FROM smoothed
-WHERE avg_loss > 0
 ORDER BY timestamp;
 ```
 
