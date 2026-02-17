@@ -85,6 +85,12 @@ JOIN.
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on
    symbol columns
 
+## Mixed-precision timestamps
+
+The left and right tables can use different timestamp resolutions (e.g.,
+`TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds). QuestDB
+aligns the timestamps internally — no explicit casting is needed.
+
 ## Aggregate functions
 
 WINDOW JOIN supports all aggregate functions on the right table. However, the
