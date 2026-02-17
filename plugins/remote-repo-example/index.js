@@ -15,7 +15,7 @@ const sources = [
   "questdb/go-questdb-client/main",
   "questdb/nodejs-questdb-client/main",
   "questdb/net-questdb-client/main",
-  "questdb/questdb/master",
+  "questdb/java-questdb-client/master",
 ]
 
 module.exports = () => ({
