@@ -7,7 +7,7 @@ description:
 
 AI coding agents like <a href="https://claude.ai/code" target="_blank">Claude Code</a> and <a href="https://openai.com/index/openai-codex/" target="_blank">OpenAI Codex</a> can help you build applications that use QuestDB.
 
-These agents work with QuestDB out of the box by reading the online documentation. For deeper integration, the [QuestDB agent skill](#questdb-agent-skill) embeds rich context directly into the agent, making it faster and more accurate for common tasks like writing SQL, setting up ingestion, and deploying Grafana dashboards.
+These agents work with QuestDB out of the box by reading the online documentation. For deeper integration, agent skills embed rich context directly into the agent so it can work faster and more accurately. The [QuestDB agent skill](#questdb-agent-skill) covers SQL, ingestion, and Grafana dashboards, while the [TSBS Benchmark skill](#tsbs-benchmark-skill) automates end-to-end performance benchmarking.
 
 ## Getting started
 
@@ -94,6 +94,56 @@ The agent will create the database schema, write the ingestion script, wait for 
 The following indicators are embedded in the skill and can be generated without online lookups:
 
 Aggressor imbalance, ATR, Bid-ask spread, Bollinger Bands, Bollinger BandWidth, Compound interest, Cumulative product, Donchian Channels, Keltner Channels, Liquidity comparison, MACD, Maximum drawdown, OBV, OHLC bars, Rate of Change, Realized volatility, Rolling std dev, RSI, Stochastic Oscillator, TICK & TRIN, Volume profile, Volume spikes, VWAP.
+
+## TSBS Benchmark skill
+
+The <a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">TSBS Benchmark skill</a> is a skill for Claude Code and Codex that runs end-to-end <a href="https://github.com/timescale/tsbs" target="_blank">Time Series Benchmark Suite</a> (TSBS) benchmarks against QuestDB. It installs prerequisites, spins up QuestDB in Docker, builds TSBS, generates data, loads it, runs all query benchmarks, and cleans up - all from a single prompt.
+
+### Installation
+
+Copy `claude/SKILL.md` from the <a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">repository</a> into your skills directory:
+
+**Claude Code:**
+- `~/.claude/skills/tsbs-benchmark/SKILL.md` - available in all projects
+- `<project>/.claude/skills/tsbs-benchmark/SKILL.md` - available in a specific project
+
+**Codex:**
+- `~/.codex/skills/tsbs-benchmark/SKILL.md` - available in all projects
+- `<project>/.codex/skills/tsbs-benchmark/SKILL.md` - available in a specific project
+
+### What it handles
+
+The skill orchestrates eight sequential steps:
+
+1. **Prerequisites** - validates and installs Docker, Go 1.22.5, and build tools (make, gcc, gzip)
+2. **QuestDB deployment** - launches the latest QuestDB container with ports 9000, 9009, 8812, and 9003
+3. **TSBS compilation** - clones and builds four QuestDB-specific binaries from the TSBS repository
+4. **Data generation** - creates ~12 GB of uncompressed benchmark data (34.5M rows, 345.6M metrics)
+5. **Data loading** - ingests via ILP with worker threads matching CPU cores (capped at 32)
+6. **Query generation** - produces 1,000 queries for each of the 16 query types
+7. **Benchmark execution** - runs all queries in single-worker mode so QuestDB's internal parallelization is measured accurately
+8. **Cleanup** - removes the Docker container and temporary files
+
+### Benchmark parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Use case | `cpu-only` |
+| Scale | 4,000 hosts |
+| Time window | 1 day (2016-01-01 to 2016-01-02) |
+| Log interval | 10 seconds |
+| Rows generated | 34.5M |
+| Metrics generated | 345.6M |
+| Query types | 16 (cpu-max variants, single/double-groupby, high-cpu, lastpoint, groupby-orderby-limit) |
+| Queries per type | 1,000 |
+
+### Example prompt
+
+```text
+Run the full TSBS benchmark against QuestDB with the default cpu-only dataset.
+```
+
+The agent will handle everything from installing prerequisites through reporting the final query-by-query results.
 
 ## Tips
 
