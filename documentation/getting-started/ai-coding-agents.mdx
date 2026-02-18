@@ -1,0 +1,112 @@
+---
+title: AI Coding Agents
+sidebar_label: AI Coding Agents
+description:
+  Use AI coding agents like Claude Code or OpenAI Codex to build applications, write queries, and work with QuestDB using natural language.
+---
+
+AI coding agents like <a href="https://claude.ai/code" target="_blank">Claude Code</a> and <a href="https://openai.com/index/openai-codex/" target="_blank">OpenAI Codex</a> can help you build applications that use QuestDB.
+
+These agents work with QuestDB out of the box by reading the online documentation. For deeper integration, the [QuestDB agent skill](#questdb-agent-skill) embeds rich context directly into the agent, making it faster and more accurate for common tasks like writing SQL, setting up ingestion, and deploying Grafana dashboards.
+
+## Getting started
+
+No setup required. Use the public QuestDB demo with Claude Code:
+
+```
+You: "Use QuestDB's REST API at https://demo.questdb.io/ to list all tables"
+
+Claude Code: [Queries /exec endpoint and lists available tables including trades]
+
+You: "Query the trades table and show me the last 10 trades. Data is time-ordered natively, no ORDER BY needed"
+
+Claude Code: [Sends SQL via HTTP: SELECT * FROM trades LIMIT -10]
+
+You: "What's the total volume traded per symbol, sampled by 1 hour? Use SAMPLE BY"
+
+Claude Code: [Writes and executes SAMPLE BY 1h query grouped by symbol]
+
+You: "Plot the price of BTC-USDT over the last 30 days"
+
+Claude Code: [Queries data and generates a chart using matplotlib]
+```
+
+### Connect to your own QuestDB
+
+1. Install Claude Code: https://claude.ai/code
+2. Start QuestDB (default port 9000)
+3. Ask Claude Code to connect and explore
+
+```
+You: "Connect to my QuestDB at localhost:9000 and show me what tables I have"
+
+Claude Code: I'll query the QuestDB REST API to list your tables.
+[Executes curl command and shows results]
+```
+
+## QuestDB agent skill
+
+The <a href="https://github.com/questdb/questdb-agent-skill" target="_blank">QuestDB agent skill</a> is an experimental skill for Claude Code and Codex. It embeds QuestDB-specific knowledge directly into the agent's context - SQL syntax, common mistakes, ingestion patterns, Grafana templates, and financial indicator recipes - so the agent can build complete data pipelines without searching the docs for every step. For topics not covered by the skill, the agent falls back to the online documentation automatically.
+
+### Installation
+
+Copy the `questdb/` folder from the <a href="https://github.com/questdb/questdb-agent-skill" target="_blank">repository</a> into your skills directory:
+
+**Claude Code:**
+- `~/.claude/skills/questdb/` - available in all projects
+- `<project>/.claude/skills/questdb/` - available in a specific project
+
+**Codex:**
+- `~/.codex/skills/questdb/` - available in all projects
+- `<project>/.codex/skills/questdb/` - available in a specific project
+
+The folder must contain `SKILL.md` and the `references/` directory.
+
+### What's included
+
+- **SQL reference** - QuestDB-specific syntax including `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, window functions, and materialized views
+- **Common mistakes** - 50+ patterns to avoid when coming from PostgreSQL (e.g., `time_bucket()` does not exist, use `SAMPLE BY` instead)
+- **Ingestion patterns** - Python templates for ILP ingestion, including array support for order book data
+- **Grafana integration** - Dashboard deployment via API, datasource configuration, and ready-to-use panel queries
+- **Financial indicators** - 20+ indicator recipes ready for Grafana panels
+- **Enterprise authentication** - REST and ILP token configuration, ACL setup
+
+### Example prompt
+
+With QuestDB and Grafana running locally:
+
+```text
+Build a real-time crypto market data pipeline using cryptofeed (OKX exchange)
+ingesting trades and L2 order book data into QuestDB.
+Symbols: BTC-USDT, ETH-USDT, SOL-USDT.
+
+Then create a Grafana dashboard with OHLC candlesticks, VWAP,
+Bollinger Bands, and RSI panels, with a symbol dropdown.
+```
+
+The agent will create the database schema, write the ingestion script, wait for data, and deploy a Grafana dashboard - all in a single pass.
+
+<video autoPlay muted loop playsInline width="100%"
+  src={require("/static/images/docs/ai-coding-agents/questdb-skill.mp4").default} />
+
+### Built-in indicators
+
+The following indicators are embedded in the skill and can be generated without online lookups:
+
+Aggressor imbalance, ATR, Bid-ask spread, Bollinger Bands, Bollinger BandWidth, Compound interest, Cumulative product, Donchian Channels, Keltner Channels, Liquidity comparison, MACD, Maximum drawdown, OBV, OHLC bars, Rate of Change, Realized volatility, Rolling std dev, RSI, Stochastic Oscillator, TICK & TRIN, Volume profile, Volume spikes, VWAP.
+
+## Tips
+
+- **Provide context** - Tell the agent about your use case, data volume, and
+  requirements
+- **Ask follow-up questions** - Agents remember context within a session
+- **Request explanations** - Ask "why?" to understand recommendations
+- **Iterate on code** - Ask the agent to modify or improve generated code
+
+## Next steps
+
+- [REST API reference](/docs/query/rest-api/) - API documentation
+- [SQL overview](/docs/query/overview/) - QuestDB SQL syntax
+- [Client libraries](/docs/ingestion/overview/) - Official client libraries
+- [Sample datasets](https://github.com/questdb/sample-datasets) - Example data
+  to try
