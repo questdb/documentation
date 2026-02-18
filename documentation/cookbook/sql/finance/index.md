@@ -6,8 +6,8 @@ description: SQL recipes for financial analysis including technical indicators, 
 
 # Capital Markets Recipes
 
-This section contains SQL recipes for financial market analysis. Most recipes use the
-[demo dataset](/docs/cookbook/demo-data-schema/) available in the QuestDB web console. Recipes using `HORIZON JOIN` require a local QuestDB instance with that feature enabled.
+This section contains SQL recipes for financial market analysis. All recipes use the
+[demo dataset](/docs/cookbook/demo-data-schema/) available in the QuestDB web console.
 
 ## Price-Based Indicators
 

@@ -737,9 +737,14 @@ module.exports = {
           collapsed: false,
           link: {
             type: "doc",
-            id: "cookbook/sql/finance/index",
+            id: "cookbook/sql/finance/post-trade-overview",
           },
           items: [
+            {
+              type: "doc",
+              id: "cookbook/sql/finance/post-trade-overview",
+              label: "Overview",
+            },
             "cookbook/sql/finance/slippage",
             "cookbook/sql/finance/slippage-aggregated",
             "cookbook/sql/finance/markout",
@@ -747,6 +752,7 @@ module.exports = {
             "cookbook/sql/finance/implementation-shortfall",
             "cookbook/sql/finance/implementation-shortfall-order",
             "cookbook/sql/finance/ecn-scorecard",
+            "cookbook/sql/finance/vpin",
           ],
         },
         {
