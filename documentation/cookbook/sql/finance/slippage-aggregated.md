@@ -24,21 +24,21 @@ SELECT
     sum(t.quantity) AS total_qty,
     avg(
         CASE t.side
-            WHEN 'buy'  THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
-            WHEN 'sell' THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
+            WHEN 'buy'  THEN (t.price - (m.best_bid + m.best_ask) / 2)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
+            WHEN 'sell' THEN ((m.best_bid + m.best_ask) / 2 - t.price)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
         END
     ) AS avg_slippage_vs_mid_bps,
     avg(
         CASE t.side
-            WHEN 'buy'  THEN (t.price - m.asks[1][1]) / m.asks[1][1] * 10000
-            WHEN 'sell' THEN (m.bids[1][1] - t.price) / m.bids[1][1] * 10000
+            WHEN 'buy'  THEN (t.price - m.best_ask) / m.best_ask * 10000
+            WHEN 'sell' THEN (m.best_bid - t.price) / m.best_bid * 10000
         END
     ) AS avg_slippage_vs_tob_bps,
     avg(
-        (m.asks[1][1] - m.bids[1][1])
-        / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
+        (m.best_ask - m.best_bid)
+        / ((m.best_bid + m.best_ask) / 2) * 10000
     ) AS avg_spread_bps
 FROM fx_trades t
 ASOF JOIN market_data m ON (symbol)
@@ -72,10 +72,10 @@ SELECT
     count() AS trade_count,
     round(avg(
         CASE t.side
-            WHEN 'buy'  THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
-            WHEN 'sell' THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
+            WHEN 'buy'  THEN (t.price - (m.best_bid + m.best_ask) / 2)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
+            WHEN 'sell' THEN ((m.best_bid + m.best_ask) / 2 - t.price)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
         END
     ), 3) AS avg_slippage_bps
 FROM fx_trades t
@@ -96,17 +96,16 @@ SELECT
     count() AS trade_count,
     round(avg(
         CASE t.side
-            WHEN 'buy'  THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
-            WHEN 'sell' THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
-                             / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
+            WHEN 'buy'  THEN (t.price - (m.best_bid + m.best_ask) / 2)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
+            WHEN 'sell' THEN ((m.best_bid + m.best_ask) / 2 - t.price)
+                             / ((m.best_bid + m.best_ask) / 2) * 10000
         END
     ), 3) AS avg_slippage_bps
 FROM fx_trades t
 ASOF JOIN market_data m ON (symbol)
 WHERE t.timestamp IN '$yesterday'
-SAMPLE BY 1h
-GROUP BY t.ecn;
+SAMPLE BY 1h;
 ```
 
 ### Cost by size bucket
@@ -120,8 +119,8 @@ WITH fills AS (
         t.price,
         t.quantity,
         h.offset,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid,
-        m.asks[1][1] - m.bids[1][1] AS spread,
+        (m.best_bid + m.best_ask) / 2 AS mid,
+        m.best_ask - m.best_bid AS spread,
         CASE
             WHEN t.quantity < 100000    THEN 'S'
             WHEN t.quantity < 1000000   THEN 'M'
@@ -167,9 +166,9 @@ WITH cp_costs AS (
         t.price,
         t.quantity,
         h.offset,
-        m.bids[1][1] AS best_bid,
-        m.asks[1][1] AS best_ask,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid
+        m.best_bid,
+        m.best_ask,
+        (m.best_bid + m.best_ask) / 2 AS mid
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -205,9 +204,9 @@ WITH hourly AS (
         t.quantity,
         hour(t.timestamp) AS hour_utc,
         h.offset,
-        m.bids[1][1] AS best_bid,
-        m.asks[1][1] AS best_ask,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid
+        m.best_bid,
+        m.best_ask,
+        (m.best_bid + m.best_ask) / 2 AS mid
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h
@@ -244,7 +243,7 @@ WITH daily AS (
         t.quantity,
         t.timestamp::date AS trade_date,
         h.offset,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid
+        (m.best_bid + m.best_ask) / 2 AS mid
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 1m, 5m) AS h

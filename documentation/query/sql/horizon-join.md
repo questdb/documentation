@@ -116,7 +116,7 @@ way to evaluate execution quality and price impact:
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
-    avg((m.bids[1][1] + m.asks[1][1]) / 2) AS avg_mid
+    avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 RANGE FROM 1s TO 60s STEP 1s AS h
@@ -134,7 +134,7 @@ Compute the average post-trade markout at specific horizons using `LIST`:
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
-    avg((m.bids[1][1] + m.asks[1][1]) / 2 - t.price) AS avg_markout
+    avg((m.best_bid + m.best_ask) / 2 - t.price) AS avg_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 LIST (1s, 5s, 30s, 1m) AS h
@@ -150,7 +150,7 @@ detecting information leakage or adverse selection:
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
-    avg((m.bids[1][1] + m.asks[1][1]) / 2) AS avg_mid,
+    avg((m.best_bid + m.best_ask) / 2) AS avg_mid,
     count() AS sample_size
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
@@ -165,7 +165,7 @@ Compute an overall volume-weighted markout without grouping by symbol:
 ```questdb-sql title="Volume-weighted markout across all symbols"
 SELECT
     h.offset / 1000000000 AS horizon_sec,
-    sum(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price) * t.quantity)
+    sum(((m.best_bid + m.best_ask) / 2 - t.price) * t.quantity)
         / sum(t.quantity) AS vwap_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)

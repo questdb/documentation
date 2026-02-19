@@ -106,7 +106,12 @@ tables are joined by `symbol` and aligned by timestamp:
 - **`fx_trades`** — trade executions with `symbol`, `ecn`, `side`, `passive`,
   `price`, `quantity`, `counterparty`, `order_id` (nanosecond timestamps)
 - **`market_data`** — order book snapshots with `symbol`, `bids[][]`,
-  `asks[][]` where `[1][1]` is the best price (microsecond timestamps)
+  `asks[][]`, `best_bid`, and `best_ask` (microsecond timestamps).
+  The `bids` and `asks` arrays hold price and size at each level of the book -
+  `[1][1]` is the best price, `[1][-1]` is the price at the deepest level.
+  The `best_bid` and `best_ask` columns provide the top-of-book prices
+  directly for convenience and efficiency, since most post-trade analytics
+  queries need only the best price
 
 The tables use different timestamp resolutions. QuestDB's time-series joins
 handle

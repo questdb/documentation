@@ -21,11 +21,11 @@ SELECT
     count() AS fill_count,
     sum(t.quantity) AS total_volume,
     avg(t.quantity) AS avg_fill_size,
-    avg((m.asks[1][1] - m.bids[1][1])
-        / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000) AS avg_spread_bps,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    avg((m.best_ask - m.best_bid)
+        / ((m.best_bid + m.best_ask) / 2) * 10000) AS avg_spread_bps,
+    avg(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000) AS avg_slippage_bps,
-    avg((m.asks[1][1] - t.price)
+    avg((m.best_ask - t.price)
         / t.price * 10000) AS avg_slippage_vs_ask_bps,
     avg(CASE WHEN t.passive THEN 1.0 ELSE 0.0 END) AS passive_ratio
 FROM fx_trades t
@@ -50,7 +50,7 @@ Each row is one symbol-ECN combination. The metrics in each row:
 Results are ordered by `avg_slippage_bps` so the best-performing ECN for each symbol appears first.
 
 :::note Buy-side only
-This query filters to `side = 'buy'` because the slippage formulas are direction-specific (no `CASE` expression). For a sell-side scorecard, flip the slippage formulas: use `(t.price - mid) / t.price` for slippage vs mid, and `(t.price - m.bids[1][1]) / t.price` for slippage vs bid.
+This query filters to `side = 'buy'` because the slippage formulas are direction-specific (no `CASE` expression). For a sell-side scorecard, flip the slippage formulas: use `(t.price - mid) / t.price` for slippage vs mid, and `(t.price - m.best_bid) / t.price` for slippage vs bid.
 :::
 
 ## Interpreting results
@@ -73,9 +73,9 @@ SELECT
     t.ecn,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    avg(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000) AS avg_markout_bps,
-    sum(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    sum(((m.best_bid + m.best_ask) / 2 - t.price)
         * t.quantity) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
@@ -104,11 +104,12 @@ SELECT
     t.symbol,
     t.ecn,
     hour(t.timestamp) AS hour_utc,
+    h.offset,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    avg(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000) AS markout_5s_bps,
-    avg((m.asks[1][1] - m.bids[1][1])
-        / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000) AS avg_spread_bps
+    avg((m.best_ask - m.best_bid)
+        / ((m.best_bid + m.best_ask) / 2) * 10000) AS avg_spread_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     LIST (5s) AS h
@@ -133,7 +134,7 @@ SELECT
     t.passive,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    avg(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000) AS avg_markout_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
@@ -161,13 +162,14 @@ Rank ECNs by a single toxicity metric â€” the volume-weighted 5-second markout â
 SELECT
     t.symbol,
     t.ecn,
+    h.offset,
     count() AS fill_count,
     sum(t.quantity) AS total_volume,
-    sum(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    sum(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000 * t.quantity)
         / sum(t.quantity) AS vw_markout_5s_bps,
     avg(CASE
-        WHEN (m.bids[1][1] + m.asks[1][1]) / 2 < t.price THEN 1.0
+        WHEN (m.best_bid + m.best_ask) / 2 < t.price THEN 1.0
         ELSE 0.0
     END) AS adverse_fill_ratio
 FROM fx_trades t
@@ -198,8 +200,8 @@ WITH markouts AS (
         t.price,
         t.quantity,
         h.offset,
-        m.bids[1][1] AS best_bid,
-        m.asks[1][1] AS best_ask
+        m.best_bid,
+        m.best_ask
     FROM fx_trades t
     HORIZON JOIN market_data m ON (symbol)
         LIST (0, 5s, 1m) AS h

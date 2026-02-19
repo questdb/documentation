@@ -30,7 +30,7 @@ WITH markouts AS (
         f.quantity,
         f.side,
         h.offset,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid
+        (m.best_bid + m.best_ask) / 2 AS mid
     FROM fx_trades f
     HORIZON JOIN market_data m ON (f.symbol = m.symbol)
         LIST (0, 1800s) AS h

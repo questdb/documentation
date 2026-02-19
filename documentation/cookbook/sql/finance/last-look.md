@@ -25,9 +25,9 @@ SELECT
     count() AS n,
     avg(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              / t.price * 10000
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              / t.price * 10000
         END
     ) AS avg_markout_bps

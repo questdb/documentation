@@ -31,17 +31,17 @@ SELECT
     count() AS n,
     avg(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              / t.price * 10000
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              / t.price * 10000
         END
     ) AS avg_markout_bps,
     sum(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              * t.quantity
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              * t.quantity
         END
     ) AS total_pnl
@@ -83,9 +83,9 @@ SELECT
     count() AS n,
     round(avg(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              / t.price * 10000
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              / t.price * 10000
         END
     ), 3) AS avg_markout_bps
@@ -107,9 +107,9 @@ SELECT
     count() AS n,
     round(avg(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              / t.price * 10000
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              / t.price * 10000
         END
     ), 3) AS avg_markout_bps
@@ -135,9 +135,9 @@ SELECT
     count() AS n,
     round(avg(
         CASE t.side
-            WHEN 'buy'  THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+            WHEN 'buy'  THEN ((m.best_bid + m.best_ask) / 2 - t.price)
                              / t.price * 10000
-            WHEN 'sell' THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
+            WHEN 'sell' THEN (t.price - (m.best_bid + m.best_ask) / 2)
                              / t.price * 10000
         END
     ), 3) AS avg_markout_bps
@@ -160,8 +160,8 @@ SELECT
     t.symbol,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price) / t.price * 10000) AS avg_markout_bps,
-    sum(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price) * t.quantity) AS total_pnl
+    avg(((m.best_bid + m.best_ask) / 2 - t.price) / t.price * 10000) AS avg_markout_bps,
+    sum(((m.best_bid + m.best_ask) / 2 - t.price) * t.quantity) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
@@ -176,8 +176,8 @@ SELECT
     t.symbol,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg((t.price - (m.bids[1][1] + m.asks[1][1]) / 2) / t.price * 10000) AS avg_markout_bps,
-    sum((t.price - (m.bids[1][1] + m.asks[1][1]) / 2) * t.quantity) AS total_pnl
+    avg((t.price - (m.best_bid + m.best_ask) / 2) / t.price * 10000) AS avg_markout_bps,
+    sum((t.price - (m.best_bid + m.best_ask) / 2) * t.quantity) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
@@ -199,7 +199,7 @@ SELECT
     t.counterparty,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price) / t.price * 10000) AS avg_markout_bps,
+    avg(((m.best_bid + m.best_ask) / 2 - t.price) / t.price * 10000) AS avg_markout_bps,
     sum(t.quantity) AS total_volume
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
@@ -224,10 +224,10 @@ SELECT
     t.passive,
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
-    avg(((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
+    avg(((m.best_bid + m.best_ask) / 2 - t.price)
         / t.price * 10000) AS avg_markout_bps,
-    avg((m.asks[1][1] - m.bids[1][1])
-        / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000) / 2 AS avg_half_spread_bps
+    avg((m.best_ask - m.best_bid)
+        / ((m.best_bid + m.best_ask) / 2) * 10000) / 2 AS avg_half_spread_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 5m STEP 1s AS h

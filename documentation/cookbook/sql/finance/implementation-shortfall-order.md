@@ -25,7 +25,7 @@ WITH fills_enriched AS (
         f.price,
         f.quantity,
         f.timestamp,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid_at_fill
+        (m.best_bid + m.best_ask) / 2 AS mid_at_fill
     FROM fx_trades f
     ASOF JOIN market_data m ON (symbol)
     WHERE f.timestamp IN '$yesterday'
@@ -103,7 +103,7 @@ WITH fills_enriched AS (
         f.price,
         f.quantity,
         f.timestamp,
-        (m.bids[1][1] + m.asks[1][1]) / 2 AS mid_at_fill
+        (m.best_bid + m.best_ask) / 2 AS mid_at_fill
     FROM fx_trades f
     ASOF JOIN market_data m ON (symbol)
     WHERE f.timestamp IN '$yesterday'
@@ -152,7 +152,7 @@ WITH fills_enriched AS (
         f.side,
         f.price,
         f.quantity,
-        m.asks[1][1] - m.bids[1][1] AS spread_at_fill
+        m.best_ask - m.best_bid AS spread_at_fill
     FROM fx_trades f
     ASOF JOIN market_data m ON (symbol)
     WHERE f.timestamp IN '$yesterday'
@@ -188,7 +188,7 @@ WITH order_markouts AS (
         f.symbol,
         f.side,
         h.offset,
-        sum((m.bids[1][1] + m.asks[1][1]) / 2 * f.quantity)
+        sum((m.best_bid + m.best_ask) / 2 * f.quantity)
             / sum(f.quantity) AS weighted_mid,
         sum(f.price * f.quantity) / sum(f.quantity) AS avg_exec_price,
         sum(f.quantity) AS total_qty

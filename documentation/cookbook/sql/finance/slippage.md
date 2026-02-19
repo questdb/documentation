@@ -31,19 +31,19 @@ SELECT
     t.passive,
     t.price,
     t.quantity,
-    m.bids[1][1] AS best_bid,
-    m.asks[1][1] AS best_ask,
-    (m.bids[1][1] + m.asks[1][1]) / 2 AS mid,
-    (m.asks[1][1] - m.bids[1][1]) AS spread,
+    m.best_bid,
+    m.best_ask,
+    (m.best_bid + m.best_ask) / 2 AS mid,
+    (m.best_ask - m.best_bid) AS spread,
     CASE t.side
-        WHEN 'buy'  THEN (t.price - (m.bids[1][1] + m.asks[1][1]) / 2)
-                         / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
-        WHEN 'sell' THEN ((m.bids[1][1] + m.asks[1][1]) / 2 - t.price)
-                         / ((m.bids[1][1] + m.asks[1][1]) / 2) * 10000
+        WHEN 'buy'  THEN (t.price - (m.best_bid + m.best_ask) / 2)
+                         / ((m.best_bid + m.best_ask) / 2) * 10000
+        WHEN 'sell' THEN ((m.best_bid + m.best_ask) / 2 - t.price)
+                         / ((m.best_bid + m.best_ask) / 2) * 10000
     END AS slippage_bps,
     CASE t.side
-        WHEN 'buy'  THEN (t.price - m.asks[1][1]) / m.asks[1][1] * 10000
-        WHEN 'sell' THEN (m.bids[1][1] - t.price) / m.bids[1][1] * 10000
+        WHEN 'buy'  THEN (t.price - m.best_ask) / m.best_ask * 10000
+        WHEN 'sell' THEN (m.best_bid - t.price) / m.best_bid * 10000
     END AS slippage_vs_tob_bps
 FROM fx_trades t
 ASOF JOIN market_data m ON (symbol)
