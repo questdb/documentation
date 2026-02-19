@@ -6,7 +6,7 @@ description: SQL recipes for financial analysis including technical indicators, 
 
 # Capital Markets Recipes
 
-This section contains SQL recipes for financial market analysis. Each recipe uses the
+This section contains SQL recipes for financial market analysis. All recipes use the
 [demo dataset](/docs/cookbook/demo-data-schema/) available in the QuestDB web console.
 
 ## Price-Based Indicators
@@ -53,6 +53,7 @@ Analyze trading activity and order flow dynamics.
 | [Volume Profile](volume-profile.md) | Volume distribution by price level |
 | [Volume Spike](volume-spike.md) | Detect abnormal volume |
 | [Aggressor Imbalance](aggressor-volume-imbalance.md) | Buy vs sell pressure |
+| [VPIN](vpin.md) | Volume-synchronized informed trading probability |
 
 ## Risk Metrics
 
@@ -70,6 +71,20 @@ Analyze market quality and trading costs.
 |--------|-------------|
 | [Bid-Ask Spread](bid-ask-spread.md) | Spread metrics and analysis |
 | [Liquidity Comparison](liquidity-comparison.md) | Compare liquidity across instruments |
+
+## Post-Trade Analysis
+
+Measure execution quality, fill performance, and trading costs. Also available as a [top-level sidebar section](/docs/cookbook/sql/finance/) for quick access.
+
+| Recipe | Description |
+|--------|-------------|
+| [Slippage](slippage.md) | Measure execution slippage per fill |
+| [Slippage (aggregated)](slippage-aggregated.md) | Compare slippage across venues and counterparties |
+| [Markout analysis](markout.md) | Post-trade price reversion and adverse selection |
+| [Last look detection](last-look.md) | Millisecond-granularity markout for last-look analysis |
+| [Implementation shortfall](implementation-shortfall.md) | Cost decomposition into spread, permanent, and temporary impact |
+| [Implementation shortfall (order)](implementation-shortfall-order.md) | Total IS per order vs arrival mid |
+| [ECN scorecard](ecn-scorecard.md) | Dashboard-style venue comparison combining spread, slippage, and fill metrics |
 
 ## Market Breadth
 
