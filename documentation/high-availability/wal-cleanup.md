@@ -210,9 +210,9 @@ gantt
     B :milestone, p6, 2026-01-11, 0d
 
   section apple-parrot-baby
-    B :milestone, a1, 2026-01-10, 0d
-    B :milestone, a2, 2026-01-11, 0d
-    B :milestone, a3, 2026-01-12, 0d
+    B :done, milestone, a1, 2026-01-10, 0d
+    B :done, milestone, a2, 2026-01-11, 0d
+    B :done, milestone, a3, 2026-01-12, 0d
 
     B :crit, vert, cb, 2026-01-03, 0d
 ```
