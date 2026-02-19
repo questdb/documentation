@@ -625,6 +625,11 @@ module.exports = {
           type: "doc",
           label: "Tuning",
         },
+        {
+          id: "high-availability/wal-cleanup",
+          type: "doc",
+          label: "WAL Cleanup",
+        },
       ],
     },
 
