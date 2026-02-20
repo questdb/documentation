@@ -9,6 +9,90 @@ list of all functions that may take an array parameter. For example, financial
 functions are listed in [their own section](/docs/query/functions/finance/), whether or
 not they can take an array parameter.
 
+## array_build
+
+`array_build(nDims, size, filler1 [, filler2, ...])` constructs a `DOUBLE` array
+with a specified shape and fill values. Each dimension is filled independently,
+either by repeating a scalar value or by copying elements from an existing array.
+
+#### Parameters
+
+- `nDims` — number of dimensions (compile-time constant). Determines the return
+  type: `1` produces `DOUBLE[]`, `2` produces `DOUBLE[][]`
+- `size` — number of elements per dimension. Accepts an `INT`/`LONG` value
+  directly, or a `DOUBLE[]` array whose element count is used as the size
+- `filler1..N` — one fill value per dimension. A scalar (`DOUBLE`/`INT`/`LONG`)
+  is repeated for every element. A `DOUBLE[]` array is copied
+  position-by-position; if shorter than `size`, remaining positions are `NaN`;
+  if longer, excess elements are ignored
+
+All arguments except `nDims` can be constants, declared variables, column
+references, or expressions evaluated per row.
+
+#### Examples
+
+Scalar fill - create an array of zeros:
+
+```questdb-sql
+SELECT array_build(1, 3, 0) FROM long_sequence(1);
+```
+
+| array_build     |
+| --------------- |
+| [0.0,0.0,0.0]  |
+
+Size derived from an existing array (copy it):
+
+```questdb-sql
+SELECT array_build(1, prices, prices)
+FROM market_data
+LIMIT 1;
+```
+
+The second argument `prices` is a `DOUBLE[]`, so its element count determines
+the output size. The third argument fills position-by-position, producing a copy.
+
+Fill with a computed scalar, matching the length of another array:
+
+```questdb-sql
+SELECT array_build(1, prices, array_max(prices))
+FROM market_data
+LIMIT 1;
+```
+
+Each row gets an array filled with the max price, the same length as `prices`.
+
+NaN padding when filler is shorter than size:
+
+```questdb-sql
+SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
+```
+
+| array_build                 |
+| --------------------------- |
+| [10.0,20.0,30.0,NaN,NaN]   |
+
+Build a 2D array from two sub-arrays:
+
+```questdb-sql
+SELECT array_build(2, bids[1], bids[1], asks[1])
+FROM market_data
+LIMIT 1;
+```
+
+Returns a `DOUBLE[][]` where `result[1]` contains bid prices and `result[2]`
+contains ask prices.
+
+2D array with scalar fill:
+
+```questdb-sql
+SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
+```
+
+| array_build                      |
+| -------------------------------- |
+| [[1.0,1.0,1.0],[0.0,0.0,0.0]]   |
+
 ## array_avg
 
 `array_avg(array)` returns the average of all the array elements. `NULL` elements
