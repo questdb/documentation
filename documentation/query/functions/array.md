@@ -80,8 +80,8 @@ FROM market_data
 LIMIT 1;
 ```
 
-Returns a `DOUBLE[][]` where `result[1]` contains bid prices and `result[2]`
-contains ask prices.
+Returns a `DOUBLE[][]` where the first slice contains bid prices and the second
+slice contains ask prices.
 
 2D array with scalar fill:
 
