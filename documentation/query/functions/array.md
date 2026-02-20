@@ -9,6 +9,25 @@ list of all functions that may take an array parameter. For example, financial
 functions are listed in [their own section](/docs/query/functions/finance/), whether or
 not they can take an array parameter.
 
+## array_avg
+
+`array_avg(array)` returns the average of all the array elements. `NULL` elements
+don't contribute to either count or sum.
+
+#### Parameter
+
+- `array` — the array
+
+#### Example
+
+```questdb-sql
+SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```
+
+| array_avg |
+| --------- |
+| 1.5       |
+
 ## array_build
 
 `array_build(nDims, size, filler1 [, filler2, ...])` constructs a `DOUBLE` array
@@ -93,25 +112,6 @@ SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
 | array_build                      |
 | -------------------------------- |
 | [[1.0,1.0,1.0],[0.0,0.0,0.0]]   |
-
-## array_avg
-
-`array_avg(array)` returns the average of all the array elements. `NULL` elements
-don't contribute to either count or sum.
-
-#### Parameter
-
-- `array` — the array
-
-#### Example
-
-```questdb-sql
-SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
-```
-
-| array_avg |
-| --------- |
-| 1.5       |
 
 ## array_count
 
