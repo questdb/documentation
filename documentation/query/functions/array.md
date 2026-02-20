@@ -28,6 +28,105 @@ SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | --------- |
 | 1.5       |
 
+## array_build
+
+`array_build(nArrays, size, filler1 [, filler2, ...])` constructs a `DOUBLE`
+array with a specified shape and fill values. Each sub-array is filled
+independently, either by repeating a scalar value or by copying elements from an
+existing array.
+
+#### Parameters
+
+- `nArrays` — number of sub-arrays to build (compile-time constant). `1`
+  produces a flat `DOUBLE[]`. `2` or more produces a `DOUBLE[][]` with
+  `nArrays` rows
+- `size` — number of elements per sub-array. Accepts an `INT`/`LONG` value
+  directly, or a `DOUBLE[]` array whose element count is used as the size
+- `filler1..N` — one fill value per sub-array. There must be exactly `nArrays`
+  fillers. A scalar (`DOUBLE`/`INT`/`LONG`) is repeated for every element. A
+  `DOUBLE[]` array is copied position-by-position; if shorter than `size`,
+  remaining positions are `NaN`; if longer, excess elements are ignored
+
+All arguments except `nArrays` can be constants, declared variables, column
+references, or expressions evaluated per row.
+
+#### Examples
+
+Scalar fill - create an array of zeros:
+
+```questdb-sql demo title="array_build - scalar fill"
+SELECT array_build(1, 3, 0) FROM long_sequence(1);
+```
+
+| array_build     |
+| --------------- |
+| [0.0,0.0,0.0]  |
+
+Size derived from an existing array (copy it):
+
+```questdb-sql demo title="array_build - copy an array"
+SELECT array_build(1, bids[1], bids[1])
+FROM market_data
+LIMIT 1;
+```
+
+The second argument `bids[1]` is a `DOUBLE[]`, so its element count determines
+the output size. The third argument fills position-by-position, producing a copy.
+
+Fill with a computed scalar, matching the length of another array:
+
+```questdb-sql demo title="array_build - fill with computed scalar"
+SELECT array_build(1, bids[1], array_max(bids[1]))
+FROM market_data
+LIMIT 1;
+```
+
+Each row gets an array filled with the max bid price, the same length as
+`bids[1]`.
+
+NaN padding when filler is shorter than size:
+
+```questdb-sql demo title="array_build - NaN padding"
+SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
+```
+
+| array_build                 |
+| --------------------------- |
+| [10.0,20.0,30.0,NaN,NaN]   |
+
+Build a 2D array from two sub-arrays:
+
+```questdb-sql demo title="array_build - 2D from order book"
+SELECT array_build(2, bids[1], bids[1], asks[1])
+FROM market_data
+LIMIT 1;
+```
+
+Returns a `DOUBLE[][]` where the first slice contains bid prices and the second
+slice contains ask prices.
+
+2D array with scalar fill:
+
+```questdb-sql demo title="array_build - 2D scalar fill"
+SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
+```
+
+| array_build                      |
+| -------------------------------- |
+| [[1.0,1.0,1.0],[0.0,0.0,0.0]]   |
+
+Combine multiple array columns into a single 2D array:
+
+```questdb-sql title="array_build - combine 4 sub-arrays"
+SELECT array_build(4, ask_price, ask_price, ask_size, bid_price, bid_size)
+FROM order_book
+LIMIT 1;
+```
+
+| array_build                                                                    |
+| ------------------------------------------------------------------------------ |
+| [[100.0,101.0,102.0],[10.0,20.0,30.0],[99.0,98.0,97.0],[15.0,25.0,35.0]]      |
+
 ## array_count
 
 `array_count(array)` returns the number of finite elements in the array. `NULL`
