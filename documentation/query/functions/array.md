@@ -30,22 +30,24 @@ SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 
 ## array_build
 
-`array_build(nDims, size, filler1 [, filler2, ...])` constructs a `DOUBLE` array
-with a specified shape and fill values. Each dimension is filled independently,
-either by repeating a scalar value or by copying elements from an existing array.
+`array_build(nArrays, size, filler1 [, filler2, ...])` constructs a `DOUBLE`
+array with a specified shape and fill values. Each sub-array is filled
+independently, either by repeating a scalar value or by copying elements from an
+existing array.
 
 #### Parameters
 
-- `nDims` — number of dimensions (compile-time constant). Determines the return
-  type: `1` produces `DOUBLE[]`, `2` produces `DOUBLE[][]`
-- `size` — number of elements per dimension. Accepts an `INT`/`LONG` value
+- `nArrays` — number of sub-arrays to build (compile-time constant). `1`
+  produces a flat `DOUBLE[]`. `2` or more produces a `DOUBLE[][]` with
+  `nArrays` rows
+- `size` — number of elements per sub-array. Accepts an `INT`/`LONG` value
   directly, or a `DOUBLE[]` array whose element count is used as the size
-- `filler1..N` — one fill value per dimension. A scalar (`DOUBLE`/`INT`/`LONG`)
-  is repeated for every element. A `DOUBLE[]` array is copied
-  position-by-position; if shorter than `size`, remaining positions are `NaN`;
-  if longer, excess elements are ignored
+- `filler1..N` — one fill value per sub-array. There must be exactly `nArrays`
+  fillers. A scalar (`DOUBLE`/`INT`/`LONG`) is repeated for every element. A
+  `DOUBLE[]` array is copied position-by-position; if shorter than `size`,
+  remaining positions are `NaN`; if longer, excess elements are ignored
 
-All arguments except `nDims` can be constants, declared variables, column
+All arguments except `nArrays` can be constants, declared variables, column
 references, or expressions evaluated per row.
 
 #### Examples
@@ -112,6 +114,18 @@ SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
 | array_build                      |
 | -------------------------------- |
 | [[1.0,1.0,1.0],[0.0,0.0,0.0]]   |
+
+Combine multiple array columns into a single 2D array:
+
+```questdb-sql demo title="array_build - combine 4 sub-arrays"
+SELECT array_build(4, ask_price, ask_price, ask_size, bid_price, bid_size)
+FROM order_book
+LIMIT 1;
+```
+
+| array_build                                                                    |
+| ------------------------------------------------------------------------------ |
+| [[100.0,101.0,102.0],[10.0,20.0,30.0],[99.0,98.0,97.0],[15.0,25.0,35.0]]      |
 
 ## array_count
 

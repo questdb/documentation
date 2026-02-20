@@ -23,7 +23,7 @@ available.
 | Create 1D array | `ARRAY[v1, v2, ...]` | `ARRAY[1.0, 2.0, 3.0]` |
 | Create 2D array | `ARRAY[[...], [...]]` | `ARRAY[[1, 2], [3, 4]]` |
 | Create 3D array | `ARRAY[[[...]], [[...]]]` | `ARRAY[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]` |
-| Build dynamically | `array_build(nDims, size, fillers...)` | `array_build(1, 3, 0)` returns `[0.0, 0.0, 0.0]` |
+| Build dynamically | `array_build(nArrays, size, fillers...)` | `array_build(1, 3, 0)` returns `[0.0, 0.0, 0.0]` |
 | Access element | `arr[i, j, ...]` or `arr[i][j]...` | `arr[1, 2, 3]` returns `DOUBLE` |
 | Access sub-array | `arr[i]` | `arr[1]` returns lower-dimensional array |
 | Slice (range) | `arr[low:high]` | `arr[1:3]` keeps dimensionality |
