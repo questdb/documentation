@@ -117,7 +117,7 @@ SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
 
 Combine multiple array columns into a single 2D array:
 
-```questdb-sql demo title="array_build - combine 4 sub-arrays"
+```questdb-sql title="array_build - combine 4 sub-arrays"
 SELECT array_build(4, ask_price, ask_price, ask_size, bid_price, bid_size)
 FROM order_book
 LIMIT 1;
