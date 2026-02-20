@@ -33,7 +33,7 @@ references, or expressions evaluated per row.
 
 Scalar fill - create an array of zeros:
 
-```questdb-sql
+```questdb-sql demo title="array_build - scalar fill"
 SELECT array_build(1, 3, 0) FROM long_sequence(1);
 ```
 
@@ -43,28 +43,29 @@ SELECT array_build(1, 3, 0) FROM long_sequence(1);
 
 Size derived from an existing array (copy it):
 
-```questdb-sql
-SELECT array_build(1, prices, prices)
+```questdb-sql demo title="array_build - copy an array"
+SELECT array_build(1, bids[1], bids[1])
 FROM market_data
 LIMIT 1;
 ```
 
-The second argument `prices` is a `DOUBLE[]`, so its element count determines
+The second argument `bids[1]` is a `DOUBLE[]`, so its element count determines
 the output size. The third argument fills position-by-position, producing a copy.
 
 Fill with a computed scalar, matching the length of another array:
 
-```questdb-sql
-SELECT array_build(1, prices, array_max(prices))
+```questdb-sql demo title="array_build - fill with computed scalar"
+SELECT array_build(1, bids[1], array_max(bids[1]))
 FROM market_data
 LIMIT 1;
 ```
 
-Each row gets an array filled with the max price, the same length as `prices`.
+Each row gets an array filled with the max bid price, the same length as
+`bids[1]`.
 
 NaN padding when filler is shorter than size:
 
-```questdb-sql
+```questdb-sql demo title="array_build - NaN padding"
 SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
 ```
 
@@ -74,7 +75,7 @@ SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
 
 Build a 2D array from two sub-arrays:
 
-```questdb-sql
+```questdb-sql demo title="array_build - 2D from order book"
 SELECT array_build(2, bids[1], bids[1], asks[1])
 FROM market_data
 LIMIT 1;
@@ -85,7 +86,7 @@ slice contains ask prices.
 
 2D array with scalar fill:
 
-```questdb-sql
+```questdb-sql demo title="array_build - 2D scalar fill"
 SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
 ```
 
