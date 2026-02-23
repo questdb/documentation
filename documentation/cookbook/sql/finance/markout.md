@@ -49,8 +49,8 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 5m STEP 1s AS h
 WHERE t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.ecn, t.counterparty, t.passive, h.offset
-ORDER BY t.symbol, t.ecn, t.counterparty, t.passive, h.offset;
+GROUP BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec
+ORDER BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec;
 ```
 
 ## How it works
@@ -93,8 +93,8 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
 WHERE t.timestamp IN '$yesterday'
-GROUP BY t.ecn, t.passive, h.offset
-ORDER BY t.ecn, t.passive, h.offset;
+GROUP BY t.ecn, t.passive, horizon_sec
+ORDER BY t.ecn, t.passive, horizon_sec;
 ```
 
 ### Pre- and post-trade analysis
@@ -117,8 +117,8 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM -30s TO 30s STEP 1s AS h
 WHERE t.timestamp IN '$yesterday'
-GROUP BY h.offset
-ORDER BY h.offset;
+GROUP BY horizon_sec
+ORDER BY horizon_sec;
 ```
 
 If the markout is already trending before offset 0, it suggests the market was moving before your order — a sign of information leakage or that you are reacting to stale signals.
@@ -145,8 +145,8 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
 WHERE t.timestamp IN '$yesterday'
-GROUP BY t.ecn, t.side, h.offset
-ORDER BY t.ecn, t.side, h.offset;
+GROUP BY t.ecn, t.side, horizon_sec
+ORDER BY t.ecn, t.side, horizon_sec;
 ```
 
 If buy markouts diverge significantly from sell markouts at the same venue, it may indicate directional information leakage or asymmetric adverse selection.
@@ -167,8 +167,8 @@ HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, h.offset
-ORDER BY t.symbol, h.offset;
+GROUP BY t.symbol, horizon_sec
+ORDER BY t.symbol, horizon_sec;
 ```
 
 ```questdb-sql title="Sell-side markout — positive means price moved down after you sold"
@@ -183,8 +183,8 @@ HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
 WHERE t.side = 'sell'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, h.offset
-ORDER BY t.symbol, h.offset;
+GROUP BY t.symbol, horizon_sec
+ORDER BY t.symbol, horizon_sec;
 ```
 
 This approach is useful when you want to run separate analyses per side, or when feeding results into dashboards that track buy and sell P&L independently.
@@ -207,8 +207,8 @@ HORIZON JOIN market_data m ON (symbol)
           30s, 1m, 5m) AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.counterparty, h.offset
-ORDER BY t.symbol, t.counterparty, h.offset;
+GROUP BY t.symbol, t.counterparty, horizon_sec
+ORDER BY t.symbol, t.counterparty, horizon_sec;
 ```
 
 A counterparty whose markout is persistently negative across horizons is likely trading on information you don't have. Compare `total_volume` alongside markout — a small counterparty with terrible markout may not matter, but a large one warrants flow management.
@@ -233,8 +233,8 @@ HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 5m STEP 1s AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.ecn, t.passive, h.offset
-ORDER BY t.symbol, t.ecn, t.passive, h.offset;
+GROUP BY t.symbol, t.ecn, t.passive, horizon_sec
+ORDER BY t.symbol, t.ecn, t.passive, horizon_sec;
 ```
 
 At offset 0, aggressive fills typically show `avg_markout_bps` close to negative `avg_half_spread_bps` (you crossed the spread). If markout recovers toward zero over subsequent offsets, execution is healthy — you paid the spread but the market didn't move further against you. If markout stays flat or worsens, it signals adverse selection beyond the spread cost.

@@ -36,8 +36,8 @@ HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1T, 5T, 10T, 50T, 100T,
           500T, 1000T, 5000T) AS h
 WHERE t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.counterparty, t.passive, h.offset
-ORDER BY t.symbol, t.counterparty, h.offset;
+GROUP BY t.symbol, t.counterparty, t.passive, horizon_ms
+ORDER BY t.symbol, t.counterparty, horizon_ms;
 ```
 
 The `LIST` offsets are: 0ms, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, and 5s — concentrated in the sub-100ms range where last-look behavior is visible.

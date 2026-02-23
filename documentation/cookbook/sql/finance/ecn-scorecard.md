@@ -82,8 +82,8 @@ HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 5m STEP 5s AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.ecn, h.offset
-ORDER BY t.symbol, t.ecn, h.offset;
+GROUP BY t.symbol, t.ecn, horizon_sec
+ORDER BY t.symbol, t.ecn, horizon_sec;
 ```
 
 Plot these curves overlaid per ECN for each symbol. Compare the shapes:
@@ -141,8 +141,8 @@ HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 10s, 1m) AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$yesterday'
-GROUP BY t.symbol, t.ecn, t.passive, h.offset
-ORDER BY t.symbol, t.ecn, t.passive, h.offset;
+GROUP BY t.symbol, t.ecn, t.passive, horizon_sec
+ORDER BY t.symbol, t.ecn, t.passive, horizon_sec;
 ```
 
 Compare the markout curves for `passive = true` vs `passive = false` on each ECN:
