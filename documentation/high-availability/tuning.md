@@ -25,15 +25,31 @@ reduced network traffic depending on your needs.
 
 ## Quick reference
 
-**For low latency**:
+**For low latency (sub-200ms)**:
 ```ini
+# Primary
 cairo.wal.segment.rollover.size=262144
-replication.primary.throttle.window.duration=1000
+replication.primary.throttle.window.duration=50
 replication.primary.sequencer.part.txn.count=5000
+
+# Replica
+replication.replica.poll.interval=50
+```
+
+**For low latency (sub-500ms)**:
+```ini
+# Primary
+cairo.wal.segment.rollover.size=524288
+replication.primary.throttle.window.duration=100
+replication.primary.sequencer.part.txn.count=5000
+
+# Replica
+replication.replica.poll.interval=100
 ```
 
 **For network efficiency**:
 ```ini
+# Primary
 cairo.wal.segment.rollover.size=2097152
 replication.primary.throttle.window.duration=60000
 replication.primary.sequencer.part.txn.count=1000
@@ -99,13 +115,35 @@ fill up before upload, reducing redundant uploads (write amplification).
 
 | Value | Behavior |
 |-------|----------|
-| `1000` (1s) | Lowest latency, most uploads. |
+| `50` (50ms) | Ultra-low latency. Best with NFS transport. |
+| `100` (100ms) | Low latency. Good balance for NFS transport. |
+| `1000` (1s) | Low latency for object store transport. |
 | `10000` (10s) | Default. Balanced. |
 | `60000` (60s) | 1 minute delay OK. Fewer uploads. |
 | `300000` (5 min) | Cost-sensitive. Batches more data. |
 
 This is your **maximum replication latency tolerance**. QuestDB still actively
 manages replication to prevent backlogs during bursts.
+
+### Replica poll interval
+
+```ini
+replication.replica.poll.interval=1000  # 1 second (default)
+```
+
+How often the replica checks the transport layer for new data. This setting
+is configured on the **replica** node.
+
+| Value | Behavior |
+|-------|----------|
+| `50` (50ms) | Ultra-low latency. Pair with aggressive primary settings. |
+| `100` (100ms) | Low latency. Good for NFS transport. |
+| `1000` (1s) | Default. Balanced. |
+
+:::note
+Reducing the poll interval below the throttle window duration has diminishing
+returns, since the replica cannot consume data faster than the primary produces it.
+:::
 
 ### Sequencer part size
 
