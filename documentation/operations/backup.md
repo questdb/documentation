@@ -251,10 +251,9 @@ Returns `null` if no backup has been run yet.
 When replication is enabled, the
 [WAL cleaner](/docs/high-availability/wal-cleanup/) uses backup manifests to
 determine which replicated WAL data in object storage can be safely deleted.
-By default, the cleaner retains replication data needed by your most recent
-backups, controlled by the
-[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5), and
-deletes the rest. No additional configuration is required — enabling
+By default, the cleaner retains replication data for as many backups as your
+[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5) and
+deletes everything older. No additional configuration is required — enabling
 backups on a replicated instance is sufficient.
 
 ### Performance characteristics

@@ -22,9 +22,8 @@ Requires: QuestDB Enterprise with replication enabled.
 
 :::warning
 The WAL cleaner is enabled by default, **but it will not delete anything until
-at least 5 completed backups or checkpoints exist.** If you have not configured
-[Enterprise backups](/docs/operations/backup/) or run
-[`CHECKPOINT`](/docs/query/sql/checkpoint/) commands, WAL data accumulates
+at least 5 completed backups or checkpoints exist.** Without configuring backups
+or checkpoint history, and executing regular backups, WAL data accumulates
 indefinitely regardless of this setting.
 :::
 
@@ -39,16 +38,14 @@ replication.primary.cleaner.enabled=true
 replication.primary.cleaner.backup.window.count=5
 ```
 
-The cleaner retains WAL data needed by your 4 most recent backups or
-checkpoints, and deletes the rest (including the 5th-newest entry). It runs every 10 minutes
-(`replication.primary.cleaner.interval`).
+It runs every 10 minutes (`replication.primary.cleaner.interval`).
 
 The cleaner requires at least one **trigger source** with sufficient history
 before it will delete anything. The two supported sources are:
 
 - **[Enterprise backups](/docs/operations/backup/)** — the cleaner reads backup
   manifests to determine what can be safely deleted.
-- **[Checkpoint history](#checkpoint-history)** — the cleaner reads
+- **[Checkpoint integration](#checkpoint-integration)** — the cleaner reads
   `CHECKPOINT RELEASE` records synced to the replication object store.
 
 Both sources are enabled by default when replication is active. If you only use
@@ -72,9 +69,14 @@ Key fields:
 | `backup_ts` | Timestamp of the boundary entry. Data up to and including this entry is deleted. |
 | `tables` | Number of tables processed in this cycle. |
 
-If you see no `prune requested` lines, the cleaner has not yet accumulated
-enough history to act. Check that backups or checkpoints are running
-successfully.
+If the cleaner does not have enough history to act, it logs:
+
+```
+insufficient backup history, skipping WAL cleanup [backup_window_count=5, history={door-echo-yoyo:3, park-sugar-system:2}]
+```
+
+This means no instance has reached the N-entry threshold yet. Check that
+backups or checkpoints are running successfully.
 
 You can find a node's backup instance name by running:
 
@@ -82,7 +84,7 @@ You can find a node's backup instance name by running:
 SELECT backup_instance_name;
 ```
 
-## Enterprise backup integration
+## Backup integration
 
 The cleaner automatically reads your backup manifests to determine what can be
 safely deleted. The backup feature must be enabled and configured on the
@@ -101,7 +103,7 @@ deleting anything. N defaults to your
 [`backup.cleanup.keep.latest.n`](/docs/operations/backup/#backup-retention)
 setting (itself default 5) and can be overridden with
 `replication.primary.cleaner.backup.window.count`. For example, with the default
-of 5 the cleaner deletes data up to and including the 5th-newest complete backup.
+of 5 the cleaner deletes data up to and including the 5th-newest complete backup, which becomes the oldest backup from which a node can be restored into the replication cluster.
 
 :::warning
 All nodes in a replication cluster should use the **same `backup.object.store`**
@@ -110,7 +112,7 @@ node to compute the cleanup boundary. If nodes back up to different object
 stores, the cleaner cannot see all manifests and will not trigger correctly.
 :::
 
-## Checkpoint history
+## Checkpoint integration
 
 If you take filesystem snapshots, AWS EBS volume snapshots, or use custom backup
 scripts that issue `CHECKPOINT` / `CHECKPOINT RELEASE`, checkpoint history
@@ -151,31 +153,6 @@ transiently, QuestDB retries in the background (controlled by
 history tracking — the mechanism that syncs checkpoint records to the
 replication object store for WAL cleanup — requires QuestDB Enterprise with
 replication enabled.
-:::
-
-## Using both backups and checkpoints
-
-When both trigger sources are active (the default):
-
-```ini
-backup.enabled=true
-checkpoint.history.enabled=true
-replication.primary.cleaner.checkpoint.source=true
-```
-
-The cleaner **merges entries from both sources into a single list per backup
-instance name**, then keeps the newest N entries. This means enabling both
-sources can make cleanup **more** aggressive: an instance with 3 backups and 3
-checkpoints has 6 entries total, crossing the N=5 threshold, whereas neither
-source alone would be sufficient to trigger cleanup.
-
-:::tip
-If you want the cleaner to act only on backup history and ignore checkpoints
-(or vice versa), disable the unwanted source:
-
-```ini
-replication.primary.cleaner.checkpoint.source=false
-```
 :::
 
 ## How the cleanup boundary works
@@ -235,7 +212,7 @@ gantt
     B :milestone, d7, 2026-01-07, 0d
 
   section park-sugar-system
-    B :milestone, p1, 2026-01-06, 0d
+    B :done, milestone, p1, 2026-01-06, 0d
     B :milestone, p2, 2026-01-07, 0d
     B :milestone, p3, 2026-01-08, 0d
     B :milestone, p4, 2026-01-09, 0d
@@ -243,23 +220,54 @@ gantt
     B :milestone, p6, 2026-01-11, 0d
 
   section apple-parrot-baby
-    B :milestone, a1, 2026-01-10, 0d
-    B :milestone, a2, 2026-01-11, 0d
-    B :milestone, a3, 2026-01-12, 0d
+    B :done, milestone, a1, 2026-01-10, 0d
+    B :done, milestone, a2, 2026-01-11, 0d
+    B :done, milestone, a3, 2026-01-12, 0d
 
     B :crit, vert, cb, 2026-01-03, 0d
 ```
 
+Greyed-out entries in the diagram are not considered by the algorithm.
+
+Skipped and not considered:
+- **apple-parrot-baby** has only 3 entries, fewer than N=5, so it is skipped.
+
+The following entries are considered by the algorithm:
 - **door-echo-yoyo** has 7 entries. Its 5th newest entry is **Jan 3**.
 - **park-sugar-system** has 6 entries. Its 5th newest entry is **Jan 7**.
-- **apple-parrot-baby** has only 3 entries, fewer than N=5, so it is skipped.
-- Comparing the Nth-newest entries: Jan 3 (door-echo-yoyo) vs Jan 7
-  (park-sugar-system). The earliest is **Jan 3**, so the cleanup boundary falls
-  there. All replication WAL data up to and including Jan 3 is deleted.
-- After cleanup, restoring from the Jan 3 backup or older (such as
-  door-echo-yoyo's Jan 1 or Jan 2 backups) is only possible as a standalone
-  instance, not as part of the replication cluster.
-- Any point-in-time recovery target must be **after** Jan 3.
+
+Comparing the Nth-newest considered entries: Jan 3 (door-echo-yoyo) vs Jan 7
+(park-sugar-system). The earliest is **Jan 3**, so the cleanup boundary falls
+there. All replication WAL data up to and including Jan 3 is deleted.
+After cleanup, restoring from a backup older than Jan 3 (such as
+door-echo-yoyo's Jan 1 or Jan 2 backups) is only possible as a standalone
+instance, not as part of the replication cluster.
+Any point-in-time recovery target must be **after** Jan 3.
+
+## Using both backups and checkpoints
+
+By default, both trigger sources are active:
+
+```ini
+backup.enabled=true
+checkpoint.history.enabled=true
+replication.primary.cleaner.checkpoint.source=true
+```
+
+Backups and checkpoints are merged into a single list per backup instance name
+before the boundary is computed. The effect depends on your cluster topology:
+
+- **Same instance produces both backups and checkpoints** — more entries
+  accumulate per instance, crossing the N threshold sooner and pushing the
+  Nth-newest entry forward in time. This more eagerly reduces the time window
+  of data kept in the replication object store.
+- **Different instances produce backups vs checkpoints** — each instance has
+  fewer entries individually, and the cross-instance comparison in step 3 picks
+  the oldest boundary. This increases the time window of data retained.
+
+To restrict the cleaner to a single source, set
+`replication.primary.cleaner.checkpoint.source=false` to ignore checkpoint
+history, or disable `backup.enabled` to ignore backup manifests.
 
 ## Troubleshooting
 
@@ -271,8 +279,9 @@ gantt
    cleaner has not started yet. Run `SELECT * FROM backups();` or check your
    checkpoint schedule.
 
-2. **Check the logs.** Search for `wal::uploader::cleaner`. If there are no
-   `prune requested` lines, the cleaner is not finding enough history to act.
+2. **Check the logs.** Search for `wal::uploader::cleaner`. If you see
+   `insufficient backup history, skipping WAL cleanup`, the cleaner is not
+   finding enough history to act.
 
 3. **Check for abandoned backup instance names.** A decommissioned node whose
    history remains in the object store drags the cleanup boundary backward

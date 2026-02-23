@@ -197,7 +197,7 @@ longer needed, based on your backup and checkpoint history.
 
 The cleaner is enabled by default and requires no configuration when backups
 or checkpoint history are active. By default, it retains replication data
-needed by the 4 most recent backups or checkpoints and deletes the rest.
+for the most recent 5 backups or checkpoints and deletes everything older.
 
 See the [WAL Cleanup guide](/docs/high-availability/wal-cleanup/) for
 configuration options, tuning, and troubleshooting.
