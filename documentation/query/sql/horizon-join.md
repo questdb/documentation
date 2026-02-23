@@ -201,6 +201,29 @@ QuestDB aligns the timestamps internally — no explicit casting is needed.
 When the tables differ in resolution, `h.offset` uses the resolution of the
 **left-hand table** (the event table).
 
+## Parallel execution
+
+QuestDB can execute HORIZON JOIN queries in parallel across multiple worker
+threads. Use [`EXPLAIN`](/docs/query/sql/explain/) to see the execution plan and
+verify parallelization:
+
+```questdb-sql title="Analyze HORIZON JOIN execution plan"
+EXPLAIN SELECT
+    h.offset / 1000000000 AS horizon_sec,
+    t.symbol,
+    avg((m.best_bid + m.best_ask) / 2) AS avg_mid
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+RANGE FROM 1s TO 60s STEP 1s AS h
+ORDER BY t.symbol, horizon_sec;
+```
+
+Look for these indicators in the plan:
+
+- **Async Horizon Join**: Parallel execution using Java-evaluated expressions
+- **Async JIT Horizon Join**: Parallel execution using Just-In-Time-compiled
+  expressions for better performance
+
 ## Current limitations
 
 - **No other joins**: HORIZON JOIN cannot be combined with other joins in the
