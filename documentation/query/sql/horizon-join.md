@@ -93,13 +93,30 @@ Both `RANGE` and `LIST` use the same interval expression syntax as
 | `m` | Minutes |
 | `h` | Hours |
 | `d` | Days |
-| `w` | Weeks |
 
 Note that `h.offset` is always returned as a `LONG` in the left-hand table's
 timestamp resolution (e.g., nanoseconds for `TIMESTAMP_NS` tables), regardless
 of the unit used in the `RANGE` or `LIST` definition. When matching offset
 values in a `PIVOT ... FOR offset IN (...)` clause, use the raw numeric value
 (e.g., `1800000000000` for 30 minutes in nanoseconds), not the interval literal.
+
+## GROUP BY rules
+
+HORIZON JOIN queries always require aggregate functions in the `SELECT` list.
+The `GROUP BY` clause is optional — when omitted, results are implicitly grouped
+by all non-aggregate `SELECT` columns. When `GROUP BY` is present, it follows
+stricter rules than regular `GROUP BY`:
+
+- Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
+  expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`)
+  or a `SELECT` column alias.
+- Every non-aggregate `SELECT` column must appear in `GROUP BY`.
+- Column index references are supported (e.g., `GROUP BY 1, 2`).
+
+For example, if the `SELECT` list contains `h.offset / 1000000000 AS
+horizon_sec`, the `GROUP BY` must use either the alias `horizon_sec` or the full
+expression `h.offset / 1000000000` — using just `h.offset` is not valid because
+it does not exactly match any non-aggregate `SELECT` expression.
 
 ## Examples
 
@@ -186,10 +203,18 @@ When the tables differ in resolution, `h.offset` uses the resolution of the
 
 - **No other joins**: HORIZON JOIN cannot be combined with other joins in the
   same level of the query. Joins can be done in an outer query.
-- **No right-hand side filter**: `WHERE` clause filters apply to the left-hand
-  table only; right-hand table filters are not yet supported.
+- **No window functions**: Window functions cannot be used in HORIZON JOIN
+  queries. Wrap the HORIZON JOIN in a subquery and apply window functions in the
+  outer query.
+- **No SAMPLE BY**: `SAMPLE BY` cannot be used with HORIZON JOIN. Use `GROUP BY`
+  with a time-bucketing expression instead.
+- **WHERE filters left-hand table only**: The `WHERE` clause can only reference
+  columns from the left-hand table. References to right-hand table columns or
+  horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
 - **Both tables must have a designated timestamp**: The left-hand and right-hand
   tables must each have a designated timestamp column.
+- **Right-hand side must be a table**: The right-hand side of HORIZON JOIN must
+  be a table, not a subquery.
 - **RANGE constraints**: `STEP` must be positive; `FROM` must be less than or
   equal to `TO`.
 - **LIST constraints**: Offsets must be interval literals (e.g., `1s`, `-2m`,
