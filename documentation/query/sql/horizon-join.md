@@ -27,6 +27,7 @@ SELECT [<keys>,] <aggregations>
 FROM <left_table> AS <left_alias>
 HORIZON JOIN <right_table> AS <right_alias> [ON (<join_keys>)]
 RANGE FROM <from_expr> TO <to_expr> STEP <step_expr> AS <horizon_alias>
+[WHERE <left_table_filter>]
 [GROUP BY <keys>]
 [ORDER BY ...]
 ```
@@ -43,6 +44,7 @@ SELECT [<keys>,] <aggregations>
 FROM <left_table> AS <left_alias>
 HORIZON JOIN <right_table> AS <right_alias> [ON (<join_keys>)]
 LIST (<offset_expr>, ...) AS <horizon_alias>
+[WHERE <left_table_filter>]
 [GROUP BY <keys>]
 [ORDER BY ...]
 ```
@@ -223,6 +225,7 @@ When the tables differ in resolution, `h.offset` uses the resolution of the
 :::info Related documentation
 - [ASOF JOIN](/docs/query/sql/asof-join/)
 - [JOIN](/docs/query/sql/join/)
+- [PIVOT](/docs/query/sql/pivot/)
 - [SAMPLE BY](/docs/query/sql/sample-by/)
 - [Markout analysis recipe](/docs/cookbook/sql/finance/markout/)
 :::
