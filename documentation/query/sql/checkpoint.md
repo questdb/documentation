@@ -90,7 +90,7 @@ storage.
 
 Checkpoint history tracking is enabled by default when replication is active.
 No additional configuration is required. See the
-[WAL Cleanup guide](/docs/high-availability/wal-cleanup/#integrating-with-the-sql-checkpoint-commands)
+[WAL Cleanup guide](/docs/high-availability/wal-cleanup/#checkpoint-history)
 for details.
 
 ## CHECKPOINT examples
