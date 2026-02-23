@@ -179,6 +179,21 @@ Consider three nodes with N=5: **door-echo-yoyo** has 7 entries (Jan 1–7),
 **park-sugar-system** has 6 entries (Jan 6–11), and **apple-parrot-baby** has 3
 entries (Jan 10–12).
 
+Skipped and not considered:
+- **apple-parrot-baby** has only 3 entries, fewer than N=5, so it is skipped.
+
+The following entries are considered by the algorithm:
+- **door-echo-yoyo** has 7 entries. Its 5th newest entry is **Jan 3**.
+- **park-sugar-system** has 6 entries. Its 5th newest entry is **Jan 7**.
+
+Comparing Jan 3 (door-echo-yoyo) vs Jan 7 (park-sugar-system): the earliest
+is **Jan 3**, so the cleanup boundary falls
+there. All replication WAL data up to and including Jan 3 is deleted.
+After cleanup, restoring from a backup older than Jan 3 (such as
+door-echo-yoyo's Jan 1 or Jan 2 backups) is only possible as a standalone
+instance, not as part of the replication cluster.
+Any point-in-time recovery target must be **after** Jan 3.
+
 ```mermaid
 ---
 displayMode: compact
@@ -228,21 +243,6 @@ gantt
 ```
 
 Greyed-out entries in the diagram are not considered by the algorithm.
-
-Skipped and not considered:
-- **apple-parrot-baby** has only 3 entries, fewer than N=5, so it is skipped.
-
-The following entries are considered by the algorithm:
-- **door-echo-yoyo** has 7 entries. Its 5th newest entry is **Jan 3**.
-- **park-sugar-system** has 6 entries. Its 5th newest entry is **Jan 7**.
-
-Comparing the Nth-newest considered entries: Jan 3 (door-echo-yoyo) vs Jan 7
-(park-sugar-system). The earliest is **Jan 3**, so the cleanup boundary falls
-there. All replication WAL data up to and including Jan 3 is deleted.
-After cleanup, restoring from a backup older than Jan 3 (such as
-door-echo-yoyo's Jan 1 or Jan 2 backups) is only possible as a standalone
-instance, not as part of the replication cluster.
-Any point-in-time recovery target must be **after** Jan 3.
 
 ## Using both backups and checkpoints
 
