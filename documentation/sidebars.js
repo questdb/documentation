@@ -12,7 +12,7 @@ module.exports = {
       collapsed: true,
       items: [
         "getting-started/quick-start",
-        "getting-started/llm-coding-assistants",
+        "getting-started/ai-coding-agents",
         "getting-started/capacity-planning",
         "getting-started/create-database",
         {
