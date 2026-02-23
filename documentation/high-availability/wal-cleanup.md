@@ -39,8 +39,8 @@ replication.primary.cleaner.enabled=true
 replication.primary.cleaner.backup.window.count=5
 ```
 
-The cleaner retains WAL data needed by your 4 most recent backups or
-checkpoints, and deletes the rest (including the 5th-newest entry). It runs every 10 minutes
+The cleaner retains WAL data needed by your 5 most recent backups or
+checkpoints and deletes older data. It runs every 10 minutes
 (`replication.primary.cleaner.interval`).
 
 The cleaner requires at least one **trigger source** with sufficient history
@@ -101,7 +101,7 @@ deleting anything. N defaults to your
 [`backup.cleanup.keep.latest.n`](/docs/operations/backup/#backup-retention)
 setting (itself default 5) and can be overridden with
 `replication.primary.cleaner.backup.window.count`. For example, with the default
-of 5 the cleaner deletes data up to and including the 5th-newest complete backup.
+of 5 the cleaner retains data needed by the 5 most recent complete backups and deletes anything older.
 
 :::warning
 All nodes in a replication cluster should use the **same `backup.object.store`**
@@ -180,10 +180,10 @@ replication.primary.cleaner.checkpoint.source=false
 
 ## How the cleanup boundary works
 
-The cleanup boundary determines how far back you can restore. WAL data up to
-and including the boundary is deleted; data after the boundary is retained. Any
+The cleanup boundary determines how far back you can restore. WAL data older
+than the boundary is deleted; data from the boundary onward is retained. Any
 [point-in-time recovery](/docs/high-availability/setup/#point-in-time-recovery)
-target must be **after** this boundary.
+target must be **on or after** this boundary.
 
 Backup manifests and checkpoint history records are stored per backup instance
 name. The cleaner computes the boundary as follows:
@@ -193,8 +193,8 @@ name. The cleaner computes the boundary as follows:
    `replication.primary.cleaner.backup.window.count` (default 5).
 2. Skip any instance that has fewer than N entries.
 3. Compare the Nth-newest entry from each eligible instance. The entry with the
-   **earliest timestamp** is the cleanup boundary — WAL data up to and including
-   that entry's transactions is deleted.
+   **earliest timestamp** is the cleanup boundary — WAL data older than that
+   entry is deleted, while the boundary entry itself is retained.
 
 ### Example
 
@@ -255,11 +255,12 @@ gantt
 - **apple-parrot-baby** has only 3 entries, fewer than N=5, so it is skipped.
 - Comparing the Nth-newest entries: Jan 3 (door-echo-yoyo) vs Jan 7
   (park-sugar-system). The earliest is **Jan 3**, so the cleanup boundary falls
-  there. All replication WAL data up to and including Jan 3 is deleted.
-- After cleanup, restoring from the Jan 3 backup or older (such as
+  there. All replication WAL data older than Jan 3 is deleted (Jan 1 and Jan 2).
+  The Jan 3 entry and everything newer is retained.
+- After cleanup, restoring from backups older than the boundary (such as
   door-echo-yoyo's Jan 1 or Jan 2 backups) is only possible as a standalone
   instance, not as part of the replication cluster.
-- Any point-in-time recovery target must be **after** Jan 3.
+- Any point-in-time recovery target must be **on or after** Jan 3.
 
 ## Troubleshooting
 
