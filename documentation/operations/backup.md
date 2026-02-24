@@ -246,6 +246,16 @@ SELECT backup_instance_name;
 
 Returns `null` if no backup has been run yet.
 
+### Replication WAL cleanup integration
+
+When replication is enabled, the
+[WAL cleaner](/docs/high-availability/wal-cleanup/) uses backup manifests to
+determine which replicated WAL data in object storage can be safely deleted.
+By default, the cleaner retains replication data for as many backups as your
+[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5) and
+deletes everything older. No additional configuration is required — enabling
+backups on a replicated instance is sufficient.
+
 ### Performance characteristics
 
 Backup is designed to prioritize database availability over backup speed. Key
@@ -334,6 +344,12 @@ To find your instance name, see [Backup instance name](#backup-instance-name).
   a primary and its replica creates two separate backup sets in the object
   store. Typically, backing up the primary is sufficient since replicas sync
   from the same data.
+- **Same backup object store for all nodes**: When using replication, all
+  nodes in the cluster should use the same `backup.object.store` connection
+  string. The [WAL cleaner](/docs/high-availability/wal-cleanup/) reads
+  backup manifests from every node to determine what replication data can be
+  safely deleted. If nodes back up to different object stores, the cleaner
+  cannot see all manifests and will not trigger correctly.
 
 ### Backup validation
 
