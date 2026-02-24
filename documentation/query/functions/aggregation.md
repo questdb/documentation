@@ -524,8 +524,7 @@ GROUP BY symbol;
 ```
 
 [array_cum_sum](/docs/query/functions/array/#array_cum_sum) computes running
-totals over the collected prices in timestamp order. This has no scalar aggregate
-equivalent and is useful for intra-group cumulative analysis.
+totals over the collected prices in timestamp order.
 
 #### Constraints and edge cases
 
