@@ -416,12 +416,18 @@ FROM weather_data;
 
 ## array_agg
 
-`array_agg(value)` or `array_agg(array)` collects row values into a single
-`DOUBLE[]` array per group. Use it to build per-group vectors for downstream
-array operations such as
+**Syntax:**
+
+```questdb-sql
+array_agg(value [, ordered]) -> DOUBLE[]
+array_agg(array [, ordered]) -> DOUBLE[]
+```
+
+Collects row values into a single `DOUBLE[]` array per group. Use it to build
+per-group vectors for downstream array operations such as
 [array_avg](/docs/query/functions/array/#array_avg),
 [dot_product](/docs/query/functions/array/#dot_product), or time-bucketed
-snapshots via SAMPLE BY.
+snapshots via `SAMPLE BY`.
 
 When called with a scalar argument, each row's value becomes one element of the
 output array. When called with a `DOUBLE[]` argument, non-null input arrays are
@@ -431,20 +437,25 @@ concatenated into a single flat `DOUBLE[]`.
 
 | Parameter | Type | Description |
 | :-------- | :--- | :---------- |
-| `value` | `DOUBLE` (or castable) | Scalar to collect. Each row's value becomes one element. NULL values are included as NaN. |
+| `value` | `DOUBLE` (or castable) | Scalar to collect. Each row's value becomes one element. NULL values are preserved. |
 | `array` | `DOUBLE[]` | Array to concatenate. Non-null arrays are appended into a flat `DOUBLE[]`. NULL and empty arrays are skipped. |
 | `ordered` | `BOOLEAN` (optional, default `true`) | `true` preserves input order. `false` enables parallel execution, but output order is non-deterministic. |
 
 Only one of `value` or `array` is used per call. The `ordered` parameter can be
 added as a second argument to either form.
 
-#### Return type
+#### Return value
 
-Always `DOUBLE[]`. Returns NULL when no rows match or all inputs are NULL.
+- **Scalar form** - `DOUBLE[]`. Always produces an array when at least one row
+  exists, even if every value is NULL. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
+- **Array form** - `DOUBLE[]`. Returns NULL (not an empty array) when every
+  input array is NULL or empty. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
 
 #### SAMPLE BY support
 
-`array_agg` works with SAMPLE BY and the following FILL options:
+`array_agg` works with `SAMPLE BY` and the following FILL options:
 
 - `FILL(NULL)` - empty buckets produce NULL
 - `FILL(PREV)` - empty buckets repeat the previous bucket's array
@@ -466,6 +477,10 @@ WHERE symbol = 'EURUSD'
   AND timestamp IN '$now - 3s..$now'
 GROUP BY symbol;
 ```
+
+| symbol | prices |
+| :----- | :----- |
+| EURUSD | [1.1922, 1.1928, 1.1925, 1.1927, 1.1927, 1.1926, 1.1924, 1.1926, 1.1932, 1.1934, 1.1933, 1.1928, 1.1929, 1.1934, 1.1935, 1.1934, 1.1935, 1.1929, 1.193, ...] |
 
 Each row's `price` value is collected into a single `DOUBLE[]` per symbol.
 
@@ -526,13 +541,11 @@ GROUP BY symbol;
 [array_cum_sum](/docs/query/functions/array/#array_cum_sum) computes running
 totals over the collected prices in timestamp order.
 
-#### Constraints and edge cases
+#### NULL handling
 
-- NULL scalar values become NaN elements in the output array.
-- NULL and empty input arrays are skipped during concatenation, but NULL
+- NULL scalar inputs appear as null elements in the output array.
+- NULL and empty input arrays are skipped during concatenation, but null
   elements within a non-null array are preserved.
-- Returns NULL (not an empty array) when no rows match the filter or all inputs
-  are NULL.
 
 #### See also
 
