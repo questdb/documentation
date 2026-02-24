@@ -31,38 +31,82 @@ SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 ## array_build
 
 `array_build(nArrays, size, filler1 [, filler2, ...])` constructs a `DOUBLE`
-array with a specified shape and fill values. Each sub-array is filled
-independently, either by repeating a scalar value or by copying elements from an
-existing array.
+array at runtime, where the length and contents can vary per row.
+
+Use `array_build` when the `ARRAY[...]` literal syntax is not enough — for
+example when you need to:
+
+- **Fill an array with a scalar** — create a zero vector, or fill every
+  position with a computed value (like `array_max`)
+- **Stack arrays into a 2D matrix** — combine several 1D arrays into a single
+  `DOUBLE[][]` for downstream array operations
 
 #### Parameters
 
-- `nArrays` — number of sub-arrays to build (compile-time constant). `1`
-  produces a flat `DOUBLE[]`. `2` or more produces a `DOUBLE[][]` with
-  `nArrays` rows
-- `size` — number of elements per sub-array. Accepts an `INT`/`LONG` value
-  directly, or a `DOUBLE[]` array whose element count is used as the size
-- `filler1..N` — one fill value per sub-array. There must be exactly `nArrays`
-  fillers. A scalar (`DOUBLE`/`INT`/`LONG`) is repeated for every element. A
-  `DOUBLE[]` array is copied position-by-position; if shorter than `size`,
-  remaining positions are `NaN`; if longer, excess elements are ignored
+| Parameter | Description |
+|-----------|-------------|
+| `nArrays` | How many sub-arrays the output has. Must be an integer literal (not a column, expression, or bind variable). `1` produces a 1D `DOUBLE[]`. `2` or more produces a 2D `DOUBLE[][]` with `nArrays` sub-arrays, each of length `size`. |
+| `size` | Length of each sub-array. Can be an `INT`/`LONG` value, or a `DOUBLE[]` array — in which case the array's element count is used as the length. |
+| `filler1 .. fillerN` | One filler per sub-array (exactly `nArrays` fillers required). A **scalar** (`DOUBLE`/`INT`/`LONG`) is repeated for every position. A **`DOUBLE[]` array** is copied position-by-position: if shorter than `size`, remaining positions are `NaN`; if longer, excess elements are ignored. |
 
 All arguments except `nArrays` can be constants, declared variables, column
 references, or expressions evaluated per row.
 
+#### Return type
+
+- `DOUBLE[]` when `nArrays` is `1`
+- `DOUBLE[][]` when `nArrays` is `2` or more — the first dimension has length
+  `nArrays`, the second has length `size`
+
+The output is always 1D or 2D. Passing a large `nArrays` (e.g. 100) produces a
+2D array with 100 rows, not a 100-dimensional array.
+
 #### Examples
 
-Scalar fill - create an array of zeros:
+**Create an array filled with a scalar value:**
 
 ```questdb-sql demo title="array_build - scalar fill"
 SELECT array_build(1, 3, 0) FROM long_sequence(1);
 ```
 
-| array_build     |
-| --------------- |
+| array_build    |
+| -------------- |
 | [0.0,0.0,0.0]  |
 
-Size derived from an existing array (copy it):
+**Variable-length fill — size from a column:**
+
+```questdb-sql demo title="array_build - variable-length fill"
+SELECT x, array_build(1, x::int, -1) FROM long_sequence(3);
+```
+
+| x | array_build        |
+|---|--------------------|
+| 1 | [-1.0]             |
+| 2 | [-1.0,-1.0]        |
+| 3 | [-1.0,-1.0,-1.0]   |
+
+Each row gets an array whose length equals `x`, filled with `-1`.
+
+**Broadcast a computed value across an array:**
+
+On the [demo `market_data` table](/docs/cookbook/demo-data-schema/#market_data-table),
+`bids` is a `DOUBLE[][]` where `bids[1]` contains bid prices. The following
+creates an array the same length as `bids[1]`, filled with its maximum value:
+
+```questdb-sql demo title="array_build - broadcast computed scalar"
+SELECT array_build(1, bids[1], array_max(bids[1]))
+FROM market_data
+LIMIT 1;
+```
+
+Here `bids[1]` in the `size` position is a `DOUBLE[]`, so its element count
+determines the output length. The filler `array_max(bids[1])` is a scalar, so
+it is repeated in every position.
+
+**Copy an existing array:**
+
+When both `size` and the filler are the same `DOUBLE[]`, the filler is copied
+position-by-position — effectively cloning the array:
 
 ```questdb-sql demo title="array_build - copy an array"
 SELECT array_build(1, bids[1], bids[1])
@@ -70,62 +114,78 @@ FROM market_data
 LIMIT 1;
 ```
 
-The second argument `bids[1]` is a `DOUBLE[]`, so its element count determines
-the output size. The third argument fills position-by-position, producing a copy.
+The result is a new `DOUBLE[]` with the same length and values as `bids[1]`.
 
-Fill with a computed scalar, matching the length of another array:
-
-```questdb-sql demo title="array_build - fill with computed scalar"
-SELECT array_build(1, bids[1], array_max(bids[1]))
-FROM market_data
-LIMIT 1;
-```
-
-Each row gets an array filled with the max bid price, the same length as
-`bids[1]`.
-
-NaN padding when filler is shorter than size:
+**NaN padding when the filler array is shorter than `size`:**
 
 ```questdb-sql demo title="array_build - NaN padding"
 SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
 ```
 
-| array_build                 |
-| --------------------------- |
-| [10.0,20.0,30.0,NaN,NaN]   |
+| array_build               |
+| ------------------------- |
+| [10.0,20.0,30.0,NaN,NaN]  |
 
-Build a 2D array from two sub-arrays:
+Positions beyond the filler's length are filled with `NaN` (which QuestDB
+treats as `NULL` for `DOUBLE` values).
 
-```questdb-sql demo title="array_build - 2D from order book"
-SELECT array_build(2, bids[1], bids[1], asks[1])
-FROM market_data
-LIMIT 1;
-```
-
-Returns a `DOUBLE[][]` where the first slice contains bid prices and the second
-slice contains ask prices.
-
-2D array with scalar fill:
+**2D array with scalar fill:**
 
 ```questdb-sql demo title="array_build - 2D scalar fill"
 SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
 ```
 
-| array_build                      |
-| -------------------------------- |
-| [[1.0,1.0,1.0],[0.0,0.0,0.0]]   |
+| array_build                    |
+| ------------------------------ |
+| [[1.0,1.0,1.0],[0.0,0.0,0.0]]  |
 
-Combine multiple array columns into a single 2D array:
+Two fillers are required because `nArrays` is `2`. The first filler (`1.0`)
+fills the first row, the second (`0.0`) fills the second row.
 
-```questdb-sql title="array_build - combine 4 sub-arrays"
-SELECT array_build(4, ask_price, ask_price, ask_size, bid_price, bid_size)
-FROM order_book
+**Combine existing arrays into a 2D matrix:**
+
+```questdb-sql demo title="array_build - 2D from market data"
+SELECT array_build(2, bids[1], bids[1], asks[1])
+FROM market_data
 LIMIT 1;
 ```
 
-| array_build                                                                    |
-| ------------------------------------------------------------------------------ |
-| [[100.0,101.0,102.0],[10.0,20.0,30.0],[99.0,98.0,97.0],[15.0,25.0,35.0]]      |
+Returns a `DOUBLE[][]` where the first row contains bid prices and the second
+row contains ask prices, both taken from the order book snapshot.
+
+**Stack multiple array columns into a 2D array:**
+
+When a table has several `DOUBLE[]` columns, `array_build` can stack them into
+a single 2D array. The `market_data` table on the
+[demo instance](/docs/cookbook/demo-data-schema/#market_data-table) stores order
+book snapshots with `bids` and `asks` as `DOUBLE[][]` columns (run
+`SHOW COLUMNS FROM market_data;` on demo to see the schema). Each contains
+price and volume sub-arrays: `bids[1]` = bid prices, `bids[2]` = bid volumes,
+and likewise for `asks`.
+
+The following packs all four sub-arrays into a single `DOUBLE[4][N]` array:
+
+```questdb-sql demo title="array_build - stack 4 arrays"
+SELECT array_build(4, bids[1], bids[1], bids[2], asks[1], asks[2])
+FROM market_data
+LIMIT 1;
+```
+
+The `size` argument (`bids[1]`) is a `DOUBLE[]`, so its element count
+determines the sub-array length. Each of the four fillers is also a `DOUBLE[]`,
+copied position-by-position into its respective sub-array.
+
+#### Constraints and edge cases
+
+- `nArrays` must be at least `1`. Passing `0` raises an error.
+- `size = 0` produces an empty array. `size < 0` raises an error. If `size`
+  evaluates to `NULL`, the result is a `NULL` array.
+- Fillers must be scalars or 1D `DOUBLE[]` arrays. Multi-dimensional array
+  fillers are not accepted.
+- `NaN` values inside a filler array are copied as-is. A `NULL` filler array
+  fills the entire row with `NaN`.
+- Both `nArrays` and `size` are capped at 268,435,455. The total element count
+  (`nArrays × size`) must also fit within memory limits.
 
 ## array_count
 
