@@ -515,6 +515,7 @@ single flat array.
 
 ```questdb-sql demo title="array_agg - cumulative price sums per symbol"
 SELECT symbol,
+  array_agg(price) AS prices,
   array_cum_sum(array_agg(price)) AS cumulative_prices
 FROM fx_trades
 WHERE symbol = 'EURUSD'
