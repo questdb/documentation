@@ -12,7 +12,7 @@ module.exports = {
       collapsed: true,
       items: [
         "getting-started/quick-start",
-        "getting-started/llm-coding-assistants",
+        "getting-started/ai-coding-agents",
         "getting-started/capacity-planning",
         "getting-started/create-database",
         {
@@ -418,14 +418,15 @@ module.exports = {
                 "query/sql/distinct",
                 "query/sql/fill",
                 "query/sql/group-by",
+                "query/sql/horizon-join",
                 "query/sql/join",
-                "query/sql/window-join",
                 "query/sql/latest-on",
                 "query/sql/limit",
                 "query/sql/order-by",
                 "query/sql/pivot",
                 "query/sql/sample-by",
                 "query/sql/where",
+                "query/sql/window-join",
                 "query/sql/with",
               ],
             },
@@ -625,6 +626,11 @@ module.exports = {
           type: "doc",
           label: "Tuning",
         },
+        {
+          id: "high-availability/wal-cleanup",
+          type: "doc",
+          label: "WAL Cleanup",
+        },
       ],
     },
 
@@ -732,6 +738,30 @@ module.exports = {
       items: [
         {
           type: "category",
+          label: "Post-Trade Analysis",
+          collapsed: false,
+          link: {
+            type: "doc",
+            id: "cookbook/sql/finance/post-trade-overview",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "cookbook/sql/finance/post-trade-overview",
+              label: "Overview",
+            },
+            "cookbook/sql/finance/slippage",
+            "cookbook/sql/finance/slippage-aggregated",
+            "cookbook/sql/finance/markout",
+            "cookbook/sql/finance/last-look",
+            "cookbook/sql/finance/implementation-shortfall",
+            "cookbook/sql/finance/implementation-shortfall-order",
+            "cookbook/sql/finance/ecn-scorecard",
+            "cookbook/sql/finance/vpin",
+          ],
+        },
+        {
+          type: "category",
           label: "Cookbook",
           collapsed: false,
           items: [
@@ -746,19 +776,91 @@ module.exports = {
                   type: "category",
                   label: "Capital Markets",
                   collapsed: true,
+                  link: {
+                    type: "doc",
+                    id: "cookbook/sql/finance/index",
+                  },
                   items: [
-                    "cookbook/sql/finance/compound-interest",
-                    "cookbook/sql/finance/cumulative-product",
-                    "cookbook/sql/finance/vwap",
-                    "cookbook/sql/finance/bollinger-bands",
-                    "cookbook/sql/finance/bollinger-bandwidth",
-                    "cookbook/sql/finance/tick-trin",
-                    "cookbook/sql/finance/aggressor-volume-imbalance",
-                    "cookbook/sql/finance/volume-profile",
-                    "cookbook/sql/finance/volume-spike",
-                    "cookbook/sql/finance/rolling-stddev",
-                    "cookbook/sql/finance/liquidity-comparison",
-                    "cookbook/sql/finance/ohlc",
+                    {
+                      type: "category",
+                      label: "Price-Based Indicators",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/ohlc",
+                        "cookbook/sql/finance/vwap",
+                        "cookbook/sql/finance/bollinger-bands",
+                        "cookbook/sql/finance/bollinger-bandwidth",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Momentum Indicators",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/rsi",
+                        "cookbook/sql/finance/macd",
+                        "cookbook/sql/finance/stochastic",
+                        "cookbook/sql/finance/rate-of-change",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Volatility Indicators",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/atr",
+                        "cookbook/sql/finance/rolling-stddev",
+                        "cookbook/sql/finance/donchian-channels",
+                        "cookbook/sql/finance/keltner-channels",
+                        "cookbook/sql/finance/realized-volatility",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Volume & Order Flow",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/obv",
+                        "cookbook/sql/finance/volume-profile",
+                        "cookbook/sql/finance/volume-spike",
+                        "cookbook/sql/finance/aggressor-volume-imbalance",
+                        "cookbook/sql/finance/vpin",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Risk Metrics",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/maximum-drawdown",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Market Microstructure",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/bid-ask-spread",
+                        "cookbook/sql/finance/liquidity-comparison",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Market Breadth",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/tick-trin",
+                      ],
+                    },
+                    {
+                      type: "category",
+                      label: "Math Utilities",
+                      collapsed: true,
+                      items: [
+                        "cookbook/sql/finance/compound-interest",
+                        "cookbook/sql/finance/cumulative-product",
+                      ],
+                    },
                   ],
                 },
                 {
@@ -766,6 +868,7 @@ module.exports = {
                   label: "Time-Series Patterns",
                   collapsed: true,
                   items: [
+                    "cookbook/sql/time-series/elapsed-time",
                     "cookbook/sql/time-series/force-designated-timestamp",
                     "cookbook/sql/time-series/latest-n-per-partition",
                     "cookbook/sql/time-series/session-windows",

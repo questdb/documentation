@@ -235,7 +235,7 @@ QuestDB automatically recognizes strings formatted as ISO timestamp as a
 ![Flow chart showing the syntax of the WHERE clause with a timestamp comparison](/images/docs/diagrams/whereTimestampExact.svg)
 
 ```questdb-sql title="Timestamp equals date"
-SELECT scores WHERE ts = '2010-01-12T00:02:26.000Z';
+SELECT * FROM scores WHERE ts = '2010-01-12T00:02:26.000Z';
 ```
 
 | ts                       | score |
@@ -245,7 +245,7 @@ SELECT scores WHERE ts = '2010-01-12T00:02:26.000Z';
 | ...                      | ...   |
 
 ```questdb-sql title="Timestamp equals timestamp"
-SELECT scores WHERE ts = '2010-01-12T00:02:26.000000Z';
+SELECT * FROM scores WHERE ts = '2010-01-12T00:02:26.000000Z';
 ```
 
 | ts                          | score |
@@ -461,9 +461,9 @@ WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-03'
 LIMIT -1;
 ```
 
-| symbol | side |   price   |  amount  |          timestamp          |
-|--------|------|-----------|----------|-----------------------------|
-| BTC-USD| sell | 65,464.14 | 0.05100764 | 2024-04-02T23:59:59.9947212 |
+| symbol  | side | price     | amount     | timestamp                   |
+| ------- | ---- | --------- | ---------- | --------------------------- |
+| BTC-USD | sell | 65,464.14 | 0.05100764 | 2024-04-02T23:59:59.9947212 |
 
 The query pushes to the boundaries as far as is possible, all the way to: `2024-04-02T23:59:59.9947212`.
 
@@ -478,9 +478,9 @@ WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-03T00:00:00.99'
 LIMIT -1;
 ```
 
-| symbol  | side |  price   |   amount   |            timestamp             |
-|---------|------|----------|------------|----------------------------------|
-| ETH-USD | sell | 3,279.11 | 0.00881686 | 2024-04-03T00:00:00.988858Z      |
+| symbol  | side | price    | amount     | timestamp                   |
+| ------- | ---- | -------- | ---------- | --------------------------- |
+| ETH-USD | sell | 3,279.11 | 0.00881686 | 2024-04-03T00:00:00.988858Z |
 
 Even with fractional seconds, the boundary is inclusive.
 
