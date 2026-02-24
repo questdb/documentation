@@ -109,14 +109,14 @@ NetApp Volumes instead.
 
 ### The cost tradeoff
 
-The storage cost gap (object store at ~$20/TB vs NFS at $60–300/TB) looks large,
+The storage cost gap (object store at ~\$20/TB vs NFS at \$60–300/TB) looks large,
 but the replication working set — WAL files in transit — is typically well under
 1 TB. At that scale the per-TB premium is modest in absolute terms.
 
 The real cost difference is **operations**. With object store, every flush and
 every poll is a billable request. Each actively-written table generates one write
 op per throttle window and one read op per poll interval. Across major clouds,
-write ops typically cost ~$5/million and read ops ~$0.40/million.
+write ops typically cost ~\$5/million and read ops ~\$0.40/million.
 
 **Object store ops cost per active table:**
 
@@ -153,7 +153,7 @@ transport choice.
 | | Object store | NFS / file storage |
 |---|---|---|
 | Pricing model | Per-request + per-GB stored | Fixed monthly (provisioned) |
-| Storage cost | ~$20/TB/mo | ~$60–300/TB/mo |
+| Storage cost | ~\$20/TB/mo | ~\$60–300/TB/mo |
 | Cost of aggressive tuning | Higher (more ops) | No change |
 | Setup complexity | Low | Medium (mount on all nodes) |
 | Best for | Default settings, few tables | Sub-second latency, many tables |
