@@ -96,6 +96,7 @@ WHERE timestamp IN '$now - 1h..$now'
 :::
 
 :::info Related documentation
+- [TWAP (Time-Weighted Average Price)](/docs/cookbook/sql/finance/twap/) — the time-weighted counterpart; better suited for illiquid instruments or when volume data is unavailable
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [SUM aggregate](/docs/query/functions/aggregation/#sum)
 - [Materialized views](/docs/concepts/materialized-views/)

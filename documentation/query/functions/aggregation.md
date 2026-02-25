@@ -82,6 +82,7 @@ calculations. Functions are organized by category below.
 | [ksum](#ksum) | Kahan compensated sum (for floating-point precision) |
 | [nsum](#nsum) | Neumaier sum (for floating-point precision) |
 | [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
+| [twap](#twap) | Time-weighted average price |
 | [weighted_avg](#weighted_avg) | Weighted arithmetic mean |
 | [weighted_stddev](#weighted_stddev) | Weighted standard deviation (reliability weights) |
 | [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
@@ -1630,6 +1631,97 @@ SELECT sum(cast(a AS LONG)) FROM my_table;
 - [ksum](#ksum) - Kahan compensated sum for floating-point precision
 - [nsum](#nsum) - Neumaier sum for floating-point precision
 - [avg](#avg) - Arithmetic mean
+
+## twap
+
+`twap(price, timestamp)` - Calculates the time-weighted average price (TWAP)
+using step-function (forward-fill) integration: each observed price is assumed
+to persist until the next observation, and the TWAP is the area under this step
+function divided by the total time span. Unlike
+[VWAP](/docs/cookbook/sql/finance/vwap/), which weights by volume, TWAP gives
+equal weight to every time interval — useful for execution benchmarking,
+algorithmic trading, and fair value reference in illiquid markets. See the
+[TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) for practical examples.
+
+$$
+\text{TWAP} = \frac{\sum_{i=1}^{n-1} p_i \cdot (t_{i+1} - t_i)}{t_n - t_1}
+$$
+
+Where:
+
+- $p_i$ is the price at observation $i$
+- $t_i$ is the timestamp at observation $i$
+
+If all observations share the same timestamp, the function falls back to a
+simple arithmetic mean.
+
+If the price is `NULL`, that observation is skipped.
+
+If the timestamp is `NULL`, that observation is skipped.
+
+If there are no valid observations, the result is `NULL`.
+
+Supports `SAMPLE BY` with `FILL` modes.
+
+#### Parameters
+
+- `price` is any numeric value.
+- `timestamp` is a `timestamp` value. This is typically the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/) but can be any
+  timestamp column.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql demo title="TWAP of trade prices for a single symbol"
+SELECT twap(price, timestamp)
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$yesterday';
+```
+
+| twap     |
+| :------- |
+| 96573.24 |
+
+```questdb-sql demo title="TWAP per symbol"
+SELECT symbol, twap(price, timestamp)
+FROM trades
+WHERE timestamp IN '$yesterday';
+```
+
+| symbol   | twap     |
+| :------- | :------- |
+| BTC-USDT | 96573.24 |
+| ETH-USDT | 2641.87  |
+| SOL-USDT | 148.35   |
+| ...      | ...      |
+
+```questdb-sql demo title="Hourly TWAP"
+SELECT timestamp, symbol, twap(price, timestamp)
+FROM trades
+WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+  AND timestamp IN '$yesterday'
+SAMPLE BY 1h;
+```
+
+| timestamp                   | symbol   | twap     |
+| :-------------------------- | :------- | :------- |
+| 2025-01-01T00:00:00.000000Z | BTC-USDT | 96510.40 |
+| 2025-01-01T00:00:00.000000Z | ETH-USDT | 2638.15  |
+| 2025-01-01T01:00:00.000000Z | BTC-USDT | 96620.88 |
+| 2025-01-01T01:00:00.000000Z | ETH-USDT | 2644.50  |
+| ...                         | ...      | ...      |
+
+#### See also
+
+- [TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) - Practical examples
+  with TWAP-vs-VWAP comparison
+- [avg](#avg) - Arithmetic mean (equal-weighted)
+- [weighted_avg](#weighted_avg) - Weighted arithmetic mean
 
 ## variance / var_samp
 

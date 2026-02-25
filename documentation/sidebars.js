@@ -788,6 +788,7 @@ module.exports = {
                       items: [
                         "cookbook/sql/finance/ohlc",
                         "cookbook/sql/finance/vwap",
+                        "cookbook/sql/finance/twap",
                         "cookbook/sql/finance/bollinger-bands",
                         "cookbook/sql/finance/bollinger-bandwidth",
                       ],

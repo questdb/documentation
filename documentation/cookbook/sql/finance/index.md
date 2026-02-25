@@ -17,6 +17,7 @@ Foundation recipes for price analysis and trend identification.
 |--------|-------------|
 | [OHLC Aggregation](ohlc.md) | Aggregate tick data into candlestick bars |
 | [VWAP](vwap.md) | Volume-Weighted Average Price |
+| [TWAP](twap.md) | Time-Weighted Average Price |
 | [Bollinger Bands](bollinger-bands.md) | Price channels based on standard deviation |
 | [Bollinger BandWidth](bollinger-bandwidth.md) | Measure band expansion and contraction |
 
