@@ -292,6 +292,162 @@ SELECT
 | -- | ---- |
 | 1  | NULL |
 
+## array_reverse
+
+**Syntax:**
+
+```questdb-sql
+array_reverse(array) -> DOUBLE[]
+```
+
+Reverses the element order within the innermost dimension of a `DOUBLE[]`
+array. Unlike [array_sort](#array_sort), which reorders elements by value,
+`array_reverse` preserves whatever ordering the array already has and flips it.
+This is useful when elements are ordered by an external criterion - such as
+ingestion timestamp, another column's values, or a prior sort - and you need
+the opposite direction.
+
+For multi-dimensional arrays, each sub-array is reversed independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to reverse. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Reverse a simple array:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[1.0, 2.0, 3.0]);
+```
+
+| array_reverse |
+| :------------ |
+| [3.0, 2.0, 1.0] |
+
+**Reverse time-ordered prices to get latest-first:**
+
+```questdb-sql demo title="array_reverse - latest prices first"
+SELECT timestamp,
+  array_reverse(array_agg(price)) AS prices_latest_first
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+`array_agg` collects prices in timestamp order. Wrapping with `array_reverse`
+puts the most recent price first in each bucket.
+
+**Reverse each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[[1.0, 2.0], [3.0, 4.0]]);
+```
+
+| array_reverse |
+| :------------ |
+| [[2.0, 1.0], [4.0, 3.0]] |
+
+#### See also
+
+- [array_sort](#array_sort) - Sort array elements by value
+- [Aggregation functions](/docs/query/functions/aggregation/) - `array_agg` collects row values into an array
+
+## array_sort
+
+**Syntax:**
+
+```questdb-sql
+array_sort(array) -> DOUBLE[]
+array_sort(array, descending) -> DOUBLE[]
+array_sort(array, descending, nullsFirst) -> DOUBLE[]
+```
+
+Sorts the elements of a `DOUBLE[]` array by value along the innermost
+dimension. Use it when values collected by
+[array_agg](/docs/query/functions/aggregation/) are in timestamp
+order but you need them ordered by value instead - for example, to find the
+median, compute percentiles, or prepare input for
+[insertion_point](#insertion_point).
+
+For multi-dimensional arrays, each sub-array is sorted independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to sort. |
+| `descending` | `BOOLEAN` (optional, default `false`) | `true` sorts in descending order. |
+| `nullsFirst` | `BOOLEAN` (optional) | `true` places null values before non-null values. Default: nulls last for ascending, nulls first for descending. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Sort prices by value within each time bucket:**
+
+```questdb-sql demo title="array_sort - sort collected prices by value"
+SELECT timestamp,
+  array_agg(price) AS prices_by_time,
+  array_sort(array_agg(price)) AS prices_by_value
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+`array_agg` collects prices in timestamp order. `array_sort` re-orders them
+from lowest to highest within each bucket.
+
+**Descending sort:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[3.0, 1.0, 2.0], true);
+```
+
+| array_sort |
+| :--------- |
+| [3.0, 2.0, 1.0] |
+
+**Control null placement:**
+
+```questdb-sql
+SELECT
+  array_sort(ARRAY[1.0, null, 2.0]) AS default_nulls,
+  array_sort(ARRAY[1.0, null, 2.0], false, true) AS nulls_first;
+```
+
+| default_nulls | nulls_first |
+| :------------ | :---------- |
+| [1.0, 2.0, null] | [null, 1.0, 2.0] |
+
+**Sort each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[[3.0, 1.0, 2.0], [6.0, 4.0, 5.0]]);
+```
+
+| array_sort |
+| :--------- |
+| [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] |
+
+#### See also
+
+- [array_reverse](#array_reverse) - Reverse array element order
+- [insertion_point](#insertion_point) - Binary search on a sorted array
+- [Aggregation functions](/docs/query/functions/aggregation/) - `array_agg` collects row values into an array
+
 ## array_sum
 
 `array_sum(array)` returns the sum of all the array elements. `NULL` elements
