@@ -806,6 +806,13 @@ or `count(distinct column_name)`.
 `count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
 
+:::tip
+
+`count_distinct` is available for backwards compatibility. We recommend using
+the standard SQL syntax [`count(distinct column_name)`](#count) instead.
+
+:::
+
 #### Return value
 
 Return value type is `long`.
