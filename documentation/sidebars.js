@@ -1009,8 +1009,9 @@ module.exports = {
     },
 
     // ===================
-    // RELEASE NOTES
+    // CHANGELOG & RELEASE NOTES
     // ===================
+    "changelog",
     {
       label: "Release Notes",
       type: "link",
