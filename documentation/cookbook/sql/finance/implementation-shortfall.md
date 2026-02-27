@@ -22,7 +22,7 @@ You want to break down trading costs beyond simple slippage. For each symbol and
 
 Use `HORIZON JOIN` to capture the mid-price at execution time and 30 minutes later, then `PIVOT` to reshape the offsets into columns for the decomposition:
 
-```questdb-sql title="Implementation shortfall decomposition by symbol"
+```questdb-sql title="Implementation shortfall decomposition by symbol" demo
 WITH markouts AS (
     SELECT
         f.symbol,
