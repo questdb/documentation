@@ -47,8 +47,8 @@ SELECT
     ) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    RANGE FROM 0s TO 5m STEP 1s AS h
-WHERE t.timestamp IN '$yesterday'
+    RANGE FROM 0s TO 30s STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec
 ORDER BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec;
 ```
@@ -92,7 +92,7 @@ SELECT
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
-WHERE t.timestamp IN '$yesterday'
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.ecn, t.passive, horizon_sec
 ORDER BY t.ecn, t.passive, horizon_sec;
 ```
@@ -116,7 +116,7 @@ SELECT
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM -30s TO 30s STEP 1s AS h
-WHERE t.timestamp IN '$yesterday'
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY horizon_sec
 ORDER BY horizon_sec;
 ```
@@ -144,7 +144,7 @@ SELECT
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
-WHERE t.timestamp IN '$yesterday'
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.ecn, t.side, horizon_sec
 ORDER BY t.ecn, t.side, horizon_sec;
 ```
@@ -166,7 +166,7 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, horizon_sec
 ORDER BY t.symbol, horizon_sec;
 ```
@@ -182,7 +182,7 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 10m STEP 5s AS h
 WHERE t.side = 'sell'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, horizon_sec
 ORDER BY t.symbol, horizon_sec;
 ```
@@ -206,7 +206,7 @@ HORIZON JOIN market_data m ON (symbol)
     LIST (0, 1s, 5s, 10s,
           30s, 1m, 5m) AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.counterparty, horizon_sec
 ORDER BY t.symbol, t.counterparty, horizon_sec;
 ```
@@ -232,7 +232,7 @@ FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM 0s TO 5m STEP 1s AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.ecn, t.passive, horizon_sec
 ORDER BY t.symbol, t.ecn, t.passive, horizon_sec;
 ```

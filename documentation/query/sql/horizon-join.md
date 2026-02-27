@@ -138,7 +138,8 @@ SELECT
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 60s STEP 1s AS h
+RANGE FROM 1s TO 1m STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
@@ -157,6 +158,7 @@ SELECT
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 LIST (1s, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
@@ -174,6 +176,7 @@ SELECT
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 RANGE FROM -5s TO 5s STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
@@ -188,7 +191,8 @@ SELECT
         / sum(t.quantity) AS vwap_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 60s STEP 1s AS h
+RANGE FROM 1s TO 1m STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```
 
@@ -214,7 +218,8 @@ EXPLAIN SELECT
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 60s STEP 1s AS h
+RANGE FROM 1s TO 1m STEP 1s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
