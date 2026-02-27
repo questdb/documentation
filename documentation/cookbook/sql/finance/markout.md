@@ -21,7 +21,7 @@ You want to evaluate whether your fills are subject to adverse selection. For ea
 
 Use `HORIZON JOIN` to compute the mid-price at multiple time offsets after each trade, then aggregate into a markout curve:
 
-```questdb-sql title="Post-trade markout curve by venue and counterparty"
+```questdb-sql title="Post-trade markout curve by venue and counterparty" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -47,15 +47,15 @@ SELECT
     ) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    RANGE FROM 0s TO 5m STEP 1s AS h
-WHERE t.timestamp IN '$yesterday'
+    RANGE FROM 0s TO 30s STEP 5s AS h
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec
 ORDER BY t.symbol, t.ecn, t.counterparty, t.passive, horizon_sec;
 ```
 
 ## How it works
 
-[`HORIZON JOIN`](/docs/query/sql/horizon-join/) is the key construct. For each trade and each time offset in the range, it performs an ASOF match against `market_data` at `trade_timestamp + offset`. The `RANGE FROM 0s TO 5m STEP 1s` generates 301 offsets (0s, 1s, 2s, ... 300s), giving you a markout reading every second for 5 minutes after each trade.
+[`HORIZON JOIN`](/docs/query/sql/horizon-join/) is the key construct. For each trade and each time offset in the range, it performs an ASOF match against `market_data` at `trade_timestamp + offset`. The `RANGE FROM 0s TO 30s STEP 5s` generates 7 offsets (0s, 5s, 10s, ... 30s), giving you a markout reading every 5 seconds for 30 seconds after each trade.
 
 The two metrics:
 
@@ -73,9 +73,9 @@ As the offset increases, you see how the market evolved after each trade.
 
 ### Markout at specific horizons
 
-Use `LIST` instead of `RANGE` for non-uniform time points — useful when you care about specific benchmarks (e.g., 1s, 5s, 30s, 1m, 5m):
+Use `LIST` instead of `RANGE` for non-uniform time points — useful when you care about specific benchmarks (e.g., -30s, -5s, 0, 5s, 30s):
 
-```questdb-sql title="Markout at key horizons"
+```questdb-sql title="Markout at key horizons" demo
 SELECT
     t.ecn,
     t.passive,
@@ -91,8 +91,8 @@ SELECT
     ), 3) AS avg_markout_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
-WHERE t.timestamp IN '$yesterday'
+    LIST (-30s, -5s, 0, 5s, 30s) AS h
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.ecn, t.passive, horizon_sec
 ORDER BY t.ecn, t.passive, horizon_sec;
 ```
@@ -101,7 +101,7 @@ ORDER BY t.ecn, t.passive, horizon_sec;
 
 Use negative offsets to detect information leakage — whether the market was already moving before your trade:
 
-```questdb-sql title="Price movement around trade events"
+```questdb-sql title="Price movement around trade events" demo
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     count() AS n,
@@ -116,7 +116,7 @@ SELECT
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
     RANGE FROM -30s TO 30s STEP 1s AS h
-WHERE t.timestamp IN '$yesterday'
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY horizon_sec
 ORDER BY horizon_sec;
 ```
@@ -127,7 +127,7 @@ If the markout is already trending before offset 0, it suggests the market was m
 
 Add `t.side` to the grouping to detect asymmetry between buy and sell execution. A counterparty might look fine on average but show adverse selection on one side only:
 
-```questdb-sql title="Markout curve by side"
+```questdb-sql title="Markout curve by side" demo
 SELECT
     t.ecn,
     t.side,
@@ -143,8 +143,8 @@ SELECT
     ), 3) AS avg_markout_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
-WHERE t.timestamp IN '$yesterday'
+    LIST (-30s, -5s, 0, 5s, 30s) AS h
+WHERE t.timestamp IN '$now-1h..$now'
 GROUP BY t.ecn, t.side, horizon_sec
 ORDER BY t.ecn, t.side, horizon_sec;
 ```
@@ -155,7 +155,7 @@ If buy markouts diverge significantly from sell markouts at the same venue, it m
 
 When analyzing one side at a time, you can drop the `CASE` entirely for a simpler formula:
 
-```questdb-sql title="Buy-side markout — positive means price moved up after you bought"
+```questdb-sql title="Buy-side markout — positive means price moved up after you bought" demo
 SELECT
     t.symbol,
     h.offset / 1000000000 AS horizon_sec,
@@ -164,14 +164,14 @@ SELECT
     sum(((m.best_bid + m.best_ask) / 2 - t.price) * t.quantity) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    RANGE FROM 0s TO 10m STEP 5s AS h
+    RANGE FROM 0s TO 10m STEP 10s AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, horizon_sec
 ORDER BY t.symbol, horizon_sec;
 ```
 
-```questdb-sql title="Sell-side markout — positive means price moved down after you sold"
+```questdb-sql title="Sell-side markout — positive means price moved down after you sold" demo
 SELECT
     t.symbol,
     h.offset / 1000000000 AS horizon_sec,
@@ -180,9 +180,9 @@ SELECT
     sum((t.price - (m.best_bid + m.best_ask) / 2) * t.quantity) AS total_pnl
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    RANGE FROM 0s TO 10m STEP 5s AS h
+    RANGE FROM 0s TO 10m STEP 10s AS h
 WHERE t.side = 'sell'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, horizon_sec
 ORDER BY t.symbol, horizon_sec;
 ```
@@ -193,7 +193,7 @@ This approach is useful when you want to run separate analyses per side, or when
 
 Group by counterparty to identify which LPs are sending you toxic flow — trades that consistently move against you shortly after execution:
 
-```questdb-sql title="Counterparty toxicity markout (buy side)"
+```questdb-sql title="Counterparty toxicity markout (buy side)" demo
 SELECT
     t.symbol,
     t.counterparty,
@@ -203,10 +203,9 @@ SELECT
     sum(t.quantity) AS total_volume
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    LIST (0, 1s, 5s, 10s,
-          30s, 1m, 5m) AS h
+    LIST (0, 5s, 30s, 1m, 5m) AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.counterparty, horizon_sec
 ORDER BY t.symbol, t.counterparty, horizon_sec;
 ```
@@ -217,7 +216,7 @@ A counterparty whose markout is persistently negative across horizons is likely 
 
 Compare markout between passive (limit) and aggressive (market) orders, with the half-spread as a baseline. Aggressive fills should cost roughly half the spread; if the markout is worse than that, execution quality needs attention:
 
-```questdb-sql title="Passive vs aggressive markout with half-spread baseline (buy side)"
+```questdb-sql title="Passive vs aggressive markout with half-spread baseline (buy side)" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -230,9 +229,9 @@ SELECT
         / ((m.best_bid + m.best_ask) / 2) * 10000) / 2 AS avg_half_spread_bps
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    RANGE FROM 0s TO 5m STEP 1s AS h
+    RANGE FROM 0s TO 5m STEP 5s AS h
 WHERE t.side = 'buy'
-    AND t.timestamp IN '$yesterday'
+    AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.ecn, t.passive, horizon_sec
 ORDER BY t.symbol, t.ecn, t.passive, horizon_sec;
 ```

@@ -16,7 +16,7 @@ You want to detect whether specific counterparties show signs of last-look adver
 
 Use `HORIZON JOIN` with a `LIST` of millisecond-spaced offsets to build a high-resolution markout curve for the first few seconds after each fill:
 
-```questdb-sql title="Millisecond-granularity markout by counterparty"
+```questdb-sql title="Millisecond-granularity markout by counterparty" demo
 SELECT
     t.symbol,
     t.counterparty,

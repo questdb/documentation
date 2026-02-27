@@ -67,7 +67,7 @@ Compare rows for the same symbol across different ECNs:
 
 The scorecard above is a static snapshot. To see how fill quality evolves over time after execution, overlay markout curves per ECN. An ECN where markouts go steeply negative is delivering toxic flow — informed traders are picking you off there:
 
-```questdb-sql title="ECN markout curves side by side (buy side)"
+```questdb-sql title="ECN markout curves side by side (buy side)" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -99,7 +99,7 @@ Combine with the scorecard's `passive_ratio` and `avg_fill_size` to understand *
 
 Toxicity isn't static — an ECN may show clean markouts during London hours but turn toxic during Asia when liquidity thins out. Grouping by hour reveals intraday patterns:
 
-```questdb-sql title="ECN toxicity by hour (buy side)"
+```questdb-sql title="ECN toxicity by hour (buy side)" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -127,7 +127,7 @@ Compare `markout_5s_bps` against `avg_spread_bps` for each hour. If an ECN shows
 
 The aggregate markout curves above blend passive and aggressive fills together. Splitting by `t.passive` reveals a critical distinction — toxicity on passive fills means your resting orders are being picked off, while toxicity on aggressive fills means you're crossing into a market that moves against you immediately:
 
-```questdb-sql title="Passive vs aggressive toxicity per ECN (buy side)"
+```questdb-sql title="Passive vs aggressive toxicity per ECN (buy side)" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -158,7 +158,7 @@ An ECN showing clean aggregate markouts can still have a problem if passive fill
 
 Rank ECNs by a single toxicity metric — the volume-weighted 5-second markout — alongside an `adverse_fill_ratio` that shows what fraction of fills moved against you:
 
-```questdb-sql title="Composite toxicity score per ECN (buy side)"
+```questdb-sql title="Composite toxicity score per ECN (buy side)" demo
 SELECT
     t.symbol,
     t.ecn,
@@ -192,7 +192,7 @@ An ECN with a mildly negative `vw_markout_5s_bps` but 80%+ `adverse_fill_ratio` 
 
 The sections above produce one row per ECN per horizon offset. Using `PIVOT`, you can reshape the results into a wide format — one row per symbol-ECN combination with fill count, average size, volume, and markout at each horizon as separate columns:
 
-```questdb-sql title="Pivoted ECN scorecard (buy side)"
+```questdb-sql title="Pivoted ECN scorecard (buy side)" demo
 WITH markouts AS (
     SELECT
         t.symbol,
