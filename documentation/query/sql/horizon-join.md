@@ -128,17 +128,17 @@ arrays for bids/asks).
 
 ### Post-trade markout at uniform horizons
 
-Measure the average mid-price at 1-second intervals after each trade — a classic
+Measure the average mid-price at 5-second intervals after each trade — a classic
 way to evaluate execution quality and price impact:
 
-```questdb-sql title="Post-trade markout curve"
+```questdb-sql title="Post-trade markout curve" demo
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 1m STEP 1s AS h
+RANGE FROM 0s TO 1m STEP 5s AS h
 WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
@@ -150,14 +150,14 @@ nanoseconds. Dividing by 1,000,000,000 converts to seconds.
 
 Compute the average post-trade markout at specific horizons using `LIST`:
 
-```questdb-sql title="Markout at specific time points"
+```questdb-sql title="Markout at specific time points" demo
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
     avg((m.best_bid + m.best_ask) / 2 - t.price) AS avg_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-LIST (1s, 5s, 30s, 1m) AS h
+LIST (0, 5s, 30s, 1m) AS h
 WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
@@ -167,7 +167,7 @@ ORDER BY t.symbol, horizon_sec;
 Use negative offsets to see price levels before and after trades — useful for
 detecting information leakage or adverse selection:
 
-```questdb-sql title="Price movement around trade events"
+```questdb-sql title="Price movement around trade events" demo
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
@@ -184,14 +184,14 @@ ORDER BY t.symbol, horizon_sec;
 
 Compute an overall volume-weighted markout without grouping by symbol:
 
-```questdb-sql title="Volume-weighted markout across all symbols"
+```questdb-sql title="Volume-weighted markout across all symbols" demo
 SELECT
     h.offset / 1000000000 AS horizon_sec,
     sum(((m.best_bid + m.best_ask) / 2 - t.price) * t.quantity)
         / sum(t.quantity) AS vwap_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 1m STEP 1s AS h
+RANGE FROM -1m TO 1m STEP 5s AS h
 WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```
@@ -211,14 +211,14 @@ QuestDB can execute HORIZON JOIN queries in parallel across multiple worker
 threads. Use [`EXPLAIN`](/docs/query/sql/explain/) to see the execution plan and
 verify parallelization:
 
-```questdb-sql title="Analyze HORIZON JOIN execution plan"
+```questdb-sql title="Analyze HORIZON JOIN execution plan" demo
 EXPLAIN SELECT
     h.offset / 1000000000 AS horizon_sec,
     t.symbol,
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM 1s TO 1m STEP 1s AS h
+RANGE FROM -1m TO 1m STEP 5s AS h
 WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
