@@ -328,7 +328,13 @@ ORDER BY u.val;
 - **No nested dot paths in COLUMNS**: Column names like `foo.bar` are not
   supported in `COLUMNS()`. Use `json_extract()` to reach nested paths first.
 - **VARCHAR field size limit**: Individual `VARCHAR` and `TIMESTAMP` field values
-  extracted from JSON are limited to 4096 bytes per field.
+  extracted from JSON are limited to 4096 bytes per field by default. If your
+  JSON contains large string fields (log messages, descriptions, etc.), increase
+  the
+  [`cairo.json.unnest.max.value.size`](/docs/configuration/overview/#cairo-engine)
+  server property. Each VARCHAR/TIMESTAMP column allocates
+  `2 x maxValueSize` bytes of native memory per active UNNEST cursor, so
+  increase with care.
 
 :::info Related documentation
 - [Array functions](/docs/query/functions/array/)
