@@ -703,6 +703,9 @@ SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_ty
 - `count()` or `count(*)` - counts the number of rows irrespective of underlying
   data.
 - `count(column_name)` - counts the number of non-NULL values in a given column.
+- `count(distinct column_name)` - counts the number of distinct non-NULL values
+  in a given column. This is identical to
+  [`count_distinct(column_name)`](#count_distinct).
 
 #### Parameters
 
@@ -774,9 +777,22 @@ SELECT payment_type, count(amount) FROM transactions;
 | card         | 67    |
 | NULL         | 4     |
 
+Count distinct values using standard SQL syntax (identical to `count_distinct`):
+
+```questdb-sql
+SELECT payment_type, count(distinct counterparty) FROM transactions;
+```
+
+| payment_type | count |
+| :----------- | :---- |
+| cash         | 3     |
+| card         | 23    |
+| NULL         | 5     |
+
 :::note
 
 `NULL` values are aggregated with `count()`, but not with `count(column_name)`
+or `count(distinct column_name)`.
 
 :::
 
@@ -789,6 +805,13 @@ SELECT payment_type, count(amount) FROM transactions;
 
 `count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
+
+:::tip
+
+`count_distinct` is available for backwards compatibility. We recommend using
+the standard SQL syntax [`count(distinct column_name)`](#count) instead.
+
+:::
 
 #### Return value
 
