@@ -191,7 +191,7 @@ SELECT
         / sum(t.quantity) AS vwap_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
-RANGE FROM -1m TO 1m STEP 5s AS h
+RANGE FROM 0s TO 5m STEP 30s AS h
 WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```

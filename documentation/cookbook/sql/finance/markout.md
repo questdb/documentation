@@ -203,7 +203,7 @@ SELECT
     sum(t.quantity) AS total_volume
 FROM fx_trades t
 HORIZON JOIN market_data m ON (symbol)
-    LIST (0, 5s, 30s, 1m, 5m) AS h
+    LIST (0, 1s, 5s, 10s, 30s, 1m, 5m) AS h
 WHERE t.side = 'buy'
     AND t.timestamp IN '$now-1h..$now'
 GROUP BY t.symbol, t.counterparty, horizon_sec
