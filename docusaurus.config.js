@@ -149,7 +149,8 @@ const config = {
         return {
           resolve: {
             alias: {
-              react: path.resolve("/node_modules/react"),
+              react: path.resolve(__dirname, "node_modules/react"),
+              "@questdb/sql-parser/grammar": path.resolve(__dirname, "node_modules/@questdb/sql-parser/dist/grammar/index.js"),
             },
           },
         }
