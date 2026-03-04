@@ -27,8 +27,13 @@ We recommend starting with `C-Series` instances, and reviewing other instance ty
 
 You should deploy using an  `x86_64` Linux distribution, such as Ubuntu.
 
-For storage, we recommend using [Hyperdisk Balanced](https://cloud.google.com/compute/docs/disks/hyperdisks) disks, 
+For storage, we recommend using [Hyperdisk Balanced](https://cloud.google.com/compute/docs/disks/hyperdisks) disks,
 and provisioning them at `5000 IOPS/300 MBps` until you have tested your workload.
+
+:::warning
+Hyperdisk Balanced is not supported on all machine types. N2 instances do not
+support Hyperdisk. Use N4, C3, or C4 series instances with Hyperdisk Balanced.
+:::
 
 `Hyperdisk Extreme` generally requires much higher `vCPU` counts - for example, it cannot be used on `C3` machines
 smaller than `88 vCPUs`.
@@ -38,18 +43,60 @@ smaller than `88 vCPUs`.
 
 ### Google Filestore
 
-Google Filestore is a `NAS` solution offering an `NFS` API to talk to arbitrary volumes. 
+Google Filestore is a managed NFS service that can be used as a replication
+transport layer in QuestDB Enterprise.
 
-This should **not** be used as primary storage for QuestDB. It could be used for replication in QuestDB Enterprise,
-but `Google Cloud Storage` is likely simpler and cheaper to use.
+Filestore should **not** be used as primary storage for QuestDB. However, it
+is well-suited for replication when low latency is required. The `fs::`
+transport over NFS provides sub-200ms replication lag with
+[aggressive tuning](/docs/high-availability/tuning/), compared to ~1s+ with
+object store transport (GCS).
+
+To use Filestore for replication:
+
+1. Create a Filestore instance in the same region as your QuestDB VMs
+2. Mount the NFS share on both primary and replica nodes
+3. Configure the `fs::` transport in `server.conf`:
+
+```ini
+replication.object.store=fs::root=/mnt/questdb-repl/final;atomic_write_dir=/mnt/questdb-repl/scratch;
+```
+
+Use the [backup](/docs/operations/backup/) feature to manage WAL file retention
+on the NFS mount.
+
+On GKE, expose the Filestore share as a `PersistentVolume` with
+`ReadWriteMany` access mode using the
+[Filestore CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver),
+so both primary and replica pods can mount it simultaneously.
+
+:::note
+Filestore Zonal and Basic SSD tiers may require a
+[quota increase](https://cloud.google.com/docs/quotas/view-manage) before use.
+Basic HDD is typically available by default.
+:::
 
 ### Google Cloud Storage
 
-QuestDB supports `Google Cloud Storage` as its replication object-store in the Enterprise edition.
+QuestDB supports Google Cloud Storage as its replication object store in the
+Enterprise edition. GCS is the simplest and cheapest replication transport, but
+has higher latency (~1s+) due to object store API overhead.
 
-To get started, create a bucket for the database to use. Then follow the 
+To get started, create a bucket for the database to use. Then follow the
 [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to create a connection string and
 configure QuestDB.
+
+### NetApp Volumes
+
+[NetApp Volumes](https://cloud.google.com/netapp/volumes/docs/discover/overview)
+is a managed NFS service on GCP backed by NetApp ONTAP. Like Filestore, it can
+be used as a low-latency replication transport via the `fs::` prefix. The
+QuestDB configuration is identical to Filestore.
+
+:::note
+NetApp Volumes requires enabling the `netapp.googleapis.com` API and may
+require separate quota allocation.
+:::
 
 ### Minimum specification
 
