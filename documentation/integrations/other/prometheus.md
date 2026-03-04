@@ -134,125 +134,180 @@ can be used to graph QuestDB-specific metrics which are all prefixed with
 
 The following metrics are available:
 
-| Metric                                            | Type    | Description                                                                                                                                                                                                 |
-| :------------------------------------------------ | :------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `questdb_commits_total`                           | counter | Number of total commits of all types (in-order and out-of-order) executed on the database tables.                                                                                                           |
-| `questdb_o3_commits_total`                        | counter | Number of total out-of-order (O3) commits executed on the database tables.                                                                                                                                  |
-| `questdb_committed_rows_total`                    | counter | Number of total rows committed to the database tables.                                                                                                                                                      |
-| `questdb_physically_written_rows_total`           | counter | Number of total rows physically written to disk. Greater than `committed_rows` with [out-of-order ingestion. Write amplification is `questdb_physically_written_rows_total / questdb_committed_rows_total`. |
-| `questdb_rollbacks_total`                         | counter | Number of total rollbacks executed on the database tables.                                                                                                                                                  |
-| `questdb_json_queries_total`                      | counter | Number of total REST API queries, including retries.                                                                                                                                                        |
-| `questdb_json_queries_completed_total`            | counter | Number of successfully executed REST API queries.                                                                                                                                                           |
-| `questdb_pg_wire_queries_total`                   | counter | Number of total PGWire queries.                                                                                                                                                                             |
-| `questdb_pg_wire_queries_completed_total`         | counter | Number of successfully executed PGWire queries.                                                                                                                                                             |
-| `questdb_unhandled_errors_total`                  | counter | Number of total unhandled errors occurred in the database. Such errors usually mean a critical service degradation in one of the database subsystems.                                                       |
-| `questdb_jvm_major_gc_count_total`                | counter | Number of times major JVM garbage collection was triggered.                                                                                                                                                 |
-| `questdb_jvm_major_gc_time_total`                 | counter | Total time spent on major JVM garbage collection in milliseconds.                                                                                                                                           |
-| `questdb_jvm_minor_gc_count_total`                | counter | Number of times minor JVM garbage collection pause was triggered.                                                                                                                                           |
-| `questdb_jvm_minor_gc_time_total`                 | counter | Total time spent on minor JVM garbage collection pauses in milliseconds.                                                                                                                                    |
-| `questdb_jvm_unknown_gc_count_total`              | counter | Number of times JVM garbage collection of unknown type was triggered. Non-zero values of this metric may be observed only on some, non-mainstream JVM implementations.                                      |
-| `questdb_jvm_unknown_gc_time_total`               | counter | Total time spent on JVM garbage collection of unknown type in milliseconds. Non-zero values of this metric may be observed only on some, non-mainstream JVM implementations.                                |
-| `questdb_memory_tag_MMAP_DEFAULT`                 | gauge   | Amount of memory allocated for mmaped files.                                                                                                                                                                |
-| `questdb_memory_tag_NATIVE_DEFAULT`               | gauge   | Amount of allocated untagged native memory.                                                                                                                                                                 |
-| `questdb_memory_tag_MMAP_O3`                      | gauge   | Amount of memory allocated for O3 mmapped files.                                                                                                                                                            |
-| `questdb_memory_tag_NATIVE_O3`                    | gauge   | Amount of memory allocated for O3.                                                                                                                                                                          |
-| `questdb_memory_tag_NATIVE_RECORD_CHAIN`          | gauge   | Amount of memory allocated for SQL record chains.                                                                                                                                                           |
-| `questdb_memory_tag_MMAP_TABLE_WRITER`            | gauge   | Amount of memory allocated for table writer mmapped files.                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_TREE_CHAIN`            | gauge   | Amount of memory allocated for SQL tree chains.                                                                                                                                                             |
-| `questdb_memory_tag_MMAP_TABLE_READER`            | gauge   | Amount of memory allocated for table reader mmapped files.                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_COMPACT_MAP`           | gauge   | Amount of memory allocated for SQL compact maps.                                                                                                                                                            |
-| `questdb_memory_tag_NATIVE_FAST_MAP`              | gauge   | Amount of memory allocated for SQL fast maps.                                                                                                                                                               |
-| `questdb_memory_tag_NATIVE_LONG_LIST`             | gauge   | Amount of memory allocated for long lists.                                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_HTTP_CONN`             | gauge   | Amount of memory allocated for HTTP connections.                                                                                                                                                            |
-| `questdb_memory_tag_NATIVE_PGW_CONN`              | gauge   | Amount of memory allocated for PostgreSQL Wire Protocol connections.                                                                                                                                        |
-| `questdb_memory_tag_MMAP_INDEX_READER`            | gauge   | Amount of memory allocated for index reader mmapped files.                                                                                                                                                  |
-| `questdb_memory_tag_MMAP_INDEX_WRITER`            | gauge   | Amount of memory allocated for index writer mmapped files.                                                                                                                                                  |
-| `questdb_memory_tag_MMAP_INDEX_SLIDER`            | gauge   | Amount of memory allocated for indexed column view mmapped files.                                                                                                                                           |
-| `questdb_memory_tag_NATIVE_REPL`                  | gauge   | Amount of memory mapped for replication tasks.                                                                                                                                                              |
-| `questdb_memory_free_count`                       | gauge   | Number of times native memory was freed.                                                                                                                                                                    |
-| `questdb_memory_mem_used`                         | gauge   | Current amount of allocated native memory.                                                                                                                                                                  |
-| `questdb_memory_malloc_count`                     | gauge   | Number of times native memory was allocated.                                                                                                                                                                |
-| `questdb_memory_realloc_count`                    | gauge   | Number of times native memory was reallocated.                                                                                                                                                              |
-| `questdb_memory_rss`                              | gauge   | Resident Set Size (Linux/Unix) / Working Set Size (Windows).                                                                                                                                                |
-| `questdb_memory_jvm_free`                         | gauge   | Current amount of free Java memory heap in bytes.                                                                                                                                                           |
-| `questdb_memory_jvm_total`                        | gauge   | Current size of Java memory heap in bytes.                                                                                                                                                                  |
-| `questdb_memory_jvm_max`                          | gauge   | Maximum amount of Java heap memory that can be allocated in bytes.                                                                                                                                          |
-| `questdb_http_connections`                        | gauge   | Number of currently active HTTP connections.                                                                                                                                                                |
-| `questdb_json_queries_cached`                     | gauge   | Number of current cached REST API queries.                                                                                                                                                                  |
-| `questdb_line_tcp_connections`                    | gauge   | Number of currently active InfluxDB Line Protocol TCP connections.                                                                                                                                          |
-| `questdb_pg_wire_connections`                     | gauge   | Number of currently active PostgreSQL Wire Protocol connections.                                                                                                                                            |
-| `questdb_pg_wire_select_queries_cached`           | gauge   | Number of current cached PostgreSQL Wire Protocol `SELECT` queries.                                                                                                                                         |
-| `questdb_pg_wire_update_queries_cached`           | gauge   | Number of current cached PostgreSQL Wire Protocol `UPDATE` queries.                                                                                                                                         |
-| `questdb_json_queries_cache_hits_total`           | counter | Number of total cache hits for JSON queries.                                                                                                                                                                |
-| `questdb_json_queries_cache_misses_total`         | counter | Number of total cache misses for JSON queries.                                                                                                                                                              |
-| `questdb_json_queries_completed_total`            | counter | Total number of completed JSON queries.                                                                                                                                                                     |
-| `questdb_jvm_major_gc_count_total`                | counter | Total number of major garbage collection events.                                                                                                                                                            |
-| `questdb_jvm_major_gc_time_total`                 | counter | Total time spent on major garbage collection.                                                                                                                                                               |
-| `questdb_jvm_minor_gc_count_total`                | counter | Total number of minor garbage collection events.                                                                                                                                                            |
-| `questdb_jvm_minor_gc_time_total`                 | counter | Total time spent on minor garbage collection.                                                                                                                                                               |
-| `questdb_jvm_unknown_gc_count_total`              | counter | Total number of unknown type garbage collection events.                                                                                                                                                     |
-| `questdb_jvm_unknown_gc_time_total`               | counter | Total time spent on unknown type garbage collection.                                                                                                                                                        |
-| `questdb_memory_tag_MMAP_BLOCK_WRITER`            | gauge   | Amount of memory allocated for block writer mmapped files.                                                                                                                                                  |
-| `questdb_memory_tag_MMAP_IMPORT`                  | gauge   | Amount of memory allocated for import operations.                                                                                                                                                           |
-| `questdb_memory_tag_MMAP_PARALLEL_IMPORT`         | gauge   | Amount of memory allocated for parallel import operations.                                                                                                                                                  |
-| `questdb_memory_tag_MMAP_PARTITION_CONVERTER`     | gauge   | Amount of memory allocated for partition converter operations.                                                                                                                                              |
-| `questdb_memory_tag_MMAP_SEQUENCER_METADATA`      | gauge   | Amount of memory allocated for sequencer metadata.                                                                                                                                                          |
-| `questdb_memory_tag_MMAP_TABLE_WAL_READER`        | gauge   | Amount of memory allocated for table WAL reader mmapped files.                                                                                                                                              |
-| `questdb_memory_tag_MMAP_TABLE_WAL_WRITER`        | gauge   | Amount of memory allocated for table WAL writer mmapped files.                                                                                                                                              |
-| `questdb_memory_tag_MMAP_TX_LOG`                  | gauge   | Amount of memory allocated for transaction log mmapped files.                                                                                                                                               |
-| `questdb_memory_tag_MMAP_TX_LOG_CURSOR`           | gauge   | Amount of memory allocated for transaction log cursor mmapped files.                                                                                                                                        |
-| `questdb_memory_tag_MMAP_UPDATE`                  | gauge   | Amount of memory allocated for update operations.                                                                                                                                                           |
-| `questdb_memory_tag_NATIVE_CB1`                   | gauge   | Amount of memory allocated for native circular buffer 1.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_CB2`                   | gauge   | Amount of memory allocated for native circular buffer 2.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_CB3`                   | gauge   | Amount of memory allocated for native circular buffer 3.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_CB4`                   | gauge   | Amount of memory allocated for native circular buffer 4.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_CB5`                   | gauge   | Amount of memory allocated for native circular buffer 5.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_CIRCULAR_BUFFER`       | gauge   | Amount of memory allocated for native circular buffers.                                                                                                                                                     |
-| `questdb_memory_tag_NATIVE_DIRECT_BYTE_SINK`      | gauge   | Amount of memory allocated for native direct byte sink.                                                                                                                                                     |
-| `questdb_memory_tag_NATIVE_DIRECT_CHAR_SINK`      | gauge   | Amount of memory allocated for native direct char sink.                                                                                                                                                     |
-| `questdb_memory_tag_NATIVE_DIRECT_UTF8_SINK`      | gauge   | Amount of memory allocated for native direct UTF-8 sink.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_FAST_MAP_INT_LIST`     | gauge   | Amount of memory allocated for native fast map integer list.                                                                                                                                                |
-| `questdb_memory_tag_NATIVE_FUNC_RSS`              | gauge   | Amount of memory allocated for native function RSS.                                                                                                                                                         |
-| `questdb_memory_tag_NATIVE_GROUP_BY_FUNCTION`     | gauge   | Amount of memory allocated for native group by function.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_ILP_RSS`               | gauge   | Amount of memory allocated for native ILP RSS.                                                                                                                                                              |
-| `questdb_memory_tag_NATIVE_IMPORT`                | gauge   | Amount of memory allocated for native import operations.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_INDEX_READER`          | gauge   | Amount of memory allocated for native index reader.                                                                                                                                                         |
-| `questdb_memory_tag_NATIVE_IO_DISPATCHER_RSS`     | gauge   | Amount of memory allocated for native IO dispatcher RSS.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_JIT`                   | gauge   | Amount of memory allocated for native JIT.                                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_JIT_LONG_LIST`         | gauge   | Amount of memory allocated for native JIT long list.                                                                                                                                                        |
-| `questdb_memory_tag_NATIVE_JOIN_MAP`              | gauge   | Amount of memory allocated for native join map.                                                                                                                                                             |
-| `questdb_memory_tag_NATIVE_LATEST_BY_LONG_LIST`   | gauge   | Amount of memory allocated for native latest by long list.                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_LOGGER`                | gauge   | Amount of memory allocated for native logger.                                                                                                                                                               |
-| `questdb_memory_tag_NATIVE_MIG`                   | gauge   | Amount of memory allocated for native MIG.                                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_MIG_MMAP`              | gauge   | Amount of memory allocated for native MIG mmapped files.                                                                                                                                                    |
-| `questdb_memory_tag_NATIVE_OFFLOAD`               | gauge   | Amount of memory allocated for native offload.                                                                                                                                                              |
-| `questdb_memory_tag_NATIVE_PARALLEL_IMPORT`       | gauge   | Amount of memory allocated for native parallel import.                                                                                                                                                      |
-| `questdb_memory_tag_NATIVE_PATH`                  | gauge   | Amount of memory allocated for native path.                                                                                                                                                                 |
-| `questdb_memory_tag_NATIVE_ROSTI`                 | gauge   | Amount of memory allocated for native rosti.                                                                                                                                                                |
-| `questdb_memory_tag_NATIVE_SAMPLE_BY_LONG_LIST`   | gauge   | Amount of memory allocated for native sample by long list.                                                                                                                                                  |
-| `questdb_memory_tag_NATIVE_SQL_COMPILER`          | gauge   | Amount of memory allocated for native SQL compiler.                                                                                                                                                         |
-| `questdb_memory_tag_NATIVE_TABLE_READER`          | gauge   | Amount of memory allocated for native table reader.                                                                                                                                                         |
-| `questdb_memory_tag_NATIVE_TABLE_WAL_WRITER`      | gauge   | Amount of memory allocated for native table WAL writer.                                                                                                                                                     |
-| `questdb_memory_tag_NATIVE_TABLE_WRITER`          | gauge   | Amount of memory allocated for native table writer.                                                                                                                                                         |
-| `questdb_memory_tag_NATIVE_TEXT_PARSER_RSS`       | gauge   | Amount of memory allocated for native text parser RSS.                                                                                                                                                      |
-| `questdb_memory_tag_NATIVE_TLS_RSS`               | gauge   | Amount of memory allocated for native TLS RSS.                                                                                                                                                              |
-| `questdb_memory_tag_NATIVE_UNORDERED_MAP`         | gauge   | Amount of memory allocated for native unordered map.                                                                                                                                                        |
-| `questdb_pg_wire_errors_total`                    | counter | Total number of errors in PostgreSQL wire protocol.                                                                                                                                                         |
-| `questdb_pg_wire_select_cache_hits_total`         | counter | Total number of cache hits for PostgreSQL wire protocol select queries.                                                                                                                                     |
-| `questdb_pg_wire_select_cache_misses_total`       | counter | Total number of cache misses for PostgreSQL wire protocol select queries.                                                                                                                                   |
-| `questdb_wal_apply_physically_written_rows_total` | counter | Total number of physically written rows during WAL apply.                                                                                                                                                   |
-| `questdb_wal_apply_rows_per_second`               | gauge   | Rate of rows applied per second during WAL apply.                                                                                                                                                           |
-| `questdb_wal_apply_written_rows_total`            | counter | Total number of rows written during WAL apply.                                                                                                                                                              |
-| `questdb_wal_written_rows_total`                  | counter | Total number of rows written to WAL.                                                                                                                                                                        |
-| `questdb_wal_seq_txn`                             | gauge   | Sum of all committed transaction sequence numbers. Used in conjunction with `questdb_wal_writer_txn`.                                                                                                       |
-| `questdb_wal_writer_txn`                          | gauge   | Sum of all transaction sequence numbers applied to tables. With no pending transactions in the WAL, equal to `questdb_wal_seq_txn`. When its lag behind `questdb_wal_seq_txn` is steadily growing, indicates QuestDB is unable to keep up with writes. |
-| `questdb_wal_seq_txn_total`                       |         | Removed, new name is `questdb_wal_seq_txn`                                                                                                                                                                  |
-| `questdb_wal_writer_txn_total`                    |         | Removed, new name is `questdb_writer_seq_txn`                                                                                                                                                               |
-| `questdb_workers_job_start_micros_max`            | gauge   | Maximum time taken to start a worker job in microseconds.                                                                                                                                                   |
-| `questdb_workers_job_start_micros_min`            | gauge   | Minimum time taken to start a worker job in microseconds.                                                                                                                                                   |
+### Commit metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_commits_total` | counter | Total commits of all types (in-order and out-of-order) executed on database tables. |
+| `questdb_o3_commits_total` | counter | Total out-of-order (O3) commits executed on database tables. |
+| `questdb_committed_rows_total` | counter | Total rows committed to database tables. |
+| `questdb_physically_written_rows_total` | counter | Total rows physically written to disk. Greater than `committed_rows` with out-of-order ingestion. Write amplification is `physically_written_rows / committed_rows`. |
+| `questdb_rollbacks_total` | counter | Total rollbacks executed on database tables. |
+
+### Query metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_json_queries_total` | counter | Total REST API queries, including retries. |
+| `questdb_json_queries_completed_total` | counter | Successfully executed REST API queries. |
+| `questdb_json_queries_cached` | gauge | Current cached REST API queries. |
+| `questdb_json_queries_cache_hits_total` | counter | Total cache hits for JSON queries. |
+| `questdb_json_queries_cache_misses_total` | counter | Total cache misses for JSON queries. |
+| `questdb_pg_wire_queries_total` | counter | Total PGWire queries. |
+| `questdb_pg_wire_queries_completed_total` | counter | Successfully executed PGWire queries. |
+| `questdb_pg_wire_select_queries_cached` | gauge | Current cached PGWire `SELECT` queries. |
+| `questdb_pg_wire_update_queries_cached` | gauge | Current cached PGWire `UPDATE` queries. |
+| `questdb_pg_wire_select_cache_hits_total` | counter | Total cache hits for PGWire select queries. |
+| `questdb_pg_wire_select_cache_misses_total` | counter | Total cache misses for PGWire select queries. |
+| `questdb_pg_wire_errors_total` | counter | Total errors in PostgreSQL wire protocol. |
+| `questdb_unhandled_errors_total` | counter | Total unhandled errors. Usually indicates critical service degradation. |
+
+### Connection metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_http_connections` | gauge | Currently active HTTP connections. |
+| `questdb_line_tcp_connections` | gauge | Currently active ILP TCP connections. |
+| `questdb_pg_wire_connections` | gauge | Currently active PGWire connections. |
+
+### TLS certificate metrics (QuestDB Enterprise)
+
+These gauges report the number of seconds until the active TLS certificate
+expires for each endpoint. Values update on certificate reload, making it
+straightforward to set up alerting for upcoming expirations.
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_tls_cert_ttl_seconds_http` | gauge | Seconds until TLS certificate expires for the HTTP endpoint. |
+| `questdb_tls_cert_ttl_seconds_http_min` | gauge | Minimum TLS certificate TTL for the HTTP endpoint. |
+| `questdb_tls_cert_ttl_seconds_line` | gauge | Seconds until TLS certificate expires for the ILP endpoint. |
+| `questdb_tls_cert_ttl_seconds_pg` | gauge | Seconds until TLS certificate expires for the PGWire endpoint. |
+
+### WAL metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_wal_written_rows_total` | counter | Total rows written to WAL. |
+| `questdb_wal_apply_written_rows_total` | counter | Total rows written during WAL apply. |
+| `questdb_wal_apply_physically_written_rows_total` | counter | Total physically written rows during WAL apply. |
+| `questdb_wal_apply_rows_per_second` | gauge | Rate of rows applied per second during WAL apply. |
+| `questdb_wal_seq_txn` | gauge | Sum of all committed transaction sequence numbers. Used with `questdb_wal_writer_txn`. |
+| `questdb_wal_writer_txn` | gauge | Sum of all applied transaction sequence numbers. With no pending WAL transactions, equals `questdb_wal_seq_txn`. A steadily growing lag indicates QuestDB cannot keep up with writes. |
+
+:::note Renamed WAL metrics
+
+`questdb_wal_seq_txn_total` and `questdb_wal_writer_txn_total` have been renamed
+to `questdb_wal_seq_txn` and `questdb_wal_writer_txn` respectively.
+
+:::
+
+### JVM garbage collection metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_jvm_major_gc_count_total` | counter | Times major GC was triggered. |
+| `questdb_jvm_major_gc_time_total` | counter | Total time on major GC (ms). |
+| `questdb_jvm_minor_gc_count_total` | counter | Times minor GC pause was triggered. |
+| `questdb_jvm_minor_gc_time_total` | counter | Total time on minor GC pauses (ms). |
+| `questdb_jvm_unknown_gc_count_total` | counter | Times GC of unknown type was triggered. Non-zero only on non-mainstream JVMs. |
+| `questdb_jvm_unknown_gc_time_total` | counter | Total time on unknown type GC (ms). Non-zero only on non-mainstream JVMs. |
+
+### JVM memory metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_memory_jvm_free` | gauge | Free Java heap memory (bytes). |
+| `questdb_memory_jvm_total` | gauge | Current Java heap size (bytes). |
+| `questdb_memory_jvm_max` | gauge | Maximum Java heap memory (bytes). |
+
+### Native memory metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_memory_mem_used` | gauge | Current allocated native memory. |
+| `questdb_memory_rss` | gauge | Resident Set Size (Linux/Unix) / Working Set Size (Windows). |
+| `questdb_memory_malloc_count` | gauge | Times native memory was allocated. |
+| `questdb_memory_realloc_count` | gauge | Times native memory was reallocated. |
+| `questdb_memory_free_count` | gauge | Times native memory was freed. |
+
+### Native memory tag metrics
+
+These gauges track memory allocated by specific QuestDB subsystems.
+
+| Metric | Description |
+| :--- | :--- |
+| `questdb_memory_tag_MMAP_DEFAULT` | Mmapped files. |
+| `questdb_memory_tag_MMAP_O3` | O3 mmapped files. |
+| `questdb_memory_tag_MMAP_TABLE_WRITER` | Table writer mmapped files. |
+| `questdb_memory_tag_MMAP_TABLE_READER` | Table reader mmapped files. |
+| `questdb_memory_tag_MMAP_INDEX_READER` | Index reader mmapped files. |
+| `questdb_memory_tag_MMAP_INDEX_WRITER` | Index writer mmapped files. |
+| `questdb_memory_tag_MMAP_INDEX_SLIDER` | Indexed column view mmapped files. |
+| `questdb_memory_tag_MMAP_BLOCK_WRITER` | Block writer mmapped files. |
+| `questdb_memory_tag_MMAP_IMPORT` | Import operations. |
+| `questdb_memory_tag_MMAP_PARALLEL_IMPORT` | Parallel import operations. |
+| `questdb_memory_tag_MMAP_PARTITION_CONVERTER` | Partition converter operations. |
+| `questdb_memory_tag_MMAP_SEQUENCER_METADATA` | Sequencer metadata. |
+| `questdb_memory_tag_MMAP_TABLE_WAL_READER` | Table WAL reader mmapped files. |
+| `questdb_memory_tag_MMAP_TABLE_WAL_WRITER` | Table WAL writer mmapped files. |
+| `questdb_memory_tag_MMAP_TX_LOG` | Transaction log mmapped files. |
+| `questdb_memory_tag_MMAP_TX_LOG_CURSOR` | Transaction log cursor mmapped files. |
+| `questdb_memory_tag_MMAP_UPDATE` | Update operations. |
+| `questdb_memory_tag_NATIVE_DEFAULT` | Untagged native memory. |
+| `questdb_memory_tag_NATIVE_O3` | O3 operations. |
+| `questdb_memory_tag_NATIVE_RECORD_CHAIN` | SQL record chains. |
+| `questdb_memory_tag_NATIVE_TREE_CHAIN` | SQL tree chains. |
+| `questdb_memory_tag_NATIVE_COMPACT_MAP` | SQL compact maps. |
+| `questdb_memory_tag_NATIVE_FAST_MAP` | SQL fast maps. |
+| `questdb_memory_tag_NATIVE_FAST_MAP_INT_LIST` | Fast map integer list. |
+| `questdb_memory_tag_NATIVE_LONG_LIST` | Long lists. |
+| `questdb_memory_tag_NATIVE_HTTP_CONN` | HTTP connections. |
+| `questdb_memory_tag_NATIVE_PGW_CONN` | PGWire connections. |
+| `questdb_memory_tag_NATIVE_REPL` | Replication tasks. |
+| `questdb_memory_tag_NATIVE_CB1` | Circular buffer 1. |
+| `questdb_memory_tag_NATIVE_CB2` | Circular buffer 2. |
+| `questdb_memory_tag_NATIVE_CB3` | Circular buffer 3. |
+| `questdb_memory_tag_NATIVE_CB4` | Circular buffer 4. |
+| `questdb_memory_tag_NATIVE_CB5` | Circular buffer 5. |
+| `questdb_memory_tag_NATIVE_CIRCULAR_BUFFER` | Circular buffers. |
+| `questdb_memory_tag_NATIVE_DIRECT_BYTE_SINK` | Direct byte sink. |
+| `questdb_memory_tag_NATIVE_DIRECT_CHAR_SINK` | Direct char sink. |
+| `questdb_memory_tag_NATIVE_DIRECT_UTF8_SINK` | Direct UTF-8 sink. |
+| `questdb_memory_tag_NATIVE_FUNC_RSS` | Function RSS. |
+| `questdb_memory_tag_NATIVE_GROUP_BY_FUNCTION` | Group by function. |
+| `questdb_memory_tag_NATIVE_ILP_RSS` | ILP RSS. |
+| `questdb_memory_tag_NATIVE_IMPORT` | Native import operations. |
+| `questdb_memory_tag_NATIVE_INDEX_READER` | Native index reader. |
+| `questdb_memory_tag_NATIVE_IO_DISPATCHER_RSS` | IO dispatcher RSS. |
+| `questdb_memory_tag_NATIVE_JIT` | JIT compilation. |
+| `questdb_memory_tag_NATIVE_JIT_LONG_LIST` | JIT long list. |
+| `questdb_memory_tag_NATIVE_JOIN_MAP` | Join map. |
+| `questdb_memory_tag_NATIVE_LATEST_BY_LONG_LIST` | Latest by long list. |
+| `questdb_memory_tag_NATIVE_LOGGER` | Logger. |
+| `questdb_memory_tag_NATIVE_MIG` | MIG operations. |
+| `questdb_memory_tag_NATIVE_MIG_MMAP` | MIG mmapped files. |
+| `questdb_memory_tag_NATIVE_OFFLOAD` | Offload operations. |
+| `questdb_memory_tag_NATIVE_PARALLEL_IMPORT` | Native parallel import. |
+| `questdb_memory_tag_NATIVE_PATH` | Path operations. |
+| `questdb_memory_tag_NATIVE_ROSTI` | Rosti operations. |
+| `questdb_memory_tag_NATIVE_SAMPLE_BY_LONG_LIST` | Sample by long list. |
+| `questdb_memory_tag_NATIVE_SQL_COMPILER` | SQL compiler. |
+| `questdb_memory_tag_NATIVE_TABLE_READER` | Native table reader. |
+| `questdb_memory_tag_NATIVE_TABLE_WAL_WRITER` | Native table WAL writer. |
+| `questdb_memory_tag_NATIVE_TABLE_WRITER` | Native table writer. |
+| `questdb_memory_tag_NATIVE_TEXT_PARSER_RSS` | Text parser RSS. |
+| `questdb_memory_tag_NATIVE_TLS_RSS` | TLS RSS. |
+| `questdb_memory_tag_NATIVE_UNORDERED_MAP` | Unordered map. |
+
+### Worker metrics
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `questdb_workers_job_start_micros_max` | gauge | Maximum time to start a worker job (microseconds). |
+| `questdb_workers_job_start_micros_min` | gauge | Minimum time to start a worker job (microseconds). |
 
 Most of the above metrics are volatile, i.e. they're collected since the current
-database start. The exception are `questdb_wal_seq_txn` and
+database start. The exceptions are `questdb_wal_seq_txn` and
 `questdb_wal_writer_txn`, because transaction sequence numbers are persistent.
 
 ## Configuring Prometheus Alertmanager
