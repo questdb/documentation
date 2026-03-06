@@ -1,7 +1,7 @@
 ---
-title: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING
-sidebar_label: PARQUET ENCODING
-description: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING SQL keyword reference documentation.
+title: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING/COMPRESSION
+sidebar_label: PARQUET ENCODING/COMPRESSION
+description: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING/COMPRESSION SQL keyword reference documentation.
 ---
 
 Sets or removes per-column Parquet encoding and compression configuration on
