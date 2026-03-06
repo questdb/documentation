@@ -6,15 +6,17 @@ description:
   into rows in QuestDB.
 ---
 
-UNNEST expands arrays or JSON arrays into rows - one row per element. It
+UNNEST expands arrays or JSON arrays into rows - one row per element. This
+allows you to filter by individual element values, run aggregations or window
+functions over array contents, or join array elements with other tables. It
 supports two modes:
 
-- **Array UNNEST**: Expands native `DOUBLE[]` columns (or literal arrays) into
+- **Array `UNNEST`**: Expands native `DOUBLE[]` columns (or literal arrays) into
   rows of `DOUBLE` values.
-- **JSON UNNEST**: Expands a JSON array stored as `VARCHAR` into rows with
+- **JSON `UNNEST`**: Expands a JSON array stored as `VARCHAR` into rows with
   explicitly typed columns.
 
-UNNEST appears in the `FROM` clause and behaves like a table - you can join it
+`UNNEST` appears in the `FROM` clause and behaves like a table - you can join it
 with other tables, filter its output with `WHERE`, and use it in CTEs and
 subqueries.
 
@@ -34,7 +36,7 @@ FROM table_name, UNNEST(array_expr [, array_expr2 ...])
 
 Expand an array column into individual rows:
 
-```questdb-sql title="Expand an array literal into rows"
+```questdb-sql title="Expand an array literal into rows" demo
 SELECT value FROM UNNEST(ARRAY[1.0, 2.0, 3.0]);
 ```
 
@@ -46,17 +48,22 @@ SELECT value FROM UNNEST(ARRAY[1.0, 2.0, 3.0]);
 
 ### With a table
 
-```questdb-sql title="Expand array column from a table"
-SELECT t.symbol, u.size
-FROM market_data t, UNNEST(t.bid_sizes) u(size);
+```questdb-sql title="Expand array column from a table" demo
+SELECT t.symbol, u.vol
+FROM market_data t, UNNEST(t.asks[2]) u(vol)
+WHERE t.timestamp IN '$now-1m..$now'
+  AND t.symbol = 'EURUSD';
 ```
 
-You can also use `CROSS JOIN` - the behavior is identical to the comma syntax:
+You can also use `CROSS JOIN` - the behavior is identical to the comma syntax,
+but can be clearer when the query also joins other tables:
 
-```questdb-sql title="Equivalent CROSS JOIN syntax"
-SELECT t.symbol, u.size
+```questdb-sql title="Equivalent CROSS JOIN syntax" demo
+SELECT t.symbol, u.vol
 FROM market_data t
-CROSS JOIN UNNEST(t.bid_sizes) u(size);
+CROSS JOIN UNNEST(t.asks[2]) u(vol)
+WHERE t.timestamp IN '$now-1m..$now'
+  AND t.symbol = 'EURUSD';
 ```
 
 ### WITH ORDINALITY
@@ -67,7 +74,7 @@ is always the last output column.
 Since `ordinality` is a reserved keyword, either alias it or quote it as
 `"ordinality"`:
 
-```questdb-sql title="Array with position index"
+```questdb-sql title="Array with position index" demo
 SELECT u.val, u.pos
 FROM UNNEST(ARRAY[10.0, 20.0, 30.0]) WITH ORDINALITY u(val, pos);
 ```
@@ -80,9 +87,9 @@ FROM UNNEST(ARRAY[10.0, 20.0, 30.0]) WITH ORDINALITY u(val, pos);
 
 ### Multiple arrays
 
-Pass multiple arrays to a single UNNEST. Shorter arrays are padded with `NULL`:
+Pass multiple arrays to a single `UNNEST`. Shorter arrays are padded with `NULL`:
 
-```questdb-sql title="Two arrays side by side"
+```questdb-sql title="Two arrays side by side" demo
 SELECT u.a, u.b
 FROM UNNEST(ARRAY[1.0, 2.0, 3.0], ARRAY[10.0, 20.0]) u(a, b);
 ```
@@ -95,10 +102,10 @@ FROM UNNEST(ARRAY[1.0, 2.0, 3.0], ARRAY[10.0, 20.0]) u(a, b);
 
 ### Multidimensional arrays
 
-Unnesting reduces dimensionality by one level. A `DOUBLE[][]` produces
+`UNNEST` reduces dimensionality by one level. A `DOUBLE[][]` produces
 `DOUBLE[]` elements:
 
-```questdb-sql title="Unnest a 2D array into 1D rows"
+```questdb-sql title="Unnest a 2D array into 1D rows" demo
 SELECT value
 FROM UNNEST(ARRAY[ARRAY[1.0, 2.0], ARRAY[3.0, 4.0]]);
 ```
@@ -113,7 +120,7 @@ FROM UNNEST(ARRAY[ARRAY[1.0, 2.0], ARRAY[3.0, 4.0]]);
 Default column names are `value` for a single source or `value1`, `value2`, ...
 for multiple sources. Override them with parenthesized aliases:
 
-```questdb-sql title="Custom column name"
+```questdb-sql title="Custom column name" demo
 SELECT u.price FROM UNNEST(ARRAY[1.5, 2.5]) u(price);
 ```
 
@@ -125,9 +132,9 @@ SELECT u.price FROM UNNEST(ARRAY[1.5, 2.5]) u(price);
 
 ## JSON UNNEST
 
-JSON UNNEST expands a JSON array (stored as `VARCHAR`) into rows with explicitly
-typed columns. The `COLUMNS(...)` clause distinguishes JSON UNNEST from array
-UNNEST.
+JSON `UNNEST` expands a JSON array (stored as `VARCHAR`) into rows with
+explicitly typed columns. The `COLUMNS(...)` clause distinguishes JSON `UNNEST`
+from array `UNNEST`.
 
 ### Syntax
 
@@ -147,7 +154,7 @@ FROM table_name, UNNEST(
 Extract typed fields from an array of JSON objects. Column names in `COLUMNS()`
 are used as JSON field names for extraction:
 
-```questdb-sql title="Extract fields from JSON objects"
+```questdb-sql title="Extract fields from JSON objects" demo
 SELECT u.name, u.age
 FROM UNNEST(
     '[{"name":"Alice","age":30},{"name":"Bob","age":25}]'::VARCHAR
@@ -165,7 +172,7 @@ FROM UNNEST(
 When `COLUMNS()` declares a single column and the JSON array contains scalars
 (not objects), each element is extracted directly:
 
-```questdb-sql title="Scalar JSON array"
+```questdb-sql title="Scalar JSON array" demo
 SELECT u.val
 FROM UNNEST('[1.5, 2.5, 3.5]'::VARCHAR COLUMNS(val DOUBLE)) u;
 ```
@@ -178,9 +185,9 @@ FROM UNNEST('[1.5, 2.5, 3.5]'::VARCHAR COLUMNS(val DOUBLE)) u;
 
 ### WITH ORDINALITY
 
-Works the same as array UNNEST - alias the ordinality column as the last entry:
+Works the same as array `UNNEST` - alias the ordinality column as the last entry:
 
-```questdb-sql title="JSON UNNEST with position index"
+```questdb-sql title="JSON UNNEST with position index" demo
 SELECT u.val, u.pos
 FROM UNNEST(
     '[10, 20, 30]'::VARCHAR COLUMNS(val LONG)
@@ -198,7 +205,7 @@ FROM UNNEST(
 JSON string values are parsed using QuestDB's standard timestamp formats.
 Numeric values are treated as microseconds since epoch:
 
-```questdb-sql title="Timestamps from JSON strings"
+```questdb-sql title="Timestamps from JSON strings" demo
 SELECT u.ts, u.val
 FROM UNNEST(
     '[{"ts":"2024-01-15T10:30:00.000000Z","val":1.5},
@@ -217,7 +224,7 @@ FROM UNNEST(
 The names in `COLUMNS()` serve as both JSON field names and default output column
 names. Override the output names with aliases after the table alias:
 
-```questdb-sql title="JSON field 'price' output as 'cost'"
+```questdb-sql title="JSON field 'price' output as 'cost'" demo
 SELECT u.cost
 FROM UNNEST(
     '[{"price":1.5},{"price":2.5}]'::VARCHAR
@@ -253,7 +260,7 @@ FROM events e, UNNEST(
 When a JSON value does not match the declared column type, the result is `NULL`
 (except `BOOLEAN`, which defaults to `false`):
 
-```questdb-sql title="Missing fields produce NULL"
+```questdb-sql title="Missing fields produce NULL" demo
 SELECT u.a, u.b
 FROM UNNEST(
     '[{"a":1},{"a":2,"b":99},{"a":null}]'::VARCHAR
@@ -271,55 +278,42 @@ FROM UNNEST(
 
 ### Filter unnested rows
 
-```questdb-sql title="Filter by unnested value"
-SELECT t.symbol, u.size
-FROM market_data t, UNNEST(t.bid_sizes) u(size)
-WHERE u.size > 100.0
+```questdb-sql title="Filter by unnested value" demo
+SELECT t.symbol, u.vol
+FROM market_data t, UNNEST(t.asks[2]) u(vol)
+WHERE t.timestamp IN '$now-1m..$now'
+  AND t.symbol = 'EURUSD'
+  AND u.vol > 100.0
 ORDER BY t.timestamp;
 ```
 
 ### Aggregate unnested values
 
-```questdb-sql title="Total bid size per symbol"
-SELECT t.symbol, sum(u.size) AS total_bid_size
-FROM market_data t, UNNEST(t.bid_sizes) u(size)
+```questdb-sql title="Total ask volume per symbol" demo
+SELECT t.symbol, sum(u.vol) AS total_ask_vol
+FROM market_data t, UNNEST(t.asks[2]) u(vol)
+WHERE t.timestamp IN '$now-1m..$now'
 GROUP BY t.symbol;
-```
-
-### Aggregate JSON array fields
-
-```questdb-sql title="Sum quantities from JSON per event"
-SELECT e.id, sum(u.qty) AS total_qty
-FROM events e, UNNEST(
-    e.payload COLUMNS(qty INT)
-) u
-GROUP BY e.id;
 ```
 
 ### CTE with UNNEST
 
-```questdb-sql title="Wrap UNNEST in a CTE for further processing"
+```questdb-sql title="Wrap UNNEST in a CTE for further processing" demo
 WITH expanded AS (
-    SELECT m.symbol, m.timestamp, u.size, u.level
-    FROM market_data m, UNNEST(m.bid_sizes) WITH ORDINALITY u(size, level)
+    SELECT m.symbol, m.timestamp, u.vol, u.level
+    FROM market_data m, UNNEST(m.asks[2]) WITH ORDINALITY u(vol, level)
+    WHERE m.timestamp IN '$now-1m..$now'
+      AND m.symbol = 'EURUSD'
 )
-SELECT symbol, level, avg(size) AS avg_size
+SELECT symbol, level, avg(vol) AS avg_vol
 FROM expanded
 GROUP BY symbol, level
 ORDER BY symbol, level;
 ```
 
-### DISTINCT on unnested values
-
-```questdb-sql title="Unique values from an array column"
-SELECT DISTINCT u.val
-FROM t, UNNEST(t.arr) u(val)
-ORDER BY u.val;
-```
-
 ## Limitations
 
-- **FROM clause only**: UNNEST cannot appear in the `SELECT` list. Use
+- **`FROM` clause only**: `UNNEST` cannot appear in the `SELECT` list. Use
   `SELECT * FROM UNNEST(...)` instead.
 - **Array types**: Only `DOUBLE[]` is currently supported as a native array
   column type. Array literals like `ARRAY[1.0, 2.0]` produce `DOUBLE[]`.
