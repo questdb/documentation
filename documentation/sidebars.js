@@ -264,6 +264,7 @@ module.exports = {
                     "query/sql/alter-table-alter-column-cache",
                     "query/sql/alter-table-change-column-type",
                     "query/sql/alter-table-alter-column-drop-index",
+                    "query/sql/alter-table-alter-column-parquet-encoding",
                     "query/sql/alter-table-change-symbol-capacity",
                   ],
                 },

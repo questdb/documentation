@@ -361,6 +361,57 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp);
 ```
 
+### Per-column Parquet encoding and compression
+
+![Flow chart showing the syntax of per-column Parquet encoding and compression](/images/docs/diagrams/parquetEncodingDef.svg)
+
+Column definitions may include an optional `PARQUET` clause followed by
+`ENCODING`, `COMPRESSION`, or both. These settings only affect
+[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+ignored for native partitions. Both keywords are optional and can be used
+independently or together.
+
+```questdb-sql title="CREATE TABLE with per-column Parquet config"
+CREATE TABLE sensors (
+    ts TIMESTAMP,
+    temperature DOUBLE PARQUET ENCODING rle_dictionary COMPRESSION zstd 3,
+    humidity FLOAT PARQUET ENCODING rle_dictionary,
+    device_id VARCHAR PARQUET COMPRESSION lz4_raw,
+    status INT
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+When omitted, columns use the global defaults: a type-appropriate encoding and
+the server-wide compression codec
+(`cairo.partition.encoder.parquet.compression.codec`).
+
+#### Supported encodings
+
+| Encoding                | SQL keyword               | Valid column types           |
+| ----------------------- | ------------------------- | ---------------------------- |
+| Plain                   | `plain`                   | All                          |
+| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN and ARRAY |
+| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR      |
+| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP   |
+
+When no encoding is specified, QuestDB picks a type-appropriate default:
+`rle_dictionary` for SYMBOL and VARCHAR, `delta_length_byte_array` for STRING
+and BINARY, and `plain` for everything else.
+
+#### Supported compression codecs
+
+| Codec        | SQL keyword    | Level range |
+| ------------ | -------------- | ----------- |
+| Uncompressed | `uncompressed` | --          |
+| Snappy       | `snappy`       | --          |
+| Gzip         | `gzip`         | 1-9         |
+| Brotli       | `brotli`       | 0-11        |
+| Zstd         | `zstd`         | 1-22        |
+| LZ4 Raw      | `lz4_raw`      | --          |
+
+To modify encoding or compression on existing tables, see
+[ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+
 ### Casting types
 
 `castDef` - casts the type of a specific column. `columnRef` must reference

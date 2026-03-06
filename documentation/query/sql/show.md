@@ -88,6 +88,21 @@ CREATE TABLE trades (
 WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 ```
 
+#### Per-column Parquet encoding
+
+When columns have per-column Parquet encoding or compression overrides, they
+appear in the `SHOW CREATE TABLE` output:
+
+```questdb-sql
+CREATE TABLE sensors (
+	ts TIMESTAMP,
+	temperature DOUBLE PARQUET ENCODING rle_dictionary COMPRESSION zstd 3,
+	humidity FLOAT PARQUET ENCODING rle_dictionary,
+	device_id VARCHAR PARQUET COMPRESSION lz4_raw,
+	status INT
+) timestamp(ts) PARTITION BY DAY BYPASS WAL;
+```
+
 #### Enterprise variant
 
 [QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.

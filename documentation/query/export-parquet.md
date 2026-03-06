@@ -184,3 +184,32 @@ cairo.partition.encoder.parquet.compression.level=0
 When using `ZSTD`, the level ranges from 1 (fastest) to 22, with a default of 9.
 
 For COPY exports, you can also override compression per-query. See [Overriding compression](#overriding-compression).
+
+### Minimum compression ratio
+
+The `cairo.partition.encoder.parquet.min.compression.ratio` property controls
+whether compressed Parquet pages are worth keeping. After compressing a page,
+QuestDB checks the ratio of `uncompressed_size / compressed_size`. If the ratio
+falls below the threshold, the compressed output is discarded and the page is
+stored uncompressed instead.
+
+```ini
+# Default: 1.2 (keep compressed output only if it achieves ~17% size reduction)
+cairo.partition.encoder.parquet.min.compression.ratio=1.2
+```
+
+A value of `0.0` (or any value &lt;= 1.0) disables the check, always keeping
+compressed output.
+
+The ratio check applies to both data pages and dictionary pages and works with
+all compression codecs. It runs after compression, so the CPU cost of
+compression is still incurred -- this setting only avoids the I/O and storage
+penalty of keeping pages that barely compress.
+
+### Per-column overrides
+
+Individual columns can override the global encoding and compression settings.
+See [CREATE TABLE - Per-column Parquet encoding and compression](/docs/query/sql/create-table/#per-column-parquet-encoding-and-compression)
+for defining overrides at table creation, or
+[ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+for modifying existing tables.

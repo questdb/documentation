@@ -379,6 +379,9 @@ refreshMatView
 dropMatView
   ::= 'DROP' 'MATERIALIZED' 'VIEW' ('IF' 'EXISTS')? viewName
 
+parquetEncodingDef
+  ::= 'PARQUET' ( 'ENCODING' encoding )? ( 'COMPRESSION' codec level? )?
+
 pivot
   ::= ( '(' selectQuery ')' | tableName )
     ('WHERE' condition)?
