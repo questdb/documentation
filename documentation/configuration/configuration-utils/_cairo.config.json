@@ -419,6 +419,10 @@
     "default": "1",
     "description": "Number of partition expected on average. Initial value for purge allocation job, extended in runtime automatically."
   },
+  "cairo.sql.max.grouping.sets": {
+    "default": "4096",
+    "description": "Maximum number of grouping sets allowed in a single query. ROLLUP produces N+1 sets, CUBE produces 2^N sets, and explicit GROUPING SETS produces one set per listed group. Queries exceeding this limit are rejected at parse time."
+  },
   "cairo.sql.parallel.groupby.enabled": {
     "default": "true",
     "description": "Enables parallel GROUP BY execution; requires at least 4 shared worker threads."
