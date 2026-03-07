@@ -34,6 +34,8 @@ and partition storage size on disk.
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
+- `SHOW PLUGINS` lists all discovered plugins with their loaded status and
+  metadata (enterprise-only)
 
 ## Examples
 
@@ -326,6 +328,39 @@ SHOW SERVER_VERSION;
 | server_version |
 | -------------- |
 | 12.3 (questdb) |
+
+### SHOW PLUGINS
+
+Lists all plugins discovered in the plugin directory, whether loaded or not.
+Enterprise-only.
+
+```questdb-sql
+SHOW PLUGINS;
+```
+
+| name                           | loaded | version | description                          | author  | functions |
+| ------------------------------ | ------ | ------- | ------------------------------------ | ------- | --------- |
+| questdb-plugin-example-1.0.0   | true   | 1.0.0   | Example plugin demonstrating custom functions for QuestDB | QuestDB | 3 |
+| questdb-plugin-jsonl-1.0.0     | false  | 1.0.0   | HTTP endpoint for JSON-lines data ingestion | QuestDB | 0         |
+
+Columns:
+
+| Column      | Type    | Description |
+| ----------- | ------- | ----------- |
+| `name`      | STRING  | Plugin name (JAR filename without `.jar`) |
+| `loaded`    | BOOLEAN | `true` if the plugin is currently loaded |
+| `version`   | STRING  | Value of `Implementation-Version` from the JAR manifest |
+| `description` | STRING | Value of `Plugin-Description` from the JAR manifest |
+| `author`    | STRING  | Value of `Plugin-Author` from the JAR manifest |
+| `functions` | INT     | Number of SQL functions contributed (0 when not loaded) |
+
+`SHOW PLUGINS` can be used as a subquery for filtering:
+
+```questdb-sql
+SELECT * FROM (SHOW PLUGINS) WHERE loaded = true;
+```
+
+See the [Plugin system guide](/docs/operations/plugins/) for full details.
 
 ## See also
 
