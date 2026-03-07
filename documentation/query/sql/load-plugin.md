@@ -12,7 +12,7 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 </EnterpriseNote>
 
 Loads a plugin JAR from the plugin directory, making its SQL functions available
-immediately. Requires `DATABASE ADMIN` permission.
+immediately. Requires `PLUGIN ADMIN` permission.
 
 ## Syntax
 

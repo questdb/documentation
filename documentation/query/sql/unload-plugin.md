@@ -12,7 +12,7 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 </EnterpriseNote>
 
 Unloads a plugin, removing its SQL functions and closing its class loader.
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 ## Syntax
 

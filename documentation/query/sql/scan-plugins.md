@@ -12,7 +12,7 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 </EnterpriseNote>
 
 Rescans the plugin directory and refreshes the list of available plugins.
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 ## Syntax
 

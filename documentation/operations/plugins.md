@@ -98,7 +98,7 @@ server.
 SCAN PLUGINS;
 ```
 
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 ### SHOW PLUGINS
 
@@ -136,7 +136,7 @@ silently if the plugin is already loaded:
 LOAD PLUGIN IF NOT LOADED 'my-plugin-1.0.0';
 ```
 
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 If the plugin declares a `PluginLifecycle` implementation, its `onLoad` callback
 is invoked after the SQL functions are registered. If `onLoad` throws, the load
@@ -159,7 +159,7 @@ The optional `IF LOADED` clause makes the command idempotent:
 UNLOAD PLUGIN IF LOADED 'my-plugin-1.0.0';
 ```
 
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 A plugin cannot be unloaded if another currently-loaded plugin depends on it.
 Unload the dependent plugin first. On success, the compiled query cache is
@@ -175,7 +175,7 @@ updated JAR without two separate commands.
 RELOAD PLUGIN 'my-plugin-1.0.0';
 ```
 
-Requires `DATABASE ADMIN` permission.
+Requires `PLUGIN ADMIN` permission.
 
 If the reload fails during the load phase, the plugin is left unloaded and the
 error message indicates the original failure cause.
@@ -255,10 +255,10 @@ On server shutdown, plugins are unloaded in reverse dependency order
 
 | Operation      | Required permission |
 | -------------- | ------------------- |
-| `SCAN PLUGINS` | `DATABASE ADMIN`      |
-| `LOAD PLUGIN`  | `DATABASE ADMIN`      |
-| `UNLOAD PLUGIN`| `DATABASE ADMIN`      |
-| `RELOAD PLUGIN`| `DATABASE ADMIN`      |
+| `SCAN PLUGINS` | `PLUGIN ADMIN`      |
+| `LOAD PLUGIN`  | `PLUGIN ADMIN`      |
+| `UNLOAD PLUGIN`| `PLUGIN ADMIN`      |
+| `RELOAD PLUGIN`| `PLUGIN ADMIN`      |
 | `SHOW PLUGINS` | None                   |
 
 ## Writing a plugin

@@ -12,7 +12,7 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 </EnterpriseNote>
 
 Unloads and immediately reloads a plugin in a single operation. Requires
-`DATABASE ADMIN` permission.
+`PLUGIN ADMIN` permission.
 
 ## Syntax
 
@@ -27,7 +27,7 @@ RELOAD PLUGIN plugin_name;
 
 `RELOAD PLUGIN` is equivalent to [`UNLOAD PLUGIN`](/docs/query/sql/unload-plugin/)
 followed by [`LOAD PLUGIN`](/docs/query/sql/load-plugin/), but expressed as a
-single command. The same dependency and `DATABASE ADMIN` permission checks apply.
+single command. The same dependency and `PLUGIN ADMIN` permission checks apply.
 The compiled query cache is flushed twice — once after unload, once after load.
 
 If the reload fails during the load phase (for example because a dependency is
