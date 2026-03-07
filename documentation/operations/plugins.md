@@ -8,6 +8,13 @@ description:
 
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Plugins run on QuestDB Enterprise, but are developed and compiled against the
+  open-source <code>questdb</code> library — no enterprise dependencies are
+  required to build a plugin.
+</EnterpriseNote>
 
 QuestDB Enterprise supports a plugin system for extending the database with
 custom behaviour, packaged as standard JAR files. Plugins are isolated from the
@@ -20,14 +27,6 @@ The two primary uses are:
 - **Lifecycle integrations** — use `onLoad`/`onUnload` hooks and full
   `CairoEngine` access to build arbitrarily rich integrations: background
   services, external data ingestion endpoints, schema initialisation, and more.
-
-:::note
-
-**Deployment is enterprise-only.** Plugins run only on QuestDB Enterprise.
-However, plugins are developed and compiled against the open-source `questdb`
-library — no enterprise dependencies are required to build a plugin.
-
-:::
 
 ## Overview
 
@@ -99,7 +98,7 @@ server.
 SCAN PLUGINS;
 ```
 
-Requires `SYSTEM_ADMIN` permission.
+Requires `DATABASE ADMIN` permission.
 
 ### SHOW PLUGINS
 
@@ -137,7 +136,7 @@ silently if the plugin is already loaded:
 LOAD PLUGIN IF NOT LOADED 'my-plugin-1.0.0';
 ```
 
-Requires `SYSTEM_ADMIN` permission.
+Requires `DATABASE ADMIN` permission.
 
 If the plugin declares a `PluginLifecycle` implementation, its `onLoad` callback
 is invoked after the SQL functions are registered. If `onLoad` throws, the load
@@ -160,7 +159,7 @@ The optional `IF LOADED` clause makes the command idempotent:
 UNLOAD PLUGIN IF LOADED 'my-plugin-1.0.0';
 ```
 
-Requires `SYSTEM_ADMIN` permission.
+Requires `DATABASE ADMIN` permission.
 
 A plugin cannot be unloaded if another currently-loaded plugin depends on it.
 Unload the dependent plugin first. On success, the compiled query cache is
@@ -176,7 +175,7 @@ updated JAR without two separate commands.
 RELOAD PLUGIN 'my-plugin-1.0.0';
 ```
 
-Requires `SYSTEM_ADMIN` permission.
+Requires `DATABASE ADMIN` permission.
 
 If the reload fails during the load phase, the plugin is left unloaded and the
 error message indicates the original failure cause.
@@ -256,10 +255,10 @@ On server shutdown, plugins are unloaded in reverse dependency order
 
 | Operation      | Required permission |
 | -------------- | ------------------- |
-| `SCAN PLUGINS` | `SYSTEM_ADMIN`      |
-| `LOAD PLUGIN`  | `SYSTEM_ADMIN`      |
-| `UNLOAD PLUGIN`| `SYSTEM_ADMIN`      |
-| `RELOAD PLUGIN`| `SYSTEM_ADMIN`      |
+| `SCAN PLUGINS` | `DATABASE ADMIN`      |
+| `LOAD PLUGIN`  | `DATABASE ADMIN`      |
+| `UNLOAD PLUGIN`| `DATABASE ADMIN`      |
+| `RELOAD PLUGIN`| `DATABASE ADMIN`      |
 | `SHOW PLUGINS` | None                   |
 
 ## Writing a plugin

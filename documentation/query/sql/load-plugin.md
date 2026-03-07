@@ -4,15 +4,15 @@ sidebar_label: LOAD PLUGIN
 description: LOAD PLUGIN SQL keyword reference documentation.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Plugins are developed against the open-source <code>questdb</code> library
+  and run only on QuestDB Enterprise.
+</EnterpriseNote>
+
 Loads a plugin JAR from the plugin directory, making its SQL functions available
-immediately. Requires `SYSTEM_ADMIN` permission.
-
-:::note
-
-**Deployment is enterprise-only.** Plugins are developed against the
-open-source `questdb` library and run only on QuestDB Enterprise.
-
-:::
+immediately. Requires `DATABASE ADMIN` permission.
 
 ## Syntax
 

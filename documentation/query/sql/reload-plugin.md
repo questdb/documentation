@@ -4,15 +4,15 @@ sidebar_label: RELOAD PLUGIN
 description: RELOAD PLUGIN SQL keyword reference documentation.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Plugins are developed against the open-source <code>questdb</code> library
+  and run only on QuestDB Enterprise.
+</EnterpriseNote>
+
 Unloads and immediately reloads a plugin in a single operation. Requires
-`SYSTEM_ADMIN` permission.
-
-:::note
-
-**Deployment is enterprise-only.** Plugins are developed against the
-open-source `questdb` library and run only on QuestDB Enterprise.
-
-:::
+`DATABASE ADMIN` permission.
 
 ## Syntax
 
@@ -27,7 +27,7 @@ RELOAD PLUGIN plugin_name;
 
 `RELOAD PLUGIN` is equivalent to [`UNLOAD PLUGIN`](/docs/query/sql/unload-plugin/)
 followed by [`LOAD PLUGIN`](/docs/query/sql/load-plugin/), but expressed as a
-single command. The same dependency and `SYSTEM_ADMIN` permission checks apply.
+single command. The same dependency and `DATABASE ADMIN` permission checks apply.
 The compiled query cache is flushed twice — once after unload, once after load.
 
 If the reload fails during the load phase (for example because a dependency is

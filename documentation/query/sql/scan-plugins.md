@@ -4,15 +4,15 @@ sidebar_label: SCAN PLUGINS
 description: SCAN PLUGINS SQL keyword reference documentation.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Plugins are developed against the open-source <code>questdb</code> library
+  and run only on QuestDB Enterprise.
+</EnterpriseNote>
+
 Rescans the plugin directory and refreshes the list of available plugins.
-Requires `SYSTEM_ADMIN` permission.
-
-:::note
-
-**Deployment is enterprise-only.** Plugins are developed against the
-open-source `questdb` library and run only on QuestDB Enterprise.
-
-:::
+Requires `DATABASE ADMIN` permission.
 
 ## Syntax
 

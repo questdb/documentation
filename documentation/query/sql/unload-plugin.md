@@ -4,15 +4,15 @@ sidebar_label: UNLOAD PLUGIN
 description: UNLOAD PLUGIN SQL keyword reference documentation.
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  Plugins are developed against the open-source <code>questdb</code> library
+  and run only on QuestDB Enterprise.
+</EnterpriseNote>
+
 Unloads a plugin, removing its SQL functions and closing its class loader.
-Requires `SYSTEM_ADMIN` permission.
-
-:::note
-
-**Deployment is enterprise-only.** Plugins are developed against the
-open-source `questdb` library and run only on QuestDB Enterprise.
-
-:::
+Requires `DATABASE ADMIN` permission.
 
 ## Syntax
 
