@@ -361,6 +361,99 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp);
 ```
 
+### Per-column Parquet encoding and compression
+
+![Flow chart showing the syntax of per-column Parquet encoding and compression](/images/docs/diagrams/parquetEncodingDef.svg)
+
+Column definitions may include an optional `PARQUET(encoding [, compression[(level)]])`
+clause. These settings only affect
+[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+ignored for native partitions. Both encoding and compression are optional — use
+`default` for the encoding when specifying compression only.
+
+```questdb-sql title="CREATE TABLE with per-column Parquet config"
+CREATE TABLE sensors (
+    ts TIMESTAMP,
+    temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+    humidity FLOAT PARQUET(rle_dictionary),
+    device_id VARCHAR PARQUET(default, lz4_raw),
+    status INT
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+When omitted, columns use the global defaults: a type-appropriate encoding and
+the server-wide compression codec
+(`cairo.partition.encoder.parquet.compression.codec`).
+
+#### Supported encodings
+
+| Encoding                | SQL keyword               | Valid column types           |
+| ----------------------- | ------------------------- | ---------------------------- |
+| Plain                   | `plain`                   | All                          |
+| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN and ARRAY |
+| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR      |
+| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP   |
+
+- **Plain** — stores values as-is with no transformation. Simplest encoding
+  with no overhead. Use as a fallback when data has high cardinality and no
+  exploitable patterns (e.g. random floats or UUIDs).
+- **RLE Dictionary** — builds a dictionary of unique values and replaces each
+  value with a short integer key. The keys are then encoded with a hybrid of
+  run-length encoding (for repeated consecutive keys) and bit-packing (for
+  non-repeating sequences). Best for low-to-medium cardinality columns (status
+  codes, device IDs, symbols). The lower the cardinality, the greater the
+  compression.
+- **Delta Length Byte Array** — delta-encodes the lengths of consecutive
+  string/binary values, then stores the raw bytes back-to-back. This is the
+  Parquet-recommended encoding for byte array columns and is always preferred
+  over `plain` for STRING, BINARY, and VARCHAR.
+- **Delta Binary Packed** — delta-encodes integer values and packs the deltas
+  into a compact binary representation. Effective for monotonically increasing
+  or slowly changing integer/timestamp columns (e.g. sequential IDs, event
+  timestamps).
+
+For the full specification of each encoding, see the
+[Apache Parquet encodings documentation](https://parquet.apache.org/docs/file-format/data-pages/encodings/).
+
+When no encoding is specified, QuestDB picks a type-appropriate default:
+`rle_dictionary` for SYMBOL and VARCHAR, `delta_length_byte_array` for STRING
+and BINARY, and `plain` for everything else.
+
+#### Supported compression codecs
+
+| Codec        | SQL keyword    | Level range |
+| ------------ | -------------- | ----------- |
+| LZ4 Raw      | `lz4_raw`      | --          |
+| Zstd         | `zstd`         | 1-22        |
+| Snappy       | `snappy`       | --          |
+| Gzip         | `gzip`         | 1-9         |
+| Brotli       | `brotli`       | 0-11        |
+| Uncompressed | `uncompressed` | --          |
+
+- **LZ4 Raw** — extremely fast compression and decompression with a moderate
+  ratio. No tunable level. This is the QuestDB default and a good choice for
+  most workloads where query throughput matters.
+- **Zstd** — excellent balance of compression ratio and speed across its level
+  range. Lower levels (1-3) approach LZ4 speed with better ratios; higher
+  levels (up to 22) rival Brotli ratios. A strong general-purpose choice when
+  storage savings justify slightly slower decompression.
+- **Snappy** — very fast compression and decompression with moderate ratio. No
+  tunable level. Similar trade-offs to LZ4 Raw.
+- **Gzip** — widely supported, higher compression ratio than Snappy or LZ4 at
+  the cost of slower decompression, which reduces query throughput. Higher
+  levels (up to 9) improve ratio but further increase CPU time.
+- **Brotli** — achieves some of the highest compression ratios, especially at
+  higher levels, but decompression is significantly slower. Best suited for
+  cold/archival data where storage savings outweigh query throughput.
+- **Uncompressed** — no compression. Fastest decompression (none needed) but
+  largest file size. Useful when data is already incompressible.
+
+For more details on Parquet compression, see the
+[Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
+
+To modify encoding or compression on existing tables, see
+[ALTER TABLE ALTER COLUMN SET/DROP PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+
 ### Casting types
 
 `castDef` - casts the type of a specific column. `columnRef` must reference

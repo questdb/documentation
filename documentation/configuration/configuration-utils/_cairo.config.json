@@ -490,5 +490,9 @@
   "cairo.partition.encoder.parquet.data.page.size": {
     "default": "1048576",
     "description": "Sets the default page size for parquet-encoded partitions."
+  },
+  "cairo.partition.encoder.parquet.min.compression.ratio": {
+    "default": "1.2",
+    "description": "Minimum compression ratio (uncompressed_size / compressed_size) for Parquet pages. When a compressed page does not meet this threshold, it is stored uncompressed instead. A value of 0.0 disables the check."
   }
 }
