@@ -115,6 +115,34 @@ FROM UNNEST(ARRAY[ARRAY[1.0, 2.0], ARRAY[3.0, 4.0]]);
 | [1.0,2.0] |
 | [3.0,4.0] |
 
+### Chained UNNEST
+
+To fully flatten a multidimensional array into individual scalars, chain
+multiple `UNNEST` calls in the `FROM` clause. Each one reduces dimensionality
+by one level:
+
+```questdb-sql title="Fully flatten a 2D array" demo
+SELECT u.val
+FROM UNNEST(ARRAY[ARRAY[1.0, 2.0], ARRAY[3.0, 4.0]]) t(arr),
+     UNNEST(t.arr) u(val);
+```
+
+| val |
+| :-- |
+| 1.0 |
+| 2.0 |
+| 3.0 |
+| 4.0 |
+
+:::note
+
+`UNNEST` cannot be nested as an expression. Writing
+`UNNEST(UNNEST(...))` produces the error
+*UNNEST cannot be used as an expression; use it in the FROM clause*. Use the
+chained `FROM` clause syntax shown above instead.
+
+:::
+
 ### Column aliases
 
 Default column names are `value` for a single source or `value1`, `value2`, ...
@@ -232,9 +260,9 @@ FROM UNNEST(
 ) u(cost);
 ```
 
-### With json_extract()
+### Nested JSON arrays
 
-Use `json_extract()` to reach nested JSON paths before unnesting:
+Use `json_extract()` to reach a nested JSON array before unnesting:
 
 ```questdb-sql title="Unnest a nested JSON array"
 SELECT u.price
