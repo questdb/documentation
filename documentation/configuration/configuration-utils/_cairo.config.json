@@ -315,6 +315,10 @@
     "default": "8",
     "description": "Sets max memory pages for storing IR for JIT compilation."
   },
+  "cairo.json.unnest.max.value.size": {
+    "default": "4096",
+    "description": "Maximum byte size of a single VARCHAR or TIMESTAMP field value extracted during JSON [UNNEST](/docs/query/sql/unnest/). Numeric types (DOUBLE, LONG, INT, SHORT, BOOLEAN) are unaffected. Each VARCHAR/TIMESTAMP column allocates `2 * maxValueSize` bytes of native memory per active UNNEST cursor, so increase with care."
+  },
   "cairo.sql.page.frame.min.rows": {
     "default": "1000",
     "description": "Sets the minimum number of rows in page frames used in SQL queries."
