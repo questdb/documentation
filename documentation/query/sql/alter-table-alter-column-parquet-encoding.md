@@ -1,7 +1,7 @@
 ---
-title: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING/COMPRESSION
+title: ALTER TABLE ALTER COLUMN SET/DROP PARQUET
 sidebar_label: PARQUET ENCODING/COMPRESSION
-description: ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING/COMPRESSION SQL keyword reference documentation.
+description: ALTER TABLE ALTER COLUMN SET/DROP PARQUET SQL keyword reference documentation.
 ---
 
 Sets or removes per-column Parquet encoding and compression configuration on
@@ -12,33 +12,27 @@ ignored for native partitions.
 ## SET
 
 Override the default Parquet encoding, compression, or both for a column.
+The syntax is `SET PARQUET(encoding [, compression[(level)]])`. Use `default`
+for the encoding when specifying compression only.
 
 ```questdb-sql title="Set encoding only"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET ENCODING rle_dictionary;
+ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(rle_dictionary);
 ```
 
 ```questdb-sql title="Set compression only (with optional level)"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET COMPRESSION zstd 3;
+ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(default, zstd(3));
 ```
 
 ```questdb-sql title="Set both encoding and compression"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET ENCODING rle_dictionary COMPRESSION zstd 3;
+ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(rle_dictionary, zstd(3));
 ```
 
 ## DROP
 
 Reset per-column overrides back to the server defaults.
 
-```questdb-sql title="Drop both encoding and compression overrides"
-ALTER TABLE sensors ALTER COLUMN temperature DROP PARQUET ENCODING COMPRESSION;
-```
-
-```questdb-sql title="Drop encoding only (keeps compression override)"
-ALTER TABLE sensors ALTER COLUMN temperature DROP PARQUET ENCODING;
-```
-
-```questdb-sql title="Drop compression only (keeps encoding override)"
-ALTER TABLE sensors ALTER COLUMN temperature DROP PARQUET COMPRESSION;
+```questdb-sql title="Reset to defaults"
+ALTER TABLE sensors ALTER COLUMN temperature DROP PARQUET;
 ```
 
 ## Supported encodings and codecs

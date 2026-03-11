@@ -96,9 +96,9 @@ appear in the `SHOW CREATE TABLE` output:
 ```questdb-sql
 CREATE TABLE sensors (
 	ts TIMESTAMP,
-	temperature DOUBLE PARQUET ENCODING rle_dictionary COMPRESSION zstd 3,
-	humidity FLOAT PARQUET ENCODING rle_dictionary,
-	device_id VARCHAR PARQUET COMPRESSION lz4_raw,
+	temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+	humidity FLOAT PARQUET(rle_dictionary),
+	device_id VARCHAR PARQUET(default, lz4_raw),
 	status INT
 ) timestamp(ts) PARTITION BY DAY BYPASS WAL;
 ```

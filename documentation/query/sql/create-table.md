@@ -365,18 +365,18 @@ CREATE TABLE trades (
 
 ![Flow chart showing the syntax of per-column Parquet encoding and compression](/images/docs/diagrams/parquetEncodingDef.svg)
 
-Column definitions may include an optional `PARQUET` clause followed by
-`ENCODING`, `COMPRESSION`, or both. These settings only affect
+Column definitions may include an optional `PARQUET(encoding [, compression[(level)]])`
+clause. These settings only affect
 [Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
-ignored for native partitions. Both keywords are optional and can be used
-independently or together.
+ignored for native partitions. Both encoding and compression are optional — use
+`default` for the encoding when specifying compression only.
 
 ```questdb-sql title="CREATE TABLE with per-column Parquet config"
 CREATE TABLE sensors (
     ts TIMESTAMP,
-    temperature DOUBLE PARQUET ENCODING rle_dictionary COMPRESSION zstd 3,
-    humidity FLOAT PARQUET ENCODING rle_dictionary,
-    device_id VARCHAR PARQUET COMPRESSION lz4_raw,
+    temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+    humidity FLOAT PARQUET(rle_dictionary),
+    device_id VARCHAR PARQUET(default, lz4_raw),
     status INT
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
@@ -410,7 +410,7 @@ and BINARY, and `plain` for everything else.
 | LZ4 Raw      | `lz4_raw`      | --          |
 
 To modify encoding or compression on existing tables, see
-[ALTER TABLE ALTER COLUMN SET/DROP PARQUET ENCODING](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+[ALTER TABLE ALTER COLUMN SET/DROP PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
 
 ### Casting types
 
