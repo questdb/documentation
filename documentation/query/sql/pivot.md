@@ -15,7 +15,7 @@ This is useful for analytics, charting, and transforming time-series sensor data
 PIVOT (
     aggregateExpression [ AS alias ] [, aggregateExpression [ AS alias ] ...]
     FOR pivotExpression IN ( valueList | selectDistinctQuery )
-    [ FOR pivotExpression IN ( valueList | selectDistinctQuery ) ... ]
+    [ pivotExpression IN ( valueList | selectDistinctQuery ) ... ]
     [ GROUP BY column [, column ...] ]
 ) [ AS alias ]
 [ ORDER BY column [, column ...] ]
@@ -116,10 +116,10 @@ FROM trades
 GROUP BY symbol;
 ```
 
-| symbol  | avg       |
-|---------|-----------|
-| BTC-USD | 39267.64  |
-| ETH-USD | 2615.42   |
+| symbol  | avg      |
+| ------- | -------- |
+| BTC-USD | 39267.64 |
+| ETH-USD | 2615.42  |
 
 Without `PIVOT`, converting rows to columns requires verbose `CASE` expressions:
 
@@ -139,9 +139,9 @@ trades PIVOT (
 );
 ```
 
-| BTC-USD   | ETH-USD  |
-|-----------|----------|
-| 39267.64  | 2615.42  |
+| BTC-USD  | ETH-USD |
+| -------- | ------- |
+| 39267.64 | 2615.42 |
 
 ### Multiple aggregates
 
@@ -154,7 +154,7 @@ trades PIVOT (
 ```
 
 | BTC-USD_avg_price | BTC-USD_half_value | ETH-USD_avg_price | ETH-USD_half_value |
-|-------------------|--------------------|-------------------|--------------------|
+| ----------------- | ------------------ | ----------------- | ------------------ |
 | 39267.64          | 24500.12           | 2615.42           | 588.25             |
 
 ### Multiple FOR clauses (Cartesian product)
@@ -168,7 +168,7 @@ trades PIVOT (
 ```
 
 | BTC-USD_buy | BTC-USD_sell | ETH-USD_buy | ETH-USD_sell |
-|-------------|--------------|-------------|--------------|
+| ----------- | ------------ | ----------- | ------------ |
 | 39300.00    | 39267.64     | 2620.00     | 2615.54      |
 
 ### With GROUP BY
@@ -183,10 +183,10 @@ trades PIVOT (
 ) ORDER BY side;
 ```
 
-| side | BTC-USD   | ETH-USD  |
-|------|-----------|----------|
-| buy  | 39300.00  | 2620.00  |
-| sell | 39267.64  | 2615.54  |
+| side | BTC-USD  | ETH-USD |
+| ---- | -------- | ------- |
+| buy  | 39300.00 | 2620.00 |
+| sell | 39267.64 | 2615.54 |
 
 :::note
 When a GROUP BY key has no matching FOR values in the data, the entire row is
@@ -274,13 +274,13 @@ trades PIVOT (
 -- Columns: BTC-USD_avg_price, BTC-USD_total_price, ETH-USD_avg_price, ETH-USD_total_price
 ```
 
-| Scenario | Example | Column name |
-|----------|---------|-------------|
-| Single aggregate | `avg(price) FOR symbol IN ('BTC')` | `BTC` |
-| Multiple aggregates | `avg(price), sum(price) FOR symbol IN ('BTC')` | `BTC_avg(price)`, `BTC_sum(price)` |
-| Multiple FOR | `avg(price) FOR symbol IN ('BTC') side IN ('buy')` | `BTC_buy` |
-| With alias on value | `FOR symbol IN ('BTC-USD' AS btc)` | `btc` |
-| With alias on aggregate | `avg(price) AS avg_price FOR symbol IN ('BTC')` | `BTC_avg_price` |
+| Scenario                | Example                                            | Column name                        |
+| ----------------------- | -------------------------------------------------- | ---------------------------------- |
+| Single aggregate        | `avg(price) FOR symbol IN ('BTC')`                 | `BTC`                              |
+| Multiple aggregates     | `avg(price), sum(price) FOR symbol IN ('BTC')`     | `BTC_avg(price)`, `BTC_sum(price)` |
+| Multiple FOR            | `avg(price) FOR symbol IN ('BTC') side IN ('buy')` | `BTC_buy`                          |
+| With alias on value     | `FOR symbol IN ('BTC-USD' AS btc)`                 | `btc`                              |
+| With alias on aggregate | `avg(price) AS avg_price FOR symbol IN ('BTC')`    | `BTC_avg_price`                    |
 
 ## Limits
 
