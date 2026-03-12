@@ -16,21 +16,17 @@ use of the [FILL](#fill-options) keyword to specify a fill behavior.
 
 ## Syntax
 
-### SAMPLE BY keywords
-
-![Flow chart showing the syntax of the SAMPLE BY keywords](/images/docs/diagrams/sampleBy.svg)
-
-### FROM-TO keywords
-
-![Flow chart showing the syntax of the FROM-TO keywords](/images/docs/diagrams/fromTo.svg)
-
-### FILL keywords
-
-![Flow chart showing the syntax of the FILL keyword](/images/docs/diagrams/fill.svg)
-
-### ALIGN TO keywords
-
-![Flow chart showing the syntax of the ALIGN TO keywords](/images/docs/diagrams/alignToCalTimeZone.svg)
+```questdb-sql
+SELECT [column [, ...],] aggregate(column) [, ...]
+FROM table
+[WHERE condition]
+SAMPLE BY n{units}
+    [ROLLUP(column [, ...]) | CUBE(column [, ...]) | GROUPING SETS (...)]
+    [FROM timestamp TO timestamp]
+    [FILL(NONE | NULL | PREV | LINEAR | value [, ...])]
+    [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET 'HH:mm']
+     | ALIGN TO FIRST OBSERVATION]
+```
 
 ## Sample units
 
@@ -136,6 +132,8 @@ restrictions apply:
   `NONE`, `NULL`, `PREV`, `LINEAR` and constants may be used.
 - `LINEAR` strategy is not supported for keyed queries, i.e. queries that
   contain non-aggregated columns other than the timestamp in the SELECT clause.
+- `PREV` and `LINEAR` strategies are not supported with
+  [GROUPING SETS, ROLLUP, or CUBE](/docs/query/sql/grouping-sets/).
 - The `FILL` keyword must precede alignment described in the
   [sample calculation section](#sample-calculation), i.e.:
 
@@ -593,6 +591,7 @@ SAMPLE BY 1h;
 
 This section includes links to additional information such as tutorials:
 
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute subtotals and grand totals within time buckets
 - [PIVOT](/docs/query/sql/pivot/) - Transform SAMPLE BY results from rows to columns
 - [Materialized Views](/docs/concepts/materialized-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)

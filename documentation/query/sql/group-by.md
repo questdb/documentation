@@ -9,7 +9,16 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 
 ## Syntax
 
-![Flow chart showing the syntax of the GROUP BY keyword](/images/docs/diagrams/groupBy.svg)
+```questdb-sql
+SELECT column [, ...], aggregate(column) [, ...]
+FROM table
+[WHERE condition]
+GROUP BY
+    column [, ...]
+    | ROLLUP(column [, ...])
+    | CUBE(column [, ...])
+    | GROUPING SETS ((column [, ...]) [, ...])
+```
 
 :::note
 
@@ -72,6 +81,7 @@ GROUP BY a, b;
 
 ## See also
 
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute subtotals and grand totals in a single query
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions
