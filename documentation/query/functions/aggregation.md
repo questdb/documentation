@@ -74,6 +74,12 @@ calculations. Functions are organized by category below.
 | [bit_or](#bit_or) | Bitwise OR of all non-NULL values |
 | [bit_xor](#bit_xor) | Bitwise XOR of all non-NULL values |
 
+### Array aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [array_agg](#array_agg) | Collect values or concatenate arrays into a DOUBLE[] |
+
 ### Specialized aggregates
 
 | Function | Description |
@@ -408,6 +414,144 @@ FROM weather_data;
 - [arg_max](#arg_max) - Value at the row where another column is maximum
 - [min](#min) - Returns the minimum value itself
 - [first](#first) - Returns the first value by timestamp order
+
+## array_agg
+
+**Syntax:**
+
+```questdb-sql
+array_agg(value [, ordered]) -> DOUBLE[]
+array_agg(array [, ordered]) -> DOUBLE[]
+```
+
+Collects row values into a single `DOUBLE[]` array per group. Use it to build
+per-group vectors for downstream array operations such as
+[array_avg](/docs/query/functions/array/#array_avg),
+[dot_product](/docs/query/functions/array/#dot_product), or time-bucketed
+snapshots via `SAMPLE BY`.
+
+When called with a scalar argument, each row's value becomes one element of the
+output array. When called with a `DOUBLE[]` argument, non-null input arrays are
+concatenated into a single flat `DOUBLE[]`.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `value` | `DOUBLE` (or castable) | Scalar to collect. Each row's value becomes one element. NULL values are preserved. |
+| `array` | `DOUBLE[]` | Array to concatenate. Non-null arrays are appended into a flat `DOUBLE[]`. NULL and empty arrays are skipped. |
+| `ordered` | `BOOLEAN` (optional, default `true`) | `true` preserves input order. `false` enables parallel execution, but output order is non-deterministic. |
+
+Only one of `value` or `array` is used per call. The `ordered` parameter can be
+added as a second argument to either form.
+
+#### Return value
+
+- **Scalar form** - `DOUBLE[]`. Always produces an array when at least one row
+  exists, even if every value is NULL. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
+- **Array form** - `DOUBLE[]`. Returns NULL (not an empty array) when every
+  input array is NULL or empty. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
+
+#### SAMPLE BY support
+
+`array_agg` works with `SAMPLE BY` and the following FILL options:
+
+- `FILL(NULL)` - empty buckets produce NULL
+- `FILL(PREV)` - empty buckets repeat the previous bucket's array
+- `FILL(NONE)` - empty buckets are omitted from the result
+
+Not supported:
+
+- `FILL(LINEAR)` - interpolation is meaningless for arrays
+- `FILL(constant)` - a scalar cannot fill an array column; use `FILL(NULL)` instead
+
+#### Examples
+
+**Collect prices per symbol:**
+
+```questdb-sql demo title="array_agg - collect prices per symbol"
+SELECT symbol, array_agg(price) AS prices
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 3s..$now'
+GROUP BY symbol;
+```
+
+| symbol | prices |
+| :----- | :----- |
+| EURUSD | [1.1922, 1.1928, 1.1925, 1.1927, 1.1927, 1.1926, 1.1924, 1.1926, 1.1932, 1.1934, 1.1933, 1.1928, 1.1929, 1.1934, 1.1935, 1.1934, 1.1935, 1.1929, 1.193, ...] |
+
+Each row's `price` value is collected into a single `DOUBLE[]` per symbol.
+
+**Time-bucketed arrays with SAMPLE BY:**
+
+```questdb-sql demo title="array_agg - time-bucketed price arrays"
+SELECT timestamp, array_agg(price) AS prices
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+Produces one array per 1-second bucket containing all trade prices in that
+interval.
+
+**Parallel execution for large datasets:**
+
+```questdb-sql title="array_agg - parallel (unordered) execution"
+SELECT timestamp, array_agg(price, false) AS prices
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+Passing `false` as the second argument drops the ordering guarantee, allowing
+QuestDB to execute the aggregation in parallel across threads. The array
+elements are the same but their order within each bucket is non-deterministic.
+Use this when element order does not matter and throughput is the priority.
+
+**Concatenate arrays within a time bucket:**
+
+```questdb-sql demo title="array_agg - concatenate bid price arrays"
+SELECT timestamp, array_agg(bids[1]) AS all_bids
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 1s..$now'
+SAMPLE BY 100ms;
+```
+
+Here `bids[1]` is a `DOUBLE[]` column (bid prices at each depth level). The
+function concatenates all non-null bid-price arrays in each 100 ms bucket into a
+single flat array.
+
+**Compose with array functions:**
+
+```questdb-sql demo title="array_agg - cumulative price sums per symbol"
+SELECT symbol,
+  array_agg(price) AS prices,
+  array_cum_sum(array_agg(price)) AS cumulative_prices
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 3s..$now'
+GROUP BY symbol;
+```
+
+[array_cum_sum](/docs/query/functions/array/#array_cum_sum) computes running
+totals over the collected prices in timestamp order.
+
+#### NULL handling
+
+- NULL scalar inputs appear as null elements in the output array.
+- NULL and empty input arrays are skipped during concatenation, but null
+  elements within a non-null array are preserved.
+
+#### See also
+
+- [Array functions](/docs/query/functions/array/) - Functions that operate on arrays
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 
 ## avg
 
