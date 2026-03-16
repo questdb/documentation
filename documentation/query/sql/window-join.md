@@ -39,10 +39,6 @@ WINDOW JOIN right_table [alias]
 [ORDER BY ...]
 ```
 
-Where each `<lo_bound>` and `<hi_bound>` is a static constant, a left table
-column reference, or an expression over left table columns, followed by
-`PRECEDING`, `FOLLOWING`, or `CURRENT ROW`.
-
 ### RANGE clause
 
 The `RANGE` clause defines the time window relative to each left row's
