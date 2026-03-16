@@ -79,7 +79,7 @@ JOIN.
 
 :::
 
-### Dynamic windows
+#### Dynamic windows in RANGE clause
 
 Dynamic windows allow each left table row to define its own window size based
 on its data. This is useful when different rows require different lookback or
