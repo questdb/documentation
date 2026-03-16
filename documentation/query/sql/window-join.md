@@ -79,9 +79,9 @@ JOIN.
 
 :::
 
-#### Dynamic windows in RANGE clause
+#### Dynamic window bounds
 
-Dynamic windows allow each left table row to define its own window size based
+Dynamic window bounds allow each left table row to define its own window size based
 on its data. This is useful when different rows require different lookback or
 lookahead periods.
 
@@ -95,7 +95,7 @@ lookahead periods.
 
 :::note
 
-Dynamic windows disable the Fast Join (symbol-keyed) and vectorized (SIMD)
+Dynamic window bounds disable the Fast Join (symbol-keyed) and vectorized (SIMD)
 execution paths. Queries with an `ON` key equality clause fall back to the
 general join path with a join filter instead. For best performance, prefer
 static bounds when a fixed window size is sufficient.
@@ -429,7 +429,7 @@ This pattern applies to any aggregation over WINDOW JOIN results - always perfor
 1. **Use symbol-based joins**: When possible, join on symbol columns to enable
    the Fast Join optimization
 2. **Prefer static bounds**: Static (constant) bounds enable the Fast Join and
-   vectorized (SIMD) execution paths. Dynamic bounds disable these
+   vectorized (SIMD) execution paths. Dynamic window bounds disable these
    optimizations, so use them only when per-row window sizes are needed
 3. **Narrow time windows**: Smaller windows mean less data to aggregate
 4. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
