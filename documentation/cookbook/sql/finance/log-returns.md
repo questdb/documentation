@@ -29,7 +29,8 @@ SELECT
   round((bid_price + ask_price) / 2, 5) AS mid_price,
   LN(
     (bid_price + ask_price) / 2 /
-    LAG((bid_price + ask_price) / 2) OVER (PARTITION BY symbol ORDER BY timestamp)
+    LAG((bid_price + ask_price) / 2)
+        OVER (PARTITION BY symbol ORDER BY timestamp)
   ) AS log_return
 FROM core_price
 WHERE symbol = @symbol
@@ -59,7 +60,8 @@ SELECT
   timestamp,
   symbol,
   round(close_mid, 5) AS close_mid,
-  LN(close_mid / LAG(close_mid) OVER (ORDER BY timestamp)) AS log_return
+  LN(close_mid / LAG(close_mid)
+      OVER (ORDER BY timestamp)) AS log_return
 FROM sampled;
 ```
 
@@ -79,4 +81,5 @@ When computing returns at a fixed frequency, always aggregate into bars first wi
 - [Cumulative Product](/docs/cookbook/sql/finance/cumulative-product/) - running product of returns
 - [Rolling Std Dev](/docs/cookbook/sql/finance/rolling-stddev/) - rolling standard deviation of prices
 - [Window functions](/docs/query/functions/window-functions/overview/)
+- [ln() function](/docs/query/functions/numeric/#ln)
 :::

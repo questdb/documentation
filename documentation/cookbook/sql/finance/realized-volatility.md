@@ -22,7 +22,9 @@ WITH returns AS (
     timestamp,
     symbol,
     close,
-    ln(close / lag(close) OVER (PARTITION BY symbol ORDER BY timestamp)) AS log_return
+    ln(close / lag(close)
+        OVER (PARTITION BY symbol ORDER BY timestamp))
+        AS log_return
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
     AND timestamp IN @lookback
@@ -51,7 +53,10 @@ SELECT
   symbol,
   round(close, 5) AS close,
   round(log_return * 100, 4) AS return_pct,
-  round(sqrt(mean_sq_return - mean_return * mean_return) * sqrt(365 * 96) * 100, 2) AS realized_vol_annualized
+  round(
+    sqrt(mean_sq_return - mean_return * mean_return)
+        * sqrt(365 * 96) * 100,
+    2) AS realized_vol_annualized
 FROM with_stats
 ORDER BY timestamp;
 ```
@@ -96,7 +101,9 @@ returns AS (
     timestamp,
     symbol,
     close,
-    ln(close / lag(close) OVER (PARTITION BY symbol ORDER BY timestamp)) AS log_return
+    ln(close / lag(close)
+        OVER (PARTITION BY symbol ORDER BY timestamp))
+        AS log_return
   FROM ohlc
 ),
 with_stats AS (
@@ -123,7 +130,10 @@ SELECT
   symbol,
   round(close, 5) AS close,
   round(log_return * 100, 4) AS return_pct,
-  round(sqrt(mean_sq_return - mean_return * mean_return) * sqrt(288 * 365) * 100, 2) AS realized_vol_annualized
+  round(
+    sqrt(mean_sq_return - mean_return * mean_return)
+        * sqrt(288 * 365) * 100,
+    2) AS realized_vol_annualized
 FROM with_stats
 ORDER BY timestamp;
 ```
