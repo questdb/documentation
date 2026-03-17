@@ -6,17 +6,16 @@ description:
   Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 `CREATE USER` - create a new user in the database.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
-
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
 
 ---
 

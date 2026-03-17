@@ -40,9 +40,6 @@ Create an S3 bucket following
 **Recommendations:**
 - Select a region close to your primary node
 - Disable blob versioning
-- Set up a
-  [lifecycle policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html)
-  to manage WAL file retention (see [Snapshot and expiration policies](#snapshot-and-expiration-policies))
 
 **Connection string:**
 
@@ -53,6 +50,17 @@ replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};regi
 `DB_INSTANCE_NAME` can be any unique alphanumeric string (dashes allowed). Use
 the same value across all nodes in your replication cluster.
 
+:::tip[Using IAM roles]
+If your instance has an IAM role attached (EC2 instance profile, EKS pod identity,
+or ECS task role), you can omit the credentials:
+
+```ini
+replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};region=${AWS_REGION};
+```
+
+QuestDB will automatically use the instance's IAM role for authentication.
+:::
+
 ### Azure Blob Storage
 
 Create a Storage Account following
@@ -62,15 +70,24 @@ then create a Blob Container.
 **Recommendations:**
 - Select a region close to your primary node
 - Disable blob versioning
-- Set up
-  [Lifecycle Management](https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-configure?tabs=azure-portal)
-  for WAL file retention
 
 **Connection string:**
 
 ```ini
 replication.object.store=azblob::endpoint=https://${STORE_ACCOUNT}.blob.core.windows.net;container=${BLOB_CONTAINER};root=${DB_INSTANCE_NAME};account_name=${STORE_ACCOUNT};account_key=${STORE_KEY};
 ```
+
+:::tip[Using Managed Identity]
+If your instance has a Managed Identity assigned (Azure VM, AKS pod identity,
+or Container Apps), you can omit the `account_key`:
+
+```ini
+replication.object.store=azblob::endpoint=https://${STORE_ACCOUNT}.blob.core.windows.net;container=${BLOB_CONTAINER};root=${DB_INSTANCE_NAME};account_name=${STORE_ACCOUNT};
+```
+
+QuestDB will automatically use the Managed Identity for authentication. Ensure
+the identity has the **Storage Blob Data Contributor** role on the container.
+:::
 
 ### Google Cloud Storage
 
@@ -88,6 +105,17 @@ replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;credential=${BASE64_E
 ```
 
 Alternatively, use `credential_path` to reference the key file directly.
+
+:::tip[Using Workload Identity]
+If your instance uses Workload Identity (GKE) or runs on a GCE VM with a service
+account attached, you can omit the credentials entirely:
+
+```ini
+replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;
+```
+
+QuestDB will automatically use Application Default Credentials for authentication.
+:::
 
 ### NFS
 
@@ -124,9 +152,7 @@ nodes.
 See [Backup and restore](/docs/operations/backup/) for the full procedure.
 
 :::tip
-Set up regular snapshots (daily or weekly). See
-[Snapshot and expiration policies](#snapshot-and-expiration-policies) for
-guidance.
+Set up regular snapshots (daily or weekly).
 :::
 
 ## 4. Configure replica node(s)
@@ -163,18 +189,18 @@ export QDB_REPLICATION_OBJECT_STORE="azblob::..."
 
 For tuning options, see the [Tuning guide](/docs/high-availability/tuning/).
 
-## Snapshot and expiration policies
+## WAL data cleanup
 
-WAL files are typically read by replicas shortly after upload. To optimize
-costs, move files to cooler storage tiers after 1-7 days.
+Replicated WAL data accumulates in object storage over time. The **WAL
+cleaner** runs on the primary node and automatically removes data that is no
+longer needed, based on your backup and checkpoint history.
 
-**Recommendations:**
-- Take snapshots every 1-7 days
-- Keep WAL files for at least 30 days
-- Ensure snapshot interval is shorter than WAL expiration
+The cleaner is enabled by default and requires no configuration when backups
+or checkpoint history are active. By default, it retains replication data
+for the most recent 5 backups or checkpoints and deletes everything older.
 
-Example: Weekly snapshots + 30-day WAL retention = ability to restore up to 23
-days back. Daily snapshots restore faster but use more storage.
+See the [WAL Cleanup guide](/docs/high-availability/wal-cleanup/) for
+configuration options, tuning, and troubleshooting.
 
 ## Disaster recovery
 

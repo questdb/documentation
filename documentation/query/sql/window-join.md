@@ -85,6 +85,12 @@ JOIN.
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on
    symbol columns
 
+## Mixed-precision timestamps
+
+The left and right tables can use different timestamp resolutions (e.g.,
+`TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds). QuestDB
+aligns the timestamps internally — no explicit casting is needed.
+
 ## Aggregate functions
 
 WINDOW JOIN supports all aggregate functions on the right table. However, the
@@ -298,7 +304,7 @@ Look for these indicators in the plan:
 5. Aggregate functions cannot reference columns from both tables simultaneously
 6. WINDOW JOIN can be combined with another WINDOW JOIN, but not with other JOIN
    types
-7. **`GROUP BY` is not supported with WINDOW JOIN** - use a CTE or subquery instead
+7. **`GROUP BY` and window functions are not supported with WINDOW JOIN** - use a CTE or subquery instead
 
 ### GROUP BY workaround
 

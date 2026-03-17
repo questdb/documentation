@@ -42,7 +42,7 @@ WITH pivoted AS (
     CASE WHEN side = 'buy' THEN price END as buy,
     CASE WHEN side = 'sell' THEN price END as sell
   FROM trades
-  WHERE timestamp >= dateadd('m', -5, now())
+  WHERE timestamp IN '$now - 5m..$now'
     AND symbol = 'ETH-USDT'
 ),
 unpivoted AS (
@@ -114,7 +114,7 @@ WITH sensor_data AS (
     humidity,
     pressure
   FROM sensors
-  WHERE timestamp >= dateadd('h', -1, now())
+  WHERE timestamp IN '$now - 1h..$now'
 )
 SELECT timestamp, sensor_id, 'temperature' as metric, temperature as value FROM sensor_data
 WHERE temperature IS NOT NULL

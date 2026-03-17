@@ -619,7 +619,7 @@ table_columns('my_table');
 | s      | VARCHAR   | false   | 0                  | false        | 0              | false      | false     |
 
 ```questdb-sql title="Get designated timestamp column"
-SELECT column, type, designated FROM table_columns('my_table') WHERE designated = true;
+SELECT "column", type, designated FROM table_columns('my_table') WHERE designated = true;
 ```
 
 | column | type      | designated |

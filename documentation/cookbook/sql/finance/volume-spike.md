@@ -16,8 +16,7 @@ Use the `LAG` window function to retrieve the previous candle's volume, then com
 
 ```questdb-sql demo title="Detect volume spikes exceeding 2x previous volume"
 DECLARE
-  @anchor_date := timestamp_floor('30s', now()),
-  @start_date := dateadd('h', -7, @anchor_date),
+  @range := '$now - 7h..$now',
   @symbol := 'EURUSD'
 WITH candles AS (
   SELECT
@@ -25,7 +24,7 @@ WITH candles AS (
     symbol,
     sum(quantity) AS volume
   FROM fx_trades
-  WHERE timestamp >= @start_date
+  WHERE timestamp IN @range
     AND symbol = @symbol
   SAMPLE BY 30s
 ),

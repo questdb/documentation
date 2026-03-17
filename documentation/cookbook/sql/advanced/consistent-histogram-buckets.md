@@ -20,7 +20,7 @@ SELECT
   floor(amount / @bucket_size) * @bucket_size AS bucket,
   count(*) AS count
 FROM trades
-WHERE symbol = 'BTC-USDT' AND timestamp IN today()
+WHERE symbol = 'BTC-USDT' AND timestamp IN '$today'
 GROUP BY bucket
 ORDER BY bucket;
 ```
@@ -53,7 +53,7 @@ DECLARE @bucket_count := 50
 
 WITH raw_data AS (
   SELECT price, amount FROM trades
-  WHERE symbol = 'BTC-USDT' AND timestamp IN today()
+  WHERE symbol = 'BTC-USDT' AND timestamp IN '$today'
 ),
 bucket_size AS (
   SELECT (max(price) - min(price)) / (@bucket_count - 1) AS bucket_size FROM raw_data
@@ -83,7 +83,7 @@ SELECT
 FROM trades
 WHERE symbol = 'BTC-USDT'
   AND amount > 0.000001 -- optional. Just adding here for easier visualization
-  AND timestamp IN today()
+  AND timestamp IN '$today'
 GROUP BY bucket
 ORDER BY bucket;
 ```
@@ -104,7 +104,7 @@ SELECT
   END AS bucket,
   count(*) AS count
 FROM trades
-WHERE symbol = 'BTC-USDT' AND timestamp IN today()
+WHERE symbol = 'BTC-USDT' AND timestamp IN '$today'
 GROUP BY bucket;
 ```
 
@@ -119,7 +119,7 @@ SELECT
   floor(amount / @bucket_size) * @bucket_size AS bucket,
   count(*) AS count
 FROM trades
-WHERE symbol = 'BTC-USDT' AND timestamp IN today()
+WHERE symbol = 'BTC-USDT' AND timestamp IN '$today'
 SAMPLE BY 1h
 ORDER BY timestamp, bucket;
 ```

@@ -306,7 +306,7 @@ Specify a partitioning scheme larger than the sampling interval:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW my_view AS (
-  SELECT timestamp, symbol, sum(amount) FROM trades SAMPLE BY 8h
+  SELECT timestamp, symbol, sum(amount) AS total_amount FROM trades SAMPLE BY 8h
 ) PARTITION BY DAY;
 ```
 

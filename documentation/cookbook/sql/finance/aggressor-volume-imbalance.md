@@ -19,7 +19,7 @@ WITH volumes AS (
     SUM(CASE WHEN side = 'buy' THEN amount ELSE 0 END) AS buy_volume,
     SUM(CASE WHEN side = 'sell' THEN amount ELSE 0 END) AS sell_volume
   FROM trades
-  WHERE timestamp IN yesterday()
+  WHERE timestamp IN '$yesterday'
     AND symbol IN ('ETH-USDT', 'BTC-USDT', 'ETH-BTC')
 )
 SELECT

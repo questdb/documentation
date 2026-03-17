@@ -118,10 +118,10 @@ FROM long_sequence(120);
 
 For reference, the following functions are used to generate the example data:
 
-- [timestamp sequence](/docs/query/functions/timestamp-generator/#timestamp_sequence)
+- [timestamp_sequence](/docs/query/functions/row-generator/#timestamp_sequence)
   with 1 hour stepping
-- [row generator](/docs/query/functions/row-generator/#long_sequence) with
-  `long_sequence()` function which creates a `x:long` column
+- [long_sequence](/docs/query/functions/row-generator/#long_sequence) which
+  creates a `x:long` column
 
 The result of partitioning is visible when listing as directories on disk:
 

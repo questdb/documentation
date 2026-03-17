@@ -171,7 +171,7 @@ data arrives we recommend transforming it in QuestDB.
 For example, if you query a table with several metrics:
 
 ```questdb-sql
-SELECT * FROM diagnostics WHERE timestamp = '2016-01-01T00:00:00.000000Z' AND driver='Andy' AND name='truck_150')
+SELECT * FROM diagnostics WHERE timestamp = '2016-01-01T00:00:00.000000Z' AND driver='Andy' AND name='truck_150'
 ```
 
 Your result may be something like this:

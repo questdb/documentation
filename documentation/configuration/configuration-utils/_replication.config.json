@@ -94,5 +94,57 @@
   "native.max.blocking.threads": {
     "default": "cpuCount * 4",
     "description": "Maximum number of threads for parallel blocking disk IO read/write operations for replication (and other). These threads are ephemeral: They are spawned per need and shut down after a short duration if no longer in use. These are not cpu-bound threads, hence the relative large number. The default should be appropriate for most use cases."
+  },
+  "replication.primary.cleaner.enabled": {
+    "default": "true",
+    "description": "Master switch for the WAL cleaner."
+  },
+  "replication.primary.cleaner.interval": {
+    "default": "10m",
+    "description": "Time between cleanup cycles. Range: 1s – 24h."
+  },
+  "replication.primary.cleaner.checkpoint.source": {
+    "default": "true",
+    "description": "Use checkpoint history as a cleanup trigger source."
+  },
+  "replication.primary.cleaner.backup.window.count": {
+    "default": "backup.cleanup.keep.latest.n or 5",
+    "description": "Minimum complete backups/checkpoints per instance before cleanup starts. Defaults to `backup.cleanup.keep.latest.n` if backups are enabled, otherwise `5`."
+  },
+  "replication.primary.cleaner.delete.concurrency": {
+    "default": "4 – 12 (auto)",
+    "description": "Concurrent deletion tasks. Derived from `replication.requests.max.concurrent`. Range: 4 – 32."
+  },
+  "replication.primary.cleaner.max.requests.per.second": {
+    "default": "service-dependent",
+    "description": "Rate limit for object store delete requests. Set to `0` for unlimited. Range: 0 – 10000."
+  },
+  "replication.primary.cleaner.progress.write.interval": {
+    "default": "5s",
+    "description": "How often progress is persisted during a cleanup cycle. Lower values mean less re-work after a crash but more writes. Range: 100ms – 60s."
+  },
+  "replication.primary.cleaner.dropped.table.cooloff": {
+    "default": "1h",
+    "description": "Wait time after `DROP TABLE` before removing the table's data from object storage. Guards against clock skew."
+  },
+  "replication.primary.cleaner.retry.attempts": {
+    "default": "20",
+    "description": "Retries for transient object store failures during cleanup. Range: 0 – 100."
+  },
+  "replication.primary.cleaner.retry.interval": {
+    "default": "2s",
+    "description": "Delay between cleanup retries. Range: 0 – 5m."
+  },
+  "checkpoint.history.enabled": {
+    "default": "true (when replication is enabled)",
+    "description": "Enable the checkpoint history tracker. Requires replication."
+  },
+  "checkpoint.history.keep.count": {
+    "default": "100",
+    "description": "Maximum checkpoint records retained per instance."
+  },
+  "checkpoint.history.long.retry.interval": {
+    "default": "1m",
+    "description": "Retry interval for syncing checkpoint history to the object store after burst retries fail."
   }
 }

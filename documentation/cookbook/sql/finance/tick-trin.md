@@ -22,7 +22,7 @@ WITH with_previous AS (
   SELECT timestamp, symbol, price,
     LAG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS prev_price
   FROM fx_trades
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
 ),
 classified AS (
   SELECT  symbol,
@@ -64,7 +64,7 @@ WITH daily_stats AS (
     last(price) AS current_price,
     sum(quantity) AS total_volume
   FROM fx_trades
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
   SAMPLE BY 1d
 ),
 classified AS (
@@ -94,7 +94,7 @@ WITH candles AS (
     last(price) AS close_price,
     sum(quantity) AS total_volume
   FROM fx_trades
-  WHERE timestamp IN today()
+  WHERE timestamp IN '$today'
   SAMPLE BY 5m
 ),
 with_previous AS (

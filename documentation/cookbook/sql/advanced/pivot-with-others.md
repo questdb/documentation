@@ -13,7 +13,7 @@ You want to pivot data so that specific symbols (like EURUSD, GBPUSD, USDJPY) be
 ```questdb-sql demo title="Aggregated data per symbol"
 SELECT timestamp, symbol, SUM(bid_volume) AS total_bid
 FROM core_price
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 SAMPLE BY 1m
 LIMIT 20;
 ```
@@ -55,7 +55,7 @@ SELECT timestamp,
   SUM(CASE WHEN symbol NOT IN ('EURUSD', 'GBPUSD', 'USDJPY')
     THEN bid_volume END) AS OTHERS
 FROM core_price
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 SAMPLE BY 1m
 LIMIT 5;
 ```

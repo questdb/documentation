@@ -350,6 +350,14 @@ To summarize:
    table with no designated timestamp, if and only if you are certain the data
    is already sorted.
 
+### Mixed-precision timestamps
+
+ASOF JOIN handles tables with different timestamp resolutions automatically. For
+example, you can join a `TIMESTAMP` (microsecond) table with a `TIMESTAMP_NS`
+(nanosecond) table without explicit casting — QuestDB aligns the timestamps
+internally. This also applies to [LT JOIN](/docs/query/sql/join/#lt-join) and
+[SPLICE JOIN](/docs/query/sql/join/#splice-join).
+
 ### TOLERANCE clause
 
 The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in
@@ -395,7 +403,7 @@ days, and '2w' is 2 weeks. Please note that months (M) and years (Y) are not
 supported as units for the `TOLERANCE` clause.
 
 The effective precision of the `TOLERANCE` clause depends on the
-[designated timestamp resolution](/docs/concepts/designated-timestamp/#resolution)
+[designated timestamp resolution](/docs/concepts/designated-timestamp/#timestamp-resolution)
 of the tables involved. For example, if a table uses microsecond resolution, specifying nanosecond
 tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
 
@@ -414,6 +422,14 @@ QuestDB has several different algorithms that fit different queries and data
 distributions. If you query is performing poorly, consult the
 [SQL optimizer hints](/docs/concepts/deep-dive/sql-optimizer-hints) page and try out the
 non-default algorithms.
+
+## Cookbook recipes using ASOF JOIN
+
+For practical examples of `ASOF JOIN` in financial analysis workflows:
+
+- [Slippage per fill](/docs/cookbook/sql/finance/slippage/) — pair each trade with the prevailing order book to measure execution quality
+- [Aggregated slippage](/docs/cookbook/sql/finance/slippage-aggregated/) — compare slippage across venues, counterparties, and order types
+- [Implementation shortfall (order)](/docs/cookbook/sql/finance/implementation-shortfall-order/) — calculate total execution cost per order vs arrival price
 
 ## SPLICE JOIN
 

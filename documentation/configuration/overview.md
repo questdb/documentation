@@ -96,6 +96,99 @@ query.timeout=120s
 export QDB_QUERY_TIMEOUT=120s
 ```
 
+## Secrets from files
+
+QuestDB supports reading sensitive configuration values from files using the
+`_FILE` suffix convention. This is useful in containerized environments like
+Kubernetes, where secrets are typically mounted as files rather than passed as
+environment variables.
+
+When a `_FILE` variant is set, QuestDB reads the secret value from the specified
+file path. This works with both environment variables and properties in
+`server.conf`.
+
+### Usage
+
+**Environment variable:**
+
+```shell
+QDB_PG_PASSWORD_FILE=/run/secrets/pg-password
+```
+
+**Property file:**
+
+```ini title="server.conf"
+pg.password.file=/run/secrets/pg-password
+```
+
+### Precedence
+
+If both a `_FILE` variant and the direct value are set, the `_FILE` variant
+takes precedence. For example, if both `QDB_PG_PASSWORD_FILE` and
+`QDB_PG_PASSWORD` are set, the value is read from the file.
+
+### File requirements
+
+Secret files must meet the following requirements:
+
+- **Maximum size**: 64KB
+- **Encoding**: UTF-8
+- **Content handling**: Leading and trailing whitespace is automatically trimmed
+
+The following paths are not allowed for security reasons:
+
+- Paths containing `..` (path traversal)
+- Paths starting with `/dev/`, `/proc/`, or `/sys/`
+- Directories (including symlinks to directories)
+
+If a secret file is empty or contains only whitespace, QuestDB logs an advisory
+warning, as this may weaken authentication.
+
+### Error handling
+
+If a secret file cannot be read at startup, QuestDB fails to start. This
+includes cases where the file does not exist, is too large, or the path is
+not allowed.
+
+During runtime, if `reload_config()` cannot read a secret file, the reload
+fails and the previous value is retained. This ensures the server continues
+operating if a secret file is temporarily unavailable.
+
+### Reloading secrets
+
+Secrets loaded from files support runtime reloading. After updating a secret
+file, call `reload_config()` to apply the new value. See
+[Reloadable settings](#reloadable-settings) for details.
+
+To verify that a secret was loaded from a file, run `SHOW PARAMETERS` and check
+the `value_source` column, which displays `file` for secrets loaded from files.
+
+### Supported properties
+
+The following properties support the `_FILE` suffix:
+
+| Property               | Environment variable            |
+| ---------------------- | ------------------------------- |
+| `pg.password`          | `QDB_PG_PASSWORD_FILE`          |
+| `pg.readonly.password` | `QDB_PG_READONLY_PASSWORD_FILE` |
+| `http.password`        | `QDB_HTTP_PASSWORD_FILE`        |
+
+#### Enterprise properties
+
+The following additional properties are available in
+[QuestDB Enterprise](/enterprise/):
+
+| Property                         | Environment variable                      |
+| -------------------------------- | ----------------------------------------- |
+| `acl.admin.password`             | `QDB_ACL_ADMIN_PASSWORD_FILE`             |
+| `acl.oidc.tls.keystore.password` | `QDB_ACL_OIDC_TLS_KEYSTORE_PASSWORD_FILE` |
+| `replication.object.store`       | `QDB_REPLICATION_OBJECT_STORE_FILE`       |
+| `cold.storage.object.store`      | `QDB_COLD_STORAGE_OBJECT_STORE_FILE`      |
+| `backup.object.store.*`          | `QDB_BACKUP_OBJECT_STORE_*_FILE`          |
+
+For Kubernetes-specific examples, see the
+[Kubernetes deployment guide](/docs/deployment/kubernetes/#using-kubernetes-secrets).
+
 ## Reloadable settings
 
 Certain configuration settings can be reloaded without having to restart the

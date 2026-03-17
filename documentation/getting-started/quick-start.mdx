@@ -243,6 +243,11 @@ INSERT INTO test VALUES (now(), 42.5);
 SELECT * FROM test;
 ```
 
+The `TIMESTAMP(ts)` clause makes this a time-series table — it's what enables
+QuestDB's sub-millisecond time-range queries. See
+[Schema design](/docs/schema-design-essentials/) to understand this and other
+key concepts.
+
 It works? You're ready to bring your data.
 
 **Default ports:**
@@ -286,16 +291,16 @@ There are several quick options:
 
 ## Learn QuestDB
 
-For operators or developers looking for next steps to run an efficient instance,
-see:
+New to QuestDB? Start here:
 
-- **[Capacity planning](/docs/getting-started/capacity-planning/) for recommended
-  configurations for operating QuestDB in production**
-- [Configuration](/docs/configuration/overview/) to see all of the available options in
-  your `server.conf` file
-- [Schema design](/docs/schema-design-essentials/) for tips
-  and tricks
-- [Visualize with Grafana](/docs/integrations/visualization/grafana/) to create useful
-  dashboards and visualizations from your data
-  - Looking for inspiration? Checkout our
-    [real-time crypto dashboard](/dashboards/crypto/).
+- **[Schema design](/docs/schema-design-essentials/)** — Understand designated
+  timestamps, partitions, and SYMBOL types. These are the foundations of fast
+  time-series queries.
+
+For production deployments:
+
+- [Capacity planning](/docs/getting-started/capacity-planning/) — Recommended
+  configurations for production
+- [Configuration](/docs/configuration/overview/) — All server.conf options
+- [Visualize with Grafana](/docs/integrations/visualization/grafana/) — Create
+  dashboards from your data ([example](/dashboards/crypto/))

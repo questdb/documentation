@@ -1,216 +1,141 @@
 ---
 title: Date and Time Operators
 sidebar_label: Date and Time
-description: Date and Time operators
+description: Date and time operators for timestamp filtering in WHERE clauses
 ---
 
-This page describes the available operators to assist with performing time-based
-calculations.
+This page covers operators for filtering data by timestamp in `WHERE` clauses.
 
-:::note
+:::tip Recommended: TICK syntax
 
-If an operator's first argument is a table's timestamp, QuestDB may use an
-[Interval Scan](/docs/concepts/deep-dive/interval-scan) for optimization.
+For most timestamp filtering, use `IN` with [TICK syntax](/docs/query/operators/tick/).
+It handles simple ranges, multiple intervals, business days, timezones, and more
+in a single unified syntax:
+
+```questdb-sql
+WHERE ts IN '2024-01-[01..31]T09:30@EST#wd;6h30m'
+```
+
+The `interval()` function and `BETWEEN` operator described below are alternatives
+for specific use cases, but TICK syntax covers most needs.
 
 :::
 
-## `BETWEEN` value1 `AND` value2
+For date/time manipulation functions (`dateadd()`, `now()`, `extract()`, etc.),
+see [Date/time functions](/docs/query/functions/date-time/).
 
-The `BETWEEN` operator allows you to specify a non-standard range. It includes
-both upper and lower bounds, similar to standard SQL. The order of these bounds
-is interchangeable, meaning `BETWEEN X AND Y` is equivalent to
-`BETWEEN Y AND X`.
+## `IN` with timestamp intervals
 
-#### Arguments
+The `IN` operator with a string argument queries timestamp intervals. QuestDB
+uses [TICK syntax](/docs/query/operators/tick/) for all timestamp interval
+expressions.
 
-- `value1` and `value2` can be of `date`, `timestamp`, or `string` type.
+```questdb-sql
+-- Simple: all data from a specific day
+SELECT * FROM trades WHERE ts IN '2024-01-15';
 
-#### Examples
+-- With duration: 1-hour window starting at 09:30
+SELECT * FROM trades WHERE ts IN '2024-01-15T09:30;1h';
 
-```questdb-sql title="Explicit range"
+-- Multiple dates with bracket expansion
+SELECT * FROM trades WHERE ts IN '2024-01-[15,16,17]';
+
+-- Workdays only with timezone
+SELECT * FROM trades WHERE ts IN '2024-01-[01..31]T09:30@EST#wd;6h30m';
+
+-- Dynamic: last 5 business days
+SELECT * FROM trades WHERE ts IN '[$today-5bd..$today-1bd]';
+```
+
+For complete documentation of all patterns including bracket expansion,
+date variables, timezones, and day filters, see
+**[TICK interval syntax](/docs/query/operators/tick/)**.
+
+:::note Interval scan optimization
+
+When timestamp predicates are used on a [designated timestamp](/docs/concepts/designated-timestamp/)
+column, QuestDB performs an [interval scan](/docs/concepts/deep-dive/interval-scan/)
+using binary search instead of a full table scan.
+
+This optimization works with:
+- `IN` with TICK syntax or `interval()` function
+- `BETWEEN` ranges
+- Comparison operators (`>`, `<`, `>=`, `<=`)
+- `AND` combinations (intersects intervals)
+- `OR` combinations (unions intervals)
+
+```questdb-sql
+-- AND: intersects intervals (both conditions must match)
+WHERE ts IN '2024-01' AND ts > '2024-01-15'
+-- Results in: 2024-01-15 to 2024-01-31
+
+-- OR: unions intervals (either condition matches)
+WHERE ts IN '2024-01-10' OR ts IN '2024-01-20'
+-- Results in: two separate interval scans
+```
+
+:::
+
+## `IN` with `interval()` function
+
+The `interval()` function creates an interval from two explicit bounds. This is
+useful when bounds come from variables or subqueries.
+
+:::tip
+
+For static bounds, prefer TICK syntax: `IN '2024-01-01;30d'` instead of
+`IN interval('2024-01-01', '2024-01-31')`.
+
+:::
+
+```questdb-sql title="Interval from explicit bounds"
 SELECT * FROM trades
-WHERE timestamp BETWEEN '2022-01-01T00:00:23.000000Z' AND '2023-01-01T00:00:23.500000Z';
+WHERE ts IN interval('2024-01-01', '2024-01-31');
 ```
 
-This query returns all records within the specified timestamp range:
-
-| ts                          | value |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:23.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-01T00:00:23.500000Z | 131.5 |
-
-The `BETWEEN` operator can also accept non-constant bounds. For instance, the
-following query returns all records older than one year from the current date:
-
-```questdb-sql title="One year before current date" demo
+```questdb-sql title="Interval with bound parameters (prepared statements)"
 SELECT * FROM trades
-WHERE timestamp BETWEEN to_str(now(), 'yyyy-MM-dd')
-AND dateadd('y', -1, to_str(now(), 'yyyy-MM-dd'));
+WHERE ts IN interval($1, $2);
 ```
 
-The result set for this query would be:
+## `BETWEEN` ... `AND`
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-12-31T23:59:59.999999Z | 115.8 |
+The `BETWEEN` operator specifies an inclusive range. Useful when working with
+dynamic bounds from functions.
 
-```questdb-sql title="Results between two specific timestamps"
-SELECT * FROM trades WHERE ts BETWEEN '2022-05-23T12:15:00.000000Z' AND '2023-05-23T12:16:00.000000Z';
+:::tip
+
+For static ranges, prefer TICK syntax: `IN '2024-01'` instead of
+`BETWEEN '2024-01-01' AND '2024-01-31'`.
+
+:::
+
+```questdb-sql title="Explicit timestamp range"
+SELECT * FROM trades
+WHERE ts BETWEEN '2024-01-01T00:00:00Z' AND '2024-01-31T23:59:59Z';
 ```
 
-This query returns all records from the 15th minute of 12 PM on May 23, 2018:
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-05-23T12:15:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-05-23T12:15:59.999999Z | 115.8 |
-
-## `IN` (timeRange)
-
-Returns results within a defined range of time.
-
-#### Arguments
-
-- `timeRange` is a `string` type representing the desired time range.
-
-#### Syntax
-
-![Flow chart showing the syntax of the WHERE clause with a partial timestamp comparison](/images/docs/diagrams/whereTimestampPartial.svg)
-
-#### Examples
-
-```questdb-sql title="Results in a given year"
-SELECT * FROM scores WHERE ts IN '2018';
+```questdb-sql title="Dynamic range using functions"
+SELECT * FROM trades
+WHERE ts BETWEEN dateadd('d', -7, now()) AND now();
 ```
 
-This query returns all records from the year 2018:
+`BETWEEN` produces the same [interval scan](/docs/concepts/deep-dive/interval-scan/)
+optimization as `IN` when used on a designated timestamp column.
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-12-31T23:59:59.999999Z | 115.8 |
+### When to use each
 
-```questdb-sql title="Results in a given minute"
-SELECT * FROM scores WHERE ts IN '2018-05-23T12:15';
-```
+| Use case | Recommended |
+|----------|-------------|
+| Any static range | `IN` with TICK — `'2024-01'`, `'2024-01-15T09:00;1h'` |
+| Multiple intervals | `IN` with TICK — `'2024-01-[15,16,17]'` |
+| Schedules, business days | `IN` with TICK — `'[$today-5bd..$today]#workday'` |
+| Dynamic bounds from functions | `BETWEEN` — `BETWEEN dateadd('d', -7, now()) AND now()` |
+| Prepared statement parameters | `IN interval()` — `IN interval($1, $2)` |
 
-This query returns all records from the 15th minute of 12 PM on May 23, 2018:
+## See also
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-05-23T12:15:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-05-23T12:15:59.999999Z | 115.8 |
-
-## `IN` (timeRangeWithModifier)
-
-You can apply a modifier to further customize the range. The modifier extends
-the upper bound of the original timestamp based on the modifier parameter. An
-optional interval with occurrence can be set, to apply the search in the given
-time range repeatedly, for a set number of times.
-
-#### Arguments
-
-- `timeRangeWithModifier` is a string in the format
-  `'timeRange;modifier;interval;repetition'`.
-
-#### Syntax
-
-![Flow chart showing the syntax of the WHERE clause with a timestamp/modifier comparison](/images/docs/diagrams/whereTimestampIntervalSearch.svg)
-
-- `timestamp` is the original time range for the query.
-- `modifier` is a signed integer modifying the upper bound applying to the
-  `timestamp`:
-
-  - A `positive` value extends the selected period.
-  - A `negative` value reduces the selected period.
-
-- `interval` is an unsigned integer indicating the desired interval period for
-  the time range.
-- `repetition` is an unsigned integer indicating the number of times the
-  interval should be applied.
-
-#### Examples
-
-Modifying the range:
-
-```questdb-sql title="Results in a given year and the first month of the next year"
-SELECT * FROM scores WHERE ts IN '2018;1M';
-```
-
-In this example, the range is the year 2018. The modifier `1M` extends the upper
-bound (originally 31 Dec 2018) by one month.
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2019-01-31T23:59:59.999999Z | 115.8 |
-
-```questdb-sql title="Results in a given month excluding the last 3 days"
-SELECT * FROM scores WHERE ts IN '2018-01;-3d';
-```
-
-In this example, the range is January 2018. The modifier `-3d` reduces the upper
-bound (originally 31 Jan 2018) by 3 days.
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-28T23:59:59.999999Z | 113.8 |
-
-Modifying the interval:
-
-```questdb-sql title="Results on a given date with an interval"
-SELECT * FROM scores WHERE ts IN '2018-01-01;1d;1y;2';
-```
-
-In this example, the range is extended by one day from Jan 1 2018, with a
-one-year interval, repeated twice. This means that the query searches for
-results on Jan 1-2 in 2018 and in 2019:
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-02T23:59:59.999999Z | 110.3 |
-| 2019-01-01T00:00:00.000000Z | 128.7 |
-| ...                         | ...   |
-| 2019-01-02T23:59:59.999999Z | 103.8 |
-
-## `IN` (interval)
-
-Returns results within a defined range of time, as specified by an `interval` value.
-
-#### Arguments
-
-- `interval` is an `interval` type representing the desired time range.
-
-#### Examples
-
-```questdb-sql title="Check if timestamp is in interval success" demo
-SELECT true as is_in_interval FROM trades
-WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2018', '2019')
-LIMIT -1
-```
-
-| is_in_interval |
-| -------------- |
-| true           |
-
-If we adjust the interval to be not in range, we get no result:
-
-```questdb-sql title="Check if timestamp is in interval failure" demo
-SELECT true as is_in_interval FROM trades
-WHERE '2018-05-17T00:00:00Z'::timestamp IN interval('2022', '2023')
-LIMIT -1;
-```
-
-| is_in_interval |
-| -------------- |
+- [TICK interval syntax](/docs/query/operators/tick/) — Full reference for `IN` patterns
+- [Interval scan](/docs/concepts/deep-dive/interval-scan/) — How timestamp queries are optimized
+- [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for interval scan
+- [Date/time functions](/docs/query/functions/date-time/) — `dateadd()`, `now()`, etc.

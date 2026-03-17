@@ -4,18 +4,12 @@ sidebar_label: Parquet
 description: QuestDB Apache Parquet functions reference documentation.
 ---
 
-This page introduces the [Apache Parquet](/glossary/apache-parquet/) read function.
+QuestDB can read and query external [Apache Parquet](/glossary/apache-parquet/) files using SQL.
+
+To export data as Parquet, see [Parquet Export](/docs/query/export-parquet/).
 
 :::info
-
-Apache Parquet support is in **beta**. It may not be fit for production use.
-
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
-
+Apache Parquet support is in **beta**. Please report issues via [email](mailto:support@questdb.io), [Slack](https://slack.questdb.com/), or [Discourse](https://community.questdb.com/).
 :::
 
 ## read_parquet
@@ -26,16 +20,11 @@ Reads a parquet file as a table.
 
 ### Usage
 
-With this function, query a Parquet file located at the QuestDB copy root directory. Both relative and absolute file
-paths are supported.
+The file path must be within the [configured root directory](#configuration). It can be specified as a relative path (resolved under the root) or as an absolute path (which must still start with the root directory). Path traversal (`../`) is not allowed.
 
-```questdb-sql title="read_parquet example"
-SELECT
-  *
-FROM
-  read_parquet('trades.parquet')
-WHERE
-  side = 'buy'
+```questdb-sql title="Relative path"
+SELECT * FROM read_parquet('trades.parquet')
+WHERE side = 'buy'
 LIMIT 1;
 ```
 
@@ -43,39 +32,47 @@ LIMIT 1;
 |---------|------|---------|:-----------|-----------------------------|
 | BTC-USD | buy  | 62755.6 | 0.00043367 | 2024-07-01T00:46:39.754075Z |
 
-The query above:
+```questdb-sql title="Absolute path (must be within the configured root)"
+SELECT * FROM read_parquet('/var/lib/questdb/import/trades.parquet');
+```
 
-- Reads all columns from the file `trades.parquet` located at the server copy root directory, 
-  i.e. `import/trades.parquet` in the QuestDB copy root directory by default.
-- Filters rows, keeping only the first row where the `side` column equals `buy`.
+```questdb-sql title="Join a Parquet file with a QuestDB table"
+SELECT t.symbol, t.price, r.label
+FROM read_parquet('trades.parquet') t
+JOIN ref_data r ON t.symbol = r.symbol;
+```
 
 ### Configuration
 
-For security reason, reading is only allowed from a specified directory. It defaults to the `import` directory
-inside the QuestDB copy root directory. To change the allowed directory, set the `cairo.sql.copy.root` 
-configuration by using one of the following settings:
-  - The environment variable `QDB_CAIRO_SQL_COPY_ROOT`.
-  - The `cairo.sql.copy.root` key in `server.conf`.
+For security reasons, reading is only allowed from a configured directory. By default, this is the `import` directory
+inside the QuestDB root directory (e.g. `/var/lib/questdb/import/`). To change it, set `cairo.sql.copy.root`:
+
+- In `server.conf`: `cairo.sql.copy.root=/path/to/dir`
+- Or via the environment variable `QDB_CAIRO_SQL_COPY_ROOT`
 
 ### Limitations
 
-Parquet format support rich set of data types, including structural types. QuestDB only can read data types that match
-QuestDB data types:
+Parquet format supports a rich set of data types, including structural types. QuestDB can only read Parquet columns whose types map to QuestDB types:
 
-- Varchar
+- Boolean
+- Byte
+- Short
+- Char
 - Int
 - Long
-- Short
-- Byte
-- Boolean
-- UUID
-- Double
+- Long128
+- Long256
 - Float
+- Double
+- Varchar (also reads Symbol columns as Varchar)
 - Timestamp
+- Date
+- UUID
+- IPv4
+- GeoHash (Byte, Short, Int, Long)
 - Binary
+- Array (Double)
 
 Parquet columns with unsupported data types are ignored.
 
-Multiple files are not suppored, only a single file.
-
-Nested data and/or arrays are not supported.
+Only a single file can be read per `read_parquet` call.

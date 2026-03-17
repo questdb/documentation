@@ -11,13 +11,13 @@ Calculate volume profile to show the distribution of trading volume across diffe
 Group trades into price bins using `FLOOR` and a tick size parameter:
 
 ```questdb-sql demo title="Calculate volume profile with fixed tick size"
-DECLARE @tick_size := 1.0
+DECLARE @tick_size := 0.01
 SELECT
   floor(price / @tick_size) * @tick_size AS price_bin,
   round(SUM(quantity), 2) AS volume
 FROM fx_trades
 WHERE symbol = 'EURUSD'
-  AND timestamp IN today()
+  AND timestamp IN '$today'
 ORDER BY price_bin;
 ```
 
@@ -31,7 +31,7 @@ For consistent histograms across different price ranges, calculate the tick size
 WITH raw_data AS (
   SELECT price, quantity
   FROM fx_trades
-  WHERE symbol = 'EURUSD' AND timestamp IN today()
+  WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 ),
 tick_size AS (
   SELECT (max(price) - min(price)) / 49 as tick_size

@@ -21,7 +21,7 @@ SELECT
     max(price),
     sum(quantity) AS volume
 FROM fx_trades
-WHERE symbol = 'EURUSD' AND timestamp > dateadd('d', -14, now())
+WHERE symbol = 'EURUSD' AND timestamp IN '$now - 14d..$now'
 SAMPLE BY 1d;
 ```
 
@@ -42,7 +42,7 @@ WITH moving_trades AS (
       RANGE BETWEEN 7 days PRECEDING AND 1 day PRECEDING
     ) AS moving_avg_price
   FROM fx_trades
-  WHERE symbol = 'EURUSD' AND timestamp > dateadd('d', -21, now())
+  WHERE symbol = 'EURUSD' AND timestamp IN '$now - 21d..$now'
 )
 SELECT
     timestamp, symbol,
@@ -52,7 +52,7 @@ SELECT
     max(price),
     sum(quantity) AS volume
 FROM moving_trades
-WHERE timestamp > dateadd('d', -14, now())
+WHERE timestamp IN '$now - 14d..$now'
   AND moving_avg_price IS NOT NULL
   AND ABS(price - moving_avg_price) <= moving_avg_price * 0.01
 SAMPLE BY 1d;

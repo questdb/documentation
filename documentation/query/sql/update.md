@@ -34,7 +34,7 @@ UPDATE book SET mid = (bid + ask)/2 WHERE symbol = 'AAPL';
 ```
 
 ```questdb-sql title="Update with subquery"
-UPDATE spreads s SET s.spread = p.ask - p.bid FROM prices p WHERE s.symbol = p.symbol;
+UPDATE spreads s SET spread = p.ask - p.bid FROM prices p WHERE s.symbol = p.symbol;
 ```
 
 ```questdb-sql title="Update with multiple joins"

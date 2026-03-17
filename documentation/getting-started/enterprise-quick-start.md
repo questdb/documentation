@@ -74,6 +74,15 @@ acl.admin.user=myadmin
 acl.admin.password=my_very_secure_pwd
 ```
 
+:::tip Kubernetes deployments
+
+In Kubernetes, you can read the password from a mounted secret file instead of
+hardcoding it. Set `QDB_ACL_ADMIN_PASSWORD_FILE` to the path of the mounted
+secret. See [Secrets from files](/docs/configuration/overview/#secrets-from-files)
+for details.
+
+:::
+
 We will optionally disable this built-in administrator account later.
 
 For more on access control, see [Role-Based Access Control](/docs/security/rbac/).
