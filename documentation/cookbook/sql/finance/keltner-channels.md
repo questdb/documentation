@@ -15,7 +15,7 @@ You want volatility bands that adapt to market conditions but are smoother than 
 ```questdb-sql demo title="Calculate Keltner Channels (20-period EMA ± 2× ATR)"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH with_prev AS (
   SELECT
@@ -49,9 +49,10 @@ with_indicators AS (
     timestamp,
     symbol,
     close,
-    avg(close, 'period', 20) OVER (PARTITION BY symbol ORDER BY timestamp) AS ema20,
-    avg(tr, 'period', 20) OVER (PARTITION BY symbol ORDER BY timestamp) AS atr
+    avg(close, 'period', 20) OVER w AS ema20,
+    avg(tr, 'period', 20) OVER w AS atr
   FROM with_tr
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
 )
 SELECT
   timestamp,
