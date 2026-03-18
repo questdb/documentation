@@ -22,10 +22,11 @@ WITH stats AS (
     timestamp,
     symbol,
     price,
-    AVG(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg,
-    AVG(price * price) OVER (PARTITION BY symbol ORDER BY timestamp) AS rolling_avg_sq
+    AVG(price) OVER w AS rolling_avg,
+    AVG(price * price) OVER w AS rolling_avg_sq
   FROM fx_trades
   WHERE timestamp IN '$yesterday' AND symbol = 'EURUSD'
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
 )
 SELECT
   timestamp,

@@ -17,7 +17,17 @@ DECLARE
   @symbol := 'EURUSD',
   @lookback := '$now - 1M..$now'
 
-WITH with_peak AS (
+WITH ohlc AS (
+  SELECT
+    timestamp,
+    symbol,
+    last(price) AS close
+  FROM fx_trades
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+  SAMPLE BY 15m ALIGN TO CALENDAR
+),
+with_peak AS (
   SELECT
     timestamp,
     symbol,
@@ -27,9 +37,7 @@ WITH with_peak AS (
       ORDER BY timestamp
       ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS running_peak
-  FROM market_data_ohlc_15m
-  WHERE symbol = @symbol
-    AND timestamp IN @lookback
+  FROM ohlc
 ),
 with_drawdown AS (
   SELECT
@@ -56,9 +64,10 @@ ORDER BY timestamp;
 ```
 
 The query:
-1. Tracks the running maximum (peak) price using `max() OVER (... UNBOUNDED PRECEDING)`
-2. Calculates current drawdown as percentage from peak
-3. Tracks the minimum (worst) drawdown seen so far
+1. Aggregates raw trades into 15-minute bars using the last trade price as close
+2. Tracks the running maximum (peak) price using `max() OVER (... UNBOUNDED PRECEDING)`
+3. Calculates current drawdown as percentage from peak
+4. Tracks the minimum (worst) drawdown seen so far
 
 ## Interpreting results
 
@@ -69,14 +78,22 @@ The query:
 
 ## Finding drawdown periods
 
-```questdb-sql title="Identify significant drawdown periods"
-DECLARE @symbol := 'EURUSD'
+```questdb-sql demo title="Identify significant drawdown periods"
+DECLARE
+  @symbol := 'EURUSD',
+  @lookback := '$now - 1M..$now'
 
-WITH with_peak AS (
+WITH ohlc AS (
+  SELECT timestamp, symbol, last(price) AS close
+  FROM fx_trades
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+  SAMPLE BY 15m ALIGN TO CALENDAR
+),
+with_peak AS (
   SELECT timestamp, symbol, close,
     max(close) OVER (PARTITION BY symbol ORDER BY timestamp ROWS UNBOUNDED PRECEDING) AS running_peak
-  FROM market_data_ohlc_15m
-  WHERE symbol = @symbol
+  FROM ohlc
 ),
 with_drawdown AS (
   SELECT timestamp, symbol, close, running_peak,

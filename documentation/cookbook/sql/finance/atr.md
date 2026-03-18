@@ -15,7 +15,7 @@ You want to measure volatility to set appropriate stop-losses or position sizes.
 ```questdb-sql demo title="Calculate 14-period ATR"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH with_prev AS (
   SELECT

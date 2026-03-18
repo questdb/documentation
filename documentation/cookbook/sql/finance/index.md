@@ -4,8 +4,6 @@ sidebar_label: Overview
 description: SQL recipes for financial analysis including technical indicators, volatility metrics, volume analysis, and risk measurement in QuestDB.
 ---
 
-# Capital Markets Recipes
-
 This section contains SQL recipes for financial market analysis. All recipes use the
 [demo dataset](/docs/cookbook/demo-data-schema/) available in the QuestDB web console.
 
