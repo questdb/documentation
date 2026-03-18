@@ -90,7 +90,9 @@ lookahead periods.
 - Boundary expressions must evaluate to an **integer** type
 - Expressions must only reference **left table** columns — right table column
   references are not allowed
-- **Negative values** are clamped to zero, equivalent to `CURRENT ROW`
+- Bound expressions must evaluate to **non-negative** values — negative results
+  are clamped to zero, equivalent to `CURRENT ROW`. To reference rows before the
+  current row, use a positive value with `PRECEDING`
 - **NULL values** cause the row to produce NULL aggregates — the row is skipped
 
 :::note
