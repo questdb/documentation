@@ -22,7 +22,8 @@ WITH sampled AS (
     timestamp,
     symbol,
     last((bid_price + ask_price) / 2) AS close_mid,
-    avg(ask_price - bid_price) AS avg_spread
+    avg((ask_price - bid_price) /
+        ((bid_price + ask_price) / 2)) AS avg_rel_spread
   FROM core_price
   WHERE symbol = @symbol
     AND timestamp IN @lookback
@@ -33,30 +34,35 @@ returns AS (
     timestamp,
     symbol,
     close_mid,
-    avg_spread,
+    avg_rel_spread,
     LN(close_mid / LAG(close_mid)
-        OVER (ORDER BY timestamp)) AS log_ret
+        OVER (PARTITION BY symbol ORDER BY timestamp))
+        AS log_ret
   FROM sampled
 )
 SELECT
   timestamp,
   symbol,
-  round(AVG(avg_spread) OVER w, 6) AS spread_1h,
+  round(AVG(avg_rel_spread) OVER w * 10000, 2)
+      AS rel_spread_1h_bps,
   round(SQRT(
     (AVG(log_ret * log_ret) OVER w -
         AVG(log_ret) OVER w * AVG(log_ret) OVER w) * 1440 * 365
   ) * 100, 2) AS realized_vol_1h_ann,
   CASE
-    WHEN AVG(avg_spread) OVER w > 0 THEN
+    WHEN AVG(avg_rel_spread) OVER w > 0 THEN
       round(SQRT(
         (AVG(log_ret * log_ret) OVER w -
-            AVG(log_ret) OVER w * AVG(log_ret) OVER w) * 1440
-      ) / AVG(avg_spread) OVER w, 2)
+            AVG(log_ret) OVER w
+            * AVG(log_ret) OVER w) * 1440
+      ) / AVG(avg_rel_spread) OVER w, 2)
     ELSE NULL
   END AS vol_spread_ratio
 FROM returns
 WHERE log_ret IS NOT NULL
-WINDOW w AS (ORDER BY timestamp ROWS 59 PRECEDING);
+WINDOW w AS (
+  PARTITION BY symbol ORDER BY timestamp ROWS 59 PRECEDING
+);
 ```
 
 ## How it works
@@ -66,17 +72,17 @@ Gamma scalping is an options strategy where traders buy a straddle or strangle a
 This recipe addresses the spread cost side. The `vol_spread_ratio` measures how much the mid-price is moving per unit of transaction cost over a rolling one-hour window:
 
 - `realized_vol_1h_ann` is the annualized realized volatility, computed from one-minute log returns using the same method as the [realized volatility](/docs/cookbook/sql/finance/realized-volatility/) recipe
-- `spread_1h` is the average bid-ask spread over the same rolling hour
-- `vol_spread_ratio` divides the non-annualized hourly volatility by the average spread - higher values mean more price movement per unit of spread cost
+- `rel_spread_1h_bps` is the average relative bid-ask spread over the same rolling hour, expressed in basis points. Using relative spread (spread divided by mid-price) makes it dimensionless, matching the units of log-return volatility
+- `vol_spread_ratio` divides the non-annualized hourly volatility by the average relative spread - both are dimensionless, so the ratio is a pure number. Higher values mean more price movement per unit of spread cost
 
 The query computes both the spread and the mid-price in the same `SAMPLE BY` pass, so the spread is the average across all ticks within each one-minute bar, not just the closing snapshot.
 
 The named `WINDOW w` clause avoids repeating the frame definition, which is important for readability given three output columns sharing the same window.
 
-When interpreting the ratio: if it is consistently low (quiet market, wide spreads, or both), gamma scalping is unlikely to cover its transaction costs. Periods of elevated ratio, often around economic data releases or session overlaps, are when the strategy has the best chance of outperforming theta decay.
+When interpreting the ratio: if it is consistently low (quiet market, wide spreads, or both), gamma scalping is unlikely to cover its spread costs. Periods of elevated ratio, often around economic data releases or session overlaps, indicate favorable conditions for rebalancing. However, a high vol-spread ratio is necessary but not sufficient - the strategy must also overcome theta decay (the daily cost of holding the options), which depends on implied volatility and option pricing. This recipe only addresses the spread cost side.
 
 :::note Annualization factor
-The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `1440 * 365` (1,440 minutes per day times 365 days per year). For real FX markets (24/5), use `1440 * 252`. The `vol_spread_ratio` uses non-annualized hourly volatility (factor `1440` only, no yearly scaling) since both numerator and denominator are measured in the same price units.
+The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `1440 * 365` (1,440 minutes per day times 365 days per year). For real FX markets (24/5), use `1440 * 260` (see the [realized volatility](/docs/cookbook/sql/finance/realized-volatility/) recipe for why FX uses 260 rather than 252). The `vol_spread_ratio` uses non-annualized hourly volatility (factor `1440` only, no yearly scaling) since both numerator and denominator are dimensionless.
 :::
 
 :::info Related documentation

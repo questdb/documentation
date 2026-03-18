@@ -34,8 +34,15 @@ SELECT
   ) AS log_return
 FROM core_price
 WHERE symbol = @symbol
+  AND ecn = 'LMAX'
   AND timestamp IN @lookback;
 ```
+
+The `core_price` table contains quotes from multiple ECNs (LMAX, EBS, Currenex, Hotspot). Filtering to a single ECN avoids mixing venue-level price differences into returns - without the filter, consecutive rows may come from different venues, producing spurious returns that reflect venue spreads rather than true price moves.
+
+:::warning Tick returns and microstructure noise
+Raw tick-level log returns overstate volatility due to bid-ask bounce: even if the true price is unchanged, alternating bid- and ask-side quotes produce non-zero returns. For volatility estimation, use the [fixed-frequency](#fixed-frequency-log-returns) approach below, which aggregates ticks into bars before computing returns.
+:::
 
 ### Fixed-frequency log returns
 
@@ -61,7 +68,8 @@ SELECT
   symbol,
   round(close_mid, 5) AS close_mid,
   LN(close_mid / LAG(close_mid)
-      OVER (ORDER BY timestamp)) AS log_return
+      OVER (PARTITION BY symbol ORDER BY timestamp))
+      AS log_return
 FROM sampled;
 ```
 
@@ -70,7 +78,7 @@ FROM sampled;
 Log returns are defined as `ln(P_t / P_{t-1})` where `P_t` is the current price and `P_{t-1}` is the previous price. They are preferred over simple returns because:
 
 - **Additive over time**: you can sum log returns across periods to get the total return
-- **Symmetric**: a +10% gain and -10% loss don't net to zero with simple returns, but their log equivalents do
+- **Symmetric**: a round-trip always sums to zero. If the price goes from 100 to 110 and back to 100, the log returns are `ln(110/100) + ln(100/110) = 0`. With simple returns the same round-trip gives asymmetric percentages (+10% up, -9.09% down)
 
 `LAG(value) OVER (ORDER BY timestamp)` gives the previous row's value in timestamp order. The first row returns `NULL` since there is no predecessor, which propagates through `LN` as `NULL`.
 

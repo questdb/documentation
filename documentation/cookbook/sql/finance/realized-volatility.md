@@ -74,7 +74,11 @@ The query:
 - **Realized < Implied**: Options may be expensive
 
 :::note Annualization factor
-The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `365 * 96` (365 days × 96 fifteen-minute periods per day). For real FX markets (24/5), use `252 * 96`. For daily data, use `sqrt(252) ≈ 15.87`.
+The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `365 * 96` (365 days x 96 fifteen-minute periods per day). For real FX markets (24/5), use `260 * 96`. FX uses 260 (52 weeks x 5 trading days) rather than the 252 convention from US equities, which also excludes public holidays. For daily data, use `sqrt(260)`.
+:::
+
+:::note Variance formula
+The formula `E[X^2] - E[X]^2` computes population variance. Practitioners often prefer sample variance with Bessel's correction (dividing by N-1 instead of N). For rolling windows of 20+ bars the difference is small (under 5%), but be aware of the distinction when comparing against other implementations.
 :::
 
 ## Variant: from trade execution prices
@@ -138,7 +142,7 @@ FROM with_stats
 ORDER BY timestamp;
 ```
 
-This variant uses a 12-bar rolling window (one hour of 5-minute bars) and the annualization factor `288 * 365` (288 five-minute bars per day times 365 days).
+This variant uses a 12-bar rolling window (one hour of 5-minute bars) and the annualization factor `288 * 365` (288 five-minute bars per day times 365 days). The shorter window (1 hour vs 5 hours in the main query) produces a faster-reacting volatility estimate suited to intraday monitoring, while the 20-bar window on 15-minute bars gives a smoother signal better suited to longer-horizon analysis.
 
 :::info Related documentation
 - [Log returns](/docs/cookbook/sql/finance/log-returns/) - building block for this recipe
