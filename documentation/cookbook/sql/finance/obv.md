@@ -17,20 +17,30 @@ DECLARE
   @symbol := 'EURUSD',
   @lookback := '$now - 1M..$now'
 
-WITH with_direction AS (
+WITH ohlc AS (
+  SELECT
+    timestamp,
+    symbol,
+    last(price) AS close,
+    sum(quantity) AS volume
+  FROM fx_trades
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+  SAMPLE BY 15m ALIGN TO CALENDAR
+),
+with_direction AS (
   SELECT
     timestamp,
     symbol,
     close,
-    total_volume AS volume,
+    volume,
     CASE
-      WHEN close > lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN volume
-      WHEN close < lag(close) OVER (PARTITION BY symbol ORDER BY timestamp) THEN -volume
+      WHEN close > lag(close) OVER w THEN volume
+      WHEN close < lag(close) OVER w THEN -volume
       ELSE 0
     END AS directed_volume
-  FROM fx_trades_ohlc_1m
-  WHERE symbol = @symbol
-    AND timestamp IN @lookback
+  FROM ohlc
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
 )
 SELECT
   timestamp,
@@ -47,9 +57,10 @@ ORDER BY timestamp;
 ```
 
 The query:
-1. Compares each close to the previous close
-2. Assigns positive volume if price went up, negative if down, zero if unchanged
-3. Calculates cumulative sum of directed volume
+1. Aggregates raw trades into 15-minute bars with closing price and total volume
+2. Compares each bar's close to the previous close
+3. Assigns positive volume if price went up, negative if down, zero if unchanged
+4. Calculates cumulative sum of directed volume
 
 ## Interpreting results
 
