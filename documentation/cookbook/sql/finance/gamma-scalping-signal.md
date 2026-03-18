@@ -73,7 +73,7 @@ This recipe addresses the spread cost side. The `vol_spread_ratio` measures how 
 
 - `realized_vol_1h_ann` is the annualized realized volatility, computed from one-minute log returns using the same method as the [realized volatility](/docs/cookbook/sql/finance/realized-volatility/) recipe
 - `rel_spread_1h_bps` is the average relative bid-ask spread over the same rolling hour, expressed in basis points. Using relative spread (spread divided by mid-price) makes it dimensionless, matching the units of log-return volatility
-- `vol_spread_ratio` divides the non-annualized hourly volatility by the average relative spread - both are dimensionless, so the ratio is a pure number. Higher values mean more price movement per unit of spread cost
+- `vol_spread_ratio` divides the non-annualized daily volatility by the average relative spread - both are dimensionless, so the ratio is a pure number. Higher values mean more price movement per unit of spread cost
 
 The query computes both the spread and the mid-price in the same `SAMPLE BY` pass, so the spread is the average across all ticks within each one-minute bar, not just the closing snapshot.
 
@@ -82,7 +82,7 @@ The named `WINDOW w` clause avoids repeating the frame definition, which is impo
 When interpreting the ratio: if it is consistently low (quiet market, wide spreads, or both), gamma scalping is unlikely to cover its spread costs. Periods of elevated ratio, often around economic data releases or session overlaps, indicate favorable conditions for rebalancing. However, a high vol-spread ratio is necessary but not sufficient - the strategy must also overcome theta decay (the daily cost of holding the options), which depends on implied volatility and option pricing. This recipe only addresses the spread cost side.
 
 :::note Annualization factor
-The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `1440 * 365` (1,440 minutes per day times 365 days per year). For real FX markets (24/5), use `1440 * 260` (see the [realized volatility](/docs/cookbook/sql/finance/realized-volatility/) recipe for why FX uses 260 rather than 252). The `vol_spread_ratio` uses non-annualized hourly volatility (factor `1440` only, no yearly scaling) since both numerator and denominator are dimensionless.
+The demo FX data is simulated continuously (24/7, including weekends), so the annualization factor uses `1440 * 365` (1,440 minutes per day times 365 days per year). For real FX markets (24/5), use `1440 * 260` (see the [realized volatility](/docs/cookbook/sql/finance/realized-volatility/) recipe for why FX uses 260 rather than 252). The `vol_spread_ratio` uses non-annualized daily volatility (factor `1440`, i.e. minutes per day, without yearly scaling) since both numerator and denominator are dimensionless.
 :::
 
 :::info Related documentation

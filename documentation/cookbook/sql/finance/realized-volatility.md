@@ -15,7 +15,7 @@ You want to measure how volatile an asset has actually been, either for risk man
 ```questdb-sql demo title="Calculate 20-period realized volatility (annualized)"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH returns AS (
   SELECT
@@ -35,18 +35,14 @@ with_stats AS (
     symbol,
     close,
     log_return,
-    avg(log_return) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS mean_return,
-    avg(log_return * log_return) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS mean_sq_return
+    avg(log_return) OVER w AS mean_return,
+    avg(log_return * log_return) OVER w AS mean_sq_return
   FROM returns
   WHERE log_return IS NOT NULL
+  WINDOW w AS (
+    PARTITION BY symbol ORDER BY timestamp
+    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+  )
 )
 SELECT
   timestamp,
@@ -116,18 +112,14 @@ with_stats AS (
     symbol,
     close,
     log_return,
-    avg(log_return) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
-    ) AS mean_return,
-    avg(log_return * log_return) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
-    ) AS mean_sq_return
+    avg(log_return) OVER w AS mean_return,
+    avg(log_return * log_return) OVER w AS mean_sq_return
   FROM returns
   WHERE log_return IS NOT NULL
+  WINDOW w AS (
+    PARTITION BY symbol ORDER BY timestamp
+    ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
+  )
 )
 SELECT
   timestamp,
