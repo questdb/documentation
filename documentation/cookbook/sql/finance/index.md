@@ -69,6 +69,7 @@ Analyze market quality and trading costs.
 | Recipe | Description |
 |--------|-------------|
 | [Bid-Ask Spread](bid-ask-spread.md) | Spread metrics and analysis |
+| [Gamma Scalping Signal](gamma-scalping-signal.md) | Vol-spread ratio for gamma scalping conditions |
 | [Liquidity Comparison](liquidity-comparison.md) | Compare liquidity across instruments |
 
 ## Post-Trade Analysis
@@ -101,3 +102,4 @@ General-purpose financial calculations.
 |--------|-------------|
 | [Compound Interest](compound-interest.md) | Interest and growth calculations |
 | [Cumulative Product](cumulative-product.md) | Running product for returns |
+| [Log Returns](log-returns.md) | Compute log returns from consecutive prices |
