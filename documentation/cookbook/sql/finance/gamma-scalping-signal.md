@@ -4,7 +4,7 @@ sidebar_label: Gamma scalping signal
 description: Assess gamma scalping conditions by comparing realized volatility against bid-ask spread cost
 ---
 
-The vol-spread ratio compares realized price movement against the cost of crossing the bid-ask spread. A high ratio means the market is moving significantly relative to transaction costs; a low ratio means spread costs will likely eat into rebalancing profits.
+The vol-spread ratio compares realized price movement against the cost of crossing the bid-ask spread. A high ratio means the market is moving significantly relative to transaction costs; a low ratio means spread costs will likely eat into rebalancing profits. For background on the strategy itself, see the [gamma scalping strategies](https://questdb.com/glossary/gamma-scalping-strategies/) glossary entry.
 
 ## Problem
 
