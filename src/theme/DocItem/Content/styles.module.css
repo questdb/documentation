@@ -1,0 +1,19 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: var(--ifm-heading-margin-top) 0 var(--ifm-heading-margin-bottom) 0; 
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.header > h1 {
+  margin: 0 !important;
+}

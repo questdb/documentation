@@ -15,26 +15,22 @@ You want to identify breakout levels and trading ranges. Moving averages smooth 
 ```questdb-sql demo title="Calculate 20-period Donchian Channels"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH channels AS (
   SELECT
     timestamp,
     symbol,
     close,
-    max(high) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS upper_channel,
-    min(low) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-    ) AS lower_channel
+    max(high) OVER w AS upper_channel,
+    min(low) OVER w AS lower_channel
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
     AND timestamp IN @lookback
+  WINDOW w AS (
+    PARTITION BY symbol ORDER BY timestamp
+    ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+  )
 )
 SELECT
   timestamp,
