@@ -1,7 +1,6 @@
 import { useCallback, useState, useRef, useEffect } from "react"
 import clsx from "clsx"
 import copy from "copy-text-to-clipboard"
-import { useDoc } from "@docusaurus/plugin-content-docs/client"
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext"
 import IconCopy from "@theme/Icon/Copy"
 import IconSuccess from "@theme/Icon/Success"
@@ -45,12 +44,15 @@ export default function CopyPageButton(): JSX.Element {
   const copyTimeout = useRef<number | undefined>(undefined)
   const markdownCache = useRef<string | null>(null)
 
-  const { metadata } = useDoc()
   const { siteConfig } = useDocusaurusContext()
 
-  const markdownUrl = typeof window !== "undefined"
-    ? window.location.pathname + "index.md"
+  const basePath = siteConfig.baseUrl.replace(/\/$/, "")
+  const pathname = typeof window !== "undefined"
+    ? window.location.pathname.replace(/\/$/, "")
     : ""
+  const markdownUrl = pathname === basePath
+    ? basePath + "/index.md"
+    : pathname + ".md"
 
   const pageUrl = siteConfig.url + markdownUrl
   const chatPrompt = `I'd like to ask some questions about ${pageUrl}.\n\n`
