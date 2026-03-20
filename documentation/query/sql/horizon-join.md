@@ -15,6 +15,10 @@ It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) that combines
 [ASOF JOIN](/docs/query/sql/asof-join/) matching with a set of forward (or
 backward) time offsets, computing aggregations at each offset in a single pass.
 
+HORIZON JOIN supports joining against **multiple right-hand-side tables** in a
+single query, enabling aggregation of columns from several time-series sources
+against a common left-hand table and offset grid.
+
 ## Syntax
 
 ### RANGE form
@@ -25,7 +29,10 @@ given `STEP`:
 ```questdb-sql title="HORIZON JOIN with RANGE"
 SELECT [<keys>,] <aggregations>
 FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_table> AS <right_alias> [ON (<join_keys>)]
+HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
+[HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
+...
+HORIZON JOIN <right_table_N> AS <alias_N> [ON (<join_keys_N>)]
 RANGE FROM <from_expr> TO <to_expr> STEP <step_expr> AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -42,7 +49,10 @@ Specify explicit offsets as interval literals:
 ```questdb-sql title="HORIZON JOIN with LIST"
 SELECT [<keys>,] <aggregations>
 FROM <left_table> AS <left_alias>
-HORIZON JOIN <right_table> AS <right_alias> [ON (<join_keys>)]
+HORIZON JOIN <right_table_1> AS <alias_1> [ON (<join_keys_1>)]
+[HORIZON JOIN <right_table_2> AS <alias_2> [ON (<join_keys_2>)]]
+...
+HORIZON JOIN <right_table_N> AS <alias_N> [ON (<join_keys_N>)]
 LIST (<offset_expr>, ...) AS <horizon_alias>
 [WHERE <left_table_filter>]
 [GROUP BY <keys>]
@@ -53,18 +63,29 @@ For example, `LIST (0, 1s, 5s, 30s, 1m)` generates offsets at those specific
 points. Offsets must be monotonically increasing. Unitless `0` is allowed as
 shorthand for zero offset.
 
+When using multiple HORIZON JOINs, only the **last** HORIZON JOIN in the chain
+carries the `RANGE`/`LIST` and `AS` clauses. Preceding HORIZON JOINs omit them.
+Each right-hand table can independently use or omit the `ON` clause — you can
+freely mix keyed and non-keyed (timestamp-only ASOF) joins within the same
+query.
+
 ## How it works
 
 For each row in the left-hand table and each offset in the horizon:
 
 1. Compute `left_timestamp + offset`
-2. Perform an ASOF match against the right-hand table at that computed timestamp
+2. Perform an ASOF match against each right-hand table at that computed timestamp
 3. When join keys are provided (via `ON`), only right-hand rows matching the
    keys are considered
 
+With multiple right-hand tables, each table is matched independently at each
+offset. If a right-hand table has no match for a given row/offset combination,
+its columns resolve to `NULL` (or `NaN` for numeric types).
+
 Results are implicitly grouped by the non-aggregate SELECT columns (horizon
 offset, left-hand table keys, etc.), and aggregate functions are applied across
-all matched rows.
+all matched rows. Aggregate expressions can reference columns from different
+right-hand tables (e.g., `avg(b.bid + a.ask)`).
 
 ## The horizon pseudo-table
 
@@ -196,6 +217,63 @@ WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```
 
+### Multi-table: bid and ask spread around trades
+
+Join against two separate tables (bids and asks) in a single HORIZON JOIN query
+to compute the average spread at each horizon offset:
+
+```questdb-sql title="Multi-table HORIZON JOIN with bid/ask spread"
+SELECT
+    h.offset / 1000000000 AS horizon_sec,
+    t.sym,
+    avg(b.bid) AS avg_bid,
+    avg(a.ask) AS avg_ask,
+    avg(a.ask - b.bid) AS avg_spread
+FROM trades AS t
+HORIZON JOIN bids AS b ON (t.sym = b.sym)
+HORIZON JOIN asks AS a ON (t.sym = a.sym)
+    RANGE FROM -2s TO 2s STEP 2s AS h
+GROUP BY horizon_sec, t.sym
+ORDER BY t.sym, horizon_sec;
+```
+
+Note that the `RANGE` clause appears only on the last HORIZON JOIN.
+
+### Multi-table: keyed and non-keyed mix
+
+Combine a keyed join (matching by symbol) with a non-keyed join (timestamp-only
+ASOF) in the same query — useful when one source is symbol-specific and another
+is market-wide:
+
+```questdb-sql title="Mixed keyed and non-keyed HORIZON JOIN"
+SELECT
+    avg(p.price) AS avg_price,
+    avg(r.rate) AS avg_rate
+FROM trades AS t
+HORIZON JOIN prices AS p ON (t.sym = p.sym)
+HORIZON JOIN rates AS r
+    LIST (0, 1s, 5s) AS h;
+```
+
+Here `prices` is matched by symbol (keyed), while `rates` uses timestamp-only
+ASOF matching (non-keyed).
+
+### Multi-table: three right-hand tables
+
+HORIZON JOIN supports more than two right-hand tables:
+
+```questdb-sql title="Three-table HORIZON JOIN"
+SELECT
+    avg(b.bid) AS avg_bid,
+    avg(a.ask) AS avg_ask,
+    avg(m.mid) AS avg_mid
+FROM trades AS t
+HORIZON JOIN bids AS b ON (t.sym = b.sym)
+HORIZON JOIN asks AS a ON (t.sym = a.sym)
+HORIZON JOIN mids AS m ON (t.sym = m.sym)
+    LIST (0) AS h;
+```
+
 ## Mixed-precision timestamps
 
 The left-hand and right-hand tables can use different timestamp resolutions
@@ -228,22 +306,26 @@ Look for these indicators in the plan:
 - **Async Horizon Join**: Parallel execution using Java-evaluated expressions
 - **Async JIT Horizon Join**: Parallel execution using Just-In-Time-compiled
   expressions for better performance
+- **Async Multi Horizon Join**: Parallel execution with multiple right-hand
+  tables (shown with `tables: N` indicating the number of right-hand tables)
 
 ## Current limitations
 
-- **No other joins**: HORIZON JOIN cannot be combined with other joins in the
-  same level of the query. Joins can be done in an outer query.
+- **No other join types**: HORIZON JOIN cannot be combined with other join types
+  (e.g., `JOIN`, `ASOF JOIN`) in the same level of the query. Multiple HORIZON
+  JOINs are allowed, but mixing with non-HORIZON joins is not. Other joins can
+  be done in an outer query.
 - **No window functions**: Window functions cannot be used in HORIZON JOIN
   queries. Wrap the HORIZON JOIN in a subquery and apply window functions in the
   outer query.
 - **No SAMPLE BY**: `SAMPLE BY` cannot be used with HORIZON JOIN. Use `GROUP BY`
   with a time-bucketing expression instead.
 - **WHERE filters left-hand table only**: The `WHERE` clause can only reference
-  columns from the left-hand table. References to right-hand table columns or
-  horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
-- **Both tables must have a designated timestamp**: The left-hand and right-hand
-  tables must each have a designated timestamp column.
-- **Right-hand side must be a table**: The right-hand side of HORIZON JOIN must
+  columns from the left-hand table. References to any right-hand table columns
+  or horizon pseudo-table columns (`h.offset`, `h.timestamp`) are not allowed.
+- **All tables must have a designated timestamp**: The left-hand and all
+  right-hand tables must each have a designated timestamp column.
+- **Right-hand side must be a table**: Each right-hand side of HORIZON JOIN must
   be a table, not a subquery.
 - **RANGE constraints**: `STEP` must be positive; `FROM` must be less than or
   equal to `TO`.
