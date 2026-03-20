@@ -101,7 +101,9 @@ module.exports = () => ({
             urlPath = ""
           }
 
-          const outputFile = path.join(outputBase, urlPath, "index.md")
+          const outputFile = urlPath
+            ? path.join(outputBase, urlPath + ".md")
+            : path.join(outputBase, "index.md")
           const outputDir = path.dirname(outputFile)
 
           fs.mkdirSync(outputDir, { recursive: true })

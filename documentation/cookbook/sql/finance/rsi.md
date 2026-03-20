@@ -15,7 +15,7 @@ You want to identify when an asset may be overbought or oversold based on recent
 ```questdb-sql demo title="Calculate 14-period RSI with EMA smoothing"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH changes AS (
   SELECT
@@ -41,9 +41,10 @@ smoothed AS (
     timestamp,
     symbol,
     close,
-    avg(gain, 'period', 14) OVER (PARTITION BY symbol ORDER BY timestamp) AS avg_gain,
-    avg(loss, 'period', 14) OVER (PARTITION BY symbol ORDER BY timestamp) AS avg_loss
+    avg(gain, 'period', 14) OVER w AS avg_gain,
+    avg(loss, 'period', 14) OVER w AS avg_loss
   FROM gains_losses
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
 )
 SELECT
   timestamp,

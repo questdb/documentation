@@ -843,6 +843,7 @@ module.exports = {
                       collapsed: true,
                       items: [
                         "cookbook/sql/finance/bid-ask-spread",
+                        "cookbook/sql/finance/gamma-scalping-signal",
                         "cookbook/sql/finance/liquidity-comparison",
                       ],
                     },
@@ -861,6 +862,7 @@ module.exports = {
                       items: [
                         "cookbook/sql/finance/compound-interest",
                         "cookbook/sql/finance/cumulative-product",
+                        "cookbook/sql/finance/log-returns",
                       ],
                     },
                   ],
