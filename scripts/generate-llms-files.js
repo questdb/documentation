@@ -87,7 +87,9 @@ function generateUrl(docId, docPath) {
   if (docId === 'introduction') {
     return BASE_URL + "index.md"
   }
-  return normalizeUrl(BASE_URL + docId)
+  // Strip /index suffix to match raw-markdown plugin output (e.g. cookbook/index -> cookbook.md)
+  let urlDocId = docId.endsWith('/index') ? docId.slice(0, -'/index'.length) : docId
+  return normalizeUrl(BASE_URL + urlDocId)
 }
 
 function processForLlmsTxt(items, indent = 0, isTopLevel = false) {
