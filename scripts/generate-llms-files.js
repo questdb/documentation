@@ -54,7 +54,8 @@ function extractFrontmatter(filePath) {
 }
 
 function normalizeUrl(url) {
-  return url.endsWith("/") ? url : url + "/"
+  const clean = url.endsWith("/") ? url.slice(0, -1) : url
+  return clean + ".md"
 }
 
 function generateUrl(docId, docPath) {
@@ -68,7 +69,7 @@ function generateUrl(docId, docPath) {
     if (urlPath.startsWith('/')) {
       urlPath = urlPath.substring(1)
       if (urlPath === '') {
-        return normalizeUrl(BASE_URL)
+        return BASE_URL + "index.md"
       }
       return normalizeUrl(BASE_URL + urlPath)
     }
@@ -84,7 +85,7 @@ function generateUrl(docId, docPath) {
 
   // Default behavior: use docId
   if (docId === 'introduction') {
-    return normalizeUrl(BASE_URL)
+    return BASE_URL + "index.md"
   }
   return normalizeUrl(BASE_URL + docId)
 }
