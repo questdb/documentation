@@ -15,26 +15,22 @@ You want to identify overbought and oversold conditions based on where price is 
 ```questdb-sql demo title="Calculate Stochastic %K and %D"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH ranges AS (
   SELECT
     timestamp,
     symbol,
     close,
-    min(low) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 13 PRECEDING AND CURRENT ROW
-    ) AS lowest_low,
-    max(high) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS BETWEEN 13 PRECEDING AND CURRENT ROW
-    ) AS highest_high
+    min(low) OVER w AS lowest_low,
+    max(high) OVER w AS highest_high
   FROM market_data_ohlc_15m
   WHERE symbol = @symbol
     AND timestamp IN @lookback
+  WINDOW w AS (
+    PARTITION BY symbol ORDER BY timestamp
+    ROWS BETWEEN 13 PRECEDING AND CURRENT ROW
+  )
 ),
 with_k AS (
   SELECT

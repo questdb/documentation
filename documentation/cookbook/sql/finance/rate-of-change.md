@@ -15,7 +15,7 @@ You want a simple momentum indicator that shows how fast price is changing. Raw 
 ```questdb-sql demo title="Calculate 12-period Rate of Change"
 DECLARE
   @symbol := 'EURUSD',
-  @lookback := '$now - 1M..$now'
+  @lookback := '$now - 2d..$now'
 
 WITH with_lag AS (
   SELECT
