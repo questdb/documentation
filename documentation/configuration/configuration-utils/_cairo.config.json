@@ -19,22 +19,6 @@
     "default": "1 second",
     "description": "The minimum size of in-memory buffer in milliseconds. The buffer is allocated dynamically through analyzing the shape of the incoming data, and `o3MinLag` is the lower limit."
   },
-  "cairo.sql.backup.root": {
-    "default": "null",
-    "description": "Output root directory for backups."
-  },
-  "cairo.sql.backup.dir.datetime.format": {
-    "default": "null",
-    "description": "Date format for backup directory."
-  },
-  "cairo.sql.backup.dir.tmp.name": {
-    "default": "tmp",
-    "description": "Name of tmp directory used during backup."
-  },
-  "cairo.sql.backup.mkdir.mode": {
-    "default": "509",
-    "description": "Permission used when creating backup directories."
-  },
   "cairo.snapshot.instance.id": {
     "default": "empty string",
     "description": "Instance id to be included into disk snapshots."

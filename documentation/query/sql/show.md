@@ -184,8 +184,8 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 -- This query will return all parameters where the value contains 'tmp', ignoring upper/lower case
 (SHOW PARAMETERS) WHERE value ILIKE '%tmp%';
 
--- This query will return all parameters where the property_path is not 'cairo.root' or 'cairo.sql.backup.root', ordered by the first column
-(SHOW PARAMETERS) WHERE property_path NOT IN ('cairo.root', 'cairo.sql.backup.root') ORDER BY 1;
+-- This query will return all parameters where the property_path is not 'cairo.root' or 'cairo.snapshot.instance.id', ordered by the first column
+(SHOW PARAMETERS) WHERE property_path NOT IN ('cairo.root', 'cairo.snapshot.instance.id') ORDER BY 1;
 
 -- This query will return all parameters where the value_source is 'env'
 (SHOW PARAMETERS) WHERE value_source = 'env';
