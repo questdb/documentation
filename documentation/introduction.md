@@ -1,5 +1,5 @@
 ---
-title: Introduction
+title: "QuestDB Documentation - SQL Time-Series Database Guides"
 slug: /
 description:
   Official QuestDB documentation covering installation, data ingestion, SQL
