@@ -1,5 +1,7 @@
 ---
 title: "QuestDB Documentation - SQL Time-Series Database Guides"
+sidebar_label: Introduction
+hide_title: true
 slug: /
 description:
   Official QuestDB documentation covering installation, data ingestion, SQL
@@ -11,6 +13,8 @@ import { Guides } from "../src/components/Guides"
 import { Resources } from "../src/components/Resources"
 import { HeroPattern } from "../src/components/HeroPattern"
 import { DocButton } from "../src/components/DocButton"
+
+# Introduction
 
 QuestDB is an open source time-series database engineered for low latency. It uses a column-oriented, time-partitioned storage engine with memory-mapped files and vectorized (SIMD) execution to support high-throughput ingestion and millisecond-level analytical queries. The system is built from scratch with a zero-GC Java core and focused C++/Rust components, in a compact codebase optimized for cache locality and predictable tail latency. SQL is extended with time-series operators such as `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, and `WINDOW JOIN`. See [Architecture](https://questdb.com/docs/architecture/questdb-architecture/) for details.
 
