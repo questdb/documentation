@@ -88,6 +88,21 @@ CREATE TABLE trades (
 WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 ```
 
+#### Per-column Parquet encoding
+
+When columns have per-column Parquet encoding or compression overrides, they
+appear in the `SHOW CREATE TABLE` output:
+
+```questdb-sql
+CREATE TABLE sensors (
+	ts TIMESTAMP,
+	temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+	humidity FLOAT PARQUET(rle_dictionary),
+	device_id VARCHAR PARQUET(default, lz4_raw),
+	status INT
+) timestamp(ts) PARTITION BY DAY BYPASS WAL;
+```
+
 #### Enterprise variant
 
 [QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
@@ -169,8 +184,8 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 -- This query will return all parameters where the value contains 'tmp', ignoring upper/lower case
 (SHOW PARAMETERS) WHERE value ILIKE '%tmp%';
 
--- This query will return all parameters where the property_path is not 'cairo.root' or 'cairo.sql.backup.root', ordered by the first column
-(SHOW PARAMETERS) WHERE property_path NOT IN ('cairo.root', 'cairo.sql.backup.root') ORDER BY 1;
+-- This query will return all parameters where the property_path is not 'cairo.root' or 'cairo.snapshot.instance.id', ordered by the first column
+(SHOW PARAMETERS) WHERE property_path NOT IN ('cairo.root', 'cairo.snapshot.instance.id') ORDER BY 1;
 
 -- This query will return all parameters where the value_source is 'env'
 (SHOW PARAMETERS) WHERE value_source = 'env';
