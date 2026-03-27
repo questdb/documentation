@@ -1,7 +1,7 @@
 ---
-title: ALTER TABLE ALTER COLUMN SET/DROP PARQUET
+title: ALTER TABLE ALTER COLUMN SET PARQUET
 sidebar_label: PARQUET ENCODING/COMPRESSION
-description: ALTER TABLE ALTER COLUMN SET/DROP PARQUET SQL keyword reference documentation.
+description: ALTER TABLE ALTER COLUMN SET PARQUET SQL keyword reference documentation.
 ---
 
 Sets or removes per-column Parquet encoding and compression configuration on
@@ -27,12 +27,10 @@ ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(default, zstd(3));
 ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(rle_dictionary, zstd(3));
 ```
 
-## DROP
-
 Reset per-column overrides back to the server defaults.
 
 ```questdb-sql title="Reset to defaults"
-ALTER TABLE sensors ALTER COLUMN temperature DROP PARQUET;
+ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(default);
 ```
 
 ## Supported encodings and codecs
