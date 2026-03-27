@@ -452,7 +452,7 @@ For more details on Parquet compression, see the
 [Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
 
 To modify encoding or compression on existing tables, see
-[ALTER TABLE ALTER COLUMN SET/DROP PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
 
 ### Casting types
 
@@ -664,10 +664,10 @@ Checking the values per-table may be done using the `tables()` function:
 SELECT id, table_name, maxUncommittedRows FROM tables();
 ```
 
-| id  | name         | maxUncommittedRows |
-| :-- | :----------- | :----------------- |
-| 1   | trades       | 250000             |
-| 2   | sample_table | 50000              |
+| id   | name         | maxUncommittedRows |
+| :--- | :----------- | :----------------- |
+| 1    | trades       | 250000             |
+| 2    | sample_table | 50000              |
 
 ## Table target volume
 
