@@ -387,12 +387,12 @@ the server-wide compression codec
 
 #### Supported encodings
 
-| Encoding                | SQL keyword               | Valid column types           |
-| ----------------------- | ------------------------- | ---------------------------- |
-| Plain                   | `plain`                   | All                          |
-| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN and ARRAY |
-| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR      |
-| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP   |
+| Encoding                | SQL keyword               | Valid column types                   |
+| ----------------------- | ------------------------- | ------------------------------------ |
+| Plain                   | `plain`                   | All                                  |
+| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN, ARRAY AND STRING |
+| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR              |
+| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP           |
 
 - **Plain** — stores values as-is with no transformation. Simplest encoding
   with no overhead. Use as a fallback when data has high cardinality and no
