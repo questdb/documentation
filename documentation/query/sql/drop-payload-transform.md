@@ -39,6 +39,20 @@ DROP PAYLOAD TRANSFORM IF EXISTS binance_depth;
 | DLQ table | Not affected - existing error rows remain |
 | Active requests | In-flight `/ingest` requests may still complete |
 
+## Permissions
+
+:::note Enterprise
+
+In [QuestDB Enterprise](/enterprise/) deployments with
+[RBAC](/docs/security/rbac/) enabled, the user must hold the
+`DROP PAYLOAD TRANSFORM` grant.
+
+```questdb-sql
+GRANT DROP PAYLOAD TRANSFORM TO ingest_admin;
+```
+
+:::
+
 :::info Related documentation
 - [CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/)
 - [Payload transforms overview](/docs/ingestion/payload-transforms/)

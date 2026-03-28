@@ -141,6 +141,23 @@ returns an error so the caller knows the request failed.
 | Target table | The `/ingest` caller must have INSERT permission, checked at request time |
 | DLQ table | The DDL caller must have INSERT permission, checked at creation time. Runtime DLQ writes use the system security context |
 
+:::note Enterprise
+
+In [QuestDB Enterprise](/enterprise/) deployments with
+[RBAC](/docs/security/rbac/) enabled, the user creating the transform must hold
+the `CREATE PAYLOAD TRANSFORM` grant. The `/ingest` caller must also hold the
+`HTTP` endpoint grant and `INSERT` permission on the target table (and on the
+DLQ table, if configured).
+
+```questdb-sql
+GRANT CREATE PAYLOAD TRANSFORM TO ingest_admin;
+GRANT HTTP TO ingest_service;
+GRANT INSERT ON order_book TO ingest_service;
+GRANT INSERT ON dlq_errors TO ingest_service;
+```
+
+:::
+
 :::info Related documentation
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
 - [Payload transforms overview](/docs/ingestion/payload-transforms/)

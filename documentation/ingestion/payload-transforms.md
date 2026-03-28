@@ -125,6 +125,34 @@ Error:
 {"status": "error", "message": "..."}
 ```
 
+## Permissions
+
+In QuestDB Open Source, any user with access to the HTTP endpoint can create
+transforms and invoke `/ingest`.
+
+:::note Enterprise
+
+In [QuestDB Enterprise](/enterprise/) deployments with
+[RBAC](/docs/security/rbac/) enabled, the following grants are required:
+
+| Action | Required grants |
+| :----- | :-------------- |
+| Create a transform | `CREATE PAYLOAD TRANSFORM` and `INSERT` on the target table (and DLQ table, if configured) |
+| Drop a transform | `DROP PAYLOAD TRANSFORM` |
+| Invoke `/ingest` | `HTTP` endpoint grant and `INSERT` on the target table |
+
+```questdb-sql title="Typical Enterprise setup"
+-- Admin who manages transforms
+GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
+GRANT INSERT ON order_book, dlq_errors TO ingest_admin;
+
+-- Service account that calls /ingest
+GRANT HTTP TO ingest_service;
+GRANT INSERT ON order_book TO ingest_service;
+```
+
+:::
+
 ## Request size limit
 
 The `/ingest` endpoint rejects request bodies that exceed a configurable maximum

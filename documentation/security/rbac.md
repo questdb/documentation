@@ -566,16 +566,18 @@ SELECT * FROM all_permissions();
 | ATTACH PARTITION | Database &#124; Table | Attach partitions |
 | BACKUP DATABASE | Database | Create database backups |
 | CANCEL ANY COPY | Database | Cancel COPY operations |
-| CREATE TABLE | Database | Create tables |
 | CREATE MATERIALIZED VIEW | Database | Create materialized views |
+| CREATE PAYLOAD TRANSFORM | Database | Create payload transforms |
+| CREATE TABLE | Database | Create tables |
 | DEDUP ENABLE | Database &#124; Table | Enable deduplication |
 | DEDUP DISABLE | Database &#124; Table | Disable deduplication |
 | DETACH PARTITION | Database &#124; Table | Detach partitions |
 | DROP COLUMN | Database &#124; Table &#124; Column | Drop columns |
 | DROP INDEX | Database &#124; Table &#124; Column | Drop indexes |
 | DROP PARTITION | Database &#124; Table | Drop partitions |
-| DROP TABLE | Database &#124; Table | Drop tables |
 | DROP MATERIALIZED VIEW | Database &#124; Table | Drop materialized views |
+| DROP PAYLOAD TRANSFORM | Database | Drop payload transforms |
+| DROP TABLE | Database &#124; Table | Drop tables |
 | INSERT | Database &#124; Table | Insert data |
 | REFRESH MATERIALIZED VIEW | Database &#124; Table | Refresh materialized views |
 | REINDEX | Database &#124; Table &#124; Column | Reindex columns |
