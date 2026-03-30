@@ -145,12 +145,18 @@ returns an error so the caller knows the request failed.
 
 In [QuestDB Enterprise](/enterprise/) deployments with
 [RBAC](/docs/security/rbac/) enabled, the user creating the transform must hold
-the `CREATE PAYLOAD TRANSFORM` grant. The `/ingest` caller must also hold the
-`HTTP` endpoint grant and `INSERT` permission on the target table (and on the
-DLQ table, if configured).
+the `CREATE PAYLOAD TRANSFORM` grant. When using `OR REPLACE` on a transform
+that already exists, the user must also hold `DROP PAYLOAD TRANSFORM`. The
+`/ingest` caller must hold the `HTTP` endpoint grant and `INSERT` permission on
+the target table (and on the DLQ table, if configured).
 
 ```questdb-sql
+-- Create-only
 GRANT CREATE PAYLOAD TRANSFORM TO ingest_admin;
+
+-- If using OR REPLACE
+GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
+
 GRANT HTTP TO ingest_service;
 GRANT INSERT ON order_book TO ingest_service;
 GRANT INSERT ON dlq_errors TO ingest_service;

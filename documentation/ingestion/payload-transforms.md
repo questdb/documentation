@@ -138,6 +138,7 @@ In [QuestDB Enterprise](/enterprise/) deployments with
 | Action | Required grants |
 | :----- | :-------------- |
 | Create a transform | `CREATE PAYLOAD TRANSFORM` and `INSERT` on the target table (and DLQ table, if configured) |
+| Replace a transform (`OR REPLACE`) | `CREATE PAYLOAD TRANSFORM` and `DROP PAYLOAD TRANSFORM` |
 | Drop a transform | `DROP PAYLOAD TRANSFORM` |
 | Invoke `/ingest` | `HTTP` endpoint grant and `INSERT` on the target table |
 
