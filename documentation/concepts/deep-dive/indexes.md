@@ -14,6 +14,16 @@ Indexing is available for [symbol](/docs/concepts/symbol/) columns in both table
 and [materialized views](/docs/concepts/materialized-views). Index support
 for other types will be added over time.
 
+QuestDB supports two index types:
+
+| Index type | Syntax | Covering support | Best for |
+|------------|--------|-----------------|----------|
+| **Bitmap** (default) | `INDEX` or `INDEX TYPE BITMAP` | No | General-purpose, low write overhead |
+| **Posting** | `INDEX TYPE POSTING` | Yes (via `INCLUDE`) | Read-heavy workloads, selective queries, wide tables |
+
+See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
+for the detailed guide on the posting index and its covering query capabilities.
+
 ## Index creation and deletion
 
 The following are ways to index a `symbol` column:
