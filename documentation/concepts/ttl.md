@@ -112,10 +112,10 @@ A `ttlValue` of `0` means TTL is not configured.
 
 ## Removing TTL
 
-To disable automatic retention and keep all data:
+To disable automatic deletion and keep all data:
 
 ```questdb-sql
-ALTER TABLE trades SET TTL 0;
+ALTER TABLE trades SET TTL 0h;
 ```
 
 ## Guidelines

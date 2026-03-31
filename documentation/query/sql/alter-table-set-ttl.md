@@ -83,3 +83,9 @@ Set the TTL to 12 hours, using the shorthand syntax for the time unit:
 ```sql
 ALTER TABLE weather SET TTL 12h;
 ```
+
+Disable TTL:
+
+```questdb-sql
+ALTER TABLE weather SET TTL 0h;
+```
