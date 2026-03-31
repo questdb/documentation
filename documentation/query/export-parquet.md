@@ -211,5 +211,5 @@ penalty of keeping pages that barely compress.
 Individual columns can override the global encoding and compression settings.
 See [CREATE TABLE - Per-column Parquet encoding and compression](/docs/query/sql/create-table/#per-column-parquet-encoding-and-compression)
 for defining overrides at table creation, or
-[ALTER TABLE ALTER COLUMN SET/DROP PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
 for modifying existing tables.
