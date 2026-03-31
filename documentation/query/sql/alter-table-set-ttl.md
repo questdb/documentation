@@ -74,13 +74,13 @@ information on the behavior of this feature.
 
 Set the TTL to 3 weeks:
 
-```sql
+```questdb-sql
 ALTER TABLE weather SET TTL 3 WEEKS;
 ```
 
 Set the TTL to 12 hours, using the shorthand syntax for the time unit:
 
-```sql
+```questdb-sql
 ALTER TABLE weather SET TTL 12h;
 ```
 
