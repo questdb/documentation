@@ -4,60 +4,42 @@ sidebar_label: SHOW
 description: SHOW SQL keyword reference documentation.
 ---
 
-This keyword provides table, column, and partition information including
-metadata. The `SHOW` keyword is useful for checking the
-[designated timestamp setting](/docs/concepts/designated-timestamp/) column, the
-[partition attachment settings](/docs/query/sql/alter-table-attach-partition/),
-and partition storage size on disk.
+`SHOW` returns metadata about tables, columns, partitions, transforms,
+configuration, and users.
 
-## Syntax
+## Available statements
 
-![Flow chart showing the syntax of the SHOW keyword](/images/docs/diagrams/show.svg)
+- [`SHOW COLUMNS`](#show-columns) - column metadata for a table
+- [`SHOW CREATE TABLE`](#show-create-table) - DDL to recreate a table
+- [`SHOW CREATE VIEW`](#show-create-view) - DDL to recreate a view
+- [`SHOW GROUPS`](#show-groups) - groups a user belongs to, or all groups (enterprise)
+- [`SHOW PARAMETERS`](#show-parameters) - configuration keys, values, and sources
+- [`SHOW PARTITIONS`](#show-partitions) - partition information for a table
+- [`SHOW PAYLOAD TRANSFORMS`](#show-payload-transforms) - all defined payload transforms
+- [`SHOW PERMISSIONS`](#show-permissions) - permissions for a user, group, or service account (enterprise)
+- [`SHOW SERVER_VERSION`](#show-server_version) - PostgreSQL compatibility version
+- [`SHOW SERVICE ACCOUNT`](#show-service-account) - details of a service account (enterprise)
+- [`SHOW SERVICE ACCOUNTS`](#show-service-accounts) - all service accounts, or those assigned to a user/group (enterprise)
+- [`SHOW TABLES`](#show-tables) - all tables
+- [`SHOW USER`](#show-user) - user authentication details (enterprise)
+- [`SHOW USERS`](#show-users) - all users (enterprise)
 
-## Description
+## SHOW COLUMNS
 
-- `SHOW TABLES` returns all the tables.
-- `SHOW COLUMNS` returns all the columns and their metadata for the selected
-  table.
-- `SHOW PARTITIONS` returns the partition information for the selected table.
-- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
-- `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
-- `SHOW USER` shows user secret (enterprise-only)
-- `SHOW GROUPS` shows all groups the user belongs or all groups in the system
-    (enterprise-only)
-- `SHOW USERS` shows all users (enterprise-only)
-- `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
-- `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
-  user/group (enterprise-only)
-- `SHOW PERMISSIONS` displays permissions of user, group or service account
-  (enterprise-only)
-- `SHOW PAYLOAD TRANSFORMS` lists all defined payload transforms
-- `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
-- `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
-  their values and the source of the value
+### Syntax
 
-## Examples
-
-### SHOW TABLES
-
-```questdb-sql title="show tables" demo
-SHOW TABLES;
+```
+SHOW COLUMNS FROM tableName
 ```
 
-| table_name      |
-| --------------- |
-| ethblocks_json  |
-| trades          |
-| weather         |
-| AAPL_orderbook  |
-| trips           |
+Returns all columns and their metadata for the selected table.
 
-### SHOW COLUMNS
+### Example
 
-```questdb-sql title="show columns" demo
+```questdb-sql title="Show columns" demo
 SHOW COLUMNS FROM trades;
-
 ```
+
 | column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey |
 | --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- |
 | symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |
@@ -66,9 +48,19 @@ SHOW COLUMNS FROM trades;
 | amount    | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |
 | timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |
 
-### SHOW CREATE TABLE
+## SHOW CREATE TABLE
 
-```questdb-sql title="retrieving table ddl" demo
+### Syntax
+
+```
+SHOW CREATE TABLE tableName
+```
+
+Returns a DDL query that allows you to recreate the table.
+
+### Example
+
+```questdb-sql title="Show create table" demo
 SHOW CREATE TABLE trades;
 ```
 
@@ -127,9 +119,19 @@ This clause assigns permissions for the table to that user.
 If permissions should be assigned to a different user,
 please modify this clause appropriately.
 
-### SHOW CREATE VIEW
+## SHOW CREATE VIEW
 
-```questdb-sql title="retrieving view ddl"
+### Syntax
+
+```
+SHOW CREATE VIEW viewName
+```
+
+Returns a DDL query that allows you to recreate a view.
+
+### Example
+
+```questdb-sql title="Show create view"
 SHOW CREATE VIEW my_view;
 ```
 
@@ -140,39 +142,48 @@ SHOW CREATE VIEW my_view;
 This returns the `CREATE VIEW` statement that would recreate the view,
 including any `DECLARE` parameters if the view is parameterized.
 
-### SHOW PARTITIONS
+## SHOW GROUPS
+
+### Syntax
+
+```
+SHOW GROUPS [ entityName ]
+```
+
+Shows all groups in the system, or all groups a user belongs to. Enterprise only.
+
+### Examples
 
 ```questdb-sql
-SHOW PARTITIONS FROM my_table;
+SHOW GROUPS;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
-
-### SHOW PAYLOAD TRANSFORMS
-
-Lists all defined [payload transforms](/docs/ingestion/payload-transforms/).
-
-```questdb-sql title="List all payload transforms"
-SHOW PAYLOAD TRANSFORMS;
+```questdb-sql
+SHOW GROUPS john;
 ```
 
-| name | target_table | dlq_table | query |
-| :--- | :--- | :--- | :--- |
-| binance_depth | order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS ts, @symbol AS symbol, ... |
-| raw_events | event_log | | SELECT now() AS ts, payload() AS raw_body |
+| name       |
+| ---------- |
+| management |
 
-### SHOW PARAMETERS
+## SHOW PARAMETERS
+
+### Syntax
+
+```
+SHOW PARAMETERS
+```
+
+Shows configuration keys and their matching `env_var_name`, their values, and
+the source of the value.
+
+### Example
 
 ```questdb-sql
 SHOW PARAMETERS;
 ```
 
-The output demonstrates:
+The output columns:
 
 - `property_path`: the configuration key
 - `env_var_name`: the matching env var for the key
@@ -191,7 +202,6 @@ The output demonstrates:
 | pg.readonly.password                            | QDB_PG_READONLY_PASSWORD                            | ****                        | default      | true      | true       |
 | http.password                                   | QDB_HTTP_PASSWORD                                   | ****                        | default      | true      | false      |
 
-
 You can optionally chain `SHOW PARAMETERS` with other clauses:
 
 ```questdb-sql
@@ -208,58 +218,135 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 (SHOW PARAMETERS) WHERE  value_source <> 'default';
 ```
 
-### SHOW USER
+## SHOW PARTITIONS
 
-```questdb-sql
-SHOW USER; --as john
+### Syntax
+
+```
+SHOW PARTITIONS FROM tableName
 ```
 
-or
+Returns partition information for the selected table.
+
+### Example
 
 ```questdb-sql
-SHOW USER john;
+SHOW PARTITIONS FROM my_table;
 ```
 
-| auth_type  | enabled |
-| ---------- | ------- |
-| Password   | false   |
-| JWK Token  | false   |
-| REST Token | false   |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
 
-### SHOW USERS
+## SHOW PAYLOAD TRANSFORMS
+
+### Syntax
+
+```
+SHOW PAYLOAD TRANSFORMS
+```
+
+Lists all defined [payload transforms](/docs/ingestion/payload-transforms/).
+
+### Example
+
+```questdb-sql title="List all payload transforms"
+SHOW PAYLOAD TRANSFORMS;
+```
+
+| name | target_table | dlq_table | query |
+| :--- | :--- | :--- | :--- |
+| binance_depth | order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS ts, @symbol AS symbol, ... |
+| raw_events | event_log | | SELECT now() AS ts, payload() AS raw_body |
+
+## SHOW PERMISSIONS
+
+### Syntax
+
+```
+SHOW PERMISSIONS [ entityName ]
+```
+
+Displays permissions of a user, group, or service account. Enterprise only.
+
+Without an argument, shows permissions for the current user.
+
+### Examples
+
+```questdb-sql title="Current user"
+SHOW PERMISSIONS;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     |            |             | t            | G      |
+
+```questdb-sql title="Specific user"
+SHOW PERMISSIONS admin;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     |            |             | t            | G      |
+| INSERT     | orders     |             | f            | G      |
+| UPDATE     | order_itme | quantity    | f            | G      |
+
+```questdb-sql title="Group"
+SHOW PERMISSIONS admin_group;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| INSERT     | orders     |             | f            | G      |
+
+```questdb-sql title="Service account"
+SHOW PERMISSIONS ilp_ingestion;
+```
+
+| permission | table_name | column_name | grant_option | origin |
+| ---------- | ---------- | ----------- | ------------ | ------ |
+| SELECT     |            |             | t            | G      |
+| INSERT     |            |             | f            | G      |
+| UPDATE     |            |             | f            | G      |
+
+## SHOW SERVER_VERSION
+
+### Syntax
+
+```
+SHOW SERVER_VERSION
+```
+
+Shows PostgreSQL compatibility version.
+
+### Example
 
 ```questdb-sql
-SHOW USERS;
+SHOW SERVER_VERSION;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| server_version |
+| -------------- |
+| 12.3 (questdb) |
 
-### SHOW GROUPS
+## SHOW SERVICE ACCOUNT
 
-```questdb-sql
-SHOW GROUPS;
+### Syntax
+
+```
+SHOW SERVICE ACCOUNT [ accountName ]
 ```
 
-or
+Displays details of a service account. Enterprise only.
 
-```questdb-sql
-SHOW GROUPS john;
-```
-
-| name       |
-| ---------- |
-| management |
-
-### SHOW SERVICE ACCOUNT
+### Examples
 
 ```questdb-sql
 SHOW SERVICE ACCOUNT;
 ```
-
-or
 
 ```questdb-sql
 SHOW SERVICE ACCOUNT ilp_ingestion;
@@ -271,7 +358,18 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 | JWK Token  | false   |
 | REST Token | false   |
 
-### SHOW SERVICE ACCOUNTS
+## SHOW SERVICE ACCOUNTS
+
+### Syntax
+
+```
+SHOW SERVICE ACCOUNTS [ entityName ]
+```
+
+Displays all service accounts, or those assigned to a user or group. Enterprise
+only.
+
+### Examples
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS;
@@ -298,63 +396,76 @@ SHOW SERVICE ACCOUNTS admin_group;
 | ---------- |
 | svc1_admin |
 
-### SHOW PERMISSIONS FOR CURRENT USER
+## SHOW TABLES
 
-```questdb-sql
-SHOW PERMISSIONS;
+### Syntax
+
+```
+SHOW TABLES
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
+Returns all tables.
 
-### SHOW PERMISSIONS user
+### Example
 
-```questdb-sql
-SHOW PERMISSIONS admin;
+```questdb-sql title="Show tables" demo
+SHOW TABLES;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     | orders     |             | f            | G      |
-| UPDATE     | order_itme | quantity    | f            | G      |
+| table_name      |
+| --------------- |
+| ethblocks_json  |
+| trades          |
+| weather         |
+| AAPL_orderbook  |
+| trips           |
 
-### SHOW PERMISSIONS
+## SHOW USER
 
-#### For a group
+### Syntax
 
-```questdb-sql
-SHOW PERMISSIONS admin_group;
+```
+SHOW USER [ userName ]
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| INSERT     | orders     |             | f            | G      |
+Shows user authentication details. Enterprise only.
 
-#### For a service account
+### Examples
 
 ```questdb-sql
-SHOW PERMISSIONS ilp_ingestion;
+SHOW USER; --as john
 ```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     |            |             | t            | G      |
-| INSERT     |            |             | f            | G      |
-| UPDATE     |            |             | f            | G      |
-
-### SHOW SERVER_VERSION
-
-Shows PostgreSQL compatibility version.
 
 ```questdb-sql
-SHOW SERVER_VERSION;
+SHOW USER john;
 ```
 
-| server_version |
-| -------------- |
-| 12.3 (questdb) |
+| auth_type  | enabled |
+| ---------- | ------- |
+| Password   | false   |
+| JWK Token  | false   |
+| REST Token | false   |
+
+## SHOW USERS
+
+### Syntax
+
+```
+SHOW USERS
+```
+
+Shows all users. Enterprise only.
+
+### Example
+
+```questdb-sql
+SHOW USERS;
+```
+
+| name  |
+| ----- |
+| admin |
+| john  |
 
 ## See also
 
