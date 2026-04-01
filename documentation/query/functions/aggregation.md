@@ -88,6 +88,21 @@ calculations. Functions are organized by category below.
 | [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
 | [weighted_stddev_rel](#weighted_stddev_rel) | Weighted standard deviation (reliability weights) |
 
+### Array aggregates
+
+Several aggregates on this page ([first](#first), [first_not_null](#first_not_null),
+[last](#last), [last_not_null](#last_not_null)) accept array columns directly.
+For element-wise aggregation across arrays — summing, averaging, or finding
+min/max position-by-position — see the
+[array functions](/docs/query/functions/array/) page.
+
+| Function | Description |
+| :------- | :---------- |
+| [array_elem_avg](/docs/query/functions/array/#array_elem_avg) | Element-wise average across arrays |
+| [array_elem_max](/docs/query/functions/array/#array_elem_max) | Element-wise maximum across arrays |
+| [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
+| [array_elem_sum](/docs/query/functions/array/#array_elem_sum) | Element-wise sum across arrays |
+
 ---
 
 QuestDB supports implicit `GROUP BY`. When aggregate functions are used with
