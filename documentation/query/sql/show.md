@@ -31,6 +31,7 @@ and partition storage size on disk.
   user/group (enterprise-only)
 - `SHOW PERMISSIONS` displays permissions of user, group or service account
   (enterprise-only)
+- `SHOW PAYLOAD TRANSFORMS` lists all defined payload transforms
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
 - `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
   their values and the source of the value
@@ -151,6 +152,19 @@ SHOW PARTITIONS FROM my_table;
 | 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
 | 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
 | 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
+
+### SHOW PAYLOAD TRANSFORMS
+
+Lists all defined [payload transforms](/docs/ingestion/payload-transforms/).
+
+```questdb-sql title="List all payload transforms"
+SHOW PAYLOAD TRANSFORMS;
+```
+
+| name | target_table | dlq_table | query |
+| :--- | :--- | :--- | :--- |
+| binance_depth | order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS ts, @symbol AS symbol, ... |
+| raw_events | event_log | | SELECT now() AS ts, payload() AS raw_body |
 
 ### SHOW PARAMETERS
 
