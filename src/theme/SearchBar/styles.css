@@ -3,6 +3,10 @@
   --docsearch-text-color: var(--ifm-font-color-base);
 }
 
+.DocSearch-Modal {
+  margin-top: var(--ifm-navbar-height);
+}
+
 .DocSearch-Button {
   margin: 0;
   transition: all var(--ifm-transition-fast)
@@ -16,6 +20,12 @@
 @media (min-width: 998px) { /* lg */
   .DocSearch-Button {
     gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .DocSearch-Modal {
+    height: calc(100vh - var(--ifm-navbar-height));
   }
 }
 

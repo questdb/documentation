@@ -9,9 +9,13 @@
   Strict-Transport-Security: max-age=15768000
 
 /*/*.md
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, OPTIONS
   Cache-Control: public, max-age=60
 
 /*/web-console/*.json
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, OPTIONS
   Cache-Control: public, max-age=60
 
 # Cache JavaScript, CSS, SVG, TXT, and WebP files for a year

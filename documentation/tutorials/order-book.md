@@ -1,4 +1,7 @@
-# Order book analytics using arrays
+---
+title: Order book analytics using arrays
+description: Learn how to store and analyze order book data using 2D arrays in QuestDB, including mid-price calculation, spread analysis, and volume-weighted metrics.
+---
 
 In the following examples, we'll use the table schema below. The order book is
 stored in a 2D array with two rows: the top row are the prices, and the bottom

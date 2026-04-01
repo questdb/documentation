@@ -112,7 +112,7 @@ SAMPLE BY 1h;
 
 How does execution cost scale with order size? Bucket fills by quantity, then use [HORIZON JOIN](/docs/query/sql/horizon-join/) with `PIVOT` to see markout and spread at multiple horizons in a single wide row per symbol and bucket:
 
-```questdb-sql title="Cost by size bucket — pivoted (buy side)"
+```questdb-sql title="Cost by size bucket — pivoted (buy side)" demo
 WITH fills AS (
     SELECT
         t.symbol,
@@ -156,7 +156,7 @@ Adjust the bucket thresholds to match your typical trade sizes. The boundaries a
 
 Which counterparties are the most expensive to trade with, all-in? Group by counterparty, ECN, and passive/aggressive, then pivot across horizons to see whether the cost is immediate (spread) or delayed (adverse selection):
 
-```questdb-sql title="Counterparty cost attribution — pivoted (buy side)"
+```questdb-sql title="Counterparty cost attribution — pivoted (buy side)" demo
 WITH cp_costs AS (
     SELECT
         t.symbol,
@@ -196,7 +196,7 @@ Ordered by `t_1m_markout_bps` ascending, the most toxic counterparties appear fi
 
 When is it cheapest to trade? Group by `hour(t.timestamp)` and pivot across horizons to build a heatmap of execution cost throughout the day:
 
-```questdb-sql title="Intraday cost profile — hourly heatmap (buy side)"
+```questdb-sql title="Intraday cost profile — hourly heatmap (buy side)" demo
 WITH hourly AS (
     SELECT
         t.symbol,
@@ -234,7 +234,7 @@ Each row is one symbol-hour combination with fill count, markout, and spread at 
 
 Roll up execution costs into a daily P&L view per symbol and ECN. Unlike the bps-based metrics above, this uses absolute P&L (`(mid - price) * quantity`) so you can see dollar impact:
 
-```questdb-sql title="Daily P&L attribution (buy side)"
+```questdb-sql title="Daily P&L attribution (buy side)" demo
 WITH daily AS (
     SELECT
         t.symbol,
