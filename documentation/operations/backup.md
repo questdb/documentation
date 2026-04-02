@@ -119,58 +119,6 @@ specifies a directory for atomic write operations during backup.
 | `backup.enable.partition.hashes` | Compute BLAKE3 hashes during backup | `false` |
 | `backup.verify.partition.hashes` | Verify hashes during restore | `false` |
 
-### Run a backup
-
-Once configured, you can run a backup at any time using the following command:
-
-```questdb-sql title="Backup database"
-BACKUP DATABASE;
-```
-
-Example output:
-
-| backup_timestamp              |
-| ----------------------------- |
-| 2024-08-24T12:34:56.789123Z   |
-
-The backup captures the committed database state at the moment the command
-executes. In-flight transactions are not included.
-
-### Monitor and abort
-
-You can monitor backup progress and history using the `backups()` table function:
-
-```questdb-sql title="Backup history"
-SELECT * FROM backups();
-```
-
-Example output:
-
-| status              | progress_percent | start_ts                    | end_ts                      | backup_error     | cleanup_error |
-|---------------------|------------------|-----------------------------|-----------------------------|------------------|---------------|
-| backup complete     | 100              | 2025-07-30T12:49:30.554262Z | 2025-07-30T16:19:48.554262Z |                  |               |
-| backup complete     | 100              | 2025-08-06T14:15:22.882130Z | 2025-08-06T17:09:57.882130Z |                  |               |
-| backup failed       | 35               | 2025-08-20T11:58:03.675219Z | 2025-08-20T12:14:07.675219Z | connection error |               |
-| backup in progress  | 10               | 2025-08-27T15:42:18.281907Z |                             |                  |               |
-| cleanup in progress | 100              | 2025-08-13T13:37:41.103729Z | 2025-08-13T16:44:25.103729Z |                  |               |
-
-Status values:
-
-| Status                | Meaning                          | Action                          |
-|-----------------------|----------------------------------|---------------------------------|
-| `backup in progress`  | Backup is currently running      | Wait or run `BACKUP ABORT`      |
-| `backup complete`     | Backup finished successfully     | None required                   |
-| `backup failed`       | Backup encountered an error      | Check `backup_error` column     |
-| `cleanup in progress` | Old backup data is being removed | Wait for completion             |
-| `cleanup complete`    | Cleanup finished successfully    | None required                   |
-| `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column    |
-
-To abort a running backup:
-
-```questdb-sql title="Abort backup"
-BACKUP ABORT;
-```
-
 ### Scheduled backups
 
 You can configure automatic scheduled backups using cron syntax. The example
@@ -231,30 +179,216 @@ SELECT reload_config();
 
 You can also use this to enable and disable the schedule by adding or commenting out the `backup.schedule.cron` config setting.
 
+### Run a backup
 
-### Backup instance name
+Once configured, you can run a backup at any time using the following command:
 
-Each QuestDB instance has a backup instance name (three random words like
-`gentle-forest-orchid`). This name is generated on the first backup and
-organizes backups in the object store under `backup/<backup_instance_name>/`.
-
-To find your instance name, run:
-
-```questdb-sql
-SELECT backup_instance_name;
+```questdb-sql title="Backup database"
+BACKUP DATABASE;
 ```
 
-Returns `null` if no backup has been run yet.
+Example output:
 
-### Replication WAL cleanup integration
+| backup_timestamp              |
+| ----------------------------- |
+| 2024-08-24T12:34:56.789123Z   |
 
-When replication is enabled, the
-[WAL cleaner](/docs/high-availability/wal-cleanup/) uses backup manifests to
-determine which replicated WAL data in object storage can be safely deleted.
-By default, the cleaner retains replication data for as many backups as your
-[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5) and
-deletes everything older. No additional configuration is required — enabling
-backups on a replicated instance is sufficient.
+The backup captures the committed database state at the moment the command
+executes. In-flight transactions are not included.
+
+### Monitor and abort
+
+You can monitor backup progress and history using the `backups()` table function:
+
+```questdb-sql title="Backup history"
+SELECT * FROM backups();
+```
+
+Example output:
+
+| status              | progress_percent | start_ts                    | end_ts                      | backup_error     | cleanup_error |
+|---------------------|------------------|-----------------------------|-----------------------------|------------------|---------------|
+| backup complete     | 100              | 2025-07-30T12:49:30.554262Z | 2025-07-30T16:19:48.554262Z |                  |               |
+| backup complete     | 100              | 2025-08-06T14:15:22.882130Z | 2025-08-06T17:09:57.882130Z |                  |               |
+| backup failed       | 35               | 2025-08-20T11:58:03.675219Z | 2025-08-20T12:14:07.675219Z | connection error |               |
+| backup in progress  | 10               | 2025-08-27T15:42:18.281907Z |                             |                  |               |
+| cleanup in progress | 100              | 2025-08-13T13:37:41.103729Z | 2025-08-13T16:44:25.103729Z |                  |               |
+
+Status values:
+
+| Status                | Meaning                          | Action                          |
+|-----------------------|----------------------------------|---------------------------------|
+| `backup in progress`  | Backup is currently running      | Wait or run `BACKUP ABORT`      |
+| `backup complete`     | Backup finished successfully     | None required                   |
+| `backup failed`       | Backup encountered an error      | Check `backup_error` column     |
+| `cleanup in progress` | Old backup data is being removed | Wait for completion             |
+| `cleanup complete`    | Cleanup finished successfully    | None required                   |
+| `cleanup failed`      | Cleanup encountered an error     | Check `cleanup_error` column    |
+
+To abort a running backup:
+
+```questdb-sql title="Abort backup"
+BACKUP ABORT;
+```
+
+### Restore
+
+Restore is fast—approximately 1.8 TiB can be restored in under 20 minutes,
+depending on network bandwidth and storage performance.
+
+:::caution
+
+Enterprise backup restore uses a different trigger file (`_backup_restore`) than
+OSS checkpoint restore (`_restore`). Do not confuse these two mechanisms.
+
+:::
+
+To restore from an object store backup, create a `_backup_restore` file in the
+QuestDB install root. This is a properties file with the object store
+configuration and optional selector fields. On startup, QuestDB reads this file,
+selects the requested backup timestamp (or the latest available), downloads the
+backup data, and reconstructs the local database state.
+
+```conf
+backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
+backup.instance.name=gentle-forest-orchid
+backup.restore.timestamp=2024-08-24T12:34:56.789123Z
+```
+
+Parameters:
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `backup.object.store` | Sometimes | Object store connection string; required unless already specified in `server.conf` |
+| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
+| `backup.restore.timestamp` | No | Timestamp for point-in-time recovery; omit for latest backup |
+
+#### Point-in-time recovery
+
+Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
+finds the most recent successful backup at or before the specified timestamp.
+
+To find available backup timestamps, query the source instance:
+
+```questdb-sql
+SELECT start_ts FROM backups() WHERE status = 'backup complete';
+```
+
+You can also specify an arbitrary timestamp (e.g., just before an accidental
+deletion). QuestDB restores from the nearest available backup before that time.
+
+If no backup exists at or before the specified timestamp, QuestDB fails to start
+with the error: `backup restore error: No backup timestamp found that is <=`.
+
+:::warning
+
+Restore requires an empty database directory. If the target database already
+has data (indicated by the presence of `db/.data_id`), restore fails with:
+"The local database is not empty." Use a fresh installation directory for
+restore operations.
+
+:::
+
+The QuestDB version performing the restore must be the same as or newer than
+the version that created the backup.
+
+Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
+
+#### Restore failure recovery
+
+If restore fails, QuestDB creates artifacts to help diagnose and recover:
+
+| Artifact | Purpose |
+|----------|---------|
+| `.restore_failed/` | Directory containing tables that failed to restore |
+| `_restore_failed` | File listing the names of failed tables |
+
+To recover from a failed restore:
+
+1. Check the `.restore_failed/` directory and `_restore_failed` file for details
+2. Investigate and fix the underlying issue (connectivity, permissions, etc.)
+3. Remove both `.restore_failed/` directory and `_restore_failed` file
+4. Restart QuestDB to retry the restore
+
+If you see the error "Failed restore directory found", a previous restore
+attempt failed. Remove the artifacts listed above before restarting.
+
+#### Backup validation
+
+Backup integrity is verified during restore, not as a standalone operation.
+QuestDB performs the following checks when restoring:
+
+- **Transaction log verification**: Header, hash, and size validation of
+  transaction log entries (always enabled)
+- **Partition hash verification**: Optional BLAKE3 hash comparison for each
+  file in every partition
+- **Manifest validation**: Version compatibility and path safety checks
+
+To enable partition hash verification, set these properties in `server.conf`:
+
+```conf
+backup.enable.partition.hashes=true    # Compute hashes during backup
+backup.verify.partition.hashes=true    # Verify hashes during restore
+```
+
+If verification fails, restore stops immediately with an error such as:
+`hash mismatch [path=col1.d, expected=..., actual=...]`
+
+There is no standalone `VALIDATE BACKUP` command or dry-run restore option.
+Object store integrity relies on the storage provider (e.g., S3's built-in
+checksums).
+
+### Create a replica from a backup
+
+You can use a backup to bootstrap a new replica instance instead of relying
+solely on WAL replay from the object store. This is faster when the backup is
+more recent than the oldest available WAL data.
+
+1. **Ensure the primary is running and has replication configured**
+
+   The primary must have `replication.role=primary` and a configured
+   `replication.object.store`.
+
+2. **Create a `_backup_restore` file on the new replica machine**
+
+   Point it to the same backup location used by the primary:
+
+   ```conf
+   backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
+   backup.instance.name=gentle-forest-orchid
+   ```
+
+3. **Configure the replica**
+
+   Set `replication.role=replica` and ensure `replication.object.store` points
+   to the same object store as the primary.
+
+4. **Start the replica**
+
+   QuestDB restores from the backup first, then switches to WAL replay to catch
+   up with the primary.
+
+For more details on replication setup, see the
+[replication guide](/docs/high-availability/setup/).
+
+### Limitations
+
+- **Database-wide only**: Backup captures the entire database. You cannot
+  exclude tables or backup selected tables individually. Every backup includes
+  all user tables, materialized views, and metadata.
+- **One backup at a time**: Only one backup can run at any given time. Starting
+  a new backup while one is running will return an error.
+- **Primary and replica backups are separate**: Each QuestDB instance has its
+  own [`backup_instance_name`](#backup-instance-name), so backing up both
+  a primary and its replica creates two separate backup sets in the object
+  store. Typically, backing up the primary is sufficient since replicas sync
+  from the same data.
+- **Same backup object store for all nodes**: When using replication, all
+  nodes in the cluster should use the same `backup.object.store` connection
+  string. The [WAL cleaner](/docs/high-availability/wal-cleanup/) reads
+  backup manifests from every node to determine what replication data can be
+  safely deleted. If nodes back up to different object stores, the cleaner
+  cannot see all manifests and will not trigger correctly.
 
 ### Performance characteristics
 
@@ -332,170 +466,51 @@ the object store. Backups are stored under `backup/<backup_instance_name>/`.
 
 To find your instance name, see [Backup instance name](#backup-instance-name).
 
-### Limitations
+### How incremental backup works
 
-- **Database-wide only**: Backup captures the entire database. You cannot
-  exclude tables or backup selected tables individually. Every backup includes
-  all user tables, materialized views, and metadata.
-- **One backup at a time**: Only one backup can run at any given time. Starting
-  a new backup while one is running will return an error.
-- **Primary and replica backups are separate**: Each QuestDB instance has its
-  own [`backup_instance_name`](#backup-instance-name), so backing up both
-  a primary and its replica creates two separate backup sets in the object
-  store. Typically, backing up the primary is sufficient since replicas sync
-  from the same data.
-- **Same backup object store for all nodes**: When using replication, all
-  nodes in the cluster should use the same `backup.object.store` connection
-  string. The [WAL cleaner](/docs/high-availability/wal-cleanup/) reads
-  backup manifests from every node to determine what replication data can be
-  safely deleted. If nodes back up to different object stores, the cleaner
-  cannot see all manifests and will not trigger correctly.
+Each backup uploads only partitions that changed since the previous backup,
+along with a **manifest** that lists every partition the backup consists of.
+The manifest is a complete description of the database state at that point in
+time.
 
-### Backup validation
+There is no separate "full" or "base" backup. The first backup uploads all
+partitions because every partition counts as "changed" relative to the
+non-existent previous backup. Subsequent backups upload only the partitions
+that actually changed, reusing previously uploaded partition data for
+everything else.
 
-Backup integrity is verified during restore, not as a standalone operation.
+**Restore** reads the manifest from the selected backup timestamp and
+downloads only the partitions listed in it. Each backup is independently
+restorable without replaying a chain of increments.
 
-#### Verification during restore
+**Cleanup** runs after a backup completes and removes partition data that is
+no longer referenced by any backup within the retention window (controlled by
+[`backup.cleanup.keep.latest.n`](#backup-retention)). Partitions still
+referenced by at least one retained backup are preserved.
 
-QuestDB performs the following checks when restoring:
+### Backup instance name
 
-- **Transaction log verification**: Header, hash, and size validation of
-  transaction log entries (always enabled)
-- **Partition hash verification**: Optional BLAKE3 hash comparison for each
-  file in every partition
-- **Manifest validation**: Version compatibility and path safety checks
+Each QuestDB instance has a backup instance name (three random words like
+`gentle-forest-orchid`). This name is generated on the first backup and
+organizes backups in the object store under `backup/<backup_instance_name>/`.
 
-To enable partition hash verification, set these properties in `server.conf`:
-
-```conf
-backup.enable.partition.hashes=true    # Compute hashes during backup
-backup.verify.partition.hashes=true    # Verify hashes during restore
-```
-
-If verification fails, restore stops immediately with an error such as:
-`hash mismatch [path=col1.d, expected=..., actual=...]`
-
-#### What's not available
-
-- No standalone `VALIDATE BACKUP` command
-- No dry-run restore option
-- Object store integrity relies on the storage provider (e.g., S3's built-in
-  checksums)
-
-### Restore
-
-Restore is fast—approximately 1.8 TiB can be restored in under 20 minutes,
-depending on network bandwidth and storage performance.
-
-:::caution
-
-Enterprise backup restore uses a different trigger file (`_backup_restore`) than
-OSS checkpoint restore (`_restore`). Do not confuse these two mechanisms.
-
-:::
-
-To restore from an object store backup, create a `_backup_restore` file in the
-QuestDB install root. This is a properties file with the object store
-configuration and optional selector fields. On startup, QuestDB reads this file,
-selects the requested backup timestamp (or the latest available), downloads the
-backup data, and reconstructs the local database state.
-
-```conf
-backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
-backup.instance.name=gentle-forest-orchid
-backup.restore.timestamp=2024-08-24T12:34:56.789123Z
-```
-
-Parameters:
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `backup.object.store` | Sometimes | Object store connection string; required unless already specified in `server.conf` |
-| `backup.instance.name` | Sometimes | Required when multiple instance names exist in the bucket; see [Backup instance name](#backup-instance-name) |
-| `backup.restore.timestamp` | No | Timestamp for point-in-time recovery; omit for latest backup |
-
-#### Point-in-time recovery
-
-Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
-finds the most recent successful backup at or before the specified timestamp.
-
-To find available backup timestamps, query the source instance:
+To find your instance name, run:
 
 ```questdb-sql
-SELECT start_ts FROM backups() WHERE status = 'backup complete';
+SELECT backup_instance_name;
 ```
 
-You can also specify an arbitrary timestamp (e.g., just before an accidental
-deletion). QuestDB restores from the nearest available backup before that time.
+Returns `null` if no backup has been run yet.
 
-If no backup exists at or before the specified timestamp, QuestDB fails to start
-with the error: `backup restore error: No backup timestamp found that is <=`.
+### Replication WAL cleanup integration
 
-:::warning
-
-Restore requires an empty database directory. If the target database already
-has data (indicated by the presence of `db/.data_id`), restore fails with:
-"The local database is not empty." Use a fresh installation directory for
-restore operations.
-
-:::
-
-The QuestDB version performing the restore must have the same major version as
-the version that created the backup (e.g., 8.1.0 and 8.1.1 are compatible).
-
-Restart QuestDB. If restore succeeds, `_backup_restore` is removed automatically.
-
-#### Restore failure recovery
-
-If restore fails, QuestDB creates artifacts to help diagnose and recover:
-
-| Artifact | Purpose |
-|----------|---------|
-| `.restore_failed/` | Directory containing tables that failed to restore |
-| `_restore_failed` | File listing the names of failed tables |
-
-To recover from a failed restore:
-
-1. Check the `.restore_failed/` directory and `_restore_failed` file for details
-2. Investigate and fix the underlying issue (connectivity, permissions, etc.)
-3. Remove both `.restore_failed/` directory and `_restore_failed` file
-4. Restart QuestDB to retry the restore
-
-If you see the error "Failed restore directory found", a previous restore
-attempt failed. Remove the artifacts listed above before restarting.
-
-### Create a replica from a backup
-
-You can use a backup to bootstrap a new replica instance instead of relying
-solely on WAL replay from the object store. This is faster when the backup is
-more recent than the oldest available WAL data.
-
-1. **Ensure the primary is running and has replication configured**
-
-   The primary must have `replication.role=primary` and a configured
-   `replication.object.store`.
-
-2. **Create a `_backup_restore` file on the new replica machine**
-
-   Point it to the same backup location used by the primary:
-
-   ```conf
-   backup.object.store=s3::bucket=my-bucket;region=eu-west-1;access_key_id=...;secret_access_key=...;
-   backup.instance.name=gentle-forest-orchid
-   ```
-
-3. **Configure the replica**
-
-   Set `replication.role=replica` and ensure `replication.object.store` points
-   to the same object store as the primary.
-
-4. **Start the replica**
-
-   QuestDB restores from the backup first, then switches to WAL replay to catch
-   up with the primary.
-
-For more details on replication setup, see the
-[replication guide](/docs/high-availability/setup/).
+When replication is enabled, the
+[WAL cleaner](/docs/high-availability/wal-cleanup/) uses backup manifests to
+determine which replicated WAL data in object storage can be safely deleted.
+By default, the cleaner retains replication data for as many backups as your
+[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5) and
+deletes everything older. No additional configuration is required — enabling
+backups on a replicated instance is sufficient.
 
 ### Troubleshooting
 
@@ -680,9 +695,8 @@ Follow these steps:
 
 #### Database versions
 
-Restoring data is only possible if the backup and restore QuestDB versions have
-the same major version number, for example: `8.1.0` and `8.1.1` are compatible.
-`8.1.0` and `7.5.1` are not compatible.
+The QuestDB version performing the restore must be the same as or newer than
+the version that created the backup.
 
 #### Restore the root directory
 
