@@ -266,5 +266,9 @@
   "http.redirect.1": {
     "default": "/ -> /index.html",
     "description": "Example redirect configuration. Format is 'source -> destination'."
+  },
+  "http.ingest.max.request.size": {
+    "default": "5M",
+    "description": "Maximum request body size for the `/ingest` endpoint used by [payload transforms](/docs/ingestion/payload-transforms/). The entire request body is held in memory during processing. Requests exceeding this limit receive an HTTP 413 (Payload Too Large) response."
   }
 }
