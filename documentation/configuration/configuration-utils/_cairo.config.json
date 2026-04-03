@@ -3,6 +3,10 @@
     "default": "true",
     "description": "When `false`, disables reload_config() SQL function."
   },
+  "cairo.plugin.root": {
+    "default": "",
+    "description": "Path to the directory containing plugin JAR files. When empty, the plugin system is disabled. See the [Plugin system guide](/docs/operations/plugins/) for details."
+  },
   "query.timeout.sec": {
     "default": "60",
     "description": "A global timeout (in seconds) for long-running queries. Timeout for each query can override the default by setting HTTP header [`Statement-Timeout`](/docs/query/rest-api/#headers) or Postgres [`options`](/docs/query/pgwire/overview/#list-of-supported-connection-properties)."
