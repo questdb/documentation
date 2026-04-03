@@ -475,6 +475,8 @@ must be of type [symbol](/docs/concepts/symbol/).
 
 ![Flow chart showing the syntax of the index function](/images/docs/diagrams/indexDef.svg)
 
+### Bitmap index (default)
+
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
@@ -484,13 +486,55 @@ CREATE TABLE trades (
 ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
+### Posting index
+
+The posting index offers better compression and read performance than the
+default bitmap index. Use `INDEX TYPE POSTING`:
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+### Posting index with covering columns (INCLUDE)
+
+The `INCLUDE` clause stores additional column values in the index sidecar
+files. Queries that only need these columns plus the indexed symbol can be
+served entirely from the index, bypassing column files:
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, timestamp, exchange),
+  exchange SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+With this schema, the following query reads only from the index sidecar:
+
+```questdb-sql
+SELECT timestamp, price FROM trades WHERE symbol = 'AAPL';
+```
+
+See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
+for a comprehensive guide including supported column types, query patterns,
+and performance characteristics.
+
 :::warning
 
 - The **index capacity** and
   [**symbol capacity**](/docs/concepts/symbol/) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
-  the implications. :::
+  the implications.
+
+:::
 
 See the [Index concept](/docs/concepts/deep-dive/indexes/#how-indexes-work) for more
 information about indexes.

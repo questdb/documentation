@@ -75,6 +75,44 @@ TIMESTAMP(ts) PARTITION BY MONTH;
 
 See [Partitions](/docs/concepts/partitions/) for details.
 
+## Indexing
+
+Index your primary filter columns to speed up `WHERE` clause queries. QuestDB
+supports two index types for SYMBOL columns:
+
+```questdb-sql
+-- Default bitmap index — low overhead, good for most cases
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL INDEX,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY WAL;
+
+-- Posting index with covering columns — best for read-heavy, selective queries
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, ts),
+    price DOUBLE,
+    raw_data VARCHAR  -- not in INCLUDE, read from column files
+) TIMESTAMP(ts) PARTITION BY DAY WAL;
+```
+
+**When to choose each:**
+
+| Scenario | Recommendation |
+|----------|---------------|
+| General purpose, write-heavy | Bitmap index (`INDEX`) |
+| Read-heavy, filtering on symbol | Posting index (`INDEX TYPE POSTING`) |
+| Frequent queries on a few columns | Posting with `INCLUDE` |
+| Wide table, queries select subset | Posting with `INCLUDE` — biggest win |
+
+The covering index (`INCLUDE`) lets queries that only select covered columns
+read from compact sidecar files instead of full column files. Use `EXPLAIN` to
+verify your queries use the `CoveringIndex` plan.
+
+See [Indexes](/docs/concepts/deep-dive/indexes/) and
+[Posting index](/docs/concepts/deep-dive/posting-index/) for details.
+
 ## Data types
 
 ### SYMBOL vs VARCHAR
