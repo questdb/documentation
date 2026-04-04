@@ -1,7 +1,7 @@
 ---
 title: Finance functions
 sidebar_label: Finance
-description: Market data and financial functions reference documentation.
+description: Market data and financial functions including l2price, mid, spread_bps, TWAP, VWAP, and wmid for order book, execution benchmarking, and pricing analysis.
 ---
 
 This page describes functions specific to the financial services domain.
@@ -529,6 +529,13 @@ SELECT spread_bps(1.5760, 1.5763)
 For VWAP calculations, use window functions with the typical price formula. This approach is more flexible and works well with high-frequency market data.
 
 See the [VWAP example in Window Functions](/docs/query/functions/window-functions/overview#vwap-volume-weighted-average-price) for the recommended implementation using `SAMPLE BY` and `CUMULATIVE` window frames.
+
+## TWAP (Time-Weighted Average Price)
+
+QuestDB provides a native `twap(price, timestamp)` aggregate function that computes the time-weighted average price using step-function integration. Unlike VWAP, TWAP gives equal weight to every time interval, making it the preferred benchmark for illiquid instruments or when volume data is unavailable. It supports `GROUP BY`, `SAMPLE BY`, and `FILL` modes.
+
+- [Function reference](/docs/query/functions/aggregation#twap) — syntax, parameters, and formula
+- [Cookbook recipe](/docs/cookbook/sql/finance/twap/) — practical examples with TWAP-vs-VWAP comparison
 
 ## wmid
 

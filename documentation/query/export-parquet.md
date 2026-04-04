@@ -95,6 +95,36 @@ While it is running, export can be cancelled with:
 COPY '45ba24e5ba338099' CANCEL;
 ```
 
+### Controlling partitioning
+
+`COPY table_name TO ...` produces one Parquet file per partition, matching the table's own partitioning scheme. `COPY (SELECT ...) TO ...` produces a single file by default.
+
+To override either default, add `PARTITION_BY` to the export options.
+
+Export a table into a single consolidated file:
+
+```questdb-sql
+COPY market_data TO 'market_data_single' WITH FORMAT PARQUET PARTITION_BY NONE;
+```
+
+Re-partition independently of the source table. For example, export a day-partitioned table into monthly files:
+
+```questdb-sql
+COPY market_data TO 'market_data_monthly' WITH FORMAT PARQUET PARTITION_BY MONTH;
+```
+
+Partition a query export by month:
+
+```questdb-sql
+COPY (SELECT * FROM market_data WHERE timestamp IN '2024')
+TO 'market_data_2024'
+WITH FORMAT PARQUET PARTITION_BY MONTH;
+```
+
+Partitioning requires a designated timestamp column in the source table or query result. Valid values: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`.
+
+For the full list of export options, see the [COPY-TO documentation](/docs/query/sql/copy/#options-1).
+
 ### Overriding compression
 
 By default, exported Parquet files use `lz4_raw` compression. You can change the default via `server.conf` as shown in [Data Compression](#data-compression),
@@ -184,3 +214,32 @@ cairo.partition.encoder.parquet.compression.level=0
 When using `ZSTD`, the level ranges from 1 (fastest) to 22, with a default of 9.
 
 For COPY exports, you can also override compression per-query. See [Overriding compression](#overriding-compression).
+
+### Minimum compression ratio
+
+The `cairo.partition.encoder.parquet.min.compression.ratio` property controls
+whether compressed Parquet pages are worth keeping. After compressing a page,
+QuestDB checks the ratio of `uncompressed_size / compressed_size`. If the ratio
+falls below the threshold, the compressed output is discarded and the page is
+stored uncompressed instead.
+
+```ini
+# Default: 1.2 (keep compressed output only if it achieves ~17% size reduction)
+cairo.partition.encoder.parquet.min.compression.ratio=1.2
+```
+
+A value of `0.0` (or any value &lt;= 1.0) disables the check, always keeping
+compressed output.
+
+The ratio check applies to both data pages and dictionary pages and works with
+all compression codecs. It runs after compression, so the CPU cost of
+compression is still incurred -- this setting only avoids the I/O and storage
+penalty of keeping pages that barely compress.
+
+### Per-column overrides
+
+Individual columns can override the global encoding and compression settings.
+See [CREATE TABLE - Per-column Parquet encoding and compression](/docs/query/sql/create-table/#per-column-parquet-encoding-and-compression)
+for defining overrides at table creation, or
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+for modifying existing tables.

@@ -1,0 +1,80 @@
+---
+title: OBV (On-Balance Volume)
+sidebar_label: OBV
+description: Calculate On-Balance Volume to track cumulative buying and selling pressure using volume flow
+---
+
+On-Balance Volume (OBV) is a cumulative indicator that adds volume on up days and subtracts volume on down days. It shows whether volume is flowing into or out of an asset, often leading price movements.
+
+## Problem
+
+You want to confirm price trends with volume or spot divergences where volume doesn't support price movement. Raw volume numbers don't show direction, and comparing volumes across different time periods is difficult.
+
+## Solution
+
+```questdb-sql demo title="Calculate On-Balance Volume"
+DECLARE
+  @symbol := 'EURUSD',
+  @lookback := '$now - 1M..$now'
+
+WITH ohlc AS (
+  SELECT
+    timestamp,
+    symbol,
+    last(price) AS close,
+    sum(quantity) AS volume
+  FROM fx_trades
+  WHERE symbol = @symbol
+    AND timestamp IN @lookback
+  SAMPLE BY 15m ALIGN TO CALENDAR
+),
+with_direction AS (
+  SELECT
+    timestamp,
+    symbol,
+    close,
+    volume,
+    CASE
+      WHEN close > lag(close) OVER w THEN volume
+      WHEN close < lag(close) OVER w THEN -volume
+      ELSE 0
+    END AS directed_volume
+  FROM ohlc
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp)
+)
+SELECT
+  timestamp,
+  symbol,
+  round(close, 5) AS close,
+  round(volume, 0) AS volume,
+  round(sum(directed_volume) OVER (
+    PARTITION BY symbol
+    ORDER BY timestamp
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ), 0) AS obv
+FROM with_direction
+ORDER BY timestamp;
+```
+
+The query:
+1. Aggregates raw trades into 15-minute bars with closing price and total volume
+2. Compares each bar's close to the previous close
+3. Assigns positive volume if price went up, negative if down, zero if unchanged
+4. Calculates cumulative sum of directed volume
+
+## Interpreting results
+
+- **OBV rising with price**: Uptrend confirmed by volume
+- **OBV falling with price**: Downtrend confirmed by volume
+- **OBV rising, price flat**: Accumulation, potential breakout up
+- **OBV falling, price flat**: Distribution, potential breakout down
+- **OBV divergence from price**: Trend may be weakening
+
+:::note OBV absolute value
+The absolute value of OBV is meaningless. What matters is the direction and whether it confirms or diverges from price.
+:::
+
+:::info Related documentation
+- [sum() window function](/docs/query/functions/window-functions/reference/#sum)
+- [lag() function](/docs/query/functions/window-functions/reference/#lag)
+:::

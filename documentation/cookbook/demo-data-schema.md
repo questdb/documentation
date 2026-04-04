@@ -92,7 +92,9 @@ CREATE TABLE 'market_data' (
     timestamp TIMESTAMP,
     symbol SYMBOL CAPACITY 16384 CACHE,
     bids DOUBLE[][],
-    asks DOUBLE[][]
+    asks DOUBLE[][],
+    best_bid DOUBLE,
+    best_ask DOUBLE
 ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;
 ```
 
@@ -102,6 +104,8 @@ CREATE TABLE 'market_data' (
 - **`symbol`** - Currency pair (e.g., EURUSD, GBPJPY)
 - **`bids`** - 2D array containing bid prices and volumes: `[[price1, price2, ...], [volume1, volume2, ...]]`
 - **`asks`** - 2D array containing ask prices and volumes: `[[price1, price2, ...], [volume1, volume2, ...]]`
+- **`best_bid`** - Best (highest) bid price. Equivalent to `bids[1][1]` but preferred when only the top-of-book price is needed, as it scans much less data
+- **`best_ask`** - Best (lowest) ask price. Equivalent to `asks[1][1]` but preferred when only the top-of-book price is needed, as it scans much less data
 
 The arrays are structured so that:
 - `bids[1]` contains bid prices (descending order - highest first)
@@ -214,7 +218,6 @@ The FX dataset includes several materialized views providing pre-aggregated data
 #### FX trades OHLC
 
 - **`fx_trades_ohlc_1m`** - OHLC candlesticks from trade executions at 1-minute intervals
-- **`fx_trades_ohlc_1h`** - OHLC candlesticks from trade executions at 1-hour intervals
 - **`fx_trades_ohlc_1d`** - OHLC candlesticks from trade executions at 1-day intervals
 
 These views are continuously updated and optimized for dashboard and analytics queries on FX data.
@@ -250,12 +253,12 @@ CREATE TABLE 'trades' (
 #### Columns
 
 - **`timestamp`** - Time when the trade was executed (designated timestamp)
-- **`symbol`** - Cryptocurrency trading pair from the 12 tracked symbols (see list below)
+- **`symbol`** - Cryptocurrency trading pair from the active symbol set (see common pairs below)
 - **`side`** - Trade side: **buy** or **sell**
 - **`price`** - Execution price of the trade
 - **`amount`** - Trade size (volume in base currency)
 
-The table tracks **12 cryptocurrency pairs**: ADA-USDT, AVAX-USDT, BTC-USDT, DAI-USDT, DOT-USDT, ETH-BTC, ETH-USDT, LTC-USDT, SOL-BTC, SOL-USDT, UNI-USDT, XLM-USDT.
+Common actively traded pairs include: ADA-USDT, AVAX-USDT, BTC-USDT, DAI-USDT, DOT-USDT, ETH-BTC, ETH-USDT, LTC-USDT, SOL-BTC, SOL-USDT, UNI-USDT, XLM-USDT. Historical data may include additional symbols.
 
 #### Sample data
 
@@ -300,7 +303,7 @@ These views are continuously updated and provide faster query performance for cr
 
 **FX tables** (`core_price` and `market_data`) use a **3-day TTL (Time To Live)**, meaning data older than 3 days is automatically removed. This keeps the demo instance responsive while providing sufficient recent data.
 
-**Cryptocurrency trades table** has **no retention policy** and contains historical data dating back to **March 8, 2022**. This provides over 3 years of real cryptocurrency trade history for long-term analysis and backtesting.
+**Cryptocurrency trades table** has **no retention policy** and contains historical data dating back to **March 8, 2022**. This provides multiple years of real cryptocurrency trade history for long-term analysis and backtesting.
 
 ## Using the demo data
 

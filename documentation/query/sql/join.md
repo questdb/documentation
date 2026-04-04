@@ -211,6 +211,14 @@ ASOF JOIN is a powerful time-series join extension.
 
 It has its own page, [ASOF JOIN](/docs/query/sql/asof-join/).
 
+## HORIZON JOIN
+
+HORIZON JOIN is a specialized time-series join for markout analysis and event
+impact studies. It combines ASOF JOIN matching with a set of time offsets,
+computing aggregations at each offset in a single pass.
+
+It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
+
 ## WINDOW JOIN
 
 WINDOW JOIN aggregates data from a related table within a time-based window

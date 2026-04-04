@@ -18,11 +18,23 @@ Each recipe provides a focused solution to a specific problem, with working code
 
 ## Structure
 
-The Cookbook is organized into three main sections:
+The Cookbook is organized into the following sections:
 
 - **SQL Recipes** - Common SQL patterns, window functions, and time-series queries
+  - **[Capital Markets](/docs/cookbook/sql/finance/)** - Technical indicators, execution analysis, and risk metrics for financial data
+  - **[Time-Series Patterns](/docs/cookbook/sql/time-series/elapsed-time/)** - Common patterns for working with time-series data
+  - **[Advanced SQL](/docs/cookbook/sql/advanced/rows-before-after-value-match/)** - Complex query patterns like pivoting, funnels, and histograms
 - **Programmatic** - Language-specific client examples and integration patterns
 - **Operations** - Deployment, configuration, and operational tasks
+
+### Post-trade and execution analysis
+
+QuestDB's time-series joins (`ASOF JOIN`, `HORIZON JOIN`) and high-resolution timestamps make it well-suited for **Transaction Cost Analysis (TCA)** and post-trade workflows. The [Execution & Post-Trade Analysis](/docs/cookbook/sql/finance/) section includes recipes for:
+
+- [Slippage measurement](/docs/cookbook/sql/finance/slippage/) - Per-fill and aggregated slippage against mid and top-of-book
+- [Markout analysis](/docs/cookbook/sql/finance/markout/) - Post-trade price reversion curves and adverse selection detection
+- [Last look detection](/docs/cookbook/sql/finance/last-look/) - Millisecond-granularity counterparty analysis
+- [Implementation shortfall](/docs/cookbook/sql/finance/implementation-shortfall/) - Cost decomposition into spread, permanent, and temporary impact
 
 ## Running the examples
 

@@ -30,7 +30,7 @@
 
   <!-- Title -->
   <text class="title" x="60" y="25">ALTER TABLE trades SET TTL 1 HOUR;</text>
-  <text class="note" x="60" y="45">Wall-clock time: 10:00 · PARTITION BY HOUR</text>
+  <text class="note" x="60" y="45">PARTITION BY HOUR, reference time: 10:01</text>
 
   <!-- Time axis -->
   <line class="time-axis" x1="50" y1="180" x2="620" y2="180"/>
@@ -48,13 +48,14 @@
   <line class="time-axis" x1="520" y1="175" x2="520" y2="185"/>
   <text class="time-label" x="520" y="200" text-anchor="middle">11:00</text>
 
-  <!-- TTL window (1 hour back from now=10:00, so 09:00 to 10:00+) -->
-  <rect class="ttl-window" x="240" y="70" width="370" height="100" rx="4"/>
-  <text class="ttl-label" x="425" y="62">← TTL window (1 hour) →</text>
+  <!-- TTL window (1 hour back from now=10:01, so 09:01 to 10:01) -->
+  <rect class="ttl-window" x="250" y="70" width="140" height="100" rx="4"/>
+  <text class="ttl-label" x="260" y="62">← TTL window (1h) →</text>
 
-  <!-- Now line -->
-  <line class="now-line" x1="380" y1="65" x2="380" y2="185"/>
-  <text class="now-label" x="380" y="215" text-anchor="middle">now</text>
+  <!-- Now line (10:01, slightly past the 10:00 tick) -->
+  <line class="now-line" x1="390" y1="65" x2="390" y2="185"/>
+  <text class="now-label" x="390" y="215" text-anchor="middle">reference time</text>
+  <text class="now-label" x="390" y="230" text-anchor="middle">(10:01)</text>
 
   <!-- Partition 1: 08:00-09:00 (DROPPED - outside TTL window) -->
   <g>
@@ -82,6 +83,6 @@
 
   <!-- Key insight callout -->
   <text class="key-point" x="450" y="250" text-anchor="middle">Partition dropped when:</text>
-  <text class="annotation" x="450" y="268" text-anchor="middle">partition_end &lt; wall_clock - TTL</text>
-  <text class="annotation" x="450" y="286" text-anchor="middle">09:00 &lt; 10:00 - 1h ✓</text>
+  <text class="annotation" x="450" y="268" text-anchor="middle">partition_end &lt; reference_time - TTL</text>
+  <text class="annotation" x="450" y="286" text-anchor="middle">09:00 &lt; 10:01 - 1h ✓</text>
 </svg>

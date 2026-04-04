@@ -149,7 +149,8 @@ const config = {
         return {
           resolve: {
             alias: {
-              react: path.resolve("/node_modules/react"),
+              react: path.resolve(__dirname, "node_modules/react"),
+              "@questdb/sql-parser/grammar": path.resolve(__dirname, "node_modules/@questdb/sql-parser/dist/grammar/index.js"),
             },
           },
         }
@@ -272,7 +273,7 @@ const config = {
       disableSwitch: true,
       respectPrefersColorScheme: false, // the user preference is also overriden, see ssr.template.js
     },
-    image: "/images/og.gif",
+    image: "/images/og.png",
     prism: {
       defaultLanguage: "questdb-sql",
       additionalLanguages: [

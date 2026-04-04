@@ -33,7 +33,7 @@ SELECT
 FROM left_table [alias]
 WINDOW JOIN right_table [alias]
     [ON join_condition]
-    RANGE BETWEEN <lo_bound> AND <hi_bound>
+    RANGE BETWEEN <lo_bound> [unit] AND <hi_bound> [unit]
     [INCLUDE PREVAILING | EXCLUDE PREVAILING]
 [WHERE filter_on_left]
 [ORDER BY ...]
@@ -50,6 +50,14 @@ RANGE BETWEEN <value> <unit> PRECEDING AND <value> <unit> PRECEDING  -- past win
 RANGE BETWEEN <value> <unit> FOLLOWING AND <value> <unit> FOLLOWING  -- future window
 ```
 
+Each boundary `<value>` can be:
+- A **static constant** (e.g., `1`, `30`)
+- A **column reference** from the left table (e.g., `t.lookback`)
+- An **expression** referencing left table columns (e.g., `2 * t.lookback`)
+
+Either or both boundaries can be dynamic. For example, one boundary can be a
+column reference while the other remains a static constant.
+
 Supported time units:
 
 - `nanoseconds`
@@ -60,10 +68,39 @@ Supported time units:
 - `hours`
 - `days`
 
+When a time unit is present, the value is scaled to the left table's designated
+timestamp resolution at runtime. When omitted, the raw integer value is
+interpreted in the left table's native timestamp resolution.
+
 :::note
 
 `UNBOUNDED PRECEDING` and `UNBOUNDED FOLLOWING` are not supported in WINDOW
 JOIN.
+
+:::
+
+#### Dynamic window bounds
+
+Dynamic window bounds allow each left table row to define its own window size based
+on its data. This is useful when different rows require different lookback or
+lookahead periods.
+
+**Rules for dynamic bounds:**
+
+- Boundary expressions must evaluate to an **integer** type
+- Expressions must only reference **left table** columns — right table column
+  references are not allowed
+- Bound expressions must evaluate to **non-negative** values — negative results
+  are clamped to zero, equivalent to `CURRENT ROW`. To reference rows before the
+  current row, use a positive value with `PRECEDING`
+- **NULL values** cause the row to produce NULL aggregates — the row is skipped
+
+:::note
+
+Dynamic window bounds disable the Fast Join (symbol-keyed) and vectorized (SIMD)
+execution paths. Queries with an `ON` key equality clause fall back to the
+general join path with a join filter instead. For best performance, prefer
+static bounds when a fixed window size is sufficient.
 
 :::
 
@@ -84,6 +121,12 @@ JOIN.
    from the right table
 4. Symbol-based join conditions enable "Fast Join" optimization when matching on
    symbol columns
+
+## Mixed-precision timestamps
+
+The left and right tables can use different timestamp resolutions (e.g.,
+`TIMESTAMP` with microseconds and `TIMESTAMP_NS` with nanoseconds). QuestDB
+aligns the timestamps internally — no explicit casting is needed.
 
 ## Aggregate functions
 
@@ -232,6 +275,51 @@ WINDOW JOIN asks q
 Each WINDOW JOIN operates independently, allowing you to aggregate data from
 multiple related tables with different time windows in a single query.
 
+### Dynamic window bounds
+
+Use column references or expressions as window boundaries so each row can
+define its own window size. In this example, the `trades` table has `lookback`
+and `lookahead` columns that control the window for each trade:
+
+```questdb-sql title="Per-row window size from column values"
+SELECT
+    t.sym,
+    t.ts,
+    t.lookback,
+    t.lookahead,
+    sum(p.price) AS window_sum
+FROM trades t
+WINDOW JOIN prices p
+    ON (t.sym = p.sym)
+    RANGE BETWEEN t.lookback minutes PRECEDING AND t.lookahead minutes FOLLOWING;
+```
+
+You can mix static and dynamic bounds. Here only the lower bound is dynamic:
+
+```questdb-sql title="Dynamic lower bound, static upper bound"
+SELECT
+    t.sym,
+    t.ts,
+    avg(p.price) AS avg_price
+FROM trades t
+WINDOW JOIN prices p
+    ON (t.sym = p.sym)
+    RANGE BETWEEN t.lookback seconds PRECEDING AND 5 seconds FOLLOWING;
+```
+
+Expressions referencing left table columns are also supported:
+
+```questdb-sql title="Expression-based dynamic bound"
+SELECT
+    t.sym,
+    t.ts,
+    sum(p.price) AS window_sum
+FROM trades t
+WINDOW JOIN prices p
+    ON (t.sym = p.sym)
+    RANGE BETWEEN 2 * t.lookback seconds PRECEDING AND 10 seconds FOLLOWING;
+```
+
 ### Using EXCLUDE PREVAILING
 
 Exclude the prevailing value to only aggregate rows strictly within the time
@@ -342,8 +430,11 @@ This pattern applies to any aggregation over WINDOW JOIN results - always perfor
 
 1. **Use symbol-based joins**: When possible, join on symbol columns to enable
    the Fast Join optimization
-2. **Narrow time windows**: Smaller windows mean less data to aggregate
-3. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
+2. **Prefer static bounds**: Static (constant) bounds enable the Fast Join and
+   vectorized (SIMD) execution paths. Dynamic window bounds disable these
+   optimizations, so use them only when per-row window sizes are needed
+3. **Narrow time windows**: Smaller windows mean less data to aggregate
+4. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
    processed
-4. **Parallel execution**: WINDOW JOIN automatically leverages parallel
+5. **Parallel execution**: WINDOW JOIN automatically leverages parallel
    execution based on your worker configuration
