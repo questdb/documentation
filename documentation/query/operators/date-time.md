@@ -13,7 +13,7 @@ It handles simple ranges, multiple intervals, business days, timezones, and more
 in a single unified syntax:
 
 ```questdb-sql
-WHERE ts IN '2024-01-[01..31]T09:30@EST#wd;6h30m'
+WHERE ts IN '[2024-01]T09:30@EST#wd;6h30m'
 ```
 
 The `interval()` function and `BETWEEN` operator described below are alternatives
@@ -41,7 +41,7 @@ SELECT * FROM trades WHERE ts IN '2024-01-15T09:30;1h';
 SELECT * FROM trades WHERE ts IN '2024-01-[15,16,17]';
 
 -- Workdays only with timezone
-SELECT * FROM trades WHERE ts IN '2024-01-[01..31]T09:30@EST#wd;6h30m';
+SELECT * FROM trades WHERE ts IN '[2024-01]T09:30@EST#wd;6h30m';
 
 -- Dynamic: last 5 business days
 SELECT * FROM trades WHERE ts IN '[$today-5bd..$today-1bd]';
