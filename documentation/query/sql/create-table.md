@@ -387,12 +387,12 @@ the server-wide compression codec
 
 #### Supported encodings
 
-| Encoding                | SQL keyword               | Valid column types           |
-| ----------------------- | ------------------------- | ---------------------------- |
-| Plain                   | `plain`                   | All                          |
-| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN and ARRAY |
-| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR      |
-| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP   |
+| Encoding                | SQL keyword               | Valid column types                   |
+| ----------------------- | ------------------------- | ------------------------------------ |
+| Plain                   | `plain`                   | All                                  |
+| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN, ARRAY AND STRING |
+| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR              |
+| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP           |
 
 - **Plain** — stores values as-is with no transformation. Simplest encoding
   with no overhead. Use as a fallback when data has high cardinality and no
@@ -452,7 +452,7 @@ For more details on Parquet compression, see the
 [Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
 
 To modify encoding or compression on existing tables, see
-[ALTER TABLE ALTER COLUMN SET/DROP PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
 
 ### Casting types
 
@@ -664,10 +664,10 @@ Checking the values per-table may be done using the `tables()` function:
 SELECT id, table_name, maxUncommittedRows FROM tables();
 ```
 
-| id  | name         | maxUncommittedRows |
-| :-- | :----------- | :----------------- |
-| 1   | trades       | 250000             |
-| 2   | sample_table | 50000              |
+| id   | name         | maxUncommittedRows |
+| :--- | :----------- | :----------------- |
+| 1    | trades       | 250000             |
+| 2    | sample_table | 50000              |
 
 ## Table target volume
 
