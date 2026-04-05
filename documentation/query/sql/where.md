@@ -274,7 +274,7 @@ you can filter by real exchange schedules including holidays and early closes:
 
 ```questdb-sql
 -- NYSE trading hours for January, holidays excluded automatically
-WHERE ts IN '2025-01-[01..31]#XNYS'
+WHERE ts IN '[2025-01]#XNYS'
 ```
 
 :::
