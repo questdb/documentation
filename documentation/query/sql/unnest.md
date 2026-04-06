@@ -11,9 +11,9 @@ allows you to filter by individual element values, run aggregations or window
 functions over array contents, or join array elements with other tables. It
 supports two modes:
 
-- **Array `UNNEST`**: Expands native `DOUBLE[]` columns (or literal arrays) into
+- **[Array `UNNEST`](#array-unnest)**: Expands native `DOUBLE[]` columns (or literal arrays) into
   rows of `DOUBLE` values.
-- **JSON `UNNEST`**: Expands a JSON array stored as `VARCHAR` into rows with
+- **[JSON `UNNEST`](#json-unnest)**: Expands a JSON array stored as `VARCHAR` into rows with
   explicitly typed columns.
 
 `UNNEST` appears in the `FROM` clause and behaves like a table - you can join it
@@ -180,20 +180,26 @@ FROM table_name, UNNEST(
 ### Object arrays
 
 Extract typed fields from an array of JSON objects. Column names in `COLUMNS()`
-are used as JSON field names for extraction:
+are used as JSON field names for extraction.
 
-```questdb-sql title="Extract fields from JSON objects" demo
-SELECT u.name, u.age
+This example uses the response format from the
+[Coinbase trades API](https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=3):
+
+```questdb-sql title="Extract fields from a Coinbase trades response"
+SELECT u.trade_id, u.price, u.size, u.side, u.time
 FROM UNNEST(
-    '[{"name":"Alice","age":30},{"name":"Bob","age":25}]'::VARCHAR
-    COLUMNS(name VARCHAR, age INT)
+    '[{"trade_id":994619709,"side":"sell","size":"0.00000100","price":"69839.36000000","time":"2026-04-06T10:32:55.517183Z"},
+      {"trade_id":994619708,"side":"buy","size":"0.00000006","price":"69839.35000000","time":"2026-04-06T10:32:55.418434Z"},
+      {"trade_id":994619707,"side":"buy","size":"0.00000006","price":"69839.35000000","time":"2026-04-06T10:32:55.024765Z"}]'::VARCHAR
+    COLUMNS(trade_id LONG, price DOUBLE, size DOUBLE, side VARCHAR, time TIMESTAMP)
 ) u;
 ```
 
-| name  | age |
-| :---- | :-- |
-| Alice | 30  |
-| Bob   | 25  |
+| trade_id | price | size | side | time |
+| :--- | :--- | :--- | :--- | :--- |
+| 994619709 | 69839.36 | 0.000001 | sell | 2026-04-06T10:32:55.517183Z |
+| 994619708 | 69839.35 | 0.00000006 | buy | 2026-04-06T10:32:55.418434Z |
+| 994619707 | 69839.35 | 0.00000006 | buy | 2026-04-06T10:32:55.024765Z |
 
 ### Scalar arrays
 
