@@ -83,17 +83,23 @@ function extractHeaders(content) {
 function generateUrl(relativePath, slug) {
   if (slug) {
     // e.g., guides/schema-design-essentials.md with slug "schema-design-essentials"
-    // -> guides/schema-design-essentials/index.md
+    // -> guides/schema-design-essentials.md
     const dir = path.dirname(relativePath)
     const cleanSlug = slug.startsWith('/') ? slug.substring(1) : slug
     const urlPath = dir === '.' ? cleanSlug : `${dir}/${cleanSlug}`
-    return `${BASE_URL}/${urlPath}/index.md`
+    if (!urlPath) return `${BASE_URL}/index.md`
+    return `${BASE_URL}/${urlPath}.md`
   }
 
   // Default: convert path to URL
-  // reference/function/aggregation.md -> reference/function/aggregation/index.md
-  const urlPath = relativePath.replace(/\.md$/, '')
-  return `${BASE_URL}/${urlPath}/index.md`
+  // reference/function/aggregation.md -> reference/function/aggregation.md
+  // cookbook/sql/finance/index.md -> cookbook/sql/finance.md
+  let urlPath = relativePath.replace(/\.md$/, '')
+  if (urlPath.endsWith('/index')) {
+    urlPath = urlPath.replace(/\/index$/, '')
+  }
+  if (!urlPath || urlPath === 'index') return `${BASE_URL}/index.md`
+  return `${BASE_URL}/${urlPath}.md`
 }
 
 /**

@@ -229,6 +229,283 @@ SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | ---------------------- |
 | ARRAY[1.0,2.0,4.0,6.0] |
 
+## array_elem_min
+
+`array_elem_min(array1, array2 [, ...])` or `array_elem_min(array)` returns an
+array where each element is the minimum of the corresponding elements across the
+inputs. Works in two modes:
+
+- **Multi-argument (per-row):** pass two or more `DOUBLE[]` expressions. The
+  function returns a single array that is the element-wise minimum of all
+  arguments.
+- **Aggregate (GROUP BY / SAMPLE BY):** pass a single `DOUBLE[]` column. The
+  function aggregates across rows, returning one result array per group.
+
+`NULL` arrays are skipped entirely. `NULL` elements within an array are skipped
+at that position. If every input at a given position is `NULL`, the result at
+that position is `NULL`.
+
+When input arrays have different lengths, the output length is the maximum
+across all inputs. Positions beyond the end of a shorter array receive no
+contribution from that array.
+
+N-dimensional arrays are supported. The output shape is the per-dimension
+maximum of all inputs. In multi-argument mode, all arguments must have the same
+number of dimensions.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1` — a `DOUBLE[]` array
+- `array2` — a `DOUBLE[]` array
+- `...` — additional `DOUBLE[]` arrays (optional)
+
+**Aggregate mode:**
+
+- `array` — a `DOUBLE[]` column
+
+#### Examples
+
+**Multi-argument — element-wise minimum of two arrays:**
+
+```questdb-sql
+SELECT array_elem_min(ARRAY[1.0, 5.0, 3.0], ARRAY[4.0, 2.0, 6.0]);
+```
+
+| array_elem_min  |
+| --------------- |
+| [1.0,2.0,3.0]   |
+
+**Multi-argument — arrays of different lengths:**
+
+```questdb-sql
+SELECT array_elem_min(
+    ARRAY[100.0, 200.0, 150.0],
+    ARRAY[120.0, 180.0, 160.0, 90.0]
+);
+```
+
+| array_elem_min              |
+| --------------------------- |
+| [100.0,180.0,150.0,90.0]    |
+
+The fourth position has only one contributing value.
+
+**Multi-argument — NULL elements are skipped:**
+
+```questdb-sql
+SELECT array_elem_min(ARRAY[100.0, null], ARRAY[null, 200.0]);
+```
+
+| array_elem_min |
+| -------------- |
+| [100.0,200.0]  |
+
+Each position takes the minimum over the values that are present (1 value each
+here, not 2).
+
+**Aggregate — worst bid prices per symbol each hour:**
+
+```questdb-sql
+CREATE TABLE book (
+    ts TIMESTAMP, symbol SYMBOL, bid_prices DOUBLE[]
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+INSERT INTO book VALUES
+  ('2025-06-01T09:30:00', 'AAPL', ARRAY[150.0, 149.5, 149.0]),
+  ('2025-06-01T09:30:05', 'AAPL', ARRAY[150.5, 149.0, 148.5, 148.0]),
+  ('2025-06-01T09:30:00', 'MSFT', ARRAY[420.0, 419.5]),
+  ('2025-06-01T09:30:05', 'MSFT', ARRAY[419.0, 418.5]);
+
+SELECT ts, symbol, array_elem_min(bid_prices)
+FROM book
+SAMPLE BY 1h;
+```
+
+| ts                          | symbol | array_elem_min             |
+| --------------------------- | ------ | -------------------------- |
+| 2025-06-01T09:00:00.000000Z | AAPL   | [150.0,149.0,148.5,148.0]  |
+| 2025-06-01T09:00:00.000000Z | MSFT   | [419.0,418.5]              |
+
+The `AAPL` group has snapshots with different book depths. The fourth position
+only has one contributing row.
+
+**Multi-argument — 2D arrays:**
+
+```questdb-sql
+SELECT array_elem_min(
+    ARRAY[[1.0, 8.0, 3.0], [5.0, 2.0, 9.0]],
+    ARRAY[[4.0, 6.0, 7.0], [3.0, 8.0, 1.0]]
+);
+```
+
+| array_elem_min                     |
+| ---------------------------------- |
+| [[1.0,6.0,3.0],[3.0,2.0,1.0]]      |
+
+## array_elem_max
+
+`array_elem_max(array1, array2 [, ...])` or `array_elem_max(array)` returns an
+array where each element is the maximum of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] — two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` — a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_max(ARRAY[1.0, 5.0, 3.0], ARRAY[4.0, 2.0, 6.0]);
+```
+
+| array_elem_max  |
+| --------------- |
+| [4.0,5.0,6.0]   |
+
+```questdb-sql
+SELECT array_elem_max(
+    ARRAY[[1.0, 8.0, 3.0], [5.0, 2.0, 9.0]],
+    ARRAY[[4.0, 6.0, 7.0], [3.0, 8.0, 1.0]]
+);
+```
+
+| array_elem_max                     |
+| ---------------------------------- |
+| [[4.0,8.0,7.0],[5.0,8.0,9.0]]      |
+
+**Aggregate — best bid prices per symbol each hour:**
+
+Using the `book` table from the [array_elem_min](#array_elem_min) example:
+
+```questdb-sql
+SELECT ts, symbol, array_elem_max(bid_prices)
+FROM book
+SAMPLE BY 1h;
+```
+
+| ts                          | symbol | array_elem_max             |
+| --------------------------- | ------ | -------------------------- |
+| 2025-06-01T09:00:00.000000Z | AAPL   | [150.5,149.5,149.0,148.0]  |
+| 2025-06-01T09:00:00.000000Z | MSFT   | [420.0,419.5]              |
+
+## array_elem_sum
+
+`array_elem_sum(array1, array2 [, ...])` or `array_elem_sum(array)` returns an
+array where each element is the sum of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+Uses Kahan compensated summation to minimize floating-point rounding errors.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] — two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` — a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_sum(
+    ARRAY[1.0, 2.0, 3.0],
+    ARRAY[10.0, 20.0, 30.0]
+);
+```
+
+| array_elem_sum    |
+| ----------------- |
+| [11.0,22.0,33.0]  |
+
+**Aggregate — total filled quantities per level across a session:**
+
+```questdb-sql
+CREATE TABLE fills (
+    ts TIMESTAMP, symbol SYMBOL, fill_qtys DOUBLE[]
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+INSERT INTO fills VALUES
+  ('2025-06-01T09:30:00', 'AAPL', ARRAY[100.0, 200.0]),
+  ('2025-06-01T09:30:05', 'AAPL', ARRAY[150.0, 50.0]),
+  ('2025-06-01T09:30:10', 'AAPL', ARRAY[250.0, 300.0]);
+
+SELECT array_elem_sum(fill_qtys) FROM fills;
+```
+
+| array_elem_sum  |
+| --------------- |
+| [500.0,550.0]   |
+
+## array_elem_avg
+
+`array_elem_avg(array1, array2 [, ...])` or `array_elem_avg(array)` returns an
+array where each element is the average of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+Uses Kahan compensated summation to minimize floating-point rounding errors.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] — two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` — a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_avg(ARRAY[10.0, 20.0, 30.0], ARRAY[30.0, 40.0, 50.0]);
+```
+
+| array_elem_avg     |
+| ------------------ |
+| [20.0,30.0,40.0]   |
+
+**Aggregate — average bid sizes per symbol each hour:**
+
+```questdb-sql
+CREATE TABLE book_sizes (
+    ts TIMESTAMP, symbol SYMBOL, bid_sizes DOUBLE[]
+) TIMESTAMP(ts) PARTITION BY DAY;
+
+INSERT INTO book_sizes VALUES
+  ('2025-06-01T09:30:00', 'AAPL', ARRAY[100.0, 200.0, 150.0]),
+  ('2025-06-01T09:30:05', 'AAPL', ARRAY[120.0, 180.0, 160.0, 90.0]),
+  ('2025-06-01T09:30:00', 'MSFT', ARRAY[500.0, 400.0]),
+  ('2025-06-01T09:30:05', 'MSFT', ARRAY[600.0, 300.0]);
+
+SELECT ts, symbol, array_elem_avg(bid_sizes)
+FROM book_sizes
+SAMPLE BY 1h;
+```
+
+| ts                          | symbol | array_elem_avg           |
+| --------------------------- | ------ | ------------------------ |
+| 2025-06-01T09:00:00.000000Z | AAPL   | [110.0,190.0,155.0,90.0] |
+| 2025-06-01T09:00:00.000000Z | MSFT   | [550.0,350.0]            |
+
+The `AAPL` group has snapshots with different book depths. The fourth position
+only has one contributing row.
+
 ## array_max
 
 `array_max(array)` returns the maximum value from all the array elements. `NULL`
@@ -291,6 +568,162 @@ SELECT
 | p1 | p2   |
 | -- | ---- |
 | 1  | NULL |
+
+## array_reverse
+
+**Syntax:**
+
+```questdb-sql
+array_reverse(array) -> DOUBLE[]
+```
+
+Reverses the element order within the innermost dimension of a `DOUBLE[]`
+array. Unlike [array_sort](#array_sort), which reorders elements by value,
+`array_reverse` preserves whatever ordering the array already has and flips it.
+This is useful when elements are ordered by an external criterion - such as
+ingestion timestamp, another column's values, or a prior sort - and you need
+the opposite direction.
+
+For multi-dimensional arrays, each sub-array is reversed independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to reverse. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Reverse a simple array:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[1.0, 2.0, 3.0]);
+```
+
+| array_reverse |
+| :------------ |
+| [3.0, 2.0, 1.0] |
+
+**Reverse time-ordered prices to get latest-first:**
+
+```questdb-sql demo title="array_reverse - latest prices first"
+SELECT timestamp,
+  array_reverse(array_agg(price)) AS prices_latest_first
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+`array_agg` collects prices in timestamp order. Wrapping with `array_reverse`
+puts the most recent price first in each bucket.
+
+**Reverse each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[[1.0, 2.0], [3.0, 4.0]]);
+```
+
+| array_reverse |
+| :------------ |
+| [[2.0, 1.0], [4.0, 3.0]] |
+
+#### See also
+
+- [array_sort](#array_sort) - Sort array elements by value
+- [Aggregation functions](/docs/query/functions/aggregation/) - `array_agg` collects row values into an array
+
+## array_sort
+
+**Syntax:**
+
+```questdb-sql
+array_sort(array) -> DOUBLE[]
+array_sort(array, descending) -> DOUBLE[]
+array_sort(array, descending, nullsFirst) -> DOUBLE[]
+```
+
+Sorts the elements of a `DOUBLE[]` array by value along the innermost
+dimension. Use it when values collected by
+[array_agg](/docs/query/functions/aggregation/) are in timestamp
+order but you need them ordered by value instead - for example, to find the
+median, compute percentiles, or prepare input for
+[insertion_point](#insertion_point).
+
+For multi-dimensional arrays, each sub-array is sorted independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to sort. |
+| `descending` | `BOOLEAN` (optional, default `false`) | `true` sorts in descending order. |
+| `nullsFirst` | `BOOLEAN` (optional) | `true` places null values before non-null values. Default: nulls last for ascending, nulls first for descending. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Sort prices by value within each time bucket:**
+
+```questdb-sql demo title="array_sort - sort collected prices by value"
+SELECT timestamp,
+  array_agg(price) AS prices_by_time,
+  array_sort(array_agg(price)) AS prices_by_value
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+`array_agg` collects prices in timestamp order. `array_sort` re-orders them
+from lowest to highest within each bucket.
+
+**Descending sort:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[3.0, 1.0, 2.0], true);
+```
+
+| array_sort |
+| :--------- |
+| [3.0, 2.0, 1.0] |
+
+**Control null placement:**
+
+```questdb-sql
+SELECT
+  array_sort(ARRAY[1.0, null, 2.0]) AS default_nulls,
+  array_sort(ARRAY[1.0, null, 2.0], false, true) AS nulls_first;
+```
+
+| default_nulls | nulls_first |
+| :------------ | :---------- |
+| [1.0, 2.0, null] | [null, 1.0, 2.0] |
+
+**Sort each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[[3.0, 1.0, 2.0], [6.0, 4.0, 5.0]]);
+```
+
+| array_sort |
+| :--------- |
+| [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] |
+
+#### See also
+
+- [array_reverse](#array_reverse) - Reverse array element order
+- [insertion_point](#insertion_point) - Binary search on a sorted array
+- [Aggregation functions](/docs/query/functions/aggregation/) - `array_agg` collects row values into an array
 
 ## array_sum
 
