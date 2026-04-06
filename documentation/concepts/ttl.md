@@ -51,7 +51,8 @@ ALTER TABLE trades SET TTL 2 WEEKS;
 ALTER TABLE trades SET TTL 2w;
 ```
 
-For full syntax, see [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/).
+For full syntax, see
+[ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/).
 
 ## How TTL works
 
@@ -59,27 +60,41 @@ TTL drops partitions based on the **partition's time range**, not individual row
 timestamps. A partition is dropped only when its **entire period** falls outside
 the TTL window.
 
-**Key rule**: A partition is dropped when `partition_end_time < reference_time - TTL`.
+**Key rule**: A partition is dropped when
+`partition_end_time < reference_time - TTL`.
 
 ### Reference time
 
-By default, TTL uses wall-clock time as the reference, not the maximum timestamp
-in the table. This protects against accidental data loss if a row with a
-far-future timestamp is inserted (which would otherwise cause all existing data
-to appear "expired").
+Generally, QuestDB uses the latest (maximum) timestamp in the table as the
+reference time to decide when to drop a partition. However, this rule alone has
+a hidden danger: if you ever accidentally insert a single row with a timestamp
+far in the future, you immediately lose all the data in the table.
 
-The reference time is: `min(max_timestamp_in_table, wall_clock_time)`
+This is why, by default, QuestDB caps the data-driven timestamp with the actual
+wall-clock time.
 
-To restore legacy behavior (using only max timestamp), set in `server.conf`:
+So the formula for the TTL reference time is:
+
+```text
+reference_time := min(wall_clock_time, latest_timestamp)
+```
+
+### Restore legacy behavior
+
+To restore QuestDB's legacy behavior (using only the latest timestamp), set this
+in `server.conf`:
 
 ```ini
 cairo.ttl.use.wall.clock=false
 ```
 
 :::caution
-Disabling wall-clock protection means inserting a row with a future timestamp
-(e.g., year 2100) will immediately drop all partitions that fall outside the TTL
-window relative to that future time.
+If you disable capping by wall-clock and then insert a row with a future
+timestamp (e.g., year 2100), QuestDB will immediately drop all partitions that
+are behind the TTL window relative to that future time.
+
+Put another way, you can lose **all your data** due to a **single invalid data
+point**.
 :::
 
 ### Example
@@ -93,9 +108,9 @@ Table partitioned by `HOUR` with `TTL 1 HOUR`:
 | 09:59 | Insert row at 09:59 | `08:00-09:00`, `09:00-10:00` |
 | 10:00 | Insert row at 10:00 | `09:00-10:00`, `10:00-11:00` |
 
-The `08:00-09:00` partition survives until 10:00 because its **end time** (09:00)
-must be more than 1 hour behind the reference time. At 10:00, the partition end
-(09:00) is exactly 1 hour old, so it's dropped.
+The `08:00-09:00` partition survives until 10:00 because its **end time**
+(09:00) must be more than 1 hour behind the reference time. At 10:00, the
+partition end (09:00) is exactly 1 hour old, so it's dropped.
 
 ## Checking TTL settings
 
@@ -112,10 +127,10 @@ A `ttlValue` of `0` means TTL is not configured.
 
 ## Removing TTL
 
-To disable automatic retention and keep all data:
+To disable automatic deletion and keep all data:
 
 ```questdb-sql
-ALTER TABLE trades SET TTL 0;
+ALTER TABLE trades SET TTL 0h;
 ```
 
 ## Guidelines
