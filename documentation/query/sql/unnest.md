@@ -368,6 +368,5 @@ ORDER BY symbol, level;
 - [`array_agg`](/docs/query/functions/aggregation/#array_agg) - Collect rows into arrays (inverse of Array UNNEST)
 - [Array functions](/docs/query/functions/array/)
 - [JSON functions](/docs/query/functions/json/)
-- [Payload transforms](/docs/ingestion/payload-transforms/) - Ingest and transform HTTP payloads using UNNEST
 - [SELECT](/docs/query/sql/select/)
 :::
