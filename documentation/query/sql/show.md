@@ -259,8 +259,8 @@ SHOW PAYLOAD TRANSFORMS;
 
 | name | target_table | dlq_table | query |
 | :--- | :--- | :--- | :--- |
-| binance_depth_api | binance_order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS timestamp, @symbol AS symbol, ... |
-| raw_events | event_log | | SELECT now() AS ts, payload() AS raw_body |
+| coinbase_book_api | coinbase_order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTC-USD' SELECT json_extract(payload(), '$.time')::TIMESTAMP AS timestamp, ... |
+| coinbase_trades_api | coinbase_trades | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTC-USD' SELECT u.time AS timestamp, ... FROM UNNEST(payload() COLUMNS(...)) u |
 
 ## SHOW PERMISSIONS
 

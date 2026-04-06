@@ -47,8 +47,8 @@ columns not included in the SELECT receive their default values.
 
 ### Basic transform
 
-```questdb-sql title="Create a table and a transform for Binance order book snapshots"
-CREATE TABLE binance_order_book (
+```questdb-sql title="Create a table and a transform for Coinbase order book snapshots"
+CREATE TABLE coinbase_order_book (
     timestamp TIMESTAMP,
     symbol SYMBOL,
     bids DOUBLE[][],
@@ -57,11 +57,11 @@ CREATE TABLE binance_order_book (
     best_ask DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
-CREATE PAYLOAD TRANSFORM binance_depth_api
-INTO binance_order_book
-AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
+CREATE PAYLOAD TRANSFORM coinbase_book_api
+INTO coinbase_order_book
+AS DECLARE OVERRIDABLE @symbol := 'BTC-USD'
 SELECT
-    now() AS timestamp,
+    json_extract(payload(), '$.time')::TIMESTAMP AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
     json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
@@ -72,12 +72,12 @@ SELECT
 ### With dead-letter queue
 
 ```questdb-sql title="Transform with DLQ and 7-day retention"
-CREATE PAYLOAD TRANSFORM binance_depth_api
-INTO binance_order_book
+CREATE PAYLOAD TRANSFORM coinbase_book_api
+INTO coinbase_order_book
 DLQ dlq_errors PARTITION BY DAY TTL 7 DAYS
-AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
+AS DECLARE OVERRIDABLE @symbol := 'BTC-USD'
 SELECT
-    now() AS timestamp,
+    json_extract(payload(), '$.time')::TIMESTAMP AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
     json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
@@ -88,11 +88,11 @@ SELECT
 ### Replace an existing transform
 
 ```questdb-sql title="Replace a transform definition"
-CREATE OR REPLACE PAYLOAD TRANSFORM binance_depth_api
-INTO binance_order_book
+CREATE OR REPLACE PAYLOAD TRANSFORM coinbase_book_api
+INTO coinbase_order_book
 AS SELECT
-    now() AS timestamp,
-    'BTCUSDT' AS symbol,
+    json_extract(payload(), '$.time')::TIMESTAMP AS timestamp,
+    'BTC-USD' AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
     json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
     json_extract(payload(), '$.bids[0][0]')::DOUBLE AS best_bid,
@@ -166,7 +166,7 @@ GRANT CREATE PAYLOAD TRANSFORM TO ingest_admin;
 GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
 
 GRANT HTTP TO ingest_service;
-GRANT INSERT ON binance_order_book TO ingest_service;
+GRANT INSERT ON coinbase_order_book TO ingest_service;
 GRANT INSERT ON dlq_errors TO ingest_service;
 ```
 

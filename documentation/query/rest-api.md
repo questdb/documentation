@@ -729,8 +729,8 @@ receive an HTTP 413 (Payload Too Large) response.
 ### Example
 
 ```shell title="Ingest a JSON payload"
-curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api" \
-  -d '{"bids":[["65000.01","0.5"]],"asks":[["65000.02","0.3"]]}'
+curl -s "https://api.exchange.coinbase.com/products/BTC-USD/book?level=2" | \
+  curl -X POST "http://localhost:9000/ingest?transform=coinbase_book_api" -d @-
 ```
 
 For full documentation on creating and managing transforms, see

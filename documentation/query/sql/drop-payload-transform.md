@@ -24,11 +24,11 @@ DROP PAYLOAD TRANSFORM [ IF EXISTS ] transformName
 ## Examples
 
 ```questdb-sql title="Drop a payload transform"
-DROP PAYLOAD TRANSFORM binance_depth_api;
+DROP PAYLOAD TRANSFORM coinbase_book_api;
 ```
 
 ```questdb-sql title="Drop only if exists (no error if missing)"
-DROP PAYLOAD TRANSFORM IF EXISTS binance_depth_api;
+DROP PAYLOAD TRANSFORM IF EXISTS coinbase_book_api;
 ```
 
 ## Behavior

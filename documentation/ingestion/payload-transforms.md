@@ -19,27 +19,30 @@ For full SQL syntax, see
 [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/), and
 [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms).
 
-## Example: Binance order book snapshots
+## Example: Coinbase order book snapshots
 
-Store order book snapshots from the Binance depth API. The API returns JSON
-like:
+Store order book snapshots from the
+[Coinbase book API](https://api.exchange.coinbase.com/products/BTC-USD/book?level=2).
+With `level=2`, the API returns up to 50 aggregated price levels per side:
 
 ```json
 {
-  "lastUpdateId": 91489376936,
-  "bids": [["69884.07000000","2.54878000"], ["69884.05000000","0.00008000"], ...],
-  "asks": [["69884.08000000","1.76553000"], ["69884.09000000","0.00096000"], ...]
+  "sequence": 125688480181,
+  "bids": [["69678.77","0.00007525",2], ["69676.36","0.00000022",1], ...],
+  "asks": [["69678.78","0.35468555",6], ["69679.99","0.00071759",1], ...],
+  "time": "2026-04-06T11:52:14.454632476Z",
+  "auction_mode": false
 }
 ```
 
+Each bid/ask entry contains the price, quantity, and number of orders at that
+level. The `time` field provides a nanosecond-precision exchange timestamp.
+
 Create a target table with full depth arrays plus top-of-book prices, and a
-transform that extracts them from the payload. The Binance depth endpoint
-returns the most recent order book snapshot but does not include a timestamp, so
-the transform uses `now()` to record the server ingestion time as the designated
-timestamp.
+transform that extracts them from the payload:
 
 ```questdb-sql title="Table and transform definition"
-CREATE TABLE binance_order_book (
+CREATE TABLE coinbase_order_book (
     timestamp TIMESTAMP,
     symbol SYMBOL,
     bids DOUBLE[][],
@@ -48,12 +51,12 @@ CREATE TABLE binance_order_book (
     best_ask DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
-CREATE PAYLOAD TRANSFORM binance_depth_api
-INTO binance_order_book
+CREATE PAYLOAD TRANSFORM coinbase_book_api
+INTO coinbase_order_book
 DLQ dlq_errors PARTITION BY DAY TTL 7 DAYS
-AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
+AS DECLARE OVERRIDABLE @symbol := 'BTC-USD'
 SELECT
-    now() AS timestamp,
+    json_extract(payload(), '$.time')::TIMESTAMP AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
     json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
@@ -61,11 +64,11 @@ SELECT
     json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
-Fetch 50 levels of depth from Binance and ingest the snapshot:
+Fetch 50 levels of depth and ingest the snapshot:
 
 ```shell title="POST a payload"
-curl -s "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=50" | \
-  curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api" -d @-
+curl -s "https://api.exchange.coinbase.com/products/BTC-USD/book?level=2" | \
+  curl -X POST "http://localhost:9000/ingest?transform=coinbase_book_api" -d @-
 ```
 
 Response:
@@ -80,13 +83,77 @@ The `@symbol` variable is declared `OVERRIDABLE`, so you can override it per
 request via URL query parameters:
 
 ```shell title="Override a variable"
-curl -s "https://api.binance.com/api/v3/depth?symbol=ETHUSDT&limit=50" | \
-  curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api&symbol=ETHUSDT" -d @-
+curl -s "https://api.exchange.coinbase.com/products/ETH-USD/book?level=2" | \
+  curl -X POST "http://localhost:9000/ingest?transform=coinbase_book_api&symbol=ETH-USD" -d @-
 ```
 
 Any URL query parameter other than `transform` is matched to a
 `DECLARE OVERRIDABLE` variable by name. Variables not marked `OVERRIDABLE`
 cannot be overridden - attempting to do so returns an error.
+
+## Example: Coinbase trades with UNNEST
+
+The [Coinbase trades API](https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=100)
+returns a JSON array of recent trades.
+
+```json
+[
+  {"trade_id": 994619709, "side": "sell", "size": "0.00000100",
+   "price": "69839.36000000", "time": "2026-04-06T10:32:55.517183Z"},
+  {"trade_id": 994619708, "side": "buy", "size": "0.00000006",
+   "price": "69839.35000000", "time": "2026-04-06T10:32:55.418434Z"},
+  ...
+]
+```
+
+The transform uses [JSON UNNEST](/docs/query/sql/unnest/#json-unnest) to expand
+the array into individual rows, one per trade. Each request may return trades
+already seen in a previous request, so the target table enables
+[deduplication](/docs/concepts/deduplication/) to handle overlapping results
+safely:
+
+```questdb-sql title="Table with deduplication and transform"
+CREATE TABLE coinbase_trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    trade_id LONG,
+    price DOUBLE,
+    size DOUBLE,
+    side SYMBOL
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL
+DEDUP UPSERT KEYS(timestamp, symbol, side);
+
+CREATE PAYLOAD TRANSFORM coinbase_trades_api
+INTO coinbase_trades
+DLQ dlq_errors PARTITION BY DAY TTL 7 DAYS
+AS DECLARE OVERRIDABLE @symbol := 'BTC-USD'
+SELECT
+    u.time AS timestamp,
+    @symbol AS symbol,
+    u.trade_id,
+    u.price,
+    u.size,
+    u.side
+FROM UNNEST(
+    payload() COLUMNS(
+        trade_id LONG,
+        price DOUBLE,
+        size DOUBLE,
+        side VARCHAR,
+        time TIMESTAMP
+    )
+) u;
+```
+
+Fetch the latest 100 trades and ingest them:
+
+```shell title="Ingest trades"
+curl -s "https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=100" | \
+  curl -X POST "http://localhost:9000/ingest?transform=coinbase_trades_api" -d @-
+```
+
+If any trades were already ingested from a previous request, deduplication
+discards the duplicates automatically.
 
 ### Inspecting failed payloads
 
@@ -100,8 +167,8 @@ SELECT ts, transform_name, stage, error FROM dlq_errors;
 
 | ts | transform_name | stage | error |
 | :--- | :--- | :--- | :--- |
-| 2026-03-23T14:00:00.000000Z | binance_depth_api | transform | column not found in target table [column=extra] |
-| 2026-03-23T14:01:00.000000Z | other_transform | transform | bad JSON payload |
+| 2026-03-23T14:00:00.000000Z | coinbase_book_api | transform | column not found in target table [column=extra] |
+| 2026-03-23T14:01:00.000000Z | coinbase_trades_api | transform | bad JSON payload |
 
 Multiple transforms can share the same DLQ table. See
 [CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/#dead-letter-queue-schema)
@@ -155,11 +222,11 @@ In [QuestDB Enterprise](/enterprise/) deployments with
 ```questdb-sql title="Typical Enterprise setup"
 -- Admin who manages transforms
 GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
-GRANT INSERT ON binance_order_book, dlq_errors TO ingest_admin;
+GRANT INSERT ON coinbase_order_book, coinbase_trades, dlq_errors TO ingest_admin;
 
 -- Service account that calls /ingest
 GRANT HTTP TO ingest_service;
-GRANT INSERT ON binance_order_book TO ingest_service;
+GRANT INSERT ON coinbase_order_book, coinbase_trades TO ingest_service;
 ```
 
 :::
@@ -201,6 +268,7 @@ based on available memory and expected payload sizes.
 - [CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/)
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
 - [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
+- [UNNEST](/docs/query/sql/unnest/)
 - [JSON functions](/docs/query/functions/json/)
 - [REST API](/docs/query/rest-api/)
 - [Role-Based Access Control (RBAC)](/docs/security/rbac/)
