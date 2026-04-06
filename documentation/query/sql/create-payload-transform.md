@@ -23,6 +23,8 @@ Where:
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
 - The `SELECT` must not reference existing tables - it can only use functions
   and expressions, including CTEs
+- Use [`payload()`](/docs/query/functions/meta/#payload) to access the raw HTTP
+  request body as a `VARCHAR`
 
 ## Parameters
 
@@ -176,6 +178,7 @@ GRANT INSERT ON dlq_errors TO ingest_service;
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
 - [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
 - [Payload transforms overview](/docs/ingestion/payload-transforms/)
+- [`payload()` function](/docs/query/functions/meta/#payload)
 - [JSON functions](/docs/query/functions/json/)
 - [Role-Based Access Control (RBAC)](/docs/security/rbac/)
 :::

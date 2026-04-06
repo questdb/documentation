@@ -8,7 +8,9 @@ description:
 
 Payload transforms define how incoming HTTP payloads are parsed, transformed, and
 inserted into a QuestDB table. You define a transform once with a SQL `SELECT`
-expression, then POST data directly to QuestDB. No middleware or intermediary
+expression, then POST data directly to QuestDB. The
+[`payload()`](/docs/query/functions/meta/#payload) function provides access to
+the raw HTTP request body within the transform. No middleware or intermediary
 service is required.
 
 Use cases include webhook ingestion, IoT device data, and external API responses
@@ -185,8 +187,8 @@ for the full DLQ schema.
 | `transform` | Yes | Name of the payload transform to execute |
 | Any other | No | Overrides a `DECLARE OVERRIDABLE` variable by name |
 
-The request body is the raw payload, accessible via `payload()` in the transform
-SQL.
+The request body is the raw payload, accessible via
+[`payload()`](/docs/query/functions/meta/#payload) in the transform SQL.
 
 ### Responses
 
@@ -269,6 +271,7 @@ based on available memory and expected payload sizes.
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
 - [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
 - [UNNEST](/docs/query/sql/unnest/)
+- [`payload()` function](/docs/query/functions/meta/#payload)
 - [JSON functions](/docs/query/functions/json/)
 - [REST API](/docs/query/rest-api/)
 - [Role-Based Access Control (RBAC)](/docs/security/rbac/)
