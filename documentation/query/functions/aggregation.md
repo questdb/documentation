@@ -439,9 +439,10 @@ array_agg(value [, ordered]) -> DOUBLE[]
 array_agg(array [, ordered]) -> DOUBLE[]
 ```
 
-Collects row values into a single `DOUBLE[]` array per group. Use it to build
-per-group vectors for downstream array operations such as
-[array_avg](/docs/query/functions/array/#array_avg),
+Collects row values into a single `DOUBLE[]` array per group. This is the
+inverse of [UNNEST](/docs/query/sql/unnest/#array-unnest), which expands arrays
+back into rows. Use `array_agg` to build per-group vectors for downstream array
+operations such as [array_avg](/docs/query/functions/array/#array_avg),
 [dot_product](/docs/query/functions/array/#dot_product), or time-bucketed
 snapshots via `SAMPLE BY`.
 
@@ -565,6 +566,7 @@ totals over the collected prices in timestamp order.
 
 #### See also
 
+- [UNNEST](/docs/query/sql/unnest/#array-unnest) - Expand arrays back into rows (inverse of `array_agg`)
 - [Array functions](/docs/query/functions/array/) - Functions that operate on arrays
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 
