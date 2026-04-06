@@ -31,6 +31,10 @@ like:
 }
 ```
 
+The Binance depth endpoint returns the most recent order book snapshot but does
+not include a timestamp. The transform uses `now()` to record the server
+ingestion time as the designated timestamp.
+
 Create a target table with full depth arrays plus top-of-book prices, and a
 transform that extracts them from the payload:
 
