@@ -92,7 +92,9 @@ CREATE TABLE 'market_data' (
     timestamp TIMESTAMP,
     symbol SYMBOL CAPACITY 16384 CACHE,
     bids DOUBLE[][],
-    asks DOUBLE[][]
+    asks DOUBLE[][],
+    best_bid DOUBLE,
+    best_ask DOUBLE
 ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;
 ```
 
@@ -102,6 +104,8 @@ CREATE TABLE 'market_data' (
 - **`symbol`** - Currency pair (e.g., EURUSD, GBPJPY)
 - **`bids`** - 2D array containing bid prices and volumes: `[[price1, price2, ...], [volume1, volume2, ...]]`
 - **`asks`** - 2D array containing ask prices and volumes: `[[price1, price2, ...], [volume1, volume2, ...]]`
+- **`best_bid`** - Best (highest) bid price. Equivalent to `bids[1][1]` but preferred when only the top-of-book price is needed, as it scans much less data
+- **`best_ask`** - Best (lowest) ask price. Equivalent to `asks[1][1]` but preferred when only the top-of-book price is needed, as it scans much less data
 
 The arrays are structured so that:
 - `bids[1]` contains bid prices (descending order - highest first)

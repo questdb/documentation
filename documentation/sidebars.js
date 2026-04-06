@@ -264,6 +264,7 @@ module.exports = {
                     "query/sql/alter-table-alter-column-cache",
                     "query/sql/alter-table-change-column-type",
                     "query/sql/alter-table-alter-column-drop-index",
+                    "query/sql/alter-table-alter-column-parquet-encoding",
                     "query/sql/alter-table-change-symbol-capacity",
                   ],
                 },
@@ -425,6 +426,7 @@ module.exports = {
                 "query/sql/order-by",
                 "query/sql/pivot",
                 "query/sql/sample-by",
+                "query/sql/unnest",
                 "query/sql/where",
                 "query/sql/window-join",
                 "query/sql/with",
@@ -788,6 +790,7 @@ module.exports = {
                       items: [
                         "cookbook/sql/finance/ohlc",
                         "cookbook/sql/finance/vwap",
+                        "cookbook/sql/finance/twap",
                         "cookbook/sql/finance/bollinger-bands",
                         "cookbook/sql/finance/bollinger-bandwidth",
                       ],
@@ -841,6 +844,7 @@ module.exports = {
                       collapsed: true,
                       items: [
                         "cookbook/sql/finance/bid-ask-spread",
+                        "cookbook/sql/finance/gamma-scalping-signal",
                         "cookbook/sql/finance/liquidity-comparison",
                       ],
                     },
@@ -859,6 +863,7 @@ module.exports = {
                       items: [
                         "cookbook/sql/finance/compound-interest",
                         "cookbook/sql/finance/cumulative-product",
+                        "cookbook/sql/finance/log-returns",
                       ],
                     },
                   ],

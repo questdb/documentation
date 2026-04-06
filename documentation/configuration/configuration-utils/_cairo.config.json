@@ -19,22 +19,6 @@
     "default": "1 second",
     "description": "The minimum size of in-memory buffer in milliseconds. The buffer is allocated dynamically through analyzing the shape of the incoming data, and `o3MinLag` is the lower limit."
   },
-  "cairo.sql.backup.root": {
-    "default": "null",
-    "description": "Output root directory for backups."
-  },
-  "cairo.sql.backup.dir.datetime.format": {
-    "default": "null",
-    "description": "Date format for backup directory."
-  },
-  "cairo.sql.backup.dir.tmp.name": {
-    "default": "tmp",
-    "description": "Name of tmp directory used during backup."
-  },
-  "cairo.sql.backup.mkdir.mode": {
-    "default": "509",
-    "description": "Permission used when creating backup directories."
-  },
   "cairo.snapshot.instance.id": {
     "default": "empty string",
     "description": "Instance id to be included into disk snapshots."
@@ -315,6 +299,10 @@
     "default": "8",
     "description": "Sets max memory pages for storing IR for JIT compilation."
   },
+  "cairo.json.unnest.max.value.size": {
+    "default": "4096",
+    "description": "Maximum byte size of a single VARCHAR or TIMESTAMP field value extracted during JSON [UNNEST](/docs/query/sql/unnest/). Numeric types (DOUBLE, LONG, INT, SHORT, BOOLEAN) are unaffected. Each VARCHAR/TIMESTAMP column allocates `2 * maxValueSize` bytes of native memory per active UNNEST cursor, so increase with care."
+  },
   "cairo.sql.page.frame.min.rows": {
     "default": "1000",
     "description": "Sets the minimum number of rows in page frames used in SQL queries."
@@ -490,5 +478,9 @@
   "cairo.partition.encoder.parquet.data.page.size": {
     "default": "1048576",
     "description": "Sets the default page size for parquet-encoded partitions."
+  },
+  "cairo.partition.encoder.parquet.min.compression.ratio": {
+    "default": "1.2",
+    "description": "Minimum compression ratio (uncompressed_size / compressed_size) for Parquet pages. When a compressed page does not meet this threshold, it is stored uncompressed instead. A value of 0.0 disables the check."
   }
 }

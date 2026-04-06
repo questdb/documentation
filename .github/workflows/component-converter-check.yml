@@ -20,7 +20,7 @@ jobs:
 
             A component in `src/components/` or `src/theme/` was modified in this pull request.
 
-            We are creating markdown correspondents of every path (e.g. questdb.com/docs/quick-start → questdb.com/docs/quick-start/index.md) for LLM consumption.
+            We are creating markdown correspondents of every path (e.g. questdb.com/docs/quick-start/ → questdb.com/docs/quick-start.md) for LLM consumption.
             If the component usage is shadowing useful content, it may need a converter for markdown output in `convert-components.js`.
 
             ### Quick Check

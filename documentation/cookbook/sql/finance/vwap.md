@@ -32,9 +32,9 @@ WITH sampled AS (
 )
 SELECT
   timestamp, symbol,
-  SUM(traded_value) OVER (ORDER BY timestamp) /
-    SUM(total_volume) OVER (ORDER BY timestamp) AS vwap
-FROM sampled;
+  SUM(traded_value) OVER w / SUM(total_volume) OVER w AS vwap
+FROM sampled
+WINDOW w AS (ORDER BY timestamp);
 ```
 
 This query:
@@ -43,11 +43,12 @@ This query:
 
 ## How it works
 
-The key insight is using `SUM(...) OVER (ORDER BY timestamp)` to create running totals, then dividing them directly:
+The key insight is using `SUM(...) OVER w` with a named window to create running totals, then dividing them directly:
 
 ```sql
-SUM(traded_value) OVER (ORDER BY timestamp) /
-  SUM(total_volume) OVER (ORDER BY timestamp) AS vwap
+SUM(traded_value) OVER w / SUM(total_volume) OVER w AS vwap
+...
+WINDOW w AS (ORDER BY timestamp)
 ```
 
 When using `SUM() OVER (ORDER BY timestamp)` without specifying a frame clause, QuestDB defaults to summing from the first row to the current row, which is exactly what we need for cumulative VWAP.
@@ -68,9 +69,9 @@ WITH sampled AS (
 )
 SELECT
   timestamp, symbol,
-  SUM(traded_value) OVER (PARTITION BY symbol ORDER BY timestamp) /
-    SUM(total_volume) OVER (PARTITION BY symbol ORDER BY timestamp) AS vwap
-FROM sampled;
+  SUM(traded_value) OVER w / SUM(total_volume) OVER w AS vwap
+FROM sampled
+WINDOW w AS (PARTITION BY symbol ORDER BY timestamp);
 ```
 
 The `PARTITION BY symbol` ensures each symbol's VWAP is calculated independently.
@@ -96,6 +97,7 @@ WHERE timestamp IN '$now - 1h..$now'
 :::
 
 :::info Related documentation
+- [TWAP (Time-Weighted Average Price)](/docs/cookbook/sql/finance/twap/) — the time-weighted counterpart; better suited for illiquid instruments or when volume data is unavailable
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [SUM aggregate](/docs/query/functions/aggregation/#sum)
 - [Materialized views](/docs/concepts/materialized-views/)

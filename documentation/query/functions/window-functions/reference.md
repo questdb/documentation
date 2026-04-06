@@ -912,24 +912,18 @@ WHERE timestamp IN '[$today]' AND symbol = 'GBPUSD';
 
 ### Trade frequency analysis
 
+This example uses a [named window](syntax.md#named-windows-window-clause) to avoid repeating the same window definition:
+
 ```questdb-sql title="Trades per minute by side" demo
 SELECT
     timestamp,
     symbol,
-    COUNT(*) OVER (
-        ORDER BY timestamp
-        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
-    ) AS updates_per_min,
-    COUNT(CASE WHEN side = 'buy' THEN 1 END) OVER (
-        ORDER BY timestamp
-        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
-    ) AS buys_per_minute,
-    COUNT(CASE WHEN side = 'sell' THEN 1 END) OVER (
-        ORDER BY timestamp
-        RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
-    ) AS sells_per_minute
+    COUNT(*) OVER w AS updates_per_min,
+    COUNT(CASE WHEN side = 'buy' THEN 1 END) OVER w AS buys_per_minute,
+    COUNT(CASE WHEN side = 'sell' THEN 1 END) OVER w AS sells_per_minute
 FROM trades
-WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT';
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW);
 ```
 
 ---

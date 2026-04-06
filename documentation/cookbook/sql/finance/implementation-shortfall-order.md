@@ -181,7 +181,7 @@ Compare `spread_cost_bps` against total IS to understand how much of the executi
 
 Decompose each order's total IS into permanent impact (information content) and temporary impact (transient dislocation that reverts). This uses `HORIZON JOIN` to capture the mid at fill time and 30 minutes later, then `PIVOT` to reshape into columns:
 
-```questdb-sql title="Order-level IS decomposition into permanent and temporary impact"
+```questdb-sql title="Order-level IS decomposition into permanent and temporary impact" demo
 WITH order_markouts AS (
     SELECT
         f.order_id,

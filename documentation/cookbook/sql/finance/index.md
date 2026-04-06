@@ -4,8 +4,6 @@ sidebar_label: Overview
 description: SQL recipes for financial analysis including technical indicators, volatility metrics, volume analysis, and risk measurement in QuestDB.
 ---
 
-# Capital Markets Recipes
-
 This section contains SQL recipes for financial market analysis. All recipes use the
 [demo dataset](/docs/cookbook/demo-data-schema/) available in the QuestDB web console.
 
@@ -17,6 +15,7 @@ Foundation recipes for price analysis and trend identification.
 |--------|-------------|
 | [OHLC Aggregation](ohlc.md) | Aggregate tick data into candlestick bars |
 | [VWAP](vwap.md) | Volume-Weighted Average Price |
+| [TWAP](twap.md) | Time-Weighted Average Price |
 | [Bollinger Bands](bollinger-bands.md) | Price channels based on standard deviation |
 | [Bollinger BandWidth](bollinger-bandwidth.md) | Measure band expansion and contraction |
 
@@ -70,6 +69,7 @@ Analyze market quality and trading costs.
 | Recipe | Description |
 |--------|-------------|
 | [Bid-Ask Spread](bid-ask-spread.md) | Spread metrics and analysis |
+| [Gamma Scalping Signal](gamma-scalping-signal.md) | Vol-spread ratio for gamma scalping conditions |
 | [Liquidity Comparison](liquidity-comparison.md) | Compare liquidity across instruments |
 
 ## Post-Trade Analysis
@@ -102,3 +102,4 @@ General-purpose financial calculations.
 |--------|-------------|
 | [Compound Interest](compound-interest.md) | Interest and growth calculations |
 | [Cumulative Product](cumulative-product.md) | Running product for returns |
+| [Log Returns](log-returns.md) | Compute log returns from consecutive prices |

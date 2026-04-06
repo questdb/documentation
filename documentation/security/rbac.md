@@ -565,7 +565,6 @@ SELECT * FROM all_permissions();
 | ALTER COLUMN TYPE | Database &#124; Table &#124; Column | Change column types |
 | ATTACH PARTITION | Database &#124; Table | Attach partitions |
 | BACKUP DATABASE | Database | Create database backups |
-| BACKUP TABLE | Database &#124; Table | Create table backups |
 | CANCEL ANY COPY | Database | Cancel COPY operations |
 | CREATE TABLE | Database | Create tables |
 | CREATE MATERIALIZED VIEW | Database | Create materialized views |
