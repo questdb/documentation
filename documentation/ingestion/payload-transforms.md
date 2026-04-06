@@ -15,8 +15,9 @@ Use cases include webhook ingestion, IoT device data, and external API responses
 where you want to skip building a dedicated ingestion service.
 
 For full SQL syntax, see
-[CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/) and
-[DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/).
+[CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/),
+[DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/), and
+[SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms).
 
 ## Example: Binance order book snapshots
 
@@ -25,18 +26,17 @@ like:
 
 ```json
 {
-  "lastUpdateId": 124211219720,
-  "bids": [["73577.91","0.05"], ["73575.00","1.20"]],
-  "asks": [["73578.02","0.03"], ["73580.00","0.80"]]
+  "lastUpdateId": 91489376936,
+  "bids": [["69884.07000000","2.54878000"], ["69884.05000000","0.00008000"], ...],
+  "asks": [["69884.08000000","1.76553000"], ["69884.09000000","0.00096000"], ...]
 }
 ```
 
-The Binance depth endpoint returns the most recent order book snapshot but does
-not include a timestamp. The transform uses `now()` to record the server
-ingestion time as the designated timestamp.
-
 Create a target table with full depth arrays plus top-of-book prices, and a
-transform that extracts them from the payload:
+transform that extracts them from the payload. The Binance depth endpoint
+returns the most recent order book snapshot but does not include a timestamp, so
+the transform uses `now()` to record the server ingestion time as the designated
+timestamp.
 
 ```questdb-sql title="Table and transform definition"
 CREATE TABLE binance_order_book (
@@ -61,10 +61,10 @@ SELECT
     json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
-Ingest a snapshot:
+Fetch 50 levels of depth from Binance and ingest the snapshot:
 
 ```shell title="POST a payload"
-curl -s "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5" | \
+curl -s "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=50" | \
   curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api" -d @-
 ```
 
@@ -80,7 +80,7 @@ The `@symbol` variable is declared `OVERRIDABLE`, so you can override it per
 request via URL query parameters:
 
 ```shell title="Override a variable"
-curl -s "https://api.binance.com/api/v3/depth?symbol=ETHUSDT&limit=5" | \
+curl -s "https://api.binance.com/api/v3/depth?symbol=ETHUSDT&limit=50" | \
   curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api&symbol=ETHUSDT" -d @-
 ```
 
@@ -200,6 +200,8 @@ based on available memory and expected payload sizes.
 :::info Related documentation
 - [CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/)
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
+- [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
 - [JSON functions](/docs/query/functions/json/)
 - [REST API](/docs/query/rest-api/)
+- [Role-Based Access Control (RBAC)](/docs/security/rbac/)
 :::

@@ -174,6 +174,8 @@ GRANT INSERT ON dlq_errors TO ingest_service;
 
 :::info Related documentation
 - [DROP PAYLOAD TRANSFORM](/docs/query/sql/drop-payload-transform/)
+- [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
 - [Payload transforms overview](/docs/ingestion/payload-transforms/)
 - [JSON functions](/docs/query/functions/json/)
+- [Role-Based Access Control (RBAC)](/docs/security/rbac/)
 :::

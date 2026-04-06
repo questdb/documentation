@@ -55,5 +55,7 @@ GRANT DROP PAYLOAD TRANSFORM TO ingest_admin;
 
 :::info Related documentation
 - [CREATE PAYLOAD TRANSFORM](/docs/query/sql/create-payload-transform/)
+- [SHOW PAYLOAD TRANSFORMS](/docs/query/sql/show/#show-payload-transforms)
 - [Payload transforms overview](/docs/ingestion/payload-transforms/)
+- [Role-Based Access Control (RBAC)](/docs/security/rbac/)
 :::
