@@ -20,42 +20,48 @@ For full SQL syntax, see
 
 ## Example: Binance order book snapshots
 
-Store full order book snapshots from the Binance depth API, which returns JSON
+Store order book snapshots from the Binance depth API. The API returns JSON
 like:
 
 ```json
 {
-  "bids": [["65000.01","0.5"], ["64999.99","1.2"]],
-  "asks": [["65000.02","0.3"], ["65000.05","0.8"]]
+  "lastUpdateId": 124211219720,
+  "bids": [["73577.91","0.05"], ["73575.00","1.20"]],
+  "asks": [["73578.02","0.03"], ["73580.00","0.80"]]
 }
 ```
 
-Create the target table and the transform:
+Create a target table with full depth arrays plus top-of-book prices, and a
+transform that extracts them from the payload:
 
 ```questdb-sql title="Table and transform definition"
-CREATE TABLE order_book (
-    ts TIMESTAMP,
+CREATE TABLE binance_order_book (
+    timestamp TIMESTAMP,
     symbol SYMBOL,
     bids DOUBLE[][],
-    asks DOUBLE[][]
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+    asks DOUBLE[][],
+    best_bid DOUBLE,
+    best_ask DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
-CREATE PAYLOAD TRANSFORM binance_depth
-INTO order_book
+CREATE PAYLOAD TRANSFORM binance_depth_api
+INTO binance_order_book
 DLQ dlq_errors PARTITION BY DAY TTL 7 DAYS
 AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
 SELECT
-    now() AS ts,
+    now() AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
-    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks;
+    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
+    json_extract(payload(), '$.bids[0][0]')::DOUBLE AS best_bid,
+    json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
 Ingest a snapshot:
 
 ```shell title="POST a payload"
 curl -s "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5" | \
-  curl -X POST "http://localhost:9000/ingest?transform=binance_depth" -d @-
+  curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api" -d @-
 ```
 
 Response:
@@ -71,7 +77,7 @@ request via URL query parameters:
 
 ```shell title="Override a variable"
 curl -s "https://api.binance.com/api/v3/depth?symbol=ETHUSDT&limit=5" | \
-  curl -X POST "http://localhost:9000/ingest?transform=binance_depth&symbol=ETHUSDT" -d @-
+  curl -X POST "http://localhost:9000/ingest?transform=binance_depth_api&symbol=ETHUSDT" -d @-
 ```
 
 Any URL query parameter other than `transform` is matched to a
@@ -90,7 +96,7 @@ SELECT ts, transform_name, stage, error FROM dlq_errors;
 
 | ts | transform_name | stage | error |
 | :--- | :--- | :--- | :--- |
-| 2026-03-23T14:00:00.000000Z | binance_depth | transform | column not found in target table [column=extra] |
+| 2026-03-23T14:00:00.000000Z | binance_depth_api | transform | column not found in target table [column=extra] |
 | 2026-03-23T14:01:00.000000Z | other_transform | transform | bad JSON payload |
 
 Multiple transforms can share the same DLQ table. See
@@ -145,11 +151,11 @@ In [QuestDB Enterprise](/enterprise/) deployments with
 ```questdb-sql title="Typical Enterprise setup"
 -- Admin who manages transforms
 GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
-GRANT INSERT ON order_book, dlq_errors TO ingest_admin;
+GRANT INSERT ON binance_order_book, dlq_errors TO ingest_admin;
 
 -- Service account that calls /ingest
 GRANT HTTP TO ingest_service;
-GRANT INSERT ON order_book TO ingest_service;
+GRANT INSERT ON binance_order_book TO ingest_service;
 ```
 
 :::

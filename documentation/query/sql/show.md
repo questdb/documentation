@@ -259,7 +259,7 @@ SHOW PAYLOAD TRANSFORMS;
 
 | name | target_table | dlq_table | query |
 | :--- | :--- | :--- | :--- |
-| binance_depth | order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS ts, @symbol AS symbol, ... |
+| binance_depth_api | binance_order_book | dlq_errors | DECLARE OVERRIDABLE @symbol := 'BTCUSDT' SELECT now() AS timestamp, @symbol AS symbol, ... |
 | raw_events | event_log | | SELECT now() AS ts, payload() AS raw_body |
 
 ## SHOW PERMISSIONS

@@ -47,48 +47,56 @@ columns not included in the SELECT receive their default values.
 
 ### Basic transform
 
-```questdb-sql title="Create a table and a transform"
-CREATE TABLE order_book (
-    ts TIMESTAMP,
+```questdb-sql title="Create a table and a transform for Binance order book snapshots"
+CREATE TABLE binance_order_book (
+    timestamp TIMESTAMP,
     symbol SYMBOL,
     bids DOUBLE[][],
-    asks DOUBLE[][]
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+    asks DOUBLE[][],
+    best_bid DOUBLE,
+    best_ask DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
-CREATE PAYLOAD TRANSFORM binance_depth
-INTO order_book
+CREATE PAYLOAD TRANSFORM binance_depth_api
+INTO binance_order_book
 AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
 SELECT
-    now() AS ts,
+    now() AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
-    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks;
+    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
+    json_extract(payload(), '$.bids[0][0]')::DOUBLE AS best_bid,
+    json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
 ### With dead-letter queue
 
 ```questdb-sql title="Transform with DLQ and 7-day retention"
-CREATE PAYLOAD TRANSFORM binance_depth
-INTO order_book
+CREATE PAYLOAD TRANSFORM binance_depth_api
+INTO binance_order_book
 DLQ dlq_errors PARTITION BY DAY TTL 7 DAYS
 AS DECLARE OVERRIDABLE @symbol := 'BTCUSDT'
 SELECT
-    now() AS ts,
+    now() AS timestamp,
     @symbol AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
-    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks;
+    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
+    json_extract(payload(), '$.bids[0][0]')::DOUBLE AS best_bid,
+    json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
 ### Replace an existing transform
 
 ```questdb-sql title="Replace a transform definition"
-CREATE OR REPLACE PAYLOAD TRANSFORM binance_depth
-INTO order_book
+CREATE OR REPLACE PAYLOAD TRANSFORM binance_depth_api
+INTO binance_order_book
 AS SELECT
-    now() AS ts,
+    now() AS timestamp,
     'BTCUSDT' AS symbol,
     json_extract(payload(), '$.bids')::DOUBLE[][] AS bids,
-    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks;
+    json_extract(payload(), '$.asks')::DOUBLE[][] AS asks,
+    json_extract(payload(), '$.bids[0][0]')::DOUBLE AS best_bid,
+    json_extract(payload(), '$.asks[0][0]')::DOUBLE AS best_ask;
 ```
 
 ### Multiple overridable variables
@@ -158,7 +166,7 @@ GRANT CREATE PAYLOAD TRANSFORM TO ingest_admin;
 GRANT CREATE PAYLOAD TRANSFORM, DROP PAYLOAD TRANSFORM TO ingest_admin;
 
 GRANT HTTP TO ingest_service;
-GRANT INSERT ON order_book TO ingest_service;
+GRANT INSERT ON binance_order_book TO ingest_service;
 GRANT INSERT ON dlq_errors TO ingest_service;
 ```
 
