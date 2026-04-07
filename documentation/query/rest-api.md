@@ -600,16 +600,9 @@ returned in a tabular form to be saved and reused as opposed to JSON.
 | `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
 | `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
 | `fmt`     | No       | Export format. Valid values: `parquet`, `csv`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                         |
+| `timeout` | No       | Query timeout in seconds. Overrides the default timeout. For Parquet exports, the default is the server's export timeout. For CSV exports, the default is the general query timeout.                                         |
 
 #### Parquet Export Parameters
-
-:::warning
-
-Parquet exports currently require writing interim data to disk, and therefore must be run on **read-write instances only**.
-
-This limitation will be removed in future.
-
-:::
 
 When `fmt=parquet`, the following additional parameters are supported:
 
