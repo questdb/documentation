@@ -5,10 +5,10 @@ description: JOIN SQL keyword reference documentation.
 ---
 
 QuestDB supports the type of joins you can frequently find in
-[relational databases](/glossary/relational-database/): `INNER`, `LEFT (OUTER)`,
-`CROSS`. Additionally, it implements joins which are particularly useful for
-time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`. `FULL` joins are
-not yet implemented and are on our roadmap.
+[relational databases](/glossary/relational-database/): `INNER`,
+`LEFT (OUTER)`, `RIGHT (OUTER)`, `FULL (OUTER)`, `CROSS`, and `LATERAL`.
+Additionally, it implements joins which are particularly useful for
+time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`.
 
 All supported join types can be combined in a single SQL statement; QuestDB
 SQL's optimizer determines the best execution order and algorithms.
@@ -227,6 +227,15 @@ averages, or aggregating readings within time windows.
 
 It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).
 
+## LATERAL JOIN
+
+LATERAL JOIN allows a subquery on the right-hand side of a join to reference
+columns from tables that appear earlier in the `FROM` clause. It is useful for
+top-N per group queries, per-row aggregates, and dynamic filters whose
+thresholds come from the outer row.
+
+It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
+
 ## (INNER) JOIN
 
 `(INNER) JOIN` returns rows from two tables where the records on the compared
@@ -293,6 +302,63 @@ WHERE Lookup.Symbol = NULL;
 
 In this case, the result has 71 rows out of the 100 in the larger table, and the
 columns corresponding to the `Lookup` table are all `NULL`.
+
+## RIGHT (OUTER) JOIN
+
+`RIGHT OUTER JOIN` or simply `RIGHT JOIN` is the mirror of `LEFT JOIN`: it
+returns **all** records from the right table, and if matched, the records
+from the left table. When there is no match for the left table, it returns
+`NULL` values in left table fields.
+
+```questdb-sql title="RIGHT JOIN ON"
+WITH
+  Manytrades AS
+    (SELECT * FROM trades limit 100),
+  Lookup AS
+    (SELECT 'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+SELECT *
+FROM ManyTrades
+RIGHT OUTER JOIN Lookup
+  ON Lookup.symbol = Manytrades.symbol;
+```
+
+Any `RIGHT JOIN` can be rewritten as a `LEFT JOIN` by swapping the order of
+the tables, which is generally considered more idiomatic. `RIGHT JOIN` is
+useful when the left side of the join is itself the result of earlier joins
+in the query — rewriting it as `LEFT JOIN` would otherwise require
+restructuring the chain or wrapping it in a subquery.
+
+## FULL (OUTER) JOIN
+
+`FULL OUTER JOIN` or simply `FULL JOIN` is the union of `LEFT JOIN` and
+`RIGHT JOIN`: it returns **all** records from both tables. Matched rows
+are combined into one row, while unmatched rows from either side appear
+with `NULL` in the columns of the other table.
+
+```questdb-sql title="FULL JOIN ON"
+WITH
+  mayTrades AS (
+    SELECT symbol, COUNT(*) AS may_total
+    FROM trades
+    WHERE timestamp IN '2024-05'
+  ),
+  juneTrades AS (
+    SELECT symbol, COUNT(*) AS june_total
+    FROM trades
+    WHERE timestamp IN '2024-06'
+  )
+SELECT
+  COALESCE(mayTrades.symbol, juneTrades.symbol) AS symbol,
+  may_total,
+  june_total
+FROM mayTrades
+FULL OUTER JOIN juneTrades
+  ON mayTrades.symbol = juneTrades.symbol;
+```
+
+Symbols traded in only one of the two months get `NULL` for the other
+month's total. This makes `FULL JOIN` a natural fit for reconciliation
+queries that need to find rows present in one dataset but not the other.
 
 ## CROSS JOIN
 
