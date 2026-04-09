@@ -2,7 +2,7 @@
 title: Window Functions Overview
 sidebar_label: Overview
 description: Introduction to window functions in QuestDB - perform calculations across related rows without collapsing results.
-keywords: [window functions, over, partition by, moving average, running total, rank, dense_rank, percent_rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average]
+keywords: [window functions, over, partition by, moving average, running total, rank, dense_rank, percent_rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average, stddev, variance, covariance, correlation]
 ---
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
@@ -49,6 +49,10 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Yes |
 | [`min()`](reference.md#min) | Minimum value in window | Yes |
 | [`max()`](reference.md#max) | Maximum value in window | Yes |
+| [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Yes |
+| [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Yes |
+| [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Yes |
+| [`corr()`](reference.md#corr) | Pearson correlation coefficient | Yes |
 | [`first_value()`](reference.md#first_value) | First value in window | Yes |
 | [`last_value()`](reference.md#last_value) | Last value in window | Yes |
 | [`row_number()`](reference.md#row_number) | Sequential row number | No |

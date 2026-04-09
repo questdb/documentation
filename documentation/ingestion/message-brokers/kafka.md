@@ -524,6 +524,71 @@ entries.
 
 :::
 
+#### StructArrayExplode
+
+The `StructArrayExplode` SMT converts arrays of structs into **separate 1D
+`double[]` columns** — one per struct field. Unlike `OrderBookToArray` which
+produces a single 2D array column, this transform "explodes" each struct field
+into its own column.
+
+**Input:**
+
+```json
+{
+  "symbol": "AAPL",
+  "vols": [
+    { "strike": 150.0, "ivol": 0.25 },
+    { "strike": 160.0, "ivol": 0.22 }
+  ]
+}
+```
+
+**Output:**
+
+```json
+{
+  "symbol": "AAPL",
+  "strikes": [150.0, 160.0],
+  "ivols": [0.25, 0.22]
+}
+```
+
+**Configuration:**
+
+```properties
+transforms=explode
+transforms.explode.type=io.questdb.kafka.StructArrayExplode$Value
+transforms.explode.mappings=vols:strikes,ivols:strike,ivol
+```
+
+The `mappings` format is `sourceField:targetCol1,targetCol2:structField1,structField2;...`
+
+Target columns and struct fields are paired positionally: `structField1` maps to
+`targetCol1`, `structField2` maps to `targetCol2`, and so on. The number of
+target columns must equal the number of struct fields.
+
+Use semicolons to separate mappings from different source arrays:
+
+```properties
+transforms.explode.mappings=bids:bid_prices,bid_amounts:price,amount;asks:ask_prices,ask_amounts:price,amount
+```
+
+**Behavior:**
+- All extracted values are converted to `double`
+- Missing source fields are skipped (no error)
+- Empty source arrays are skipped
+- Null values inside structs cause an error
+- If a target column name already exists in the input, it is replaced
+- Works with both schema-based and schemaless messages
+
+**Comparison with OrderBookToArray:**
+
+| | OrderBookToArray | StructArrayExplode |
+|---|---|---|
+| Output | One 2D `double[][]` column | Separate 1D `double[]` columns |
+| Mapping format | `source:target:field1,field2` | `source:target1,target2:field1,field2` |
+| Use case | All fields in one array column | Each field as its own column |
+
 ### Sample projects
 
 Additional examples are available on GitHub:
