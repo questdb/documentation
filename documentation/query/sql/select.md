@@ -287,7 +287,7 @@ Filters query results
 QuestDB supports complex WHERE clauses along with type-specific searches. For
 more information, please refer to the
 [WHERE reference](/docs/query/sql/where/). There are different syntaxes for
-[text](/docs/query/sql/where/#symbol-and-string),
+[text](/docs/query/sql/where/#symbol-varchar-and-string),
 [numeric](/docs/query/sql/where/#numeric), or
 [timestamp](/docs/query/sql/where/#timestamp-and-date) filters.
 
