@@ -478,5 +478,13 @@
   "cairo.partition.encoder.parquet.min.compression.ratio": {
     "default": "1.2",
     "description": "Minimum compression ratio (uncompressed_size / compressed_size) for Parquet pages. When a compressed page does not meet this threshold, it is stored uncompressed instead. A value of 0.0 disables the check."
+  },
+  "cairo.sql.parquet.row.group.pruning.enabled": {
+    "default": "true",
+    "description": "Enables or disables row group pruning for queries on Parquet partitions. When enabled, QuestDB uses min/max statistics, bloom filters, and null counts to skip row groups that cannot match the query filter."
+  },
+  "cairo.partition.encoder.parquet.bloom.filter.fpp": {
+    "default": "0.01",
+    "description": "Default bloom filter false positive probability (FPP) for in-place partition encoding. Lower values produce larger but more accurate filters. Range: 0.0 to 1.0."
   }
 }
