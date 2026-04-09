@@ -1,8 +1,8 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, rank, dense_rank, percent_rank, row_number, lag, lead, EMA, VWEMA, and more.
-keywords: [window functions, avg, sum, ksum, count, rank, dense_rank, percent_rank, row_number, lag, lead, first_value, last_value, min, max, ema, vwema, exponential moving average]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, EMA, VWEMA, and more.
+keywords: [window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, first_value, last_value, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
@@ -402,6 +402,205 @@ SELECT
     ) AS highest_price
 FROM trades
 WHERE timestamp IN '[$today]';
+```
+
+---
+
+### stddev_pop() / stddev_samp() / stddev() {#stddev}
+
+Calculates the standard deviation of values over the window frame. `stddev_pop()` computes population standard deviation (divides by N), `stddev_samp()` computes sample standard deviation (divides by N-1). `stddev()` is an alias for `stddev_samp()`.
+
+**Syntax:**
+```questdb-sql
+stddev_pop(value) OVER (window_definition)
+stddev_samp(value) OVER (window_definition)
+stddev(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+
+**Return value:**
+- `double` - The standard deviation of `value` for rows in the window frame. Returns `NULL` when there are no values (or no non-null values). `stddev_samp()` and `stddev()` also return `NULL` when there is only one value (since N-1 = 0).
+
+**Description:**
+
+Standard deviation measures how spread out values are from their mean. Use standard deviation as a window function for:
+
+- **Volatility tracking**: Measure rolling price volatility in financial data
+- **Anomaly detection**: Flag values that deviate significantly from the norm (z-scores)
+- **Quality monitoring**: Track measurement consistency over time in IoT/sensor data
+- **Fleet comparison**: Compare individual device variance against fleet-wide variance
+
+:::note Numerical precision
+
+Frames that only grow (unbounded preceding, whole partitions) use [Welford's online algorithm](https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm) for numerically stable computation. Sliding frames with a bounded lower bound (e.g., `ROWS BETWEEN 100 PRECEDING AND CURRENT ROW`) use the naive sum-of-squares formula because Welford's algorithm does not support element removal. This may result in reduced precision when values are very large and close together. The same tradeoff applies to `var_pop()` / `var_samp()`, `covar_pop()` / `covar_samp()`, and `corr()`.
+
+:::
+
+**Examples:**
+```questdb-sql title="Rolling volatility" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    stddev_pop(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+    ) AS volatility_20
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+```questdb-sql title="Z-score via subquery"
+SELECT robot_id, robot_avg,
+    (robot_avg - avg(robot_avg) OVER ()) / stddev(robot_avg) OVER () AS z_score
+FROM (
+    SELECT robot_id, avg(motor_temp) AS robot_avg
+    FROM telemetry
+    WHERE ts > dateadd('d', -1, now())
+    GROUP BY robot_id
+)
+ORDER BY z_score DESC;
+```
+
+---
+
+### var_pop() / var_samp() / variance() {#variance}
+
+Calculates the variance of values over the window frame. Variance is the square of standard deviation. `var_pop()` computes population variance (divides by N), `var_samp()` computes sample variance (divides by N-1). `variance()` is an alias for `var_samp()`.
+
+**Syntax:**
+```questdb-sql
+var_pop(value) OVER (window_definition)
+var_samp(value) OVER (window_definition)
+variance(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+
+**Return value:**
+- `double` - The variance of `value` for rows in the window frame. Returns `NULL` when there are no values. `var_samp()` and `variance()` also return `NULL` for a single value.
+
+**Description:**
+
+Variance quantifies how far values spread from the mean. It shares the same implementation as `stddev_pop()` / `stddev_samp()` (without the final square root). Use variance as a window function for:
+
+- **Risk analysis**: Compare rolling variance across assets or devices
+- **Distribution analysis**: Track how data spread changes over time
+- **Weighted calculations**: Variance is often used in portfolio optimization formulas
+
+**Example:**
+```questdb-sql title="Rolling variance comparison" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    var_pop(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+    ) AS price_variance
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+---
+
+### covar_pop() / covar_samp() {#covariance}
+
+Calculates the covariance between two numeric columns over the window frame. Covariance measures how two variables change together. `covar_pop()` computes population covariance (divides by N), `covar_samp()` computes sample covariance (divides by N-1).
+
+**Syntax:**
+```questdb-sql
+covar_pop(y, x) OVER (window_definition)
+covar_samp(y, x) OVER (window_definition)
+```
+
+**Arguments:**
+- `y`: Numeric column — the dependent variable
+- `x`: Numeric column — the independent variable
+
+Rows where either `x` or `y` is `NULL` are excluded from the computation.
+
+**Return value:**
+- `double` - The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
+
+**Description:**
+
+Covariance indicates the direction of the linear relationship between two variables. A positive covariance means they tend to increase together; negative means one increases as the other decreases. Use covariance as a window function for:
+
+- **Correlation analysis**: Measure how sensor readings co-vary over rolling windows
+- **Portfolio analysis**: Track co-movement between asset prices
+- **Predictive modeling**: Identify which features move together with the target variable
+
+**Example:**
+```questdb-sql title="Rolling covariance between temperature and velocity"
+SELECT
+    ts,
+    robot_id,
+    covar_pop(motor_temp, joint_velocity) OVER (
+        PARTITION BY robot_id
+        ORDER BY ts
+        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
+    ) AS temp_vel_covariance
+FROM telemetry;
+```
+
+---
+
+### corr() {#corr}
+
+Calculates the Pearson correlation coefficient between two numeric columns over the window frame. The result ranges from -1 (perfect negative correlation) to +1 (perfect positive correlation), with 0 indicating no linear relationship.
+
+**Syntax:**
+```questdb-sql
+corr(y, x) OVER (window_definition)
+```
+
+**Arguments:**
+- `y`: Numeric column — the dependent variable
+- `x`: Numeric column — the independent variable
+
+Rows where either `x` or `y` is `NULL` are excluded from the computation.
+
+**Return value:**
+- `double` - The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
+
+**Description:**
+
+Unlike covariance, correlation is unitless and normalized, making it easier to interpret and compare across different scales. Use correlation as a window function for:
+
+- **Rolling correlation**: Track how the relationship between two metrics changes over time
+- **Regime detection**: Identify periods where correlations break down (e.g., market stress)
+- **Sensor diagnostics**: Detect when two readings that should be correlated start diverging
+- **Fleet analytics**: Compare per-device correlations against fleet-wide correlation
+
+**Example:**
+```questdb-sql title="Rolling correlation between two metrics"
+SELECT
+    ts,
+    robot_id,
+    corr(motor_temp, joint_velocity) OVER (
+        PARTITION BY robot_id
+        ORDER BY ts
+        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
+    ) AS rolling_corr
+FROM telemetry;
+```
+
+```questdb-sql title="Per-device correlation vs fleet"
+SELECT robot_id, device_corr,
+    avg(device_corr) OVER () AS fleet_avg_corr
+FROM (
+    SELECT robot_id,
+        corr(motor_temp, joint_velocity) AS device_corr
+    FROM telemetry
+    WHERE ts > dateadd('d', -1, now())
+    GROUP BY robot_id
+);
 ```
 
 ---
