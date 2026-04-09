@@ -8,7 +8,9 @@ sidebar_label: CACHE | NOCACHE
 
 ## Syntax
 
-![Flow chart showing the syntax of ALTER TABLE ALTER COLUMN NOCACHE | CACHE](/images/docs/diagrams/alterTableNoCache.svg)
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName { CACHE | NOCACHE };
+```
 
 - `columnName` is the `symbol` data type.
 - By default, a symbol column is cached.
@@ -18,5 +20,5 @@ sidebar_label: CACHE | NOCACHE
 ## Examples
 
 ```questdb-sql
-ALTER TABLE 'taxi_ride' ALTER COLUMN passenger_count NOCACHE;
+ALTER TABLE trades ALTER COLUMN side NOCACHE;
 ```
