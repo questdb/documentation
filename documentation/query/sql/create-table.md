@@ -431,31 +431,33 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp);
 ```
 
-### Per-column Parquet encoding and compression
+### Per-column Parquet encoding, compression, and bloom filters
 
 ```questdb-sql
 PARQUET(encoding [, compression[(level)]])
 ```
 
-Column definitions may include an optional `PARQUET(encoding [, compression[(level)]])`
-clause. These settings only affect
+Column definitions may include an optional
+`PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
+settings only affect
 [Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
-ignored for native partitions. Both encoding and compression are optional — use
-`default` for the encoding when specifying compression only.
+ignored for native partitions. Encoding, compression, and bloom filter are all
+optional — use `default` for the encoding when specifying compression only.
 
 ```questdb-sql title="CREATE TABLE with per-column Parquet config"
 CREATE TABLE sensors (
     ts TIMESTAMP,
     temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
     humidity FLOAT PARQUET(rle_dictionary),
-    device_id VARCHAR PARQUET(default, lz4_raw),
+    device_id VARCHAR PARQUET(default, lz4_raw, BLOOM_FILTER),
     status INT
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
 When omitted, columns use the global defaults: a type-appropriate encoding and
 the server-wide compression codec
-(`cairo.partition.encoder.parquet.compression.codec`).
+(`cairo.partition.encoder.parquet.compression.codec`). Bloom filters are not
+generated unless explicitly enabled.
 
 #### Supported encodings
 
@@ -525,6 +527,51 @@ For more details on Parquet compression, see the
 
 To modify encoding or compression on existing tables, see
 [ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+
+#### Bloom filters
+
+The optional `BLOOM_FILTER` keyword enables
+bloom filter generation for a column
+when partitions are converted to Parquet. Bloom filters allow QuestDB to skip
+row groups that do not contain matching values, significantly speeding up
+equality and `IN` queries on large Parquet partitions.
+
+`BLOOM_FILTER` can appear in several positions:
+
+```questdb-sql title="As the sole argument (default encoding/compression)"
+CREATE TABLE t (
+  a VARCHAR PARQUET(BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding and compression"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, zstd(3), BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+The false positive probability (FPP) for bloom filters is a global setting
+(`cairo.partition.encoder.parquet.bloom.filter.fpp`, default `0.01`) and cannot
+be configured per column. See
+the [Configuration reference](/docs/configuration/overview/) for all
+configuration options.
+
+:::note
+
+When converting partitions with an explicit `bloom_filter_columns` option in
+[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+the explicit list overrides per-column `BLOOM_FILTER` metadata.
+
+:::
 
 ### Casting types
 
