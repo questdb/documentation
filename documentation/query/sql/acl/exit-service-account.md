@@ -23,7 +23,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the EXIT SERVICE ACCOUNT keyword](/images/docs/diagrams/exitServiceAccount.svg)
+```questdb-sql
+EXIT SERVICE ACCOUNT serviceAccount;
+```
 
 ## Examples
 
