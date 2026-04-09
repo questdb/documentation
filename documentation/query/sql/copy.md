@@ -260,6 +260,8 @@ All export options are specified using the `WITH` clause after the `TO` destinat
 - `STATISTICS_ENABLED true/false`: Enable Parquet column statistics for better query performance. Default: `true`.
 - `PARQUET_VERSION <n>`: Parquet format version. Valid values: `1` (v1.0) or `2` (v2.0). Default: `2`.
 - `RAW_ARRAY_ENCODING true/false`: Use raw encoding for arrays (compatibility for parquet readers). Default: `true`.
+- `BLOOM_FILTER_COLUMNS '<cols>'`: Comma-separated list of column names for bloom filter generation. Default: none (no bloom filters generated).
+- `BLOOM_FILTER_FPP <value>`: False positive probability for bloom filters. Lower values produce larger but more accurate filters. Default: `0.01`.
 
 ## Examples
 
@@ -329,6 +331,17 @@ This creates separate Parquet files for each day's data in subdirectories named 
     - 2025-01-02.parquet
     - 2025-01-03.parquet
     - ...
+
+#### Export with bloom filters
+
+Generate bloom filters for specific
+columns to enable row group pruning when the exported file is queried:
+
+```questdb-sql title="Export with bloom filters on symbol and side columns"
+COPY trades TO 'trades_bloom'
+WITH FORMAT PARQUET
+BLOOM_FILTER_COLUMNS 'symbol,side';
+```
 
 #### Export with custom Parquet options
 
