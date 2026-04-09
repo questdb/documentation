@@ -17,7 +17,18 @@ blog.
 
 ## Syntax
 
-![Flow chart showing the syntax of the SELECT keyword](/images/docs/diagrams/select.svg)
+```questdb-sql
+[SELECT [DISTINCT] (column | expression | function) [[AS] alias]
+        [, (column | expression | function) [[AS] alias] ...]
+FROM]
+    { table | (query) } [[AS] alias]
+    [joinClause ...]
+    [WHERE booleanExpression]
+    [LATEST ON timestampColumn PARTITION BY column [, column ...]]
+    [{ GROUP BY column [, column ...] | SAMPLE BY interval [FILL ...] }]
+    [ORDER BY column [ASC | DESC] [, ...]]
+    [LIMIT { n | lower, upper }];
+```
 
 Note: `table` can either a specified table in your database or passed forward as
 the result of a sub-query.
@@ -184,7 +195,13 @@ Conditional results based on expressions.
 
 #### Syntax
 
-![Flow chart showing the syntax of CASE](/images/docs/diagrams/case.svg)
+```questdb-sql
+CASE
+    WHEN condition THEN value
+    [WHEN condition THEN value ...]
+    [ELSE value]
+END
+```
 
 For more information, please refer to the
 [CASE reference](/docs/query/functions/conditional/)
@@ -195,7 +212,9 @@ Convert values and expression between types.
 
 #### Syntax
 
-![Flow chart showing the syntax of the CAST keyword](/images/docs/diagrams/cast.svg)
+```questdb-sql
+CAST(expression AS type)
+```
 
 For more information, please refer to the
 [CAST reference](/docs/query/sql/cast/)
@@ -206,7 +225,10 @@ Returns distinct values of the specified column(s).
 
 #### Syntax
 
-![Flow chart showing the syntax of the DISTINCT keyword](/images/docs/diagrams/distinct.svg)
+```questdb-sql
+SELECT DISTINCT columnName [, columnName ...]
+FROM tableName;
+```
 
 For more information, please refer to the
 [DISTINCT reference](/docs/query/sql/distinct/).
@@ -218,7 +240,10 @@ complements [SAMPLE BY](/docs/query/sql/sample-by/) queries.
 
 #### Syntax
 
-![Flow chart showing the syntax of the FILL keyword](/images/docs/diagrams/fill.svg)
+```questdb-sql
+SELECT ... SAMPLE BY ... FILL({ NONE | NULL | PREV | LINEAR | constant }
+    [, { NONE | NULL | PREV | LINEAR | constant } ...]);
+```
 
 For more information, please refer to the
 [FILL reference](/docs/query/sql/fill/).
@@ -229,7 +254,9 @@ Join tables based on a key or timestamp.
 
 #### Syntax
 
-![Flow chart showing the syntax of the high-level syntax of the JOIN keyword](/images/docs/diagrams/joinOverview.svg)
+```questdb-sql
+selectClause joinClause [WHERE whereClause];
+```
 
 For more information, please refer to the
 [JOIN reference](/docs/query/sql/join/)
@@ -248,7 +275,9 @@ Specify the number and position of records returned by a query.
 
 #### Syntax
 
-![Flow chart showing the syntax of the LIMIT keyword](/images/docs/diagrams/limit.svg)
+```questdb-sql
+SELECT ... LIMIT { numberOfRecords | lowerBound, upperBound };
+```
 
 For more information, please refer to the
 [LIMIT reference](/docs/query/sql/limit/).
@@ -259,7 +288,10 @@ Orders the results of a query by one or several columns.
 
 #### Syntax
 
-![Flow chart showing the syntax of the ORDER BY keyword](/images/docs/diagrams/orderBy.svg)
+```questdb-sql
+SELECT ...
+ORDER BY columnName [ASC | DESC] [, columnName [ASC | DESC] ...];
+```
 
 For more information, please refer to the
 [ORDER BY reference](/docs/query/sql/order-by)
@@ -271,7 +303,9 @@ duplicates.
 
 #### Syntax
 
-![Flow chart showing the syntax of the UNION, EXCEPT & INTERSECT keyword](/images/docs/diagrams/unionExceptIntersect.svg)
+```questdb-sql
+query1 { UNION | EXCEPT | INTERSECT } [ALL] query2;
+```
 
 For more information, please refer to the
 [UNION, EXCEPT & INTERSECT reference](/docs/query/sql/union-except-intersect/)
@@ -282,7 +316,10 @@ Filters query results
 
 #### Syntax
 
-![Flow chart showing the syntax of the WHERE clause](/images/docs/diagrams/where.svg)
+```questdb-sql
+SELECT ... FROM tableName
+WHERE booleanExpression;
+```
 
 QuestDB supports complex WHERE clauses along with type-specific searches. For
 more information, please refer to the
@@ -303,7 +340,11 @@ This function requires a
 
 #### Syntax
 
-![Flow chart showing the syntax of the LATEST ON keyword](/images/docs/diagrams/latestOn.svg)
+```questdb-sql
+SELECT columnName [, columnName ...]
+FROM tableName
+LATEST ON timestampColumn PARTITION BY columnName [, columnName ...];
+```
 
 For more information, please refer to the
 [LATEST ON reference](/docs/query/sql/latest-on/).
@@ -316,7 +357,10 @@ average, monthly maximum etc. This function requires a
 
 #### Syntax
 
-![Flow chart showing the syntax of the SAMPLE BY keyword](/images/docs/diagrams/sampleBy.svg)
+```questdb-sql
+SELECT ... FROM tableName
+SAMPLE BY n { n | U | T | s | m | h | d | M | y };
+```
 
 For more information, please refer to the
 [SAMPLE BY reference](/docs/query/sql/sample-by/).
@@ -338,7 +382,9 @@ and using timestamp functions on unordered data may produce unexpected results.
 
 #### Syntax
 
-![Flow chart showing the syntax of the timestamp function](/images/docs/diagrams/dynamicTimestamp.svg)
+```questdb-sql
+SELECT ... FROM tableName timestamp(columnName);
+```
 
 For more information, refer to the
 [TIMESTAMP reference](/docs/query/functions/timestamp/)
