@@ -10,7 +10,24 @@ This syntax is supported within `SELECT` queries.
 
 ## Syntax
 
-![Flow chart showing the syntax of the DECLARE keyword](/images/docs/diagrams/declare.svg)
+```questdb-sql title="Standalone query"
+DECLARE @variable := expression [, @variable := expression ...]
+[WITH ...]
+SELECT ...
+```
+
+```questdb-sql title="Inside a view definition (with optional OVERRIDABLE)"
+DECLARE [OVERRIDABLE] @variable := expression
+    [, [OVERRIDABLE] @variable := expression ...]
+[WITH ...]
+SELECT ...
+```
+
+The `OVERRIDABLE` keyword only takes effect inside a
+[view definition](/docs/query/sql/create-view/#declare-with-overridable). It
+marks a variable as a parameter that the caller of the view can override at
+query time. Variables without `OVERRIDABLE` use the value set in the view and
+cannot be changed by the caller.
 
 ## Mechanics
 
