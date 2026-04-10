@@ -12,7 +12,10 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 ```questdb-sql
 SELECT column [, column ...], aggregation [, aggregation ...]
 FROM tableName
-[GROUP BY column [, column ...]];
+[GROUP BY column [, column ...]
+    | ROLLUP(column [, column ...])
+    | CUBE(column [, column ...])
+    | GROUPING SETS ((column [, column ...]) [, ...])];
 ```
 
 :::note
@@ -76,6 +79,7 @@ GROUP BY a, b;
 
 ## See also
 
+- [GROUPING SETS, ROLLUP, and CUBE](/docs/query/sql/grouping-sets/) - Compute subtotals and grand totals in a single query
 - [PIVOT](/docs/query/sql/pivot/) - Transform GROUP BY results from rows to columns
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 - [Aggregation functions](/docs/query/functions/aggregation/) - Available aggregate functions
