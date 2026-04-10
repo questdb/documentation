@@ -35,6 +35,8 @@ column files is expensive.
 
 ### At table creation
 
+Inline syntax (index defined alongside the column):
+
 ```questdb-sql
 CREATE TABLE trades (
     timestamp TIMESTAMP,
@@ -45,12 +47,25 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 ```
 
+Out-of-line syntax (index defined separately):
+
+```questdb-sql
+CREATE TABLE trades (
+    timestamp TIMESTAMP,
+    symbol SYMBOL,
+    exchange SYMBOL,
+    price DOUBLE,
+    quantity DOUBLE
+), INDEX(symbol TYPE POSTING)
+TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
 ### With covering columns (INCLUDE)
 
 ```questdb-sql
 CREATE TABLE trades (
     timestamp TIMESTAMP,
-    symbol SYMBOL INDEX TYPE POSTING INCLUDE (exchange, price, timestamp),
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (exchange, price),
     exchange SYMBOL,
     price DOUBLE,
     quantity DOUBLE
@@ -61,12 +76,57 @@ The `INCLUDE` clause specifies which columns are stored in the index sidecar
 files. Queries that only read these columns plus the indexed symbol column
 can be served entirely from the index.
 
+:::tip
+
+The designated timestamp column is automatically included in the covering
+index when an `INCLUDE` clause is present — you do not need to list it
+explicitly. This means timestamp-filtered covering queries work out of the
+box.
+
+:::
+
+:::note
+
+The `INCLUDE` clause is only supported with inline column syntax and
+`ALTER TABLE`. The out-of-line `INDEX(col TYPE POSTING)` syntax does not
+support `INCLUDE`.
+
+:::
+
 ### On an existing table
 
 ```questdb-sql
 ALTER TABLE trades
   ALTER COLUMN symbol ADD INDEX TYPE POSTING INCLUDE (exchange, price);
 ```
+
+### Encoding options
+
+The posting index supports two internal row ID encoding strategies. In most
+cases the default is optimal and no keyword is needed:
+
+| Syntax | Encoding | Description |
+|--------|----------|-------------|
+| `INDEX TYPE POSTING` | Adaptive (default) | Trial-encodes delta and flat modes per stride, picks the smaller |
+| `INDEX TYPE POSTING EF` | Adaptive (explicit) | Same as above — `EF` makes the choice explicit |
+| `INDEX TYPE POSTING DELTA` | Delta-only | Forces per-key delta encoding, skipping flat-mode trial |
+
+```questdb-sql
+-- Default adaptive encoding (recommended)
+CREATE TABLE t1 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING)
+    TIMESTAMP(ts) PARTITION BY DAY WAL;
+
+-- Force delta-only encoding
+CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
+    TIMESTAMP(ts) PARTITION BY DAY WAL;
+```
+
+:::note
+
+`CAPACITY` is only supported for bitmap indexes. Using `CAPACITY` with a
+posting index will produce an error.
+
+:::
 
 ## Covering index
 
@@ -82,20 +142,20 @@ queries on wide tables.
 
 ### Supported column types in INCLUDE
 
-| Type | Supported | Notes |
-|------|-----------|-------|
-| BOOLEAN, BYTE, SHORT, CHAR | Yes | Fixed-width, 1-2 bytes per value |
-| INT, FLOAT, IPv4 | Yes | Fixed-width, 4 bytes per value |
-| LONG, DOUBLE, TIMESTAMP, DATE | Yes | Fixed-width, 8 bytes per value |
-| GEOBYTE, GEOSHORT, GEOINT, GEOLONG | Yes | Fixed-width, 1-8 bytes depending on precision |
-| DECIMAL8, DECIMAL16, DECIMAL32, DECIMAL64 | Yes | Fixed-width, 1-8 bytes depending on precision |
-| SYMBOL | Yes | Stored as integer key, resolved at query time |
-| VARCHAR | Yes | Variable-width, FSST compressed in sealed partitions |
-| STRING | Yes | Variable-width, FSST compressed in sealed partitions |
-| BINARY | No | Not yet supported |
-| UUID, LONG256 | No | Not yet supported (requires multi-long sidecar format) |
-| DECIMAL128, DECIMAL256 | No | Not yet supported |
-| Arrays (DOUBLE[][], etc.) | No | Not supported |
+All column types except the indexed symbol column itself can be included:
+
+| Type | Compression | Notes |
+|------|-------------|-------|
+| BOOLEAN, BYTE, GEOBYTE, DECIMAL8 | Raw copy | 1 byte per value |
+| SHORT, CHAR, GEOSHORT, DECIMAL16 | Frame-of-Reference | 2 bytes uncompressed |
+| INT, FLOAT, IPv4, GEOINT, DECIMAL32 | FoR (int) / ALP (float) | 4 bytes uncompressed |
+| LONG, DOUBLE, TIMESTAMP, DATE, GEOLONG, DECIMAL64 | FoR / ALP / linear prediction | 8 bytes uncompressed |
+| SYMBOL | Frame-of-Reference | Stored as integer key, resolved at query time |
+| UUID, DECIMAL128 | Raw copy | 16 bytes per value |
+| LONG256, DECIMAL256 | Raw copy | 32 bytes per value |
+| VARCHAR, STRING | FSST compressed | Variable-width, typically 2-5x compression |
+| BINARY | Variable-width sidecar | Stored in offset-based format |
+| Arrays (DOUBLE[], INT[], etc.) | Variable-width sidecar | Stored in offset-based format |
 
 ### How to choose INCLUDE columns
 
@@ -105,10 +165,10 @@ Include columns that you frequently select together with the indexed symbol:
 -- If your typical queries look like this:
 SELECT timestamp, price, quantity FROM trades WHERE symbol = 'AAPL';
 
--- Then include those columns:
+-- Then include those columns (timestamp is auto-included as designated timestamp):
 CREATE TABLE trades (
     timestamp TIMESTAMP,
-    symbol SYMBOL INDEX TYPE POSTING INCLUDE (timestamp, price, quantity),
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, quantity),
     exchange SYMBOL,
     price DOUBLE,
     quantity DOUBLE,
@@ -126,6 +186,26 @@ the `INCLUDE` list can still be queried — they just won't benefit from the
 covering optimization and will be read from column files.
 
 :::
+
+### Inspecting indexes with SHOW COLUMNS
+
+`SHOW COLUMNS` displays index metadata for each column, including the index
+type and covered columns:
+
+```questdb-sql
+SHOW COLUMNS FROM trades;
+```
+
+| column | type | indexed | indexBlockCapacity | indexType | indexInclude | symbolCached | symbolCapacity | designated | upsertKey |
+|--------|------|---------|-------------------|-----------|-------------|-------------|----------------|------------|-----------|
+| timestamp | TIMESTAMP | false | 0 | | | false | 0 | true | false |
+| symbol | SYMBOL | true | 256 | POSTING | exchange,price | true | 128 | false | false |
+| exchange | SYMBOL | false | 0 | | | true | 128 | false | false |
+| price | DOUBLE | false | 0 | | | false | 0 | false | false |
+| quantity | DOUBLE | false | 0 | | | false | 0 | false | false |
+
+The `indexType` column shows `POSTING`, `BITMAP`, or is empty for
+non-indexed columns. The `indexInclude` column lists covered column names.
 
 ### Verifying covering index usage
 
@@ -250,12 +330,16 @@ SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
 The posting index itself is very compact (~1 byte per indexed value).
 The covering sidecar adds storage proportional to the included columns:
 
-- Fixed-width columns (DOUBLE, INT, etc.): exact column size, compressed
-  with ALP (Adaptive Lossless floating-Point) and Frame-of-Reference bitpacking
-- Variable-width columns (VARCHAR, STRING): FSST compressed in sealed
+- **Numeric columns** (DOUBLE, FLOAT): compressed with ALP (Adaptive
+  Lossless floating-Point) and Frame-of-Reference bitpacking
+- **Integer columns** (INT, LONG, etc.): Frame-of-Reference bitpacking;
+  TIMESTAMP additionally uses linear-prediction encoding
+- **Small fixed-width types** (BYTE, BOOLEAN, etc.): stored as raw copies
+- **Wide fixed-width types** (UUID, LONG256, DECIMAL128/256): stored as
+  raw copies with a count header
+- **Variable-width columns** (VARCHAR, STRING): FSST compressed in sealed
   partitions, typically 2-5x smaller than raw column data
-- The sidecar is typically 0.5-5% of the total column file size for the
-  included columns
+- **BINARY and arrays**: stored in an offset-based variable-width sidecar
 
 ### Write performance
 
@@ -317,12 +401,14 @@ sidecar file. Decompression is transparent to the query engine.
 
 :::warning
 
-- INCLUDE is only supported for POSTING index type (not BITMAP)
-- Array columns (DOUBLE[][], etc.) cannot be included
-- BINARY, UUID, LONG256, DECIMAL128, and DECIMAL256 columns cannot yet be included
-- SAMPLE BY queries do not currently use the covering index
+- `INCLUDE` is only supported for the posting index type (not bitmap)
+- `INCLUDE` cannot list the indexed symbol column itself
+- `INCLUDE` is not supported with out-of-line `INDEX(col ...)` syntax —
+  use inline column syntax or `ALTER TABLE` instead
+- `CAPACITY` is not supported for posting indexes (bitmap only)
+- `SAMPLE BY` queries do not currently use the covering index
   (they fall back to the regular index path)
-- REINDEX on WAL tables requires dropping and re-adding the index
+- `REINDEX` on WAL tables requires dropping and re-adding the index
   (this applies to all index types, not just posting)
 
 :::

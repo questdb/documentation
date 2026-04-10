@@ -489,15 +489,26 @@ CREATE TABLE trades (
 ### Posting index
 
 The posting index offers better compression and read performance than the
-default bitmap index. Use `INDEX TYPE POSTING`:
+default bitmap index. Use `INDEX TYPE POSTING` with either inline or
+out-of-line syntax:
 
 ```questdb-sql
+-- Inline syntax
 CREATE TABLE trades (
   timestamp TIMESTAMP,
   symbol SYMBOL INDEX TYPE POSTING,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+
+-- Out-of-line syntax
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+), INDEX(symbol TYPE POSTING)
+TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 ```
 
 ### Posting index with covering columns (INCLUDE)
@@ -509,18 +520,28 @@ served entirely from the index, bypassing column files:
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
-  symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, timestamp, exchange),
+  symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, exchange),
   exchange SYMBOL,
   price DOUBLE,
   amount DOUBLE
 ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 ```
 
-With this schema, the following query reads only from the index sidecar:
+The designated timestamp column is automatically included — you do not need
+to list it in the `INCLUDE` clause. With this schema, the following query
+reads only from the index sidecar:
 
 ```questdb-sql
 SELECT timestamp, price FROM trades WHERE symbol = 'AAPL';
 ```
+
+:::note
+
+`INCLUDE` is only supported with inline column syntax (not out-of-line
+`INDEX(col ...)`). Use `ALTER TABLE` to add covering columns to an existing
+table.
+
+:::
 
 See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
 for a comprehensive guide including supported column types, query patterns,
@@ -533,6 +554,8 @@ and performance characteristics.
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
   the implications.
+- `CAPACITY` is only supported for bitmap indexes — it cannot be used with
+  posting indexes.
 
 :::
 

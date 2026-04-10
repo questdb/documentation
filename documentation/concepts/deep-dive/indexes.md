@@ -107,6 +107,9 @@ Consider the following query applied to the above table
 
 :::warning
 
+Index capacity applies to **bitmap indexes only**. Posting indexes manage
+their own storage layout and do not use this setting.
+
 We strongly recommend to rely on the default index capacity. Misconfiguring this property might
 lead to worse performance and increased disk usage.
 
@@ -124,8 +127,8 @@ When in doubt, reach out via the QuestDB support channels for advice.
 
 :::
 
-When a symbol column is indexed, an additional **index capacity** can be defined
-to specify how many row IDs to store in a single storage block on disk:
+When a symbol column has a bitmap index, an additional **index capacity** can be
+defined to specify how many row IDs to store in a single storage block on disk:
 
 - Server-wide setting: `cairo.index.value.block.size` with a default of `256`
 - Column-wide setting: The

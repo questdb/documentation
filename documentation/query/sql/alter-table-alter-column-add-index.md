@@ -28,6 +28,13 @@ ALTER TABLE trades ALTER COLUMN instrument ADD INDEX;
 ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING;
 ```
 
+An encoding variant can be specified:
+
+```questdb-sql
+-- Force delta-only encoding
+ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING DELTA;
+```
+
 ### Adding a posting index with covering columns
 
 The `INCLUDE` clause stores additional column values in the index sidecar
@@ -35,11 +42,15 @@ files, enabling covering queries that bypass column file reads:
 
 ```questdb-sql
 ALTER TABLE trades
-  ALTER COLUMN symbol ADD INDEX TYPE POSTING INCLUDE (price, quantity, timestamp);
+  ALTER COLUMN symbol ADD INDEX TYPE POSTING INCLUDE (price, quantity);
 ```
 
+The designated timestamp column is automatically included in the covering
+index — you do not need to list it explicitly.
+
 After this, queries that only select columns from the `INCLUDE` list (plus the
-indexed symbol column) are served from the index sidecar:
+indexed symbol column and designated timestamp) are served from the index
+sidecar:
 
 ```questdb-sql
 -- This query reads from the index sidecar, not from column files

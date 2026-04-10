@@ -91,10 +91,11 @@ CREATE TABLE trades (
 -- Posting index with covering columns — best for read-heavy, selective queries
 CREATE TABLE trades (
     ts TIMESTAMP,
-    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, ts),
+    symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
     price DOUBLE,
     raw_data VARCHAR  -- not in INCLUDE, read from column files
 ) TIMESTAMP(ts) PARTITION BY DAY WAL;
+-- The designated timestamp (ts) is automatically included in the covering index.
 ```
 
 **When to choose each:**
@@ -107,8 +108,10 @@ CREATE TABLE trades (
 | Wide table, queries select subset | Posting with `INCLUDE` — biggest win |
 
 The covering index (`INCLUDE`) lets queries that only select covered columns
-read from compact sidecar files instead of full column files. Use `EXPLAIN` to
-verify your queries use the `CoveringIndex` plan.
+read from compact sidecar files instead of full column files. The designated
+timestamp is automatically included, so timestamp-filtered queries benefit
+without explicit listing. Use `EXPLAIN` to verify your queries use the
+`CoveringIndex` plan.
 
 See [Indexes](/docs/concepts/deep-dive/indexes/) and
 [Posting index](/docs/concepts/deep-dive/posting-index/) for details.
