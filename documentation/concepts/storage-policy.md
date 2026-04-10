@@ -213,15 +213,19 @@ before setting a storage policy.
 
 ## Configuration
 
-Storage policy behavior can be tuned in `server.conf`:
+Storage policy behavior can be tuned in `server.conf`. Time-based properties
+accept values with unit suffixes (e.g., `15m`, `30s`, `1h`) or raw microsecond
+values:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `storage.policy.check.interval` | `900000000` (15 min) | How often QuestDB scans for partitions to process (microseconds) |
-| `storage.policy.retry.interval` | `60000000` (1 min) | Retry interval for failed tasks (microseconds) |
+| `storage.policy.check.interval` | `15m` (15 min) | How often QuestDB scans for partitions to process |
+| `storage.policy.retry.interval` | `1m` (1 min) | Retry interval for failed tasks |
 | `storage.policy.max.reschedule.count` | `20` | Maximum retries before abandoning a task |
-| `storage.policy.writer.wait.timeout` | `30000000` (30 sec) | Timeout for acquiring the table writer (microseconds) |
+| `storage.policy.writer.wait.timeout` | `30s` (30 sec) | Timeout for acquiring the table writer |
 | `storage.policy.worker.count` | `2` | Number of storage policy worker threads (0 disables the feature) |
+| `storage.policy.worker.affinity` | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list) |
+| `storage.policy.worker.sleep.timeout` | `100ms` | Sleep duration when worker has no tasks |
 
 ## Permissions
 
