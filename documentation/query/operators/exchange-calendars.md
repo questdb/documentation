@@ -34,7 +34,7 @@ hours, day filters, and holidays, reference an exchange by its
 ```questdb-sql
 -- NYSE regular trading hours for January, holidays excluded automatically
 SELECT * FROM trades
-WHERE ts IN '2025-01-[01..31]#XNYS';
+WHERE ts IN '[2025-01]#XNYS';
 ```
 
 This single expression generates interval scans for every trading session in

@@ -71,7 +71,7 @@ to generate multiple optimized interval scans from a single expression:
 ```questdb-sql
 -- NYSE trading hours on workdays for January (22 intervals, one query)
 SELECT * FROM trades
-WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#workday;6h30m';
+WHERE ts IN '[2024-01]T09:30@America/New_York#workday;6h30m';
 
 -- Last 5 business days at market open
 SELECT * FROM trades
