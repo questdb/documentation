@@ -13,7 +13,7 @@ subquery is evaluated once for every outer row, with the outer columns acting
 as parameters. This unlocks queries that would otherwise require correlated
 subqueries, window functions, or self-joins, such as:
 
-- Top-N rows per group (e.g. the three largest trades for each order).
+- Top-N rows per group (e.g. the three largest fills for each order).
 - Per-row aggregates that depend on values from the outer row.
 - Dynamic filters whose thresholds come from the outer row.
 - Combining a `SAMPLE BY`, `LATEST ON`, or `ASOF JOIN` with per-row
@@ -29,26 +29,28 @@ than nested loops.
 `LATERAL` is a modifier on `JOIN`. It can be combined with `INNER`, `LEFT`, and
 `CROSS` joins. Right and full outer variants are not supported.
 
-```questdb-sql
--- INNER lateral
+```questdb-sql title="INNER lateral"
 SELECT ...
 FROM left_table [alias]
-[INNER] JOIN LATERAL (subquery) [alias] [ON condition]
+[INNER] JOIN LATERAL (subquery) [alias] [ON condition];
+```
 
--- LEFT lateral (unmatched outer rows are kept and right columns become NULL)
+```questdb-sql title="LEFT lateral (unmatched outer rows kept, right columns become NULL)"
 SELECT ...
 FROM left_table [alias]
-LEFT [OUTER] JOIN LATERAL (subquery) [alias] [ON condition]
+LEFT [OUTER] JOIN LATERAL (subquery) [alias] [ON condition];
+```
 
--- CROSS lateral (no ON clause)
+```questdb-sql title="CROSS lateral (no ON clause)"
 SELECT ...
 FROM left_table [alias]
-CROSS JOIN LATERAL (subquery) [alias]
+CROSS JOIN LATERAL (subquery) [alias];
+```
 
--- Standalone LATERAL (implicit CROSS, used in comma-separated FROM lists)
+```questdb-sql title="Comma syntax (implicit CROSS)"
 SELECT ...
 FROM left_table [alias],
-     LATERAL (subquery) [alias]
+     LATERAL (subquery) [alias];
 ```
 
 The subquery body can reference columns from any table that appears to its
@@ -67,6 +69,21 @@ after `JOIN LATERAL` is rejected with `LATERAL requires a subquery`.
 
 :::
 
+### INNER vs CROSS LATERAL
+
+For most practical purposes, `INNER JOIN LATERAL` and `CROSS JOIN LATERAL`
+(including the comma syntax) behave identically. The correlation between the
+outer row and the subquery is expressed inside the subquery's `WHERE` clause,
+not in an `ON` condition.
+
+The only difference is that `INNER JOIN LATERAL` *allows* an optional `ON`
+clause while `CROSS JOIN LATERAL` does not. In practice, `ON` is rarely
+needed because the whole point of `LATERAL` is that the subquery itself
+filters using outer-row columns.
+
+`LEFT JOIN LATERAL` is distinct: it preserves outer rows that have no
+matching subquery results, returning `NULL` for the subquery's columns.
+
 ## Examples
 
 The examples in this section all run against the following schema and data,
@@ -75,12 +92,12 @@ unless a section explicitly defines additional tables:
 ```questdb-sql
 CREATE TABLE orders (
     id        INT,
-    customer  STRING,
+    desk      SYMBOL,
     min_qty   DOUBLE,
     ts        TIMESTAMP
 ) TIMESTAMP(ts) PARTITION BY DAY;
 
-CREATE TABLE trades (
+CREATE TABLE fills (
     id        INT,
     order_id  INT,
     qty       DOUBLE,
@@ -88,11 +105,11 @@ CREATE TABLE trades (
 ) TIMESTAMP(ts) PARTITION BY DAY;
 
 INSERT INTO orders VALUES
-    (1, 'Alice',   15.0, '2024-01-01T00:00:00.000000Z'),
-    (2, 'Bob',     35.0, '2024-01-01T01:00:00.000000Z'),
-    (3, 'Charlie',  5.0, '2024-01-01T02:00:00.000000Z');
+    (1, 'eq',  15.0, '2024-01-01T00:00:00.000000Z'),
+    (2, 'fi',  35.0, '2024-01-01T01:00:00.000000Z'),
+    (3, 'cmd',  5.0, '2024-01-01T02:00:00.000000Z');
 
-INSERT INTO trades VALUES
+INSERT INTO fills VALUES
     (1, 1, 10.0, '2024-01-01T00:10:00.000000Z'),
     (2, 1, 20.0, '2024-01-01T00:40:00.000000Z'),
     (3, 1, 30.0, '2024-01-01T01:10:00.000000Z'),
@@ -100,52 +117,52 @@ INSERT INTO trades VALUES
     (5, 2, 50.0, '2024-01-01T01:40:00.000000Z');
 ```
 
-Order 1 (Alice) has three trades, order 2 (Bob) has two trades, and order 3
-(Charlie) has none.
+Order 1 (equities desk) has three fills, order 2 (fixed income) has two fills,
+and order 3 (commodities) has none.
 
 ### Per-row scan with `INNER JOIN LATERAL`
 
-For each order, return every matching trade. Charlie has no trades and is
-dropped because this is an inner join:
+For each order, return every matching fill. The commodities desk has no fills
+and is dropped because this is an inner join:
 
 ```questdb-sql
-SELECT o.id, o.customer, t.qty
+SELECT o.id, o.desk, t.qty
 FROM orders o
 JOIN LATERAL (
-    SELECT qty FROM trades WHERE order_id = o.id
+    SELECT qty FROM fills WHERE order_id = o.id
 ) t
 ORDER BY o.id, t.qty;
 ```
 
-| id | customer | qty  |
+| id | desk | qty  |
 | -- | -------- | ---- |
-| 1  | Alice    | 10.0 |
-| 1  | Alice    | 20.0 |
-| 1  | Alice    | 30.0 |
-| 2  | Bob      | 40.0 |
-| 2  | Bob      | 50.0 |
+| 1  | eq    | 10.0 |
+| 1  | eq    | 20.0 |
+| 1  | eq    | 30.0 |
+| 2  | fi      | 40.0 |
+| 2  | fi      | 50.0 |
 
 ### Preserving outer rows with `LEFT JOIN LATERAL`
 
 `LEFT JOIN LATERAL` keeps every outer row even when the subquery is empty:
 
 ```questdb-sql
-SELECT o.id, o.customer, t.qty
+SELECT o.id, o.desk, t.qty
 FROM orders o
 LEFT JOIN LATERAL (
-    SELECT qty FROM trades WHERE order_id = o.id
+    SELECT qty FROM fills WHERE order_id = o.id
 ) t
 ORDER BY o.id, t.qty;
 ```
 
-| id | customer | qty  |
+| id | desk | qty  |
 | -- | -------- | ---- |
-| 1  | Alice    | 10.0 |
-| 1  | Alice    | 20.0 |
-| 1  | Alice    | 30.0 |
-| 2  | Bob      | 40.0 |
-| 2  | Bob      | 50.0 |
-| 3  | Charlie  | null |
+| 1  | eq    | 10.0 |
+| 1  | eq    | 20.0 |
+| 1  | eq    | 30.0 |
+| 2  | fi      | 40.0 |
+| 2  | fi      | 50.0 |
+| 3  | cmd  | null |
 
 When the subquery aggregates with `count(*)`, missing groups are reported as
 `0` rather than `NULL` so totals stay numeric. Other aggregates such as
@@ -155,7 +172,7 @@ When the subquery aggregates with `count(*)`, missing groups are reported as
 SELECT o.id, t.cnt
 FROM orders o
 LEFT JOIN LATERAL (
-    SELECT count(*) AS cnt FROM trades WHERE order_id = o.id
+    SELECT count(*) AS cnt FROM fills WHERE order_id = o.id
 ) t
 ORDER BY o.id;
 ```
@@ -173,11 +190,11 @@ which is awkward with `GROUP BY` alone. Pair an `ORDER BY` with `LIMIT`
 inside the subquery — both apply independently to each outer row's matches:
 
 ```questdb-sql
-SELECT o.id, o.customer, t.qty
+SELECT o.id, o.desk, t.qty
 FROM orders o
 JOIN LATERAL (
     SELECT qty
-    FROM trades
+    FROM fills
     WHERE order_id = o.id
     ORDER BY qty DESC
     LIMIT 2
@@ -185,32 +202,32 @@ JOIN LATERAL (
 ORDER BY o.id, t.qty DESC;
 ```
 
-| id | customer | qty  |
+| id | desk | qty  |
 | -- | -------- | ---- |
-| 1  | Alice    | 30.0 |
-| 1  | Alice    | 20.0 |
-| 2  | Bob      | 50.0 |
-| 2  | Bob      | 40.0 |
+| 1  | eq    | 30.0 |
+| 1  | eq    | 20.0 |
+| 2  | fi      | 50.0 |
+| 2  | fi      | 40.0 |
 
 ### Per-row aggregates
 
 Aggregating inside the subquery returns one row per outer row:
 
 ```questdb-sql
-SELECT o.id, o.customer, t.total_qty
+SELECT o.id, o.desk, t.total_qty
 FROM orders o
 JOIN LATERAL (
     SELECT sum(qty) AS total_qty
-    FROM trades
+    FROM fills
     WHERE order_id = o.id
 ) t
 ORDER BY o.id;
 ```
 
-| id | customer | total_qty |
+| id | desk | total_qty |
 | -- | -------- | --------- |
-| 1  | Alice    | 60.0      |
-| 2  | Bob      | 90.0      |
+| 1  | eq    | 60.0      |
+| 2  | fi      | 90.0      |
 
 This particular query is equivalent to a regular `GROUP BY` join — the inner
 subquery only references the outer row through an equality. `LATERAL JOIN`
@@ -221,28 +238,28 @@ as in the next example.
 
 The subquery can reference any outer column in its `WHERE`, including in
 non-equality predicates. Below, each order's `min_qty` is used as a per-row
-threshold for the trades it sums:
+threshold for the fills it sums:
 
 ```questdb-sql
-SELECT o.id, o.customer, t.total_qty
+SELECT o.id, o.desk, t.total_qty
 FROM orders o
 JOIN LATERAL (
     SELECT sum(qty) AS total_qty
-    FROM trades
+    FROM fills
     WHERE order_id = o.id
       AND qty > o.min_qty
 ) t
 ORDER BY o.id;
 ```
 
-| id | customer | total_qty |
+| id | desk | total_qty |
 | -- | -------- | --------- |
-| 1  | Alice    | 50.0      |
-| 2  | Bob      | 90.0      |
+| 1  | eq    | 50.0      |
+| 2  | fi      | 90.0      |
 
-Alice's trades above 15 are 20 and 30 (sum 50); Bob's trades above 35 are 40
-and 50 (sum 90). Charlie has no trades to begin with and is dropped by the
-inner join.
+The equities desk fills above 15 are 20 and 30 (sum 50); the fixed income desk
+fills above 35 are 40 and 50 (sum 90). The commodities desk has no fills and
+is dropped by the inner join.
 
 ### Window functions inside `LATERAL`
 
@@ -256,7 +273,7 @@ FROM orders o
 JOIN LATERAL (
     SELECT qty,
            sum(qty) OVER (ORDER BY ts) AS running_total
-    FROM trades
+    FROM fills
     WHERE order_id = o.id
 ) t
 ORDER BY o.id, t.qty;
@@ -272,134 +289,103 @@ ORDER BY o.id, t.qty;
 
 ### `SAMPLE BY` inside `LATERAL`
 
-Each outer row gets its own sampled time-series. Buckets containing no trades
-for the outer key are omitted; combine with `LEFT JOIN LATERAL` and `FILL` if
-you need a dense grid.
+The following examples use the [`fx_trades`](https://demo.questdb.io/) and
+`core_price` tables from the QuestDB demo instance.
 
-```questdb-sql
-SELECT o.id, t.ts, t.total
-FROM orders o
-JOIN LATERAL (
-    SELECT ts, sum(qty) AS total
-    FROM trades
-    WHERE order_id = o.id
-    SAMPLE BY 30m
+Each outer row gets its own sampled time-series. Here we compute a 1-hour
+volume profile per symbol for the most recently traded symbols:
+
+```questdb-sql title="Per-symbol hourly volume" demo
+SELECT t.symbol, sub.ts, sub.volume
+FROM (
+    SELECT * FROM fx_trades
+    LATEST ON timestamp PARTITION BY symbol
 ) t
-ORDER BY o.id, t.ts;
+JOIN LATERAL (
+    SELECT timestamp AS ts, sum(quantity) AS volume
+    FROM fx_trades
+    WHERE symbol = t.symbol
+      AND timestamp IN '$now-6h..$now'
+    SAMPLE BY 1h
+) sub
+ORDER BY t.symbol, sub.ts;
 ```
-
-| id | ts                          | total |
-| -- | --------------------------- | ----- |
-| 1  | 2024-01-01T00:00:00.000000Z | 10.0  |
-| 1  | 2024-01-01T00:30:00.000000Z | 20.0  |
-| 1  | 2024-01-01T01:00:00.000000Z | 30.0  |
-| 2  | 2024-01-01T01:00:00.000000Z | 40.0  |
-| 2  | 2024-01-01T01:30:00.000000Z | 50.0  |
 
 ### `LATEST ON` inside `LATERAL`
 
 `LATEST ON ... PARTITION BY` returns the latest record per partition. Inside
 a `LATERAL` subquery, the partitions are computed independently for each
-outer row. A typical use case is execution analytics: a single parent order
-is often split into multiple child fills across different venues, and you
-want the latest fill on each venue for every order.
+outer row. Here, for each symbol we find the latest trade on each side
+(buy/sell):
 
-```questdb-sql
-CREATE TABLE executions (
-    id        INT,
-    order_id  INT,
-    venue     SYMBOL,
-    qty       DOUBLE,
-    ts        TIMESTAMP
-) TIMESTAMP(ts) PARTITION BY DAY;
-
-INSERT INTO executions VALUES
-    (1, 1, 'NYSE',   10.0, '2024-01-01T00:10:00.000000Z'),
-    (2, 1, 'NYSE',   20.0, '2024-01-01T00:20:00.000000Z'),
-    (3, 1, 'NASDAQ', 30.0, '2024-01-01T00:30:00.000000Z'),
-    (4, 2, 'NYSE',   40.0, '2024-01-01T01:10:00.000000Z'),
-    (5, 2, 'NASDAQ', 50.0, '2024-01-01T01:20:00.000000Z'),
-    (6, 2, 'NASDAQ', 60.0, '2024-01-01T01:30:00.000000Z');
-```
-
-```questdb-sql
-SELECT o.id, e.venue, e.qty
-FROM orders o
+```questdb-sql title="Latest trade per side for each symbol" demo
+SELECT t.symbol, sub.side, sub.price, sub.quantity
+FROM (
+    SELECT DISTINCT symbol FROM fx_trades
+    WHERE timestamp IN '$now-1h..$now'
+) t
 JOIN LATERAL (
-    SELECT venue, qty
-    FROM executions
-    WHERE order_id = o.id
-    LATEST ON ts PARTITION BY venue
-) e
-ORDER BY o.id, e.venue;
+    SELECT side, price, quantity
+    FROM fx_trades
+    WHERE symbol = t.symbol
+    LATEST ON timestamp PARTITION BY side
+) sub
+ORDER BY t.symbol, sub.side;
 ```
-
-| id | venue  | qty  |
-| -- | ------ | ---- |
-| 1  | NASDAQ | 30.0 |
-| 1  | NYSE   | 20.0 |
-| 2  | NASDAQ | 60.0 |
-| 2  | NYSE   | 40.0 |
-
-For every order, the query returns the most recent fill on each venue.
 
 ### `ASOF JOIN` inside `LATERAL`
 
-Combine `LATERAL` with `ASOF JOIN` to attach the most recent reference price
-to every trade of every order in a single query. Assume an additional
-`prices` table:
+Combine `LATERAL` with `ASOF JOIN` to enrich each symbol's recent trades with
+the prevailing bid/ask from the `core_price` table. For each symbol's latest
+trade, the subquery finds the top 3 trades by quantity in the last minute and
+attaches the corresponding quote:
 
-```questdb-sql
-CREATE TABLE prices (
-    price DOUBLE,
-    ts    TIMESTAMP
-) TIMESTAMP(ts) PARTITION BY DAY;
-
-INSERT INTO prices VALUES
-    (100.0, '2024-01-01T00:00:00.000000Z'),
-    (101.0, '2024-01-01T00:30:00.000000Z'),
-    (102.0, '2024-01-01T01:00:00.000000Z');
-```
-
-```questdb-sql
-SELECT o.id, sub.qty, sub.price
-FROM orders o
+```questdb-sql title="Top fills with prevailing quotes per symbol" demo
+SELECT
+    t.symbol,
+    sub.timestamp,
+    sub.side,
+    sub.price,
+    sub.quantity,
+    sub.ecn,
+    sub.bid_price,
+    sub.ask_price
+FROM (
+    SELECT * FROM fx_trades
+    LATEST ON timestamp PARTITION BY symbol
+) t
 JOIN LATERAL (
-    SELECT t.qty, p.price
-    FROM trades t
-    ASOF JOIN prices p
-    WHERE t.order_id = o.id
-) sub
-ORDER BY o.id, sub.qty;
+    SELECT
+        f.timestamp, f.side, f.price,
+        f.quantity, f.ecn,
+        c.bid_price, c.ask_price
+    FROM fx_trades f
+    ASOF JOIN core_price c
+        ON (f.symbol = c.symbol AND f.ecn = c.ecn)
+    WHERE f.symbol = t.symbol
+        AND f.timestamp IN '$now-1m..$now'
+    ORDER BY f.quantity DESC
+    LIMIT 3
+) sub;
 ```
 
-| id | qty  | price |
-| -- | ---- | ----- |
-| 1  | 10.0 | 100.0 |
-| 1  | 20.0 | 101.0 |
-| 1  | 30.0 | 102.0 |
-| 2  | 40.0 | 102.0 |
-| 2  | 50.0 | 102.0 |
-
-For each order, every matching trade is paired with the latest known price
-at the time of that trade. Trade at 00:10 only sees the 100.0 price posted at
-00:00; the trade at 00:40 picks up the 101.0 update from 00:30; from 01:00
-onwards every trade is matched with 102.0.
+For each symbol, the three largest recent trades are returned alongside
+the prevailing bid and ask from the same ECN at the time of the trade.
 
 ### `UNION ALL` of correlated branches
 
 Each branch of a `UNION` / `UNION ALL` may reference outer columns
-independently. The example below splits each order's trades into "small"
+independently. The example below splits each order's fills into "small"
 and "large" buckets in a single subquery:
 
 ```questdb-sql
 SELECT o.id, t.qty, t.bucket
 FROM orders o
 JOIN LATERAL (
-    SELECT qty, 'small' AS bucket FROM trades
+    SELECT qty, 'small' AS bucket FROM fills
         WHERE order_id = o.id AND qty < 30
     UNION ALL
-    SELECT qty, 'large' AS bucket FROM trades
+    SELECT qty, 'large' AS bucket FROM fills
         WHERE order_id = o.id AND qty >= 30
 ) t
 ORDER BY o.id, t.qty;
@@ -421,7 +407,7 @@ equivalent to `CROSS JOIN LATERAL`:
 ```questdb-sql
 SELECT o.id, t.qty
 FROM orders o,
-     LATERAL (SELECT qty FROM trades WHERE order_id = o.id) t
+     LATERAL (SELECT qty FROM fills WHERE order_id = o.id) t
 ORDER BY o.id, t.qty;
 ```
 
