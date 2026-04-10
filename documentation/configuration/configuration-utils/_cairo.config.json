@@ -81,7 +81,15 @@
   },
   "cairo.index.value.block.size": {
     "default": "256",
-    "description": "Approximation of number of rows for a single index key, must be power of 2."
+    "description": "Approximation of number of rows for a single index key, must be power of 2. Applies to bitmap indexes only; posting indexes manage their own block layout."
+  },
+  "cairo.posting.index.auto.include.timestamp": {
+    "default": "true",
+    "description": "When `true`, the designated timestamp column is automatically added to the covering index when a [posting index](/docs/concepts/deep-dive/posting-index/) is created with an `INCLUDE` clause."
+  },
+  "cairo.posting.index.row.id.encoding": {
+    "default": "posting",
+    "description": "Default row ID encoding for posting indexes. Valid values: `posting` (adaptive delta/flat trial encoding) and `posting_delta` (delta-only encoding)."
   },
   "cairo.max.swap.file.count": {
     "default": "30",
@@ -105,7 +113,7 @@
   },
   "cairo.spin.lock.timeout": {
     "default": "1000",
-    "description": "Timeout when attempting to get BitmapIndexReaders in millisecond."
+    "description": "Timeout in milliseconds when attempting to acquire index readers (bitmap and posting)."
   },
   "cairo.character.store.capacity": {
     "default": "1024",

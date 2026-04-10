@@ -522,6 +522,8 @@ must be of type [symbol](/docs/concepts/symbol/).
 
 ![Flow chart showing the syntax of the index function](/images/docs/diagrams/indexDef.svg)
 
+### Bitmap index (default)
+
 ```questdb-sql
 CREATE TABLE trades (
   timestamp TIMESTAMP,
@@ -531,13 +533,78 @@ CREATE TABLE trades (
 ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
+### Posting index
+
+The posting index offers better compression and read performance than the
+default bitmap index. Use `INDEX TYPE POSTING` with either inline or
+out-of-line syntax:
+
+```questdb-sql
+-- Inline syntax
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+
+-- Out-of-line syntax
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+), INDEX(symbol TYPE POSTING)
+TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+### Posting index with covering columns (INCLUDE)
+
+The `INCLUDE` clause stores additional column values in the index sidecar
+files. Queries that only need these columns plus the indexed symbol can be
+served entirely from the index, bypassing column files:
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, exchange),
+  exchange SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+The designated timestamp column is automatically included — you do not need
+to list it in the `INCLUDE` clause. With this schema, the following query
+reads only from the index sidecar:
+
+```questdb-sql
+SELECT timestamp, price FROM trades WHERE symbol = 'AAPL';
+```
+
+:::note
+
+`INCLUDE` is only supported with inline column syntax (not out-of-line
+`INDEX(col ...)`). Use `ALTER TABLE` to add covering columns to an existing
+table.
+
+:::
+
+See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
+for a comprehensive guide including supported column types, query patterns,
+and performance characteristics.
+
 :::warning
 
 - The **index capacity** and
   [**symbol capacity**](/docs/concepts/symbol/) are different
   settings.
 - The index capacity value should not be changed, unless a user is aware of all
-  the implications. :::
+  the implications.
+- `CAPACITY` is only supported for bitmap indexes — it cannot be used with
+  posting indexes.
+
+:::
 
 See the [Index concept](/docs/concepts/deep-dive/indexes/#how-indexes-work) for more
 information about indexes.

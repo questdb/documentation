@@ -57,13 +57,18 @@ SHOW TABLES;
 SHOW COLUMNS FROM trades;
 
 ```
-| column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey |
-| --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- |
-| symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |
-| side      | SYMBOL    | false   | 0                  | true         | 256            | 2               | false      | false     |
-| price     | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |
-| amount    | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |
-| timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |
+| column    | type      | indexed | indexBlockCapacity | indexType | indexInclude | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey |
+| --------- | --------- | ------- | ------------------ | --------- | ------------ | ------------ | -------------- | --------------- | ---------- | --------- |
+| symbol    | SYMBOL    | false   | 0                  |           |              | true         | 256            | 42              | false      | false     |
+| side      | SYMBOL    | false   | 0                  |           |              | true         | 256            | 2               | false      | false     |
+| price     | DOUBLE    | false   | 0                  |           |              | false        | 0              | 0               | false      | false     |
+| amount    | DOUBLE    | false   | 0                  |           |              | false        | 0              | 0               | false      | false     |
+| timestamp | TIMESTAMP | false   | 0                  |           |              | false        | 0              | 0               | true       | false     |
+
+The `indexType` column shows the index type (`POSTING`, `BITMAP`, or empty for
+non-indexed columns). The `indexInclude` column lists the names of columns
+included in a [posting index's](/docs/concepts/deep-dive/posting-index/)
+covering sidecar, as a comma-separated string.
 
 ### SHOW CREATE TABLE
 
@@ -81,6 +86,22 @@ This is printed with formatting, so when pasted into a text editor that support 
 CREATE TABLE trades (
 	symbol SYMBOL CAPACITY 256 CACHE,
 	side SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+```
+
+#### Posting index with covering columns
+
+When a symbol column has a posting index with `INCLUDE`, the DDL reflects
+the index type and covered columns:
+
+```questdb-sql
+CREATE TABLE trades (
+	symbol SYMBOL CAPACITY 128 CACHE INDEX TYPE POSTING INCLUDE (price, exchange),
+	exchange SYMBOL CAPACITY 128 CACHE,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP

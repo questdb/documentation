@@ -14,6 +14,16 @@ Indexing is available for [symbol](/docs/concepts/symbol/) columns in both table
 and [materialized views](/docs/concepts/materialized-views). Index support
 for other types will be added over time.
 
+QuestDB supports two index types:
+
+| Index type | Syntax | Covering support | Best for |
+|------------|--------|-----------------|----------|
+| **Bitmap** (default) | `INDEX` or `INDEX TYPE BITMAP` | No | General-purpose, low write overhead |
+| **Posting** | `INDEX TYPE POSTING` | Yes (via `INCLUDE`) | Read-heavy workloads, selective queries, wide tables |
+
+See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
+for the detailed guide on the posting index and its covering query capabilities.
+
 ## Index creation and deletion
 
 The following are ways to index a `symbol` column:
@@ -97,6 +107,9 @@ Consider the following query applied to the above table
 
 :::warning
 
+Index capacity applies to **bitmap indexes only**. Posting indexes manage
+their own storage layout and do not use this setting.
+
 We strongly recommend to rely on the default index capacity. Misconfiguring this property might
 lead to worse performance and increased disk usage.
 
@@ -114,8 +127,8 @@ When in doubt, reach out via the QuestDB support channels for advice.
 
 :::
 
-When a symbol column is indexed, an additional **index capacity** can be defined
-to specify how many row IDs to store in a single storage block on disk:
+When a symbol column has a bitmap index, an additional **index capacity** can be
+defined to specify how many row IDs to store in a single storage block on disk:
 
 - Server-wide setting: `cairo.index.value.block.size` with a default of `256`
 - Column-wide setting: The
