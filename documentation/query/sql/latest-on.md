@@ -11,7 +11,11 @@ for scenarios where multiple time series are stored in the same table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the LATEST ON keyword](/images/docs/diagrams/latestOn.svg)
+```questdb-sql
+SELECT columnName [, columnName ...]
+FROM tableName
+LATEST ON timestampColumn PARTITION BY columnName [, columnName ...];
+```
 
 where:
 

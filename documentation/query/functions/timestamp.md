@@ -33,7 +33,9 @@ Create a [designated timestamp](/docs/concepts/designated-timestamp/) column
 during table creation. For more information, refer to the
 [CREATE TABLE](/docs/query/sql/create-table/) section.
 
-![Flow chart showing the syntax of the TIMESTAMP keyword](/images/docs/diagrams/timestamp.svg)
+```questdb-sql
+CREATE TABLE tableName (...) timestamp(columnName);
+```
 
 ### During a SELECT operation
 
@@ -43,7 +45,9 @@ the result of a query. Assigning a timestamp in a `SELECT` statement
 `SAMPLE BY` or `LATEST BY` on tables which do not have a `designated timestamp`
 assigned.
 
-![Flow chart showing the syntax of the timestamp function](/images/docs/diagrams/dynamicTimestamp.svg)
+```questdb-sql
+SELECT ... FROM tableName timestamp(columnName);
+```
 
 ## Optimization with WHERE clauses
 

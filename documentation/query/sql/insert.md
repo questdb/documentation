@@ -4,17 +4,38 @@ sidebar_label: INSERT
 description: INSERT SQL keyword reference documentation.
 ---
 
-`INSERT` ingests selected data into a database table.
+`INSERT` ingests data into a database table.
+
+`INSERT` has three forms:
+
+1. **`VALUES`** - insert one or more literal rows.
+2. **`SELECT`** - insert the result of a query.
+3. **`WITH ... INSERT ... SELECT`** - insert from a query wrapped in a common
+   table expression (CTE).
+
+All forms accept the optional [`ATOMIC`](#atomic) and [`BATCH`](#batch)
+modifiers.
 
 ## Syntax
 
-Inserting values directly or using sub-queries:
+```questdb-sql title="INSERT with VALUES"
+INSERT [ATOMIC | BATCH n [o3MaxLag value]]
+INTO tableName [(columnName [, columnName ...])]
+VALUES (value [, value ...]) [, (value [, value ...]) ...];
+```
 
-![Flow chart showing the syntax of the INSERT keyword](/images/docs/diagrams/insert.svg)
+```questdb-sql title="INSERT with SELECT"
+INSERT [ATOMIC | BATCH n [o3MaxLag value]]
+INTO tableName [(columnName [, columnName ...])]
+selectQuery;
+```
 
-Inserting using sub-query alias:
-
-![Flow chart showing the syntax of the WITH AS INSERT keyword](/images/docs/diagrams/withAsInsert.svg)
+```questdb-sql title="INSERT with a CTE (WITH ... INSERT ... SELECT)"
+WITH subQueryName AS (subQuery) [, subQueryName AS (subQuery) ...]
+INSERT [ATOMIC | BATCH n [o3MaxLag value]]
+INTO tableName
+SELECT ... FROM subQueryName;
+```
 
 ### Description
 

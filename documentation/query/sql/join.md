@@ -6,9 +6,9 @@ description: JOIN SQL keyword reference documentation.
 
 QuestDB supports the type of joins you can frequently find in
 [relational databases](/glossary/relational-database/): `INNER`,
-`LEFT (OUTER)`, `RIGHT (OUTER)`, `FULL (OUTER)`, `CROSS`, and `LATERAL`.
+`LEFT [OUTER]`, `RIGHT [OUTER]`, `FULL [OUTER]`, `CROSS`, and `LATERAL`.
 Additionally, it implements joins which are particularly useful for
-time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`.
+time-series analytics: `ASOF`, `LT`, `SPLICE`, `HORIZON`, and `WINDOW`.
 
 All supported join types can be combined in a single SQL statement; QuestDB
 SQL's optimizer determines the best execution order and algorithms.
@@ -20,27 +20,51 @@ joins and there are no limitations on the number of joins, either.
 
 High-level overview:
 
-![Flow chart showing the syntax of the high-level syntax of the JOIN keyword](/images/docs/diagrams/joinOverview.svg)
+```questdb-sql
+selectClause joinClause [WHERE whereClause];
+```
 
 - `selectClause` - see [SELECT](/docs/query/sql/select/) for more
   information.
 - `whereClause` - see [WHERE](/docs/query/sql/where/) for more information.
 - The specific syntax for `joinClause` depends on the type of `JOIN`:
 
-  - `INNER` and `LEFT` `JOIN` has a mandatory `ON` clause allowing arbitrary
-    `JOIN` predicates, `operator`:
+`INNER`, `LEFT`, `RIGHT`, and `FULL` `JOIN` have a mandatory `ON` clause
+allowing arbitrary join predicates. The `OUTER` keyword is optional in
+`LEFT`, `RIGHT`, and `FULL`:
 
-  ![Flow chart showing the syntax of the INNER, LEFT JOIN keyword](/images/docs/diagrams/InnerLeftJoin.svg)
+```questdb-sql
+[INNER | LEFT [OUTER] | RIGHT [OUTER] | FULL [OUTER]] JOIN
+    { table | (subQuery) }
+    ON ( column operator anotherColumn [AND column operator anotherColumn ...]
+       | (column [, column ...]) );
+```
 
-  - `ASOF`, `LT`, and `SPLICE` `JOIN` has optional `ON` clause allowing only the
-    `=` predicate. 
-  - `ASOF` and `LT` join additionally allows an optional `TOLERANCE` clause:
+`ASOF`, `LT`, and `SPLICE` `JOIN` have an optional `ON` clause allowing only
+the `=` predicate. `ASOF` and `LT` additionally allow an optional `TOLERANCE`
+clause:
 
-  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
+```questdb-sql
+{ ASOF | LT } JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )]
+    [TOLERANCE intervalLiteral];
 
-  - `CROSS JOIN` does not allow any `ON` clause:
+SPLICE JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )];
+```
 
-  ![Flow chart showing the syntax of the CROSS JOIN keyword](/images/docs/diagrams/crossJoin.svg)
+`CROSS JOIN` does not allow any `ON` clause:
+
+```questdb-sql
+CROSS JOIN { table | (subQuery) };
+```
+
+`HORIZON JOIN`, `WINDOW JOIN`, and `LATERAL JOIN` are specialized joins with
+their own dedicated syntax - see [HORIZON JOIN](/docs/query/sql/horizon-join/),
+[WINDOW JOIN](/docs/query/sql/window-join/), and
+[LATERAL JOIN](/docs/query/sql/lateral-join/) for details.
 
 Columns from joined tables are combined in a single row. Columns with the same
 name originating from different tables will be automatically aliased to create a
