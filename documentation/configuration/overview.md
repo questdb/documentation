@@ -337,7 +337,9 @@ If not overridden, the following default setting will be used.
         "cairo.partition.encoder.parquet.compression.codec",
         "cairo.partition.encoder.parquet.compression.level",
         "cairo.partition.encoder.parquet.row.group.size",
-        "cairo.partition.encoder.parquet.data.page.size"
+        "cairo.partition.encoder.parquet.data.page.size",
+        "cairo.partition.encoder.parquet.bloom.filter.fpp",
+        "cairo.sql.parquet.row.group.pruning.enabled"
     ]}
 />
 

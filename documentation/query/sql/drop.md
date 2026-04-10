@@ -15,7 +15,13 @@ permanently deletes all tables, all materialized views, and their contents on di
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP TABLE keyword](/images/docs/diagrams/dropTable.svg)
+```questdb-sql title="Drop a single table"
+DROP TABLE [IF EXISTS] tableName;
+```
+
+```questdb-sql title="Drop all tables"
+DROP ALL TABLES;
+```
 
 ### IF EXISTS
 
@@ -38,7 +44,7 @@ reads might delay space reclamation.
 ## Example
 
 ```questdb-sql
-DROP TABLE ratings;
+DROP TABLE trades;
 ```
 
 ```questdb-sql

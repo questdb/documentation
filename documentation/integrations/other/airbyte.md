@@ -1,27 +1,28 @@
 ---
-title: "Airbyte"
+title: Integrating Airbyte with QuestDB
 description: Learn how to use Airbyte to collect data from various sources and send it to QuestDB for efficient time-series data storage and analysis.
 ---
-
-# Integrating Airbyte with QuestDB
 
 [Airbyte](https://airbyte.com/) is an open-source ETL platform designed to help you sync data from a wide range of sources into your desired destinations. With its extensive library of connectors, Airbyte allows users to build scalable data pipelines effortlessly. This guide will walk you through the process of integrating Airbyte with QuestDB, enabling efficient storage and querying of data in a high-performance time-series database.
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Prerequisites](#prerequisites)
 - [Configuring Airbyte](#configuring-airbyte)
-  - [Adding a Source](#adding-a-source)
-  - [Adding a Destination](#adding-a-destination)
-  - [Generating Configuration](#generating-configuration)
-- [Example Inputs](#example-inputs)
-  - [PostgreSQL Source Configuration](#postgresql-source-configuration)
+  - [Adding a source](#adding-a-source)
+  - [Adding a destination](#adding-a-destination)
+  - [Generating configuration](#generating-configuration)
+- [Example inputs](#example-inputs)
+  - [PostgreSQL source configuration](#postgresql-source-configuration)
   - [Writing to QuestDB](#writing-to-questdb)
-  - [Running the Connection](#running-the-connection)
-  - [Monitoring Sync Status](#monitoring-sync-status)
-  - [Debugging Tips](#debugging-tips)
-- [Verifying the Integration](#verifying-the-integration)
-- [Best Practices](#best-practices)
+    - [QuestDB destination configuration](#questdb-destination-configuration)
+  - [Running the connection](#running-the-connection)
+  - [Monitoring sync status](#monitoring-sync-status)
+    - [Example sync status output](#example-sync-status-output)
+  - [Debugging tips](#debugging-tips)
+- [Verifying the integration](#verifying-the-integration)
+- [Best practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 - [Summary](#summary)
 

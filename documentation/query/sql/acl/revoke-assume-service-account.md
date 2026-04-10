@@ -22,7 +22,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the REVOKE ASSUME SERVICE ACCOUNT keyword](/images/docs/diagrams/revokeAssumeServiceAccount.svg)
+```questdb-sql
+REVOKE ASSUME SERVICE ACCOUNT serviceAccount FROM entityName;
+```
 
 ## Description
 

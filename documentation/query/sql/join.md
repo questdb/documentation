@@ -5,10 +5,10 @@ description: JOIN SQL keyword reference documentation.
 ---
 
 QuestDB supports the type of joins you can frequently find in
-[relational databases](/glossary/relational-database/): `INNER`, `LEFT (OUTER)`,
-`CROSS`. Additionally, it implements joins which are particularly useful for
-time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`. `FULL` joins are
-not yet implemented and are on our roadmap.
+[relational databases](/glossary/relational-database/): `INNER`,
+`LEFT [OUTER]`, `RIGHT [OUTER]`, `FULL [OUTER]`, `CROSS`, and `LATERAL`.
+Additionally, it implements joins which are particularly useful for
+time-series analytics: `ASOF`, `LT`, `SPLICE`, `HORIZON`, and `WINDOW`.
 
 All supported join types can be combined in a single SQL statement; QuestDB
 SQL's optimizer determines the best execution order and algorithms.
@@ -20,27 +20,51 @@ joins and there are no limitations on the number of joins, either.
 
 High-level overview:
 
-![Flow chart showing the syntax of the high-level syntax of the JOIN keyword](/images/docs/diagrams/joinOverview.svg)
+```questdb-sql
+selectClause joinClause [WHERE whereClause];
+```
 
 - `selectClause` - see [SELECT](/docs/query/sql/select/) for more
   information.
 - `whereClause` - see [WHERE](/docs/query/sql/where/) for more information.
 - The specific syntax for `joinClause` depends on the type of `JOIN`:
 
-  - `INNER` and `LEFT` `JOIN` has a mandatory `ON` clause allowing arbitrary
-    `JOIN` predicates, `operator`:
+`INNER`, `LEFT`, `RIGHT`, and `FULL` `JOIN` have a mandatory `ON` clause
+allowing arbitrary join predicates. The `OUTER` keyword is optional in
+`LEFT`, `RIGHT`, and `FULL`:
 
-  ![Flow chart showing the syntax of the INNER, LEFT JOIN keyword](/images/docs/diagrams/InnerLeftJoin.svg)
+```questdb-sql
+[INNER | LEFT [OUTER] | RIGHT [OUTER] | FULL [OUTER]] JOIN
+    { table | (subQuery) }
+    ON ( column operator anotherColumn [AND column operator anotherColumn ...]
+       | (column [, column ...]) );
+```
 
-  - `ASOF`, `LT`, and `SPLICE` `JOIN` has optional `ON` clause allowing only the
-    `=` predicate. 
-  - `ASOF` and `LT` join additionally allows an optional `TOLERANCE` clause:
+`ASOF`, `LT`, and `SPLICE` `JOIN` have an optional `ON` clause allowing only
+the `=` predicate. `ASOF` and `LT` additionally allow an optional `TOLERANCE`
+clause:
 
-  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
+```questdb-sql
+{ ASOF | LT } JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )]
+    [TOLERANCE intervalLiteral];
 
-  - `CROSS JOIN` does not allow any `ON` clause:
+SPLICE JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )];
+```
 
-  ![Flow chart showing the syntax of the CROSS JOIN keyword](/images/docs/diagrams/crossJoin.svg)
+`CROSS JOIN` does not allow any `ON` clause:
+
+```questdb-sql
+CROSS JOIN { table | (subQuery) };
+```
+
+`HORIZON JOIN`, `WINDOW JOIN`, and `LATERAL JOIN` are specialized joins with
+their own dedicated syntax - see [HORIZON JOIN](/docs/query/sql/horizon-join/),
+[WINDOW JOIN](/docs/query/sql/window-join/), and
+[LATERAL JOIN](/docs/query/sql/lateral-join/) for details.
 
 Columns from joined tables are combined in a single row. Columns with the same
 name originating from different tables will be automatically aliased to create a
@@ -227,6 +251,15 @@ averages, or aggregating readings within time windows.
 
 It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).
 
+## LATERAL JOIN
+
+LATERAL JOIN allows a subquery on the right-hand side of a join to reference
+columns from tables that appear earlier in the `FROM` clause. It is useful for
+top-N per group queries, per-row aggregates, and dynamic filters whose
+thresholds come from the outer row.
+
+It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
+
 ## (INNER) JOIN
 
 `(INNER) JOIN` returns rows from two tables where the records on the compared
@@ -293,6 +326,63 @@ WHERE Lookup.Symbol = NULL;
 
 In this case, the result has 71 rows out of the 100 in the larger table, and the
 columns corresponding to the `Lookup` table are all `NULL`.
+
+## RIGHT (OUTER) JOIN
+
+`RIGHT OUTER JOIN` or simply `RIGHT JOIN` is the mirror of `LEFT JOIN`: it
+returns **all** records from the right table, and if matched, the records
+from the left table. When there is no match for the left table, it returns
+`NULL` values in left table fields.
+
+```questdb-sql title="RIGHT JOIN ON"
+WITH
+  Manytrades AS
+    (SELECT * FROM trades limit 100),
+  Lookup AS
+    (SELECT 'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+SELECT *
+FROM ManyTrades
+RIGHT OUTER JOIN Lookup
+  ON Lookup.symbol = Manytrades.symbol;
+```
+
+Any `RIGHT JOIN` can be rewritten as a `LEFT JOIN` by swapping the order of
+the tables, which is generally considered more idiomatic. `RIGHT JOIN` is
+useful when the left side of the join is itself the result of earlier joins
+in the query — rewriting it as `LEFT JOIN` would otherwise require
+restructuring the chain or wrapping it in a subquery.
+
+## FULL (OUTER) JOIN
+
+`FULL OUTER JOIN` or simply `FULL JOIN` is the union of `LEFT JOIN` and
+`RIGHT JOIN`: it returns **all** records from both tables. Matched rows
+are combined into one row, while unmatched rows from either side appear
+with `NULL` in the columns of the other table.
+
+```questdb-sql title="FULL JOIN ON"
+WITH
+  mayTrades AS (
+    SELECT symbol, COUNT(*) AS may_total
+    FROM trades
+    WHERE timestamp IN '2024-05'
+  ),
+  juneTrades AS (
+    SELECT symbol, COUNT(*) AS june_total
+    FROM trades
+    WHERE timestamp IN '2024-06'
+  )
+SELECT
+  COALESCE(mayTrades.symbol, juneTrades.symbol) AS symbol,
+  may_total,
+  june_total
+FROM mayTrades
+FULL OUTER JOIN juneTrades
+  ON mayTrades.symbol = juneTrades.symbol;
+```
+
+Symbols traded in only one of the two months get `NULL` for the other
+month's total. This makes `FULL JOIN` a natural fit for reconciliation
+queries that need to find rows present in one dataset but not the other.
 
 ## CROSS JOIN
 

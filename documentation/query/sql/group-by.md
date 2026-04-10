@@ -10,14 +10,12 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 ## Syntax
 
 ```questdb-sql
-SELECT column [, ...], aggregate(column) [, ...]
-FROM table
-[WHERE condition]
-GROUP BY
-    column [, ...]
-    | ROLLUP(column [, ...])
-    | CUBE(column [, ...])
-    | GROUPING SETS ((column [, ...]) [, ...])
+SELECT column [, column ...], aggregation [, aggregation ...]
+FROM tableName
+[GROUP BY column [, column ...]
+    | ROLLUP(column [, column ...])
+    | CUBE(column [, column ...])
+    | GROUPING SETS ((column [, column ...]) [, ...])];
 ```
 
 :::note

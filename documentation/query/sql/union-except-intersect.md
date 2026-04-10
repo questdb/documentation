@@ -31,9 +31,9 @@ To work properly, all of the following must be true:
 
 ## Syntax
 
-### UNION
-
-![Flow chart showing the syntax of the UNION, EXCEPT & INTERSECT keyword](/images/docs/diagrams/unionExceptIntersect.svg)
+```questdb-sql
+query1 { UNION | EXCEPT | INTERSECT } [ALL] query2;
+```
 
 - `UNION` returns distinct results.
 - `UNION ALL` returns all `UNION` results including duplicates.
@@ -45,140 +45,140 @@ To work properly, all of the following must be true:
 
 ## Examples
 
-The examples for the set operations use the following tables:
+The examples below compare the symbols listed by two crypto exchanges. Set
+operations let traders quickly answer questions like "which pairs are listed
+on both exchanges?" (arbitrage candidates) or "which pairs are unique to one
+exchange?" (single-venue exposure).
 
-sensor_1:
+`binance_symbols`:
 
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
-| 1   | Honeywell         | New York      |
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
 
-Notice that the last row in the sensor_1 table is a duplicate.
+Notice that the last row in `binance_symbols` is a duplicate of `BNBUSDT`.
 
-sensor_2:
+`coinbase_symbols`:
 
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | San Francisco |
-| 2   | United Automation | Boston        |
-| 3   | Eberle            | New York      |
-| 4   | Honeywell         | Boston        |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| XRPUSDT  | XRP  | USDT  |
+| LTCUSDT  | LTC  | USDT  |
+| LINKUSDT | LINK | USDT  |
 
 ### UNION
 
+All distinct symbols available on either exchange:
+
 ```questdb-sql
-sensor_1 UNION sensor_2;
+binance_symbols UNION coinbase_symbols;
 ```
 
-returns
-
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
-| 1   | Honeywell         | San Francisco |
-| 2   | United Automation | Boston        |
-| 3   | Eberle            | New York      |
-| 4   | Honeywell         | Boston        |
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
+| XRPUSDT  | XRP  | USDT  |
+| LTCUSDT  | LTC  | USDT  |
+| LINKUSDT | LINK | USDT  |
 
 `UNION` eliminates duplication even when one of the queries returns nothing.
-
-For instance:
+For instance, filtering coinbase down to nothing still deduplicates Binance:
 
 ```questdb-sql
-sensor_1
+binance_symbols
 UNION
-sensor_2 WHERE ID > 10;
+coinbase_symbols WHERE base = 'NONEXISTENT';
 ```
 
-returns:
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
 
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
+The duplicate `BNBUSDT` row in `binance_symbols` is not returned.
 
-The duplicate row in `sensor_1` is not returned as a result.
+`UNION ALL` keeps every row, including duplicates and rows shared between
+exchanges:
 
 ```questdb-sql
-sensor_1 UNION ALL sensor_2;
+binance_symbols UNION ALL coinbase_symbols;
 ```
 
-returns
-
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
-| 1   | Honeywell         | San Francisco |
-| 2   | United Automation | Boston        |
-| 3   | Eberle            | New York      |
-| 4   | Honeywell         | Boston        |
-| 5   | Omron             | Boston        |
-| 6   | RS Pro            | Boston        |
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
+| BTCUSDT  | BTC  | USDT  |
+| ETHUSDT  | ETH  | USDT  |
+| SOLUSDT  | SOL  | USDT  |
+| XRPUSDT  | XRP  | USDT  |
+| LTCUSDT  | LTC  | USDT  |
+| LINKUSDT | LINK | USDT  |
 
 ### EXCEPT
 
-```questdb-sql
-sensor_1 EXCEPT sensor_2;
-```
-
-returns
-
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-
-Notice that `EXCEPT` eliminates duplicates. Let's run `EXCEPT ALL` to change
-that.
+Symbols listed on Binance but not on Coinbase (single-venue on Binance):
 
 ```questdb-sql
-sensor_1 EXCEPT ALL sensor_2;
+binance_symbols EXCEPT coinbase_symbols;
 ```
 
-| ID  | make              | city          |
-| --- | ----------------- | ------------- |
-| 1   | Honeywell         | New York      |
-| 2   | United Automation | Miami         |
-| 3   | Omron             | Miami         |
-| 4   | Honeywell         | San Francisco |
-| 1   | Honeywell         | New York      |
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
+
+Notice that `EXCEPT` eliminates duplicates. `EXCEPT ALL` preserves them, so
+the duplicate `BNBUSDT` in Binance shows up twice:
+
+```questdb-sql
+binance_symbols EXCEPT ALL coinbase_symbols;
+```
+
+| symbol   | base | quote |
+| -------- | ---- | ----- |
+| BNBUSDT  | BNB  | USDT  |
+| AVAXUSDT | AVAX | USDT  |
+| ADAUSDT  | ADA  | USDT  |
+| BNBUSDT  | BNB  | USDT  |
 
 ### INTERSECT
 
+Symbols listed on both exchanges - the candidates for cross-venue arbitrage:
+
 ```questdb-sql
-sensor_1 INTERSECT sensor_2;
+binance_symbols INTERSECT coinbase_symbols;
 ```
 
-returns
-
-| ID  | make   | city   |
-| --- | ------ | ------ |
-| 5   | Omron  | Boston |
-| 6   | RS Pro | Boston |
+| symbol  | base | quote |
+| ------- | ---- | ----- |
+| BTCUSDT | BTC  | USDT  |
+| ETHUSDT | ETH  | USDT  |
+| SOLUSDT | SOL  | USDT  |
 
 In this example we have no duplicates, but if there were any, we could use
 `INTERSECT ALL` to have them.

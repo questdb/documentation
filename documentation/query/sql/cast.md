@@ -12,7 +12,9 @@ Type conversion. Can be either:
 
 ## Syntax
 
-![Flow chart showing the syntax of the CAST keyword](/images/docs/diagrams/cast.svg)
+```questdb-sql
+CAST(expression AS type)
+```
 
 where:
 
