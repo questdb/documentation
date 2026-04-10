@@ -19,6 +19,7 @@ import iamConfig from "./configuration-utils/\_iam.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
 import logConfig from "./configuration-utils/\_log.config.json"
 import matViewConfig from "./configuration-utils/\_mat-view.config.json"
+import storagePolicyConfig from "./configuration-utils/\_storage-policy.config.json"
 import configValidationConfig from "./configuration-utils/\_config-validation.config.json"
 import telemetryConfig from "./configuration-utils/\_telemetry.config.json"
 
@@ -485,6 +486,22 @@ If you are using versions earlier than `8.3.1`, we suggest you upgrade at your e
 The following settings are available in `server.conf`:
 
 <ConfigTable rows={matViewConfig} />
+
+## Storage policy
+
+:::note
+
+Storage policy is [Enterprise](/enterprise/) only.
+
+:::
+
+Storage policies automate partition lifecycle management, including local
+deletion and cold storage offloading.
+
+For details, see the
+[storage policy concept](/docs/concepts/storage-policy/) page.
+
+<ConfigTable rows={storagePolicyConfig} />
 
 ## Logging & Metrics
 
