@@ -32,7 +32,7 @@ The first two modes accept the same set of optional clauses:
 ```questdb-sql title="Providing the table schema"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
-    (columnName typeDef [, columnName typeDef ...])
+    (columnName columnTypeDef [, columnName columnTypeDef ...])
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
@@ -43,11 +43,13 @@ TABLE [IF NOT EXISTS] tableName
     [OWNED BY ownerName];
 ```
 
+Where [`columnTypeDef`](#type-definition) is the column's data type.
+
 ```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     AS (selectQuery)
-    [, cast(columnRef AS typeDef) ...]
+    [, cast(columnRef AS columnTypeDef) ...]
     [, INDEX (columnRef [CAPACITY n]) ...]
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
@@ -579,7 +581,7 @@ the explicit list overrides per-column `BLOOM_FILTER` metadata.
 existing column in the `selectSql`
 
 ```questdb-sql
-cast(columnRef AS typeDef)
+cast(columnRef AS columnTypeDef)
 ```
 
 ```questdb-sql
