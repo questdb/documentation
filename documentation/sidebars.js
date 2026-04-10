@@ -424,6 +424,7 @@ module.exports = {
                 "query/sql/group-by",
                 "query/sql/horizon-join",
                 "query/sql/join",
+                "query/sql/lateral-join",
                 "query/sql/latest-on",
                 "query/sql/limit",
                 "query/sql/order-by",

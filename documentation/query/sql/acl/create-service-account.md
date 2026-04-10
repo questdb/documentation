@@ -22,7 +22,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the CREATE SERVICE ACCOUNT keyword](/images/docs/diagrams/createServiceAccount.svg)
+```questdb-sql
+CREATE SERVICE ACCOUNT [IF NOT EXISTS] accountName [OWNED BY ownerName];
+```
 
 ## Description
 

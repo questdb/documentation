@@ -380,7 +380,7 @@ dropMatView
   ::= 'DROP' 'MATERIALIZED' 'VIEW' ('IF' 'EXISTS')? viewName
 
 parquetEncodingDef
-  ::= 'PARQUET' '(' encoding ( ',' compression-codec ( '(' level ')' )? )? ')'
+  ::= 'PARQUET' '(' encoding ( ',' compression-codec ( '(' level ')' )? )? ( ',' 'BLOOM_FILTER' )? ')'
 
 pivot
   ::= ( '(' selectQuery ')' | tableName )

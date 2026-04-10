@@ -21,7 +21,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the CREATE GROUP keyword](/images/docs/diagrams/createGroup.svg)
+```questdb-sql
+CREATE GROUP [IF NOT EXISTS] groupName;
+```
 
 ## Description
 

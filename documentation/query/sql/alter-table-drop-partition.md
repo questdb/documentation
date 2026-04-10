@@ -21,8 +21,13 @@ unintended data loss.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of ALTER TABLE with DROP PARTITION keyword](/images/docs/diagrams/alterTableDropPartition.svg)
+```questdb-sql title="By partition name list"
+ALTER TABLE tableName DROP PARTITION LIST partitionName [, partitionName ...];
+```
+
+```questdb-sql title="By WHERE clause on the designated timestamp"
+ALTER TABLE tableName DROP PARTITION WHERE booleanExpression;
+```
 
 ## Drop partition by name
 
@@ -33,15 +38,15 @@ The naming convention is detailed in [Partitions](/docs/concepts/partitions/).
 
 ```questdb-sql title="Drop a single partition"
 --DAY
-ALTER TABLE measurements DROP PARTITION LIST '2019-05-18';
+ALTER TABLE trades DROP PARTITION LIST '2019-05-18';
 --MONTH
-ALTER TABLE measurements DROP PARTITION LIST '2019-05';
+ALTER TABLE trades DROP PARTITION LIST '2019-05';
 --YEAR
-ALTER TABLE measurements DROP PARTITION LIST '2019';
+ALTER TABLE trades DROP PARTITION LIST '2019';
 ```
 
 ```questdb-sql title="Drop multiple partitions"
-ALTER TABLE measurements DROP PARTITION LIST '2018','2019';
+ALTER TABLE trades DROP PARTITION LIST '2018','2019';
 ```
 
 ## Drop partitions using boolean expression
@@ -52,13 +57,13 @@ column.
 ### Examples
 
 ```questdb-sql title="Drop one partition"
-ALTER TABLE measurements
+ALTER TABLE trades
 DROP PARTITION
 WHERE timestamp = to_timestamp('2019-01-01:00:00:00', 'yyyy-MM-dd:HH:mm:ss');
 ```
 
 ```questdb-sql title="Drop all partitions older than 2018"
-ALTER TABLE measurements
+ALTER TABLE trades
 DROP PARTITION
 WHERE timestamp < to_timestamp('2018-01-01:00:00:00', 'yyyy-MM-dd:HH:mm:ss');
 ```

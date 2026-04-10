@@ -9,6 +9,23 @@ configuration, and users.
 
 ## Available statements
 
+```questdb-sql
+SHOW { TABLES
+     | COLUMNS FROM tableName
+     | PARTITIONS FROM tableName
+     | CREATE TABLE tableName
+     | CREATE VIEW viewName
+     | PAYLOAD TRANSFORMS
+     | USER [userName]
+     | USERS
+     | GROUPS [userName]
+     | SERVICE ACCOUNT [accountName]
+     | SERVICE ACCOUNTS [userName]
+     | PERMISSIONS [entityName]
+     | SERVER_VERSION
+     | PARAMETERS };
+```
+
 - [`SHOW COLUMNS`](#show-columns) - column metadata for a table
 - [`SHOW CREATE TABLE`](#show-create-table) - DDL to recreate a table
 - [`SHOW CREATE VIEW`](#show-create-view) - DDL to recreate a view
