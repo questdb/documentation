@@ -195,6 +195,45 @@ information on the behavior of this feature.
 
 :::
 
+## Storage Policy
+
+:::note
+
+Storage policies are available in **QuestDB Enterprise** only.
+
+:::
+
+A [storage policy](/docs/concepts/storage-policy/) automates the partition
+lifecycle by defining when partitions are converted to Parquet locally, when
+native data is removed, and when local copies are dropped. Place the
+`STORAGE POLICY(...)` clause after `PARTITION BY`:
+
+```questdb-sql title="With storage policy (Enterprise)"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M, DROP REMOTE 6M)
+WAL;
+```
+
+A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional. TTL values must be in
+ascending order.
+
+To modify a storage policy after table creation, see
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated. Use `STORAGE POLICY` instead.
+If a table has a TTL set, remove it before setting a storage policy.
+
+:::
+
 ## Deduplication
 
 When [Deduplication](/docs/concepts/deduplication) is enabled, QuestDB only

@@ -147,3 +147,6 @@ ALTER TABLE trades SET TTL 0h;
 - TTL should be significantly larger than your partition interval
 - For manual control instead of automatic TTL, see
   [Data Retention](/docs/operations/data-retention/)
+- For graduated lifecycle management (convert to Parquet, offload to object
+  storage, then drop), see [Storage Policy](/docs/concepts/storage-policy/)
+  (Enterprise)

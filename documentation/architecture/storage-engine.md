@@ -55,9 +55,10 @@ Older partitions (any partition other than the most recent one) can be converted
 Partitions in Parquet format remain fully available for queries. Users don't need to know whether a partition is in QuestDB
 binary format or Parquet format. All the data types available in QuestDB can be converted to Parquet.
 
-When using QuestDB Enterprise, tables can be configured to convert to Parquet automatically and to send the Parquet
-files to object storage (Amazon S3, Microsoft Blob Storage, Google Cloud Storage, NFS...). This can help reduce the
-cost of storing historical data while keeping it fully available for queries.
+When using QuestDB Enterprise, tables can be configured to convert to Parquet automatically using
+[storage policies](/docs/concepts/storage-policy/). This can help reduce local disk usage
+while keeping historical data fully available for queries. Support for automatic upload
+of Parquet files to object storage will be added in a future release.
 
 
 
