@@ -362,33 +362,20 @@ QuestDB. For best results, we recommend using only alphanumeric characters along
 ## Type definition
 
 When specifying a column, a name and
-[type definition](/docs/query/datatypes/overview/) must be provided. The `symbol`
-type may have additional optional parameters applied.
+[type definition](/docs/query/datatypes/overview/) must be provided.
 
 ```questdb-sql
 columnTypeDef ::=
-      BINARY
-    | BOOLEAN
-    | BYTE
-    | CHAR
-    | DATE
-    | DECIMAL(<precision>, <scale>)
-    | DOUBLE
+    -- Types with parameters
+      DECIMAL(<precision>, <scale>)
     | DOUBLE[][]...  -- array: one [] pair per dimension
-    | FLOAT
     | GEOHASH(<size>)
-    | INT
-    | IPV4
-    | LONG
-    | LONG256
-    | SHORT
-    | STRING
     | SYMBOL [CAPACITY distinctValueEstimate] [CACHE | NOCACHE]
              [INDEX [CAPACITY valueBlockSize]]
-    | TIMESTAMP
-    | TIMESTAMP_NS
-    | UUID
-    | VARCHAR
+    -- Simple types
+    | BINARY | BOOLEAN | BYTE | CHAR | DATE | DOUBLE | FLOAT
+    | INT | IPV4 | LONG | LONG256 | SHORT | STRING
+    | TIMESTAMP | TIMESTAMP_NS | UUID | VARCHAR
 ```
 
 ### Symbols
