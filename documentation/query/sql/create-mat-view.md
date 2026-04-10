@@ -277,6 +277,40 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
 
+## Storage Policy
+
+:::note
+
+Storage policies are available in **QuestDB Enterprise** only.
+
+:::
+
+A [storage policy](/docs/concepts/storage-policy/) automates the partition
+lifecycle by defining when partitions are converted to Parquet locally, when
+native data is removed, and when local copies are dropped. Place the
+`STORAGE POLICY(...)` clause after `PARTITION BY`:
+
+```questdb-sql title="With storage policy (Enterprise)"
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
+) PARTITION BY DAY
+  STORAGE POLICY(TO PARQUET 7d, DROP NATIVE 14d);
+```
+
+A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional. TTL values must be in
+ascending order.
+
+To modify a storage policy after creation, see
+[ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
+
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated. Use `STORAGE POLICY` instead.
+If a materialized view has a TTL set, remove it before setting a storage policy.
+
+:::
+
 ## Complete example
 
 Putting it all together:
@@ -397,4 +431,5 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 - [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
 - [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
 - [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
+- [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)

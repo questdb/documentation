@@ -571,18 +571,22 @@ SELECT * FROM all_permissions();
 | DEDUP ENABLE | Database &#124; Table | Enable deduplication |
 | DEDUP DISABLE | Database &#124; Table | Disable deduplication |
 | DETACH PARTITION | Database &#124; Table | Detach partitions |
+| DISABLE STORAGE POLICY | Database &#124; Table | Disable storage policies |
 | DROP COLUMN | Database &#124; Table &#124; Column | Drop columns |
 | DROP INDEX | Database &#124; Table &#124; Column | Drop indexes |
 | DROP PARTITION | Database &#124; Table | Drop partitions |
 | DROP TABLE | Database &#124; Table | Drop tables |
 | DROP MATERIALIZED VIEW | Database &#124; Table | Drop materialized views |
+| ENABLE STORAGE POLICY | Database &#124; Table | Enable storage policies |
 | INSERT | Database &#124; Table | Insert data |
 | REFRESH MATERIALIZED VIEW | Database &#124; Table | Refresh materialized views |
 | REINDEX | Database &#124; Table &#124; Column | Reindex columns |
+| REMOVE STORAGE POLICY | Database &#124; Table | Remove storage policies |
 | RENAME COLUMN | Database &#124; Table &#124; Column | Rename columns |
 | RENAME TABLE | Database &#124; Table | Rename tables |
 | RESUME WAL | Database &#124; Table | Resume WAL processing |
 | SELECT | Database &#124; Table &#124; Column | Read data |
+| SET STORAGE POLICY | Database &#124; Table | Set storage policies |
 | SET TABLE PARAM | Database &#124; Table | Set table parameters |
 | SET TABLE TYPE | Database &#124; Table | Change table type |
 | SETTINGS | Database | Change instance settings in Web Console |
