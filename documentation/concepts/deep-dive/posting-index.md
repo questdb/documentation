@@ -102,13 +102,14 @@ ALTER TABLE trades
 
 ### Encoding options
 
-The posting index supports two row ID encoding strategies with different
-performance characteristics:
+The posting index supports three row ID encoding options with different
+compression and query performance characteristics:
 
 | Syntax | Encoding | Best for |
 |--------|----------|----------|
-| `INDEX TYPE POSTING` | Adaptive (default) | General purpose — trial-encodes both modes per stride, picks the smaller |
-| `INDEX TYPE POSTING DELTA` | Delta-only | Regular, evenly-distributed data — faster large scans |
+| `INDEX TYPE POSTING` | Adaptive (default) | General purpose — trial-encodes both EF and delta per stride, picks the smaller |
+| `INDEX TYPE POSTING EF` | Elias-Fano | Irregular data distributions, point queries and selective lookups |
+| `INDEX TYPE POSTING DELTA` | Delta | Regular, evenly-distributed data, large sequential scans |
 
 **Delta encoding** stores per-key deltas between consecutive row IDs with
 Frame-of-Reference bitpacking. It compresses best when row IDs for each
@@ -116,23 +117,27 @@ symbol key are evenly spaced (e.g. round-robin or time-ordered ingestion
 of a fixed set of symbols) and is faster for queries that scan large
 ranges of matching rows.
 
-The **adaptive (default)** encoding additionally trial-encodes a
-stride-wide flat layout and picks whichever is smaller. This mode
-compresses better for irregular data distributions (e.g. bursty or
-skewed symbol frequencies) and produces a layout that is faster for
-point queries and selective lookups.
+**Elias-Fano (EF) encoding** uses a stride-wide flat layout with
+Frame-of-Reference bitpacking across all keys in a stride. It compresses
+better for irregular data distributions (e.g. bursty or skewed symbol
+frequencies) and is faster for point queries and selective lookups.
 
-For most workloads the default adaptive encoding is the best choice.
-Use `DELTA` only when you know your data arrives in a regular pattern
-and your queries predominantly scan large result sets.
+The **adaptive (default)** encoding trial-encodes both EF and delta modes
+per stride and picks whichever produces the smaller output. This is the
+best choice when you are unsure about your data distribution or have a
+mixed query workload.
 
 ```questdb-sql
 -- Default adaptive encoding (recommended for most workloads)
 CREATE TABLE t1 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 
+-- EF encoding (irregular data, point queries)
+CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING EF)
+    TIMESTAMP(ts) PARTITION BY DAY WAL;
+
 -- Delta-only encoding (regular data, large scans)
-CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
+CREATE TABLE t3 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
 
@@ -394,17 +399,18 @@ generations are **sealed** into a single dense generation with stride-indexed
 layout for optimal read performance.
 
 Sealing happens automatically when the generation count reaches the maximum
-(125) or when the partition is closed. With the default adaptive encoding,
-sealed data uses two encoding modes per stride (256 keys):
+(125) or when the partition is closed. Sealed data uses two encoding modes
+per stride (256 keys):
 
-- **Delta mode**: per-key delta encoding with bitpacking — compresses best
-  for regular, evenly-distributed row IDs and is faster for large scans
-- **Flat mode**: stride-wide Frame-of-Reference with contiguous bitpacking —
-  compresses better for irregular distributions and is faster for point
-  queries
+- **Delta mode** (`POSTING DELTA`): per-key delta encoding with bitpacking —
+  compresses best for regular, evenly-distributed row IDs and is faster for
+  large sequential scans
+- **Elias-Fano mode** (`POSTING EF`): stride-wide Frame-of-Reference with
+  contiguous bitpacking — compresses better for irregular distributions and
+  is faster for point queries
 
-The encoder trial-encodes both modes and picks the smaller one per stride.
-With `POSTING DELTA`, only delta mode is used.
+With the default adaptive encoding (`POSTING`), the encoder trial-encodes
+both modes per stride and picks the smaller one.
 
 ### FSST compression for strings
 
