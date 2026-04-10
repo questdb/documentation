@@ -12,6 +12,7 @@ query performance for filtered lookups.
 
 ```
 ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX [ CAPACITY n ]
+ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX TYPE POSTING
 ```
 
 ## Parameters
@@ -20,7 +21,8 @@ ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX [ CAPACITY n 
 | --------- | ----------- |
 | `viewName` | Name of the materialized view |
 | `columnName` | Name of the `SYMBOL` column to index |
-| `CAPACITY` | Optional index capacity (advanced; use default unless you understand implications) |
+| `CAPACITY` | Optional index capacity for bitmap indexes (advanced; use default unless you understand implications) |
+| `TYPE POSTING` | Use a [posting index](/docs/concepts/deep-dive/posting-index/) instead of the default bitmap index |
 
 ## When to use
 
@@ -30,12 +32,28 @@ Add an index when:
 - The column has high cardinality (many distinct values)
 - Query performance on the materialized view needs improvement
 
-## Example
+## Examples
 
-```questdb-sql title="Add index to symbol column"
+### Adding a bitmap index (default)
+
+```questdb-sql title="Add bitmap index to symbol column"
 ALTER MATERIALIZED VIEW trades_hourly
   ALTER COLUMN symbol ADD INDEX;
 ```
+
+### Adding a posting index
+
+```questdb-sql title="Add posting index to symbol column"
+ALTER MATERIALIZED VIEW trades_hourly
+  ALTER COLUMN symbol ADD INDEX TYPE POSTING;
+```
+
+:::note
+
+The `INCLUDE` clause for covering indexes is not supported on materialized
+views. Use a posting index without `INCLUDE` for faster filtered lookups.
+
+:::
 
 ## Behavior
 
