@@ -153,6 +153,7 @@ module.exports = {
           ],
         },
         "ingestion/import-csv",
+        "ingestion/payload-transforms",
       ],
     },
 
@@ -337,6 +338,7 @@ module.exports = {
                   id: "query/sql/acl/create-service-account",
                   type: "doc",
                         },
+                "query/sql/create-payload-transform",
                 "query/sql/create-table",
                 {
                   id: "query/sql/acl/create-user",
@@ -354,6 +356,7 @@ module.exports = {
                   type: "doc",
                         },
                 "query/sql/drop-mat-view",
+                "query/sql/drop-payload-transform",
                 {
                   id: "query/sql/acl/drop-service-account",
                   type: "doc",
