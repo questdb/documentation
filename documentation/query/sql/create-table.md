@@ -32,7 +32,7 @@ The first two modes accept the same set of optional clauses:
 ```questdb-sql title="Providing the table schema"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
-    (columnName columnTypeDef [, columnName columnTypeDef ...])
+    (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
@@ -43,13 +43,11 @@ TABLE [IF NOT EXISTS] tableName
     [OWNED BY ownerName];
 ```
 
-Where [`columnTypeDef`](#type-definition) is the column's data type.
-
 ```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     AS (selectQuery)
-    [, cast(columnRef AS columnTypeDef) ...]
+    [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
     [, INDEX (columnRef [CAPACITY n]) ...]
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
