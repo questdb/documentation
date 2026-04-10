@@ -102,21 +102,36 @@ ALTER TABLE trades
 
 ### Encoding options
 
-The posting index supports two internal row ID encoding strategies. In most
-cases the default is optimal and no keyword is needed:
+The posting index supports two row ID encoding strategies with different
+performance characteristics:
 
-| Syntax | Encoding | Description |
-|--------|----------|-------------|
-| `INDEX TYPE POSTING` | Adaptive (default) | Trial-encodes delta and flat modes per stride, picks the smaller |
-| `INDEX TYPE POSTING EF` | Adaptive (explicit) | Same as above — `EF` makes the choice explicit |
-| `INDEX TYPE POSTING DELTA` | Delta-only | Forces per-key delta encoding, skipping flat-mode trial |
+| Syntax | Encoding | Best for |
+|--------|----------|----------|
+| `INDEX TYPE POSTING` | Adaptive (default) | General purpose — trial-encodes both modes per stride, picks the smaller |
+| `INDEX TYPE POSTING DELTA` | Delta-only | Regular, evenly-distributed data — faster large scans |
+
+**Delta encoding** stores per-key deltas between consecutive row IDs with
+Frame-of-Reference bitpacking. It compresses best when row IDs for each
+symbol key are evenly spaced (e.g. round-robin or time-ordered ingestion
+of a fixed set of symbols) and is faster for queries that scan large
+ranges of matching rows.
+
+The **adaptive (default)** encoding additionally trial-encodes a
+stride-wide flat layout and picks whichever is smaller. This mode
+compresses better for irregular data distributions (e.g. bursty or
+skewed symbol frequencies) and produces a layout that is faster for
+point queries and selective lookups.
+
+For most workloads the default adaptive encoding is the best choice.
+Use `DELTA` only when you know your data arrives in a regular pattern
+and your queries predominantly scan large result sets.
 
 ```questdb-sql
--- Default adaptive encoding (recommended)
+-- Default adaptive encoding (recommended for most workloads)
 CREATE TABLE t1 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 
--- Force delta-only encoding
+-- Delta-only encoding (regular data, large scans)
 CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
@@ -379,13 +394,17 @@ generations are **sealed** into a single dense generation with stride-indexed
 layout for optimal read performance.
 
 Sealing happens automatically when the generation count reaches the maximum
-(125) or when the partition is closed. Sealed data uses two encoding modes
-per stride (256 keys):
+(125) or when the partition is closed. With the default adaptive encoding,
+sealed data uses two encoding modes per stride (256 keys):
 
-- **Delta mode**: per-key delta encoding with bitpacking
-- **Flat mode**: stride-wide Frame-of-Reference with contiguous bitpacking
+- **Delta mode**: per-key delta encoding with bitpacking — compresses best
+  for regular, evenly-distributed row IDs and is faster for large scans
+- **Flat mode**: stride-wide Frame-of-Reference with contiguous bitpacking —
+  compresses better for irregular distributions and is faster for point
+  queries
 
 The encoder trial-encodes both modes and picks the smaller one per stride.
+With `POSTING DELTA`, only delta mode is used.
 
 ### FSST compression for strings
 
