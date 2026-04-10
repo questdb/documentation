@@ -133,7 +133,7 @@ by all non-aggregate `SELECT` columns. When `GROUP BY` is present, it follows
 stricter rules than regular `GROUP BY`:
 
 - Each `GROUP BY` expression must **exactly match** a non-aggregate `SELECT`
-  expression (with table prefix tolerance, e.g., `t.symbol` matches `symbol`) or
+  expression (with table prefix tolerance, e.g., `t.symbolbol` matches `symbol`) or
   a `SELECT` column alias.
 - Every non-aggregate `SELECT` column must appear in `GROUP BY`.
 - Column index references are supported (e.g., `GROUP BY 1, 2`).
@@ -157,13 +157,13 @@ way to evaluate execution quality and price impact:
 ```questdb-sql title="Post-trade markout curve" demo
 SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.symbol,
+    t.symbolbol,
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 RANGE FROM 0s TO 1m STEP 5s AS h
 WHERE t.timestamp IN '$now-1h..$now'
-ORDER BY t.symbol, horizon_sec;
+ORDER BY t.symbolbol, horizon_sec;
 ```
 
 Since `fx_trades` uses nanosecond timestamps (`TIMESTAMP_NS`), `h.offset` is in
@@ -176,13 +176,13 @@ Compute the average post-trade markout value at specific horizons using `LIST`:
 ```questdb-sql title="Markout at specific time points" demo
 SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.symbol,
+    t.symbolbol,
     avg((m.best_bid + m.best_ask) / 2 - t.price) AS avg_markout
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 LIST (0, 5s, 30s, 1m) AS h
 WHERE t.timestamp IN '$now-1h..$now'
-ORDER BY t.symbol, horizon_sec;
+ORDER BY t.symbolbol, horizon_sec;
 ```
 
 ### Pre- and post-trade price movement
@@ -193,14 +193,14 @@ detecting information leakage or adverse selection:
 ```questdb-sql title="Price movement around trade events" demo
 SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.symbol,
+    t.symbolbol,
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid,
     count() AS sample_size
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 RANGE FROM -5s TO 5s STEP 1s AS h
 WHERE t.timestamp IN '$now-1h..$now'
-ORDER BY t.symbol, horizon_sec;
+ORDER BY t.symbolbol, horizon_sec;
 ```
 
 ### Volume-weighted markout
@@ -219,7 +219,34 @@ WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```
 
-### Multi-table: bid and ask spread around trades
+### Multi-table: consolidated and ECN-level quotes around trades
+
+Join against two right-hand tables in a single query - `market_data` for
+consolidated book prices and `core_price` for ECN-level quotes - to compare
+how both track around each EURUSD trade:
+
+```questdb-sql title="Multi-table HORIZON JOIN with demo data" demo
+SELECT
+    h.offset / 1000000 AS horizon_ms,
+    t.symbolbol,
+    avg(m.best_bid) AS consolidated_bid,
+    avg(c.bid_price) AS ecn_bid
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m
+    ON (t.symbolbol = m.symbolbol)
+HORIZON JOIN core_price AS c
+    ON (t.symbolbol = c.symbol AND t.ecn = c.ecn)
+    LIST (-1s, 0, 1s, 5s) AS h
+WHERE t.symbolbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+GROUP BY horizon_ms, t.symbolbol
+ORDER BY t.symbolbol, horizon_ms;
+```
+
+Note that the `LIST` clause appears only on the last HORIZON JOIN. Each
+right-hand table can independently use or omit `ON`.
+
+### Multi-table: bid and ask spread (synthetic example)
 
 Join against two separate tables (bids and asks) in a single HORIZON JOIN query
 to compute the average spread at each horizon:
@@ -227,19 +254,17 @@ to compute the average spread at each horizon:
 ```questdb-sql title="Multi-table HORIZON JOIN with bid/ask spread"
 SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.sym,
+    t.symbol,
     avg(b.bid) AS avg_bid,
     avg(a.ask) AS avg_ask,
     avg(a.ask - b.bid) AS avg_spread
 FROM trades AS t
-HORIZON JOIN bids AS b ON (t.sym = b.sym)
-HORIZON JOIN asks AS a ON (t.sym = a.sym)
+HORIZON JOIN bids AS b ON (t.symbol = b.symbol)
+HORIZON JOIN asks AS a ON (t.symbol = a.symbol)
     RANGE FROM -2s TO 2s STEP 2s AS h
-GROUP BY horizon_sec, t.sym
-ORDER BY t.sym, horizon_sec;
+GROUP BY horizon_sec, t.symbol
+ORDER BY t.symbol, horizon_sec;
 ```
-
-Note that the `RANGE` clause appears only on the last HORIZON JOIN.
 
 ### Multi-table: keyed and non-keyed mix
 
@@ -252,7 +277,7 @@ SELECT
     avg(p.price) AS avg_price,
     avg(r.rate) AS avg_rate
 FROM trades AS t
-HORIZON JOIN prices AS p ON (t.sym = p.sym)
+HORIZON JOIN prices AS p ON (t.symbol = p.symbol)
 HORIZON JOIN rates AS r
     LIST (0, 1s, 5s) AS h;
 ```
@@ -270,9 +295,9 @@ SELECT
     avg(a.ask) AS avg_ask,
     avg(m.mid) AS avg_mid
 FROM trades AS t
-HORIZON JOIN bids AS b ON (t.sym = b.sym)
-HORIZON JOIN asks AS a ON (t.sym = a.sym)
-HORIZON JOIN mids AS m ON (t.sym = m.sym)
+HORIZON JOIN bids AS b ON (t.symbol = b.symbol)
+HORIZON JOIN asks AS a ON (t.symbol = a.symbol)
+HORIZON JOIN mids AS m ON (t.symbol = m.symbol)
     LIST (0) AS h;
 ```
 
@@ -294,13 +319,13 @@ verify parallelization:
 ```questdb-sql title="Analyze HORIZON JOIN execution plan" demo
 EXPLAIN SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.symbol,
+    t.symbolbol,
     avg((m.best_bid + m.best_ask) / 2) AS avg_mid
 FROM fx_trades AS t
 HORIZON JOIN market_data AS m ON (symbol)
 RANGE FROM -1m TO 1m STEP 5s AS h
 WHERE t.timestamp IN '$now-1h..$now'
-ORDER BY t.symbol, horizon_sec;
+ORDER BY t.symbolbol, horizon_sec;
 ```
 
 Look for these indicators in the plan:

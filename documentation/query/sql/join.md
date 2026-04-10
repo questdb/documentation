@@ -229,38 +229,9 @@ The result of both queries is the following:
 
 </div>
 
-## ASOF JOIN
+## Standard SQL joins
 
-ASOF JOIN is a powerful time-series join extension.
-
-It has its own page, [ASOF JOIN](/docs/query/sql/asof-join/).
-
-## HORIZON JOIN
-
-HORIZON JOIN is a specialized time-series join for markout analysis and event
-impact studies. It combines ASOF JOIN matching with a set of time offsets,
-computing aggregations at each offset in a single pass.
-
-It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
-
-## WINDOW JOIN
-
-WINDOW JOIN aggregates data from a related table within a time-based window
-around each row. It is useful for calculating rolling statistics, moving
-averages, or aggregating readings within time windows.
-
-It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).
-
-## LATERAL JOIN
-
-LATERAL JOIN allows a subquery on the right-hand side of a join to reference
-columns from tables that appear earlier in the `FROM` clause. It is useful for
-top-N per group queries, per-row aggregates, and dynamic filters whose
-thresholds come from the outer row.
-
-It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
-
-## (INNER) JOIN
+### (INNER) JOIN
 
 `(INNER) JOIN` returns rows from two tables where the records on the compared
 column have matching values in both tables. `JOIN` is interpreted as
@@ -271,7 +242,7 @@ The query we just saw above is an example. It returns the `symbol`, `side` and
 `total` from the `juneTrades` subquery. Both tables are matched based on the
 `symbol` and `side`, as specified on the `ON` condition.
 
-## LEFT (OUTER) JOIN
+### LEFT (OUTER) JOIN
 
 `LEFT OUTER JOIN` or simply `LEFT JOIN` returns **all** records from the left
 table, and if matched, the records of the right table. When there is no match
@@ -327,7 +298,7 @@ WHERE Lookup.Symbol = NULL;
 In this case, the result has 71 rows out of the 100 in the larger table, and the
 columns corresponding to the `Lookup` table are all `NULL`.
 
-## RIGHT (OUTER) JOIN
+### RIGHT (OUTER) JOIN
 
 `RIGHT OUTER JOIN` or simply `RIGHT JOIN` is the mirror of `LEFT JOIN`: it
 returns **all** records from the right table, and if matched, the records
@@ -352,7 +323,7 @@ useful when the left side of the join is itself the result of earlier joins
 in the query — rewriting it as `LEFT JOIN` would otherwise require
 restructuring the chain or wrapping it in a subquery.
 
-## FULL (OUTER) JOIN
+### FULL (OUTER) JOIN
 
 `FULL OUTER JOIN` or simply `FULL JOIN` is the union of `LEFT JOIN` and
 `RIGHT JOIN`: it returns **all** records from both tables. Matched rows
@@ -384,7 +355,7 @@ Symbols traded in only one of the two months get `NULL` for the other
 month's total. This makes `FULL JOIN` a natural fit for reconciliation
 queries that need to find rows present in one dataset but not the other.
 
-## CROSS JOIN
+### CROSS JOIN
 
 `CROSS JOIN` returns the Cartesian product of the two tables being joined and
 can be used to create a table with all possible combinations of columns.
@@ -416,9 +387,29 @@ WHERE t.timestamp < t2.timestamp
 
 :::
 
-## LT JOIN
+### LATERAL JOIN
 
-Similar to [`ASOF JOIN`](/docs/query/sql/asof-join/), `LT JOIN` joins two different time-series measured. For
+`LATERAL JOIN` allows a subquery on the right-hand side of a join to reference
+columns from tables that appear earlier in the `FROM` clause. It is useful for
+top-N per group queries, per-row aggregates, and dynamic filters whose
+thresholds come from the outer row.
+
+It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
+
+## Time-series joins
+
+### ASOF JOIN
+
+ASOF JOIN matches each row in a time-series table with the most recent row in
+another time-series table whose timestamp is at or before the left row's
+timestamp. Typical use cases include attaching the prevailing market quote to
+each trade, or enriching events with the latest known state.
+
+It has its own page, [ASOF JOIN](/docs/query/sql/asof-join/).
+
+### LT JOIN
+
+Similar to [`ASOF JOIN`](/docs/query/sql/asof-join/), `LT JOIN` joins two different time-series. For
 each row in the first time-series, the `LT JOIN` takes from the second
 time-series a timestamp that meets both of the following criteria:
 
@@ -427,7 +418,7 @@ time-series a timestamp that meets both of the following criteria:
 
 In other words: `LT JOIN` won't join records with equal timestamps.
 
-### Example
+#### Example
 
 Consider the following tables:
 
@@ -501,7 +492,7 @@ order to get preceding values for every row.
 The `ON` clause can also be used in combination with `LT JOIN` to join both by
 timestamp and column values.
 
-### TOLERANCE clause
+#### TOLERANCE clause
 
 The `TOLERANCE` clause enhances LT JOIN by limiting how far back in time the join should look for a match in the right
 table. The `TOLERANCE` parameter accepts a time interval value (e.g., 2s, 100ms, 1d).
@@ -522,7 +513,7 @@ LT JOIN table2 TOLERANCE 10s
 The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100ms' (100 milliseconds),
 '2m' ( 2 minutes), '3h' (3 hours), or '1d' (1 day).
 
-#### Supported Units for interval_literal
+##### Supported Units for interval_literal
 
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
 
@@ -546,12 +537,12 @@ tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
 
 See [`ASOF JOIN documentation`](/docs/query/sql/asof-join#tolerance-clause) for more examples with the `TOLERANCE` clause.
 
-## SPLICE JOIN
+### SPLICE JOIN
 
-`SPLICE JOIN` is a full `ASOF JOIN`. It will return all the records from both
-tables. For each record from left table splice join will find prevailing record
-from right table and for each record from right table - prevailing record from
-left table.
+`SPLICE JOIN` is a full `ASOF JOIN`. It returns all records from both tables.
+For each record from the left table, it finds the prevailing record from the
+right table, and for each record from the right table, the prevailing record
+from the left table.
 
 Considering the following tables:
 
@@ -610,3 +601,19 @@ This query returns the following results:
 
 Note that the above query does not use the optional `ON` clause. In case you
 need additional filtering on the two tables, the `ON` clause can also be used.
+
+### HORIZON JOIN
+
+HORIZON JOIN is a specialized time-series join for markout analysis and event
+impact studies. It combines ASOF JOIN matching with a set of time offsets,
+computing aggregations at each offset in a single pass.
+
+It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
+
+### WINDOW JOIN
+
+WINDOW JOIN aggregates data from a related table within a time-based window
+around each row. It is useful for calculating rolling statistics, moving
+averages, or aggregating readings within time windows.
+
+It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).
