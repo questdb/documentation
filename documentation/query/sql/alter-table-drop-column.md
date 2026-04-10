@@ -22,9 +22,9 @@ data loss.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-
-![Flow chart showing the syntax of ALTER TABLE with DROP COLUMN keyword](/images/docs/diagrams/alterTableDropColumn.svg)
+```questdb-sql
+ALTER TABLE tableName DROP COLUMN columnName [, columnName ...];
+```
 
 ## Example
 

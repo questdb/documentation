@@ -23,9 +23,9 @@ If upgrading, match the following sequence:
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-
-![Flow chart showing the syntax of ALTER TABLE with SET TYPE keyword](/images/docs/diagrams/setType.svg)
+```questdb-sql
+ALTER TABLE tableName SET TYPE [BYPASS] WAL;
+```
 
 ## Description
 

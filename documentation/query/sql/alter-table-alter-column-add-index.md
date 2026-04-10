@@ -8,7 +8,9 @@ Indexes an existing [`symbol`](/docs/concepts/symbol/) column.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE ALTER COLUMN ADD INDEX keyword](/images/docs/diagrams/alterTableAddIndex.svg)
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName ADD INDEX;
+```
 
 
 Adding an [index](/docs/concepts/deep-dive/indexes/) is an atomic, non-blocking, and
@@ -18,5 +20,5 @@ index for SQL executions.
 ## Example
 
 ```questdb-sql title="Adding an index"
-ALTER TABLE trades ALTER COLUMN instrument ADD INDEX;
+ALTER TABLE trades ALTER COLUMN side ADD INDEX;
 ```

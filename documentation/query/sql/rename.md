@@ -8,7 +8,9 @@ description: RENAME TABLE SQL keyword reference documentation.
 
 ## Syntax
 
-![Flow chart showing the syntax of the RENAME TABLE keyword](/images/docs/diagrams/renameTable.svg)
+```questdb-sql
+RENAME TABLE oldName TO newName;
+```
 
 ## Example
 

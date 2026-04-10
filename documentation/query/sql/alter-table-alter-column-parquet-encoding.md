@@ -18,21 +18,21 @@ combination for a column. The syntax is
 `default` for the encoding when specifying compression only.
 
 ```questdb-sql title="Set encoding only"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(rle_dictionary);
+ALTER TABLE trades ALTER COLUMN price SET PARQUET(rle_dictionary);
 ```
 
 ```questdb-sql title="Set compression only (with optional level)"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(default, zstd(3));
+ALTER TABLE trades ALTER COLUMN price SET PARQUET(default, zstd(3));
 ```
 
 ```questdb-sql title="Set both encoding and compression"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(rle_dictionary, zstd(3));
+ALTER TABLE trades ALTER COLUMN price SET PARQUET(rle_dictionary, zstd(3));
 ```
 
 Reset per-column overrides back to the server defaults.
 
 ```questdb-sql title="Reset to defaults"
-ALTER TABLE sensors ALTER COLUMN temperature SET PARQUET(default);
+ALTER TABLE trades ALTER COLUMN price SET PARQUET(default);
 ```
 
 ### Bloom filter

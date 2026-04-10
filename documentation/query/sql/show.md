@@ -12,7 +12,21 @@ and partition storage size on disk.
 
 ## Syntax
 
-![Flow chart showing the syntax of the SHOW keyword](/images/docs/diagrams/show.svg)
+```questdb-sql
+SHOW { TABLES
+     | COLUMNS FROM tableName
+     | PARTITIONS FROM tableName
+     | CREATE TABLE tableName
+     | CREATE VIEW viewName
+     | USER [userName]
+     | USERS
+     | GROUPS [userName]
+     | SERVICE ACCOUNT [accountName]
+     | SERVICE ACCOUNTS [userName]
+     | PERMISSIONS [entityName]
+     | SERVER_VERSION
+     | PARAMETERS };
+```
 
 ## Description
 

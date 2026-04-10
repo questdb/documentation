@@ -65,6 +65,9 @@ or tackle a PR.
 
 ### Railroad diagrams
 
+**Note**: Railroad diagrams are now deprecated in this repository, and a code block describing the syntax is preferred.
+This reference is left here just for historical reasons.
+
 Our SQL syntax diagrams are created using Railroad.
 
 To create a diagram, use the

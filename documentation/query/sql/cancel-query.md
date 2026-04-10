@@ -8,7 +8,9 @@ Gracefully stops the execution of a running query.
 
 ## Syntax
 
-![Flow chart showing the syntax of the CANCEL QUERY keyword](/images/docs/diagrams/cancelQuery.svg)
+```questdb-sql
+CANCEL QUERY queryId;
+```
 
 ## Description
 
