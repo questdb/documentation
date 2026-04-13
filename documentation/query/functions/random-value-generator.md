@@ -418,6 +418,50 @@ To generate increasing timestamps, refer to the page about
 
 :::
 
+## rnd_timestamp_ns
+
+- `rnd_timestamp_ns(start, end, nanRate)` - generates a random nanosecond
+  timestamp between `start` and `end` timestamps (both inclusive). It will also
+  generate `NaN` values at a frequency defined by `nanRate`. When `start` or
+  `end` are invalid timestamps, or when `start` is superior to `end`, it will
+  return `invalid range` error. When `nanRate` is inferior to 0, it will return
+  `invalid NAN rate` error.
+
+This function is identical to [`rnd_timestamp`](#rnd_timestamp) but returns
+`timestamp_ns` (nanosecond resolution) instead of `timestamp` (microsecond
+resolution).
+
+**Arguments:**
+
+- `start` is a `timestamp` defining the minimum possible generated timestamp
+  (inclusive)
+- `end` is a `timestamp` defining the maximum possible generated timestamp
+  (inclusive)
+- `nanRate` defines the frequency of occurrence of `NaN` values:
+  - `0`: No `NaN` will be returned.
+  - `1`: Will only return `NaN`.
+  - `N > 1`: On average, one in N generated values will be NaN.
+
+**Return value:**
+
+Return value type is `timestamp_ns`.
+
+**Examples:**
+
+```questdb-sql title="Random nanosecond timestamp"
+SELECT rnd_timestamp_ns(
+    to_timestamp('2015', 'yyyy'),
+    to_timestamp('2016', 'yyyy'),
+    0)
+FROM long_sequence(5);
+```
+
+```
+2015-01-29T18:00:17.402762123Z, 2015-11-15T20:22:14.112744456Z,
+2015-12-08T09:26:04.483039789Z, 2015-05-28T02:22:47.022680012Z,
+2015-10-13T19:16:37.034203345Z
+```
+
 ## rnd_char
 
 - `rnd_char()` is used to generate a random `char` which will be an uppercase
