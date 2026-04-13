@@ -193,46 +193,6 @@ SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP B
 | 2        | 67890                 |
 | ...      | ...                   |
 
-## approx_percentile
-
-`approx_percentile(value, percentile, precision)` calculates the approximate
-value for the given non-negative column and percentile using the
-[HdrHistogram](http://hdrhistogram.org/) algorithm.
-
-#### Parameters
-
-- `value` is any numeric non-negative value.
-- `percentile` is a `double` value between 0.0 and 1.0, inclusive.
-- `precision` is an optional `int` value between 0 and 5, inclusive. This is the
-  number of significant decimal digits to which the histogram will maintain
-  value resolution and separation. For example, when the input column contains
-  integer values between 0 and 3,600,000,000 and the precision is set to 3,
-  value quantization within the range will be no larger than 1/1,000th (or 0.1%)
-  of any value. In this example, the function tracks and analyzes the counts of
-  observed response times ranging between 1 microsecond and 1 hour in magnitude,
-  while maintaining a value resolution of 1 microsecond up to 1 millisecond, a
-  resolution of 1 millisecond (or better) up to one second, and a resolution of
-  1 second (or better) up to 1,000 seconds. At its maximum tracked value (1
-  hour), it would still maintain a resolution of 3.6 seconds (or better).
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql title="Approximate percentile"
-SELECT approx_percentile(price, 0.99) FROM trades;
-```
-
-| approx_percentile |
-| :---------------- |
-| 101.5             |
-
-#### See also
-
-- [approx_median](#approx_median) - Shorthand for 50th percentile
-
 ## approx_median
 
 `approx_median(value, precision)` calculates the approximate median (50th
@@ -283,6 +243,46 @@ GROUP BY symbol;
 #### See also
 
 - [approx_percentile](#approx_percentile) - Approximate percentile for any quantile
+
+## approx_percentile
+
+`approx_percentile(value, percentile, precision)` calculates the approximate
+value for the given non-negative column and percentile using the
+[HdrHistogram](http://hdrhistogram.org/) algorithm.
+
+#### Parameters
+
+- `value` is any numeric non-negative value.
+- `percentile` is a `double` value between 0.0 and 1.0, inclusive.
+- `precision` is an optional `int` value between 0 and 5, inclusive. This is the
+  number of significant decimal digits to which the histogram will maintain
+  value resolution and separation. For example, when the input column contains
+  integer values between 0 and 3,600,000,000 and the precision is set to 3,
+  value quantization within the range will be no larger than 1/1,000th (or 0.1%)
+  of any value. In this example, the function tracks and analyzes the counts of
+  observed response times ranging between 1 microsecond and 1 hour in magnitude,
+  while maintaining a value resolution of 1 microsecond up to 1 millisecond, a
+  resolution of 1 millisecond (or better) up to one second, and a resolution of
+  1 second (or better) up to 1,000 seconds. At its maximum tracked value (1
+  hour), it would still maintain a resolution of 3.6 seconds (or better).
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Approximate percentile"
+SELECT approx_percentile(price, 0.99) FROM trades;
+```
+
+| approx_percentile |
+| :---------------- |
+| 101.5             |
+
+#### See also
+
+- [approx_median](#approx_median) - Shorthand for 50th percentile
 
 ## arg_max
 
@@ -1761,6 +1761,33 @@ SAMPLE BY 1h;
 - [avg](#avg) - Arithmetic mean (equal-weighted)
 - [weighted_avg](#weighted_avg) - Weighted arithmetic mean
 
+## var_pop
+
+`var_pop(value)` - Calculates the population variance of a set of values. The
+population variance is a measure of the amount of variation or dispersion of a
+set of values. A low variance indicates that the values tend to be very close to
+the mean, while a high variance indicates that the values are spread out over a
+wider range.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql
+SELECT var_pop(x)
+FROM (SELECT x FROM long_sequence(100));
+```
+
+| var_pop |
+| :------ |
+| 833.25  |
+
 ## variance / var_samp
 
 `var_samp(value)` - Calculates the sample variance of a set of values. The
@@ -1789,33 +1816,6 @@ FROM (SELECT x FROM long_sequence(100));
 | var_samp         |
 | :--------------- |
 | 841.666666666666 |
-
-## var_pop
-
-`var_pop(value)` - Calculates the population variance of a set of values. The
-population variance is a measure of the amount of variation or dispersion of a
-set of values. A low variance indicates that the values tend to be very close to
-the mean, while a high variance indicates that the values are spread out over a
-wider range.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql
-SELECT var_pop(x)
-FROM (SELECT x FROM long_sequence(100));
-```
-
-| var_pop |
-| :------ |
-| 833.25  |
 
 ## weighted_avg
 
