@@ -62,6 +62,33 @@ trades,instrument=EW,side=S price=10427,quantity=1945 1571270400300
 trades,instrument=MI,side=B price=99348,quantity=8450 1571270400400
 ```
 
+## left
+
+`left(string, count)` - extracts a substring of the given length from a string
+(starting from left).
+
+**Arguments:**
+
+- `string` is a string to extract from.
+- `count` is an integer specifying the count of characters to be extracted into
+  a substring.
+
+**Return value:**
+
+Returns a string with the extracted characters.
+
+**Examples:**
+
+```questdb-sql title="Example"
+SELECT name, left('Thompson', 3) l FROM names LIMIT 3
+```
+
+| name   | l   |
+| ------ | --- |
+| AARON  | AAR |
+| AMELIE | AME |
+| TOM    | TOM |
+
 ## length
 
 `length(value)` - reads length of the given value.
@@ -120,89 +147,6 @@ SELECT name a, length_bytes(name) b FROM names limit 4
 | ДЖЕК   | 8   |
 | null   | -1  |
 
-## left
-
-`left(string, count)` - extracts a substring of the given length from a string
-(starting from left).
-
-**Arguments:**
-
-- `string` is a string to extract from.
-- `count` is an integer specifying the count of characters to be extracted into
-  a substring.
-
-**Return value:**
-
-Returns a string with the extracted characters.
-
-**Examples:**
-
-```questdb-sql title="Example"
-SELECT name, left('Thompson', 3) l FROM names LIMIT 3
-```
-
-| name   | l   |
-| ------ | --- |
-| AARON  | AAR |
-| AMELIE | AME |
-| TOM    | TOM |
-
-## right
-
-`right(string, count)` - extracts a substring of the given length from a string
-(starting from right).
-
-**Arguments:**
-
-- `string` is a string to extract from.
-- `count` is an integer specifying the count of characters to be extracted into
-  a substring.
-
-**Return value:**
-
-Returns a string with the extracted characters.
-
-**Examples:**
-
-```questdb-sql title="Example"
-SELECT name, right('Thompson', 2) r FROM names LIMIT 3
-```
-
-| name   | l   |
-| ------ | --- |
-| AARON  | ON  |
-| AMELIE | IE  |
-| TOM    | OM  |
-
-## replace
-
-`replace` replaces all occurrences of a substring within a string with another
-substring.
-
-**Arguments:**
-
-- `replace(string, from_string, to_string)`
-
-  - `string` is the original string where replacements will be made.
-  - `from_string` is the substring that will be searched for in the original
-    string.
-  - `to_string` is the substring that will replace occurrences of `from_string`.
-
-**Return value:**
-
-Returns a new string that is derived from the original string by replacing every
-occurrence of `from_string` with `to_string`.
-
-**Examples:**
-
-```sql
-SELECT replace('Hello World', 'World', 'QuestDB');
-```
-
-| replace       |
-| ------------- |
-| Hello QuestDB |
-
 ## lpad
 
 **Arguments:**
@@ -254,6 +198,92 @@ SELECT ltrim('   QuestDB   ') AS trimmed_string;
 | ------------------------------- |
 | QuestDB&nbsp;&nbsp;&nbsp;&nbsp; |
 
+## quote_ident
+
+**Arguments:**
+
+- `quote_ident(string)`
+  - `string` is the string that may need quoting to be used as a SQL identifier.
+
+**Return value:**
+
+Returns the value enclosed in quotes if needed to make it a valid SQL
+identifier, else the value unchanged.
+
+**Examples:**
+
+```sql
+SELECT quote_ident("a b");
+```
+
+| quote_ident |
+| ----------- |
+| "a b"       |
+
+```sql
+SELECT quote_ident("ab");
+```
+
+| quote_ident |
+| ----------- |
+| ab          |
+
+## replace
+
+`replace` replaces all occurrences of a substring within a string with another
+substring.
+
+**Arguments:**
+
+- `replace(string, from_string, to_string)`
+
+  - `string` is the original string where replacements will be made.
+  - `from_string` is the substring that will be searched for in the original
+    string.
+  - `to_string` is the substring that will replace occurrences of `from_string`.
+
+**Return value:**
+
+Returns a new string that is derived from the original string by replacing every
+occurrence of `from_string` with `to_string`.
+
+**Examples:**
+
+```sql
+SELECT replace('Hello World', 'World', 'QuestDB');
+```
+
+| replace       |
+| ------------- |
+| Hello QuestDB |
+
+## right
+
+`right(string, count)` - extracts a substring of the given length from a string
+(starting from right).
+
+**Arguments:**
+
+- `string` is a string to extract from.
+- `count` is an integer specifying the count of characters to be extracted into
+  a substring.
+
+**Return value:**
+
+Returns a string with the extracted characters.
+
+**Examples:**
+
+```questdb-sql title="Example"
+SELECT name, right('Thompson', 2) r FROM names LIMIT 3
+```
+
+| name   | l   |
+| ------ | --- |
+| AARON  | ON  |
+| AMELIE | IE  |
+| TOM    | OM  |
+
 ## rtrim
 
 `rtrim` extracts white space from the right of a string value.
@@ -276,29 +306,6 @@ SELECT rtrim('Hello QuestDB   ');
 | rtrim         |
 | ------------- |
 | Hello QuestDB |
-
-## trim
-
-**Arguments:**
-
-- `trim(string)`
-
-  - `string` is the input string from which you want to remove leading and
-    trailing whitespace.
-
-**Return value:**
-
-Returns a string with leading and trailing whitespace removed.
-
-**Example:**
-
-```questdb-sql title="Using trim function"
-SELECT trim('   QuestDB   ') AS trimmed_string;
-```
-
-| trim    |
-| ------- |
-| QuestDB |
 
 ## split_part
 
@@ -554,32 +561,25 @@ SELECT to_uppercase('questDB');
 | ------------ |
 | QUESTDB      |
 
-## quote_ident
+## trim
 
 **Arguments:**
 
-- `quote_ident(string)`
-  - `string` is the string that may need quoting to be used as a SQL identifier.
+- `trim(string)`
+
+  - `string` is the input string from which you want to remove leading and
+    trailing whitespace.
 
 **Return value:**
 
-Returns the value enclosed in quotes if needed to make it a valid SQL
-identifier, else the value unchanged.
+Returns a string with leading and trailing whitespace removed.
 
-**Examples:**
+**Example:**
 
-```sql
-SELECT quote_ident("a b");
+```questdb-sql title="Using trim function"
+SELECT trim('   QuestDB   ') AS trimmed_string;
 ```
 
-| quote_ident |
-| ----------- |
-| "a b"       |
-
-```sql
-SELECT quote_ident("ab");
-```
-
-| quote_ident |
-| ----------- |
-| ab          |
+| trim    |
+| ------- |
+| QuestDB |
