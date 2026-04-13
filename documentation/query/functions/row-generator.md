@@ -14,7 +14,8 @@ to populate tables with test data.
 |----------|-------------|---------|
 | `long_sequence(n)` | You need exactly N rows | Generate 1 million test records |
 | `generate_series(start, end, step)` | You need values in a specific range | Generate hourly timestamps for January 2025 |
-| `timestamp_sequence(start, step)` | You need timestamps with `long_sequence` (supports random steps) | Generate N rows with varying intervals |
+| `timestamp_sequence(start, step)` | You need microsecond timestamps with `long_sequence` (supports random steps) | Generate N rows with varying intervals |
+| `timestamp_sequence_ns(start, step)` | You need nanosecond timestamps with `long_sequence` | Generate N rows with nanosecond precision |
 
 **Key difference for timestamps:**
 - `generate_series` is standalone and range-based: "give me timestamps from A to B"
@@ -22,90 +23,10 @@ to populate tables with test data.
 
 ## Function reference
 
-- [long_sequence](#long_sequence) - generate N rows for use with random functions
 - [generate_series](#generate_series) - generate arithmetic series (long, double, or timestamp)
-- [timestamp_sequence](#timestamp_sequence) - generate monotonically increasing timestamps
-
-## long_sequence
-
-Generates a pseudo-table with a specified number of rows. This is the primary
-function for creating test data in QuestDB.
-
-- `long_sequence(num_rows)` - generates rows with a random seed.
-- `long_sequence(num_rows, seed1, seed2)` - generates rows deterministically
-  using the provided seed values.
-
-The function serves two purposes:
-
-1. Generates a pseudo-table with an ascending series of `LONG` numbers starting
-   at 1 (accessible via column `x`)
-2. Provides the seed for pseudo-randomness to all
-   [random value functions](/docs/query/functions/random-value-generator/)
-
-:::tip
-
-Deterministic procedural generation makes it easy to test on vast amounts of
-data without moving large files across machines. Using the same seed on any
-machine at any time will consistently produce the same results for all random
-functions.
-
-:::
-
-**Arguments:**
-
-- `num_rows` is a `long` representing the number of rows to generate.
-- `seed1` and `seed2` are `long` numbers that combine into a `long128` seed for
-  deterministic generation.
-
-**Return value:**
-
-Returns a pseudo-table with a single column `x` of type `long`, containing
-values from 1 to `num_rows`.
-
-**Examples:**
-
-```questdb-sql title="Generate rows with random values"
-SELECT x, rnd_double()
-FROM long_sequence(5);
-```
-
-| x   | rnd_double   |
-| --- | ------------ |
-| 1   | 0.3279246687 |
-| 2   | 0.8341038236 |
-| 3   | 0.1023834675 |
-| 4   | 0.9130602021 |
-| 5   | 0.718276777  |
-
-```questdb-sql title="Access row number using the x column"
-SELECT x, x * x AS square
-FROM long_sequence(5);
-```
-
-| x   | square |
-| --- | ------ |
-| 1   | 1      |
-| 2   | 4      |
-| 3   | 9      |
-| 4   | 16     |
-| 5   | 25     |
-
-```questdb-sql title="Deterministic generation with fixed seed"
-SELECT rnd_double()
-FROM long_sequence(2, 128349234, 4327897);
-```
-
-:::note
-
-The results below will be the same on any machine at any time as long as they
-use the same seed in `long_sequence`.
-
-:::
-
-| rnd_double         |
-| ------------------ |
-| 0.8251337821991485 |
-| 0.2714941145110299 |
+- [long_sequence](#long_sequence) - generate N rows for use with random functions
+- [timestamp_sequence](#timestamp_sequence) - generate monotonically increasing microsecond timestamps
+- [timestamp_sequence_ns](#timestamp_sequence_ns) - generate monotonically increasing nanosecond timestamps
 
 ## generate_series
 
@@ -281,11 +202,94 @@ generate_series(
 | 2025-01-01T00:00:00.000000500Z |
 | 2025-01-01T00:00:00.000001000Z |
 
+## long_sequence
+
+Generates a pseudo-table with a specified number of rows. This is the primary
+function for creating test data in QuestDB.
+
+- `long_sequence(num_rows)` - generates rows with a random seed.
+- `long_sequence(num_rows, seed1, seed2)` - generates rows deterministically
+  using the provided seed values.
+
+The function serves two purposes:
+
+1. Generates a pseudo-table with an ascending series of `LONG` numbers starting
+   at 1 (accessible via column `x`)
+2. Provides the seed for pseudo-randomness to all
+   [random value functions](/docs/query/functions/random-value-generator/)
+
+:::tip
+
+Deterministic procedural generation makes it easy to test on vast amounts of
+data without moving large files across machines. Using the same seed on any
+machine at any time will consistently produce the same results for all random
+functions.
+
+:::
+
+**Arguments:**
+
+- `num_rows` is a `long` representing the number of rows to generate.
+- `seed1` and `seed2` are `long` numbers that combine into a `long128` seed for
+  deterministic generation.
+
+**Return value:**
+
+Returns a pseudo-table with a single column `x` of type `long`, containing
+values from 1 to `num_rows`.
+
+**Examples:**
+
+```questdb-sql title="Generate rows with random values"
+SELECT x, rnd_double()
+FROM long_sequence(5);
+```
+
+| x   | rnd_double   |
+| --- | ------------ |
+| 1   | 0.3279246687 |
+| 2   | 0.8341038236 |
+| 3   | 0.1023834675 |
+| 4   | 0.9130602021 |
+| 5   | 0.718276777  |
+
+```questdb-sql title="Access row number using the x column"
+SELECT x, x * x AS square
+FROM long_sequence(5);
+```
+
+| x   | square |
+| --- | ------ |
+| 1   | 1      |
+| 2   | 4      |
+| 3   | 9      |
+| 4   | 16     |
+| 5   | 25     |
+
+```questdb-sql title="Deterministic generation with fixed seed"
+SELECT rnd_double()
+FROM long_sequence(2, 128349234, 4327897);
+```
+
+:::note
+
+The results below will be the same on any machine at any time as long as they
+use the same seed in `long_sequence`.
+
+:::
+
+| rnd_double         |
+| ------------------ |
+| 0.8251337821991485 |
+| 0.2714941145110299 |
+
 ## timestamp_sequence
 
-Generates monotonically increasing timestamps when used with `long_sequence()`.
-Unlike `generate_series`, this function generates a single value per row and
-requires `long_sequence()` to produce multiple rows.
+Generates monotonically increasing microsecond timestamps when used with
+`long_sequence()`. Unlike `generate_series`, this function generates a single
+value per row and requires `long_sequence()` to produce multiple rows.
+
+For nanosecond timestamps, use [`timestamp_sequence_ns`](#timestamp_sequence_ns).
 
 - `timestamp_sequence(startTimestamp, step)` - generates timestamps starting at
   `startTimestamp`, incrementing by `step` microseconds per row.
@@ -302,8 +306,8 @@ The `step` can be:
 
 **Return value:**
 
-Return type is `TIMESTAMP`. If a `TIMESTAMP_NS` or a date literal with
-nanosecond resolution is provided, the return type is `TIMESTAMP_NS`.
+Return type is always `TIMESTAMP` (microsecond resolution), regardless of the
+input type.
 
 **Examples:**
 
@@ -338,3 +342,45 @@ FROM long_sequence(5);
 | 3   | 2019-10-17T00:00:00.600000Z |
 | 4   | 2019-10-17T00:00:00.900000Z |
 | 5   | 2019-10-17T00:00:01.300000Z |
+
+## timestamp_sequence_ns
+
+Generates monotonically increasing nanosecond timestamps when used with
+`long_sequence()`. This is the nanosecond counterpart of
+[`timestamp_sequence`](#timestamp_sequence).
+
+- `timestamp_sequence_ns(startTimestamp, step)` - generates timestamps starting
+  at `startTimestamp`, incrementing by `step` nanoseconds per row.
+
+The `step` can be:
+- A fixed value, resulting in evenly-spaced timestamps
+- A random function invocation, resulting in timestamps that grow by random
+  intervals
+
+**Arguments:**
+
+- `startTimestamp` is the starting (lowest) timestamp in the sequence. Use
+  `to_timestamp_ns()` to create a nanosecond-resolution start value.
+- `step` is the interval in nanoseconds between consecutive timestamps.
+
+**Return value:**
+
+Return type is always `TIMESTAMP_NS` (nanosecond resolution).
+
+**Examples:**
+
+```questdb-sql title="Nanosecond timestamps (100ns apart)"
+SELECT x, timestamp_sequence_ns(
+    to_timestamp_ns('2019-10-17T00:00:00', 'yyyy-MM-ddTHH:mm:ss'),
+    100L -- 100 nanoseconds
+) AS ts
+FROM long_sequence(5);
+```
+
+| x   | ts                                 |
+| --- | ---------------------------------- |
+| 1   | 2019-10-17T00:00:00.000000000Z     |
+| 2   | 2019-10-17T00:00:00.000000100Z     |
+| 3   | 2019-10-17T00:00:00.000000200Z     |
+| 4   | 2019-10-17T00:00:00.000000300Z     |
+| 5   | 2019-10-17T00:00:00.000000400Z     |
