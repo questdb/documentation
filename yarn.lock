@@ -2484,10 +2484,10 @@
   resolved "https://registry.npmjs.org/@polka/url/-/url-1.0.0-next.28.tgz"
   integrity sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==
 
-"@questdb/sql-parser@0.1.7":
-  version "0.1.7"
-  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.7.tgz#405b8402dbc3c2027e12376e5108d71630b330d5"
-  integrity sha512-BYXa6mkB8PyVJux+OQNvdCM2e1F7mE+Bf2Y2I9g3G9SGXoRAqsdBoNZpUIGVsoLUI6BxmXJ26FLgSCZiGUPLaA==
+"@questdb/sql-parser@0.1.8":
+  version "0.1.8"
+  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.8.tgz#8410004bcaa628903611c140ba89c3d301901ab5"
+  integrity sha512-Xoj1MPHRRBK7V7pEmesEkQ1Oprh3i6ZviEvGJfVgQIn2OjhzZ5ScyUNQl5ejIeOohXMbc2dqvbshvoneLWtjKQ==
   dependencies:
     chevrotain "^11.1.1"
 
