@@ -13,44 +13,44 @@ calculations. Functions are organized by category below.
 
 | Function | Description |
 | :------- | :---------- |
-| [count](#count) | Count rows or non-NULL values |
-| [sum](#sum) | Sum of values |
 | [avg](#avg) | Arithmetic mean |
+| [count](#count) | Count rows or non-NULL values |
 | [geomean](#geomean) | Geometric mean |
-| [min](#min) | Minimum value |
 | [max](#max) | Maximum value |
+| [min](#min) | Minimum value |
+| [sum](#sum) | Sum of values |
 
 ### Positional aggregates
 
 | Function | Description |
 | :------- | :---------- |
+| [arg_max](#arg_max) | Value at the row where another column is maximum |
+| [arg_min](#arg_min) | Value at the row where another column is minimum |
 | [first](#first) | First value (by designated timestamp or insertion order) |
 | [first_not_null](#first_not_null) | First non-NULL value |
 | [last](#last) | Last value (by designated timestamp or insertion order) |
 | [last_not_null](#last_not_null) | Last non-NULL value |
-| [arg_min](#arg_min) | Value at the row where another column is minimum |
-| [arg_max](#arg_max) | Value at the row where another column is maximum |
 
 ### Statistical aggregates
 
 | Function | Description |
 | :------- | :---------- |
-| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
-| [stddev_pop](#stddev_pop) | Population standard deviation |
-| [variance / var_samp](#variance--var_samp) | Sample variance |
-| [var_pop](#var_pop) | Population variance |
 | [corr](#corr) | Pearson correlation coefficient |
 | [covar_pop](#covar_pop) | Population covariance |
 | [covar_samp](#covar_samp) | Sample covariance |
 | [mode](#mode) | Most frequent value |
+| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
+| [stddev_pop](#stddev_pop) | Population standard deviation |
+| [var_pop](#var_pop) | Population variance |
+| [variance / var_samp](#variance--var_samp) | Sample variance |
 
 ### Approximate aggregates
 
 | Function | Description |
 | :------- | :---------- |
 | [approx_count_distinct](#approx_count_distinct) | Estimated distinct count using HyperLogLog |
-| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
 | [approx_median](#approx_median) | Approximate median (50th percentile) |
+| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
 
 ### String aggregates
 
@@ -58,6 +58,7 @@ calculations. Functions are organized by category below.
 | :------- | :---------- |
 | [string_agg](#string_agg) | Concatenate values with delimiter |
 | [string_distinct_agg](#string_distinct_agg) | Concatenate distinct values with delimiter |
+
 
 ### Boolean aggregates
 
@@ -79,9 +80,9 @@ calculations. Functions are organized by category below.
 | Function | Description |
 | :------- | :---------- |
 | [count_distinct](#count_distinct) | Exact count of distinct values |
+| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
 | [ksum](#ksum) | Kahan compensated sum (for floating-point precision) |
 | [nsum](#nsum) | Neumaier sum (for floating-point precision) |
-| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
 | [twap](#twap) | Time-weighted average price |
 | [weighted_avg](#weighted_avg) | Weighted arithmetic mean |
 | [weighted_stddev](#weighted_stddev) | Weighted standard deviation (reliability weights) |
