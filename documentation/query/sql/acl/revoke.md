@@ -21,7 +21,17 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the REVOKE keyword](/images/docs/diagrams/revoke.svg)
+```questdb-sql title="Database scope"
+REVOKE permission [, permission ...] FROM entityName;
+```
+
+```questdb-sql title="Table or column scope"
+REVOKE permission [, permission ...]
+    ON { ALL TABLES
+       | tableName [(columnName [, columnName ...])]
+         [, tableName [(columnName [, columnName ...])] ...] }
+    FROM entityName;
+```
 
 ## Description
 

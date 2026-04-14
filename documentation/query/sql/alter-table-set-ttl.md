@@ -10,9 +10,9 @@ Refer to the [section on TTL](/docs/concepts/ttl/) for a conceptual overview.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-
-![Flow chart showing the syntax of ALTER TABLE with SET TTL keyword](/images/docs/diagrams/setTtl.svg)
+```questdb-sql
+ALTER TABLE tableName SET TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] };
+```
 
 ## Description
 
@@ -50,8 +50,6 @@ QuestDB accepts both singular and plural forms:
 - `MONTH` or `MONTHS`
 - `YEAR` or `YEARS`
 
-It also supports shorthand notation: `3h` for 3 hours, `2M` for 2 months.
-
 :::note
 
 QuestDB drops data that exceeded its TTL only a whole partition at a time. For
@@ -69,6 +67,15 @@ Refer to the [section on TTL in Concepts](/docs/concepts/ttl/) for detailed
 information on the behavior of this feature.
 
 :::
+
+### Shorthand notation
+
+QuestDB also supports a shorthand notation that combines the number and unit
+into a single token, such as `3h` for 3 hours or `2M` for 2 months:
+
+```questdb-sql
+ALTER TABLE tableName SET TTL n{h|d|w|M|y};
+```
 
 ## Examples
 

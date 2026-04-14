@@ -13,21 +13,17 @@ overhead of rebuilding the entire table.
 
 ## Syntax
 
-![Flow chart showing the syntax of ALTER TABLE SYMBOL CAPACITY command](/images/docs/diagrams/alterTableSymbolCapacity.svg)
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName SYMBOL CAPACITY capacity;
+```
 
 ## Examples
 
-Change the capacity of the SYMBOL column `ik` in table `x` to 512:
+Change the capacity of the SYMBOL column `counterparty` in table `fx_trades`
+to 512:
 
 ```questdb-sql
-ALTER TABLE x ALTER COLUMN ik SYMBOL CAPACITY 512;
-```
-
-Increase the capacity of the SYMBOL column `department` in the table `employees`
-to 10000:
-
-```questdb-sql
-ALTER TABLE employees ALTER COLUMN department SYMBOL CAPACITY 10000;
+ALTER TABLE fx_trades ALTER COLUMN counterparty SYMBOL CAPACITY 512;
 ```
 
 ## Notes

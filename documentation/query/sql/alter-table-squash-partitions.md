@@ -14,9 +14,9 @@ earlier QuestDB versions.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-
-![Flow chart showing the syntax of ALTER TABLE with SQUASH PARTITIONS keyword](/images/docs/diagrams/alterTableSquashPartitions.svg)
+```questdb-sql
+ALTER TABLE tableName SQUASH PARTITIONS;
+```
 
 ## Examples
 

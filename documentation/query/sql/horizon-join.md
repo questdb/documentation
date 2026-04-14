@@ -219,7 +219,34 @@ WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY horizon_sec;
 ```
 
-### Multi-table: bid and ask spread around trades
+### Multi-table: consolidated and ECN-level quotes around trades
+
+Join against two right-hand tables in a single query - `market_data` for
+consolidated book prices and `core_price` for ECN-level quotes - to compare
+how both track around each EURUSD trade:
+
+```questdb-sql title="Multi-table HORIZON JOIN with demo data" demo
+SELECT
+    h.offset / 1000000 AS horizon_ms,
+    t.symbol,
+    avg(m.best_bid) AS consolidated_bid,
+    avg(c.bid_price) AS ecn_bid
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m
+    ON (t.symbol = m.symbol)
+HORIZON JOIN core_price AS c
+    ON (t.symbol = c.symbol AND t.ecn = c.ecn)
+    LIST (-1s, 0, 1s, 5s) AS h
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+GROUP BY horizon_ms, t.symbol
+ORDER BY t.symbol, horizon_ms;
+```
+
+Note that the `LIST` clause appears only on the last HORIZON JOIN. Each
+right-hand table can independently use or omit `ON`.
+
+### Multi-table: bid and ask spread (synthetic example)
 
 Join against two separate tables (bids and asks) in a single HORIZON JOIN query
 to compute the average spread at each horizon:
@@ -227,19 +254,17 @@ to compute the average spread at each horizon:
 ```questdb-sql title="Multi-table HORIZON JOIN with bid/ask spread"
 SELECT
     h.offset / 1_000_000_000 AS horizon_sec,
-    t.sym,
+    t.symbol,
     avg(b.bid) AS avg_bid,
     avg(a.ask) AS avg_ask,
     avg(a.ask - b.bid) AS avg_spread
 FROM trades AS t
-HORIZON JOIN bids AS b ON (t.sym = b.sym)
-HORIZON JOIN asks AS a ON (t.sym = a.sym)
+HORIZON JOIN bids AS b ON (t.symbol = b.symbol)
+HORIZON JOIN asks AS a ON (t.symbol = a.symbol)
     RANGE FROM -2s TO 2s STEP 2s AS h
-GROUP BY horizon_sec, t.sym
-ORDER BY t.sym, horizon_sec;
+GROUP BY horizon_sec, t.symbol
+ORDER BY t.symbol, horizon_sec;
 ```
-
-Note that the `RANGE` clause appears only on the last HORIZON JOIN.
 
 ### Multi-table: keyed and non-keyed mix
 
@@ -252,7 +277,7 @@ SELECT
     avg(p.price) AS avg_price,
     avg(r.rate) AS avg_rate
 FROM trades AS t
-HORIZON JOIN prices AS p ON (t.sym = p.sym)
+HORIZON JOIN prices AS p ON (t.symbol = p.symbol)
 HORIZON JOIN rates AS r
     LIST (0, 1s, 5s) AS h;
 ```
@@ -270,9 +295,9 @@ SELECT
     avg(a.ask) AS avg_ask,
     avg(m.mid) AS avg_mid
 FROM trades AS t
-HORIZON JOIN bids AS b ON (t.sym = b.sym)
-HORIZON JOIN asks AS a ON (t.sym = a.sym)
-HORIZON JOIN mids AS m ON (t.sym = m.sym)
+HORIZON JOIN bids AS b ON (t.symbol = b.symbol)
+HORIZON JOIN asks AS a ON (t.symbol = a.symbol)
+HORIZON JOIN mids AS m ON (t.symbol = m.symbol)
     LIST (0) AS h;
 ```
 

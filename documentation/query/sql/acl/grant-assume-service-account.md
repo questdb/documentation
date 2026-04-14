@@ -21,7 +21,10 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the GRANT ASSUME SERVICE ACCOUNT keyword](/images/docs/diagrams/grantAssumeServiceAccount.svg)
+```questdb-sql
+GRANT ASSUME SERVICE ACCOUNT serviceAccount TO entityName
+    [WITH GRANT OPTION];
+```
 
 ## Description
 

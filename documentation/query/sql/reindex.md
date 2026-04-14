@@ -14,7 +14,12 @@ write should be performed on the selected table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the REINDEX keyword](/images/docs/diagrams/reindexTable.svg)
+```questdb-sql
+REINDEX TABLE tableName
+    [COLUMN columnName]
+    [PARTITION partitionName]
+    LOCK EXCLUSIVE;
+```
 
 ## Options
 

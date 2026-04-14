@@ -15,59 +15,64 @@ which contain `WHERE` clauses.
 The general syntax is as follows. Specific filters have distinct syntaxes
 detailed thereafter.
 
-![Flow chart showing the syntax of the WHERE clause](/images/docs/diagrams/where.svg)
+```questdb-sql
+SELECT ... FROM tableName
+WHERE booleanExpression;
+```
 
 ### Logical operators
 
 QuestDB supports `AND`, `OR`, `NOT` as logical operators and can assemble
 conditions using brackets `()`.
 
-![Flow chart showing the detailed syntax of the WHERE clause](/images/docs/diagrams/whereComplex.svg)
-
-```questdb-sql title="Example"
-SELECT * FROM table
-WHERE
-a = 1 AND (b = 2 OR c = 3 AND NOT d);
+```questdb-sql
+WHERE [NOT] condition [{ AND | OR } [NOT] condition ...]
 ```
 
-## Symbol and string
+Conditions may be grouped using parentheses.
 
-QuestDB can filter strings and symbols based on equality, inequality, and
-regular expression patterns.
+```questdb-sql title="Example" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND side = 'buy'
+  AND (symbol = 'BTC-USDT' OR price > 100000)
+LIMIT -3;
+```
+
+## Symbol, varchar, and string
+
+QuestDB can filter symbols, varchars, and strings based on equality,
+inequality, and regular expression patterns.
 
 ### Exact match
 
-Evaluates match of a string or symbol.
+Evaluates match of a symbol, varchar, or string.
 
-![Flow chart showing the syntax of the WHERE clause with a string comparison](/images/docs/diagrams/whereExactString.svg)
-
-```questdb-sql title="Example"
-SELECT * FROM users
-WHERE name = 'John';
+```questdb-sql
+WHERE columnName = 'string';
 ```
 
-| name | age |
-| ---- | --- |
-| John | 31  |
-| John | 45  |
-| ...  | ... |
+```questdb-sql title="Example" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol = 'BTC-USDT'
+LIMIT -3;
+```
 
 ### Does NOT match
 
-Evaluates mismatch of a string or symbol.
+Evaluates mismatch of a symbol, varchar, or string.
 
-![Flow chart showing the syntax of the WHERE clause with a string comparison](/images/docs/diagrams/whereStringNotMatch.svg)
-
-```questdb-sql title="Example"
-SELECT * FROM users
-WHERE name != 'John';
+```questdb-sql
+WHERE columnName { != | <> } 'string';
 ```
 
-| name | age |
-| ---- | --- |
-| Tim  | 31  |
-| Tom  | 45  |
-| ...  | ... |
+```questdb-sql title="Example" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol != 'BTC-USDT'
+LIMIT -3;
+```
 
 ### Regular expression match
 
@@ -75,17 +80,16 @@ Evaluates match against a regular expression defined using
 [java.util.regex](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/regex/Pattern.html)
 patterns.
 
-![Flow chart showing the syntax of the WHERE clause with a regex comparison](/images/docs/diagrams/whereRegexMatch.svg)
-
-```questdb-sql title="Regex example"
-SELECT * FROM users WHERE name ~ 'Jo';
+```questdb-sql
+WHERE columnName ~ 'regex';
 ```
 
-| name     | age |
-| -------- | --- |
-| Joe      | 31  |
-| Jonathan | 45  |
-| ...      | ... |
+```questdb-sql title="Regex example" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol ~ '^BTC'
+LIMIT -3;
+```
 
 ### Regular expression does NOT match
 
@@ -93,43 +97,38 @@ Evaluates mismatch against a regular expression defined using
 [java.util.regex](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/regex/Pattern.html)
 patterns.
 
-![Flow chart showing the syntax of the WHERE clause with a regex comparison](/images/docs/diagrams/whereRegexNotMatch.svg)
-
-```questdb-sql title="Example"
-SELECT * FROM users WHERE name !~ 'Jo';
+```questdb-sql
+WHERE columnName !~ 'regex';
 ```
 
-| name | age |
-| ---- | --- |
-| Tim  | 31  |
-| Tom  | 45  |
-| ...  | ... |
+```questdb-sql title="Example" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol !~ '^BTC'
+LIMIT -3;
+```
 
 ### List search
 
 Evaluates match or mismatch against a list of elements.
 
-![Flow chart showing the syntax of the WHERE clause with a list comparison](/images/docs/diagrams/whereListIn.svg)
-
-```questdb-sql title="List match"
-SELECT * FROM users WHERE name in('Tim', 'Tom');
+```questdb-sql
+WHERE [NOT] columnName IN ('value' [, 'value' ...]);
 ```
 
-| name | age |
-| ---- | --- |
-| Tim  | 31  |
-| Tom  | 45  |
-| ...  | ... |
-
-```questdb-sql title="List mismatch"
-SELECT * FROM users WHERE NOT name in('Tim', 'Tom');
+```questdb-sql title="List match" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol IN ('BTC-USDT', 'ETH-USDT')
+LIMIT -20;
 ```
 
-| name   | age |
-| ------ | --- |
-| Aaron  | 31  |
-| Amelie | 45  |
-| ...    | ... |
+```questdb-sql title="List mismatch" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now'
+  AND symbol NOT IN ('BTC-USDT', 'ETH-USDT')
+LIMIT -20;
+```
 
 ## Numeric
 
@@ -146,46 +145,61 @@ verbose.
 
 ### Equality, inequality and comparison
 
-![Flow chart showing the syntax of the WHERE clause with a numeric comparison](/images/docs/diagrams/whereNumericValue.svg)
-
-```questdb-sql title="Superior or equal to 23"
-SELECT * FROM users WHERE age >= 23;
+```questdb-sql
+WHERE columnName { = | != | <> | > | >= | < | <= } value;
 ```
 
-```questdb-sql title="Equal to 23"
-SELECT * FROM users WHERE age = 23;
+```questdb-sql title="Greater than or equal" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now' AND amount >= 1.0
+LIMIT -3;
 ```
 
-```questdb-sql title="NOT Equal to 23"
-SELECT * FROM users WHERE age != 23;
+```questdb-sql title="Equal" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now' AND amount = 1.0
+LIMIT -3;
+```
+
+```questdb-sql title="Not equal" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1h..$now' AND amount != 1.0
+LIMIT -3;
 ```
 
 ## Boolean
 
-![Flow chart showing the syntax of the WHERE clause with a boolean comparison](/images/docs/diagrams/whereBoolean.svg)
+```questdb-sql
+WHERE [NOT] columnName;
+```
 
 Using the columnName will return `true` values. To return `false` values,
 precede the column name with the `NOT` operator.
 
+The examples below assume a small `instruments` table:
+
+| symbol  | is_tradable |
+| ------- | ----------- |
+| BTC-USD | true        |
+| ETH-USD | true        |
+| XYZ-USD | false       |
+
 ```questdb-sql title="Example - true"
-SELECT * FROM users WHERE isActive;
+SELECT * FROM instruments WHERE is_tradable;
 ```
 
-| userId | isActive |
-| ------ | -------- |
-| 12532  | true     |
-| 38572  | true     |
-| ...    | ...      |
+| symbol  | is_tradable |
+| ------- | ----------- |
+| BTC-USD | true        |
+| ETH-USD | true        |
 
 ```questdb-sql title="Example - false"
-SELECT * FROM users WHERE NOT isActive;
+SELECT * FROM instruments WHERE NOT is_tradable;
 ```
 
-| userId | isActive |
-| ------ | -------- |
-| 876534 | false    |
-| 43234  | false    |
-| ...    | ...      |
+| symbol  | is_tradable |
+| ------- | ----------- |
+| XYZ-USD | false       |
 
 ## Timestamp and date
 
@@ -206,53 +220,43 @@ QuestDB automatically recognizes strings formatted as ISO timestamp as a
 
 | Valid STRING Format              | Resulting Timestamp         |
 | -------------------------------- | --------------------------- |
-| 2010-01-12T12:35:26.123456+01:30 | 2010-01-12T11:05:26.123456Z |
-| 2010-01-12T12:35:26.123456+01    | 2010-01-12T11:35:26.123456Z |
-| 2010-01-12T12:35:26.123456Z      | 2010-01-12T12:35:26.123456Z |
-| 2010-01-12T12:35:26.12345        | 2010-01-12T12:35:26.123450Z |
-| 2010-01-12T12:35:26.1234         | 2010-01-12T12:35:26.123400Z |
-| 2010-01-12T12:35:26.123          | 2010-01-12T12:35:26.123000Z |
-| 2010-01-12T12:35:26.12           | 2010-01-12T12:35:26.120000Z |
-| 2010-01-12T12:35:26.1            | 2010-01-12T12:35:26.100000Z |
-| 2010-01-12T12:35:26              | 2010-01-12T12:35:26.000000Z |
-| 2010-01-12T12:35                 | 2010-01-12T12:35:00.000000Z |
-| 2010-01-12T12                    | 2010-01-12T12:00:00.000000Z |
-| 2010-01-12                       | 2010-01-12T00:00:00.000000Z |
-| 2010-01                          | 2010-01-01T00:00:00.000000Z |
-| 2010                             | 2010-01-01T00:00:00.000000Z |
-| 2010-01-12 12:35:26.123456-02:00 | 2010-01-12T14:35:26.123456Z |
-| 2010-01-12 12:35:26.123456Z      | 2010-01-12T12:35:26.123456Z |
-| 2010-01-12 12:35:26.123          | 2010-01-12T12:35:26.123000Z |
-| 2010-01-12 12:35:26.12           | 2010-01-12T12:35:26.120000Z |
-| 2010-01-12 12:35:26.1            | 2010-01-12T12:35:26.100000Z |
-| 2010-01-12 12:35:26              | 2010-01-12T12:35:26.000000Z |
-| 2010-01-12 12:35                 | 2010-01-12T12:35:00.000000Z |
+| 2026-01-12T12:35:26.123456+01:30 | 2026-01-12T11:05:26.123456Z |
+| 2026-01-12T12:35:26.123456+01    | 2026-01-12T11:35:26.123456Z |
+| 2026-01-12T12:35:26.123456Z      | 2026-01-12T12:35:26.123456Z |
+| 2026-01-12T12:35:26.12345        | 2026-01-12T12:35:26.123450Z |
+| 2026-01-12T12:35:26.1234         | 2026-01-12T12:35:26.123400Z |
+| 2026-01-12T12:35:26.123          | 2026-01-12T12:35:26.123000Z |
+| 2026-01-12T12:35:26.12           | 2026-01-12T12:35:26.120000Z |
+| 2026-01-12T12:35:26.1            | 2026-01-12T12:35:26.100000Z |
+| 2026-01-12T12:35:26              | 2026-01-12T12:35:26.000000Z |
+| 2026-01-12T12:35                 | 2026-01-12T12:35:00.000000Z |
+| 2026-01-12T12                    | 2026-01-12T12:00:00.000000Z |
+| 2026-01-12                       | 2026-01-12T00:00:00.000000Z |
+| 2026-01                          | 2026-01-01T00:00:00.000000Z |
+| 2026                             | 2026-01-01T00:00:00.000000Z |
+| 2026-01-12 12:35:26.123456-02:00 | 2026-01-12T14:35:26.123456Z |
+| 2026-01-12 12:35:26.123456Z      | 2026-01-12T12:35:26.123456Z |
+| 2026-01-12 12:35:26.123          | 2026-01-12T12:35:26.123000Z |
+| 2026-01-12 12:35:26.12           | 2026-01-12T12:35:26.120000Z |
+| 2026-01-12 12:35:26.1            | 2026-01-12T12:35:26.100000Z |
+| 2026-01-12 12:35:26              | 2026-01-12T12:35:26.000000Z |
+| 2026-01-12 12:35                 | 2026-01-12T12:35:00.000000Z |
 
 ### Exact timestamp
 
 #### Syntax
 
-![Flow chart showing the syntax of the WHERE clause with a timestamp comparison](/images/docs/diagrams/whereTimestampExact.svg)
-
-```questdb-sql title="Timestamp equals date"
-SELECT * FROM scores WHERE ts = '2010-01-12T00:02:26.000Z';
+```questdb-sql
+WHERE timestampColumn = 'timestamp';
 ```
 
-| ts                       | score |
-| ------------------------ | ----- |
-| 2010-01-12T00:02:26.000Z | 2.4   |
-| 2010-01-12T00:02:26.000Z | 3.1   |
-| ...                      | ...   |
-
-```questdb-sql title="Timestamp equals timestamp"
-SELECT * FROM scores WHERE ts = '2010-01-12T00:02:26.000000Z';
+```questdb-sql title="Timestamp equals date" demo
+SELECT * FROM trades WHERE timestamp = '2026-04-02T12:00:00.190Z';
 ```
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2010-01-12T00:02:26.000000Z | 2.4   |
-| 2010-01-12T00:02:26.000000Z | 3.1   |
-| ...                         | ...   |
+```questdb-sql title="Timestamp equals timestamp" demo
+SELECT * FROM trades WHERE timestamp = '2026-04-02T12:00:00.190000Z';
+```
 
 ### Time range (WHERE IN)
 
@@ -281,27 +285,21 @@ WHERE ts IN '[2025-01]#XNYS'
 
 #### Syntax
 
-![Flow chart showing the syntax of the WHERE clause with a partial timestamp comparison](/images/docs/diagrams/whereTimestampPartial.svg)
-
-```questdb-sql title="Results in a given year"
-SELECT * FROM scores WHERE ts IN '2018';
+```questdb-sql
+WHERE timestampColumn IN 'partialTimestamp';
 ```
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:0000.000000Z  | 123.4 |
-| ...                         | ...   |
-| 2018-12-31T23:59:59.999999Z | 115.8 |
+`partialTimestamp` is any prefix of an ISO 8601 timestamp (`yyyy`,
+`yyyy-MM`, `yyyy-MM-dd`, `yyyy-MM-ddThh`, `yyyy-MM-ddThh:mm`,
+`yyyy-MM-ddThh:mm:ss`).
 
-```questdb-sql title="Results in a given minute"
-SELECT * FROM scores WHERE ts IN '2018-05-23T12:15';
+```questdb-sql title="Trades in a given year" demo
+SELECT * FROM trades WHERE timestamp IN '2026' LIMIT -3;
 ```
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-05-23T12:15:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-05-23T12:15:59.999999Z | 115.8 |
+```questdb-sql title="Trades in a given minute" demo
+SELECT * FROM trades WHERE timestamp IN '2026-04-02T12:15' LIMIT -3;
+```
 
 ### Time range with interval modifier
 
@@ -312,7 +310,9 @@ time range repeatedly, for a set number of times.
 
 #### Syntax
 
-![Flow chart showing the syntax of the WHERE clause with a timestamp/modifier comparison](/images/docs/diagrams/whereTimestampIntervalSearch.svg)
+```questdb-sql
+WHERE timestampColumn IN 'timestamp;modifier[;interval;repetition]';
+```
 
 - `timestamp` is the original time range for the query.
 - `modifier` is a signed integer modifying the upper bound applying to the
@@ -330,66 +330,45 @@ time range repeatedly, for a set number of times.
 
 Modifying the range:
 
-```questdb-sql title="Results in a given year and the first month of the next year"
-SELECT * FROM scores WHERE ts IN '2018;1M';
+```questdb-sql title="Trades in a given year and the first month of the next year" demo
+SELECT * FROM trades WHERE timestamp IN '2026;1M' LIMIT -3;
 ```
 
-The range is 2018. The modifier extends the upper bound (originally 31 Dec 2018)
+The range is 2026. The modifier extends the upper bound (originally 31 Dec 2026)
 by one month.
 
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2019-01-31T23:59:59.999999Z | 115.8 |
-
-```questdb-sql title="Results in a given month excluding the last 3 days"
-SELECT * FROM scores WHERE ts IN '2018-01;-3d';
+```questdb-sql title="Trades in a given month excluding the last 3 days" demo
+SELECT * FROM trades WHERE timestamp IN '2026-04;-3d' LIMIT -3;
 ```
 
-The range is Jan 2018. The modifier reduces the upper bound (originally 31
-Jan 2018) by 3 days.
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-28T23:59:59.999999Z | 113.8 |
+The range is April 2026. The modifier reduces the upper bound (originally 30
+April 2026) by 3 days.
 
 Modifying the interval:
 
-```questdb-sql title="Results on a given date with an interval"
-SELECT * FROM scores WHERE ts IN '2018-01-01;1d;1y;2';
-
+```questdb-sql title="Trades on a given date with an interval" demo
+SELECT * FROM trades
+WHERE timestamp IN '2025-01-01;1d;1y;2' AND symbol = 'SOL-ETH';
 ```
 
-The range is extended by one day from Jan 1 2018, with a one-year interval,
-repeated twice. This means that the query searches for results on Jan 1-2 in
-2018 and in 2019:
-
-| ts                          | score |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-02T23:59:59.999999Z | 110.3 |
-| 2019-01-01T00:00:00.000000Z | 128.7 |
-| ...                         | ...   |
-| 2019-01-02T23:59:59.999999Z | 103.8 |
+The range is extended by one day from Jan 1 2025, with a one-year interval,
+repeated twice. This means that the query searches for trades on Jan 1-2 in
+2025 and in 2026.
 
 A more complete query breakdown would appear as such:
 
 ```questdb-sql
 -- IN extension for time-intervals
 
-SELECT * FROM trades WHERE timestamp in '2023'; -- whole year
-SELECT * FROM trades WHERE timestamp in '2023-12'; -- whole month
-SELECT * FROM trades WHERE timestamp in '2023-12-20'; -- whole day
+SELECT * FROM trades WHERE timestamp in '2026'; -- whole year
+SELECT * FROM trades WHERE timestamp in '2025-12'; -- whole month
+SELECT * FROM trades WHERE timestamp in '2025-12-20'; -- whole day
 
 -- The whole day, extending 15s into the next day
-SELECT * FROM trades WHERE timestamp in '2023-12-20;15s';
+SELECT * FROM trades WHERE timestamp in '2025-12-20;15s';
 
 -- For the past 7 days, 2 seconds before and after midnight
-SELECT * from trades WHERE timestamp in '2023-09-20T23:59:58;4s;-1d;7'
+SELECT * from trades WHERE timestamp in '2025-09-20T23:59:58;4s;-1d;7'
 ```
 
 ### IN with multiple arguments
@@ -399,23 +378,19 @@ SELECT * from trades WHERE timestamp in '2023-09-20T23:59:58;4s;-1d;7'
 `IN` with more than 1 argument is treated as standard SQL `IN`. It is a
 shorthand of multiple `OR` conditions, i.e. the following query:
 
-```questdb-sql title="IN list"
-SELECT * FROM scores
-WHERE ts IN ('2018-01-01', '2018-01-01T12:00', '2018-01-02');
+```questdb-sql title="IN list" demo
+SELECT * FROM trades
+WHERE timestamp IN ('2026-04-01', '2026-04-01T12:00:00.017999Z', '2026-04-02');
 ```
 
 is equivalent to:
 
-```questdb-sql title="IN list equivalent OR"
-SELECT * FROM scores
-WHERE ts = '2018-01-01' or ts = '2018-01-01T12:00' or ts = '2018-01-02';
+```questdb-sql title="IN list equivalent OR" demo
+SELECT * FROM trades
+WHERE timestamp = '2026-04-01'
+   OR timestamp = '2026-04-01T12:00:00.017999Z'
+   OR timestamp = '2026-04-02';
 ```
-
-| ts                          | value |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:00.000000Z | 123.4 |
-| 2018-01-01T12:00:00.000000Z | 589.1 |
-| 2018-01-02T00:00:00.000000Z | 131.5 |
 
 ### BETWEEN
 
@@ -426,24 +401,27 @@ For non-standard ranges, users can explicitly specify the target range using the
 `BETWEEN` are inclusive, and the order of lower and upper bounds is not
 important so that `BETWEEN X AND Y` is equivalent to `BETWEEN Y AND X`.
 
-```questdb-sql title="Explicit range"
-SELECT * FROM scores
-WHERE ts BETWEEN '2018-01-01T00:00:23.000000Z' AND '2018-01-01T00:00:23.500000Z';
+```questdb-sql title="Explicit range" demo
+SELECT * FROM trades
+WHERE timestamp BETWEEN '2026-04-01T00:00:23.000000Z'
+                    AND '2026-04-01T00:00:23.500000Z';
 ```
-
-| ts                          | value |
-| --------------------------- | ----- |
-| 2018-01-01T00:00:23.000000Z | 123.4 |
-| ...                         | ...   |
-| 2018-01-01T00:00:23.500000Z | 131.5 |
 
 `BETWEEN` can accept non-constant bounds, for example, the following query will
 return all records older than one year before the current date:
 
-```questdb-sql title="One year before current date"
-SELECT * FROM scores
-WHERE ts BETWEEN to_str(now(), 'yyyy-MM-dd')
+```questdb-sql title="One year before current date" demo
+SELECT * FROM trades
+WHERE timestamp BETWEEN to_str(now(), 'yyyy-MM-dd')
 AND dateadd('y', -1, to_str(now(), 'yyyy-MM-dd'));
+```
+
+Alternatively, [TICK interval syntax](/docs/query/operators/tick/) expresses
+the same intent more compactly:
+
+```questdb-sql title="Last year using TICK syntax" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1y..$now';
 ```
 
 ##### Inclusivity example
@@ -454,34 +432,34 @@ If a timestamp in the format YYYY-MM-DD is passed forward, it is computed as YYY
 
 To demonstrate, note the behaviour of the following example queries:
 
-```questdb-sql title="Demonstrating inclusivity"
+```questdb-sql title="Demonstrating inclusivity" demo
 SELECT *
 FROM trades
-WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-03'
+WHERE timestamp BETWEEN '2026-04-01' AND '2026-04-03'
 LIMIT -1;
 ```
 
-| symbol  | side | price     | amount     | timestamp                   |
-| ------- | ---- | --------- | ---------- | --------------------------- |
-| BTC-USD | sell | 65,464.14 | 0.05100764 | 2024-04-02T23:59:59.9947212 |
+| symbol   | side | price   | amount | timestamp                   |
+| -------- | ---- | ------- | ------ | --------------------------- |
+| XLM-USDT | buy  | 0.16304 | 15.0   | 2026-04-02T23:59:59.982000Z |
 
-The query pushes to the boundaries as far as is possible, all the way to: `2024-04-02T23:59:59.9947212`.
+The query pushes to the boundaries as far as is possible, all the way to: `2026-04-02T23:59:59.982000Z`.
 
-If there was an event at precisely `2024-04-03T00:00:00.00000`, it would also be included.
+If there was an event at precisely `2026-04-03T00:00:00.00000`, it would also be included.
 
 Now let us look at:
 
-```title="Demonstrating inclusivity"
+```questdb-sql title="Demonstrating inclusivity" demo
 SELECT *
 FROM trades
-WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-03T00:00:00.99'
+WHERE timestamp BETWEEN '2026-04-01' AND '2026-04-03T00:00:00.99'
 LIMIT -1;
 ```
 
-| symbol  | side | price    | amount     | timestamp                   |
-| ------- | ---- | -------- | ---------- | --------------------------- |
-| ETH-USD | sell | 3,279.11 | 0.00881686 | 2024-04-03T00:00:00.988858Z |
+| symbol   | side | price   | amount     | timestamp                   |
+| -------- | ---- | ------- | ---------- | --------------------------- |
+| BTC-USDT | buy  | 66912.9 | 0.00054697 | 2026-04-03T00:00:00.936000Z |
 
 Even with fractional seconds, the boundary is inclusive.
 
-A row with timestamp 2024-04-03T00:00:00.990000Z would also return in boundary.
+A row with timestamp 2026-04-03T00:00:00.990000Z would also return in boundary.
