@@ -12,7 +12,9 @@ Our implementation uses `LIMIT` for both the offset from start and limit.
 
 ## Syntax
 
-![Flow chart showing the syntax of the LIMIT keyword](/images/docs/diagrams/limit.svg)
+```questdb-sql
+SELECT ... LIMIT { numberOfRecords | lowerBound, upperBound };
+```
 
 - `numberOfRecords` is the number of records to return.
 - `upperBound` and `lowerBound` is the range of records to return.
@@ -45,12 +47,12 @@ These are additional edge-case variants:
 Examples use this schema and dataset:
 
 ```questdb-sql
-CREATE TABLE tango (id LONG);
-INSERT INTO tango VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+CREATE TABLE orders (id LONG);
+INSERT INTO orders VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 ```
 
 ```questdb-sql title="First 5 records"
-SELECT * FROM tango LIMIT 5;
+SELECT * FROM orders LIMIT 5;
 
  id
 ----
@@ -62,7 +64,7 @@ SELECT * FROM tango LIMIT 5;
 ```
 
 ```questdb-sql title="Last 5 records"
-SELECT * FROM tango LIMIT -5;
+SELECT * FROM orders LIMIT -5;
 
 
  id
@@ -75,7 +77,7 @@ SELECT * FROM tango LIMIT -5;
 ```
 
 ```questdb-sql title="Records 3, 4, and 5"
-SELECT * FROM tango LIMIT 2, 5;
+SELECT * FROM orders LIMIT 2, 5;
 
  id
 ----
@@ -85,7 +87,7 @@ SELECT * FROM tango LIMIT 2, 5;
 ```
 
 ```questdb-sql title="Records -5 and -4"
-SELECT * FROM tango LIMIT -5, -3;
+SELECT * FROM orders LIMIT -5, -3;
 
  id
 ----
@@ -94,7 +96,7 @@ SELECT * FROM tango LIMIT -5, -3;
 ```
 
 ```questdb-sql title="Records 3, 4, ..., -3, -2"
-SELECT * FROM tango LIMIT 2, -1;
+SELECT * FROM orders LIMIT 2, -1;
 
  id
 ----
@@ -108,7 +110,7 @@ SELECT * FROM tango LIMIT 2, -1;
 ```
 
 ```questdb-sql title="Implicit argument swap, records 3, 4, 5"
-SELECT * FROM tango LIMIT 5, 2;
+SELECT * FROM orders LIMIT 5, 2;
 
  id
 ----
@@ -118,7 +120,7 @@ SELECT * FROM tango LIMIT 5, 2;
 ```
 
 ```questdb-sql title="Implicit argument swap, records -5 and -4"
-SELECT * FROM tango LIMIT -3, -5;
+SELECT * FROM orders LIMIT -3, -5;
 
  id
 ----

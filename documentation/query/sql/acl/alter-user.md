@@ -19,7 +19,23 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER USER keyword](/images/docs/diagrams/alterUser.svg)
+```questdb-sql title="Enable / disable"
+ALTER USER userName { ENABLE | DISABLE };
+```
+
+```questdb-sql title="Set or remove password"
+ALTER USER userName WITH { PASSWORD password | NO PASSWORD };
+```
+
+```questdb-sql title="Create token"
+ALTER USER userName CREATE TOKEN TYPE
+    { JWK | REST WITH TTL timeUnit [REFRESH] };
+```
+
+```questdb-sql title="Drop token"
+ALTER USER userName DROP TOKEN TYPE
+    { JWK | REST [token] };
+```
 
 ## Description
 

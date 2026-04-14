@@ -23,7 +23,9 @@ altering the column type.
 
 ## Syntax
 
-![Flow chart showing the syntax of ALTER TABLE with ALTER COLUMN TYPE keyword](/images/docs/diagrams/alterColumnType.svg)
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName TYPE typeDef;
+```
 
 ## Supported Data Types
 
@@ -32,10 +34,11 @@ compatible data type.
 
 ## Examples
 
-Change the data type of the column `age` in the table `employees` to `INT`:
+Change the data type of the column `counterparty` in the table `fx_trades` to
+`VARCHAR`:
 
 ```questdb-sql
-ALTER TABLE employees ALTER COLUMN age TYPE INT;
+ALTER TABLE fx_trades ALTER COLUMN counterparty TYPE VARCHAR;
 ```
 
 When changing the column type, ensure that the new type is compatible with the
@@ -44,14 +47,14 @@ result in data loss or conversion errors if the existing data contains
 non-numeric values.
 
 ```questdb-sql
-ALTER TABLE tbl ALTER COLUMN col_name TYPE DOUBLE;
+ALTER TABLE tableName ALTER COLUMN col_name TYPE DOUBLE;
 ```
 
 It is possible to specify all the additional column type parameters, like
 `CAPACITY` & `CACHE`:
 
 ```questdb-sql
-ALTER TABLE tbl ALTER COLUMN department TYPE SYMBOL CAPACITY 10000 CACHE;
+ALTER TABLE fx_trades ALTER COLUMN counterparty TYPE SYMBOL CAPACITY 10000 CACHE;
 ```
 
 ## Available Conversions
@@ -131,9 +134,9 @@ rules as explicit [CAST](/docs/query/sql/cast/) apply.
 
 Converting from the type to itself is not supported.
 
-If the column `department` is of type `SYMBOL`, then the following query will
+If the column `counterparty` is of type `SYMBOL`, then the following query will
 result in error, even if the capacity parameter changes:
 
 ```questdb-sql
-ALTER TABLE employees ALTER COLUMN department TYPE SYMBOL CAPACITY 4096;
+ALTER TABLE fx_trades ALTER COLUMN counterparty TYPE SYMBOL CAPACITY 4096;
 ```

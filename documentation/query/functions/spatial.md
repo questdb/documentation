@@ -240,72 +240,6 @@ INSERT INTO vehicle_positions VALUES
   ('2024-01-15T10:00:20Z', 'truck-1', 51.5350, -0.0890, 40);
 ```
 
-### geo_within_radius_latlon
-
-`geo_within_radius_latlon(lat, lon, center_lat, center_lon, radius_meters)` -
-Returns `true` if a geographic point lies within a specified distance from a
-center point (inclusive).
-
-Use this function for proximity queries on GPS data, location-based filtering,
-and geographic area searches.
-
-**Arguments:**
-
-- `lat` - Latitude of the point to test in degrees (-90 to 90)
-- `lon` - Longitude of the point to test in degrees (-180 to 180)
-- `center_lat` - Latitude of the center point in degrees (-90 to 90)
-- `center_lon` - Longitude of the center point in degrees (-180 to 180)
-- `radius_meters` - Radius in meters (double). Must be non-negative.
-
-**Return value:**
-
-Returns `boolean`:
-
-- `true` if the point is within the specified distance
-- `false` if the point is outside the radius
-- `NULL` if any argument is `NULL`
-
-Invalid inputs (coordinates out of range, `NaN`, or negative radius) produce an
-error.
-
-**Examples:**
-
-```questdb-sql title="Find vehicle positions within 500m of a depot"
-SELECT ts, vehicle_id, lat, lon
-FROM vehicle_positions
-WHERE geo_within_radius_latlon(lat, lon, 51.5074, -0.1278, 500);
-```
-
-| ts                          | vehicle_id | lat     | lon     |
-| :-------------------------- | :--------- | :------ | :------ |
-| 2024-01-15T10:00:00.000000Z | truck-1    | 51.5074 | -0.1278 |
-| 2024-01-15T10:00:05.000000Z | truck-1    | 51.5095 | -0.1245 |
-| 2024-01-15T10:00:10.000000Z | truck-1    | 51.5120 | -0.1190 |
-
-```questdb-sql title="Lookup positions by service area name"
-CREATE TABLE service_areas (
-  area_name SYMBOL,
-  center_lat DOUBLE,
-  center_lon DOUBLE,
-  radius_m DOUBLE
-);
-
-INSERT INTO service_areas VALUES
-  ('central_london', 51.5074, -0.1278, 1000),
-  ('kings_cross', 51.5320, -0.1240, 800);
-
-SELECT v.ts, v.vehicle_id, v.lat, v.lon
-FROM vehicle_positions v
-JOIN service_areas a ON geo_within_radius_latlon(v.lat, v.lon, a.center_lat, a.center_lon, a.radius_m)
-WHERE a.area_name = 'central_london';
-```
-
-| ts                          | vehicle_id | lat     | lon     |
-| :-------------------------- | :--------- | :------ | :------ |
-| 2024-01-15T10:00:00.000000Z | truck-1    | 51.5074 | -0.1278 |
-| 2024-01-15T10:00:05.000000Z | truck-1    | 51.5095 | -0.1245 |
-| 2024-01-15T10:00:10.000000Z | truck-1    | 51.5120 | -0.1190 |
-
 ### geo_distance_meters
 
 `geo_distance_meters(lat1, lon1, lat2, lon2)` - Calculates the distance in
@@ -375,42 +309,78 @@ JOIN depots d ON d.depot_name = 'east_depot';
 | 2024-01-15T10:00:15.000000Z | truck-1    | 1567       |
 | 2024-01-15T10:00:20.000000Z | truck-1    | 1456       |
 
+### geo_within_radius_latlon
+
+`geo_within_radius_latlon(lat, lon, center_lat, center_lon, radius_meters)` -
+Returns `true` if a geographic point lies within a specified distance from a
+center point (inclusive).
+
+Use this function for proximity queries on GPS data, location-based filtering,
+and geographic area searches.
+
+**Arguments:**
+
+- `lat` - Latitude of the point to test in degrees (-90 to 90)
+- `lon` - Longitude of the point to test in degrees (-180 to 180)
+- `center_lat` - Latitude of the center point in degrees (-90 to 90)
+- `center_lon` - Longitude of the center point in degrees (-180 to 180)
+- `radius_meters` - Radius in meters (double). Must be non-negative.
+
+**Return value:**
+
+Returns `boolean`:
+
+- `true` if the point is within the specified distance
+- `false` if the point is outside the radius
+- `NULL` if any argument is `NULL`
+
+Invalid inputs (coordinates out of range, `NaN`, or negative radius) produce an
+error.
+
+**Examples:**
+
+```questdb-sql title="Find vehicle positions within 500m of a depot"
+SELECT ts, vehicle_id, lat, lon
+FROM vehicle_positions
+WHERE geo_within_radius_latlon(lat, lon, 51.5074, -0.1278, 500);
+```
+
+| ts                          | vehicle_id | lat     | lon     |
+| :-------------------------- | :--------- | :------ | :------ |
+| 2024-01-15T10:00:00.000000Z | truck-1    | 51.5074 | -0.1278 |
+| 2024-01-15T10:00:05.000000Z | truck-1    | 51.5095 | -0.1245 |
+| 2024-01-15T10:00:10.000000Z | truck-1    | 51.5120 | -0.1190 |
+
+```questdb-sql title="Lookup positions by service area name"
+CREATE TABLE service_areas (
+  area_name SYMBOL,
+  center_lat DOUBLE,
+  center_lon DOUBLE,
+  radius_m DOUBLE
+);
+
+INSERT INTO service_areas VALUES
+  ('central_london', 51.5074, -0.1278, 1000),
+  ('kings_cross', 51.5320, -0.1240, 800);
+
+SELECT v.ts, v.vehicle_id, v.lat, v.lon
+FROM vehicle_positions v
+JOIN service_areas a ON geo_within_radius_latlon(v.lat, v.lon, a.center_lat, a.center_lon, a.radius_m)
+WHERE a.area_name = 'central_london';
+```
+
+| ts                          | vehicle_id | lat     | lon     |
+| :-------------------------- | :--------- | :------ | :------ |
+| 2024-01-15T10:00:00.000000Z | truck-1    | 51.5074 | -0.1278 |
+| 2024-01-15T10:00:05.000000Z | truck-1    | 51.5095 | -0.1245 |
+| 2024-01-15T10:00:10.000000Z | truck-1    | 51.5120 | -0.1190 |
+
 ## Geohash functions
 
 Geohash functions encode geographic coordinates into compact string
 representations suitable for indexing. For comprehensive geohash documentation,
 see the [geohashes data type](/docs/query/datatypes/geohashes/) and
 [spatial operators](/docs/query/operators/spatial/).
-
-### rnd_geohash
-
-`rnd_geohash(bits)` - Returns a random geohash of variable precision.
-
-**Arguments:**
-
-- `bits` - An integer between `1` and `60` which determines the precision of the
-  generated geohash
-
-**Return value:**
-
-Returns a `geohash`.
-
-**Examples:**
-
-```questdb-sql title="Generate random geohashes of various precisions"
-SELECT
-    rnd_geohash(7) AS g7,
-    rnd_geohash(10) AS g10,
-    rnd_geohash(30) AS g30,
-    rnd_geohash(60) AS g60
-FROM long_sequence(3);
-```
-
-| g7      | g10 | g30    | g60          |
-| :------ | :-- | :----- | :----------- |
-| 1101100 | 4h  | hsmmq8 | rjtwedd0z72p |
-| 0010011 | vf  | f9jc1q | fzj09w97tj1h |
-| 0101011 | kx  | fkhked | v4cs8qsnjkeh |
 
 ### make_geohash
 
@@ -454,6 +424,36 @@ SELECT
     make_geohash(lon, lat, 30) AS geohash
 FROM locations;
 ```
+
+### rnd_geohash
+
+`rnd_geohash(bits)` - Returns a random geohash of variable precision.
+
+**Arguments:**
+
+- `bits` - An integer between `1` and `60` which determines the precision of the
+  generated geohash
+
+**Return value:**
+
+Returns a `geohash`.
+
+**Examples:**
+
+```questdb-sql title="Generate random geohashes of various precisions"
+SELECT
+    rnd_geohash(7) AS g7,
+    rnd_geohash(10) AS g10,
+    rnd_geohash(30) AS g30,
+    rnd_geohash(60) AS g60
+FROM long_sequence(3);
+```
+
+| g7      | g10 | g30    | g60          |
+| :------ | :-- | :----- | :----------- |
+| 1101100 | 4h  | hsmmq8 | rjtwedd0z72p |
+| 0010011 | vf  | f9jc1q | fzj09w97tj1h |
+| 0101011 | kx  | fkhked | v4cs8qsnjkeh |
 
 ## See also
 

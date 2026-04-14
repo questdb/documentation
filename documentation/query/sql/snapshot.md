@@ -12,5 +12,7 @@ _For a detailed guide backup creation and restoration? Check out our
 
 ## Syntax
 
-![Flow chart showing the syntax of the SNAPSHOT keyword](/images/docs/diagrams/snapshot.svg)
+```questdb-sql
+SNAPSHOT { PREPARE | COMPLETE };
+```
 
