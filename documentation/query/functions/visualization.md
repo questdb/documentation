@@ -252,3 +252,24 @@ When explicit `min`/`max` are provided, out-of-range values are clamped:
 - [Aggregate functions](/docs/query/functions/aggregation/) - Full aggregate
   reference
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
+
+## Configuration
+
+Both functions enforce a maximum output size controlled by an existing server
+property:
+
+```ini
+# server.conf
+cairo.sql.string.function.buffer.max.size=1048576
+```
+
+Default is 1,048,576 bytes (1 MB). This is the same property used by
+`string_agg()`, `lpad()`, and `rpad()`.
+
+Each output character is 3 bytes in UTF-8, so the default allows up to 349,525
+characters of output. For `sparkline`, this limits the number of values
+accumulated per group. For `bar`, this limits the `width` parameter. If the
+limit is exceeded, the function throws a non-critical error.
+
+In practice these limits are generous - a sparkline or bar of 349K characters
+would be unusable. The limit exists to prevent accidental memory exhaustion.
