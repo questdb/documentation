@@ -7,11 +7,61 @@ description: CREATE TABLE SQL keywords reference documentation.
 To create a new table in the database, the `CREATE TABLE` keywords followed by
 column definitions are used.
 
+`CREATE TABLE` has three creation modes:
+
+1. **[Providing the table schema](#syntax)** -
+   define each column and its type yourself.
+2. **[CREATE TABLE AS SELECT](#create-table-as)** -
+   derive both schema and data from a query.
+3. **[CREATE TABLE LIKE](#create-table-like)** -
+   clone the structure (but not the data) of an existing table.
+
+The first two modes accept the same set of optional clauses:
+
+- [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
+- [`PARTITION BY`](#partitioning) - partition unit and WAL mode
+- [`TTL`](#time-to-live-ttl) - time-to-live for partitions
+- [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
+  [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
+- [`WITH`](#with-table-parameter) - table parameters
+- [`IN VOLUME`](#table-target-volume) - target volume for storage
+- [`OWNED BY`](#owned-by) - Enterprise RBAC owner
+
 ## Syntax
 
-To create a table by manually entering parameters and settings:
+```questdb-sql title="Providing the table schema"
+CREATE [ATOMIC | BATCH n [o3MaxLag value]]
+TABLE [IF NOT EXISTS] tableName
+    (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
+    [TIMESTAMP (columnName)
+        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+            [BYPASS WAL | WAL]
+            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [WITH tableParameter]
+    [IN VOLUME 'alias']
+    [OWNED BY ownerName];
+```
 
-![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTableDef.svg)
+```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
+CREATE [ATOMIC | BATCH n [o3MaxLag value]]
+TABLE [IF NOT EXISTS] tableName
+    AS (selectQuery)
+    [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
+    [, INDEX (columnRef [CAPACITY n]) ...]
+    [TIMESTAMP (columnName)
+        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+            [BYPASS WAL | WAL]
+            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [WITH tableParameter]
+    [IN VOLUME 'alias']
+    [OWNED BY ownerName];
+```
+
+```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
+CREATE TABLE tableName (LIKE sourceTableName);
+```
 
 :::note
 
@@ -20,10 +70,6 @@ functions which are described in the
 [meta functions](/docs/query/functions/meta/) documentation page.
 
 :::
-
-To create a table by cloning the metadata of an existing table:
-
-![Flow chart showing the syntax of the CREATE TABLE LIKE keyword](/images/docs/diagrams/createTableLike.svg)
 
 ## Examples
 
@@ -316,10 +362,21 @@ QuestDB. For best results, we recommend using only alphanumeric characters along
 ## Type definition
 
 When specifying a column, a name and
-[type definition](/docs/query/datatypes/overview/) must be provided. The `symbol`
-type may have additional optional parameters applied.
+[type definition](/docs/query/datatypes/overview/) must be provided.
 
-![Flow chart showing the syntax of the different column types](/images/docs/diagrams/columnTypeDef.svg)
+```questdb-sql
+columnTypeDef ::=
+    -- Types with parameters
+      DECIMAL(<precision>, <scale>)
+    | DOUBLE[][]...  -- array: one [] pair per dimension
+    | GEOHASH(<size>)
+    | SYMBOL [CAPACITY distinctValueEstimate] [CACHE | NOCACHE]
+             [INDEX [CAPACITY valueBlockSize]]
+    -- Simple types
+    | BINARY | BOOLEAN | BYTE | CHAR | DATE | DOUBLE | FLOAT
+    | INT | IPV4 | LONG | LONG256 | SHORT | STRING
+    | TIMESTAMP | TIMESTAMP_NS | UUID | VARCHAR
+```
 
 ### Symbols
 
@@ -361,12 +418,156 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp);
 ```
 
+### Per-column Parquet encoding, compression, and bloom filters
+
+```questdb-sql
+PARQUET(encoding [, compression[(level)]])
+```
+
+Column definitions may include an optional
+`PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
+settings only affect
+[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+ignored for native partitions. Encoding, compression, and bloom filter are all
+optional — use `default` for the encoding when specifying compression only.
+
+```questdb-sql title="CREATE TABLE with per-column Parquet config"
+CREATE TABLE sensors (
+    ts TIMESTAMP,
+    temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+    humidity FLOAT PARQUET(rle_dictionary),
+    device_id VARCHAR PARQUET(default, lz4_raw, BLOOM_FILTER),
+    status INT
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+When omitted, columns use the global defaults: a type-appropriate encoding and
+the server-wide compression codec
+(`cairo.partition.encoder.parquet.compression.codec`). Bloom filters are not
+generated unless explicitly enabled.
+
+#### Supported encodings
+
+| Encoding                | SQL keyword               | Valid column types                   |
+| ----------------------- | ------------------------- | ------------------------------------ |
+| Plain                   | `plain`                   | All                                  |
+| RLE Dictionary          | `rle_dictionary`          | All except BOOLEAN, ARRAY AND STRING |
+| Delta Length Byte Array | `delta_length_byte_array` | STRING, BINARY, VARCHAR              |
+| Delta Binary Packed     | `delta_binary_packed`     | INT, LONG, DATE, TIMESTAMP           |
+
+- **Plain** — stores values as-is with no transformation. Simplest encoding
+  with no overhead. Use as a fallback when data has high cardinality and no
+  exploitable patterns (e.g. random floats or UUIDs).
+- **RLE Dictionary** — builds a dictionary of unique values and replaces each
+  value with a short integer key. The keys are then encoded with a hybrid of
+  run-length encoding (for repeated consecutive keys) and bit-packing (for
+  non-repeating sequences). Best for low-to-medium cardinality columns (status
+  codes, device IDs, symbols). The lower the cardinality, the greater the
+  compression.
+- **Delta Length Byte Array** — delta-encodes the lengths of consecutive
+  string/binary values, then stores the raw bytes back-to-back. This is the
+  Parquet-recommended encoding for byte array columns and is always preferred
+  over `plain` for STRING, BINARY, and VARCHAR.
+- **Delta Binary Packed** — delta-encodes integer values and packs the deltas
+  into a compact binary representation. Effective for monotonically increasing
+  or slowly changing integer/timestamp columns (e.g. sequential IDs, event
+  timestamps).
+
+For the full specification of each encoding, see the
+[Apache Parquet encodings documentation](https://parquet.apache.org/docs/file-format/data-pages/encodings/).
+
+When no encoding is specified, QuestDB picks a type-appropriate default:
+`rle_dictionary` for SYMBOL and VARCHAR, `delta_length_byte_array` for STRING
+and BINARY, and `plain` for everything else.
+
+#### Supported compression codecs
+
+| Codec        | SQL keyword    | Level range |
+| ------------ | -------------- | ----------- |
+| LZ4 Raw      | `lz4_raw`      | --          |
+| Zstd         | `zstd`         | 1-22        |
+| Snappy       | `snappy`       | --          |
+| Gzip         | `gzip`         | 1-9         |
+| Brotli       | `brotli`       | 0-11        |
+| Uncompressed | `uncompressed` | --          |
+
+- **LZ4 Raw** — extremely fast compression and decompression with a moderate
+  ratio. No tunable level. This is the QuestDB default and a good choice for
+  most workloads where query throughput matters.
+- **Zstd** — excellent balance of compression ratio and speed across its level
+  range. Lower levels (1-3) approach LZ4 speed with better ratios; higher
+  levels (up to 22) rival Brotli ratios. A strong general-purpose choice when
+  storage savings justify slightly slower decompression.
+- **Snappy** — very fast compression and decompression with moderate ratio. No
+  tunable level. Similar trade-offs to LZ4 Raw.
+- **Gzip** — widely supported, higher compression ratio than Snappy or LZ4 at
+  the cost of slower decompression, which reduces query throughput. Higher
+  levels (up to 9) improve ratio but further increase CPU time.
+- **Brotli** — achieves some of the highest compression ratios, especially at
+  higher levels, but decompression is significantly slower. Best suited for
+  cold/archival data where storage savings outweigh query throughput.
+- **Uncompressed** — no compression. Fastest decompression (none needed) but
+  largest file size. Useful when data is already incompressible.
+
+For more details on Parquet compression, see the
+[Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
+
+To modify encoding or compression on existing tables, see
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+
+#### Bloom filters
+
+The optional `BLOOM_FILTER` keyword enables
+bloom filter generation for a column
+when partitions are converted to Parquet. Bloom filters allow QuestDB to skip
+row groups that do not contain matching values, significantly speeding up
+equality and `IN` queries on large Parquet partitions.
+
+`BLOOM_FILTER` can appear in several positions:
+
+```questdb-sql title="As the sole argument (default encoding/compression)"
+CREATE TABLE t (
+  a VARCHAR PARQUET(BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding and compression"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, zstd(3), BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+The false positive probability (FPP) for bloom filters is a global setting
+(`cairo.partition.encoder.parquet.bloom.filter.fpp`, default `0.01`) and cannot
+be configured per column. See
+the [Configuration reference](/docs/configuration/overview/) for all
+configuration options.
+
+:::note
+
+When converting partitions with an explicit `bloom_filter_columns` option in
+[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+the explicit list overrides per-column `BLOOM_FILTER` metadata.
+
+:::
+
 ### Casting types
 
 `castDef` - casts the type of a specific column. `columnRef` must reference
 existing column in the `selectSql`
 
-![Flow chart showing the syntax of the cast function](/images/docs/diagrams/castDef.svg)
+```questdb-sql
+cast(columnRef AS columnTypeDef)
+```
 
 ```questdb-sql
 CREATE TABLE test AS (
@@ -380,7 +581,9 @@ Index definitions (`indexDef`) are used to create an
 [index](/docs/concepts/deep-dive/indexes/) for a table column. The referenced table column
 must be of type [symbol](/docs/concepts/symbol/).
 
-![Flow chart showing the syntax of the index function](/images/docs/diagrams/indexDef.svg)
+```questdb-sql
+INDEX (columnRef [CAPACITY valueBlockSize])
+```
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -541,7 +744,9 @@ CREATE TABLE new_table (LIKE my_table);
 
 ## WITH table parameter
 
-![Flow chart showing the syntax of keyword to specify WITH table parameter](/images/docs/diagrams/createTableWithMaxRowParam.svg)
+```questdb-sql
+WITH maxUncommittedRows = rowCount
+```
 
 The parameter influences how often commits of out-of-order data occur. It may be
 set during table creation using the `WITH` keyword.
@@ -571,10 +776,10 @@ Checking the values per-table may be done using the `tables()` function:
 SELECT id, table_name, maxUncommittedRows FROM tables();
 ```
 
-| id  | name         | maxUncommittedRows |
-| :-- | :----------- | :----------------- |
-| 1   | trades       | 250000             |
-| 2   | sample_table | 50000              |
+| id   | name         | maxUncommittedRows |
+| :--- | :----------- | :----------------- |
+| 1    | trades       | 250000             |
+| 2    | sample_table | 50000              |
 
 ## Table target volume
 
@@ -582,7 +787,9 @@ The `IN VOLUME` clause is used to create a table in a different volume than the
 standard. The table is created in the specified target volume, and a symbolic
 link is created in the table's standard volume to point to it.
 
-![Flow chart showing the syntax of keywords to specify a table target volume](/images/docs/diagrams/tableTargetVolumeDef.svg)
+```questdb-sql
+[,] IN VOLUME ['secondaryVolumeAlias']
+```
 
 The use of the comma (`,`) depends on the existence of the `WITH` clause:
 

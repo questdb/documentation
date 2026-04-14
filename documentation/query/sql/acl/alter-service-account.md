@@ -21,7 +21,23 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER SERVICE ACCOUNT keyword](/images/docs/diagrams/alterServiceAccount.svg)
+```questdb-sql title="Enable / disable"
+ALTER SERVICE ACCOUNT serviceAccountName { ENABLE | DISABLE };
+```
+
+```questdb-sql title="Set or remove password"
+ALTER SERVICE ACCOUNT serviceAccountName WITH { PASSWORD password | NO PASSWORD };
+```
+
+```questdb-sql title="Create token"
+ALTER SERVICE ACCOUNT serviceAccountName CREATE TOKEN TYPE
+    { JWK | REST WITH TTL timeUnit [REFRESH] };
+```
+
+```questdb-sql title="Drop token"
+ALTER SERVICE ACCOUNT serviceAccountName DROP TOKEN TYPE
+    { JWK | REST [token] };
+```
 
 ## Description
 

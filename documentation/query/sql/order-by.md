@@ -8,7 +8,10 @@ Sort the results of a query in ascending or descending order.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ORDER BY keyword](/images/docs/diagrams/orderBy.svg)
+```questdb-sql
+SELECT ...
+ORDER BY columnName [ASC | DESC] [, columnName [ASC | DESC] ...];
+```
 
 Default order is `ASC`. You can omit to order in ascending order.
 
@@ -19,14 +22,20 @@ check you have sufficient memory to perform the operation.
 
 ## Examples
 
-```questdb-sql title="Omitting ASC will default to ascending order"
-ratings ORDER BY userId;
+```questdb-sql title="Omitting ASC will default to ascending order" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1m..$now'
+ORDER BY symbol;
 ```
 
-```questdb-sql title="Ordering in descending order"
-ratings ORDER BY userId DESC;
+```questdb-sql title="Ordering in descending order" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1m..$now'
+ORDER BY symbol DESC;
 ```
 
-```questdb-sql title="Multi-level ordering"
-ratings ORDER BY userId, rating DESC;
+```questdb-sql title="Multi-level ordering" demo
+SELECT * FROM trades
+WHERE timestamp IN '$now-1m..$now'
+ORDER BY symbol, side DESC;
 ```

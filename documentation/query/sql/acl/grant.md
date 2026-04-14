@@ -21,7 +21,21 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the GRANT keyword](/images/docs/diagrams/grant.svg)
+```questdb-sql title="Database scope"
+GRANT permission [, permission ...] TO entityName
+    [WITH GRANT OPTION]
+    [WITH VERIFICATION];
+```
+
+```questdb-sql title="Table or column scope"
+GRANT permission [, permission ...]
+    ON { ALL TABLES
+       | tableName [(columnName [, columnName ...])]
+         [, tableName [(columnName [, columnName ...])] ...] }
+    TO entityName
+    [WITH GRANT OPTION]
+    [WITH VERIFICATION];
+```
 
 ## Description
 

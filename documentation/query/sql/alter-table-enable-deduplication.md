@@ -20,7 +20,9 @@ Enable storage level data deduplication on inserts and configures `UPSERT KEYS`.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE DEDUP ENABLE statement](/images/docs/diagrams/enableDedup.svg)
+```questdb-sql
+ALTER TABLE tableName DEDUP ENABLE UPSERT KEYS(columnName [, columnName ...]);
+```
 
 `UPSERT KEYS` list can include one or more columns. The [designated timestamp](/docs/concepts/designated-timestamp) column must be
   included in the `UPSERT KEYS` list.
@@ -33,12 +35,12 @@ list.
 
 ## Example
 
-To enable deduplication on the `TICKER_PRICE` table for the `ts` and `ticker`
-columns, where `ts` is the designated timestamp for the table, use the following
-command:
+To enable deduplication on the `fx_trades` table for the `timestamp` and
+`trade_id` columns, where `timestamp` is the designated timestamp for the
+table, use the following command:
 
 ```sql
-ALTER TABLE TICKER_PRICE DEDUP ENABLE UPSERT KEYS(ts, ticker)
+ALTER TABLE fx_trades DEDUP ENABLE UPSERT KEYS(timestamp, trade_id);
 ```
 
 See more example at [data deduplication](/docs/concepts/deduplication/#quick-example)
