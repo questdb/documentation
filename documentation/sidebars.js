@@ -467,6 +467,7 @@ module.exports = {
             "query/functions/touch",
             "query/functions/trigonometric",
             "query/functions/uuid",
+            "query/functions/visualization",
             {
               type: "category",
               label: "Window Functions",
