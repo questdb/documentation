@@ -1,5 +1,5 @@
 ---
-title: ALTER TABLE ALTER COLUMN SET PARQUET [ENCODING|COMPRESSION|BLOOM_FILTER]
+title: "ALTER TABLE ALTER COLUMN SET PARQUET: encoding,compression and bloom filter options."
 sidebar_label: SET PARQUET
 description: ALTER TABLE ALTER COLUMN SET PARQUET SQL keyword reference documentation.
 ---
