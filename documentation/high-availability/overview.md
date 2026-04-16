@@ -79,6 +79,28 @@ cases.
 Tables without timestamps (typically used for reference/lookup data) are not
 replicated automatically and should be populated separately on each instance.
 
+## Storage policies in a replicated cluster
+
+[Storage policy](/docs/concepts/storage-policy/) definitions are stored in
+WAL-backed system tables, so the policy itself — the `TO PARQUET`,
+`DROP NATIVE`, and `DROP LOCAL` TTLs and the active/disabled status — is
+replicated to every instance through the same WAL pipeline as user data.
+
+Enforcement, however, runs **independently on each instance**. Parquet files
+are produced locally and are not replicated; each node's storage policy job
+schedules its own `PARQUET_CONVERSION`, `PARQUET_COMMIT`, and `DROP_LOCAL`
+work against its local data. As a result:
+
+- At any given moment a partition may be in different states across the
+  primary and its replicas (e.g. already converted on the primary but still
+  native on a replica that hasn't yet hit its check interval).
+- These differences are temporary. Once each instance's check job runs and
+  processes the partition, the cluster converges to the same logical state.
+- Tuning the [check interval](/docs/concepts/storage-policy/#configuration)
+  (`storage.policy.check.interval`) or worker count
+  (`storage.policy.worker.count`) per instance lets you trade conversion
+  latency against background load on that node.
+
 ## Bring Your Own Cloud (BYOC)
 
 QuestDB Enterprise can be self-managed or operated by QuestDB's team under the

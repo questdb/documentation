@@ -220,6 +220,20 @@ only `SET TTL` value Enterprise accepts; any non-zero value is rejected with
 
 :::
 
+## Replication
+
+Storage policy definitions are persisted in WAL-backed system tables, so the
+policy itself is replicated to every instance in the cluster. Enforcement runs
+**independently on each instance** — Parquet files are produced locally and
+are not replicated.
+
+This means the primary and its replicas can temporarily disagree on which
+partitions have been converted to Parquet or dropped, depending on when each
+node's storage policy [check interval](#configuration) last fired. The state
+converges as each instance processes its own queue. See
+[Replication overview](/docs/high-availability/overview/#storage-policies-in-a-replicated-cluster)
+for details.
+
 ## Configuration
 
 Storage policy behavior can be tuned in `server.conf`. Time-based properties
