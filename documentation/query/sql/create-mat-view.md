@@ -298,16 +298,21 @@ CREATE MATERIALIZED VIEW trades_hourly AS (
 ```
 
 A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
-`DROP LOCAL`, and `DROP REMOTE`. All are optional. TTL values must be in
-ascending order.
+`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
+positive, and they must be in ascending order. `DROP REMOTE` is reserved
+syntax and is currently rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after creation, see
 [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
 
 :::note
 
-In QuestDB Enterprise, `TTL` is deprecated. Use `STORAGE POLICY` instead.
-If a materialized view has a TTL set, remove it before setting a storage policy.
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE MATERIALIZED VIEW ... TTL`
+is rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy materialized view has a TTL
+set, clear it with `ALTER MATERIALIZED VIEW SET TTL 0` before setting a storage
+policy.
 
 :::
 

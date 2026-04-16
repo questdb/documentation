@@ -262,21 +262,25 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M, DROP REMOTE 6M)
+STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
 WAL;
 ```
 
 A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
-`DROP LOCAL`, and `DROP REMOTE`. All are optional. TTL values must be in
-ascending order.
+`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
+positive, and they must be in ascending order. `DROP REMOTE` is reserved
+syntax and is currently rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after table creation, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 :::note
 
-In QuestDB Enterprise, `TTL` is deprecated. Use `STORAGE POLICY` instead.
-If a table has a TTL set, remove it before setting a storage policy.
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
+rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
+it with `ALTER TABLE SET TTL 0` before setting a storage policy.
 
 :::
 

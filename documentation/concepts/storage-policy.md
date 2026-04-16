@@ -18,8 +18,10 @@ external scheduling.
 :::info
 
 Storage policies currently operate **locally only**. Parquet files are not
-automatically uploaded to object storage, and `DROP REMOTE` is not yet
-supported. Object storage integration will be added in a future release.
+automatically uploaded to object storage, and the `DROP REMOTE` clause is
+reserved syntax — it is recognised by the parser but rejected with
+`'DROP REMOTE' is not supported yet`. Object storage integration will be added
+in a future release.
 
 :::
 
@@ -41,9 +43,10 @@ stage in the partition lifecycle:
 | `TO PARQUET` | Convert the partition from native binary format to Parquet |
 | `DROP NATIVE` | Remove native binary files, keeping only the local Parquet copy |
 | `DROP LOCAL` | Remove all local data (both native and Parquet) |
-| `DROP REMOTE` | Remove the Parquet file from object storage _(not yet supported)_ |
+| `DROP REMOTE` | _Reserved._ Will remove the Parquet file from object storage when remote upload is supported |
 
-All settings are optional. Use only the ones relevant to your use case.
+All settings are optional. Use only the ones relevant to your use case. All TTL
+values must be **positive**; `0` is rejected.
 
 ### Partition lifecycle
 
@@ -84,7 +87,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M, DROP REMOTE 6M)
+    STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
     WAL;
 ```
 
@@ -94,8 +97,7 @@ CREATE TABLE trades (
 ALTER TABLE trades SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
     DROP NATIVE 10 DAYS,
-    DROP LOCAL 1 MONTH,
-    DROP REMOTE 6 MONTHS
+    DROP LOCAL 1 MONTH
 );
 ```
 
@@ -141,7 +143,7 @@ TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE
 ```
 
 For example, you cannot drop native files before the Parquet conversion
-completes.
+completes. All TTL values must be positive — `0` is rejected.
 
 ## Disabling and enabling
 
@@ -156,6 +158,9 @@ Re-enable it later:
 ```questdb-sql
 ALTER TABLE trades ENABLE STORAGE POLICY;
 ```
+
+Both `ENABLE` and `DISABLE` require a policy to exist on the table; the
+statement returns an error otherwise.
 
 ## Removing a storage policy
 
@@ -175,11 +180,13 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
 |----------------|-----------|-------------|------------|-------------|--------|--------------|
-| trades | 72h | 240h | 1m | 6m | A | 2025-01-15T10:30:00.000000Z |
+| trades | 72h | 240h | 1m | | A | 2025-01-15T10:30:00.000000Z |
 
 - TTL values with an `h` suffix are in hours; values with an `m` suffix are in
   months
 - Status `A` means active; `D` means disabled
+- Unset stages appear blank — `drop_remote` is always blank in the current
+  release because the clause is rejected at SQL parse time
 
 ## Storage policy vs TTL
 
@@ -206,8 +213,10 @@ ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
 
 :::note
 
-If a table already has a TTL set, you must remove it with `ALTER TABLE DROP TTL`
-before setting a storage policy.
+If a table already has a TTL set, you must clear it with
+`ALTER TABLE SET TTL 0` before setting a storage policy. `SET TTL 0` is the
+only `SET TTL` value Enterprise accepts; any non-zero value is rejected with
+`TTL settings are deprecated, please, create a storage policy instead`.
 
 :::
 

@@ -60,13 +60,14 @@ transition from native format to Parquet and eventually get removed:
 | `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally |
 | `DROP NATIVE <ttl>` | Remove native binary files, keeping only the local Parquet copy |
 | `DROP LOCAL <ttl>` | Remove all local copies of the partition |
-| `DROP REMOTE <ttl>` | Remove the partition from object storage _(not yet supported)_ |
+| `DROP REMOTE <ttl>` | _Reserved._ Will remove the partition from object storage when remote upload is supported |
 
 :::info
 
-`DROP REMOTE` is accepted in the syntax but is not yet operational. Automatic
-upload of Parquet files to object storage is not currently supported. Storage
-policies operate locally only.
+`DROP REMOTE` is reserved syntax. It is recognised by the parser but is rejected
+with `'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
+object storage is not currently supported — storage policies operate locally
+only.
 
 :::
 
@@ -84,10 +85,15 @@ Both singular and plural forms are accepted.
 
 - TTL values must be in ascending order:
   `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`
+- All TTL values must be positive — `0` is rejected
 - Each setting can only appear once per statement
 - The materialized view must have a designated timestamp and partitioning enabled
-- If the materialized view has a TTL set, remove it with
-  `ALTER MATERIALIZED VIEW DROP TTL` before setting a storage policy
+- If the materialized view has a TTL set, clear it with
+  `ALTER MATERIALIZED VIEW SET TTL 0` before setting a storage policy. Any
+  non-zero `SET TTL` value is rejected in Enterprise with
+  `TTL settings are deprecated, please, create a storage policy instead`
+- `ENABLE` and `DISABLE` require a policy to exist on the view; both return an
+  error otherwise
 
 ### Permissions
 
