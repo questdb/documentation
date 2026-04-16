@@ -556,7 +556,7 @@ For more details on Parquet compression, see the
 [Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
 
 To modify encoding or compression on existing tables, see
-[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-set-parquet/).
 
 #### Bloom filters
 

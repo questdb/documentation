@@ -257,26 +257,6 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
-                  type: "category",
-                  label: "ALTER COLUMN (TABLE)",
-                  items: [
-                    "query/sql/alter-table-alter-column-add-index",
-                    "query/sql/alter-table-alter-column-cache",
-                    "query/sql/alter-table-change-column-type",
-                    "query/sql/alter-table-alter-column-drop-index",
-                    "query/sql/alter-table-alter-column-parquet-encoding",
-                    "query/sql/alter-table-change-symbol-capacity",
-                  ],
-                },
-                {
-                  type: "category",
-                  label: "ALTER COLUMN (MAT VIEW)",
-                  items: [
-                    "query/sql/alter-mat-view-alter-column-add-index",
-                    "query/sql/alter-mat-view-alter-column-drop-index",
-                  ],
-                },
-                {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
                         },
@@ -285,6 +265,18 @@ module.exports = {
                   label: "ALTER TABLE",
                   items: [
                     "query/sql/alter-table-add-column",
+                    {
+                      type: "category",
+                      label: "ALTER COLUMN",
+                      items: [
+                        "query/sql/alter-table-alter-column-add-index",
+                        "query/sql/alter-table-alter-column-cache",
+                        "query/sql/alter-table-change-column-type",
+                        "query/sql/alter-table-alter-column-drop-index",
+                        "query/sql/alter-table-alter-column-set-parquet",
+                        "query/sql/alter-table-change-symbol-capacity",
+                      ],
+                    },
                     "query/sql/alter-table-attach-partition",
                     "query/sql/alter-table-change-column-type",
                     "query/sql/alter-table-enable-deduplication",
@@ -306,6 +298,14 @@ module.exports = {
                   type: "category",
                   label: "ALTER MATERIALIZED VIEW",
                   items: [
+                    {
+                      type: "category",
+                      label: "ALTER COLUMN",
+                      items: [
+                        "query/sql/alter-mat-view-alter-column-add-index",
+                        "query/sql/alter-mat-view-alter-column-drop-index",
+                      ],
+                    },
                     "query/sql/alter-mat-view-resume-wal",
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
