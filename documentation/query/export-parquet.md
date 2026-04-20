@@ -274,7 +274,7 @@ penalty of keeping pages that barely compress.
 Individual columns can override the global encoding and compression settings.
 See [CREATE TABLE - Per-column Parquet encoding, compression, and bloom filters](/docs/query/sql/create-table/#per-column-parquet-encoding-compression-and-bloom-filters)
 for defining overrides at table creation, or
-[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-set-parquet/)
 for modifying existing tables.
 
 ## Bloom Filters
@@ -286,7 +286,7 @@ alongside min/max statistics.
 
 Bloom filters can be enabled per-column via the `BLOOM_FILTER` keyword in
 [`CREATE TABLE`](/docs/query/sql/create-table/#bloom-filters) or
-[`ALTER TABLE`](/docs/query/sql/alter-table-alter-column-parquet-encoding/#bloom-filter),
+[`ALTER TABLE`](/docs/query/sql/alter-table-alter-column-set-parquet/#bloom-filter),
 or per-export via `bloom_filter_columns` in
 [`CONVERT PARTITION`](#bloom-filters-for-in-place-conversion),
 [`COPY TO`](/docs/query/sql/copy/), and the
