@@ -104,6 +104,16 @@ min/max position-by-position — see the
 | [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
 | [array_elem_sum](/docs/query/functions/array/#array_elem_sum) | Element-wise sum across arrays |
 
+### Visualization aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [sparkline](/docs/query/functions/visualization/#sparkline) | Vertical block chart of values within a group |
+
+See the [visualization functions](/docs/query/functions/visualization/) page for
+full reference, including the scalar [bar](/docs/query/functions/visualization/#bar)
+function.
+
 ---
 
 QuestDB supports implicit `GROUP BY`. When aggregate functions are used with
