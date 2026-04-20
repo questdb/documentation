@@ -55,7 +55,7 @@ policy:
 
 ```text
                   TO PARQUET        DROP NATIVE       DROP LOCAL
-  [Native] ──────────┬──────────────────┬──────────────────┬───────
+   [Native] ──────────┬──────────────────┬──────────────────┬───────
                       │                  │                  │
                       ▼                  ▼                  ▼
                Native + Parquet    Parquet only       Data removed
