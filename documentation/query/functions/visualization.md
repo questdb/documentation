@@ -232,11 +232,6 @@ When explicit `min`/`max` are provided, out-of-range values are clamped:
 
 #### Limitations
 
-- **No parallel GROUP BY.** `sparkline` requires row-order preservation. It runs
-  on the single-threaded group-by path. This is typically not a bottleneck
-  because visualization queries operate on pre-aggregated or moderately-sized
-  data.
-
 - **Sub-sampling averages buckets.** When `width` is smaller than the number of
   collected values, the function divides values into equal buckets and averages
   each. This smooths spikes. If preserving peaks is important, use a `width`
