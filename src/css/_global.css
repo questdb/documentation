@@ -486,7 +486,7 @@ html[data-theme="dark"] .DocSearch {
   font-size: var(--font-size-small);
 }
 
-/* Make doc article images fill the content width */
-article img {
+/* Make subsample diagram SVGs fill the content width */
+article img[src*="/subsample/"] {
   width: 100%;
 }
