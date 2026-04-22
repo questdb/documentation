@@ -83,10 +83,13 @@ transition from native format to Parquet and eventually get removed:
 
 :::info
 
-`DROP REMOTE` is reserved syntax. It is recognised by the parser but is rejected
-with `'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
-object storage is not currently supported — storage policies operate locally
-only.
+`DROP REMOTE` is reserved syntax. It is recognised by the parser but is
+rejected at execute time with `'DROP REMOTE' is not supported yet`. Automatic
+upload of Parquet files to object storage is not currently supported — storage
+policies operate locally only. Because the clause cannot take effect, the
+`drop_remote` column in the
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) view is
+always blank in the current release.
 
 :::
 
@@ -191,3 +194,18 @@ STORAGE POLICY(TO PARQUET 3 DAYS, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
 ```
 
 Stages that are not set are omitted from the output.
+
+## See also
+
+- [Storage Policy concept](/docs/concepts/storage-policy/)
+- [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/)
+- [CREATE TABLE](/docs/query/sql/create-table/) — `STORAGE POLICY` clause at
+  table creation
+- [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/) — the TTL
+  feature storage policies supersede in Enterprise
+- [`storage_policies`](/docs/query/functions/meta/#storage_policies) — system
+  view listing active policies
+- [`SHOW CREATE TABLE`](/docs/query/sql/show/#show-create-table) — displays
+  the attached `STORAGE POLICY` clause
+- [RBAC permissions](/docs/security/rbac/#permissions) — `SET`, `REMOVE`,
+  `ENABLE`, and `DISABLE STORAGE POLICY` permissions

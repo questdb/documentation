@@ -19,9 +19,11 @@ external scheduling.
 
 Storage policies currently operate **locally only**. Parquet files are not
 automatically uploaded to object storage, and the `DROP REMOTE` clause is
-reserved syntax — it is recognised by the parser but rejected with
-`'DROP REMOTE' is not supported yet`. Object storage integration will be added
-in a future release.
+reserved syntax — it is recognised by the parser but rejected at execute time
+with `'DROP REMOTE' is not supported yet`. Accordingly, the `drop_remote`
+column in the [`storage_policies`](/docs/query/functions/meta/#storage_policies)
+view is always blank in the current release; it is kept for forward
+compatibility. Object storage integration will be added in a future release.
 
 :::
 
@@ -72,10 +74,48 @@ when its **entire time range** falls outside the TTL window:
 eligible when: partition_end_time < reference_time - TTL
 ```
 
+**This rule is applied independently for each stage's TTL.** A partition can
+be eligible for `TO PARQUET` long before it is eligible for `DROP NATIVE`,
+`DROP LOCAL`, or (one day) `DROP REMOTE`. Each stage uses its own `TTL` in the
+formula above; the stages share only the reference time and the ordering
+constraint `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`.
+
 The reference time is `min(wall_clock_time, latest_timestamp)` by default.
 
 QuestDB checks storage policies periodically (every 15 minutes by default) and
 processes eligible partitions automatically.
+
+## Storage policy vs TTL
+
+Storage policies replace [TTL](/docs/concepts/ttl/) in QuestDB Enterprise. If
+you are already familiar with TTL, this comparison is the fastest way in:
+
+| | TTL | Storage Policy |
+|---|-----|----------------|
+| **Availability** | Open source | Enterprise only |
+| **Action** | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
+| **Parquet conversion** | No | Yes (automatic local conversion) |
+| **Granularity** | Single retention window | Up to four independent TTL stages |
+
+In QuestDB Enterprise, `CREATE TABLE ... TTL` and `ALTER TABLE SET TTL` are
+deprecated. Use storage policies instead:
+
+```questdb-sql
+-- Instead of:
+-- ALTER TABLE trades SET TTL 30 DAYS;
+
+-- Use:
+ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
+```
+
+:::note
+
+If a table already has a TTL set, you must clear it with
+`ALTER TABLE SET TTL 0` before setting a storage policy. `SET TTL 0` is the
+only `SET TTL` value Enterprise accepts; any non-zero value is rejected with
+`TTL settings are deprecated, please, create a storage policy instead`.
+
+:::
 
 ## Setting a storage policy
 
@@ -180,45 +220,21 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
 |----------------|-----------|-------------|------------|-------------|--------|--------------|
-| trades | 72h | 240h | 1m | | A | 2025-01-15T10:30:00.000000Z |
+| trades~12 | 72h | 240h | 1M | | A | 2025-01-15T10:30:00.000000Z |
 
-- TTL values with an `h` suffix are in hours; values with an `m` suffix are in
-  months
-- Status `A` means active; `D` means disabled
-- Unset stages appear blank — `drop_remote` is always blank in the current
-  release because the clause is rejected at SQL parse time
+- TTL values are rendered in their native stored units. `h` means hours; `M`
+  means months. **`1M` in this view means one month, not one minute** — the
+  view uses the `MONTH` shorthand documented in
+  [TTL duration format](#ttl-duration-format)
+- Status `A` means active; `D` means disabled (see
+  [Disabling and enabling](#disabling-and-enabling))
+- Unset stages appear blank. `drop_remote` is **always blank in the current
+  release** because `DROP REMOTE` is rejected at execute time with
+  `'DROP REMOTE' is not supported yet`; the column is kept for forward
+  compatibility
 
-## Storage policy vs TTL
-
-Storage policies replace [TTL](/docs/concepts/ttl/) in QuestDB Enterprise. The
-key differences:
-
-| | TTL | Storage Policy |
-|---|-----|----------------|
-| **Availability** | Open source + Enterprise | Enterprise only |
-| **Action** | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
-| **Parquet conversion** | No | Yes (automatic local conversion) |
-| **Granularity** | Single retention window | Up to four independent TTL stages |
-
-In QuestDB Enterprise, `CREATE TABLE ... TTL` and `ALTER TABLE SET TTL` are
-deprecated. Use storage policies instead:
-
-```questdb-sql
--- Instead of:
--- ALTER TABLE trades SET TTL 30 DAYS;
-
--- Use:
-ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
-```
-
-:::note
-
-If a table already has a TTL set, you must clear it with
-`ALTER TABLE SET TTL 0` before setting a storage policy. `SET TTL 0` is the
-only `SET TTL` value Enterprise accepts; any non-zero value is rejected with
-`TTL settings are deprecated, please, create a storage policy instead`.
-
-:::
+For the full column reference and types, see
+[`storage_policies`](/docs/query/functions/meta/#storage_policies).
 
 ## Replication
 
@@ -268,13 +284,67 @@ GRANT SET STORAGE POLICY ON trades TO analyst;
 GRANT REMOVE STORAGE POLICY ON trades TO admin;
 ```
 
+## End-to-end example
+
+A complete lifecycle on a single table, from creation through verification,
+modification, inspection of the generated DDL, temporary suspension, and
+permanent removal:
+
+```questdb-sql title="1. Create the table with a storage policy"
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY
+    STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+    WAL;
+```
+
+```questdb-sql title="2. Verify via the system view"
+SELECT table_dir_name, to_parquet, drop_native, drop_local, status
+FROM storage_policies
+WHERE table_dir_name LIKE 'trades%';
+```
+
+| table_dir_name | to_parquet | drop_native | drop_local | status |
+|----------------|------------|-------------|------------|--------|
+| trades~12      | 72h        | 240h        | 1M         | A      |
+
+```questdb-sql title="3. Modify one stage (others remain unchanged)"
+ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 1d);
+```
+
+```questdb-sql title="4. Inspect the current DDL"
+SHOW CREATE TABLE trades;
+```
+
+```text
+CREATE TABLE 'trades' (
+    ts TIMESTAMP,
+    symbol SYMBOL CAPACITY 256 CACHE,
+    price DOUBLE
+) timestamp(ts) PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 1 DAY, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+```
+
+```questdb-sql title="5. Temporarily suspend the policy (e.g. during a backfill)"
+ALTER TABLE trades DISABLE STORAGE POLICY;
+-- status in storage_policies changes to 'D'
+```
+
+```questdb-sql title="6. Re-enable and, later, drop it for good"
+ALTER TABLE trades ENABLE STORAGE POLICY;
+ALTER TABLE trades DROP STORAGE POLICY;
+-- row disappears from storage_policies
+```
+
 ## Guidelines
 
 | Use case | Suggested policy | Rationale |
 |----------|-----------------|-----------|
 | Real-time metrics | `TO PARQUET 1d, DROP NATIVE 7d, DROP LOCAL 30d` | Keep recent data fast, drop old data automatically |
 | Trading data | `TO PARQUET 7d, DROP NATIVE 30d` | Keep Parquet locally for long-term queries |
-| IoT telemetry | `TO PARQUET 3d, DROP NATIVE 3d, DROP LOCAL 90d` | High volume, convert early to save disk |
+| IoT telemetry | `TO PARQUET 1d, DROP NATIVE 3d, DROP LOCAL 90d` | High volume, convert early to save disk; keep a brief native overlap for in-flight queries before dropping the native files |
 | Aggregated views | `TO PARQUET 30d` | Low volume, keep locally in Parquet |
 
 **Tips:**

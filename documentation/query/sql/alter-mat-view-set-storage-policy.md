@@ -64,10 +64,13 @@ transition from native format to Parquet and eventually get removed:
 
 :::info
 
-`DROP REMOTE` is reserved syntax. It is recognised by the parser but is rejected
-with `'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
-object storage is not currently supported — storage policies operate locally
-only.
+`DROP REMOTE` is reserved syntax. It is recognised by the parser but is
+rejected at execute time with `'DROP REMOTE' is not supported yet`. Automatic
+upload of Parquet files to object storage is not currently supported — storage
+policies operate locally only. Because the clause cannot take effect, the
+`drop_remote` column in the
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) view is
+always blank in the current release.
 
 :::
 
@@ -154,3 +157,7 @@ SELECT * FROM storage_policies;
 - [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/)
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)
+- [`storage_policies`](/docs/query/functions/meta/#storage_policies) — system
+  view listing active policies
+- [RBAC permissions](/docs/security/rbac/#permissions) — `SET`, `REMOVE`,
+  `ENABLE`, and `DISABLE STORAGE POLICY` permissions

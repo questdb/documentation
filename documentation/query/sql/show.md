@@ -117,6 +117,29 @@ CREATE TABLE sensors (
 ) timestamp(ts) PARTITION BY DAY BYPASS WAL;
 ```
 
+#### Storage policy clause
+
+When a [storage policy](/docs/concepts/storage-policy/) is attached to a table
+(Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in the
+`SHOW CREATE TABLE` output:
+
+```questdb-sql
+SHOW CREATE TABLE sensor_data;
+```
+
+```text
+CREATE TABLE 'sensor_data' (
+    ts TIMESTAMP,
+    value DOUBLE
+) timestamp(ts) PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+```
+
+Stages that are not configured on the policy are omitted from the clause. A
+disabled policy (`ALTER TABLE ... DISABLE STORAGE POLICY`) still renders — the
+disabled state is not part of the DDL. See
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
 #### Enterprise variant
 
 [QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.

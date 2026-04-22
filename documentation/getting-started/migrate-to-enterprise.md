@@ -16,8 +16,9 @@ stays in place and works immediately.
 - **Role-based access control (RBAC)** with users, groups, and permissions
 - **Single Sign-On (SSO)** via OpenID Connect
 - **Database replication** for high availability
-- **Multi-tier storage** with seamless object storage integration
-- **Automated backup and recovery** for data protection
+- **[Storage policies](/docs/concepts/storage-policy/)** for automated partition
+  lifecycle management (convert to Parquet, then drop on a schedule)
+- **Automated [backup and recovery](/docs/operations/backup/)** for data protection
 
 ## Upgrade steps
 

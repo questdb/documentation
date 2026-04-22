@@ -8,6 +8,20 @@ TTL (Time To Live) automatically drops old partitions based on data age. Set a
 retention period, and QuestDB removes partitions that fall entirely outside that
 window - no cron jobs or manual cleanup required.
 
+:::caution
+
+**QuestDB Enterprise: TTL is superseded by
+[Storage Policy](/docs/concepts/storage-policy/).** Enterprise rejects any
+non-zero `SET TTL` with
+`TTL settings are deprecated, please, create a storage policy instead`.
+Storage policies extend TTL with graduated lifecycle management (convert to
+Parquet, then drop) and are the recommended retention primitive for Enterprise
+users. The rest of this page describes TTL behavior on QuestDB Open Source
+(and the `SET TTL 0` case on Enterprise, used to clear an older TTL before
+attaching a storage policy).
+
+:::
+
 import Screenshot from "@theme/Screenshot"
 
 <Screenshot
