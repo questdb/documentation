@@ -427,6 +427,7 @@ module.exports = {
                 "query/sql/order-by",
                 "query/sql/pivot",
                 "query/sql/sample-by",
+                "query/sql/subsample",
                 "query/sql/unnest",
                 "query/sql/where",
                 "query/sql/window-join",

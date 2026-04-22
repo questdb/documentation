@@ -319,6 +319,10 @@
     "default": "0",
     "description": "SampleBy default alignment behaviour. true corresponds to ALIGN TO CALENDAR, false corresponds to ALIGN TO FIRST OBSERVATION."
   },
+  "cairo.sql.subsample.max.rows": {
+    "default": "100000000",
+    "description": "Maximum number of input rows SUBSAMPLE will buffer. Exceeding this limit returns an error. Must be between 1 and 2,147,483,647."
+  },
   "cairo.date.locale": {
     "default": "en",
     "description": "The locale to handle date types."

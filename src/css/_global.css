@@ -485,3 +485,8 @@ html[data-theme="dark"] .DocSearch {
   font-family: SegoeUI, -apple-system, BlinkMacSystemFont, Ubuntu, sans-serif;
   font-size: var(--font-size-small);
 }
+
+/* Make doc article images fill the content width */
+article img {
+  width: 100%;
+}
