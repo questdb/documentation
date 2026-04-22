@@ -169,33 +169,44 @@ SUBSAMPLE minmax(avg_price, 8)
 ### Gap-preserving LTTB
 
 Standard LTTB divides data by row count, so it connects across time gaps. An
-optional third parameter enables gap detection:
+optional third parameter sets a gap threshold:
 
 ```questdb-sql
-SUBSAMPLE lttb(price, 12, '1h')
+SUBSAMPLE lttb(price, 12, '6h')
 ```
 
-When specified, LTTB splits data into contiguous segments where consecutive
-timestamps are within the gap threshold. Each segment is downsampled
-independently with its proportional share of the target points. Gaps between
-segments are preserved in the output.
+When specified, LTTB scans for gaps where consecutive timestamps are further
+apart than the threshold. Gaps below the threshold are ignored - the data is
+treated as continuous. Gaps above the threshold split the data into separate
+segments, each downsampled independently with its proportional share of the
+target points.
 
-![LTTB gap handling comparison](/images/docs/subsample/lttb-gap.svg)
+The diagrams below show a dataset with two gaps - a small one (3 hours) and
+a large one (24 hours):
 
-Without gap detection, LTTB draws a straight line across the gap. With gap
-detection enabled, each segment is downsampled independently and the gap is
-visible in the output.
+![Raw data with gaps](/images/docs/subsample/gap-raw.svg)
+
+Without gap detection, LTTB treats all points as continuous and connects
+across both gaps:
+
+![LTTB without gap detection](/images/docs/subsample/gap-no-detect.svg)
+
+With a threshold of `'6h'`, the small gap (3h) is below the threshold so
+segments A and B are treated as continuous. The large gap (24h) exceeds the
+threshold, so segment C is downsampled separately and the gap is preserved:
+
+![LTTB with gap detection](/images/docs/subsample/gap-detect.svg)
 
 Supported interval units: `s` (seconds), `m` (minutes), `h` (hours),
 `d` (days).
 
 Examples: `'30s'`, `'5m'`, `'1h'`, `'7d'`
 
-```questdb-sql title="Preserve gaps larger than 1 hour in the output" demo
+```questdb-sql title="Preserve gaps larger than 6 hours in the output" demo
 SELECT timestamp, price
 FROM fx_trades
 WHERE symbol = 'EURUSD'
-SUBSAMPLE lttb(price, 12, '1h')
+SUBSAMPLE lttb(price, 12, '6h')
 ```
 
 :::note

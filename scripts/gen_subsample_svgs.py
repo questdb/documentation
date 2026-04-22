@@ -21,8 +21,16 @@ SEG_A = [
     0.45, 0.50, 0.48, 0.46,
 ]
 
-SEG_B_START = 48
-SEG_B = [
+# Gap dataset: 3 data segments, 1 small gap (3h), 1 big gap (24h)
+# Seg A: i=0..10, Seg B: i=14..23 (small gap 11-13), Seg C: i=48..68 (big gap 24-47)
+GAP_SEG_A_I = list(range(0, 11))
+GAP_SEG_A_V = [0.50, 0.55, 0.60, 0.65, 0.70, 0.95, 0.85, 0.70, 0.60, 0.55, 0.50]
+
+GAP_SEG_B_I = list(range(14, 24))
+GAP_SEG_B_V = [0.42, 0.38, 0.35, 0.28, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45]
+
+GAP_SEG_C_I = list(range(48, 69))
+GAP_SEG_C_V = [
     0.45, 0.50, 0.55, 0.58, 0.60, 0.65, 0.70, 0.75, 0.70, 0.55,
     0.40, 0.25, 0.15, 0.25, 0.40, 0.55, 0.60, 0.62, 0.60, 0.58, 0.55,
 ]
@@ -34,11 +42,12 @@ XL, XR = 10, 590  # plot x range - use full width
 YT, YB = 60, 240  # plot y range (180px tall)
 LY = 275           # legend baseline
 
-# Gap SVG layout (two panels)
-GH = 530
-G1T, G1B = 60, 210   # panel 1 plot area
-G2T, G2B = 300, 450  # panel 2 plot area
-GLY = 510
+# Gap SVG layout (three panels: raw, no-gap LTTB, gap LTTB)
+GH = 600
+G0T, G0B = 50, 140    # panel 0: raw data with gap
+G1T, G1B = 200, 310   # panel 1: LTTB without gap detection
+G2T, G2B = 370, 480   # panel 2: LTTB with gap detection
+GLY = 520              # legend
 
 # Intrinsic pixel width - set larger than container so max-width:100% fills it
 PX_W = 1400
@@ -56,17 +65,17 @@ STYLE = f"""<style>
   .t {{ font-size: {TITLE_SZ}px; font-weight: 600; }}
   .l {{ font-size: {LEG_SZ}px; }}
   .ref {{ stroke-width: {REF_SW}; stroke-dasharray: 6 5; fill: none; }}
-  .bk {{ stroke-width: {BK_SW}; stroke-dasharray: 6 5; }}
+  .bk {{ stroke-width: {BK_SW}; stroke-dasharray: 2 3; }}
   .t {{ fill: {CYAN}; }}
   .l {{ fill: #64748b; }}
   .ref {{ stroke: #bbb; }}
-  .bk {{ stroke: #aaa; }}
+  .bk {{ stroke: #5a9aa8; }}
   .sep {{ stroke: #ccc; }}
   @media (prefers-color-scheme: dark) {{
     .t {{ fill: {CYAN}; }}
     .l {{ fill: #b1b5d3; }}
     .ref {{ stroke: #555; }}
-    .bk {{ stroke: #4a4a4a; }}
+    .bk {{ stroke: #2a7a8a; }}
     .sep {{ stroke: #3a3a3a; }}
   }}
 </style>"""
@@ -215,48 +224,105 @@ def gen_minmax():
 </svg>"""
 
 
-def gen_lttb_gap():
-    N_A = len(SEG_A)
-    N_B = len(SEG_B)
-    im, ix = 0, SEG_B_START + N_B - 1  # 0..68
-    rai = list(range(N_A))
-    rbi = list(range(SEG_B_START, SEG_B_START + N_B))
-    # LTTB no gap, target 12 on 45 total points
-    li = [0,4,5,12,15,23,51,55,59,60,65,68]
-    lv = [.50,.70,.95,.40,.20,.46,.25,.55,.60,.62,.58,.55]
-    # LTTB with gap detection, 6 per segment
-    g1i = [0,4,5,15,19,23]
-    g1v = [.50,.70,.95,.20,.40,.46]
-    g2i = [48,53,55,60,65,68]
-    g2v = [.45,.65,.75,.15,.62,.55]
+def _gap_helpers():
+    """Shared helpers for the three gap SVGs."""
+    im, ix = 0, 68
+    raw_color = "#888"
+    small_gap_mid = 12
+    big_gap_mid = 35.5
 
-    def refs(yt, yb):
-        return f"{rpl(rai, SEG_A, im, ix, yt, yb)}\n{rpl(rbi, SEG_B, im, ix, yt, yb)}"
+    def raw_pls(yt, yb):
+        return (f"{rpl(GAP_SEG_A_I, GAP_SEG_A_V, im, ix, yt, yb)}\n"
+                f"{rpl(GAP_SEG_B_I, GAP_SEG_B_V, im, ix, yt, yb)}\n"
+                f"{rpl(GAP_SEG_C_I, GAP_SEG_C_V, im, ix, yt, yb)}")
 
-    total = N_A + N_B
-    return f"""{hdr(W, GH, "LTTB gap handling", "Comparing LTTB with and without gap detection.")}
-<text class="t" x="{XL}" y="38">LTTB without gap detection: line connects across the gap</text>
-{refs(G1T, G1B)}
-<polyline points="{pl(li,lv,im,ix,G1T,G1B)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
-{cd(li,lv,im,ix,G1T,G1B,GRAY)}
-<line class="sep" x1="10" y1="260" x2="590" y2="260"/>
-<text class="t" x="{XL}" y="288">LTTB with gap detection: each segment downsampled</text>
-{refs(G2T, G2B)}
-<polyline points="{pl(g1i,g1v,im,ix,G2T,G2B)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
-<polyline points="{pl(g2i,g2v,im,ix,G2T,G2B)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
-{cd(g1i,g1v,im,ix,G2T,G2B,GRAY)}
-{cd(g2i,g2v,im,ix,G2T,G2B,GRAY)}
-<line class="ref" x1="{XL}" y1="{GLY}" x2="{XL+24}" y2="{GLY}"/>
-<text class="l" x="{XL+30}" y="{GLY+5}">Raw data ({total} points with gap)</text>
-<circle cx="{XL+290}" cy="{GLY}" r="{LEG_DOT}" fill="{GRAY}"/>
-<text class="l" x="{XL+302}" y="{GLY+5}">Selected points (12)</text>
+    def raw_dots_str(yt, yb):
+        parts = []
+        for si, sv in [(GAP_SEG_A_I, GAP_SEG_A_V),
+                       (GAP_SEG_B_I, GAP_SEG_B_V),
+                       (GAP_SEG_C_I, GAP_SEG_C_V)]:
+            parts.extend(
+                f'<circle cx="{xp(i,im,ix):.1f}" cy="{yp(v,yt,yb):.1f}" '
+                f'r="3.5" fill="{raw_color}"/>'
+                for i, v in zip(si, sv))
+        return "\n".join(parts)
+
+    def raw_lines_str(yt, yb):
+        return (
+            f'<polyline points="{pl(GAP_SEG_A_I, GAP_SEG_A_V, im, ix, yt, yb)}" '
+            f'fill="none" stroke="{raw_color}" stroke-width="1.5"/>\n'
+            f'<polyline points="{pl(GAP_SEG_B_I, GAP_SEG_B_V, im, ix, yt, yb)}" '
+            f'fill="none" stroke="{raw_color}" stroke-width="1.5"/>\n'
+            f'<polyline points="{pl(GAP_SEG_C_I, GAP_SEG_C_V, im, ix, yt, yb)}" '
+            f'fill="none" stroke="{raw_color}" stroke-width="1.5"/>')
+
+    return im, ix, raw_color, small_gap_mid, big_gap_mid, raw_pls, raw_dots_str, raw_lines_str
+
+
+def gen_gap_raw():
+    """Raw data with gaps - shows where the gaps are."""
+    im, ix, raw_color, sg, bg, _, raw_dots_str, raw_lines_str = _gap_helpers()
+    total = len(GAP_SEG_A_V) + len(GAP_SEG_B_V) + len(GAP_SEG_C_V)
+    return f"""{hdr(W, H, "Raw data with gaps", "42 points with a small and large gap.")}
+<text class="t" x="{XL}" y="35">Raw data: {total} points, small gap (3h) and large gap (24h)</text>
+{bkl([sg, bg], im, ix, YT, YB)}
+{raw_lines_str(YT, YB)}
+{raw_dots_str(YT, YB)}
+<circle cx="{XL+10}" cy="{LY}" r="3.5" fill="{raw_color}"/>
+<text class="l" x="{XL+22}" y="{LY+5}">Data points ({total})</text>
+<line class="bk" x1="{XL+160}" y1="{LY}" x2="{XL+184}" y2="{LY}"/>
+<text class="l" x="{XL+190}" y="{LY+5}">Gap boundary</text>
+</svg>"""
+
+
+def gen_gap_no_detect():
+    """LTTB without gap detection - connects across all gaps."""
+    im, ix, _, sg, bg, raw_pls, _, _ = _gap_helpers()
+    ng_i = [0, 4, 5, 10, 18, 23, 51, 55, 60, 64, 67, 68]
+    ng_v = [.50, .70, .95, .50, .20, .45, .55, .75, .15, .55, .60, .55]
+    return f"""{hdr(W, H, "LTTB without gap detection", "LTTB connects across all gaps.")}
+<text class="t" x="{XL}" y="35">LTTB without gap detection: connects across all gaps</text>
+{raw_pls(YT, YB)}
+<polyline points="{pl(ng_i,ng_v,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(ng_i,ng_v,im,ix,YT,YB,GRAY)}
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Selected points (12 of {len(GAP_SEG_A_V)+len(GAP_SEG_B_V)+len(GAP_SEG_C_V)})</text>
+</svg>"""
+
+
+def gen_gap_detect():
+    """LTTB with gap detection - small gap connected, large gap preserved."""
+    im, ix, _, sg, bg, raw_pls, _, _ = _gap_helpers()
+    g_ab_i = [0, 5, 10, 18, 22, 23]
+    g_ab_v = [.50, .95, .50, .20, .40, .45]
+    g_c_i = [48, 55, 58, 60, 65, 68]
+    g_c_v = [.45, .75, .55, .15, .60, .55]
+    return f"""{hdr(W, H, "LTTB with gap detection", "Small gap connected, large gap preserved.")}
+<text class="t" x="{XL}" y="35">LTTB with gap threshold '6h': small gap connected, large gap preserved</text>
+{bkl([bg], im, ix, YT, YB)}
+{raw_pls(YT, YB)}
+<polyline points="{pl(g_ab_i,g_ab_v,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+<polyline points="{pl(g_c_i,g_c_v,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(g_ab_i,g_ab_v,im,ix,YT,YB,GRAY)}
+{cd(g_c_i,g_c_v,im,ix,YT,YB,GRAY)}
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Selected points (12)</text>
+<line class="bk" x1="{XL+310}" y1="{LY}" x2="{XL+334}" y2="{LY}"/>
+<text class="l" x="{XL+340}" y="{LY+5}">Gap boundary</text>
 </svg>"""
 
 
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in [("raw.svg", gen_raw), ("lttb.svg", gen_lttb), ("m4.svg", gen_m4),
-                     ("minmax.svg", gen_minmax), ("lttb-gap.svg", gen_lttb_gap)]:
+                     ("minmax.svg", gen_minmax),
+                     ("gap-raw.svg", gen_gap_raw),
+                     ("gap-no-detect.svg", gen_gap_no_detect),
+                     ("gap-detect.svg", gen_gap_detect)]:
         path = os.path.join(OUT_DIR, name)
         with open(path, "w") as f:
             f.write(fn())
