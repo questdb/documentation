@@ -20,13 +20,17 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
 AS [ ( ] query [ ) ]
 [ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) [ TTL n timeUnit ] ]
+[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+      [ TTL n timeUnit
+      | STORAGE POLICY ( policyStage [, policyStage ...] ) ] ]
 [ OWNED BY ownerName ]
 ```
 
 Where:
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
+- `policyStage`: `TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration`
+  (Enterprise only; all stages optional; durations must be positive and in ascending order)
 - `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
 
 ## Parameters
@@ -42,6 +46,7 @@ Where:
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
+| `STORAGE POLICY` | Partition lifecycle automation (Enterprise) — mutually exclusive with `TTL` |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
 ## Rules and defaults
@@ -277,6 +282,16 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
 
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE MATERIALIZED VIEW ... TTL`
+is rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy materialized view has a TTL
+set, clear it with `ALTER MATERIALIZED VIEW SET TTL 0` before setting a storage
+policy.
+
+:::
+
 ## Storage Policy
 
 :::note
@@ -305,16 +320,6 @@ syntax and is currently rejected at SQL parse time with
 
 To modify a storage policy after creation, see
 [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
-
-:::note
-
-In QuestDB Enterprise, `TTL` is deprecated — `CREATE MATERIALIZED VIEW ... TTL`
-is rejected with `TTL settings are deprecated, please, create a storage policy
-instead`. Use `STORAGE POLICY` instead. If a legacy materialized view has a TTL
-set, clear it with `ALTER MATERIALIZED VIEW SET TTL 0` before setting a storage
-policy.
-
-:::
 
 ## Complete example
 
@@ -429,6 +434,7 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `base table does not exist` | Referenced table doesn't exist |
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
 | `permission denied` | Missing required permission (Enterprise) |
+| `TTL settings are deprecated, please, create a storage policy instead` | `TTL` clause used in QuestDB Enterprise — use `STORAGE POLICY` instead |
 
 ## See also
 

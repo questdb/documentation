@@ -4,8 +4,9 @@ sidebar_label: SET STORAGE POLICY
 description: ALTER TABLE SET STORAGE POLICY SQL keyword reference documentation.
 ---
 
-Sets, modifies, enables, disables, or removes a storage policy on a table or
-materialized view.
+Sets, modifies, enables, disables, or removes a storage policy on a table. For
+the equivalent operations on materialized views, see
+[ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
 
 :::note
 
@@ -32,27 +33,11 @@ ALTER TABLE table_name SET STORAGE POLICY(
 Only the specified settings are changed. Omitted settings retain their current
 values.
 
-The same syntax applies to materialized views:
-
-```questdb-sql
-ALTER MATERIALIZED VIEW view_name SET STORAGE POLICY(
-    [TO PARQUET ttl,]
-    [DROP NATIVE ttl,]
-    [DROP LOCAL ttl,]
-    [DROP REMOTE ttl]
-);
-```
-
 ### Enable or disable a storage policy
 
 ```questdb-sql
 ALTER TABLE table_name ENABLE STORAGE POLICY;
 ALTER TABLE table_name DISABLE STORAGE POLICY;
-```
-
-```questdb-sql
-ALTER MATERIALIZED VIEW view_name ENABLE STORAGE POLICY;
-ALTER MATERIALIZED VIEW view_name DISABLE STORAGE POLICY;
 ```
 
 Disabling a policy suspends processing without removing the policy definition.
@@ -61,10 +46,6 @@ Disabling a policy suspends processing without removing the policy definition.
 
 ```questdb-sql
 ALTER TABLE table_name DROP STORAGE POLICY;
-```
-
-```questdb-sql
-ALTER MATERIALIZED VIEW view_name DROP STORAGE POLICY;
 ```
 
 This permanently removes the storage policy from the table.
@@ -144,15 +125,6 @@ Update only the Parquet conversion threshold:
 
 ```questdb-sql
 ALTER TABLE sensor_data SET STORAGE POLICY(TO PARQUET 7d);
-```
-
-Set a policy on a materialized view:
-
-```questdb-sql
-ALTER MATERIALIZED VIEW hourly_metrics SET STORAGE POLICY(
-    TO PARQUET 14d,
-    DROP NATIVE 30d
-);
 ```
 
 Temporarily suspend a policy:

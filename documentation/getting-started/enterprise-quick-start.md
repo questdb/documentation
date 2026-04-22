@@ -476,6 +476,53 @@ Parquet, drops the native binary files, and eventually drops the Parquet files
 too — on a schedule you define. This supersedes plain TTL in Enterprise, where
 `ALTER TABLE SET TTL` with a non-zero value is rejected.
 
+### Migrating from TTL when upgrading from OSS
+
+Tables and materialized views that were created in OSS keep their existing
+`TTL` setting after you upgrade to Enterprise — no data is lost at upgrade
+time. However, Enterprise rejects any **new** `TTL` changes (both
+`CREATE ... TTL` and `ALTER ... SET TTL <non-zero>`) with:
+
+```
+TTL settings are deprecated, please, create a storage policy instead
+```
+
+To move a legacy table or materialized view from `TTL` to a storage policy:
+
+1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
+   value Enterprise accepts, and it is required before a storage policy can be
+   attached:
+
+   ```questdb-sql title="Clear the legacy TTL"
+   ALTER TABLE trades SET TTL 0;
+   -- or, for a materialized view:
+   ALTER MATERIALIZED VIEW trades_hourly SET TTL 0;
+   ```
+
+2. **Attach a storage policy** that reproduces — and ideally extends — the
+   retention the TTL used to provide. A policy lets you keep data in Parquet
+   after you would previously have dropped it, so `DROP LOCAL` (or
+   `DROP NATIVE` if you don't want Parquet at all) is the stage that replaces
+   the old TTL horizon:
+
+   ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
+   ALTER TABLE trades SET STORAGE POLICY(
+       TO PARQUET 3 DAYS,
+       DROP NATIVE 10 DAYS,
+       DROP LOCAL 1 MONTH
+   );
+   ```
+
+   If you want the policy to behave exactly like the old TTL (delete the
+   partition outright after the same interval), use a single-stage policy —
+   for example `STORAGE POLICY(DROP NATIVE 1 MONTH)` to match `TTL 1 MONTH`.
+
+Do this for every table and materialized view you want to keep managed
+automatically. Tables without a storage policy retain their data indefinitely
+once their legacy TTL has been cleared.
+
+### Creating new tables with a storage policy
+
 Attach a policy at table creation:
 
 ```questdb-sql title="Web Console - Create a table with a storage policy"

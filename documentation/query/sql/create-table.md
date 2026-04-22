@@ -21,6 +21,7 @@ The first two modes accept the same set of optional clauses:
 - [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
 - [`PARTITION BY`](#partitioning) - partition unit and WAL mode
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
+- [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
 - [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
   [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
 - [`WITH`](#with-table-parameter) - table parameters
@@ -36,7 +37,8 @@ TABLE [IF NOT EXISTS] tableName
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
-            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -52,12 +54,23 @@ TABLE [IF NOT EXISTS] tableName
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
-            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
     [OWNED BY ownerName];
 ```
+
+Where `policyStage` is one of:
+
+```
+TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration
+```
+
+Stages are Enterprise-only, all optional, and their durations must be positive
+and in ascending order. `TTL` and `STORAGE POLICY` are mutually exclusive — see
+[Storage Policy](#storage-policy).
 
 ```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
 CREATE TABLE tableName (LIKE sourceTableName);
@@ -241,6 +254,15 @@ information on the behavior of this feature.
 
 :::
 
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
+rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
+it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+
+:::
+
 ## Storage Policy
 
 :::note
@@ -274,15 +296,6 @@ syntax and is currently rejected at SQL parse time with
 
 To modify a storage policy after table creation, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
-
-:::note
-
-In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
-rejected with `TTL settings are deprecated, please, create a storage policy
-instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
-it with `ALTER TABLE SET TTL 0` before setting a storage policy.
-
-:::
 
 ## Deduplication
 
