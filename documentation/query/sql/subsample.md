@@ -69,11 +69,15 @@ same 24-point series as input (think 24 hourly bars over one day):
 ### lttb - Largest Triangle Three Buckets
 
 Divides the data into equal-sized row-count buckets and selects the point in
-each bucket that forms the largest triangle with its neighbors. The first and
+each bucket that forms the largest triangle with its neighbors. The idea is
+that points where the line changes direction sharply (a spike, a valley, a
+sudden trend shift) form large triangles and get kept, while points in the
+middle of a smooth trend form small triangles and get dropped. The first and
 last points are always kept. Output is exactly N points.
 
-Best for line charts where preserving the visual shape (spikes, valleys,
-trend changes) matters most.
+Best for line charts where the visual shape matters most - a chart drawn
+from the LTTB output looks nearly identical to one drawn from the full
+dataset, despite using far fewer points.
 
 ![LTTB downsampling](/images/docs/subsample/lttb.svg)
 
@@ -94,57 +98,14 @@ SAMPLE BY 1h
 SUBSAMPLE lttb(avg_price, 8)
 ```
 
-### m4 - Min/Max/First/Last per time interval
-
-Divides the time range into equal time intervals and selects up to 4 points
-per interval: the first, last, minimum, and maximum values. Empty intervals
-produce no output, naturally preserving data gaps.
-
-Best for monitoring dashboards where you must not miss spikes or drops. The
-min/max envelope is pixel-accurate to the full dataset.
-
-![M4 downsampling](/images/docs/subsample/m4.svg)
-
-How it works:
-
-1. The total time range is divided into N/4 equal time intervals.
-2. For each interval, up to 4 points are selected: first, last, min, max.
-3. When multiple roles resolve to the same physical row (e.g., the minimum
-   value is also the first row), duplicates are removed. A bucket emits
-   between 1 and 4 rows depending on the data.
-4. Empty intervals produce no output.
-
-Output is up to N points (N/4 buckets, up to 4 points each). In the diagram
-above, target 8 creates 2 time buckets. The first row happens to also be
-the minimum in bucket 1, so each bucket emits 3-4 distinct rows instead of 4,
-giving 7 total.
-
-```questdb-sql title="Hourly bars reduced to 8 with M4 - spike and trough guaranteed" demo
-SELECT timestamp, avg(price) avg_price
-FROM fx_trades
-WHERE symbol = 'EURUSD'
-  AND timestamp IN '$today'
-SAMPLE BY 1h
-SUBSAMPLE m4(avg_price, 8)
-```
-
-:::tip
-
-When sizing `targetPoints` for a pixel-wide chart, remember that N/4 gives
-the number of time buckets. A 1920-pixel-wide chart needs
-`SUBSAMPLE m4(col, 1920)` to get 480 time buckets with up to 4 points each.
-
-:::
-
 ### minmax - Min/Max per time interval
 
 Divides the time range into equal time intervals and selects up to 2 points
-per interval: the minimum and maximum values. Lighter than M4 (no first/last
-tracking), producing roughly half the output. Empty intervals produce no
-output.
-
-Best for simple envelope visualization where you only need the value range
-per bucket, not entry/exit points.
+per interval: the row with the minimum value and the row with the maximum
+value. This creates a visual envelope - at any point on the chart, you can
+see the full range the data covered during that interval. No spike or drop
+is ever hidden, even under heavy compression. Empty intervals produce no
+output, naturally preserving data gaps.
 
 ![MinMax downsampling](/images/docs/subsample/minmax.svg)
 
@@ -165,6 +126,50 @@ WHERE symbol = 'EURUSD'
 SAMPLE BY 1h
 SUBSAMPLE minmax(avg_price, 8)
 ```
+
+### m4 - Min/Max/First/Last per time interval
+
+Builds on MinMax by also capturing the first and last rows in each time
+interval. Where MinMax shows you the range of values in a bucket, M4 also
+shows you where the data entered and exited - the opening and closing levels.
+This matters when trends within a bucket are important: a price that opens
+high, dips, then recovers looks different from one that opens low and climbs.
+MinMax would show the same min/max range for both; M4 distinguishes them.
+
+Empty intervals produce no output, naturally preserving data gaps.
+
+![M4 downsampling](/images/docs/subsample/m4.svg)
+
+How it works:
+
+1. The total time range is divided into N/4 equal time intervals.
+2. For each interval, up to 4 points are selected: first, last, min, max.
+3. When multiple roles resolve to the same physical row (e.g., the minimum
+   value is also the first row), duplicates are removed. A bucket emits
+   between 1 and 4 rows depending on the data.
+4. Empty intervals produce no output.
+
+Output is up to N points (N/4 buckets, up to 4 points each). In the diagram
+above, compare the right side with MinMax: M4 captures the exit at i=23
+(the pullback after the late spike), while MinMax ends at the peak. M4
+gives a more faithful picture of where the data actually settled.
+
+```questdb-sql title="Hourly bars reduced to 8 with M4 - captures entry/exit levels" demo
+SELECT timestamp, avg(price) avg_price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 1h
+SUBSAMPLE m4(avg_price, 8)
+```
+
+:::tip
+
+When sizing `targetPoints` for a pixel-wide chart, remember that N/4 gives
+the number of time buckets. A 1920-pixel-wide chart needs
+`SUBSAMPLE m4(col, 1920)` to get 480 time buckets with up to 4 points each.
+
+:::
 
 ### Gap-preserving LTTB
 
@@ -221,13 +226,13 @@ treat `targetPoints` as a hard maximum.
 
 ### Algorithm comparison
 
-| Property | lttb | m4 | minmax |
-|----------|------|----|--------|
+| Property | lttb | minmax | m4 |
+|----------|------|--------|-----|
 | Bucket type | Equal row count | Equal time intervals | Equal time intervals |
-| Points per bucket | Exactly 1 | Up to 4 (first, last, min, max) | Up to 2 (min, max) |
+| Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) |
 | Output count | Exactly N (non-gap mode) | Up to N | Up to N |
 | Gap handling | Connects across gaps (use 3rd parameter to preserve) | Naturally preserves gaps | Naturally preserves gaps |
-| Best use case | Line charts, shape preservation | Monitoring, spike detection | Lightweight envelope |
+| Best use case | Line charts, shape preservation | Quick value range overview | Dashboards, SLA compliance |
 
 ## Examples
 

@@ -15,10 +15,12 @@ CYAN = "#0cc0df"       # titles, M4/MinMax min/max role dots
 GRAY = "#888"          # default dots (real rows from raw data)
 
 # Segment A: 24 points, i=0..23 (represents 24 hourly bars)
+# Late spike at i=22 (0.65) with pullback at i=23 (0.60) makes M4 visibly
+# better than MinMax: M4 captures the exit at 0.60, MinMax only sees the peak.
 SEG_A = [
     0.50, 0.55, 0.60, 0.65, 0.70, 0.95, 0.85, 0.70, 0.60, 0.55,
-    0.50, 0.45, 0.40, 0.35, 0.28, 0.20, 0.25, 0.30, 0.35, 0.40,
-    0.45, 0.50, 0.48, 0.46,
+    0.50, 0.45, 0.55, 0.35, 0.28, 0.20, 0.25, 0.30, 0.35, 0.40,
+    0.45, 0.50, 0.65, 0.60,
 ]
 
 # Gap dataset: 3 data segments, 1 small gap (3h), 1 big gap (24h)
@@ -154,7 +156,7 @@ def gen_lttb():
     im, ix = 0, N - 1
     ri = list(range(N))
     # LTTB target 8: first + last always kept, 6 interior buckets
-    si = [0, 4, 5, 8, 15, 19, 22, 23]
+    si = [0, 4, 5, 11, 15, 18, 22, 23]
     sv = [SEG_A[i] for i in si]
     return f"""{hdr(W, H, "LTTB downsampling", "LTTB selects 8 points from 24.")}
 <text class="t" x="{XL}" y="35">LTTB: 24 hourly bars reduced to 8</text>
@@ -173,11 +175,12 @@ def gen_m4():
     im, ix = 0, N - 1
     ri = list(range(N))
     # M4 target 8 -> 2 time buckets (0..11, 12..23)
-    # Bucket 1: first=0(.50), last=11(.45), min=0(.50)->dup, max=5(.95) -> 3 pts
-    # Bucket 2: first=12(.40), last=23(.46), min=15(.20), max=21(.50) -> 4 pts
+    # Bucket 1: first=0(.50), last=11(.45), min=0(.50)->dup first, max=5(.95) -> 3 pts
+    # Bucket 2: first=12(.55), last=23(.60), min=15(.20), max=22(.65) -> 4 pts
+    # Key: M4 catches the exit at i=23 (0.60) that MinMax misses
     m4 = [
         (0,.50,GRAY),(5,.95,CYAN),(11,.45,GRAY),
-        (12,.40,GRAY),(15,.20,CYAN),(21,.50,CYAN),(23,.46,GRAY),
+        (12,.55,GRAY),(15,.20,CYAN),(22,.65,CYAN),(23,.60,GRAY),
     ]
     mi = [p[0] for p in m4]
     mv = [p[1] for p in m4]
@@ -205,10 +208,10 @@ def gen_minmax():
     # MinMax target 8 -> 4 time buckets of 6 (0..5, 6..11, 12..17, 18..23)
     # Bucket 1: min=0(.50), max=5(.95)
     # Bucket 2: min=11(.45), max=6(.85)
-    # Bucket 3: min=15(.20), max=12(.40)
-    # Bucket 4: min=23(.46), max=21(.50)
-    mi = [0, 5, 6, 11, 12, 15, 21, 23]
-    mv = [.50, .95, .85, .45, .40, .20, .50, .46]
+    # Bucket 3: min=15(.20), max=12(.55)
+    # Bucket 4: min=18(.35), max=22(.65) -- misses the exit at i=23 (0.60)
+    mi = [0, 5, 6, 11, 12, 15, 18, 22]
+    mv = [.50, .95, .85, .45, .55, .20, .35, .65]
     return f"""{hdr(W, H, "MinMax downsampling", "MinMax selects 8 points from 24.")}
 <text class="t" x="{XL}" y="35">MinMax: target 8, emitted 8 (4 time buckets)</text>
 {bkl([6, 12, 18], im, ix, YT, YB)}
@@ -318,8 +321,8 @@ def gen_gap_detect():
 
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
-    for name, fn in [("raw.svg", gen_raw), ("lttb.svg", gen_lttb), ("m4.svg", gen_m4),
-                     ("minmax.svg", gen_minmax),
+    for name, fn in [("raw.svg", gen_raw), ("lttb.svg", gen_lttb),
+                     ("minmax.svg", gen_minmax), ("m4.svg", gen_m4),
                      ("gap-raw.svg", gen_gap_raw),
                      ("gap-no-detect.svg", gen_gap_no_detect),
                      ("gap-detect.svg", gen_gap_detect)]:
