@@ -344,6 +344,13 @@ WHERE symbol = 'EURUSD'
 SUBSAMPLE lttb(price, 500)
 ```
 
+```questdb-sql title="LTTB with gap detection: preserve gaps larger than 1 hour" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE lttb(price, 500, '1h')
+```
+
 ```questdb-sql title="M4: pixel-accurate envelope for a 1920px-wide chart" demo
 SELECT timestamp, price
 FROM fx_trades
@@ -356,6 +363,20 @@ SELECT timestamp, price
 FROM fx_trades
 WHERE symbol = 'EURUSD'
 SUBSAMPLE minmax(price, 500)
+```
+
+```questdb-sql title="Uniform: 500 evenly spaced rows for a dense table" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE uniform(500)
+```
+
+```questdb-sql title="Cadence: every 1000th row for quick decimation" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE cadence(1000)
 ```
 
 ### Composing with SAMPLE BY
@@ -396,7 +417,7 @@ the result, so the moving average values are accurate.
 
 ### With DECLARE variable
 
-```questdb-sql title="Parameterized target point count"
+```questdb-sql title="Parameterized target point count" demo
 DECLARE @points := 500
 SELECT timestamp, price
 FROM fx_trades
@@ -406,7 +427,7 @@ SUBSAMPLE lttb(price, @points)
 
 ### With bind variable
 
-```questdb-sql title="Grafana integration - screen width as bind variable"
+```questdb-sql title="Programmatic integration - target as bind variable"
 SELECT timestamp, price
 FROM fx_trades
 WHERE symbol = 'EURUSD'
