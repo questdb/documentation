@@ -111,6 +111,11 @@ Put another way, you can lose **all your data** due to a **single invalid data
 point**.
 :::
 
+`cairo.ttl.use.wall.clock` also governs
+[storage policy](/docs/concepts/storage-policy/) evaluation in QuestDB
+Enterprise — storage policies share this reference-time logic with TTL, so
+the same setting toggles both.
+
 ### Example
 
 Table partitioned by `HOUR` with `TTL 1 HOUR`:

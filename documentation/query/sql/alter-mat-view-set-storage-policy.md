@@ -64,11 +64,10 @@ transition from native format to Parquet and eventually get removed:
 
 :::info
 
-`DROP REMOTE` is reserved syntax. It is recognised by the parser but is
-rejected at execute time with `'DROP REMOTE' is not supported yet`. Automatic
-upload of Parquet files to object storage is not currently supported — storage
-policies operate locally only. Because the clause cannot take effect, the
-`drop_remote` column in the
+`DROP REMOTE` is reserved syntax. It is rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
+object storage is not currently supported — storage policies operate locally
+only. Because the clause cannot take effect, the `drop_remote` column in the
 [`storage_policies`](/docs/query/functions/meta/#storage_policies) view is
 always blank in the current release.
 

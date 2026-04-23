@@ -307,19 +307,21 @@ SELECT * FROM storage_policies;
 | Column | Type | Description |
 |--------|------|-------------|
 | `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
-| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `3d`, `1M`). Blank when the stage is not configured. |
+| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
 | `drop_native` | _STRING_ | TTL for the `DROP NATIVE` stage. Blank when the stage is not configured. |
 | `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
-| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is parsed but rejected at execute time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
+| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
 | `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
 
 **Notes on TTL formatting:**
 
-- TTL values are rendered in their native stored units: `h` for hours and `m`
-  for months. `1m` in this view means **one month**, not one minute — this
-  matches the `MONTH` / `M` shorthand documented in
-  [TTL duration format](/docs/concepts/storage-policy/#ttl-duration-format).
+- TTL values are rendered in just two units: `h` for hours and `m` for
+  **months**. Durations written in the DDL as days, weeks, or years are
+  normalized to hours when stored (e.g., `3 DAYS` → `72h`, `1 WEEK` →
+  `168h`). Month-based durations are stored and rendered with the lowercase
+  `m` suffix — despite the visual collision with "minute", `m` in this view
+  is **months**, and QuestDB's duration shorthand has no unit for minutes.
 
 **Example:**
 
@@ -330,7 +332,7 @@ SELECT * FROM storage_policies;
 | table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
 |----------------|------------|-------------|------------|-------------|--------|--------------|
 | trades~12      | 72h        | 240h        | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
-| metrics~18     | 7d         |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
+| metrics~18     | 168h       |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
 
 The first row is a policy with three active stages (3-day Parquet conversion,
 10-day native drop, 1-month local drop) and is currently enforced. The second

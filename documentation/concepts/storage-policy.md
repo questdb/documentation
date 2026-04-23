@@ -19,8 +19,8 @@ external scheduling.
 
 Storage policies currently operate **locally only**. Parquet files are not
 automatically uploaded to object storage, and the `DROP REMOTE` clause is
-reserved syntax — it is recognised by the parser but rejected at execute time
-with `'DROP REMOTE' is not supported yet`. Accordingly, the `drop_remote`
+reserved syntax — it is rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`. Accordingly, the `drop_remote`
 column in the [`storage_policies`](/docs/query/functions/meta/#storage_policies)
 view is always blank in the current release; it is kept for forward
 compatibility. Object storage integration will be added in a future release.
@@ -80,7 +80,13 @@ be eligible for `TO PARQUET` long before it is eligible for `DROP NATIVE`,
 formula above; the stages share only the reference time and the ordering
 constraint `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`.
 
-The reference time is `min(wall_clock_time, latest_timestamp)` by default.
+The reference time is `min(wall_clock_time, latest_timestamp)` by default —
+the same formula used by TTL. The
+[`cairo.ttl.use.wall.clock`](/docs/concepts/ttl/#restore-legacy-behavior)
+setting applies to storage policies as well: setting it to `false` removes
+the wall-clock cap for both TTL and storage policy evaluation. See
+[TTL § Reference time](/docs/concepts/ttl/#reference-time) for the rationale
+and the data-loss hazard of disabling the cap.
 
 QuestDB checks storage policies periodically (every 15 minutes by default) and
 processes eligible partitions automatically.
@@ -220,16 +226,18 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
 |----------------|-----------|-------------|------------|-------------|--------|--------------|
-| trades~12 | 72h | 240h | 1M | | A | 2025-01-15T10:30:00.000000Z |
+| trades~12 | 72h | 240h | 1m | | A | 2025-01-15T10:30:00.000000Z |
 
-- TTL values are rendered in their native stored units. `h` means hours; `M`
-  means months. **`1M` in this view means one month, not one minute** — the
-  view uses the `MONTH` shorthand documented in
-  [TTL duration format](#ttl-duration-format)
+- TTL values are rendered in just two units: `h` for hours and `m` for
+  **months**. Hour-, day-, and week-based durations are normalized to hours
+  when stored, so a `3 DAYS` TTL appears as `72h` and `1 WEEK` appears as
+  `168h`. Month-based durations keep the lowercase `m` suffix — **`1m` in
+  this view means one month, not one minute**; QuestDB's duration shorthand
+  has no unit for minutes
 - Status `A` means active; `D` means disabled (see
   [Disabling and enabling](#disabling-and-enabling))
 - Unset stages appear blank. `drop_remote` is **always blank in the current
-  release** because `DROP REMOTE` is rejected at execute time with
+  release** because `DROP REMOTE` is rejected at SQL parse time with
   `'DROP REMOTE' is not supported yet`; the column is kept for forward
   compatibility
 
@@ -308,7 +316,7 @@ WHERE table_dir_name LIKE 'trades%';
 
 | table_dir_name | to_parquet | drop_native | drop_local | status |
 |----------------|------------|-------------|------------|--------|
-| trades~12      | 72h        | 240h        | 1M         | A      |
+| trades~12      | 72h        | 240h        | 1m         | A      |
 
 ```questdb-sql title="3. Modify one stage (others remain unchanged)"
 ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 1d);
