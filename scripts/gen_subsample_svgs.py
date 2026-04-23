@@ -227,6 +227,49 @@ def gen_minmax():
 </svg>"""
 
 
+def gen_uniform():
+    N = len(SEG_A)
+    im, ix = 0, N - 1
+    ri = list(range(N))
+    # uniform(8): evenly spaced, first and last pinned
+    # positions: round(i * 23 / 7) for i in 0..7 = 0, 3, 7, 10, 13, 16, 20, 23
+    si = [round(i * (N - 1) / 7) for i in range(8)]
+    sv = [SEG_A[i] for i in si]
+    return f"""{hdr(W, H, "Uniform downsampling", "Uniform selects 8 evenly spaced points from 24.")}
+<text class="t" x="{XL}" y="35">Uniform: 8 evenly spaced from 24</text>
+{rpl(ri, SEG_A, im, ix, YT, YB)}
+<polyline points="{pl(si,sv,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(si,sv,im,ix,YT,YB,GRAY)}
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Selected points (8 of 24)</text>
+</svg>"""
+
+
+def gen_cadence():
+    N = len(SEG_A)
+    im, ix = 0, N - 1
+    ri = list(range(N))
+    # cadence(3): every 3rd row from offset 0, plus last row pinned
+    # positions: 0, 3, 6, 9, 12, 15, 18, 21, 23(pinned)
+    stride = 3
+    si = list(range(0, N, stride))
+    if si[-1] != N - 1:
+        si.append(N - 1)
+    sv = [SEG_A[i] for i in si]
+    return f"""{hdr(W, H, "Cadence downsampling", "Cadence selects every 3rd row from 24.")}
+<text class="t" x="{XL}" y="35">Cadence: stride 3, emitted {len(si)} from 24</text>
+{rpl(ri, SEG_A, im, ix, YT, YB)}
+<polyline points="{pl(si,sv,im,ix,YT,YB)}" fill="none" stroke="{PINK}" stroke-width="{ALGO_SW}"/>
+{cd(si,sv,im,ix,YT,YB,GRAY)}
+<line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
+<text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<text class="l" x="{XL+142}" y="{LY+5}">Selected points ({len(si)} of 24)</text>
+</svg>"""
+
+
 def _gap_helpers():
     """Shared helpers for the three gap SVGs."""
     im, ix = 0, 68
@@ -323,6 +366,7 @@ if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in [("raw.svg", gen_raw), ("lttb.svg", gen_lttb),
                      ("minmax.svg", gen_minmax), ("m4.svg", gen_m4),
+                     ("uniform.svg", gen_uniform), ("cadence.svg", gen_cadence),
                      ("gap-raw.svg", gen_gap_raw),
                      ("gap-no-detect.svg", gen_gap_no_detect),
                      ("gap-detect.svg", gen_gap_detect)]:

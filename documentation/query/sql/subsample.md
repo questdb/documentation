@@ -107,7 +107,7 @@ SAMPLE BY 1h
 SUBSAMPLE lttb(avg_price, 8)
 ```
 
-### Gap-preserving LTTB
+#### Gap-preserving LTTB
 
 Standard LTTB divides data by row count, so it connects across time gaps. An
 optional third parameter sets a gap threshold:
@@ -247,6 +247,8 @@ count. For a heatmap, scatter plot, or tabular display where every row looks
 similar, `uniform` is faster and the output is indistinguishable from
 value-aware methods.
 
+![Uniform downsampling](/images/docs/subsample/uniform.svg)
+
 How it works:
 
 1. First and last rows are always selected.
@@ -271,6 +273,8 @@ stepping through the input at a fixed rhythm.
 The `stride` parameter is the step distance, not the output count. To keep
 500 rows, use `uniform(500)` or `lttb(col, 500)`. `cadence(500)` emits one
 row out of every 500, which is a different (and input-dependent) number.
+
+![Cadence downsampling](/images/docs/subsample/cadence.svg)
 
 How it works:
 
@@ -322,9 +326,10 @@ SUBSAMPLE cadence(1000, 42)
 | Inspects values | Yes | Yes | Yes | No | No |
 | Bucket type | Equal row count | Equal time intervals | Equal time intervals | Equal row spacing | Fixed row stride |
 | Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) | N/A | N/A |
-| Output count | Exactly N | Up to N | Up to N | Exactly N | ~rowCount/stride |
+| Output count | Exactly N (or all rows if fewer) | Up to N | Up to N | Exactly N (or all rows if fewer) | ~rowCount/stride |
 | Gap handling | Connects across (use threshold) | Naturally preserves | Naturally preserves | Connects across | Connects across |
 | Best use case | Line charts | Value range overview | Dashboards, SLA | Dense uniform data | Decimation, anti-aliasing |
+| Relative cost | Higher: triangle area per point | Low: min/max per bucket | Medium: first/last/min/max per bucket | Lowest: position arithmetic | Lowest: stride arithmetic |
 
 ## Examples
 
