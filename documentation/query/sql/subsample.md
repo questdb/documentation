@@ -268,7 +268,9 @@ SUBSAMPLE uniform(500)
 
 Selects one row out of every N, starting from a configurable offset. Like
 `uniform`, `cadence` does not inspect values - it reduces row count by
-stepping through the input at a fixed rhythm.
+stepping through the input at a fixed rhythm. An optional second parameter
+sets the starting offset, either as a fixed seed for reproducible results or
+as `NULL` for a fresh random offset each run.
 
 The `stride` parameter is the step distance, not the output count. To keep
 500 rows, use `uniform(500)` or `lttb(col, 500)`. `cadence(500)` emits one
