@@ -332,6 +332,31 @@ the object store. Backups are stored under `backup/<backup_instance_name>/`.
 
 To find your instance name, see [Backup instance name](#backup-instance-name).
 
+### Interaction with storage policies
+
+[Storage policies](/docs/concepts/storage-policy/) operate locally — they
+convert partitions to Parquet in place and then drop native (and eventually
+local Parquet) files on a schedule. Backups capture whatever is on local disk
+at the time the backup runs:
+
+- Partitions still in native format are backed up as native files.
+- Partitions that have been converted to Parquet (via the `TO PARQUET` stage,
+  after `DROP NATIVE` has fired) are backed up as Parquet files.
+- Once `DROP LOCAL` fires and removes a partition from local disk, subsequent
+  backups will no longer contain that partition — restoring an earlier backup
+  is the only way to recover it.
+
+Plan retention (`backup.cleanup.keep.latest.n`) with your storage policy's
+`DROP LOCAL` TTL in mind: a partition is only recoverable from a backup that
+was taken **before** `DROP LOCAL` removed it from disk. If you need to keep
+historical partitions available for restore, make sure your oldest retained
+backup predates the earliest `DROP LOCAL` fire.
+
+Storage policies run per-instance, so primaries and replicas may disagree on
+which partitions are native vs. Parquet at any given moment. Typically,
+backing up the primary is sufficient (see the bullet on
+primary/replica backups below).
+
 ### Limitations
 
 - **Database-wide only**: Backup captures the entire database. You cannot

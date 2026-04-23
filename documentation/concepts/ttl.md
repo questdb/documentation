@@ -8,6 +8,20 @@ TTL (Time To Live) automatically drops old partitions based on data age. Set a
 retention period, and QuestDB removes partitions that fall entirely outside that
 window - no cron jobs or manual cleanup required.
 
+:::caution
+
+**QuestDB Enterprise: TTL is superseded by
+[Storage Policy](/docs/concepts/storage-policy/).** Enterprise rejects any
+non-zero `SET TTL` with
+`TTL settings are deprecated, please, create a storage policy instead`.
+Storage policies extend TTL with graduated lifecycle management (convert to
+Parquet, then drop) and are the recommended retention primitive for Enterprise
+users. The rest of this page describes TTL behavior on QuestDB Open Source
+(and the `SET TTL 0` case on Enterprise, used to clear an older TTL before
+attaching a storage policy).
+
+:::
+
 import Screenshot from "@theme/Screenshot"
 
 <Screenshot
@@ -97,6 +111,11 @@ Put another way, you can lose **all your data** due to a **single invalid data
 point**.
 :::
 
+`cairo.ttl.use.wall.clock` also governs
+[storage policy](/docs/concepts/storage-policy/) evaluation in QuestDB
+Enterprise — storage policies share this reference-time logic with TTL, so
+the same setting toggles both.
+
 ### Example
 
 Table partitioned by `HOUR` with `TTL 1 HOUR`:
@@ -147,3 +166,6 @@ ALTER TABLE trades SET TTL 0h;
 - TTL should be significantly larger than your partition interval
 - For manual control instead of automatic TTL, see
   [Data Retention](/docs/operations/data-retention/)
+- For graduated lifecycle management (convert to Parquet, offload to object
+  storage, then drop), see [Storage Policy](/docs/concepts/storage-policy/)
+  (Enterprise)
