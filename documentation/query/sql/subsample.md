@@ -20,24 +20,28 @@ Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 
 ## Syntax
 
-```questdb-sql
-SELECT columns
-FROM table
-[WHERE conditions]
-[SAMPLE BY ...]
+```questdb-sql title="Value-based algorithms"
 SUBSAMPLE { lttb | m4 | minmax }(valueColumn, targetPoints [, gapThreshold])
-[ORDER BY ...]
-[LIMIT ...]
+```
+
+```questdb-sql title="Position-based algorithms"
+SUBSAMPLE uniform(targetPoints)
+SUBSAMPLE cadence(stride [, seed])
 ```
 
 Where:
 
 - **`valueColumn`** - the numeric column used to decide which points are
-  visually significant. All other columns pass through for selected rows.
+  visually significant. Required for `lttb`, `m4`, and `minmax`. Not used
+  by `uniform` or `cadence`.
 - **`targetPoints`** - target number of output rows. Supports integer
   literals, [DECLARE](/docs/query/sql/declare/) variables, and bind
   variables (`$1`). Must be at least 2. Maximum is 2,147,483,647.
-- **`gapThreshold`** - (LTTB only) optional interval that enables
+- **`stride`** - (`cadence` only) step distance between emitted rows. This
+  is not an output count: `cadence(500)` emits one row out of every 500.
+- **`seed`** - (`cadence` only) optional integer seed or `NULL`. See
+  [cadence](#cadence---every-nth-row).
+- **`gapThreshold`** - (`lttb` only) optional interval that enables
   gap-preserving mode. See [gap-preserving LTTB](#gap-preserving-lttb).
 
 ### Execution order
@@ -60,9 +64,14 @@ downsampling.
 
 ## Algorithms
 
-Three algorithms are available. Each one selects real rows from the input -
-no values are ever interpolated or computed. The diagrams below all use the
-same 24-point series as input (think 24 hourly bars over one day):
+Five algorithms are available. The first three (`lttb`, `minmax`, `m4`)
+inspect values to decide which rows are visually significant. The last two
+(`uniform`, `cadence`) ignore values and select rows purely by position -
+they are cheaper and useful when the input is dense or as a baseline.
+
+All five select real rows from the input - no values are ever interpolated
+or computed. The diagrams below use a 24-point series as input (think 24
+hourly bars over one day):
 
 ![Raw time series](/images/docs/subsample/raw.svg)
 
@@ -97,6 +106,59 @@ WHERE symbol = 'EURUSD'
 SAMPLE BY 1h
 SUBSAMPLE lttb(avg_price, 8)
 ```
+
+### Gap-preserving LTTB
+
+Standard LTTB divides data by row count, so it connects across time gaps. An
+optional third parameter sets a gap threshold:
+
+```questdb-sql
+SUBSAMPLE lttb(price, 12, '6h')
+```
+
+When specified, LTTB scans for gaps where consecutive timestamps are further
+apart than the threshold. Gaps below the threshold are ignored - the data is
+treated as continuous. Gaps above the threshold split the data into separate
+segments, each downsampled independently with its proportional share of the
+target points.
+
+The diagrams below show a dataset with two gaps - a small one (3 hours) and
+a large one (24 hours):
+
+![Raw data with gaps](/images/docs/subsample/gap-raw.svg)
+
+Without gap detection, LTTB treats all points as continuous and connects
+across both gaps:
+
+![LTTB without gap detection](/images/docs/subsample/gap-no-detect.svg)
+
+With a threshold of `'6h'`, the small gap (3h) is below the threshold so
+segments A and B are treated as continuous. The large gap (24h) exceeds the
+threshold, so segment C is downsampled separately and the gap is preserved:
+
+![LTTB with gap detection](/images/docs/subsample/gap-detect.svg)
+
+Supported interval units: `s` (seconds), `m` (minutes), `h` (hours),
+`d` (days).
+
+Examples: `'30s'`, `'5m'`, `'1h'`, `'7d'`
+
+```questdb-sql title="Preserve gaps larger than 6 hours in the output" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE lttb(price, 12, '6h')
+```
+
+:::note
+
+Gap-preserving LTTB uses a soft target. Each segment receives at least its
+first and last points. When many segments are detected, the total output may
+exceed `targetPoints`. This is by design so that the same query does not fail
+for one time range and succeed for another. Non-gap LTTB, M4, and MinMax
+treat `targetPoints` as a hard maximum.
+
+:::
 
 ### minmax - Min/Max per time interval
 
@@ -171,68 +233,98 @@ the number of time buckets. A 1920-pixel-wide chart needs
 
 :::
 
-### Gap-preserving LTTB
+### uniform - Evenly spaced rows
 
-Standard LTTB divides data by row count, so it connects across time gaps. An
-optional third parameter sets a gap threshold:
+Selects a target number of rows spaced evenly across the input. First and
+last rows are always kept, interior rows are picked at regular positions
+between them. Unlike the previous algorithms, `uniform` does not inspect
+values - it reduces row count purely by position in the time-ordered input.
 
-```questdb-sql
-SUBSAMPLE lttb(price, 12, '6h')
-```
+Use `uniform` when the input is dense and you care about reducing transfer
+size more than preserving spikes or troughs. For a line chart where visual
+fidelity matters, `lttb` or `m4` produce better results at the same target
+count. For a heatmap, scatter plot, or tabular display where every row looks
+similar, `uniform` is faster and the output is indistinguishable from
+value-aware methods.
 
-When specified, LTTB scans for gaps where consecutive timestamps are further
-apart than the threshold. Gaps below the threshold are ignored - the data is
-treated as continuous. Gaps above the threshold split the data into separate
-segments, each downsampled independently with its proportional share of the
-target points.
+How it works:
 
-The diagrams below show a dataset with two gaps - a small one (3 hours) and
-a large one (24 hours):
+1. First and last rows are always selected.
+2. Remaining `targetPoints - 2` rows are selected at evenly spaced positions
+   between first and last.
+3. Output is exactly `targetPoints` rows when the input is larger than the
+   target, otherwise all input rows are returned unchanged.
 
-![Raw data with gaps](/images/docs/subsample/gap-raw.svg)
-
-Without gap detection, LTTB treats all points as continuous and connects
-across both gaps:
-
-![LTTB without gap detection](/images/docs/subsample/gap-no-detect.svg)
-
-With a threshold of `'6h'`, the small gap (3h) is below the threshold so
-segments A and B are treated as continuous. The large gap (24h) exceeds the
-threshold, so segment C is downsampled separately and the gap is preserved:
-
-![LTTB with gap detection](/images/docs/subsample/gap-detect.svg)
-
-Supported interval units: `s` (seconds), `m` (minutes), `h` (hours),
-`d` (days).
-
-Examples: `'30s'`, `'5m'`, `'1h'`, `'7d'`
-
-```questdb-sql title="Preserve gaps larger than 6 hours in the output" demo
+```questdb-sql title="500 evenly spaced rows from a dense tick table" demo
 SELECT timestamp, price
 FROM fx_trades
 WHERE symbol = 'EURUSD'
-SUBSAMPLE lttb(price, 12, '6h')
+SUBSAMPLE uniform(500)
 ```
+
+### cadence - Every Nth row
+
+Selects one row out of every N, starting from a configurable offset. Like
+`uniform`, `cadence` does not inspect values - it reduces row count by
+stepping through the input at a fixed rhythm.
+
+The `stride` parameter is the step distance, not the output count. To keep
+500 rows, use `uniform(500)` or `lttb(col, 500)`. `cadence(500)` emits one
+row out of every 500, which is a different (and input-dependent) number.
+
+How it works:
+
+1. First and last rows are always selected (except when stride exceeds the
+   input size, in which case only the first row is emitted).
+2. From the offset position, emit one row every `stride` rows.
+3. Output is in timestamp-ascending order.
+
+| Form | Behavior |
+|------|----------|
+| `cadence(N)` | Every Nth row, deterministic, offset 0 |
+| `cadence(N, seed)` | Random offset in [0, N), reproducible given seed |
+| `cadence(N, NULL)` | Random offset in [0, N), fresh each run |
+
+The seeded and NULL forms exist to avoid phase-lock with periodic signals.
+If the input has a 1000-row period and you stride by 1000 with offset 0,
+every emitted row hits the same phase of the period and the chart loses the
+periodic structure. A random offset breaks this alignment.
 
 :::note
 
-Gap-preserving LTTB uses a soft target. Each segment receives at least its
-first and last points. When many segments are detected, the total output may
-exceed `targetPoints`. This is by design so that the same query does not fail
-for one time range and succeed for another. Non-gap LTTB, M4, and MinMax
-treat `targetPoints` as a hard maximum.
+Randomizing the offset helps with aliasing on periodic signals, but it does
+not make `cadence` a statistical sampler. It does not produce unbiased
+estimates of aggregates like mean or percentile. For those, use
+[SAMPLE BY](/docs/query/sql/sample-by/) with the appropriate aggregate
+function.
 
 :::
 
+```questdb-sql title="Every 1000th row - simple decimation" demo
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE cadence(1000)
+```
+
+```questdb-sql title="Anti-aliasing with reproducible seed"
+SELECT timestamp, price
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+SUBSAMPLE cadence(1000, 42)
+```
+
 ### Algorithm comparison
 
-| Property | lttb | minmax | m4 |
-|----------|------|--------|-----|
-| Bucket type | Equal row count | Equal time intervals | Equal time intervals |
-| Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) |
-| Output count | Exactly N (non-gap mode) | Up to N | Up to N |
-| Gap handling | Connects across gaps (use 3rd parameter to preserve) | Naturally preserves gaps | Naturally preserves gaps |
-| Best use case | Line charts, shape preservation | Quick value range overview | Dashboards, SLA compliance |
+| Property | lttb | minmax | m4 | uniform | cadence |
+|----------|------|--------|-----|---------|---------|
+| Parameter | targetPoints | targetPoints | targetPoints | targetPoints | stride |
+| Inspects values | Yes | Yes | Yes | No | No |
+| Bucket type | Equal row count | Equal time intervals | Equal time intervals | Equal row spacing | Fixed row stride |
+| Points per bucket | Exactly 1 | Up to 2 (min, max) | Up to 4 (first, last, min, max) | N/A | N/A |
+| Output count | Exactly N | Up to N | Up to N | Exactly N | ~rowCount/stride |
+| Gap handling | Connects across (use threshold) | Naturally preserves | Naturally preserves | Connects across | Connects across |
+| Best use case | Line charts | Value range overview | Dashboards, SLA | Dense uniform data | Decimation, anti-aliasing |
 
 ## Examples
 
