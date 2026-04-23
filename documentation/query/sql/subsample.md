@@ -395,6 +395,12 @@ complement each other: aggregate first, then reduce for display.
 
 ### Multiple columns pass through
 
+Because `SUBSAMPLE` selects real rows rather than computing new ones, every
+column in the output carries its original value from the source table. In
+the query below, `side` and `quantity` are not involved in the downsampling
+decision, but each output row is a real trade with the actual side and
+quantity that occurred at that timestamp.
+
 ```questdb-sql title="LTTB selects rows by price; all columns emit" demo
 SELECT timestamp, symbol, side, price, quantity
 FROM fx_trades
