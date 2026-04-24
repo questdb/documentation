@@ -179,8 +179,8 @@ def gen_m4():
     # Bucket 2: first=12(.55), last=23(.60), min=15(.20), max=22(.65) -> 4 pts
     # Key: M4 catches the exit at i=23 (0.60) that MinMax misses
     m4 = [
-        (0,.50,GRAY),(5,.95,CYAN),(11,.45,GRAY),
-        (12,.55,GRAY),(15,.20,CYAN),(22,.65,CYAN),(23,.60,GRAY),
+        (0,.50,CYAN),(5,.95,GRAY),(11,.45,CYAN),
+        (12,.55,CYAN),(15,.20,GRAY),(22,.65,GRAY),(23,.60,CYAN),
     ]
     mi = [p[0] for p in m4]
     mv = [p[1] for p in m4]
@@ -192,9 +192,9 @@ def gen_m4():
 {cdm(m4, im, ix, YT, YB)}
 <line class="ref" x1="{XL}" y1="{LY}" x2="{XL+24}" y2="{LY}"/>
 <text class="l" x="{XL+30}" y="{LY+5}">Raw data</text>
-<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
+<circle cx="{XL+130}" cy="{LY}" r="{LEG_DOT}" fill="{CYAN}"/>
 <text class="l" x="{XL+142}" y="{LY+5}">First / Last</text>
-<circle cx="{XL+240}" cy="{LY}" r="{LEG_DOT}" fill="{CYAN}"/>
+<circle cx="{XL+240}" cy="{LY}" r="{LEG_DOT}" fill="{GRAY}"/>
 <text class="l" x="{XL+252}" y="{LY+5}">Min / Max</text>
 <line class="bk" x1="{XL+340}" y1="{LY}" x2="{XL+364}" y2="{LY}"/>
 <text class="l" x="{XL+370}" y="{LY+5}">Bucket boundary</text>
