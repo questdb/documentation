@@ -27,13 +27,7 @@ indistinguishable in the output.
 
 These functions are designed for quick visual inspection of trends, relative
 magnitudes, and data structure directly in query results. They are not a
-replacement for pixel-level charting tools. For precise values, query the
-underlying numbers directly or use the `_labels` variants where available.
-
-Some monospaced fonts render Unicode characters from different blocks at
-slightly different pixel widths, which can cause minor horizontal misalignment.
-For best results, use a font with consistent Unicode coverage such as JetBrains
-Mono, Fira Code, or Cascadia Code.
+replacement for pixel-level charting tools.
 
 ## bar
 
@@ -44,11 +38,12 @@ for sub-character precision.
 Characters used (varying width):
 
 ```
-▏▎▍▌▋▊▉█
+█▉▊▋▌▍▎▏
 ```
 
-Characters range from `▏` (1/8 fill, U+258F) to `█` (full fill, U+2588). A
-`width` of 20 characters gives 160 discrete levels of resolution (20 x 8).
+A full block fills the character cell; fractional blocks at the end provide
+sub-character precision. A `width` of 20 characters gives 160 discrete levels
+of resolution (20 x 8).
 
 Since `bar` is a scalar function, it can wrap aggregates like `sum()`, `avg()`,
 or `count()` to visualize their results inline.
@@ -83,8 +78,19 @@ SELECT timestamp, symbol,
        bar(sum(amount), 0, 50, 30)
 FROM trades
 WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+  AND timestamp IN '$today'
 SAMPLE BY 1m
-LIMIT -10;
+LIMIT -5;
+```
+
+```
+ timestamp                   | symbol   | total  | bar
+-----------------------------+----------+--------+--------------------------------
+ 2026-04-29T15:41:00.000000Z | BTC-USDT |   5.89 | ███▌
+ 2026-04-29T15:42:00.000000Z | ETH-USDT | 119.54 | ██████████████████████████████
+ 2026-04-29T15:42:00.000000Z | BTC-USDT |   3.53 | ██
+ 2026-04-29T15:43:00.000000Z | ETH-USDT |  41.15 | ████████████████████████▋
+ 2026-04-29T15:43:00.000000Z | BTC-USDT |   1.6  | ▉
 ```
 
 ```questdb-sql demo title="Per-symbol scaling with window functions"
@@ -95,23 +101,21 @@ FROM (
   SELECT timestamp, symbol, sum(amount) total
   FROM trades
   WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+    AND timestamp IN '$today'
   SAMPLE BY 1m
 )
-LIMIT -10;
+LIMIT -5;
 ```
 
-| timestamp                   | symbol   | total  | bar                |
-| :-------------------------- | :------- | :----- | :----------------- |
-| 2026-03-06T17:18:00.000000Z | ETH-USDT | 72.94  | ██                 |
-| 2026-03-06T17:18:00.000000Z | BTC-USDT | 6.76   | ██████             |
-| 2026-03-06T17:19:00.000000Z | ETH-USDT | 118.19 | ███                |
-| 2026-03-06T17:19:00.000000Z | BTC-USDT | 1.59   | █                  |
-| 2026-03-06T17:20:00.000000Z | ETH-USDT | 246.87 | ███████            |
-| 2026-03-06T17:20:00.000000Z | BTC-USDT | 14.36  | █████████████      |
-| 2026-03-06T17:21:00.000000Z | BTC-USDT | 2.9    | ██                 |
-| 2026-03-06T17:21:00.000000Z | ETH-USDT | 375.3  | ██████████         |
-| 2026-03-06T17:22:00.000000Z | BTC-USDT | 8.07   | ███████            |
-| 2026-03-06T17:22:00.000000Z | ETH-USDT | 529.74 | ███████████████    |
+```
+ timestamp                   | symbol   | total  | bar
+-----------------------------+----------+--------+------
+ 2026-04-29T15:41:00.000000Z | ETH-USDT |  44.7  | █▍
+ 2026-04-29T15:42:00.000000Z | BTC-USDT |   3.53 | █▏
+ 2026-04-29T15:42:00.000000Z | ETH-USDT | 119.54 | ███▋
+ 2026-04-29T15:43:00.000000Z | BTC-USDT |   1.6  | ▌
+ 2026-04-29T15:43:00.000000Z | ETH-USDT |  41.15 | █▎
+```
 
 Each symbol's bars scale independently because `PARTITION BY symbol` gives each
 its own min/max range.
@@ -124,18 +128,41 @@ FROM (
   SELECT timestamp, symbol, sum(amount) total
   FROM trades
   WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+    AND timestamp IN '$today'
   SAMPLE BY 1m
 )
-LIMIT -10;
+LIMIT -5;
+```
+
+```
+ timestamp                   | symbol   | total  | bar
+-----------------------------+----------+--------+-----
+ 2026-04-29T15:41:00.000000Z | ETH-USDT |  44.7  | █▍
+ 2026-04-29T15:42:00.000000Z | BTC-USDT |   3.53 |
+ 2026-04-29T15:42:00.000000Z | ETH-USDT | 119.54 | ███▋
+ 2026-04-29T15:43:00.000000Z | BTC-USDT |   1.6  |
+ 2026-04-29T15:43:00.000000Z | ETH-USDT |  41.15 | █▎
 ```
 
 All symbols share the same min/max, making bars comparable across groups.
 
 ```questdb-sql demo title="Inline with row-level data"
-SELECT symbol, price,
-       bar(price, 0, 100000, 25)
-FROM trades
+SELECT symbol, round(price, 4) price,
+       bar(price, 0.5, 1.5, 25)
+FROM fx_trades
+WHERE symbol IN ('EURUSD', 'GBPUSD',
+  'USDCHF', 'USDCAD', 'AUDUSD')
 LATEST ON timestamp PARTITION BY symbol;
+```
+
+```
+ symbol | price  | bar
+--------+--------+------------------------
+ AUDUSD | 0.7128 | █████▎
+ USDCAD | 1.3708 | █████████████████████▊
+ USDCHF | 0.7836 | ███████
+ EURUSD | 1.1618 | ████████████████▌
+ GBPUSD | 1.3417 | █████████████████████
 ```
 
 #### See also
@@ -157,10 +184,10 @@ The web console [colorizes](#colorizing) bid and ask sides in green and red.
 
 Characters used:
 
-| Purpose | Character | Code point |
-| :------ | :-------- | :--------- |
-| Depth levels | `▁▂▃▄▅▆▇█` | U+2581 through U+2588 |
-| Spread marker | `╎` | U+254E |
+| Purpose | Character |
+| :------ | :-------- |
+| Depth levels | `█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█` |
+| Spread marker | `╎` |
 
 #### Parameters
 
@@ -215,13 +242,15 @@ WHERE timestamp IN '$today'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| timestamp | symbol | depth_chart |
-| :-------- | :----- | :---------- |
-| 2026-04-29T12:11:46.703189Z | USDCAD | █▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▂▂▁▁╎▁▁▂▂▂▃▃▃▃▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇ |
-| 2026-04-29T12:11:47.128542Z | USDJPY | ▇▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▄▄▄▄▄▃▃▃▃▂▂▂▁▁╎▁▁▂▂▂▃▃▃▃▄▄▄▄▄▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇█ |
-| 2026-04-29T12:11:47.139327Z | USDCHF | ▇▇▇▇▇▆▆▆▆▆▅▅▅▅▄▄▄▄▄▃▃▃▃▂▂▁▁╎▁▁▂▂▂▃▃▃▄▄▄▄▅▅▅▅▅▆▆▆▆▆▇▇▇▇█ |
-| 2026-04-29T12:11:47.188192Z | GBPUSD | ▇▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▂▂▂▁▁╎▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇█ |
-| 2026-04-29T12:11:47.189339Z | EURUSD | ▇▇▆▅▃▁╎▁▃▅▆▇█ |
+```
+ timestamp                   | symbol | depth_chart
+-----------------------------+--------+-----------------------------------------------------------------------
+ 2026-04-29T13:18:09.646733Z | EURUSD | █▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▂▂▂▁▁╎▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇▇
+ 2026-04-29T13:18:09.783631Z | GBPUSD | █▇▇▇▆▆▆▆▅▅▅▄▄▄▃▃▂▂▁╎▁▂▃▃▃▄▄▄▅▅▅▆▆▆▆▇▇▇▇
+ 2026-04-29T13:18:10.044379Z | USDCHF | ▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▄▄▄▄▃▃▃▃▂▂▁▁╎▁▁▂▂▃▃▃▃▄▄▄▄▅▅▅▅▅▆▆▆▆▆▇▇▇▇█
+ 2026-04-29T13:18:10.106524Z | USDCAD | ▇▇▇▇▆▆▆▆▅▅▅▅▄▄▄▃▃▃▂▁▁╎▁▂▂▃▃▃▄▄▄▅▅▅▅▆▆▆▇▇▇▇█
+ 2026-04-29T13:18:10.159159Z | USDJPY | ▇▆▄▁╎▁▄▆█
+```
 
 Each symbol has a different number of depth levels. The chart width adjusts
 automatically. Symmetric shapes indicate balanced books; one side taller than the
@@ -237,11 +266,13 @@ WHERE timestamp IN '$today'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| symbol | depth_chart |
-| :----- | :---------- |
-| EURUSD | ▇▇▆▅▅▄▃▃▂▁╎▁▂▃▃▄▅▅▆▇█ |
-| GBPUSD | ▇▇▆▆▅▄▄▃▂▁╎▁▂▃▄▄▅▆▆▇█ |
-| USDJPY | ▁▁▁▁█▇▇▇▇▆╎▆▇▇▇▇▇▁▁▁▁ |
+```
+ symbol | depth_chart
+--------+------------------------
+ EURUSD | █▇▆▅▅▄▃▃▂▁╎▁▂▃▃▄▅▅▆▇▇
+ GBPUSD | █▇▆▆▅▅▄▃▂▁╎▁▂▃▄▅▅▆▆▇▇
+ USDJPY | ▁▁▁▁▁▁▇▇▇▆╎▆▇▇█▁▁▁▁▁▁
+```
 
 At a fixed width, books with different numbers of levels are directly
 comparable. The shape reveals structural differences: USDJPY shows an unusual
@@ -280,10 +311,12 @@ WHERE timestamp IN '$today'
 LATEST ON timestamp PARTITION BY symbol;
 ```
 
-| timestamp | symbol | depth_chart_labels |
-| :-------- | :----- | :----------------- |
-| 2026-04-29T12:11:47.188192Z | GBPUSD | ▇▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▂▂▂▁▁╎▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇█ bb:61656.0 ba:93520.0 tb:6.33657709E8 ta:6.7937576E8 |
-| 2026-04-29T12:11:47.189339Z | EURUSD | ▇▇▆▅▃▁╎▁▃▅▆▇█ bb:55648.0 ba:70550.0 tb:973577.0 ta:1009598.0 |
+```
+ timestamp                   | symbol | depth_chart_labels
+-----------------------------+--------+----------------------------------------------------------------------------------------------------------------------
+ 2026-04-29T13:18:09.646733Z | EURUSD | █▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▂▂▂▁▁╎▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇▇ bb:55076.0 ba:79588.0 tb:1.044909019E9 ta:1.033808641E9
+ 2026-04-29T13:18:09.783631Z | GBPUSD | █▇▇▇▆▆▆▆▅▅▅▄▄▄▃▃▂▂▁╎▁▂▃▃▃▄▄▄▅▅▅▆▆▆▆▇▇▇▇ bb:53119.0 ba:92211.0 tb:2.9577178E7 ta:2.9154932E7
+```
 
 #### See also
 
@@ -305,13 +338,11 @@ candlestick chart.
 
 Visual encoding:
 
-| Purpose | Character | Code point |
-| :------ | :-------- | :--------- |
-| Blank (padding) | `⠀` | U+2800 |
-| Wick | `─` | U+2500 |
-| Bullish body (close >= open) | `█` | U+2588 |
-| Bearish body (close < open) | `░` | U+2591 |
-| Doji (close == open at bar resolution) | `│` | U+2502 |
+```
+⠀⠀⠀───██████─────⠀⠀⠀  Bullish (close >= open): █ body, ─ wick
+⠀⠀───────░░░░──⠀⠀⠀⠀  Bearish (close < open):  ░ body, ─ wick
+⠀⠀⠀⠀──│──⠀⠀⠀⠀⠀⠀⠀⠀  Doji (close == open):    │ line, ─ wick
+```
 
 All candles in a result set are scaled against the same min/max bounds, so their
 horizontal positions are directly comparable across rows.
@@ -350,7 +381,8 @@ non-deterministic in QuestDB's parallel execution engine.
 
 Common patterns for supplying bounds:
 
-- **Constants or DECLARE variables** for known price ranges
+- **Constants** for known price ranges
+- **DECLARE variables** for parameterized queries
 - **CROSS JOIN subquery** for single-symbol dynamic bounds
 - **LATERAL JOIN** for per-symbol bounds in multi-symbol queries
 
@@ -361,7 +393,52 @@ The aggregate variant supports `FILL(NULL)`, `FILL(PREV)`, and `FILL(NONE)`.
 
 #### Examples
 
-```questdb-sql demo title="OHLC candles with dynamic bounds"
+```questdb-sql demo title="Constant bounds"
+SELECT timestamp,
+       ohlc_bar(price, 1.15, 1.19, 40)
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 30m
+LIMIT -5;
+```
+
+```
+ timestamp                      | ohlc_bar
+--------------------------------+------------------------------------------
+ 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀─░░░░░░░░░░░░───────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T11:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀──██─────────────────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀─███████████████───────⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀─────░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀────██─────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+Bullish candles (`█`) show close above open, bearish candles (`░`) show close
+below open. The wick (`─`) extends from high to low.
+
+```questdb-sql title="DECLARE variables"
+DECLARE @lo := 1.15, @hi := 1.19
+
+SELECT timestamp,
+       ohlc_bar(price, @lo, @hi, 40)
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 30m
+LIMIT -5;
+```
+
+```
+ timestamp                      | ohlc_bar
+--------------------------------+------------------------------------------
+ 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀─░░░░░░░░░░░░───────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T11:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀──██─────────────────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀─███████████████───────⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀─────░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀────██─────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+```questdb-sql demo title="Dynamic bounds via CROSS JOIN"
 SELECT timestamp,
        ohlc_bar(price, lo, hi, 50)
 FROM fx_trades
@@ -369,34 +446,52 @@ CROSS JOIN (
   SELECT min(price) lo, max(price) hi
   FROM fx_trades
   WHERE symbol = 'EURUSD'
+    AND timestamp IN '$today'
 )
 WHERE symbol = 'EURUSD'
-SAMPLE BY 1h
-LIMIT -10;
-```
-
-| timestamp | ohlc_bar |
-| :-------- | :------- |
-| 2026-01-27T00:00:00.000000Z | ⠀⠀⠀───────────────────────███──────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ |
-| 2026-01-27T01:00:00.000000Z | ⠀⠀⠀⠀───────────░░░░░░░░░░░░░────────────────⠀⠀⠀⠀⠀⠀ |
-| 2026-01-27T02:00:00.000000Z | ──────░░░░░░░░░░░░░░░░░░────────────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ |
-| 2026-01-27T03:00:00.000000Z | ────░░░───────────────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ |
-| 2026-01-27T04:00:00.000000Z | ───██████████───────────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ |
-| 2026-01-27T05:00:00.000000Z | ──────────███████────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ |
-
-Bullish candles (`█`) show close above open, bearish candles (`░`) show close
-below open. The wick (`─`) extends from high to low.
-
-```questdb-sql title="Candles with constant bounds"
-DECLARE @lo := 1.05, @hi := 1.15
-
-SELECT timestamp,
-       ohlc_bar(price, @lo, @hi, 50)
-FROM fx_trades
-WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
 SAMPLE BY 30m
-LIMIT -10;
+LIMIT -5;
 ```
+
+```
+ timestamp                      | ohlc_bar
+--------------------------------+----------------------------------------------------
+ 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀──░░░░░░░░░░░░░░░░░░░░░░──────────────────────⠀
+ 2026-04-29T11:30:00.000000000Z | ⠀⠀────███─────────────────────────────────────────
+ 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀──█████████████████████████████────────────
+ 2026-04-29T12:30:00.000000000Z | ────────░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | ────────│──────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+```questdb-sql demo title="Per-symbol bounds via LATERAL JOIN"
+SELECT timestamp, symbol,
+       ohlc_bar(price, lo, hi, 40)
+FROM fx_trades t
+JOIN LATERAL (
+  SELECT min(price) lo, max(price) hi
+  FROM fx_trades t2
+  WHERE t.symbol = t2.symbol
+    AND t2.timestamp IN '$today'
+)
+WHERE symbol IN ('EURUSD', 'GBPUSD')
+  AND timestamp IN '$today'
+SAMPLE BY 30m
+LIMIT -5;
+```
+
+```
+ timestamp                      | symbol | ohlc_bar
+--------------------------------+--------+------------------------------------------
+ 2026-04-29T12:00:00.000000000Z | GBPUSD | ⠀──░░░░░░░░░░░░░░░░░░░░░░░░░──────────
+ 2026-04-29T12:00:00.000000000Z | EURUSD | ⠀⠀⠀⠀⠀──███████████████████████──────────
+ 2026-04-29T12:30:00.000000000Z | EURUSD | ───────░░░░░░░░░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:30:00.000000000Z | GBPUSD | ───████────────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | GBPUSD | ───██████─────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+Each symbol gets its own min/max scale via the lateral join, so candles are
+comparable within a symbol regardless of absolute price level.
 
 ### Scalar variant
 
@@ -435,10 +530,21 @@ FROM (
       min(price) l, last(price) c
     FROM fx_trades
     WHERE symbol = 'EURUSD'
-    SAMPLE BY 1h
+      AND timestamp IN '$today'
+    SAMPLE BY 30m
   )
 )
-LIMIT -10;
+LIMIT -5;
+```
+
+```
+ timestamp                      | ohlc_bar
+--------------------------------+----------------------------------------------------
+ 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀──░░░░░░░░░░░░░░░░░░░░░░──────────────────────⠀
+ 2026-04-29T11:30:00.000000000Z | ⠀⠀────███─────────────────────────────────────────
+ 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀──█████████████████████████████────────────
+ 2026-04-29T12:30:00.000000000Z | ────────░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | ────────│──────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ```
 
 ### NULL handling and validation
@@ -487,20 +593,23 @@ JOIN LATERAL (
   SELECT min(price) lo, max(price) hi
   FROM fx_trades t2
   WHERE t.symbol = t2.symbol
+    AND t2.timestamp IN '$today'
 )
 WHERE symbol IN ('EURUSD', 'GBPUSD')
-SAMPLE BY 1h
-LIMIT -10;
+  AND timestamp IN '$today'
+SAMPLE BY 30m
+LIMIT -5;
 ```
 
-| timestamp | symbol | ohlc_bar_labels |
-| :-------- | :----- | :-------------- |
-| 2026-01-27T00:00:00.000000Z | EURUSD | ⠀⠀─────────────██────⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.1982 H:1.2025 L:1.1864 C:1.1992 |
-| 2026-01-27T01:00:00.000000Z | EURUSD | ⠀⠀───────░░░░░░░░─────────⠀⠀⠀⠀ O:1.1987 H:1.207 L:1.1868 C:1.1927 |
-| 2026-01-27T02:00:00.000000Z | EURUSD | ────░░░░░░░░░░──────────⠀⠀⠀⠀⠀⠀ O:1.1966 H:1.2052 L:1.1851 C:1.1883 |
-| 2026-01-27T03:00:00.000000Z | EURUSD | ──░░────────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.1879 H:1.1977 L:1.1851 C:1.1868 |
-| 2026-01-27T04:00:00.000000Z | EURUSD | ──██████─────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.1867 H:1.1987 L:1.185 C:1.191 |
-| 2026-01-27T05:00:00.000000Z | EURUSD | ──────████───⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.1903 H:1.1955 L:1.1851 C:1.1932 |
+```
+ timestamp                      | symbol | ohlc_bar_labels
+--------------------------------+--------+------------------------------------------------------------------------------
+ 2026-04-29T12:00:00.000000000Z | GBPUSD | ⠀─░░░░░░░░░░░░░░░░░░░░░─────── O:1.3577 H:1.3651 L:1.3368 C:1.3378
+ 2026-04-29T12:00:00.000000000Z | EURUSD | ⠀⠀⠀⠀─██████████████████─────── O:1.162 H:1.1834 L:1.161 C:1.177
+ 2026-04-29T12:30:00.000000000Z | EURUSD | ─────░░░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀ O:1.1784 H:1.1784 L:1.1574 C:1.1618
+ 2026-04-29T12:30:00.000000000Z | GBPUSD | ──███─────────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.3378 H:1.3493 L:1.3358 C:1.3403
+ 2026-04-29T13:00:00.000000000Z | GBPUSD | ──█████──────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ O:1.3382 H:1.3482 L:1.3358 C:1.3417
+```
 
 #### See also
 
@@ -519,8 +628,8 @@ Characters used (varying height):
 ▁▂▃▄▅▆▇█
 ```
 
-Characters range from `▁` (lowest, U+2581) to `█` (highest, U+2588), giving 8
-levels of vertical resolution per character.
+Characters range from `▁` (lowest) to `█` (highest), giving 8 levels of
+vertical resolution per character.
 
 Since `sparkline` is an aggregate, it pairs naturally with
 [SAMPLE BY](/docs/query/sql/sample-by/) to show intra-bucket trends.
@@ -566,52 +675,83 @@ SELECT timestamp, symbol,
        sparkline(price, NULL, NULL, 20)
 FROM trades
 WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
-  AND timestamp IN '2026-03-07'
+  AND timestamp IN '$yesterday'
 SAMPLE BY 1h
-LIMIT 10;
+LIMIT -5;
 ```
 
 | timestamp                   | symbol   | avg_price | sparkline            |
 | :-------------------------- | :------- | :-------- | :------------------- |
-| 2026-03-07T00:00:00.000000Z | BTC-USDT | 68229     | ▄▄▄▄▄▄▃▂▁▁▂▃▃▄▆▇▇▇▇▇ |
-| 2026-03-07T00:00:00.000000Z | ETH-USDT | 1981      | ▆▅▄▅▅▄▅▅▆▆▆▄▂▂▂▄▇▆▇▇ |
-| 2026-03-07T01:00:00.000000Z | BTC-USDT | 68239     | ▇▅▃▃▂▃▃▂▂▂▂▁▁▁▂▃▃▃▅▅ |
-| 2026-03-07T01:00:00.000000Z | ETH-USDT | 1979      | ▇▅▃▃▃▃▂▁▁▃▄▃▂▂▃▂▂▁▂▅ |
-| 2026-03-07T02:00:00.000000Z | BTC-USDT | 68182     | ▇▇▇▆▆▆▄▃▂▃▂▂▂▁▂▄▅▆▆▆ |
-| 2026-03-07T02:00:00.000000Z | ETH-USDT | 1978      | ▆▆▅▄▃▃▃▃▃▂▂▂▃▅▅▆▆▇▇▇ |
-| 2026-03-07T03:00:00.000000Z | BTC-USDT | 68286     | ▇▆▆▆▅▅▅▅▅▄▄▃▂▂▃▃▃▁▁▁ |
-| 2026-03-07T03:00:00.000000Z | ETH-USDT | 1986      | ▁▄▇▇▇▆▆▅▅▅▅▅▃▃▃▄▃▂▂▂ |
-| 2026-03-07T04:00:00.000000Z | ETH-USDT | 1973      | ▁▁▂▂▃▃▃▄▄▅▇▇▇▇▇▇▆▆▆▆ |
-| 2026-03-07T04:00:00.000000Z | BTC-USDT | 68026     | ▁▃▃▃▃▄▄▄▄▅▅▅▇▇▇▇▇▇▆▆ |
+| 2026-04-28T21:00:00.000000Z | ETH-USDT | 2291      | ▆▇▆▅▄▃▃▄▃▃▂▃▃▃▃▁▂▁▃▃ |
+| 2026-04-28T22:00:00.000000Z | BTC-USDT | 76343     | ▅▆▅▆▇▇▆▅▅▄▄▄▄▄▄▃▂▂▁▁ |
+| 2026-04-28T22:00:00.000000Z | ETH-USDT | 2290      | ▅▅▅▆▆▇▆▄▄▄▄▄▃▃▂▂▂▁▁▁ |
+| 2026-04-28T23:00:00.000000Z | BTC-USDT | 76288     | ▂▂▂▁▁▂▄▅▆▄▅▄▄▃▄▅▅▅▆▆ |
+| 2026-04-28T23:00:00.000000Z | ETH-USDT | 2287      | ▃▂▂▃▄▅▅▆▅▄▃▃▃▃▄▄▆▆▆▇ |
 
 The `width` of 20 sub-samples each hour's tick data into 20 characters,
 regardless of how many ticks exist within each bucket.
 
 ```questdb-sql demo title="Compare intra-day trends across symbols"
-SELECT symbol, sparkline(price)
+SELECT symbol, sparkline(price, NULL, NULL, 24)
 FROM trades
-WHERE timestamp IN '2026-03-07'
+WHERE timestamp IN '$yesterday'
 SAMPLE BY 1h;
 ```
 
-```questdb-sql demo title="Fixed scale for cross-symbol comparison"
-SELECT symbol, sparkline(amount, 0, 1000000, 24)
-FROM trades
-SAMPLE BY 1d
-LIMIT -5;
+```
+ symbol   | sparkline
+----------+--------------------------
+ ETH-USDT | ▃▂▃▂▂▃▄▄▄▃▂▁▁▁▁▃▅▅▇▇▆▅▆▅
+ BTC-USDT | ▅▄▃▃▂▄▅▄▅▂▂▁▁▂▂▅▆▆▆▇▅▃▅▅
+ LTC-USDT | ▄▃▄▅▅▆▆▄▅▃▂▂▂▁▂▂▃▄▃▃▂▂▁▁
+ XLM-USDT | ▇▅▅▅▅▅▆▆▆▅▆▅▄▄▃▁▁▁▂▄▄▃▂▂
+ SOL-USDT | ▆▅▄▅▅▆▅▅▅▅▄▄▄▃▃▃▃▄▅▆▇▇▆▆
 ```
 
-This ensures 0 is always `▁` and 1,000,000 is always `█` across all symbols,
-making the sparklines visually comparable.
+```questdb-sql demo title="Fixed scale for cross-symbol comparison"
+SELECT symbol,
+       sparkline(price, 0.5, 1.5, 24)
+FROM fx_trades
+WHERE symbol IN ('EURUSD', 'GBPUSD',
+  'USDCHF', 'AUDUSD', 'USDCAD')
+  AND timestamp IN '$today'
+SAMPLE BY 1d;
+```
+
+```
+ symbol | sparkline
+--------+--------------------------
+ AUDUSD | ▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂
+ USDCHF | ▃▃▃▃▃▃▃▃▂▃▃▃▃▂▂▃▃▃▃▂▂▂▂▂
+ GBPUSD | ▆▆▆▆▆▆▆▆▆▆▇▇▆▆▆▆▆▆▆▆▆▆▆▆
+ EURUSD | ▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅
+ USDCAD | ▇▇▇▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇▆▇▇▇▇▇
+```
+
+All symbols share the 0.5-1.5 scale, so their relative price levels are
+directly comparable. USDCAD trades near the top, AUDUSD near the bottom.
 
 ```questdb-sql demo title="Partial auto-scaling with fixed floor"
-SELECT symbol, sparkline(price, 0, NULL, 24)
-FROM trades
-SAMPLE BY 1d
+SELECT timestamp,
+       sparkline(price, 1.15, NULL, 24)
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 30m
 LIMIT -5;
 ```
 
-Fixes the floor at 0 but auto-computes the ceiling from the data.
+```
+ timestamp                      | sparkline
+--------------------------------+--------------------------
+ 2026-04-29T11:00:00.000000000Z | ▅▅▅▅▆▆▅▆▇▆▆▆▇▇▆▆▆▅▅▅▄▄▃▃
+ 2026-04-29T11:30:00.000000000Z | ▃▃▄▄▄▅▅▅▆▇▇▇▇▅▅▆▆▅▅▅▅▃▃▃
+ 2026-04-29T12:00:00.000000000Z | ▃▄▄▅▄▄▅▆▆▆▇▇▇▅▅▆▆▆▆▆▆▆▇▇
+ 2026-04-29T12:30:00.000000000Z | ▆▄▄▃▃▄▄▅▅▄▃▃▃▃▄▅▅▅▆▅▆▅▄▃
+ 2026-04-29T13:00:00.000000000Z | ▅▅▄▄▅▆▅▄▄▅▅▄▆▆▆▆▅▅▄▅▄▅▅▅
+```
+
+Fixes the floor at 1.15 but auto-computes the ceiling from the data.
 
 #### Clamping
 
@@ -692,7 +832,8 @@ VARCHAR column header. Clicking it toggles between:
   left-to-right along a horizontal scroll axis, and bars are rendered
   vertically, resembling a traditional candlestick or bar chart. Timestamps
   appear at the bottom of each column (time in green, date in gray). OHLC
-  green/red coloring is preserved.
+  green/red coloring is preserved. For `ohlc_bar_labels`, labels are stripped
+  from the visual bar and shown as a tooltip on hover instead.
 
 The rotate icon turns cyan when the rotated view is active.
 
@@ -700,13 +841,11 @@ The rotation state persists across consecutive queries that produce rotatable
 results. If you run a query that does not meet the rotation conditions (different
 functions, extra columns, or no visualization function), the state resets.
 
-For `ohlc_bar_labels`, labels are shown inline in normal view and as a tooltip
-on hover in rotated view.
-
 :::note
-In rotated view, `bar()` output replaces fractional block characters
-(U+2589 through U+258F) with full blocks, as partial-width characters do not
-render correctly when the text flow is vertical.
+In rotated view, `bar()` fractional block characters are replaced because
+partial-width characters do not render correctly when the text flow is vertical.
+Fractional blocks that are half or more (`▉▊▋▌`) become a full block (`█`),
+while smaller fractions (`▍▎▏`) become a faded tip (`░`).
 :::
 
 `depth_chart` and `sparkline` do not support rotation.
@@ -727,7 +866,9 @@ Default is 1,048,576 bytes (1 MB). This is the same property used by
 Each output character is 3 bytes in UTF-8, so the default allows up to 349,525
 characters of output. For `sparkline`, this limits the number of values
 accumulated per group. For `bar` and `ohlc_bar`, this limits the `width`
-parameter. If the limit is exceeded, the function throws a non-critical error.
+parameter. For `depth_chart`, this limits the total chart width (bid levels +
+spread + ask levels). If the limit is exceeded, the function throws a
+non-critical error.
 
 In practice these limits are generous - a sparkline or bar of 349K characters
 would be unusable. The limit exists to prevent accidental memory exhaustion.
