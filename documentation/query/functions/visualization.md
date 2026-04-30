@@ -6,7 +6,7 @@ description: SQL functions for rendering inline charts in query results using Un
 
 Visualization functions render numeric data as compact Unicode block charts
 directly in query results. The output is a `varchar` cell that works everywhere:
-psql, the web console, JDBC clients, CSV exports, ...
+psql, the web console, JDBC clients, or CSV exports.
 
 | Function | Type | Description |
 | :------- | :--- | :---------- |
@@ -19,7 +19,8 @@ psql, the web console, JDBC clients, CSV exports, ...
 
 ## Resolution and rendering
 
-Visualization functions render data as Unicode text characters. Each character
+Visualization functions render data as Unicode text characters, for example
+`⠀⠀───░░░░──⠀⠀` (OHLC candle) or `▃▅▇▆▄▂▁▃▅▇` (sparkline). Each character
 position represents a range of values, not a single precise point. A bar
 rendered at width 40 can only distinguish 40 distinct levels across its scale
 range. Values that fall within the same character-width bucket are
@@ -31,26 +32,9 @@ replacement for pixel-level charting tools.
 
 ## bar
 
-`bar(value, min, max, width)` - Renders a single numeric value as a horizontal
-bar. The bar is made of full block characters with a fractional block at the end
-for sub-character precision.
-
-Characters used (varying width):
-
-```
-█▉▊▋▌▍▎▏
-```
-
-A full block fills the character cell; fractional blocks at the end provide
-sub-character precision. A `width` of 20 characters gives 160 discrete levels
-of resolution (20 x 8).
-
-Since `bar` is a scalar function, it can wrap aggregates like `sum()`, `avg()`,
-or `count()` to visualize their results inline.
-
-The web console can
-[rotate](#rotating-to-vertical-chart) `bar` output to a vertical chart when the
-query returns exactly two columns (timestamp + bar).
+`bar(value, min, max, width)` renders a single numeric value as a horizontal
+bar (`████████████▌`), made of full block characters with a fractional block
+at the end for sub-character precision.
 
 #### Parameters
 
@@ -69,6 +53,42 @@ if `min >= max`, the function returns `NULL`.
 #### Return value
 
 Return value type is `varchar`.
+
+```questdb-sql demo title="Inline with row-level data"
+SELECT symbol, round(price, 4) price,
+       bar(price, 0.5, 1.5, 25)
+FROM fx_trades
+WHERE symbol IN ('EURUSD', 'GBPUSD',
+  'USDCHF', 'USDCAD', 'AUDUSD')
+LATEST ON timestamp PARTITION BY symbol;
+```
+
+```
+ symbol | price  | bar
+--------+--------+------------------------
+ AUDUSD | 0.7128 | █████▎
+ USDCAD | 1.3708 | █████████████████████▊
+ USDCHF | 0.7836 | ███████
+ EURUSD | 1.1618 | ████████████████▌
+ GBPUSD | 1.3417 | █████████████████████
+```
+
+#### Visual encoding
+
+```
+█▉▊▋▌▍▎▏
+```
+
+A full block fills the character cell; fractional blocks at the end provide
+sub-character precision. A `width` of 20 characters gives 160 discrete levels
+of resolution (20 x 8).
+
+Since `bar` is a scalar function, it can wrap aggregates like `sum()`, `avg()`,
+or `count()` to visualize their results inline.
+
+The web console can
+[rotate](#rotating-to-vertical-chart) `bar` output to a vertical chart when the
+query returns exactly two columns (timestamp + bar).
 
 #### Examples
 
@@ -146,25 +166,6 @@ LIMIT -5;
 
 All symbols share the same min/max, making bars comparable across groups.
 
-```questdb-sql demo title="Inline with row-level data"
-SELECT symbol, round(price, 4) price,
-       bar(price, 0.5, 1.5, 25)
-FROM fx_trades
-WHERE symbol IN ('EURUSD', 'GBPUSD',
-  'USDCHF', 'USDCAD', 'AUDUSD')
-LATEST ON timestamp PARTITION BY symbol;
-```
-
-```
- symbol | price  | bar
---------+--------+------------------------
- AUDUSD | 0.7128 | █████▎
- USDCAD | 1.3708 | █████████████████████▊
- USDCHF | 0.7836 | ███████
- EURUSD | 1.1618 | ████████████████▌
- GBPUSD | 1.3417 | █████████████████████
-```
-
 #### See also
 
 - [sparkline](#sparkline) - Aggregate trend chart
@@ -172,30 +173,20 @@ LATEST ON timestamp PARTITION BY symbol;
 
 ## depth_chart
 
-`depth_chart(bid_volumes[], ask_volumes[] [, width])` - Renders a market depth
-profile from bid and ask volume arrays as a single-line sparkline-style chart.
-Bids appear on the left (tallest at the edges representing deepest liquidity),
-asks on the right, with a spread marker (`╎`) in the center.
+`depth_chart(bid_volumes[], ask_volumes[] [, width])` renders a market depth
+profile (`█▇▆▅▄▃▂▁╎▁▂▃▄▅▆▇█`) from bid and ask volume arrays. Bids appear on
+the left (tallest at the edges representing deepest liquidity), asks on the
+right, with a spread marker (`╎`) in the center.
 
 See also [depth_chart_labels](#depth_chart_labels), which appends volume
 statistics after the chart.
 
-The web console [colorizes](#colorizing) bid and ask sides in green and red.
-
-Characters used:
-
-| Purpose | Character |
-| :------ | :-------- |
-| Depth levels | `█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█` |
-| Spread marker | `╎` |
-
 #### Parameters
 
-| Parameter | Type | Description |
-| :-------- | :--- | :---------- |
-| bid_volumes | DOUBLE[] | Per-level bid volumes, ordered best-to-worst |
-| ask_volumes | DOUBLE[] | Per-level ask volumes, ordered best-to-worst |
-| width | INT (optional) | Total chart width in characters. Default: array lengths + 1. Minimum: 3. |
+- `bid_volumes` (`DOUBLE[]`): per-level bid volumes, ordered best-to-worst.
+- `ask_volumes` (`DOUBLE[]`): per-level ask volumes, ordered best-to-worst.
+- `width` (optional, `int`): total chart width in characters. Default: array
+  lengths + 1. Minimum: 3.
 
 Arrays must be one-dimensional. They can have different lengths (asymmetric
 books are valid).
@@ -203,34 +194,6 @@ books are valid).
 #### Return value
 
 Return value type is `varchar`.
-
-#### How scaling works
-
-The function computes cumulative sums from each array, then applies `log1p()` to
-compress the dynamic range. This is necessary because cumulative depth grows
-exponentially - without log scale, only the deepest levels would be visible and
-all near-spread levels would appear as the lowest character.
-
-The log-scaled values are mapped to sparkline characters (`▁` through `█`)
-relative to the global min/max across both sides.
-
-#### Width behavior
-
-- **Default**: one character per array element plus the spread marker. A 30-level
-  book on each side produces a 61-character chart.
-- **Explicit width**: the cumulative curve is subsampled if the width is smaller
-  than the arrays. If the width is larger, remaining positions are padded with
-  `▁` on the far sides (bids pad on the left, asks pad on the right), keeping
-  real data adjacent to the spread.
-
-#### NULL handling
-
-- NULL or empty arrays return NULL
-- Non-finite elements (NaN, Infinity) throw an error
-- Negative volumes throw an error
-- Zero volumes are valid and render as `▁`
-
-#### Examples
 
 ```questdb-sql demo title="Latest depth for multiple symbols"
 SELECT timestamp, symbol,
@@ -253,8 +216,42 @@ LATEST ON timestamp PARTITION BY symbol;
 ```
 
 Each symbol has a different number of depth levels. The chart width adjusts
-automatically. Symmetric shapes indicate balanced books; one side taller than the
-other indicates a liquidity imbalance.
+automatically. Symmetric shapes indicate balanced books, and one side taller
+than the other indicates a liquidity imbalance. Use the optional `width`
+parameter to force all charts to the same number of characters for side-by-side
+comparison.
+
+#### Visual encoding
+
+| Purpose | Character |
+| :------ | :-------- |
+| Depth levels | `█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█` |
+| Spread marker | `╎` |
+
+The function computes cumulative sums from each array, then applies `log1p()` to
+compress the dynamic range. This is necessary because cumulative depth grows
+exponentially. Without log scale, only the deepest levels would be visible and
+all near-spread levels would appear as the lowest character.
+
+The web console [colorizes](#colorizing) bid and ask sides in green and red.
+
+#### Width behavior
+
+- **Default**: one character per array element plus the spread marker. A 30-level
+  book on each side produces a 61-character chart.
+- **Explicit width**: the cumulative curve is subsampled if the width is smaller
+  than the arrays. If the width is larger, remaining positions are padded with
+  `▁` on the far sides (bids pad on the left, asks pad on the right), keeping
+  real data adjacent to the spread.
+
+#### NULL handling
+
+- NULL or empty arrays return NULL
+- Non-finite elements (NaN, Infinity) throw an error
+- Negative volumes throw an error
+- Zero volumes are valid and render as `▁`
+
+#### Examples
 
 ```questdb-sql demo title="Fixed-width comparison"
 SELECT symbol,
@@ -286,7 +283,7 @@ profile with thin liquidity near the spread and heavy volume at the edges.
 
 ## depth_chart_labels
 
-`depth_chart_labels(bid_volumes[], ask_volumes[] [, width])` - Identical to
+`depth_chart_labels(bid_volumes[], ask_volumes[] [, width])` is identical to
 [depth_chart](#depth_chart) but appends volume statistics after the chart:
 `bb:<best_bid_vol> ba:<best_ask_vol> tb:<total_bid_vol> ta:<total_ask_vol>`.
 
@@ -326,17 +323,57 @@ LATEST ON timestamp PARTITION BY symbol;
 ## ohlc_bar
 
 Renders OHLC (Open, High, Low, Close) candlestick data as horizontal Unicode
-bars. Each row produces a text candlestick showing wick (high-low range) and
-body (open-close range), directly in query results.
+bars (`⠀⠀───░░░░░──⠀⠀`). Each row produces a text candlestick showing wick
+(high-low range) and body (open-close range), directly in query results.
 
 See also [ohlc_bar_labels](#ohlc_bar_labels), which appends OHLC values after the
 bar.
 
-The web console [colorizes](#colorizing) bullish bodies green and bearish bodies
-red, and can [rotate](#rotating-to-vertical-chart) the output to a vertical
-candlestick chart.
+### Aggregate variant
 
-Visual encoding:
+`ohlc_bar(price, min, max [, width])` is a GROUP BY / SAMPLE BY aggregate.
+Computes Open (first value by row order), High (max), Low (min), and Close (last
+value by row order) from raw price observations within each group. Renders using
+the supplied min/max bounds for scaling.
+
+**When to use:** raw tick or trade data where you want OHLC candles computed and
+rendered in one step with SAMPLE BY.
+
+#### Parameters
+
+- `price` (`double`): value column to aggregate into OHLC.
+- `min` (`double`): lower bound for scaling (left edge of bar).
+- `max` (`double`): upper bound for scaling (right edge of bar).
+- `width` (optional, `int`): bar width in characters, default 40.
+
+The min and max parameters accept column references, lateral join results,
+constants, and bind variables.
+
+#### Return value
+
+Return value type is `varchar`.
+
+```questdb-sql demo title="Constant bounds"
+SELECT timestamp,
+       ohlc_bar(price, 1.15, 1.19, 40)
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 30m
+LIMIT -5;
+```
+
+```
+ timestamp                      | ohlc_bar
+--------------------------------+------------------------------------------
+ 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀─░░░░░░░░░░░░───────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T11:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀──██─────────────────────⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀─███████████████───────⠀⠀⠀⠀⠀⠀
+ 2026-04-29T12:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀─────░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+ 2026-04-29T13:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀────██─────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
+#### Visual encoding
 
 ```
 ⠀⠀⠀───██████─────⠀⠀⠀  Bullish (close >= open): █ body, ─ wick
@@ -347,27 +384,9 @@ Visual encoding:
 All candles in a result set are scaled against the same min/max bounds, so their
 horizontal positions are directly comparable across rows.
 
-### Aggregate variant
-
-`ohlc_bar(price, min, max [, width])` - A GROUP BY / SAMPLE BY aggregate.
-Computes Open (first value by row order), High (max), Low (min), and Close (last
-value by row order) from raw price observations within each group. Renders using
-the supplied min/max bounds for scaling.
-
-**When to use:** raw tick or trade data where you want OHLC candles computed and
-rendered in one step with SAMPLE BY.
-
-#### Parameters
-
-| Parameter | Type | Description |
-| :-------- | :--- | :---------- |
-| price | DOUBLE | Value column to aggregate into OHLC |
-| min | DOUBLE | Lower bound for scaling (left edge of bar) |
-| max | DOUBLE | Upper bound for scaling (right edge of bar) |
-| width | INT (optional) | Bar width in characters, default 40 |
-
-The min and max parameters accept column references, lateral join results,
-constants, and bind variables.
+The web console [colorizes](#colorizing) bullish bodies green and bearish bodies
+red, and can [rotate](#rotating-to-vertical-chart) the output to the traditional vertical
+candlestick chart.
 
 #### Bounds
 
@@ -392,29 +411,6 @@ The aggregate variant supports `FILL(NULL)`, `FILL(PREV)`, and `FILL(NONE)`.
 `FILL(LINEAR)` is not supported (interpolating OHLC is undefined).
 
 #### Examples
-
-```questdb-sql demo title="Constant bounds"
-SELECT timestamp,
-       ohlc_bar(price, 1.15, 1.19, 40)
-FROM fx_trades
-WHERE symbol = 'EURUSD'
-  AND timestamp IN '$today'
-SAMPLE BY 30m
-LIMIT -5;
-```
-
-```
- timestamp                      | ohlc_bar
---------------------------------+------------------------------------------
- 2026-04-29T11:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀─░░░░░░░░░░░░───────────⠀⠀⠀⠀⠀⠀⠀
- 2026-04-29T11:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀──██─────────────────────⠀⠀⠀⠀⠀⠀⠀
- 2026-04-29T12:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀─███████████████───────⠀⠀⠀⠀⠀⠀
- 2026-04-29T12:30:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀─────░░░░░░░░░░░░░░░░░⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
- 2026-04-29T13:00:00.000000000Z | ⠀⠀⠀⠀⠀⠀⠀────██─────⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-```
-
-Bullish candles (`█`) show close above open, bearish candles (`░`) show close
-below open. The wick (`─`) extends from high to low.
 
 ```questdb-sql title="DECLARE variables"
 DECLARE @lo := 1.15, @hi := 1.19
@@ -495,9 +491,9 @@ comparable within a symbol regardless of absolute price level.
 
 ### Scalar variant
 
-`ohlc_bar(open, high, low, close, min, max [, width])` - A per-row scalar
-function. Takes precomputed OHLC values and explicit bounds. Does not
-aggregate - renders one candle per input row.
+`ohlc_bar(open, high, low, close, min, max [, width])` is a per-row scalar
+function that takes precomputed OHLC values and explicit bounds, rendering one
+candle per input row without aggregation.
 
 **When to use:** OHLC values are already computed (from a subquery, materialized
 view, or external source) and you want to render them with precise control over
@@ -505,15 +501,13 @@ the scaling bounds.
 
 #### Parameters
 
-| Parameter | Type | Description |
-| :-------- | :--- | :---------- |
-| open | DOUBLE | Opening price |
-| high | DOUBLE | Highest price |
-| low | DOUBLE | Lowest price |
-| close | DOUBLE | Closing price |
-| min | DOUBLE | Lower bound for scaling (left edge) |
-| max | DOUBLE | Upper bound for scaling (right edge) |
-| width | INT (optional) | Bar width in characters, default 40 |
+- `open` (`double`): opening price.
+- `high` (`double`): highest price.
+- `low` (`double`): lowest price.
+- `close` (`double`): closing price.
+- `min` (`double`): lower bound for scaling (left edge).
+- `max` (`double`): upper bound for scaling (right edge).
+- `width` (optional, `int`): bar width in characters, default 40.
 
 #### Examples
 
@@ -618,24 +612,16 @@ LIMIT -5;
 
 ## sparkline
 
-`sparkline(value)` or `sparkline(value, min, max, width)` - Collects numeric
-values within a group and renders them as a compact vertical block chart. Each
-value maps to one character. Best for showing trends, cycles, and spikes.
-
-Characters used (varying height):
-
-```
-▁▂▃▄▅▆▇█
-```
-
-Characters range from `▁` (lowest) to `█` (highest), giving 8 levels of
-vertical resolution per character.
+`sparkline(value)` or `sparkline(value, min, max, width)` collects numeric
+values within a group and renders them as a compact vertical block chart
+(`▃▅▇▆▄▂▁▃▅▇`). Each value maps to one character. Best for showing trends,
+cycles, and spikes.
 
 Since `sparkline` is an aggregate, it pairs naturally with
 [SAMPLE BY](/docs/query/sql/sample-by/) to show intra-bucket trends.
 
-The input can be any numeric type (`double`, `int`, `long`, `short`, `float`) -
-it is implicitly cast to `double`.
+The input can be any numeric type (`double`, `int`, `long`, `short`, `float`),
+implicitly cast to `double`.
 
 #### Parameters
 
@@ -658,16 +644,6 @@ auto-computes the ceiling from the data.
 #### Return value
 
 Return value type is `varchar`.
-
-#### Null handling
-
-- `NULL` input values are silently skipped.
-- If all values in a group are `NULL`, the function returns `NULL`.
-- An empty group (no rows) also returns `NULL`.
-- When all values are identical (`min` equals `max`), every character renders as
-  `█`, signaling "no variation".
-
-#### Examples
 
 ```questdb-sql demo title="Hourly price trends with sub-sampling"
 SELECT timestamp, symbol,
@@ -692,6 +668,25 @@ LIMIT -5;
 
 The `width` of 20 sub-samples each hour's tick data into 20 characters,
 regardless of how many ticks exist within each bucket.
+
+#### Visual encoding
+
+```
+▁▂▃▄▅▆▇█
+```
+
+Characters range from `▁` (lowest) to `█` (highest), giving 8 levels of
+vertical resolution per character.
+
+#### Null handling
+
+- `NULL` input values are silently skipped.
+- If all values in a group are `NULL`, the function returns `NULL`.
+- An empty group (no rows) also returns `NULL`.
+- When all values are identical (`min` equals `max`), every character renders as
+  `█`, signaling "no variation".
+
+#### Examples
 
 ```questdb-sql demo title="Compare intra-day trends across symbols"
 SELECT symbol, sparkline(price, NULL, NULL, 24)
@@ -805,6 +800,13 @@ columns the query returns.
 - For `ohlc_bar_labels`, the label prefixes (`O:`, `H:`, `L:`, `C:`) are
   displayed in orange
 
+<Screenshot
+  alt="OHLC colorizing in the web console"
+  title="Bullish candles in green, bearish in red, label prefixes in orange."
+  src="images/docs/query/functions/ohlc-horizontal.webp"
+  width={800}
+/>
+
 **Market depth coloring** (`depth_chart` / `depth_chart_labels`):
 
 - Bid side (characters before the spread separator `╎`) is displayed in green
@@ -812,6 +814,13 @@ columns the query returns.
 - The spread separator itself remains in the default text color
 - For `depth_chart_labels`, the label prefixes (`bb:`, `ba:`, `tb:`, `ta:`) are
   displayed in orange
+
+<Screenshot
+  alt="Depth chart colorizing in the web console"
+  title="Bid side in green, ask side in red, label prefixes in orange."
+  src="images/docs/query/functions/depth_chart.webp"
+  width={800}
+/>
 
 `bar` and `sparkline` output is not colorized.
 
@@ -825,23 +834,24 @@ met:
 - One column is TIMESTAMP or TIMESTAMP_NS
 - The other column is VARCHAR containing `bar` or `ohlc_bar` output
 
-When these conditions are met, a rotate icon appears at the right side of the
-VARCHAR column header. Clicking it toggles between:
+When these conditions are met, a rotate icon
+(![rotate](/images/docs/query/functions/rotate-icon.svg)) appears at the right
+side of the VARCHAR column header. Clicking it toggles between:
 
 - **Normal (horizontal) view**: the default grid layout. Rows are listed
   vertically with bars rendered horizontally.
 - **Rotated (vertical) view**: a transposed layout where time flows
   left-to-right along a horizontal scroll axis, and bars are rendered
   vertically, resembling a traditional candlestick or bar chart. Timestamps
-  appear at the bottom of each column (time in green, date in gray). OHLC
-  green/red coloring is preserved. For `ohlc_bar_labels`, labels are stripped
-  from the visual bar and shown as a tooltip on hover instead.
+  appear at the bottom of each column (time in green, date in gray). The
+  rotate icon turns cyan when the rotated view is active.
 
-The rotate icon turns cyan when the rotated view is active.
-
-The rotation state persists across consecutive queries that produce rotatable
-results. If you run a query that does not meet the rotation conditions (different
-functions, extra columns, or no visualization function), the state resets.
+<Screenshot
+  alt="Bar output rotated to vertical chart"
+  title="Bar chart rotated to vertical view. Fractional blocks become full blocks or faded tips."
+  src="images/docs/query/functions/bars-vertical.webp"
+  width={800}
+/>
 
 :::note
 In rotated view, `bar()` fractional block characters are replaced because
@@ -849,6 +859,21 @@ partial-width characters do not render correctly when the text flow is vertical.
 Fractional blocks that are half or more (`▉▊▋▌`) become a full block (`█`),
 while smaller fractions (`▍▎▏`) become a faded tip (`░`).
 :::
+
+For `ohlc_bar_labels`, labels appear inline in the normal horizontal view
+but are stripped in rotated view and shown as a tooltip when hovering over a
+candle column. OHLC green/red coloring is preserved in both views.
+
+<Screenshot
+  alt="OHLC candles rotated to vertical with tooltip on hover"
+  title="OHLC labels shown as tooltip when hovering over a candle in rotated view."
+  src="images/docs/query/functions/ohlc-vertical.webp"
+  width={800}
+/>
+
+The rotation state persists across consecutive queries that produce rotatable
+results. If you run a query that does not meet the rotation conditions (different
+functions, extra columns, or no visualization function), the state resets.
 
 `depth_chart` and `sparkline` do not support rotation.
 
@@ -872,5 +897,5 @@ parameter. For `depth_chart`, this limits the total chart width (bid levels +
 spread + ask levels). If the limit is exceeded, the function throws a
 non-critical error.
 
-In practice these limits are generous - a sparkline or bar of 349K characters
+In practice these limits are generous. A sparkline or bar of 349K characters
 would be unusable. The limit exists to prevent accidental memory exhaustion.
