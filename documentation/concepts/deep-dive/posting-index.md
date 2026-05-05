@@ -79,9 +79,13 @@ can be served entirely from the index.
 :::tip
 
 The designated timestamp column is automatically included in the covering
-index when an `INCLUDE` clause is present — you do not need to list it
-explicitly. This means timestamp-filtered covering queries work out of the
-box.
+index — even when no explicit `INCLUDE` clause is given. So a bare
+`INDEX TYPE POSTING` already covers `SELECT timestamp, sym FROM t WHERE
+sym = 'X'`. The expanded list is what `SHOW CREATE TABLE` round-trips, so
+`INCLUDE (exchange, price)` renders back as
+`INCLUDE (exchange, price, timestamp)` after creation. Controlled by the
+`cairo.posting.index.auto.include.timestamp` server property
+(default `true`).
 
 :::
 
@@ -90,6 +94,10 @@ box.
 The `INCLUDE` clause is only supported with inline column syntax and
 `ALTER TABLE`. The out-of-line `INDEX(col TYPE POSTING)` syntax does not
 support `INCLUDE`.
+
+Writing `INDEX INCLUDE (...)` (no explicit `TYPE`) is also accepted and
+implicitly creates a posting index — `INCLUDE` is only valid with
+`POSTING`, so the parser promotes the type for you.
 
 :::
 
@@ -243,21 +251,57 @@ SelectedRecord
       filter: symbol='AAPL'
 ```
 
+`IN`-list filters render as `filter: symbol IN ['AAPL','GOOGL','MSFT']`.
+`LATEST ON` queries that hit the covering path show an `op: latest`
+annotation and have no `SelectedRecord` wrapper:
+
+```
+CoveringIndex op: latest on: symbol with: timestamp, price
+  filter: symbol='AAPL'
+```
+
+`SELECT DISTINCT` does not need to read covered values, so it shows up as
+`PostingIndex op: distinct` rather than `CoveringIndex`:
+
+```
+PostingIndex op: distinct on: symbol
+    Frame forward scan on: trades
+```
+
+When you add a filter on a covered column, an `Async Filter` is layered
+above the covering index — the predicate values are read from the sidecar,
+not the column file:
+
+```
+SelectedRecord
+    Async Filter workers: N
+      filter: 100<price
+        CoveringIndex on: symbol with: price
+          filter: symbol='AAPL'
+```
+
 If you see `DeferredSingleSymbolFilterPageFrame` or `PageFrame` instead, the
 query is reading from column files. This happens when the `SELECT` list
-includes columns not in the `INCLUDE` list.
+includes columns not in the `INCLUDE` list, or when the `WHERE` clause
+doesn't filter on the indexed symbol.
 
 ## Comparison with bitmap index
 
 | Feature | Bitmap index | Posting index |
 |---------|-------------|---------------|
-| Storage size | 8-16 bytes/value | ~1 byte/value |
+| Storage size | ~15 bytes/value | ~1 byte/value |
 | Covering index (INCLUDE) | No | Yes |
 | DISTINCT acceleration | No | Yes |
-| Write overhead | Minimal | Minimal (without INCLUDE) |
-| Write overhead with INCLUDE | N/A | Moderate (depends on INCLUDE columns) |
+| Write overhead | Low | Low (without INCLUDE), moderate with INCLUDE |
 | LATEST ON optimization | Yes | Yes |
+| `CAPACITY` clause | Yes | No (parse error) |
 | Syntax | `INDEX` or `INDEX TYPE BITMAP` | `INDEX TYPE POSTING` |
+
+In end-to-end benchmarks (geomean across five workloads, sealed indexes), the
+posting index is roughly 13× smaller than the bitmap index and 1.3–1.5×
+faster on point, range, and full-scan reads. Writes are ~9% slower than the
+bitmap index for the index part itself; sidecar writes add overhead
+proportional to the number and type of `INCLUDE` columns.
 
 ## Query patterns accelerated
 
@@ -270,8 +314,9 @@ SELECT price FROM trades WHERE symbol = 'AAPL';
 
 ### Point queries with additional filters
 
-If the additional filter columns are also in INCLUDE, the covering index
-is still used with a filter applied on top:
+If the additional filter columns are also in `INCLUDE`, the covering index
+streams matching rows and an `Async Filter` applies the extra predicate on
+top — the predicate values are read from the sidecar, not the column file:
 
 ```questdb-sql
 -- Covering index + filter on covered column
@@ -315,7 +360,8 @@ SELECT COUNT(*) FROM trades WHERE symbol = 'AAPL';
 ### Aggregate queries on covered columns
 
 ```questdb-sql
--- Vectorized GROUP BY reads from sidecar page frames
+-- Aggregates over a covered column read from the sidecar instead of
+-- the column file
 SELECT count(*), min(price), max(price)
 FROM trades
 WHERE symbol = 'AAPL';
@@ -363,33 +409,44 @@ The covering sidecar adds storage proportional to the included columns:
 
 ### Write performance
 
-Write overhead depends on the number and type of INCLUDE columns. Typical
-ranges (measured with 100K row inserts, 50 symbol keys):
+Write overhead depends on the number and type of `INCLUDE` columns:
 
-- **Posting index without INCLUDE**: ~15-20% slower than no index
-- **Posting index with fixed-width INCLUDE** (DOUBLE, INT): ~40-50% slower
-- **Posting index with VARCHAR INCLUDE**: ~2x slower
+- **Posting index without INCLUDE**: ~9% slower than the bitmap index for
+  the index path itself (delta + Frame-of-Reference encoding vs. simple
+  append).
+- **Posting index with fixed-width INCLUDE**: additional sidecar write cost
+  proportional to the number of columns; values are batched and compressed
+  at seal time.
+- **Posting index with VARCHAR / STRING / BINARY / ARRAY INCLUDE**: pays
+  the full variable-width copy cost per row plus an FSST symbol-table
+  rebuild per seal for VARCHAR / STRING.
 
-Actual overhead varies with row size, cardinality, and hardware. Query
-performance improvements typically far outweigh the write cost for
+Query performance improvements typically far outweigh the write cost for
 read-heavy workloads.
 
 ### Memory
 
-The posting index uses native memory for encoding/decoding buffers.
-The covering index's FSST symbol tables use ~70KB of native memory per
-compressed column per active reader.
+The posting index uses native memory for encoding/decoding buffers. Each
+FSST-compressed `VARCHAR` or `STRING` column carries a ~2.3 KB symbol
+table that is loaded alongside the sidecar at read time and easily fits
+in L1 cache; per-reader decompression buffers are also small.
 
 ## Architecture
 
 The posting index stores data in three file types per partition:
 
-- **`.pk`** — Key file: double-buffered metadata pages with generation
-  directory (32 bytes per generation entry)
-- **`.pv`** — Value file: delta + Frame-of-Reference bitpacked row IDs,
-  organized into stride-indexed generations
-- **`.pci` + `.pc0`, `.pc1`, ...** — Sidecar files: covered column values
-  stored alongside the posting list, one file per INCLUDE column
+- **`.pk`** — Key file: double-buffered metadata pages with the per-key
+  generation directory; readers see consistent snapshots via a seqlock
+  protocol.
+- **`.pv`** — Value file: row IDs encoded as either delta +
+  Frame-of-Reference bitpacking or Elias-Fano (depending on the index's
+  encoding variant), organised into stride-indexed generations.
+- **`.pci` + `.pc0`, `.pc1`, …** — Sidecar files: covered column values
+  stored alongside the posting list. `.pci` holds the per-column header
+  (including the `coverCount`); each `.pcN` (with txn-segment suffix on
+  disk, e.g. `s.pc0.0.0`) holds the encoded data for one `INCLUDE`
+  column. The auto-included designated timestamp counts as one of the
+  covered columns and gets its own `.pcN` file.
 
 ### Generations and sealing
 
@@ -398,42 +455,56 @@ generation contains a sparse block of key→rowID mappings. Periodically,
 generations are **sealed** into a single dense generation with stride-indexed
 layout for optimal read performance.
 
-Sealing happens automatically when the generation count reaches the maximum
-(125) or when the partition is closed. Sealed data uses two encoding modes
-per stride (256 keys):
+Sealing happens automatically when the active generation count reaches a
+threshold (`cairo.posting.seal.gen.threshold`, default 16) or when a
+partition is closed. Sealed data is written stride-by-stride (256 keys per
+stride). Within the delta + Frame-of-Reference family, the writer
+trial-encodes each stride in two sub-layouts and keeps whichever produces
+fewer bytes:
 
-- **Delta mode** (`POSTING DELTA`): per-key delta encoding with bitpacking —
-  compresses best for regular, evenly-distributed row IDs and is faster for
-  large sequential scans
-- **Elias-Fano mode** (`POSTING EF`): stride-wide Frame-of-Reference with
-  contiguous bitpacking — compresses better for irregular distributions and
-  is faster for point queries
+- **Delta sub-layout** — per-key delta encoding, then per-block
+  Frame-of-Reference bitpacking. Wins when there are roughly ten or more
+  values per key, where the delta distribution lets each block use a
+  small bitwidth.
+- **Flat sub-layout** — stride-wide Frame-of-Reference with a single base
+  and bitwidth, plus a prefix-count array for per-key slicing. Wins when
+  keys are sparse (roughly eight or fewer values per key) by eliminating
+  per-key metadata.
 
-With the default adaptive encoding (`POSTING`), the encoder trial-encodes
-both modes per stride and picks the smaller one.
+These are internal to delta + Frame-of-Reference and are independent of the
+SQL `DELTA` / `EF` encoding variants described above. When the resulting
+bitwidth is 8, 16, or 32, decoding uses a native AVX2 fast path; other
+bit widths fall back to a Java decoder.
 
 ### FSST compression for strings
 
 VARCHAR and STRING columns in the INCLUDE list are compressed using FSST
-(Fast Static Symbol Table) compression during sealing. FSST replaces
-frequently occurring 1-8 byte patterns with single-byte codes, typically
-achieving 2-5x compression on string data with repetitive patterns.
+(Fast Static Symbol Table) compression during sealing once a stride exceeds
+4 KB of raw data. FSST replaces frequently occurring 1–8 byte patterns
+with single-byte codes, typically achieving 2–5× compression on string data
+with repetitive patterns. The 2.3 KB symbol table fits in L1 cache and
+gives stateless O(1) per-value decode.
 
-The FSST symbol table is trained per stride block and stored inline in the
-sidecar file. Decompression is transparent to the query engine.
+The FSST symbol table is trained per seal and stored inline in the sidecar
+file. Decompression is transparent to the query engine.
 
 ## Limitations
 
 :::warning
 
-- `INCLUDE` is only supported for the posting index type (not bitmap)
-- `INCLUDE` cannot list the indexed symbol column itself
+- `INCLUDE` is only supported for the posting index type (not bitmap).
+  Writing `INDEX TYPE BITMAP INCLUDE (...)` errors with
+  `INCLUDE is only supported for POSTING index type`.
+- `INCLUDE` cannot list the indexed symbol column itself.
 - `INCLUDE` is not supported with out-of-line `INDEX(col ...)` syntax —
-  use inline column syntax or `ALTER TABLE` instead
-- `CAPACITY` is not supported for posting indexes (bitmap only)
-- `SAMPLE BY` queries do not currently use the covering index
-  (they fall back to the regular index path)
+  use inline column syntax or `ALTER TABLE` instead.
+- `CAPACITY` is not supported for posting indexes (bitmap only).
+- The covering path engages only when the query filters on the indexed
+  symbol (single key, `IN`-list, or bind variable). Queries without such
+  a filter — including unfiltered `LATEST ON … PARTITION BY sym`,
+  unfiltered `SAMPLE BY`, and unfiltered `GROUP BY` — fall back to a
+  regular page-frame scan.
 - `REINDEX` on WAL tables requires dropping and re-adding the index
-  (this applies to all index types, not just posting)
+  (this applies to all index types, not just posting).
 
 :::

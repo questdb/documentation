@@ -85,11 +85,15 @@
   },
   "cairo.posting.index.auto.include.timestamp": {
     "default": "true",
-    "description": "When `true`, the designated timestamp column is automatically added to the covering index when a [posting index](/docs/concepts/deep-dive/posting-index/) is created with an `INCLUDE` clause."
+    "description": "When `true`, the designated timestamp column is automatically added to the covering index for any [posting index](/docs/concepts/deep-dive/posting-index/) — including bare `INDEX TYPE POSTING` declarations with no `INCLUDE` clause."
   },
   "cairo.posting.index.row.id.encoding": {
-    "default": "posting",
-    "description": "Default row ID encoding for posting indexes. Valid values: `posting` (adaptive delta/flat trial encoding) and `posting_delta` (delta-only encoding)."
+    "default": "adaptive",
+    "description": "Default row ID encoding for posting indexes when no encoding variant is specified. Valid values: `adaptive` (trial-encodes both delta + Frame-of-Reference and Elias-Fano per stride and picks the smaller), `delta` (delta + Frame-of-Reference only), `ef` (Elias-Fano only)."
+  },
+  "cairo.posting.seal.gen.threshold": {
+    "default": "16",
+    "description": "Maximum number of unsealed generations per partition before [posting index](/docs/concepts/deep-dive/posting-index/) sealing is triggered. Sealing compacts active generations into a single dense generation with a stride-indexed layout."
   },
   "cairo.max.swap.file.count": {
     "default": "30",
