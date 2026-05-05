@@ -50,8 +50,12 @@ ALTER MATERIALIZED VIEW trades_hourly
 
 :::note
 
-The `INCLUDE` clause for covering indexes is not supported on materialized
-views. Use a posting index without `INCLUDE` for faster filtered lookups.
+An explicit `INCLUDE` clause for covering indexes is not currently
+accepted on materialized views — the parser rejects it. The view's
+designated timestamp is still auto-added, so `INDEX TYPE POSTING` on a
+view's symbol column produces a covering index over the timestamp,
+which is enough to accelerate `WHERE symbol = … LATEST ON ts` and
+similar timestamp-only covering queries.
 
 :::
 

@@ -30,11 +30,18 @@ ALTER TABLE trades ALTER COLUMN side ADD INDEX;
 ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING;
 ```
 
-An encoding variant can be specified:
+The designated timestamp is auto-included as a covered column even when
+no explicit `INCLUDE` clause is given, so the bare form above already
+covers `SELECT timestamp, instrument FROM trades WHERE instrument = 'X'`.
+
+An encoding variant can also be forced:
 
 ```questdb-sql
--- Force delta-only encoding
+-- Force delta + Frame-of-Reference (benchmarking)
 ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING DELTA;
+
+-- Force Elias-Fano (benchmarking)
+ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING EF;
 ```
 
 ### Adding a posting index with covering columns
@@ -47,12 +54,10 @@ ALTER TABLE trades
   ALTER COLUMN symbol ADD INDEX TYPE POSTING INCLUDE (price, quantity);
 ```
 
-The designated timestamp column is automatically included in the covering
-index — you do not need to list it explicitly.
-
-After this, queries that only select columns from the `INCLUDE` list (plus the
-indexed symbol column and designated timestamp) are served from the index
-sidecar:
+The designated timestamp is appended to the `INCLUDE` list automatically.
+After this, queries that only select columns from the `INCLUDE` list (plus
+the indexed symbol column and designated timestamp) are served from the
+index sidecar:
 
 ```questdb-sql
 -- This query reads from the index sidecar, not from column files
