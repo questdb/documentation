@@ -361,7 +361,7 @@ SELECT DISTINCT symbol FROM trades WHERE timestamp > '2024-01-01';
 ### COUNT queries
 
 ```questdb-sql
--- Uses index to scan only matching rows instead of full table
+-- Plan: Count over CoveringIndex, no column data read
 SELECT COUNT(*) FROM trades WHERE symbol = 'AAPL';
 ```
 
@@ -455,11 +455,12 @@ The posting index stores data in three file types per partition:
   Frame-of-Reference bitpacking or Elias-Fano (depending on the index's
   encoding variant), organised into stride-indexed generations.
 - **`.pci` + `.pc0`, `.pc1`, …** — Sidecar files: covered column values
-  stored alongside the posting list. `.pci` holds the per-column header
-  (including the `coverCount`); each `.pcN` (with txn-segment suffix on
-  disk, e.g. `s.pc0.0.0`) holds the encoded data for one `INCLUDE`
-  column. The auto-included designated timestamp counts as one of the
-  covered columns and gets its own `.pcN` file.
+  stored alongside the posting list. The single `.pci` header lists the
+  covered columns by writer index (`PCI1` magic, plus the `coverCount`
+  used by readers to size their sidecar mappings). Each `.pcN` (with
+  txn-segment suffix on disk, e.g. `s.pc0.0.0`) holds the encoded data
+  for one `INCLUDE` column. The auto-included designated timestamp
+  counts as one of the covered columns and gets its own `.pcN` file.
 
 ### Generations and sealing
 
