@@ -71,18 +71,19 @@ SHOW TABLES;
 SHOW COLUMNS FROM trades;
 
 ```
-| column    | type      | indexed | indexBlockCapacity | indexType | indexInclude | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey |
-| --------- | --------- | ------- | ------------------ | --------- | ------------ | ------------ | -------------- | --------------- | ---------- | --------- |
-| symbol    | SYMBOL    | false   | 0                  |           |              | true         | 256            | 42              | false      | false     |
-| side      | SYMBOL    | false   | 0                  |           |              | true         | 256            | 2               | false      | false     |
-| price     | DOUBLE    | false   | 0                  |           |              | false        | 0              | 0               | false      | false     |
-| amount    | DOUBLE    | false   | 0                  |           |              | false        | 0              | 0               | false      | false     |
-| timestamp | TIMESTAMP | false   | 0                  |           |              | false        | 0              | 0               | true       | false     |
+| column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude |
+| --------- | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- | --------- | ------------ |
+| symbol    | SYMBOL    | false   | 0                  | true         | 256            | 42              | false      | false     |           |              |
+| side      | SYMBOL    | false   | 0                  | true         | 256            | 2               | false      | false     |           |              |
+| price     | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
+| amount    | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
+| timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |              |
 
-The `indexType` column shows the index type (`POSTING`, `BITMAP`, or empty for
-non-indexed columns). The `indexInclude` column lists the names of columns
-included in a [posting index's](/docs/concepts/deep-dive/posting-index/)
-covering sidecar, as a comma-separated string.
+The `indexType` column shows the index type (`POSTING`, `POSTING DELTA`,
+`POSTING EF`, `BITMAP`, or empty for non-indexed columns). The
+`indexInclude` column lists the names of columns included in a
+[posting index's](/docs/concepts/deep-dive/posting-index/) covering
+sidecar, as a comma-separated string.
 
 ### SHOW CREATE TABLE
 

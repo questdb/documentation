@@ -113,27 +113,30 @@ ALTER TABLE trades
 The posting index supports three row ID encoding options with different
 compression and query performance characteristics:
 
-| Syntax | Encoding | Best for |
-|--------|----------|----------|
-| `INDEX TYPE POSTING` | Adaptive (default) | General purpose — trial-encodes both EF and delta per stride, picks the smaller |
-| `INDEX TYPE POSTING EF` | Elias-Fano | Irregular data distributions, point queries and selective lookups |
-| `INDEX TYPE POSTING DELTA` | Delta | Regular, evenly-distributed data, large sequential scans |
+| Syntax | Encoding | Notes |
+|--------|----------|-------|
+| `INDEX TYPE POSTING` | Adaptive (default) | Trials delta + Frame-of-Reference and Elias-Fano per key per stride and keeps the smaller output |
+| `INDEX TYPE POSTING EF` | Elias-Fano only | Forces Elias-Fano even when delta + FoR would be smaller — useful for benchmarking |
+| `INDEX TYPE POSTING DELTA` | Delta + Frame-of-Reference only | Forces delta + FoR even when Elias-Fano would be smaller — useful for benchmarking |
 
-**Delta encoding** stores per-key deltas between consecutive row IDs with
-Frame-of-Reference bitpacking. It compresses best when row IDs for each
-symbol key are evenly spaced (e.g. round-robin or time-ordered ingestion
-of a fixed set of symbols) and is faster for queries that scan large
-ranges of matching rows.
+**Delta + Frame-of-Reference encoding** stores each key's row IDs as
+per-key deltas, split into blocks of 64 with per-block Frame-of-Reference
+bitpacking. Round-robin or periodic distributions produce constant
+deltas (bitwidth 0), so this mode compresses them to near-zero. The
+trade-off is a per-key block-header overhead that hurts low-cardinality
+keys.
 
-**Elias-Fano (EF) encoding** uses a stride-wide flat layout with
-Frame-of-Reference bitpacking across all keys in a stride. It compresses
-better for irregular data distributions (e.g. bursty or skewed symbol
-frequencies) and is faster for point queries and selective lookups.
+**Elias-Fano (EF) encoding** is a classic monotonic-sequence encoding:
+each key's sorted row IDs are split into low and high bit halves, with
+the high half stored as a unary-coded bit array and the low half as a
+fixed-width packed array. This typically produces denser output for
+keys with few values per stride and avoids the block-header overhead.
 
-The **adaptive (default)** encoding trial-encodes both EF and delta modes
-per stride and picks whichever produces the smaller output. This is the
-best choice when you are unsure about your data distribution or have a
-mixed query workload.
+The **adaptive (default)** encoding trial-encodes each key with both
+delta + Frame-of-Reference and Elias-Fano per stride and picks whichever
+produces the smaller output. This is the right choice for almost all
+workloads — the explicit `DELTA` / `EF` variants exist mainly for
+benchmarking.
 
 ```questdb-sql
 -- Default adaptive encoding (recommended for most workloads)
@@ -174,16 +177,19 @@ All column types except the indexed symbol column itself can be included:
 
 | Type | Compression | Notes |
 |------|-------------|-------|
-| BOOLEAN, BYTE, GEOBYTE, DECIMAL8 | Raw copy | 1 byte per value |
-| SHORT, CHAR, GEOSHORT, DECIMAL16 | Frame-of-Reference | 2 bytes uncompressed |
-| INT, FLOAT, IPv4, GEOINT, DECIMAL32 | FoR (int) / ALP (float) | 4 bytes uncompressed |
-| LONG, DOUBLE, TIMESTAMP, DATE, GEOLONG, DECIMAL64 | FoR / ALP / linear prediction | 8 bytes uncompressed |
-| SYMBOL | Frame-of-Reference | Stored as integer key, resolved at query time |
+| BOOLEAN, BYTE, GEOBYTE, DECIMAL8 | Frame-of-Reference bitpacking | ≤1 byte per value (worst case) |
+| SHORT, CHAR, GEOSHORT, DECIMAL16 | Frame-of-Reference bitpacking | ≤2 bytes per value |
+| INT, IPv4, GEOINT, DECIMAL32 | Frame-of-Reference bitpacking | ≤4 bytes per value |
+| FLOAT | ALP (Adaptive Lossless floating-Point) | Lossless float compression |
+| LONG, DATE, GEOLONG, DECIMAL64 | Frame-of-Reference bitpacking | ≤8 bytes per value |
+| TIMESTAMP | Linear-prediction + Frame-of-Reference | Designed for monotonic timestamps |
+| DOUBLE | ALP (Adaptive Lossless floating-Point) | Lossless float compression |
+| SYMBOL | Frame-of-Reference bitpacking | Stored as integer key, resolved at query time |
 | UUID, DECIMAL128 | Raw copy | 16 bytes per value |
 | LONG256, DECIMAL256 | Raw copy | 32 bytes per value |
-| VARCHAR, STRING | FSST compressed | Variable-width, typically 2-5x compression |
-| BINARY | Variable-width sidecar | Stored in offset-based format |
-| Arrays (DOUBLE[], INT[], etc.) | Variable-width sidecar | Stored in offset-based format |
+| VARCHAR, STRING | FSST compressed (≥4 KB strides) | Typically 2–5× compression on repetitive text |
+| BINARY | Length-prefixed raw bytes | Variable-width, no compression |
+| Arrays (DOUBLE[], INT[], etc.) | Length-prefixed raw bytes | Variable-width, no compression |
 
 ### How to choose INCLUDE columns
 
@@ -224,16 +230,17 @@ type and covered columns:
 SHOW COLUMNS FROM trades;
 ```
 
-| column | type | indexed | indexBlockCapacity | indexType | indexInclude | symbolCached | symbolCapacity | designated | upsertKey |
-|--------|------|---------|-------------------|-----------|-------------|-------------|----------------|------------|-----------|
-| timestamp | TIMESTAMP | false | 0 | | | false | 0 | true | false |
-| symbol | SYMBOL | true | 256 | POSTING | exchange,price | true | 128 | false | false |
-| exchange | SYMBOL | false | 0 | | | true | 128 | false | false |
-| price | DOUBLE | false | 0 | | | false | 0 | false | false |
-| quantity | DOUBLE | false | 0 | | | false | 0 | false | false |
+| column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude              |
+|-----------|-----------|---------|--------------------|--------------|----------------|-----------------|------------|-----------|-----------|---------------------------|
+| timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |                           |
+| symbol    | SYMBOL    | true    | 256                | true         | 256            | 0               | false      | false     | POSTING   | exchange,price,timestamp  |
+| exchange  | SYMBOL    | false   | 256                | true         | 256            | 0               | false      | false     |           |                           |
+| price     | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |                           |
+| quantity  | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |                           |
 
-The `indexType` column shows `POSTING`, `BITMAP`, or is empty for
-non-indexed columns. The `indexInclude` column lists covered column names.
+The `indexType` column shows `POSTING`, `POSTING DELTA`, `POSTING EF`,
+`BITMAP`, or is empty for non-indexed columns. The `indexInclude` column
+lists covered column names — note the auto-included designated timestamp.
 
 ### Verifying covering index usage
 
@@ -393,19 +400,24 @@ SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
 
 ### Storage
 
-The posting index itself is very compact (~1 byte per indexed value).
-The covering sidecar adds storage proportional to the included columns:
+The posting index itself is very compact (~1 byte per indexed value, vs.
+~15 bytes per value for the bitmap index). The covering sidecar adds
+storage proportional to the included columns:
 
-- **Numeric columns** (DOUBLE, FLOAT): compressed with ALP (Adaptive
-  Lossless floating-Point) and Frame-of-Reference bitpacking
-- **Integer columns** (INT, LONG, etc.): Frame-of-Reference bitpacking;
-  TIMESTAMP additionally uses linear-prediction encoding
-- **Small fixed-width types** (BYTE, BOOLEAN, etc.): stored as raw copies
-- **Wide fixed-width types** (UUID, LONG256, DECIMAL128/256): stored as
-  raw copies with a count header
-- **Variable-width columns** (VARCHAR, STRING): FSST compressed in sealed
-  partitions, typically 2-5x smaller than raw column data
-- **BINARY and arrays**: stored in an offset-based variable-width sidecar
+- **DOUBLE, FLOAT**: ALP (Adaptive Lossless floating-Point), backed by
+  Frame-of-Reference bitpacking with an exception list for outliers.
+- **TIMESTAMP**: linear-prediction header with Frame-of-Reference residual
+  bitpacking — designed for monotonic timestamp data.
+- **Other fixed-width integer types** (BOOLEAN, BYTE, SHORT, CHAR, INT,
+  LONG, DATE, IPv4, GEO\*, DECIMAL8–DECIMAL64, SYMBOL keys):
+  Frame-of-Reference bitpacking sized to the column's natural width, so
+  the worst case is the column-file byte size and typical case is much
+  smaller.
+- **UUID, LONG256, DECIMAL128, DECIMAL256**: stored raw at full width
+  with a small count header.
+- **VARCHAR, STRING**: FSST-compressed once a stride exceeds 4 KB of raw
+  data; typically 2–5× smaller than the column file.
+- **BINARY and arrays**: length-prefixed raw bytes (no compression).
 
 ### Write performance
 
