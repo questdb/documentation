@@ -111,12 +111,15 @@ WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
 #### Posting index with covering columns
 
 When a symbol column has a posting index with `INCLUDE`, the DDL reflects
-the index type and covered columns:
+the index type and covered columns. The designated timestamp is appended
+to the `INCLUDE` list automatically, so a table created with
+`INCLUDE (price, exchange)` round-trips as
+`INCLUDE (price, exchange, timestamp)`:
 
 ```questdb-sql
 CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 128 CACHE INDEX TYPE POSTING INCLUDE (price, exchange),
-	exchange SYMBOL CAPACITY 128 CACHE,
+	symbol SYMBOL CAPACITY 256 CACHE INDEX TYPE POSTING INCLUDE (price, exchange, timestamp),
+	exchange SYMBOL CAPACITY 256 CACHE,
 	price DOUBLE,
 	amount DOUBLE,
 	timestamp TIMESTAMP
