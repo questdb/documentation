@@ -6,13 +6,25 @@ description: ALTER TABLE SET TTL SQL keyword reference documentation.
 
 Sets the time-to-live (TTL) period on a table.
 
+:::caution
+
+**QuestDB Enterprise: TTL is deprecated.** Enterprise rejects any non-zero
+`SET TTL` with
+`TTL settings are deprecated, please, create a storage policy instead`. Use
+[`ALTER TABLE SET STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)
+instead. `SET TTL 0` is still accepted, for clearing a pre-existing TTL before
+attaching a storage policy. See [Storage Policy](/docs/concepts/storage-policy/)
+for the Enterprise replacement.
+
+:::
+
 Refer to the [section on TTL](/docs/concepts/ttl/) for a conceptual overview.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-
-![Flow chart showing the syntax of ALTER TABLE with SET TTL keyword](/images/docs/diagrams/setTtl.svg)
+```questdb-sql
+ALTER TABLE tableName SET TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] };
+```
 
 ## Description
 
@@ -50,8 +62,6 @@ QuestDB accepts both singular and plural forms:
 - `MONTH` or `MONTHS`
 - `YEAR` or `YEARS`
 
-It also supports shorthand notation: `3h` for 3 hours, `2M` for 2 months.
-
 :::note
 
 QuestDB drops data that exceeded its TTL only a whole partition at a time. For
@@ -70,16 +80,31 @@ information on the behavior of this feature.
 
 :::
 
+### Shorthand notation
+
+QuestDB also supports a shorthand notation that combines the number and unit
+into a single token, such as `3h` for 3 hours or `2M` for 2 months:
+
+```questdb-sql
+ALTER TABLE tableName SET TTL n{h|d|w|M|y};
+```
+
 ## Examples
 
 Set the TTL to 3 weeks:
 
-```sql
+```questdb-sql
 ALTER TABLE weather SET TTL 3 WEEKS;
 ```
 
 Set the TTL to 12 hours, using the shorthand syntax for the time unit:
 
-```sql
+```questdb-sql
 ALTER TABLE weather SET TTL 12h;
+```
+
+Disable TTL:
+
+```questdb-sql
+ALTER TABLE weather SET TTL 0h;
 ```

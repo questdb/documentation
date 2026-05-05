@@ -21,7 +21,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP USER keyword](/images/docs/diagrams/dropUser.svg)
+```questdb-sql
+DROP USER [IF EXISTS] userName;
+```
 
 ## Description
 

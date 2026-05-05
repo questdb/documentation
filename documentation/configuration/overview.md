@@ -19,6 +19,7 @@ import iamConfig from "./configuration-utils/\_iam.config.json"
 import oidcConfig from "./configuration-utils/\_oidc.config.json"
 import logConfig from "./configuration-utils/\_log.config.json"
 import matViewConfig from "./configuration-utils/\_mat-view.config.json"
+import storagePolicyConfig from "./configuration-utils/\_storage-policy.config.json"
 import configValidationConfig from "./configuration-utils/\_config-validation.config.json"
 import telemetryConfig from "./configuration-utils/\_telemetry.config.json"
 
@@ -337,7 +338,9 @@ If not overridden, the following default setting will be used.
         "cairo.partition.encoder.parquet.compression.codec",
         "cairo.partition.encoder.parquet.compression.level",
         "cairo.partition.encoder.parquet.row.group.size",
-        "cairo.partition.encoder.parquet.data.page.size"
+        "cairo.partition.encoder.parquet.data.page.size",
+        "cairo.partition.encoder.parquet.bloom.filter.fpp",
+        "cairo.sql.parquet.row.group.pruning.enabled"
     ]}
 />
 
@@ -483,6 +486,22 @@ If you are using versions earlier than `8.3.1`, we suggest you upgrade at your e
 The following settings are available in `server.conf`:
 
 <ConfigTable rows={matViewConfig} />
+
+## Storage policy
+
+:::note
+
+Storage policy is [Enterprise](/enterprise/) only.
+
+:::
+
+Storage policies automate partition lifecycle management, including local
+deletion and cold storage offloading.
+
+For details, see the
+[storage policy concept](/docs/concepts/storage-policy/) page.
+
+<ConfigTable rows={storagePolicyConfig} />
 
 ## Logging & Metrics
 

@@ -18,6 +18,17 @@ All methods compress with `lz4_raw` by default. See [Data Compression](#data-com
 
 To read and query Parquet files, see the [`read_parquet` function](/docs/query/functions/parquet/).
 
+:::tip
+
+In QuestDB Enterprise, in-place Parquet conversion can be **automated** via
+[storage policies](/docs/concepts/storage-policy/). A storage policy runs the
+conversion on a schedule (e.g., convert to Parquet after 3 days), and can also
+drop the native files and, later, the Parquet files. The manual `ALTER TABLE
+CONVERT PARTITION TO PARQUET` approach described below remains available on
+both OSS and Enterprise.
+
+:::
+
 ## Export via REST
 
 The `/exp` REST API endpoint executes a query and streams the result as a Parquet file directly to the client. This is a synchronous operation — the HTTP response completes when the file is fully transferred.
@@ -95,6 +106,36 @@ While it is running, export can be cancelled with:
 COPY '45ba24e5ba338099' CANCEL;
 ```
 
+### Controlling partitioning
+
+`COPY table_name TO ...` produces one Parquet file per partition, matching the table's own partitioning scheme. `COPY (SELECT ...) TO ...` produces a single file by default.
+
+To override either default, add `PARTITION_BY` to the export options.
+
+Export a table into a single consolidated file:
+
+```questdb-sql
+COPY market_data TO 'market_data_single' WITH FORMAT PARQUET PARTITION_BY NONE;
+```
+
+Re-partition independently of the source table. For example, export a day-partitioned table into monthly files:
+
+```questdb-sql
+COPY market_data TO 'market_data_monthly' WITH FORMAT PARQUET PARTITION_BY MONTH;
+```
+
+Partition a query export by month:
+
+```questdb-sql
+COPY (SELECT * FROM market_data WHERE timestamp IN '2024')
+TO 'market_data_2024'
+WITH FORMAT PARQUET PARTITION_BY MONTH;
+```
+
+Partitioning requires a designated timestamp column in the source table or query result. Valid values: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`.
+
+For the full list of export options, see the [COPY-TO documentation](/docs/query/sql/copy/#options-1).
+
 ### Overriding compression
 
 By default, exported Parquet files use `lz4_raw` compression. You can change the default via `server.conf` as shown in [Data Compression](#data-compression),
@@ -155,6 +196,39 @@ command. Partitions in the Parquet format will have the `isParquet` column set t
 ALTER TABLE trades CONVERT PARTITION TO PARQUET WHERE timestamp < '2025-08-31';
 ```
 
+### Bloom filters for in-place conversion
+
+Bloom filters enable row group
+pruning for equality and `IN` queries on Parquet partitions. There are two ways
+to generate them during in-place conversion.
+
+**Per-column metadata** — If a column was defined with the `BLOOM_FILTER`
+keyword in its
+[`PARQUET()` clause](/docs/query/sql/create-table/#bloom-filters), bloom
+filters are generated automatically during conversion. No additional options are
+needed:
+
+```questdb-sql title="Columns with BLOOM_FILTER metadata are indexed automatically"
+ALTER TABLE trades CONVERT PARTITION TO PARQUET WHERE timestamp < '2025-08-31';
+```
+
+**Explicit column list** — You can specify which columns to index and
+optionally set the false positive probability (FPP) using `WITH`:
+
+```questdb-sql title="Convert with explicit bloom filter columns"
+ALTER TABLE trades CONVERT PARTITION TO PARQUET
+WHERE timestamp < '2025-08-31'
+WITH (bloom_filter_columns = 'symbol,side', bloom_filter_fpp = 0.01);
+```
+
+:::note
+
+When an explicit `bloom_filter_columns` list is provided, it overrides any
+per-column `PARQUET(BLOOM_FILTER)` metadata on the table. If the option is
+omitted, per-column metadata is used.
+
+:::
+
 ### Converting to Native
 
 ```questdb-sql
@@ -209,7 +283,36 @@ penalty of keeping pages that barely compress.
 ### Per-column overrides
 
 Individual columns can override the global encoding and compression settings.
-See [CREATE TABLE - Per-column Parquet encoding and compression](/docs/query/sql/create-table/#per-column-parquet-encoding-and-compression)
+See [CREATE TABLE - Per-column Parquet encoding, compression, and bloom filters](/docs/query/sql/create-table/#per-column-parquet-encoding-compression-and-bloom-filters)
 for defining overrides at table creation, or
-[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-set-parquet/)
 for modifying existing tables.
+
+## Bloom Filters
+
+Bloom filters are opt-in
+probabilistic indexes that enable row group pruning for equality and `IN`
+queries. When generated, they are embedded in the Parquet file metadata
+alongside min/max statistics.
+
+Bloom filters can be enabled per-column via the `BLOOM_FILTER` keyword in
+[`CREATE TABLE`](/docs/query/sql/create-table/#bloom-filters) or
+[`ALTER TABLE`](/docs/query/sql/alter-table-alter-column-set-parquet/#bloom-filter),
+or per-export via `bloom_filter_columns` in
+[`CONVERT PARTITION`](#bloom-filters-for-in-place-conversion),
+[`COPY TO`](/docs/query/sql/copy/), and the
+[REST `/exp` endpoint](/docs/query/rest-api/#parquet-export-parameters).
+
+The false positive probability (FPP) determines the trade-off between filter
+size and accuracy. It is configured globally:
+
+```ini
+# In-place conversion (ALTER TABLE CONVERT PARTITION TO PARQUET)
+cairo.partition.encoder.parquet.bloom.filter.fpp=0.01
+
+# Export (REST /exp and COPY TO)
+cairo.parquet.export.bloom.filter.fpp=0.01
+```
+
+See the [Configuration reference](/docs/configuration/overview/) for all
+Parquet-related settings.

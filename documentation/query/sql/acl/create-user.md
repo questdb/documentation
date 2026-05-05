@@ -21,7 +21,10 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the CREATE USER keyword](/images/docs/diagrams/createUser.svg)
+```questdb-sql
+CREATE USER [IF NOT EXISTS] userName
+    [WITH { PASSWORD password | NO PASSWORD }];
+```
 
 ## Description
 

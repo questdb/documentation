@@ -8,7 +8,12 @@ Updates data in a database table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the UPDATE keyword](/images/docs/diagrams/update.svg)
+```questdb-sql
+UPDATE tableName [alias]
+SET columnName = expression [, columnName = expression ...]
+    [FROM joinTable [JOIN joinTable2 ON joinCondition] ...]
+    [WHERE filter];
+```
 
 :::note
 

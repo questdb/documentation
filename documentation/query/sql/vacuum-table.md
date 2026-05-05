@@ -9,7 +9,9 @@ directories and files.
 
 ## Syntax
 
-![Flow chart showing Vacuum Table syntax](/images/docs/diagrams/vacuumTable.svg)
+```questdb-sql
+VACUUM TABLE tableName;
+```
 
 ## Description
 

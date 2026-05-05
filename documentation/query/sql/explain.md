@@ -9,7 +9,9 @@ statement.
 
 ## Syntax
 
-![Flow chart showing the syntax of the EXPLAIN keyword](/images/docs/diagrams/explain.svg)
+```questdb-sql
+EXPLAIN statement;
+```
 
 ### Description
 

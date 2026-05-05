@@ -9,7 +9,11 @@ is [optional](/docs/concepts/deep-dive/sql-extensions/#group-by-is-optional).
 
 ## Syntax
 
-![Flow chart showing the syntax of the GROUP BY keyword](/images/docs/diagrams/groupBy.svg)
+```questdb-sql
+SELECT column [, column ...], aggregation [, aggregation ...]
+FROM tableName
+[GROUP BY column [, column ...]];
+```
 
 :::note
 

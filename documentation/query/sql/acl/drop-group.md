@@ -21,7 +21,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP GROUP keyword](/images/docs/diagrams/dropGroup.svg)
+```questdb-sql
+DROP GROUP [IF EXISTS] groupName;
+```
 
 ## Description
 

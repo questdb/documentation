@@ -11,7 +11,19 @@ using the complementary SQL keyword
 
 ## Syntax
 
-![Flow chart showing the syntax of ALTER TABLE with DETACH LIST PARTITION keyword](/images/docs/diagrams/alterTableDetachPartition.svg)
+```questdb-sql title="By partition name list"
+ALTER TABLE tableName DETACH PARTITION LIST partitionName [, partitionName ...];
+```
+
+```questdb-sql title="By timestamp comparison"
+ALTER TABLE tableName DETACH PARTITION
+    WHERE timestampColumn { = | > | < | >= | <= } 'timestamp';
+```
+
+```questdb-sql title="By timestamp IN list"
+ALTER TABLE tableName DETACH PARTITION
+    WHERE timestampColumn IN ('timestamp' [, 'timestamp' ...]);
+```
 
 ## Example
 

@@ -9,7 +9,10 @@ column as part of a [SELECT statement](/docs/query/sql/select/).
 
 ## Syntax
 
-![Flow chart showing the syntax of the DISTINCT keyword](/images/docs/diagrams/distinct.svg)
+```questdb-sql
+SELECT DISTINCT columnName [, columnName ...]
+FROM tableName;
+```
 
 ## Examples
 

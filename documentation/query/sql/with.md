@@ -14,7 +14,10 @@ sub-queries, particularly when such sub-queries are used several times.
 
 ## Syntax
 
-![Flow chart showing the syntax of the WITH clause](/images/docs/diagrams/with.svg)
+```questdb-sql
+WITH alias AS (subQuery) [, alias AS (subQuery) ...]
+mainQuery;
+```
 
 Where:
 
@@ -23,22 +26,41 @@ Where:
 
 ## Examples
 
-```questdb-sql title="Single alias"
-WITH first_10_users AS (SELECT * FROM users limit 10)
-SELECT user_name FROM first_10_users;
+```questdb-sql title="Single alias" demo
+WITH recent_eurusd AS (
+    SELECT timestamp, price FROM fx_trades
+    WHERE symbol = 'EURUSD'
+    LIMIT -10
+)
+SELECT * FROM recent_eurusd;
 ```
 
-```questdb-sql title="Using recursively"
-WITH first_10_users AS (SELECT * FROM users limit 10),
-first_5_users AS (SELECT * FROM first_10_users limit 5)
-SELECT user_name FROM first_5_users;
+```questdb-sql title="Using recursively" demo
+WITH recent_eurusd AS (
+    SELECT timestamp, price FROM fx_trades
+    WHERE symbol = 'EURUSD'
+    LIMIT -10
+),
+last_5 AS (SELECT * FROM recent_eurusd LIMIT -5)
+SELECT * FROM last_5;
 ```
 
-```questdb-sql title="Flag whether individual trades are above or below average price"
-WITH avg_price AS (SELECT avg(price) average FROM trades)
-SELECT timestamp, trades.price > avg_price.average above_average
-FROM trades CROSS JOIN avg_price;
+```questdb-sql title="Find EURUSD trades above today's average price" demo
+WITH eurusd_today AS (
+    SELECT timestamp, price,
+           avg(price) OVER () AS avg_price
+    FROM fx_trades
+    WHERE symbol = 'EURUSD'
+      AND timestamp IN '$today'
+)
+SELECT timestamp, price, avg_price
+FROM eurusd_today
+WHERE price > avg_price;
 ```
+
+The CTE is required here because window functions cannot be referenced
+directly in the same query's `WHERE` clause. The outer query reads the
+materialized `avg_price` column and filters on it.
 
 ```questdb-sql title="Update with a sub-query"
 WITH up AS (
