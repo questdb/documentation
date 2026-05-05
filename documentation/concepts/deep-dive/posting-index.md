@@ -143,11 +143,11 @@ benchmarking.
 CREATE TABLE t1 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 
--- EF encoding (irregular data, point queries)
+-- Force Elias-Fano only (benchmarking)
 CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING EF)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 
--- Delta-only encoding (regular data, large scans)
+-- Force delta + Frame-of-Reference only (benchmarking)
 CREATE TABLE t3 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
