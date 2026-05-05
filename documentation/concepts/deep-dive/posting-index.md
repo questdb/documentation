@@ -300,7 +300,8 @@ doesn't filter on the indexed symbol.
 | Covering index (INCLUDE) | No | Yes |
 | DISTINCT acceleration | No | Yes |
 | Write overhead | Low | Low (without INCLUDE), moderate with INCLUDE |
-| LATEST ON optimization | Yes | Yes |
+| Filtered LATEST ON | Yes | Yes (covering) |
+| Unfiltered LATEST ON | Yes (`LatestByAllIndexed`) | Falls back to deferred-list scan |
 | `CAPACITY` clause | Yes | No (parse error) |
 | Syntax | `INDEX` or `INDEX TYPE BITMAP` | `INDEX TYPE POSTING` |
 
