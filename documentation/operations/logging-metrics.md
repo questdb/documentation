@@ -3,8 +3,6 @@ title: Logging and metrics
 description: Configure and understand QuestDB logging and metrics, including log levels, configuration options, and Prometheus integration.
 ---
 
-import { ConfigTable } from "@theme/ConfigTable"
-import httpMinimalConfig from "./_http-minimal.config.json"
 
 This page outlines logging in QuestDB. It covers how to configure logs via `log.conf` and expose metrics via Prometheus.
 
@@ -202,9 +200,8 @@ and the server will respond with identical results, e.g.:
 curl -v http://127.0.0.1:9003/status
 ```
 
-The following configuration options can be set in your `server.conf`:
-
-<ConfigTable rows={httpMinimalConfig} />
+For configuration options, see the
+[Minimal HTTP server](/docs/configuration/http-min-server/) reference.
 
 :::warning
 

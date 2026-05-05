@@ -6,10 +6,7 @@ description:
   storage, primary and replica nodes.
 ---
 
-import { ConfigTable } from "@theme/ConfigTable"
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
-
-import replicationConfig from "../configuration/configuration-utils/\_replication.config.json"
 
 <EnterpriseNote>
   This guide covers setting up primary-replica replication.
@@ -185,7 +182,8 @@ export QDB_REPLICATION_OBJECT_STORE="azblob::..."
 ```
 :::
 
-<ConfigTable rows={replicationConfig} />
+For the full list of replication properties, see the
+[Replication configuration](/docs/configuration/database-replication/) reference.
 
 For tuning options, see the [Tuning guide](/docs/high-availability/tuning/).
 

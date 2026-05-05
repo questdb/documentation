@@ -607,5 +607,5 @@ the replica's view was not fully up-to-date.
     materialized view (QuestDB Enterprise)
 
 - **Configuration**
-  - [Materialized views configs](/docs/configuration/overview/#materialized-views):
+  - [Materialized views configs](/docs/configuration/materialized-views/):
     Server configuration options for materialized views from `server.conf`
