@@ -726,6 +726,16 @@ allocator.
 
 Maximum allowed native memory allocation for GROUP BY functions.
 
+### cairo.sql.max.grouping.sets
+
+- **Default**: `4096`
+- **Reloadable**: no
+
+Maximum number of grouping sets allowed in a single query. ROLLUP produces
+N+1 sets, CUBE produces 2^N sets, and explicit GROUPING SETS produces one
+set per listed group. Queries exceeding this limit are rejected at parse
+time.
+
 ### cairo.sql.parallel.groupby.enabled
 
 - **Default**: `true`
