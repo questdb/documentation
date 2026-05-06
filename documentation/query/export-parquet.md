@@ -18,6 +18,17 @@ All methods compress with `lz4_raw` by default. See [Data Compression](#data-com
 
 To read and query Parquet files, see the [`read_parquet` function](/docs/query/functions/parquet/).
 
+:::tip
+
+In QuestDB Enterprise, in-place Parquet conversion can be **automated** via
+[storage policies](/docs/concepts/storage-policy/). A storage policy runs the
+conversion on a schedule (e.g., convert to Parquet after 3 days), and can also
+drop the native files and, later, the Parquet files. The manual `ALTER TABLE
+CONVERT PARTITION TO PARQUET` approach described below remains available on
+both OSS and Enterprise.
+
+:::
+
 ## Export via REST
 
 The `/exp` REST API endpoint executes a query and streams the result as a Parquet file directly to the client. This is a synchronous operation — the HTTP response completes when the file is fully transferred.

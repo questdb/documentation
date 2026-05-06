@@ -30,7 +30,8 @@ inform your own unique choices.
 [6. Query data, PostgreSQL query](#6-query-data-postgresql-query)\
 [7. Setup replication](#7-setup-replication)\
 [8. Enable compression](#8-enable-compression)\
-[9. Double-check kernel limits](#9-double-check-kernel-limits)\
+[9. Configure a storage policy](#9-configure-a-storage-policy)\
+[10. Double-check kernel limits](#10-double-check-kernel-limits)\
 [Next steps](#next-steps)\
 [FAQ](#faq)
 
@@ -467,7 +468,95 @@ of Kubernetes is supported.
 
 For more on storage and compression, see [Enable compression with ZFS](/docs/deployment/compression-zfs/).
 
-## 9. Double-check kernel limits
+## 9. Configure a storage policy
+
+[Storage policies](/docs/concepts/storage-policy/) are the Enterprise primitive
+for automated partition retention. A policy converts older partitions to
+Parquet, drops the native binary files, and eventually drops the Parquet files
+too — on a schedule you define. This supersedes plain TTL in Enterprise, where
+`ALTER TABLE SET TTL` with a non-zero value is rejected.
+
+### Migrating from TTL when upgrading from OSS
+
+Tables and materialized views that were created in OSS keep their existing
+`TTL` setting after you upgrade to Enterprise — no data is lost at upgrade
+time. However, Enterprise rejects any **new** `TTL` changes (both
+`CREATE ... TTL` and `ALTER ... SET TTL <non-zero>`) with:
+
+```
+TTL settings are deprecated, please, create a storage policy instead
+```
+
+To move a legacy table or materialized view from `TTL` to a storage policy:
+
+1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
+   value Enterprise accepts, and it is required before a storage policy can be
+   attached:
+
+   ```questdb-sql title="Clear the legacy TTL"
+   ALTER TABLE trades SET TTL 0;
+   -- or, for a materialized view:
+   ALTER MATERIALIZED VIEW trades_hourly SET TTL 0;
+   ```
+
+2. **Attach a storage policy** that reproduces — and ideally extends — the
+   retention the TTL used to provide. A policy lets you keep data in Parquet
+   after you would previously have dropped it, so `DROP LOCAL` (or
+   `DROP NATIVE` if you don't want Parquet at all) is the stage that replaces
+   the old TTL horizon:
+
+   ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
+   ALTER TABLE trades SET STORAGE POLICY(
+       TO PARQUET 3 DAYS,
+       DROP NATIVE 10 DAYS,
+       DROP LOCAL 1 MONTH
+   );
+   ```
+
+   If you want the policy to behave exactly like the old TTL (delete the
+   partition outright after the same interval), use a single-stage policy —
+   for example `STORAGE POLICY(DROP NATIVE 1 MONTH)` to match `TTL 1 MONTH`.
+
+Do this for every table and materialized view you want to keep managed
+automatically. Tables without a storage policy retain their data indefinitely
+once their legacy TTL has been cleared.
+
+### Creating new tables with a storage policy
+
+Attach a policy at table creation:
+
+```questdb-sql title="Web Console - Create a table with a storage policy"
+CREATE TABLE trades (
+    ts TIMESTAMP,
+    symbol SYMBOL,
+    price DOUBLE
+) TIMESTAMP(ts) PARTITION BY DAY
+  STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+  WAL;
+```
+
+Or attach a policy to an existing table:
+
+```questdb-sql title="Web Console - Set a storage policy on an existing table"
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 3 DAYS,
+    DROP NATIVE 10 DAYS,
+    DROP LOCAL 1 MONTH
+);
+```
+
+Check active policies via the `storage_policies` system view:
+
+```questdb-sql
+SELECT * FROM storage_policies;
+```
+
+For the full concept, including the stage model, timing, and replication
+behavior, see
+[Storage Policy](/docs/concepts/storage-policy/) and
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+## 10. Double-check kernel limits
 
 QuestDB works together with your server operating system to achieve maximum
 performance. Prior to putting your server under heavy loads, consider checking

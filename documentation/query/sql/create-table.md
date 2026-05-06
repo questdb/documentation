@@ -21,6 +21,7 @@ The first two modes accept the same set of optional clauses:
 - [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
 - [`PARTITION BY`](#partitioning) - partition unit and WAL mode
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
+- [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
 - [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
   [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
 - [`WITH`](#with-table-parameter) - table parameters
@@ -36,7 +37,8 @@ TABLE [IF NOT EXISTS] tableName
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
-            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -52,12 +54,23 @@ TABLE [IF NOT EXISTS] tableName
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
-            [TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }]]]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
     [OWNED BY ownerName];
 ```
+
+Where `policyStage` is one of:
+
+```
+TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration
+```
+
+Stages are Enterprise-only, all optional, and their durations must be positive
+and in ascending order. `TTL` and `STORAGE POLICY` are mutually exclusive — see
+[Storage Policy](#storage-policy).
 
 ```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
 CREATE TABLE tableName (LIKE sourceTableName);
@@ -149,7 +162,7 @@ By default, created tables are
 WAL-enabled tables, it is still possible to create non-WAL-enabled tables.
 
 `CREATE TABLE`'s
-[global configuration setting](/docs/configuration/overview/#cairo-engine) allows you to
+[global configuration setting](/docs/configuration/cairo-engine/) allows you to
 alter the default behaviour via `cairo.wal.enabled.default`:
 
 - `true`: Creates a WAL table (default)
@@ -240,6 +253,49 @@ Refer to the [section on TTL in Concepts](/docs/concepts/ttl/) for detailed
 information on the behavior of this feature.
 
 :::
+
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
+rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
+it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+
+:::
+
+## Storage Policy
+
+:::note
+
+Storage policies are available in **QuestDB Enterprise** only.
+
+:::
+
+A [storage policy](/docs/concepts/storage-policy/) automates the partition
+lifecycle by defining when partitions are converted to Parquet locally, when
+native data is removed, and when local copies are dropped. Place the
+`STORAGE POLICY(...)` clause after `PARTITION BY`:
+
+```questdb-sql title="With storage policy (Enterprise)"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+WAL;
+```
+
+A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
+positive, and they must be in ascending order. `DROP REMOTE` is reserved
+syntax and is currently rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`.
+
+To modify a storage policy after table creation, see
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 ## Deduplication
 
@@ -851,7 +907,7 @@ its volume.
 ### Configuration
 
 The secondary table target volume is defined by `cairo.volumes` in
-[`server.conf`](/docs/configuration/overview/#cairo-engine). The default setting contains
+[`server.conf`](/docs/configuration/cairo-engine/). The default setting contains
 an empty list, which means the feature is not enabled.
 
 To enable the feature, define as many volume pairs as you need, with syntax
