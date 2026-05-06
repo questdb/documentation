@@ -18,6 +18,17 @@ All methods compress with `lz4_raw` by default. See [Data Compression](#data-com
 
 To read and query Parquet files, see the [`read_parquet` function](/docs/query/functions/parquet/).
 
+:::tip
+
+In QuestDB Enterprise, in-place Parquet conversion can be **automated** via
+[storage policies](/docs/concepts/storage-policy/). A storage policy runs the
+conversion on a schedule (e.g., convert to Parquet after 3 days), and can also
+drop the native files and, later, the Parquet files. The manual `ALTER TABLE
+CONVERT PARTITION TO PARQUET` approach described below remains available on
+both OSS and Enterprise.
+
+:::
+
 ## Export via REST
 
 The `/exp` REST API endpoint executes a query and streams the result as a Parquet file directly to the client. This is a synchronous operation — the HTTP response completes when the file is fully transferred.
@@ -274,7 +285,7 @@ penalty of keeping pages that barely compress.
 Individual columns can override the global encoding and compression settings.
 See [CREATE TABLE - Per-column Parquet encoding, compression, and bloom filters](/docs/query/sql/create-table/#per-column-parquet-encoding-compression-and-bloom-filters)
 for defining overrides at table creation, or
-[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/)
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-set-parquet/)
 for modifying existing tables.
 
 ## Bloom Filters
@@ -286,7 +297,7 @@ alongside min/max statistics.
 
 Bloom filters can be enabled per-column via the `BLOOM_FILTER` keyword in
 [`CREATE TABLE`](/docs/query/sql/create-table/#bloom-filters) or
-[`ALTER TABLE`](/docs/query/sql/alter-table-alter-column-parquet-encoding/#bloom-filter),
+[`ALTER TABLE`](/docs/query/sql/alter-table-alter-column-set-parquet/#bloom-filter),
 or per-export via `bloom_filter_columns` in
 [`CONVERT PARTITION`](#bloom-filters-for-in-place-conversion),
 [`COPY TO`](/docs/query/sql/copy/), and the

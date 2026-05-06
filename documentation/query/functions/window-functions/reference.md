@@ -185,6 +185,60 @@ WHERE timestamp IN '[$today]';
 
 ---
 
+### corr() {#corr}
+
+Calculates the Pearson correlation coefficient between two numeric columns over the window frame. The result ranges from -1 (perfect negative correlation) to +1 (perfect positive correlation), with 0 indicating no linear relationship.
+
+**Syntax:**
+```questdb-sql
+corr(y, x) OVER (window_definition)
+```
+
+**Arguments:**
+- `y`: Numeric column - the dependent variable
+- `x`: Numeric column - the independent variable
+
+Rows where either `x` or `y` is `NULL` are excluded from the computation.
+
+**Return value:**
+- `double` - The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
+
+**Description:**
+
+Unlike covariance, correlation is unitless and normalized, making it easier to interpret and compare across different scales. Use correlation as a window function for:
+
+- **Rolling correlation**: Track how the relationship between two metrics changes over time
+- **Regime detection**: Identify periods where correlations break down (e.g., market stress)
+- **Sensor diagnostics**: Detect when two readings that should be correlated start diverging
+- **Fleet analytics**: Compare per-device correlations against fleet-wide correlation
+
+**Example:**
+```questdb-sql title="Rolling correlation between two metrics"
+SELECT
+    ts,
+    robot_id,
+    corr(motor_temp, joint_velocity) OVER (
+        PARTITION BY robot_id
+        ORDER BY ts
+        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
+    ) AS rolling_corr
+FROM telemetry;
+```
+
+```questdb-sql title="Per-device correlation vs fleet"
+SELECT robot_id, device_corr,
+    avg(device_corr) OVER () AS fleet_avg_corr
+FROM (
+    SELECT robot_id,
+        corr(motor_temp, joint_velocity) AS device_corr
+    FROM telemetry
+    WHERE ts > dateadd('d', -1, now())
+    GROUP BY robot_id
+);
+```
+
+---
+
 ### count()
 
 Counts rows or non-null values over the window frame.
@@ -227,41 +281,91 @@ WHERE timestamp IN '[$today]';
 
 ---
 
-### sum()
+### covar_pop() / covar_samp() {#covariance}
 
-Calculates the sum of values over the window frame. Commonly used for running totals.
+Calculates the covariance between two numeric columns over the window frame. Covariance measures how two variables change together. `covar_pop()` computes population covariance (divides by N), `covar_samp()` computes sample covariance (divides by N-1).
 
 **Syntax:**
 ```questdb-sql
-sum(value) OVER (window_definition)
+covar_pop(y, x) OVER (window_definition)
+covar_samp(y, x) OVER (window_definition)
 ```
 
 **Arguments:**
-- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+- `y`: Numeric column - the dependent variable
+- `x`: Numeric column - the independent variable
+
+Rows where either `x` or `y` is `NULL` are excluded from the computation.
 
 **Return value:**
-- `double` - The sum of `value` for rows in the window frame
+- `double` - The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
 
 **Description:**
 
-Use `sum()` as a window function when you need to track accumulation or totals over a sequence. Common use cases include:
+Covariance indicates the direction of the linear relationship between two variables. A positive covariance means they tend to increase together; negative means one increases as the other decreases. Use covariance as a window function for:
 
-- **Running totals**: Track cumulative values like total volume traded throughout the day
-- **Rolling sums**: Calculate sums over sliding windows (e.g., volume in the last 5 minutes)
-- **Budget tracking**: Show how spending accumulates against a budget over time
-- **Position tracking**: Calculate net position by summing buys and sells
+- **Correlation analysis**: Measure how sensor readings co-vary over rolling windows
+- **Portfolio analysis**: Track co-movement between asset prices
+- **Predictive modeling**: Identify which features move together with the target variable
 
 **Example:**
-```questdb-sql title="Cumulative amount" demo
+```questdb-sql title="Rolling covariance between temperature and velocity"
+SELECT
+    ts,
+    robot_id,
+    covar_pop(motor_temp, joint_velocity) OVER (
+        PARTITION BY robot_id
+        ORDER BY ts
+        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
+    ) AS temp_vel_covariance
+FROM telemetry;
+```
+
+---
+
+### first_value()
+
+Returns the first value in the window frame. Supports `IGNORE NULLS` clause.
+
+**Syntax:**
+```questdb-sql
+first_value(value) [(IGNORE|RESPECT) NULLS]
+OVER ([PARTITION BY partition_expression]
+      [ORDER BY sort_expression]
+      [frame_clause])
+```
+
+**Arguments:**
+- `value`: Column or expression to get value from
+- `IGNORE NULLS` (optional): Skip null values
+- `RESPECT NULLS` (default): Include null values
+
+**Return value:**
+- Same type as input - The first value in the window frame (or first non-null with `IGNORE NULLS`)
+
+**Description:**
+
+Use `first_value()` when you need to reference the starting point of a sequence. Common use cases include:
+
+- **Opening price**: Get the first price of each trading session to calculate daily returns
+- **Baseline comparison**: Compare each row to the first value in its partition
+- **Session start**: Reference the initial state at the beginning of each user session
+- **Gap filling**: Use `IGNORE NULLS` to carry forward the last known value when data is sparse
+
+**Example:**
+```questdb-sql title="First price in partition" demo
 SELECT
     symbol,
-    amount,
+    price,
     timestamp,
-    sum(amount) OVER (
+    first_value(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
-        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    ) AS cumulative_amount
+    ) AS first_price,
+    first_value(price) IGNORE NULLS OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS first_non_null_price
 FROM trades
 WHERE timestamp IN '[$today]';
 ```
@@ -324,44 +428,61 @@ WHERE timestamp IN '[$today]';
 
 ---
 
-### min()
+### last_value()
 
-Returns the minimum value within the window frame.
+Returns the last value in the window frame. Supports `IGNORE NULLS` clause.
 
 **Syntax:**
 ```questdb-sql
-min(value) OVER (window_definition)
+last_value(value) [(IGNORE|RESPECT) NULLS]
+OVER ([PARTITION BY partition_expression]
+      [ORDER BY sort_expression]
+      [frame_clause])
 ```
 
 **Arguments:**
-- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+- `value`: Column or expression to get value from
+- `IGNORE NULLS` (optional): Skip null values
+- `RESPECT NULLS` (default): Include null values
 
 **Return value:**
-- Same type as input - The minimum value (excluding null) in the window frame
+- Same type as input - The last value in the window frame (or last non-null with `IGNORE NULLS`)
 
 **Description:**
 
-Use `min()` as a window function when you need to track lowest values over a range. Common use cases include:
+Use `last_value()` when you need to reference the most recent or ending value in a sequence. Common use cases include:
 
-- **Support levels**: Track the lowest price within a rolling window for technical analysis
-- **Drawdown calculation**: Find the minimum value since a peak to measure decline
-- **Quality thresholds**: Identify the worst reading within each time period
-- **Intraday lows**: Track the lowest price per symbol throughout the trading day
+- **Closing price**: Get the last price in each time bucket for OHLC calculations
+- **Current state**: Access the most recent value in a rolling window
+- **Forward filling**: Use `IGNORE NULLS` to get the most recent non-null value for sparse data
+- **End-of-period values**: Capture the final state at partition boundaries
+
+**Frame behavior:**
+- Without `ORDER BY` or frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
+- With `ORDER BY` but no frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
 
 **Example:**
-```questdb-sql title="Rolling minimum price" demo
+```questdb-sql title="Last value with IGNORE NULLS" demo
 SELECT
-    symbol,
-    price,
     timestamp,
-    min(price) OVER (
+    price,
+    last_value(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
-    ) AS lowest_price
+        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+    ) AS last_price,
+    last_value(price) IGNORE NULLS OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS last_non_null_price
 FROM trades
 WHERE timestamp IN '[$today]';
 ```
+
+This example:
+- Gets the last price within a 3-row window for each symbol (`last_price`)
+- Gets the last non-null price for each symbol (`last_non_null_price`)
+- Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
 
 ---
 
@@ -400,6 +521,47 @@ SELECT
         ORDER BY timestamp
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS highest_price
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+---
+
+### min()
+
+Returns the minimum value within the window frame.
+
+**Syntax:**
+```questdb-sql
+min(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+
+**Return value:**
+- Same type as input - The minimum value (excluding null) in the window frame
+
+**Description:**
+
+Use `min()` as a window function when you need to track lowest values over a range. Common use cases include:
+
+- **Support levels**: Track the lowest price within a rolling window for technical analysis
+- **Drawdown calculation**: Find the minimum value since a peak to measure decline
+- **Quality thresholds**: Identify the worst reading within each time period
+- **Intraday lows**: Track the lowest price per symbol throughout the trading day
+
+**Example:**
+```questdb-sql title="Rolling minimum price" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    min(price) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
+    ) AS lowest_price
 FROM trades
 WHERE timestamp IN '[$today]';
 ```
@@ -467,6 +629,47 @@ ORDER BY z_score DESC;
 
 ---
 
+### sum()
+
+Calculates the sum of values over the window frame. Commonly used for running totals.
+
+**Syntax:**
+```questdb-sql
+sum(value) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
+
+**Return value:**
+- `double` - The sum of `value` for rows in the window frame
+
+**Description:**
+
+Use `sum()` as a window function when you need to track accumulation or totals over a sequence. Common use cases include:
+
+- **Running totals**: Track cumulative values like total volume traded throughout the day
+- **Rolling sums**: Calculate sums over sliding windows (e.g., volume in the last 5 minutes)
+- **Budget tracking**: Show how spending accumulates against a budget over time
+- **Position tracking**: Calculate net position by summing buys and sells
+
+**Example:**
+```questdb-sql title="Cumulative amount" demo
+SELECT
+    symbol,
+    amount,
+    timestamp,
+    sum(amount) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS cumulative_amount
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+---
+
 ### var_pop() / var_samp() / variance() {#variance}
 
 Calculates the variance of values over the window frame. Variance is the square of standard deviation. `var_pop()` computes population variance (divides by N), `var_samp()` computes sample variance (divides by N-1). `variance()` is an alias for `var_samp()`.
@@ -509,296 +712,9 @@ WHERE timestamp IN '[$today]';
 
 ---
 
-### covar_pop() / covar_samp() {#covariance}
-
-Calculates the covariance between two numeric columns over the window frame. Covariance measures how two variables change together. `covar_pop()` computes population covariance (divides by N), `covar_samp()` computes sample covariance (divides by N-1).
-
-**Syntax:**
-```questdb-sql
-covar_pop(y, x) OVER (window_definition)
-covar_samp(y, x) OVER (window_definition)
-```
-
-**Arguments:**
-- `y`: Numeric column — the dependent variable
-- `x`: Numeric column — the independent variable
-
-Rows where either `x` or `y` is `NULL` are excluded from the computation.
-
-**Return value:**
-- `double` - The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
-
-**Description:**
-
-Covariance indicates the direction of the linear relationship between two variables. A positive covariance means they tend to increase together; negative means one increases as the other decreases. Use covariance as a window function for:
-
-- **Correlation analysis**: Measure how sensor readings co-vary over rolling windows
-- **Portfolio analysis**: Track co-movement between asset prices
-- **Predictive modeling**: Identify which features move together with the target variable
-
-**Example:**
-```questdb-sql title="Rolling covariance between temperature and velocity"
-SELECT
-    ts,
-    robot_id,
-    covar_pop(motor_temp, joint_velocity) OVER (
-        PARTITION BY robot_id
-        ORDER BY ts
-        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
-    ) AS temp_vel_covariance
-FROM telemetry;
-```
-
----
-
-### corr() {#corr}
-
-Calculates the Pearson correlation coefficient between two numeric columns over the window frame. The result ranges from -1 (perfect negative correlation) to +1 (perfect positive correlation), with 0 indicating no linear relationship.
-
-**Syntax:**
-```questdb-sql
-corr(y, x) OVER (window_definition)
-```
-
-**Arguments:**
-- `y`: Numeric column — the dependent variable
-- `x`: Numeric column — the independent variable
-
-Rows where either `x` or `y` is `NULL` are excluded from the computation.
-
-**Return value:**
-- `double` - The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
-
-**Description:**
-
-Unlike covariance, correlation is unitless and normalized, making it easier to interpret and compare across different scales. Use correlation as a window function for:
-
-- **Rolling correlation**: Track how the relationship between two metrics changes over time
-- **Regime detection**: Identify periods where correlations break down (e.g., market stress)
-- **Sensor diagnostics**: Detect when two readings that should be correlated start diverging
-- **Fleet analytics**: Compare per-device correlations against fleet-wide correlation
-
-**Example:**
-```questdb-sql title="Rolling correlation between two metrics"
-SELECT
-    ts,
-    robot_id,
-    corr(motor_temp, joint_velocity) OVER (
-        PARTITION BY robot_id
-        ORDER BY ts
-        ROWS BETWEEN 99 PRECEDING AND CURRENT ROW
-    ) AS rolling_corr
-FROM telemetry;
-```
-
-```questdb-sql title="Per-device correlation vs fleet"
-SELECT robot_id, device_corr,
-    avg(device_corr) OVER () AS fleet_avg_corr
-FROM (
-    SELECT robot_id,
-        corr(motor_temp, joint_velocity) AS device_corr
-    FROM telemetry
-    WHERE ts > dateadd('d', -1, now())
-    GROUP BY robot_id
-);
-```
-
----
-
-### first_value()
-
-Returns the first value in the window frame. Supports `IGNORE NULLS` clause.
-
-**Syntax:**
-```questdb-sql
-first_value(value) [(IGNORE|RESPECT) NULLS]
-OVER ([PARTITION BY partition_expression]
-      [ORDER BY sort_expression]
-      [frame_clause])
-```
-
-**Arguments:**
-- `value`: Column or expression to get value from
-- `IGNORE NULLS` (optional): Skip null values
-- `RESPECT NULLS` (default): Include null values
-
-**Return value:**
-- Same type as input - The first value in the window frame (or first non-null with `IGNORE NULLS`)
-
-**Description:**
-
-Use `first_value()` when you need to reference the starting point of a sequence. Common use cases include:
-
-- **Opening price**: Get the first price of each trading session to calculate daily returns
-- **Baseline comparison**: Compare each row to the first value in its partition
-- **Session start**: Reference the initial state at the beginning of each user session
-- **Gap filling**: Use `IGNORE NULLS` to carry forward the last known value when data is sparse
-
-**Example:**
-```questdb-sql title="First price in partition" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    first_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS first_price,
-    first_value(price) IGNORE NULLS OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS first_non_null_price
-FROM trades
-WHERE timestamp IN '[$today]';
-```
-
----
-
-### last_value()
-
-Returns the last value in the window frame. Supports `IGNORE NULLS` clause.
-
-**Syntax:**
-```questdb-sql
-last_value(value) [(IGNORE|RESPECT) NULLS]
-OVER ([PARTITION BY partition_expression]
-      [ORDER BY sort_expression]
-      [frame_clause])
-```
-
-**Arguments:**
-- `value`: Column or expression to get value from
-- `IGNORE NULLS` (optional): Skip null values
-- `RESPECT NULLS` (default): Include null values
-
-**Return value:**
-- Same type as input - The last value in the window frame (or last non-null with `IGNORE NULLS`)
-
-**Description:**
-
-Use `last_value()` when you need to reference the most recent or ending value in a sequence. Common use cases include:
-
-- **Closing price**: Get the last price in each time bucket for OHLC calculations
-- **Current state**: Access the most recent value in a rolling window
-- **Forward filling**: Use `IGNORE NULLS` to get the most recent non-null value for sparse data
-- **End-of-period values**: Capture the final state at partition boundaries
-
-**Frame behavior:**
-- Without `ORDER BY` or frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`
-- With `ORDER BY` but no frame clause: default is `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
-
-**Example:**
-```questdb-sql title="Last value with IGNORE NULLS" demo
-SELECT
-    timestamp,
-    price,
-    last_value(price) OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-        ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
-    ) AS last_price,
-    last_value(price) IGNORE NULLS OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS last_non_null_price
-FROM trades
-WHERE timestamp IN '[$today]';
-```
-
-This example:
-- Gets the last price within a 3-row window for each symbol (`last_price`)
-- Gets the last non-null price for each symbol (`last_non_null_price`)
-- Demonstrates both `RESPECT NULLS` (default) and `IGNORE NULLS` behavior
-
----
-
 ## Ranking functions
 
 These functions assign ranks or row numbers. They ignore the frame clause and operate on the entire partition.
-
-### row_number()
-
-Assigns a unique sequential number to each row within its partition, starting at 1.
-
-**Syntax:**
-```questdb-sql
-row_number() OVER (window_definition)
-```
-
-**Arguments:**
-- None required
-
-**Return value:**
-- Sequential row number (`long` type)
-
-**Description:**
-
-`row_number()` assigns unique numbers even when rows have equal values in the `ORDER BY` column. The assignment among equal values is non-deterministic.
-
-Use `row_number()` when you need unique sequential identifiers within groups. Common use cases include:
-
-- **Pagination**: Assign row numbers to implement efficient pagination over query results
-- **Deduplication**: Select only the first row from each group (where `row_number() = 1`)
-- **Top-N queries**: Get the top N records per category by filtering on row number
-- **Sequence generation**: Create sequential IDs within each partition for ordering or reference
-
-**Example:**
-```questdb-sql title="Number trades sequentially" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    row_number() OVER (
-        PARTITION BY symbol
-        ORDER BY timestamp
-    ) AS trade_number
-FROM trades
-WHERE timestamp IN '[$today]';
-```
-
----
-
-### rank()
-
-Assigns ranks within a partition. Rows with equal values get the same rank, with gaps in the sequence.
-
-**Syntax:**
-```questdb-sql
-rank() OVER (window_definition)
-```
-
-**Arguments:**
-- None required
-
-**Return value:**
-- Rank number (`long` type)
-
-**Description:**
-
-With `rank()`, if two rows tie for rank 2, the next row gets rank 4 (not 3). The rank equals the `row_number` of the first row in its peer group.
-
-Use `rank()` when ties should share a rank and you want gaps to reflect the true position. Common use cases include:
-
-- **Competition ranking**: Assign standings where ties share a position (1st, 2nd, 2nd, 4th)
-- **Leaderboards**: Rank scores where tied values get the same rank
-- **Percentile buckets**: Group values by rank to create percentile bands
-- **Top performers**: Identify all items tied for top positions
-
-**Example:**
-```questdb-sql title="Rank by price" demo
-SELECT
-    symbol,
-    price,
-    timestamp,
-    rank() OVER (
-        PARTITION BY symbol
-        ORDER BY price DESC
-    ) AS price_rank
-FROM trades
-WHERE timestamp IN '[$today]';
-```
-
----
 
 ### dense_rank()
 
@@ -913,6 +829,90 @@ WHERE timestamp IN '[$today]'
 | BTC-USDT | 99 | 5 | 1.0 |
 
 In this example, `percent_rank` shows where each price falls relative to others: 0.0 means highest price, 1.0 means lowest, and 0.5 means middle of the distribution. Tied values (both 101) receive the same percent rank.
+
+---
+
+### rank()
+
+Assigns ranks within a partition. Rows with equal values get the same rank, with gaps in the sequence.
+
+**Syntax:**
+```questdb-sql
+rank() OVER (window_definition)
+```
+
+**Arguments:**
+- None required
+
+**Return value:**
+- Rank number (`long` type)
+
+**Description:**
+
+With `rank()`, if two rows tie for rank 2, the next row gets rank 4 (not 3). The rank equals the `row_number` of the first row in its peer group.
+
+Use `rank()` when ties should share a rank and you want gaps to reflect the true position. Common use cases include:
+
+- **Competition ranking**: Assign standings where ties share a position (1st, 2nd, 2nd, 4th)
+- **Leaderboards**: Rank scores where tied values get the same rank
+- **Percentile buckets**: Group values by rank to create percentile bands
+- **Top performers**: Identify all items tied for top positions
+
+**Example:**
+```questdb-sql title="Rank by price" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    rank() OVER (
+        PARTITION BY symbol
+        ORDER BY price DESC
+    ) AS price_rank
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+---
+
+### row_number()
+
+Assigns a unique sequential number to each row within its partition, starting at 1.
+
+**Syntax:**
+```questdb-sql
+row_number() OVER (window_definition)
+```
+
+**Arguments:**
+- None required
+
+**Return value:**
+- Sequential row number (`long` type)
+
+**Description:**
+
+`row_number()` assigns unique numbers even when rows have equal values in the `ORDER BY` column. The assignment among equal values is non-deterministic.
+
+Use `row_number()` when you need unique sequential identifiers within groups. Common use cases include:
+
+- **Pagination**: Assign row numbers to implement efficient pagination over query results
+- **Deduplication**: Select only the first row from each group (where `row_number() = 1`)
+- **Top-N queries**: Get the top N records per category by filtering on row number
+- **Sequence generation**: Create sequential IDs within each partition for ordering or reference
+
+**Example:**
+```questdb-sql title="Number trades sequentially" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    row_number() OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+    ) AS trade_number
+FROM trades
+WHERE timestamp IN '[$today]';
+```
 
 ---
 

@@ -34,6 +34,44 @@ SELECT build();
 | -------------------------------------------------------------------------------------------------- |
 | Build Information: QuestDB 7.3.5, JDK 17.0.7, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
+## current database, schema, or user
+
+`current_database()`, `current_schema()`, and `current_user()` are standard SQL
+functions that return information about the current database, schema, schemas,
+and user, respectively.
+
+```questdb-sql
+-- Get the current database
+SELECT current_database();
+
+-- Get the current schema
+SELECT current_schema();
+
+-- Get the current user
+SELECT current_user();
+```
+
+Each of these functions returns a single value, so you can use them in a SELECT
+statement without any arguments.
+
+## flush_query_cache()
+
+`flush_query_cache' invalidates cached query execution plans.
+
+**Arguments:**
+
+- `flush_query_cache()` does not require arguments.
+
+**Return value:**
+
+Returns `boolean`. `true` if successful, `false` if unsuccessful.
+
+**Examples:**
+
+```questdb-sql title="Flush cached query execution plans"
+SELECT flush_query_cache();
+```
+
 ## functions
 
 **Arguments:**
@@ -55,6 +93,116 @@ functions();
 | or   | or(TT)    | or(boolean, boolean)  | FALSE            | STANDARD |
 | and  | and(TT)   | and(boolean, boolean) | FALSE            | STANDARD |
 | not  | not(T)    | not(boolean)          | FALSE            | STANDARD |
+
+## hydrate_table_metadata('table1', 'table2' ...)
+
+`hydrate_table_metadata' re-reads table metadata from disk to update the static
+metadata cache.
+
+:::warning
+
+This function should only be used when directed by QuestDB support. Misuse could
+cause corruption of the metadata cache, requiring the database to be restarted.
+
+:::
+
+**Arguments:**
+
+A variable list of strings, corresponding to table names.
+
+Alternatively, a single asterisk, '\*', representing all tables.
+
+**Return value:**
+
+Returns `boolean`. `true` if successful, `false` if unsuccessful.
+
+**Examples:**
+
+Simply pass table names as arguments to the function.
+
+```
+SELECT hydrate_table_metadata('trades', 'trips');
+```
+
+| hydrate_table_metadata |
+| ---------------------- |
+| true                   |
+
+If you want to re-read metadata for all user tables, simply use an asterisk:
+
+```
+SELECT hydrate_table_metadata('*');
+```
+
+## materialized_views
+
+`materialized_views()` returns the list of all materialized views in the
+database.
+
+**Arguments:**
+
+- `materialized_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `view_name` - materialized view name
+- `refresh_type` - refresh strategy type
+- `base_table_name` - base table name
+- `last_refresh_start_timestamp` - last time when an incremental refresh for the
+  view was started
+- `last_refresh_finish_timestamp` - last time when an incremental refresh for
+  the view finished
+- `view_sql` - query used to populate view data
+- `view_table_dir_name` - view directory name
+- `invalidation_reason` - message explaining why the view was marked as invalid
+- `view_status` - view status: 'valid', 'refreshing', or 'invalid'
+- `refresh_base_table_txn` - the last base table transaction used to refresh the
+  materialized view
+- `base_table_txn` - the last committed transaction in the base table
+- `refresh_limit_value` - how many units back in time the refresh limit goes
+- `refresh_limit_unit` - how long each unit is
+- `timer_start` - start date for the scheduled refresh timer
+- `timer_interval_value` - how many interval units between each refresh
+- `timer_interval_unit` - how long each unit is
+
+**Examples:**
+
+```questdb-sql title="List all materialized views"
+materialized_views();
+```
+
+| view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
+|------------------|--------------|-----------------|------------------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------------------|-------------|------------------------|----------------|---------------------|--------------------|-------------|----------------------|---------------------|
+| trades_OHLC_15m  | immediate   | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+| trades_latest_1d | immediate   | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+
+
+## memory_metrics
+
+**Arguments:**
+
+- `memory_metrics()` does not require arguments.
+
+**Return value:**
+
+Returns granular memory metrics.
+
+**Examples:**
+
+```questdb-sql
+memory_metrics();
+```
+
+| memory_tag     | bytes     |
+| -------------- | --------- |
+| TOTAL_USED     | 142624730 |
+| RSS            | 328609792 |
+| MMAP_DEFAULT   | 196728    |
+| NATIVE_DEFAULT | 256       |
+| MMAP_O3        | 0         |
+| NATIVE_O3      | 96        |
 
 ## query_activity
 
@@ -89,31 +237,6 @@ SELECT * FROM query_activity();
 | 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397  | active | select \* from query_activity()                           |
 | 57777    | 6         | shared      | bob      | 2024-01-09T08:58:55.988017Z | 2024-01-09T08:58:55.988017Z | active | SELECT symbol,approx_percentile(price, 50, 2) from trades |
 
-## memory_metrics
-
-**Arguments:**
-
-- `memory_metrics()` does not require arguments.
-
-**Return value:**
-
-Returns granular memory metrics.
-
-**Examples:**
-
-```questdb-sql
-memory_metrics();
-```
-
-| memory_tag     | bytes     |
-| -------------- | --------- |
-| TOTAL_USED     | 142624730 |
-| RSS            | 328609792 |
-| MMAP_DEFAULT   | 196728    |
-| NATIVE_DEFAULT | 256       |
-| MMAP_O3        | 0         |
-| NATIVE_O3      | 96        |
-
 ## reader_pool
 
 **Arguments:**
@@ -139,53 +262,310 @@ SELECT * FROM reader_pool();
 | ---------- | --------------- | --------------------------- | ----------- |
 | sensors    | null            | 2023-12-01T19:28:14.311703Z | 1           |
 
-## writer_pool
+## reload_config()
+
+`reload_config' reloads server configuration file's contents (`server.conf`)
+without server restart. The list of reloadable settings can be found
+[here](/docs/configuration/overview/#reloadable-settings).
 
 **Arguments:**
 
-- `writer_pool()` does not require arguments.
+- `reload_config()` does not require arguments.
 
 **Return value:**
 
-Returns information about the current state of the writer pool in QuestDB. The
-writer pool is a cache of table writers that are kept open to speed up
-subsequent writes to the same table. The returned information includes the table
-name, the ID of the thread that currently owns the writer, the timestamp of the
-last time the writer was accessed, and the reason for the ownership.
+Returns `boolean`. `true` if any configuration properties were reloaded, `false`
+if none were reloaded.
 
 **Examples:**
 
-```questdb-sql
-SELECT * FROM writer_pool();
+Edit `server.conf` and run `reload_config`:
+
+```questdb-sql title="Reload server configuration"
+SELECT reload_config();
 ```
 
-| table_name                    | owner_thread_id | last_access_timestamp       | ownership_reason |
-| ----------------------------- | --------------- | --------------------------- | ---------------- |
-| sys.column_versions_purge_log | 1               | 2023-12-01T18:50:03.412468Z | QuestDB system   |
-| telemetry_config              | 1               | 2023-12-01T18:50:03.470604Z | telemetryConfig  |
-| telemetry                     | 1               | 2023-12-01T18:50:03.464501Z | telemetry        |
-| sys.telemetry_wal             | 1               | 2023-12-01T18:50:03.467924Z | telemetry        |
-| example_table                 | null            | 2023-12-01T20:33:33.270984Z | null             |
+## storage_policies
 
-## current database, schema, or user
+:::note
 
-`current_database()`, `current_schema()`, and `current_user()` are standard SQL
-functions that return information about the current database, schema, schemas,
-and user, respectively.
+Storage policies — and the `storage_policies` view — are available in
+**QuestDB Enterprise** only.
+
+:::
+
+`storage_policies` is a system view that lists every
+[storage policy](/docs/concepts/storage-policy/) currently attached to a table
+or materialized view. Query it like any other table:
 
 ```questdb-sql
--- Get the current database
-SELECT current_database();
-
--- Get the current schema
-SELECT current_schema();
-
--- Get the current user
-SELECT current_user();
+SELECT * FROM storage_policies;
 ```
 
-Each of these functions returns a single value, so you can use them in a SELECT
-statement without any arguments.
+**Columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
+| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
+| `drop_native` | _STRING_ | TTL for the `DROP NATIVE` stage. Blank when the stage is not configured. |
+| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
+| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
+| `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
+| `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
+
+**Notes on TTL formatting:**
+
+- TTL values are rendered in just two units: `h` for hours and `m` for
+  **months**. Durations written in the DDL as days, weeks, or years are
+  normalized to hours when stored (e.g., `3 DAYS` → `72h`, `1 WEEK` →
+  `168h`). Month-based durations are stored and rendered with the lowercase
+  `m` suffix — despite the visual collision with "minute", `m` in this view
+  is **months**, and QuestDB's duration shorthand has no unit for minutes.
+
+**Example:**
+
+```questdb-sql title="List all storage policies"
+SELECT * FROM storage_policies;
+```
+
+| table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
+|----------------|------------|-------------|------------|-------------|--------|--------------|
+| trades~12      | 72h        | 240h        | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
+
+The first row is a policy with three active stages (3-day Parquet conversion,
+10-day native drop, 1-month local drop) and is currently enforced. The second
+row has only the `TO PARQUET` stage set and has been temporarily disabled.
+
+## table_columns
+
+`table_columns('tableName')` returns the schema of a table or a materialized
+view.
+
+**Arguments:**
+
+- `tableName` is the name of an existing table or materialized view as a string.
+
+**Return value:**
+
+Returns a `table` with the following columns:
+
+- `column` - name of the available columns in the table
+- `type` - type of the column
+- `indexed` - if indexing is applied to this column
+- `indexBlockCapacity` - how many row IDs to store in a single storage block on
+  disk
+- `symbolCached` - whether this `symbol` column is cached
+- `symbolCapacity` - how many distinct values this column of `symbol` type is
+  expected to have
+- `designated` - if this is set as the designated timestamp column for this
+  table
+- `upsertKey` - if this column is a part of UPSERT KEYS list for table
+  [deduplication](/docs/concepts/deduplication)
+
+For more details on the meaning and use of these values, see the
+[CREATE TABLE](/docs/query/sql/create-table/) documentation.
+
+**Examples:**
+
+```questdb-sql title="Get all columns in a table"
+table_columns('my_table');
+```
+
+| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated | upsertKey |
+| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- | --------- |
+| symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      | false     |
+| price  | DOUBLE    | false   | 0                  | false        | 0              | false      | false     |
+| ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       | false     |
+| s      | VARCHAR   | false   | 0                  | false        | 0              | false      | false     |
+
+```questdb-sql title="Get designated timestamp column"
+SELECT "column", type, designated FROM table_columns('my_table') WHERE designated = true;
+```
+
+| column | type      | designated |
+| ------ | --------- | ---------- |
+| ts     | TIMESTAMP | true       |
+
+```questdb-sql title="Get the count of column types"
+SELECT type, count() FROM table_columns('my_table');
+```
+
+| type      | count |
+| --------- | ----- |
+| SYMBOL    | 1     |
+| DOUBLE    | 1     |
+| TIMESTAMP | 1     |
+| VARCHAR   | 1     |
+
+## table_partitions
+
+`table_partitions('tableName')` returns information for the partitions of a
+table or a materialized view with the option to filter the partitions.
+
+**Arguments:**
+
+- `tableName` is the name of an existing table or materialized view as a string.
+
+**Return value:**
+
+Returns a table with the following columns:
+
+- `index` - _INTEGER_, index of the partition (_NaN_ when the partition is not
+  attached)
+- `partitionBy` - _STRING_, one of _NONE_, _HOUR_, _DAY_, _WEEK_, _MONTH_ and
+  _YEAR_
+- `name` - _STRING_, name of the partition, e.g. `2023-03-14`,
+  `2023-03-14.detached`, `2023-03-14.attachable`
+- `minTimestamp` - _LONG_, min timestamp of the partition (_NaN_ when the table
+  is not partitioned)
+- `maxTimestamp` - _LONG_, max timestamp of the partition (_NaN_ when the table
+  is not partitioned)
+- `numRows` - _LONG_, number of rows in the partition
+- `diskSize` - _LONG_, size of the partition in bytes
+- `diskSizeHuman` - _STRING_, size of the partition meant for humans to read
+  (same output as function
+  [size_pretty](/docs/query/functions/numeric/#size_pretty))
+- `readOnly` - _BOOLEAN_, true if the partition is
+  [attached via soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links)
+- `active` - _BOOLEAN_, true if the partition is the last partition, and whether
+  we are writing to it (at least one record)
+- `attached` - _BOOLEAN_, true if the partition is
+  [attached](/docs/query/sql/alter-table-attach-partition/)
+- `detached` - _BOOLEAN_, true if the partition is
+  [detached](/docs/query/sql/alter-table-detach-partition/) (`name` of the
+  partition will contain the `.detached` extension)
+- `attachable` - _BOOLEAN_, true if the partition is detached and can be
+  attached (`name` of the partition will contain the `.attachable` extension)
+- `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
+  has been produced alongside the native files. Set by either
+  [manual Parquet conversion](/docs/query/export-parquet/#in-place-conversion)
+  (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
+  [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
+  (Enterprise). The partition is still served from native storage until it is
+  switched to Parquet-only format
+- `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format
+  (native files have been replaced). Set the same way as
+  `hasParquetGenerated` — either manually or by a storage policy's `DROP
+  NATIVE` stage
+- `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
+  file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
+
+**Examples:**
+
+```questdb-sql title="Create table my_table"
+CREATE TABLE my_table AS (
+    SELECT
+        rnd_symbol('EURO', 'USD', 'OTHER') symbol,
+        rnd_double() * 50.0 price,
+        rnd_double() * 20.0 amount,
+        to_timestamp('2023-01-01', 'yyyy-MM-dd') + x * 6 * 3600 * 100000L timestamp
+    FROM long_sequence(700)
+), INDEX(symbol capacity 32) TIMESTAMP(timestamp) PARTITION BY WEEK;
+```
+
+```questdb-sql title="Get all partitions from my_table"
+table_partitions('my_table');
+```
+
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+
+```questdb-sql title="Get size of a table in disk"
+SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
+```
+
+| size_pretty |
+| ----------- |
+| 80.3 MB     |
+
+```questdb-sql title="Get active partition of a table"
+SELECT * FROM table_partitions('my_table') WHERE active = true;
+```
+
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+
+## table_storage
+
+`table_storage()` - Returns information about the storage and structure of all
+user tables and materialized views in the database.
+
+Provides detailed storage information about all user tables and materialized
+views within QuestDB. It returns one row per table, including information about
+partitioning, row counts, and disk usage.
+
+- The `table_storage()` function excludes system tables; it only lists
+  user-created tables.
+- The `diskSize` value represents the total size of all files associated with
+  the table on disk, including data, index, and metadata files.
+- The `partitionBy` column indicates the partitioning strategy used for the
+  table. It can be `NONE` if the table is not partitioned.
+
+**Return values:**
+
+The function returns the following columns:
+
+- `tableName` (`string`): The name of the table or materialized view.
+- `walEnabled` (`boolean`): Indicates whether Write-Ahead Logging (WAL) is
+  enabled for the table.
+- `partitionBy` (`string`): The partitioning type of the table (e.g., NONE, DAY,
+  MONTH, YEAR, etc.).
+- `partitionCount` (`long`): The number of partitions the table has.
+- `rowCount` (`long`): The total number of rows in the table.
+- `diskSize` (`long`): The total disk space used by the table, in bytes.
+
+**Examples:**
+
+Retrieve storage information for all tables.
+
+```questdb-sql title="Checking our demo tables" demo
+SELECT * FROM table_storage();
+```
+
+- The query retrieves storage details for all tables in the database.
+- The `diskSize` column shows the total disk space used by each table in bytes.
+
+| tableName      | walEnabled | partitionBy | partitionCount | rowCount   | diskSize     |
+| -------------- | ---------- | ----------- | -------------- | ---------- | ------------ |
+| trips          | true       | MONTH       | 126            | 1634599313 | 261536158948 |
+| AAPL_orderbook | true       | HOUR        | 16             | 3024878    | 2149403527   |
+| weather        | false      | NONE        | 1              | 137627     | 9972598      |
+| trades         | true       | DAY         | 954            | 1000848308 | 32764798760  |
+| ethblocks_json | true       | DAY         | 3328           | 20688364   | 28311960478  |
+
+<hr />
+
+Filter tables with WAL enabled.
+
+```questdb-sql title="WAL only tables" demo
+SELECT tableName, rowCount, diskSize
+FROM table_storage()
+WHERE walEnabled = true;
+```
+
+| tableName      | rowCount   | diskSize     |
+| -------------- | ---------- | ------------ |
+| trips          | 1634599313 | 261536158948 |
+| AAPL_orderbook | 3024878    | 2149403527   |
+| trades         | 1000850255 | 32764804264  |
+| ethblocks_json | 20688364   | 28311960478  |
+
+<hr />
+
+Show tables partitioned by `HOUR`.
+
+```questdb-sql title="Show tables partitioned by hour" demo
+SELECT tableName, partitionCount, rowCount
+FROM table_storage()
+WHERE partitionBy = 'HOUR';
+```
 
 ## tables
 
@@ -457,79 +837,72 @@ ORDER BY
     wal_pending_row_count DESC;
 ```
 
-## table_storage
+## version/pg_catalog.version
 
-`table_storage()` - Returns information about the storage and structure of all
-user tables and materialized views in the database.
+`version()` or `pg_catalog.version()` returns the supported version of the
+PostgreSQL Wire Protocol.
 
-Provides detailed storage information about all user tables and materialized
-views within QuestDB. It returns one row per table, including information about
-partitioning, row counts, and disk usage.
+**Arguments:**
 
-- The `table_storage()` function excludes system tables; it only lists
-  user-created tables.
-- The `diskSize` value represents the total size of all files associated with
-  the table on disk, including data, index, and metadata files.
-- The `partitionBy` column indicates the partitioning strategy used for the
-  table. It can be `NONE` if the table is not partitioned.
+- `version()` or `pg_catalog.version()` does not require arguments.
 
-**Return values:**
+**Return value:**
 
-The function returns the following columns:
-
-- `tableName` (`string`): The name of the table or materialized view.
-- `walEnabled` (`boolean`): Indicates whether Write-Ahead Logging (WAL) is
-  enabled for the table.
-- `partitionBy` (`string`): The partitioning type of the table (e.g., NONE, DAY,
-  MONTH, YEAR, etc.).
-- `partitionCount` (`long`): The number of partitions the table has.
-- `rowCount` (`long`): The total number of rows in the table.
-- `diskSize` (`long`): The total disk space used by the table, in bytes.
+Returns `string`.
 
 **Examples:**
 
-Retrieve storage information for all tables.
+```questdb-sql
+SELECT version();
 
-```questdb-sql title="Checking our demo tables" demo
-SELECT * FROM table_storage();
+--The above equals to:
+
+SELECT pg_catalog.version();
 ```
 
-- The query retrieves storage details for all tables in the database.
-- The `diskSize` column shows the total disk space used by each table in bytes.
+| version                                                             |
+| ------------------------------------------------------------------- |
+| PostgreSQL 12.3, compiled by Visual C++ build 1914, 64-bit, QuestDB |
 
-| tableName      | walEnabled | partitionBy | partitionCount | rowCount   | diskSize     |
-| -------------- | ---------- | ----------- | -------------- | ---------- | ------------ |
-| trips          | true       | MONTH       | 126            | 1634599313 | 261536158948 |
-| AAPL_orderbook | true       | HOUR        | 16             | 3024878    | 2149403527   |
-| weather        | false      | NONE        | 1              | 137627     | 9972598      |
-| trades         | true       | DAY         | 954            | 1000848308 | 32764798760  |
-| ethblocks_json | true       | DAY         | 3328           | 20688364   | 28311960478  |
+## views
 
-<hr />
+`views()` returns the list of all views in the database.
 
-Filter tables with WAL enabled.
+**Arguments:**
 
-```questdb-sql title="WAL only tables" demo
-SELECT tableName, rowCount, diskSize
-FROM table_storage()
-WHERE walEnabled = true;
+- `views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` including the following information:
+
+- `view_name` - view name
+- `view_sql` - query used to define the view (without CREATE VIEW wrapper)
+- `view_table_dir_name` - internal directory name
+- `invalidation_reason` - message explaining why the view was marked as invalid,
+  empty if valid
+- `view_status` - view status: `valid` or `invalid`
+- `view_status_update_time` - timestamp of last status change
+
+**Examples:**
+
+```questdb-sql title="List all views"
+views();
 ```
 
-| tableName      | rowCount   | diskSize     |
-| -------------- | ---------- | ------------ |
-| trips          | 1634599313 | 261536158948 |
-| AAPL_orderbook | 3024878    | 2149403527   |
-| trades         | 1000850255 | 32764804264  |
-| ethblocks_json | 20688364   | 28311960478  |
+| view_name      | view_sql                                              | view_table_dir_name | invalidation_reason | view_status | view_status_update_time     |
+| -------------- | ----------------------------------------------------- | ------------------- | ------------------- | ----------- | --------------------------- |
+| hourly_summary | SELECT ts, symbol, sum(qty) FROM trades SAMPLE BY 1h  | hourly_summary~1    |                     | valid       | 2025-05-30T10:15:00.000000Z |
+| price_view     | SELECT symbol, last(price) FROM trades SAMPLE BY 1d   | price_view~2        |                     | valid       | 2025-05-30T10:20:00.000000Z |
 
-<hr />
+```questdb-sql title="Find invalid views"
+SELECT view_name, invalidation_reason
+FROM views()
+WHERE view_status = 'invalid';
+```
 
-Show tables partitioned by `HOUR`.
-
-```questdb-sql title="Show tables partitioned by hour" demo
-SELECT tableName, partitionCount, rowCount
-FROM table_storage()
-WHERE partitionBy = 'HOUR';
+```questdb-sql title="List views ordered by name"
+SELECT * FROM views() ORDER BY view_name;
 ```
 
 ## wal_tables
@@ -576,337 +949,30 @@ wal_tables();
 | weather_wal | false     | 3         | 0                 | 3            |
 | test_wal    | true      | 7         | 1                 | 9            |
 
-## table_columns
-
-`table_columns('tableName')` returns the schema of a table or a materialized
-view.
+## writer_pool
 
 **Arguments:**
 
-- `tableName` is the name of an existing table or materialized view as a string.
+- `writer_pool()` does not require arguments.
 
 **Return value:**
 
-Returns a `table` with the following columns:
-
-- `column` - name of the available columns in the table
-- `type` - type of the column
-- `indexed` - if indexing is applied to this column
-- `indexBlockCapacity` - how many row IDs to store in a single storage block on
-  disk
-- `symbolCached` - whether this `symbol` column is cached
-- `symbolCapacity` - how many distinct values this column of `symbol` type is
-  expected to have
-- `designated` - if this is set as the designated timestamp column for this
-  table
-- `upsertKey` - if this column is a part of UPSERT KEYS list for table
-  [deduplication](/docs/concepts/deduplication)
-
-For more details on the meaning and use of these values, see the
-[CREATE TABLE](/docs/query/sql/create-table/) documentation.
-
-**Examples:**
-
-```questdb-sql title="Get all columns in a table"
-table_columns('my_table');
-```
-
-| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated | upsertKey |
-| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- | --------- |
-| symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      | false     |
-| price  | DOUBLE    | false   | 0                  | false        | 0              | false      | false     |
-| ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       | false     |
-| s      | VARCHAR   | false   | 0                  | false        | 0              | false      | false     |
-
-```questdb-sql title="Get designated timestamp column"
-SELECT "column", type, designated FROM table_columns('my_table') WHERE designated = true;
-```
-
-| column | type      | designated |
-| ------ | --------- | ---------- |
-| ts     | TIMESTAMP | true       |
-
-```questdb-sql title="Get the count of column types"
-SELECT type, count() FROM table_columns('my_table');
-```
-
-| type      | count |
-| --------- | ----- |
-| SYMBOL    | 1     |
-| DOUBLE    | 1     |
-| TIMESTAMP | 1     |
-| VARCHAR   | 1     |
-
-## table_partitions
-
-`table_partitions('tableName')` returns information for the partitions of a
-table or a materialized view with the option to filter the partitions.
-
-**Arguments:**
-
-- `tableName` is the name of an existing table or materialized view as a string.
-
-**Return value:**
-
-Returns a table with the following columns:
-
-- `index` - _INTEGER_, index of the partition (_NaN_ when the partition is not
-  attached)
-- `partitionBy` - _STRING_, one of _NONE_, _HOUR_, _DAY_, _WEEK_, _MONTH_ and
-  _YEAR_
-- `name` - _STRING_, name of the partition, e.g. `2023-03-14`,
-  `2023-03-14.detached`, `2023-03-14.attachable`
-- `minTimestamp` - _LONG_, min timestamp of the partition (_NaN_ when the table
-  is not partitioned)
-- `maxTimestamp` - _LONG_, max timestamp of the partition (_NaN_ when the table
-  is not partitioned)
-- `numRows` - _LONG_, number of rows in the partition
-- `diskSize` - _LONG_, size of the partition in bytes
-- `diskSizeHuman` - _STRING_, size of the partition meant for humans to read
-  (same output as function
-  [size_pretty](/docs/query/functions/numeric/#size_pretty))
-- `readOnly` - _BOOLEAN_, true if the partition is
-  [attached via soft link](/docs/query/sql/alter-table-attach-partition/#symbolic-links)
-- `active` - _BOOLEAN_, true if the partition is the last partition, and whether
-  we are writing to it (at least one record)
-- `attached` - _BOOLEAN_, true if the partition is
-  [attached](/docs/query/sql/alter-table-attach-partition/)
-- `detached` - _BOOLEAN_, true if the partition is
-  [detached](/docs/query/sql/alter-table-detach-partition/) (`name` of the
-  partition will contain the `.detached` extension)
-- `attachable` - _BOOLEAN_, true if the partition is detached and can be
-  attached (`name` of the partition will contain the `.attachable` extension)
-
-**Examples:**
-
-```questdb-sql title="Create table my_table"
-CREATE TABLE my_table AS (
-    SELECT
-        rnd_symbol('EURO', 'USD', 'OTHER') symbol,
-        rnd_double() * 50.0 price,
-        rnd_double() * 20.0 amount,
-        to_timestamp('2023-01-01', 'yyyy-MM-dd') + x * 6 * 3600 * 100000L timestamp
-    FROM long_sequence(700)
-), INDEX(symbol capacity 32) TIMESTAMP(timestamp) PARTITION BY WEEK;
-```
-
-```questdb-sql title="Get all partitions from my_table"
-table_partitions('my_table');
-```
-
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
-
-```questdb-sql title="Get size of a table in disk"
-SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
-```
-
-| size_pretty |
-| ----------- |
-| 80.3 MB     |
-
-```questdb-sql title="Get active partition of a table"
-SELECT * FROM table_partitions('my_table') WHERE active = true;
-```
-
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
-
-## materialized_views
-
-`materialized_views()` returns the list of all materialized views in the
-database.
-
-**Arguments:**
-
-- `materialized_views()` does not require arguments.
-
-**Return value:**
-
-Returns a `table` including the following information:
-
-- `view_name` - materialized view name
-- `refresh_type` - refresh strategy type
-- `base_table_name` - base table name
-- `last_refresh_start_timestamp` - last time when an incremental refresh for the
-  view was started
-- `last_refresh_finish_timestamp` - last time when an incremental refresh for
-  the view finished
-- `view_sql` - query used to populate view data
-- `view_table_dir_name` - view directory name
-- `invalidation_reason` - message explaining why the view was marked as invalid
-- `view_status` - view status: 'valid', 'refreshing', or 'invalid'
-- `refresh_base_table_txn` - the last base table transaction used to refresh the
-  materialized view
-- `base_table_txn` - the last committed transaction in the base table
-- `refresh_limit_value` - how many units back in time the refresh limit goes
-- `refresh_limit_unit` - how long each unit is
-- `timer_start` - start date for the scheduled refresh timer
-- `timer_interval_value` - how many interval units between each refresh
-- `timer_interval_unit` - how long each unit is
-
-**Examples:**
-
-```questdb-sql title="List all materialized views"
-materialized_views();
-```
-
-| view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
-|------------------|--------------|-----------------|------------------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------------------|-------------|------------------------|----------------|---------------------|--------------------|-------------|----------------------|---------------------|
-| trades_OHLC_15m  | immediate   | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-| trades_latest_1d | immediate   | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-
-
-## views
-
-`views()` returns the list of all views in the database.
-
-**Arguments:**
-
-- `views()` does not require arguments.
-
-**Return value:**
-
-Returns a `table` including the following information:
-
-- `view_name` - view name
-- `view_sql` - query used to define the view (without CREATE VIEW wrapper)
-- `view_table_dir_name` - internal directory name
-- `invalidation_reason` - message explaining why the view was marked as invalid,
-  empty if valid
-- `view_status` - view status: `valid` or `invalid`
-- `view_status_update_time` - timestamp of last status change
-
-**Examples:**
-
-```questdb-sql title="List all views"
-views();
-```
-
-| view_name      | view_sql                                              | view_table_dir_name | invalidation_reason | view_status | view_status_update_time     |
-| -------------- | ----------------------------------------------------- | ------------------- | ------------------- | ----------- | --------------------------- |
-| hourly_summary | SELECT ts, symbol, sum(qty) FROM trades SAMPLE BY 1h  | hourly_summary~1    |                     | valid       | 2025-05-30T10:15:00.000000Z |
-| price_view     | SELECT symbol, last(price) FROM trades SAMPLE BY 1d   | price_view~2        |                     | valid       | 2025-05-30T10:20:00.000000Z |
-
-```questdb-sql title="Find invalid views"
-SELECT view_name, invalidation_reason
-FROM views()
-WHERE view_status = 'invalid';
-```
-
-```questdb-sql title="List views ordered by name"
-SELECT * FROM views() ORDER BY view_name;
-```
-
-## version/pg_catalog.version
-
-`version()` or `pg_catalog.version()` returns the supported version of the
-PostgreSQL Wire Protocol.
-
-**Arguments:**
-
-- `version()` or `pg_catalog.version()` does not require arguments.
-
-**Return value:**
-
-Returns `string`.
+Returns information about the current state of the writer pool in QuestDB. The
+writer pool is a cache of table writers that are kept open to speed up
+subsequent writes to the same table. The returned information includes the table
+name, the ID of the thread that currently owns the writer, the timestamp of the
+last time the writer was accessed, and the reason for the ownership.
 
 **Examples:**
 
 ```questdb-sql
-SELECT version();
-
---The above equals to:
-
-SELECT pg_catalog.version();
+SELECT * FROM writer_pool();
 ```
 
-| version                                                             |
-| ------------------------------------------------------------------- |
-| PostgreSQL 12.3, compiled by Visual C++ build 1914, 64-bit, QuestDB |
-
-## hydrate_table_metadata('table1', 'table2' ...)
-
-`hydrate_table_metadata' re-reads table metadata from disk to update the static
-metadata cache.
-
-:::warning
-
-This function should only be used when directed by QuestDB support. Misuse could
-cause corruption of the metadata cache, requiring the database to be restarted.
-
-:::
-
-**Arguments:**
-
-A variable list of strings, corresponding to table names.
-
-Alternatively, a single asterisk, '\*', representing all tables.
-
-**Return value:**
-
-Returns `boolean`. `true` if successful, `false` if unsuccessful.
-
-**Examples:**
-
-Simply pass table names as arguments to the function.
-
-```
-SELECT hydrate_table_metadata('trades', 'trips');
-```
-
-| hydrate_table_metadata |
-| ---------------------- |
-| true                   |
-
-If you want to re-read metadata for all user tables, simply use an asterisk:
-
-```
-SELECT hydrate_table_metadata('*');
-```
-
-## flush_query_cache()
-
-`flush_query_cache' invalidates cached query execution plans.
-
-**Arguments:**
-
-- `flush_query_cache()` does not require arguments.
-
-**Return value:**
-
-Returns `boolean`. `true` if successful, `false` if unsuccessful.
-
-**Examples:**
-
-```questdb-sql title="Flush cached query execution plans"
-SELECT flush_query_cache();
-```
-
-## reload_config()
-
-`reload_config' reloads server configuration file's contents (`server.conf`)
-without server restart. The list of reloadable settings can be found
-[here](/docs/configuration/overview/#reloadable-settings).
-
-**Arguments:**
-
-- `reload_config()` does not require arguments.
-
-**Return value:**
-
-Returns `boolean`. `true` if any configuration properties were reloaded, `false`
-if none were reloaded.
-
-**Examples:**
-
-Edit `server.conf` and run `reload_config`:
-
-```questdb-sql title="Reload server configuration"
-SELECT reload_config();
-```
+| table_name                    | owner_thread_id | last_access_timestamp       | ownership_reason |
+| ----------------------------- | --------------- | --------------------------- | ---------------- |
+| sys.column_versions_purge_log | 1               | 2023-12-01T18:50:03.412468Z | QuestDB system   |
+| telemetry_config              | 1               | 2023-12-01T18:50:03.470604Z | telemetryConfig  |
+| telemetry                     | 1               | 2023-12-01T18:50:03.464501Z | telemetry        |
+| sys.telemetry_wal             | 1               | 2023-12-01T18:50:03.467924Z | telemetry        |
+| example_table                 | null            | 2023-12-01T20:33:33.270984Z | null             |

@@ -58,6 +58,13 @@ The **Schema Explorer** is the navigation hub for exploring tables and materiali
 [Learn more about Schema Explorer →](/docs/getting-started/web-console/schema-explorer)
 
 
+### Table Details
+
+The **Table Details** panel provides real-time monitoring and detailed metadata for any table or materialized view. It includes health status indicators, WAL ingestion metrics such as pending rows and transaction lag, performance alerts, and a full view of the table's DDL, columns, and storage configuration.
+
+[Learn more about Table Details →](/docs/getting-started/web-console/table-details)
+
+
 ### Result Grid
 
 The **Result Grid** displays your query results in an interactive table format with features for data navigation, export, and visualization.
@@ -83,8 +90,9 @@ The **Import CSV** interface allows you to upload and import CSV files into Ques
 
 The **Right Sidebar** provides quick access to essential tools and information:
 - **Help**: Access quick links and contact options through a convenient help menu
+- **AI Assistant**: Open AI Assistant chat window and manage conversations
 - **QuestDB News**: Stay up-to-date with the latest QuestDB announcements and updates
-- **Create Table**: Build new tables visually using an intuitive interface. Define table structure, configure partitioning, enable WAL, and add columns with their data types—all without writing SQL code. [Learn more about Create Table →](/docs/getting-started/web-console/create-table)
+- **Table Details**: Monitor real-time ingestion metrics and health status, view metadata for any table or materialized view.
 
 
 ### Instance Naming

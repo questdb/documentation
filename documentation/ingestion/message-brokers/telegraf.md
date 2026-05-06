@@ -78,7 +78,7 @@ the inputs in more detail:
 ## Writing to QuestDB over HTTP
 
 QuestDB expects Influx Line Protocol messages over HTTP on port `9000`. To change
-the default port, see the [HTTP server configuration](/docs/configuration/overview/#http-server)
+the default port, see the [HTTP server configuration](/docs/configuration/http-server/)
 section of the server configuration page.
 
 Create a new file named `questdb.conf` in one of the locations Telegraf can
