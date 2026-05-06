@@ -506,10 +506,14 @@ When enabled, startup fails if there are configuration errors.
 
 _We recommend enabling strict validation._
 
-## Keys and default values
+## Configuration reference
 
-Configuration keys are organized by subsystem. Parameters for specifying buffer
-and memory page sizes use the format `n<unit>`, where `<unit>` can be:
+The full configuration reference is divided by subsystem. Each page lists
+every available property with its default value, whether it can be reloaded
+at runtime, and a description.
+
+Parameters for specifying buffer and memory page sizes use the format
+`n<unit>`, where `<unit>` can be:
 
 - `m` for **MB**
 - `k` for **kB**
