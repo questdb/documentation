@@ -22,7 +22,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ADD USER keyword](/images/docs/diagrams/addUser.svg)
+```questdb-sql
+ADD USER userName TO groupName [, groupName ...];
+```
 
 ## Description
 

@@ -15,6 +15,9 @@ keywords:
   - $now
   - timestamp interval
   - WHERE IN
+  - imprecise dates
+  - month-level
+  - year-level
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
@@ -26,12 +29,14 @@ multiple time ranges, schedules, and patterns efficiently.
 ```questdb-sql
 -- NYSE trading hours on workdays for January
 SELECT * FROM trades
-WHERE ts IN '2025-01-[02..8,10..19,21..31]T09:30@America/New_York#workday;6h30m';
+WHERE ts IN '[2025-01]T09:30@America/New_York#workday;6h30m';
 ```
 
-This single expression generates interval scans for every weekday except
-holidays in January, each starting at 9:30 AM New York time and lasting 6 hours
-30 minutes.
+This single expression generates interval scans for every weekday in January,
+each starting at 9:30 AM New York time and lasting 6 hours 30 minutes. The
+month-level date `[2025-01]` expands to all days in January automatically — see
+[imprecise dates](#imprecise-dates) for details on month-level and year-level
+shorthand.
 
 <EnterpriseNote>
   With [exchange calendars](/docs/query/operators/exchange-calendars/), TICK
@@ -42,7 +47,7 @@ holidays in January, each starting at 9:30 AM New York time and lasting 6 hours
 ```questdb-sql
 -- NYSE trading hours for January, holidays excluded automatically
 SELECT * FROM trades
-WHERE ts IN '2025-01-[01..31]#XNYS';
+WHERE ts IN '[2025-01]#XNYS';
 ```
 
 </EnterpriseNote>
@@ -54,6 +59,7 @@ WHERE ts IN '2025-01-[01..31]#XNYS';
 - Each generated interval uses optimized
   [interval scan](/docs/concepts/deep-dive/interval-scan/) (binary search)
 - Use `[a,b,c]` for values, `[a..b]` for ranges, `#workday` for day filters
+- Dates can be day (`2024-01-15`), month (`[2024-01]`), or year (`[2024]`) level
 - Overlapping intervals are automatically merged
 :::
 
@@ -62,11 +68,16 @@ WHERE ts IN '2025-01-[01..31]#XNYS';
 ```text
 TICK_EXPR     = DATE_PART [TIME] [TIMEZONE] [FILTER] [DURATION]
 
-DATE_PART     = literal_date                    -- '2024-01-15'
+DATE_PART     = literal_date                    -- '2024-01-15', '2024-01', '2024'
               | date_list                       -- '[2024-01-15, 2024-03-20]'
               | date_variable                   -- '$today', '$now - 2h'
-              | bracket_expansion               -- '2024-01-[10..15]'
+              | bracket_expansion               -- '2024-01-[10..15]', '2024-[01..03]'
               | iso_week                        -- '2024-W01-1'
+
+-- Dates can be day-level, month-level, or year-level:
+literal_date  = YYYY-MM-DD                      -- day:   single day
+              | YYYY-MM                          -- month: expands to all days in month
+              | YYYY                             -- year:  expands to all days in year
 
 TIME          = 'T' time_value                  -- 'T09:30'
               | 'T' bracket_expansion           -- 'T[09:00,14:30]'
@@ -87,8 +98,9 @@ expansion_item    = value                       -- single: [10]
                   -- mixed example: [5,10..12,20] = 5, 10, 11, 12, 20
 
 -- Date list: multiple complete dates (can nest bracket expansions)
+-- Elements can mix precision: day-level, month-level, and year-level
 date_list    = '[' date_entry (',' date_entry)* ']'
-date_entry   = literal_date                     -- '2024-01-15'
+date_entry   = literal_date                     -- '2024-01-15', '2024-01', '2024'
              | date_variable                    -- '$today'
              | literal_date with brackets       -- '2024-01-[01..05]'
 
@@ -147,8 +159,11 @@ WHERE ts IN '$today'
 -- Last 5 business days
 WHERE ts IN '$today - 5bd..$today - 1bd'
 
--- Workdays only with time window
-WHERE ts IN '2024-01-[01..31]T09:00#workday;8h'
+-- All workdays in January at 09:00 for 8 hours
+WHERE ts IN '[2024-01]T09:00#workday;8h'
+
+-- All of 2024 at 09:30
+WHERE ts IN '[2024]T09:30'
 
 -- Multiple times on one day
 WHERE ts IN '2024-01-15T[09:00,12:00,18:00];1h'
@@ -168,7 +183,7 @@ date [T time] @ timezone # dayFilter ; duration
  │       │         │          └─ day filter (e.g., #workday)
  │       │         └─ timezone (e.g., @America/New_York)
  │       └─ time component (e.g., T09:30)
- └─ date with optional brackets (e.g., 2024-01-[01..31])
+ └─ date (e.g., 2024-01-15, [2024-01], [2024])
 ```
 
 **Examples showing the order:**
@@ -181,14 +196,20 @@ date [T time] @ timezone # dayFilter ; duration
 | `'2024-01-15T09:30#workday'` | date + time + filter |
 | `'2024-01-15T09:30;1h'` | date + time + duration |
 | `'2024-01-15T09:30@America/New_York#workday;6h30m'` | all components |
+| `'[2024-01]T09:30@America/New_York#workday;6h30m'` | all components (month-level) |
 
 ## Quick reference
 
 | Feature | Syntax | Example |
 | ------- | ------ | ------- |
+| Day-level date | `YYYY-MM-DD` | `'2024-01-15'` |
+| Month-level date | `YYYY-MM` or `[YYYY-MM]` | `'[2024-01]T09:30'` |
+| Year-level date | `YYYY` or `[YYYY]` | `'[2024]T09:30'` |
 | Bracket expansion | `[a,b,c]` | `'2024-01-[10,15,20]'` |
 | Range expansion | `[a..b]` | `'2024-01-[10..15]'` |
+| Month range | `YYYY-[MM..MM]` | `'2024-[01..03]T09:30'` |
 | Date list | `[date1,date2]` | `'[2024-01-15,2024-03-20]'` |
+| Mixed-precision list | `[day,month]` | `'[2024-01-15,2024-02]T09:30'` |
 | Time list | `T[time1,time2]` | `'2024-01-15T[09:00,14:30]'` |
 | Timezone | `@timezone` | `'T09:00@America/New_York'` |
 | Day filter | `#filter` | `'#workday'`, `'#Mon,Wed,Fri'` |
@@ -228,7 +249,8 @@ This ensures efficient query execution without duplicate scans.
 
 ### Optional brackets for date variables
 
-Single date variables can omit brackets, even with suffixes:
+Single date variables can omit brackets, even with suffixes (the same rule
+applies to [bare imprecise dates](#bare-imprecise-dates)):
 
 ```questdb-sql
 -- Single variable - brackets optional:
@@ -449,6 +471,117 @@ SELECT * FROM trades WHERE ts IN '[2024-01-15,2024-01-20]T09:30';
 SELECT * FROM trades WHERE ts IN '[2024-01-15,2024-01-20]T09:30;6h30m';
 ```
 
+### Mixed-precision date lists
+
+Date lists can mix day-level, month-level, and year-level elements. Each element
+is expanded independently before suffixes are applied. See
+[imprecise dates](#imprecise-dates) for full details on month and year-level
+expansion.
+
+```questdb-sql
+-- Jan 15 (1 day) + all of February (29 days) = 30 intervals
+SELECT * FROM trades WHERE ts IN '[2024-01-15, 2024-02]T09:30';
+
+-- Two full months, workdays only
+SELECT * FROM trades
+WHERE ts IN '[2024-01, 2024-02]T09:30@America/New_York#workday;6h30m';
+```
+
+## Imprecise dates
+
+Dates don't need day-level precision. Month-level (`YYYY-MM`) and year-level
+(`YYYY`) dates are expanded to all their constituent days before any suffixes are
+applied.
+
+This lets you replace verbose bracket ranges with concise expressions:
+
+```questdb-sql
+-- Before: enumerate every day in January
+WHERE ts IN '2024-01-[01..31]T09:30#workday;6h30m'
+
+-- After: same result, month-level date
+WHERE ts IN '[2024-01]T09:30#workday;6h30m'
+
+-- Before: enumerate every day in 2024
+WHERE ts IN '[2024-01-[01..31], 2024-02-[01..29], ..., 2024-12-[01..31]]T09:30'
+
+-- After: year-level date
+WHERE ts IN '[2024]T09:30'
+```
+
+### Month-level dates
+
+A date with only year and month (`YYYY-MM`) expands to every day in that month:
+
+| Expression | Expands to |
+| --- | --- |
+| `[2024-02]T09:30` | Feb 1–29 at 09:30 (leap year) |
+| `[2024-02];6h30m` | Feb 1–29, midnight to 06:30 each day |
+| `[2024-02]#workday` | All weekdays in Feb 2024 |
+| `[2024-02]T09:30#workday;6h30m` | Weekdays at 09:30 for 6h30m |
+| `[2024-02]T09:30@America/New_York` | Feb 1–29 at 09:30 Eastern |
+| `[2024-02]T[09:30,14:00]` | Feb 1–29 at both 09:30 and 14:00 |
+
+### Year-level dates
+
+A date with only a year (`YYYY`) expands to every day in that year:
+
+| Expression | Expands to |
+| --- | --- |
+| `[2024]T09:30` | All 366 days of 2024 at 09:30 |
+| `[2024];6h30m` | All 366 days, midnight to 06:30 |
+| `[2024]#workday;6h30m` | All 262 workdays, midnight to 06:30 |
+| `[2024]T09:30#workday;6h30m` | All workdays at 09:30 for 6h30m |
+
+### Month-level bracket ranges
+
+Bracket ranges work at the month level too. Each month in the range is expanded
+to all of its days:
+
+| Expression | Expands to |
+| --- | --- |
+| `2024-[01..03]T09:30` | Jan 1 – Mar 31 at 09:30 (91 days) |
+| `2024-[01..02];6h30m` | Jan 1 – Feb 29, midnight to 06:30 (60 days) |
+| `2024-[01..02]T09:30#workday` | Workdays in Jan–Feb at 09:30 |
+
+This differs from day-level bracket ranges (e.g., `2024-01-[01..15]`) which
+enumerate specific days within a single month.
+
+### Bare imprecise dates
+
+Imprecise dates work with or without surrounding brackets when used alone
+(similar to [date variables](#optional-brackets-for-date-variables)):
+
+| Expression | Equivalent to |
+| --- | --- |
+| `2024-02T09:30` | `[2024-02]T09:30` |
+| `2024-02;6h30m` | `[2024-02];6h30m` |
+| `2024-02T09:30;6h30m` | `[2024-02]T09:30;6h30m` |
+| `2024T09:30` | `[2024]T09:30` |
+| `2024;6h30m` | `[2024];6h30m` |
+
+Brackets are required in lists (`[2024-01, 2024-02]`) and when combining with
+other date entries.
+
+### Expansion order
+
+When suffixes are combined with imprecise dates, the engine processes them in
+this order:
+
+1. **Expand** the imprecise date to individual days
+2. **Apply** the time override to each day
+3. **Convert** to the specified timezone
+4. **Filter** by day-of-week
+5. **Apply** the duration window
+
+### Calendar handling
+
+The expansion respects calendar rules:
+
+- February in leap years → 29 days; non-leap years → 28 days
+- Century years divisible by 100 but not 400 (e.g., 2100) are non-leap
+- Each month expands to its correct length (28–31 days)
+
 ## Time lists
 
 Specify multiple complete times with colons inside brackets:
@@ -520,13 +653,13 @@ Add `#filter` to include only specific days:
 
 ```questdb-sql
 -- Workdays only (Monday-Friday)
-SELECT * FROM trades WHERE ts IN '2024-01-[01..31]#workday';
+SELECT * FROM trades WHERE ts IN '[2024-01]#workday';
 
 -- Weekends only
-SELECT * FROM logs WHERE ts IN '2024-01-[01..31]T02:00#weekend;4h';
+SELECT * FROM logs WHERE ts IN '[2024-01]T02:00#weekend;4h';
 
 -- Specific days
-SELECT * FROM attendance WHERE ts IN '2024-01-[01..31]#Mon,Wed,Fri';
+SELECT * FROM attendance WHERE ts IN '[2024-01]#Mon,Wed,Fri';
 ```
 
 ### Available filters
@@ -548,7 +681,7 @@ The filter applies to **local time** before timezone conversion:
 -- 09:30 New York time, workdays only
 -- "Monday" means Monday in New York, not Monday in UTC
 SELECT * FROM trades
-WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#workday;6h30m';
+WHERE ts IN '[2024-01]T09:30@America/New_York#workday;6h30m';
 ```
 
 ## Duration suffix
@@ -647,7 +780,7 @@ SELECT * FROM trades WHERE ts IN '2024-W[01..04]-[1,5]';
 ```questdb-sql
 -- NYSE trading hours for January workdays
 SELECT * FROM nyse_trades
-WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#workday;6h30m';
+WHERE ts IN '[2024-01]T09:30@America/New_York#workday;6h30m';
 
 -- Compare trading sessions across markets
 SELECT * FROM global_trades
@@ -705,9 +838,9 @@ WHERE ts IN '[$now - 4h, $now - 3h, $now - 2h, $now - 1h, $now];5m';
 ### Maintenance windows
 
 ```questdb-sql
--- Weekend maintenance (every Sat/Sun at 02:00)
+-- Weekend maintenance (every Sat/Sun in January at 02:00)
 SELECT * FROM system_logs
-WHERE ts IN '2024-01-[01..31]T02:00#weekend;4h';
+WHERE ts IN '[2024-01]T02:00#weekend;4h';
 
 -- Quarterly maintenance (first Sunday of each quarter)
 SELECT * FROM maintenance
@@ -724,7 +857,7 @@ TICK expressions are fully optimized by QuestDB's query engine:
 3. **Parallel expansion** — Complex expressions generate multiple efficient
    interval scans
 
-A TICK expression like `'2024-01-[01..31]T09:00#workday;8h'` (22 workdays)
+A TICK expression like `'[2024-01]T09:00#workday;8h'` (22 workdays)
 performs comparably to 22 separate simple queries, but with a single parse.
 
 Use [EXPLAIN](/docs/query/sql/explain/) to see the generated intervals:
@@ -744,6 +877,8 @@ WHERE ts IN '2024-01-[15,16,17]T09:00;1h';
 | `Invalid timezone: xyz` | Unknown timezone |
 | `Unknown date variable: $invalid` | Unrecognized variable |
 | `Invalid day name: xyz` | Unknown day in filter |
+| `Invalid date: 00` | Month value out of range (must be 01–12) |
+| `Invalid date: 13` | Month value out of range (must be 01–12) |
 
 ## See also
 

@@ -34,8 +34,8 @@ QuestDB exposes a REST API for compatibility with a wide range of libraries and
 tools. The REST API is accessible on port `9000` and has the following
 insert-capable entrypoints:
 
-| Entrypoint                                 | HTTP Method | Description                             | API Docs                                                      |
-| :----------------------------------------- | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
+| Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
+| :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/query/rest-api/#imp---import-data)      |
 | [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/query/rest-api/#exec---execute-queries) |
 
@@ -112,7 +112,7 @@ The `/exec` entrypoint takes a SQL query and returns results as JSON.
 
 We can use this for quick SQL inserts too, but note that there's no support for
 parameterized queries that are necessary to avoid SQL injection issues. Prefer
-[InfluxDB Line Protocol](/docs/configuration/overview/#influxdb-line-protocol-ilp) if you
+[InfluxDB Line Protocol](/docs/configuration/ingestion/) if you
 need high-performance inserts.
 
 <Tabs defaultValue="curl" values={[
@@ -162,7 +162,7 @@ non-representative of the rest of the data, automatic imports can yield errors.
 If the data follows a uniform pattern, the number of lines which are analyzed
 for schema detection can be reduced to improve performance during uploads using
 the `http.text.analysis.max.lines` key. Usage of this setting is described in
-the [HTTP server configuration](/docs/configuration/overview/#http-server) documentation.
+the [HTTP server configuration](/docs/configuration/http-server/) documentation.
 
 :::
 
@@ -177,13 +177,13 @@ Content-Type with following optional URL parameters which must be URL encoded:
 | `delimiter`          | No       |                  | URL encoded delimiter character. When set, import will try to detect the delimiter automatically. Since automatic delimiter detection requires at least two lines (rows) to be present in the file, this parameter may be used to allow single line file import. |
 | `fmt`                | No       | `tabular`        | Can be set to `json` to get the response formatted as such.                                                                                                                                                                                                      |
 | `forceHeader`        | No       | `false`          | `true` or `false`. When `false`, QuestDB will try to infer if the first line of the file is the header line. When set to `true`, QuestDB will expect that line to be the header line.                                                                            |
-| `name`               | No       | Name of the file | Name of the table to create, [see below](/docs/query/rest-api/#names).                                                                                                                                                                                       |
+| `name`               | No       | Name of the file | Name of the table to create, [see below](/docs/query/rest-api/#names).                                                                                                                                                                                           |
 | `overwrite`          | No       | `false`          | `true` or `false`. When set to true, any existing data or structure will be overwritten.                                                                                                                                                                         |
-| `partitionBy`        | No       | `NONE`           | See [partitions](/docs/concepts/partitions/#creating-partitioned-tables).                                                                                                                                                                                                          |
+| `partitionBy`        | No       | `NONE`           | See [partitions](/docs/concepts/partitions/#creating-partitioned-tables).                                                                                                                                                                                        |
 | `o3MaxLag`           | No       |                  | Sets upper limit on the created table to be used for the in-memory out-of-order buffer. Can be also set globally via the `cairo.o3.max.lag` configuration property.                                                                                              |
 | `maxUncommittedRows` | No       |                  | Maximum number of uncommitted rows to be set for the created table. When the number of pending rows reaches this parameter on a table, a commit will be issued. Can be also set globally via the `cairo.max.uncommitted.rows` configuration property.            |
 | `skipLev`            | No       | `false`          | `true` or `false`. Skip “Line Extra Values”, when set to true, the parser will ignore those extra values rather than ignoring entire line. An extra value is something in addition to what is defined by the header.                                             |
-| `timestamp`          | No       |                  | Name of the column that will be used as a [designated timestamp](/docs/concepts/designated-timestamp/).                                                                                                                                                           |
+| `timestamp`          | No       |                  | Name of the column that will be used as a [designated timestamp](/docs/concepts/designated-timestamp/).                                                                                                                                                          |
 | `create`             | No       | `true`           | `true` or `false`. When set to `false`, QuestDB will not automatically create a table '`name`' if one does not exist, and will return an error instead.                                                                                                          |
 
 :::tip
@@ -595,34 +595,29 @@ returned in a tabular form to be saved and reused as opposed to JSON.
 `/exp` is expecting an HTTP GET request with following parameters:
 
 | Parameter | Required | Description                                                                                                                                                                                                                  |
-|:----------|:---------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :-------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `query`   | Yes      | URL encoded query text. It can be multi-line.                                                                                                                                                                                |
 | `limit`   | No       | Paging opp parameter. For example, `limit=10,20` will return row numbers 10 through to 20 inclusive and `limit=20` will return first 20 rows, which is equivalent to `limit=0,20`. `limit=-20` will return the last 20 rows. |
 | `nm`      | No       | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                                                            |
 | `fmt`     | No       | Export format. Valid values: `parquet`, `csv`. When set to `parquet`, exports data in Parquet format instead of CSV.                                                                                                         |
+| `timeout` | No       | Query timeout in seconds. Overrides the default timeout. For Parquet exports, the default is the server's export timeout. For CSV exports, the default is the general query timeout.                                         |
 
 #### Parquet Export Parameters
 
-:::warning
-
-Parquet exports currently require writing interim data to disk, and therefore must be run on **read-write instances only**.
-
-This limitation will be removed in future.
-
-:::
-
 When `fmt=parquet`, the following additional parameters are supported:
 
-| Parameter            | Required | Default   | Description                                                                                                        |
-|:---------------------|:---------|:----------|:-------------------------------------------------------------------------------------------------------------------|
-| `partition_by`       | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                                 |
-| `compression_codec`  | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`.                |
-| `compression_level`  | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                                 |
-| `row_group_size`     | No       | `100000`  | Number of rows per Parquet row group.                                                                              |
-| `data_page_size`     | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                                         |
-| `statistics_enabled` | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
-| `parquet_version`    | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
-| `raw_array_encoding` | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
+| Parameter              | Required | Default   | Description                                                                                                        |
+| :--------------------- | :------- | :-------- | :----------------------------------------------------------------------------------------------------------------- |
+| `partition_by`         | No       | `NONE`    | Partition unit: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, or `YEAR`.                                                 |
+| `compression_codec`    | No       | `ZSTD`    | Compression algorithm: `UNCOMPRESSED`, `SNAPPY`, `GZIP`, `LZ4`, `ZSTD`, `LZ4_RAW`, `BROTLI`, `LZO`.                |
+| `compression_level`    | No       | `9`       | Compression level (codec-specific). Higher values = better compression but slower.                                 |
+| `row_group_size`       | No       | `100000`  | Number of rows per Parquet row group.                                                                              |
+| `data_page_size`       | No       | `1048576` | Size of data pages in bytes (default 1MB).                                                                         |
+| `statistics_enabled`   | No       | `true`    | Enable Parquet column statistics: `true` or `false`.                                                               |
+| `parquet_version`      | No       | `2`       | Parquet format version: `1` (v1.0) or `2` (v2.0).                                                                  |
+| `raw_array_encoding`   | No       | `false`   | Use raw encoding for arrays: `true` (lighter-weight, less compatible) or `false` (heavier-weight, more compatible) |
+| `bloom_filter_columns` | No       | (none)    | Comma-separated column names for bloom filter generation.                                                          |
+| `bloom_filter_fpp`     | No       | `0.01`    | False positive probability for bloom filters (0.0 to 1.0). Lower values produce larger but more accurate filters.  |
 
 The parameters must be URL encoded.
 
@@ -686,6 +681,19 @@ curl -G \
   --data-urlencode "fmt=parquet" \
   --data-urlencode "compression_codec=LZ4_RAW" \
   http://localhost:9000/exp > recent_trades.parquet
+```
+
+#### Parquet Export with Bloom Filters
+
+Export with bloom filters for faster
+equality lookups on the exported file:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT * FROM trades" \
+  --data-urlencode "fmt=parquet" \
+  --data-urlencode "bloom_filter_columns=symbol,side" \
+  http://localhost:9000/exp > trades_bloom.parquet
 ```
 
 ## Error responses

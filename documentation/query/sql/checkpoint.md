@@ -22,7 +22,9 @@ If you are a Windows user and require backup functionality, please
 
 ## CHECKPOINT syntax
 
-![Flow chart showing the syntax of the CHECKPOINT keyword](/images/docs/diagrams/checkpoint.svg)
+```questdb-sql
+CHECKPOINT { CREATE | RELEASE };
+```
 
 ## CHECKPOINT overview
 

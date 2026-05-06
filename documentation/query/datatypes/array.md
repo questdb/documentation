@@ -308,7 +308,9 @@ SELECT ARRAY[1, NULL, 3] = ARRAY[1, NULL, 3] as with_nulls;
 ## Array functions
 
 Functions that operate on arrays are documented on a
-[dedicated page](/docs/query/functions/array). There are also some
+[dedicated page](/docs/query/functions/array), including
+[element-wise aggregates](/docs/query/functions/array/#array_elem_min) that
+work with `GROUP BY` and `SAMPLE BY`. There are also some
 [financial functions](/docs/query/functions/finance#l2price) that operate on
 arrays.
 

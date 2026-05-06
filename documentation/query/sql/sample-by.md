@@ -4,33 +4,29 @@ sidebar_label: SAMPLE BY
 description: SAMPLE BY SQL keyword reference documentation.
 ---
 
-`SAMPLE BY` is used on [time-series data](/blog/what-is-time-series-data/) to summarize large datasets into
-aggregates of homogeneous time chunks as part of a
-[SELECT statement](/docs/query/sql/select/).
+`SAMPLE BY` aggregates time-series data into time-based groups (hourly, daily, etc.) and applies aggregate functions to each group. It is QuestDB's primary tool for downsampling and summarizing large datasets. Supports interpolation for missing intervals via `FILL`.
 
-To use `SAMPLE BY`, a table column needs to be specified as a
-[designated timestamp](/docs/concepts/designated-timestamp/).
-
-Users performing `SAMPLE BY` queries on datasets **with missing data** may make
-use of the [FILL](#fill-options) keyword to specify a fill behavior.
+Requires a [designated timestamp](/docs/concepts/designated-timestamp/) column.
 
 ## Syntax
 
-### SAMPLE BY keywords
+```questdb-sql
+SELECT columns, aggregate_functions
+FROM table
+[WHERE conditions]
+SAMPLE BY <n><unit>
+    [FROM timestamp TO timestamp]
+    [FILL(fill_option)]
+    [ALIGN TO CALENDAR [TIME ZONE tz] [WITH OFFSET offset] | ALIGN TO FIRST OBSERVATION]
+```
 
-![Flow chart showing the syntax of the SAMPLE BY keywords](/images/docs/diagrams/sampleBy.svg)
+### Key clauses
 
-### FROM-TO keywords
-
-![Flow chart showing the syntax of the FROM-TO keywords](/images/docs/diagrams/fromTo.svg)
-
-### FILL keywords
-
-![Flow chart showing the syntax of the FILL keyword](/images/docs/diagrams/fill.svg)
-
-### ALIGN TO keywords
-
-![Flow chart showing the syntax of the ALIGN TO keywords](/images/docs/diagrams/alignToCalTimeZone.svg)
+- **`SAMPLE BY <n><unit>`**: Groups rows into time buckets (e.g., `1h`, `5m`, `1d`)
+- **`FROM ... TO`**: Defines explicit time boundaries for filling missing intervals
+- **`FILL(option)`**: Specifies how to handle missing time buckets (`NONE`, `NULL`, `PREV`, `LINEAR`, or constant)
+- **`ALIGN TO CALENDAR`**: Aligns buckets to calendar boundaries (default). Supports `TIME ZONE` and `WITH OFFSET`
+- **`ALIGN TO FIRST OBSERVATION`**: Aligns buckets relative to the first row's timestamp
 
 ## Sample units
 
@@ -44,6 +40,7 @@ Where the unit for sampled groups may be one of the following:
 
 | unit | description |
 | ---- | ----------- |
+| `n`  | nanosecond  |
 | `U`  | microsecond |
 | `T`  | millisecond |
 | `s`  | second      |
@@ -63,74 +60,19 @@ FROM trades
 SAMPLE BY 1h;
 ```
 
-## FROM-TO
-
-:::note
-
-Versions prior to QuestDB 8.1.0 do not have access to this extension.
-
-Please see the new blog for more information.
-
-:::
-
-When using `SAMPLE BY` with `FILL`, you can fill missing rows within the result set with pre-determined values.
-
-However, this method will only fill rows between existing data in the data set and cannot fill rows outside of this range.
-
-To fill outside the bounds of the existing data, you can specify a fill range using a `FROM-TO` clause. The boundary
-timestamps are expected in UTC.
-
-Note that `FROM-TO` clause can be used only on non-keyed SAMPLE BY queries, i.e. queries that have no grouping columns
-other than the timestamp.
-
-#### Syntax
-
-Specify the shape of the query using `FROM` and `TO`:
-
-```questdb-sql title='Pre-filling trade data' demo
-SELECT timestamp as ts, count()
-FROM trades
-SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
-```
-
-If no rows exist at the start of the range, QuestDB automatically fills in these rows.
-
-This is distinct from the `WHERE` clause with a simple rule of thumb -
-`WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
-
-Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM` is not provided, then the lower bound is the start of the dataset, aligned to calendar. The opposite is true omitting `TO`.
-
-#### `WHERE` clause optimisation
-
-If the user does not provide a `WHERE` clause, or the `WHERE` clause does not consider the designated timestamp,
-QuestDB will add one for you, matching the `FROM-TO` interval.
-
-This means that the query will run optimally, and avoid touching data not relevant to the result.
-
-Therefore, we compile the prior query into something similar to this:
-
-```questdb-sql title='Pre-filling trade data with WHERE optimisation' demo
-SELECT timestamp as ts, count()
-FROM trades
-WHERE timestamp >= '2009-01-01'
-  AND timestamp <  '2009-01-10'
-SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
-```
-
-#### Limitations
-
-Here are the current limits to this feature.
-
-- This syntax is not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
-- This syntax is for `ALIGN TO CALENDAR` only (default alignment).
-- Does not consider any specified `OFFSET`.
-- This syntax is for non-keyed `SAMPLE BY` i.e. only designated timestamp and aggregate columns.
-
 ## Fill options
 
-The `FILL` keyword is optional and expects one or more `fillOption` strategies
-which will be applied to one or more aggregate columns. The following
-restrictions apply:
+`FILL` specifies how to handle time intervals with no data. By default, missing intervals are skipped. Use `FILL` to interpolate or substitute values.
+
+| fillOption | Description                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `NONE`     | No fill applied. If there is no data, the time sample will be skipped in the results. A table could be missing intervals. |
+| `NULL`     | Fills with `NULL` values.                                                                                                 |
+| `PREV`     | Fills using the previous value.                                                                                           |
+| `LINEAR`   | Fills by linear interpolation of the 2 surrounding points.                                                                |
+| `x`        | Fills with a constant value - where `x` is the desired value, for example `FILL(100.05)`.                                 |
+
+The following restrictions apply:
 
 - Keywords denoting fill strategies may not be combined. Only one option from
   `NONE`, `NULL`, `PREV`, `LINEAR` and constants may be used.
@@ -145,14 +87,6 @@ FROM prices
 SAMPLE BY 1h FILL(LINEAR)
 ALIGN TO ...
 ```
-
-| fillOption | Description                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `NONE`     | No fill applied. If there is no data, the time sample will be skipped in the results. A table could be missing intervals. |
-| `NULL`     | Fills with `NULL` values.                                                                                                 |
-| `PREV`     | Fills using the previous value.                                                                                           |
-| `LINEAR`   | Fills by linear interpolation of the 2 surrounding points.                                                                |
-| `x`        | Fills with a constant value - where `x` is the desired value, for example `FILL(100.05)`.                                 |
 
 Consider an example table named `prices` which has no records during the entire
 third hour (`2021-01-01T03`):
@@ -262,6 +196,61 @@ FILL(NULL, 10, PREV);
 In the above query `min(price)` aggregate will get `FILL(NULL)` strategy
 applied, `max(price)` will get `FILL(10)`, and `avg(price)` will get
 `FILL(PREV)`.
+
+## FROM-TO
+
+`FILL` only fills intervals between existing data points. To fill outside the bounds of existing data, use `FROM-TO` to specify explicit time boundaries.
+
+```questdb-sql title='Pre-filling trade data' demo
+SELECT timestamp as ts, count()
+FROM trades
+SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
+```
+
+If no rows exist at the start of the range, QuestDB automatically fills in these rows.
+
+This is distinct from the `WHERE` clause with a simple rule of thumb -
+`WHERE` controls what data flows in, `FROM-TO` controls what data flows out.
+
+Use both `FROM` and `TO` in isolation to pre-fill or post-fill data. If `FROM` is not provided, then the lower bound is the start of the dataset, aligned to calendar. The opposite is true omitting `TO`.
+
+When used without a `TIME ZONE`, boundary timestamps are interpreted as UTC. When a `TIME ZONE` is specified in `ALIGN TO CALENDAR`, the `FROM` and `TO` values are interpreted as local time in that timezone. For example:
+
+```questdb-sql
+SELECT ts, count()
+FROM trades
+SAMPLE BY 1h FROM '2026-01-01T00:00:00' TO '2026-01-02T00:00:00' FILL(NULL)
+ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin';
+```
+
+Here, `FROM '2026-01-01T00:00:00'` means midnight January 1st in Berlin local time
+(= `2025-12-31T23:00:00Z` UTC).
+
+`FROM-TO` can only be used on non-keyed SAMPLE BY queries (queries with no grouping columns other than the timestamp).
+
+### `WHERE` clause optimisation
+
+If the user does not provide a `WHERE` clause, or the `WHERE` clause does not consider the designated timestamp,
+QuestDB will add one for you, matching the `FROM-TO` interval.
+
+This means that the query will run optimally, and avoid touching data not relevant to the result.
+
+Therefore, we compile the prior query into something similar to this:
+
+```questdb-sql title='Pre-filling trade data with WHERE optimisation' demo
+SELECT timestamp as ts, count()
+FROM trades
+WHERE timestamp >= '2009-01-01'
+  AND timestamp <  '2009-01-10'
+SAMPLE BY 1d FROM '2009-01-01' TO '2009-01-10' FILL(NULL);
+```
+
+### Limitations
+
+- Not compatible with `FILL(PREV)` or `FILL(LINEAR)`.
+- Only works with `ALIGN TO CALENDAR` (default alignment).
+- Does not consider any specified `OFFSET`.
+- Only for non-keyed `SAMPLE BY` (designated timestamp and aggregate columns only). See [Fill keyed queries with arbitrary intervals](/docs/cookbook/sql/time-series/fill-keyed-arbitrary-interval/) for a workaround.
 
 ## Sample calculation
 
@@ -414,16 +403,35 @@ FROM (
 #### Time zone transitions
 
 Calendar dates may contain historical time zone transitions or may vary in the
-total number of hours due to daylight savings time. Considering the 31st October
-2021, in the `Europe/London` calendar day which consists of 25 hours:
+total number of hours due to daylight savings time. How `SAMPLE BY` handles
+DST transitions depends on the stride size.
+
+##### Super-day strides (day, week, month, year)
+
+Super-day strides adjust bucket length to follow the local calendar. For
+example, October 31st 2021 in `Europe/London` is a 25-hour day:
 
 > - Sunday, 31 October 2021, 02:00:00 clocks are turned backward 1 hour to
 > - Sunday, 31 October 2021, 01:00:00 local standard time
 
-When a `SAMPLE BY` operation crosses time zone transitions in cases such as
-this, the first sampled group which spans a transition will include aggregates
-by full calendar range. Consider a table `trades` with one trade per hour
-spanning five calendar hours:
+Given one data point per hour, running `SAMPLE BY 1d` aligned to calendar
+time zone `Europe/London` will produce a count of `25` for this day.
+
+##### Sub-day strides (hours, minutes, seconds)
+
+Sub-day strides use the timezone's standard (non-DST) offset to maintain
+uniform bucket width in UTC. This has the following effects during DST
+transitions:
+
+- **Fall-back** (clocks go back): the repeated local hour produces two separate
+  UTC-based buckets. Both buckets map to the same local time but have distinct
+  UTC timestamps. Output timestamps remain monotonic in UTC.
+- **Spring-forward** (clocks go forward): the skipped local hour produces no
+  bucket if no UTC timestamps fall in that range.
+- Bucket boundaries are evenly spaced in UTC, regardless of DST transitions.
+
+Consider a table `trades` with one trade per hour spanning five calendar hours
+around the `Europe/London` fall-back:
 
 | ts                          | price |
 | --------------------------- | ----- |
@@ -433,8 +441,7 @@ spanning five calendar hours:
 | 2021-10-31T03:10:00.000000Z | 101.5 |
 | 2021-10-31T04:10:00.000000Z | 102.0 |
 
-The following query will sample by hour with the `Europe/London` time zone and
-align to calendar ranges:
+The following query will sample by hour with the `Europe/London` time zone:
 
 ```questdb-sql
 SELECT ts, count()
@@ -443,19 +450,21 @@ SAMPLE BY 1h
 ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
 
-The record count for the hour which encounters a time zone transition will
-contain two records for both hours at the time zone transition:
+Since `Europe/London` has a standard offset of UTC+0, sub-day buckets align
+with UTC hour boundaries. Each data point falls into its own bucket:
 
 | ts                          | count |
 | --------------------------- | ----- |
-| 2021-10-31T00:00:00.000000Z | 2     |
+| 2021-10-31T00:00:00.000000Z | 1     |
 | 2021-10-31T01:00:00.000000Z | 1     |
 | 2021-10-31T02:00:00.000000Z | 1     |
 | 2021-10-31T03:00:00.000000Z | 1     |
+| 2021-10-31T04:00:00.000000Z | 1     |
 
-Similarly, given one data point per hour on this table, running `SAMPLE BY 1d`
-will have a count of `25` for this day when aligned to calendar time zone
-`Europe/London`.
+For timezones with a non-zero standard offset (e.g., `Europe/Berlin` at
+UTC+1), bucket boundaries shift by the standard offset but remain uniformly
+spaced in UTC. During a fall-back transition, data in the repeated local hour
+will be split across two consecutive UTC buckets rather than merged into one.
 
 ### WITH OFFSET
 

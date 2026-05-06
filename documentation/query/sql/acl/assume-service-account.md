@@ -22,7 +22,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ASSUME SERVICE ACCOUNT keyword](/images/docs/diagrams/assumeServiceAccount.svg)
+```questdb-sql
+ASSUME SERVICE ACCOUNT serviceAccount;
+```
 
 ## Examples
 

@@ -33,7 +33,7 @@ SELECT
 FROM left_table [alias]
 WINDOW JOIN right_table [alias]
     [ON join_condition]
-    RANGE BETWEEN <lo_bound> AND <hi_bound>
+    RANGE BETWEEN <lo_bound> [unit] AND <hi_bound> [unit]
     [INCLUDE PREVAILING | EXCLUDE PREVAILING]
 [WHERE filter_on_left]
 [ORDER BY ...]
@@ -50,6 +50,14 @@ RANGE BETWEEN <value> <unit> PRECEDING AND <value> <unit> PRECEDING  -- past win
 RANGE BETWEEN <value> <unit> FOLLOWING AND <value> <unit> FOLLOWING  -- future window
 ```
 
+Each boundary `<value>` can be:
+- A **static constant** (e.g., `1`, `30`)
+- A **column reference** from the left table (e.g., `t.lookback`)
+- An **expression** referencing left table columns (e.g., `2 * t.lookback`)
+
+Either or both boundaries can be dynamic. For example, one boundary can be a
+column reference while the other remains a static constant.
+
 Supported time units:
 
 - `nanoseconds`
@@ -60,10 +68,39 @@ Supported time units:
 - `hours`
 - `days`
 
+When a time unit is present, the value is scaled to the left table's designated
+timestamp resolution at runtime. When omitted, the raw integer value is
+interpreted in the left table's native timestamp resolution.
+
 :::note
 
 `UNBOUNDED PRECEDING` and `UNBOUNDED FOLLOWING` are not supported in WINDOW
 JOIN.
+
+:::
+
+#### Dynamic window bounds
+
+Dynamic window bounds allow each left table row to define its own window size based
+on its data. This is useful when different rows require different lookback or
+lookahead periods.
+
+**Rules for dynamic bounds:**
+
+- Boundary expressions must evaluate to an **integer** type
+- Expressions must only reference **left table** columns — right table column
+  references are not allowed
+- Bound expressions must evaluate to **non-negative** values — negative results
+  are clamped to zero, equivalent to `CURRENT ROW`. To reference rows before the
+  current row, use a positive value with `PRECEDING`
+- **NULL values** cause the row to produce NULL aggregates — the row is skipped
+
+:::note
+
+Dynamic window bounds disable the Fast Join (symbol-keyed) and vectorized (SIMD)
+execution paths. Queries with an `ON` key equality clause fall back to the
+general join path with a join filter instead. For best performance, prefer
+static bounds when a fixed window size is sufficient.
 
 :::
 
@@ -108,28 +145,31 @@ execution.
 
 ## Examples
 
-For the following examples, consider two tables:
+The examples below use the [QuestDB demo](https://demo.questdb.io/) tables:
 
-- `trades`: A table of executed trades with `sym`, `price`, and `ts` columns
-- `prices`: A table of price quotes with `sym`, `price`, `bid`, and `ts` columns
+- `fx_trades` - FX trade executions (symbol, side, price, quantity, ecn, timestamp)
+- `core_price` - ECN-level quotes (symbol, ecn, bid_price, ask_price, timestamp)
+- `market_data` - consolidated order book snapshots (symbol, best_bid, best_ask, timestamp)
 
-### Basic example: Rolling sum
+### Basic example: rolling average quote
 
-Calculate the sum of prices from the `prices` table within ±1 minute of each
-trade:
+Calculate the average bid from `core_price` within +-5 seconds of each trade:
 
-```questdb-sql title="Rolling sum within a time window"
+```questdb-sql title="Rolling average bid around each trade" demo
 SELECT
-    t.sym,
+    t.symbol,
     t.price,
-    t.ts,
-    sum(p.price) AS window_sum
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 5 seconds PRECEDING AND 5 seconds FOLLOWING
     EXCLUDE PREVAILING
-ORDER BY t.ts;
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+ORDER BY t.timestamp
+LIMIT -20;
 ```
 
 ### Symbol-based Fast Join
@@ -137,122 +177,201 @@ ORDER BY t.ts;
 When joining on symbol columns, QuestDB uses an optimized "Fast Join" path for
 improved performance:
 
-```questdb-sql title="Fast Join with symbol matching"
+```questdb-sql title="Fast Join with symbol matching" demo
 SELECT
-    t.sym,
-    t.ts,
-    avg(p.bid) AS avg_bid,
-    count() AS num_prices
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid,
+    count() AS num_quotes
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
     RANGE BETWEEN 5 seconds PRECEDING AND 5 seconds FOLLOWING
-    EXCLUDE PREVAILING;
+    EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 ### With additional join filters
 
-You can add additional conditions to the `ON` clause to filter the right table:
+You can add additional conditions to the `ON` clause to filter the right table.
+Here we restrict to quotes from a specific ECN:
 
-```questdb-sql title="WINDOW JOIN with price filter"
+```questdb-sql title="WINDOW JOIN with ECN filter" demo
 SELECT
-    t.sym,
-    t.ts,
-    avg(p.price) AS avg_price
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym) AND p.price < 300
-    RANGE BETWEEN 2 minutes PRECEDING AND 2 minutes FOLLOWING
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol) AND c.ecn = t.ecn
+    RANGE BETWEEN 2 seconds PRECEDING AND 2 seconds FOLLOWING
     EXCLUDE PREVAILING
-ORDER BY t.ts;
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+ORDER BY t.timestamp
+LIMIT -20;
 ```
 
 ### Past-only window
 
-Look back at a historical window before each trade:
+Look back at a historical window before each trade - useful for pre-trade
+analytics:
 
-```questdb-sql title="Historical window (2 to 1 minutes before)"
+```questdb-sql title="Historical window (2 to 1 seconds before)" demo
 SELECT
-    t.sym,
-    t.ts,
-    sum(p.price) AS past_sum
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 2 minutes PRECEDING AND 1 minute PRECEDING
-    EXCLUDE PREVAILING;
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS pre_trade_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 2 seconds PRECEDING AND 1 second PRECEDING
+    EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 ### Future-only window
 
-Look ahead at a future window after each trade:
+Look ahead at a future window after each trade - useful for post-trade impact
+analysis:
 
-```questdb-sql title="Future window (1 to 2 minutes after)"
+```questdb-sql title="Future window (1 to 5 seconds after)" demo
 SELECT
-    t.sym,
-    t.ts,
-    sum(p.price) AS future_sum
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 1 minute FOLLOWING AND 2 minutes FOLLOWING
-    EXCLUDE PREVAILING;
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS post_trade_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 1 second FOLLOWING AND 5 seconds FOLLOWING
+    EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 ### Cross-table aggregation (no symbol match)
 
-Aggregate all prices within the time window regardless of symbol:
+When the left table is already filtered to a single symbol, you can omit the
+`ON` clause to count all quotes in the window regardless of their symbol.
+This shows market-wide quoting activity around each EURUSD trade:
 
-```questdb-sql title="Aggregate all prices in window"
+```questdb-sql title="Aggregate all quotes in window" demo
 SELECT
-    t.sym,
-    t.ts,
-    count() AS total_prices
-FROM trades t
-WINDOW JOIN prices p
-    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
-    EXCLUDE PREVAILING;
+    t.symbol,
+    t.timestamp,
+    count() AS total_quotes
+FROM fx_trades t
+WINDOW JOIN core_price c
+    RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
+    EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 ### Chained WINDOW JOINs
 
-You can chain multiple WINDOW JOINs together to aggregate from different tables
-or with different time windows:
+Chain multiple WINDOW JOINs to aggregate from different tables with different
+time windows. Here we compare the consolidated book (1-second window) with
+ECN-level quotes (5-second window) around each trade:
 
-```questdb-sql title="Chained WINDOW JOINs"
+```questdb-sql title="Chained WINDOW JOINs" demo
 SELECT
-    t.sym,
-    t.ts,
+    t.symbol,
+    t.timestamp,
     t.price,
-    sum(p.bid) AS sum_bids,
-    avg(q.ask) AS avg_asks
-FROM trades t
-WINDOW JOIN bids p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
-WINDOW JOIN asks q
-    ON (t.sym = q.sym)
-    RANGE BETWEEN 30 seconds PRECEDING AND 30 seconds FOLLOWING;
+    avg(m.best_bid) AS consolidated_bid_1s,
+    avg(c.bid_price) AS ecn_bid_5s
+FROM fx_trades t
+WINDOW JOIN market_data m
+    ON (t.symbol = m.symbol)
+    RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 5 seconds PRECEDING AND 5 seconds FOLLOWING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 Each WINDOW JOIN operates independently, allowing you to aggregate data from
 multiple related tables with different time windows in a single query.
+
+### Dynamic window bounds
+
+Use column references or expressions as window boundaries so each row can
+define its own window size. The examples below assume that `fx_trades` has
+additional `lookback` and `lookahead` integer columns (not present in the demo
+dataset):
+
+```questdb-sql title="Per-row window size from column values"
+SELECT
+    t.symbol,
+    t.timestamp,
+    t.lookback,
+    t.lookahead,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN t.lookback seconds PRECEDING AND t.lookahead seconds FOLLOWING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now';
+```
+
+You can mix static and dynamic bounds. Here only the lower bound is dynamic:
+
+```questdb-sql title="Dynamic lower bound, static upper bound"
+SELECT
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN t.lookback seconds PRECEDING AND 5 seconds FOLLOWING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now';
+```
+
+Expressions referencing left table columns are also supported:
+
+```questdb-sql title="Expression-based dynamic bound"
+SELECT
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 2 * t.lookback seconds PRECEDING AND 10 seconds FOLLOWING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now';
+```
 
 ### Using EXCLUDE PREVAILING
 
 Exclude the prevailing value to only aggregate rows strictly within the time
 window:
 
-```questdb-sql title="WINDOW JOIN excluding prevailing value"
+```questdb-sql title="WINDOW JOIN excluding prevailing value" demo
 SELECT
-    t.sym,
-    t.ts,
-    sum(p.price) AS window_sum
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
-    EXCLUDE PREVAILING;
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
+    EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now'
+LIMIT -20;
 ```
 
 This is useful when you want strict window boundaries and do not need the last
@@ -262,30 +381,35 @@ known value before the window starts.
 
 Filter left table rows using a `WHERE` clause:
 
-```questdb-sql title="WINDOW JOIN with WHERE filter"
+```questdb-sql title="WINDOW JOIN with WHERE filter" demo
 SELECT
-    t.sym,
-    t.ts,
-    sum(p.price) AS window_sum
-FROM trades t
-WINDOW JOIN prices p
-    ON (t.sym = p.sym)
-    RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
+    t.symbol,
+    t.timestamp,
+    avg(c.bid_price) AS avg_bid
+FROM fx_trades t
+WINDOW JOIN core_price c
+    ON (t.symbol = c.symbol)
+    RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
     EXCLUDE PREVAILING
-WHERE t.price < 450
-ORDER BY t.ts;
+WHERE t.symbol = 'EURUSD'
+    AND t.side = 'buy'
+    AND t.timestamp IN '$now-1h..$now'
+ORDER BY t.timestamp
+LIMIT -20;
 ```
 
 ## Query plan analysis
 
 Use `EXPLAIN` to see the execution plan and verify optimization:
 
-```questdb-sql title="Analyze WINDOW JOIN execution plan"
-EXPLAIN SELECT t.sym, sum(p.price)
-FROM trades t
-WINDOW JOIN prices p ON (t.sym = p.sym)
-RANGE BETWEEN 1 minute PRECEDING AND 1 minute FOLLOWING
-EXCLUDE PREVAILING;
+```questdb-sql title="Analyze WINDOW JOIN execution plan" demo
+EXPLAIN SELECT t.symbol, avg(c.bid_price)
+FROM fx_trades t
+WINDOW JOIN core_price c ON (t.symbol = c.symbol)
+RANGE BETWEEN 1 second PRECEDING AND 1 second FOLLOWING
+EXCLUDE PREVAILING
+WHERE t.symbol = 'EURUSD'
+    AND t.timestamp IN '$now-1h..$now';
 ```
 
 Look for these indicators in the plan:
@@ -313,33 +437,33 @@ WINDOW JOIN cannot be combined with `GROUP BY` in the same query. To aggregate W
 ```questdb-sql title="Incorrect - GROUP BY with WINDOW JOIN not supported"
 -- This will NOT work:
 SELECT
-    t.counterparty,
+    t.symbol,
     count(*) AS trade_count,
-    avg(first(m.mid_price) - t.price) AS avg_slippage
-FROM trades t
-WINDOW JOIN market_data m ON (t.symbol = m.symbol)
+    avg(first(c.bid_price) - t.price) AS avg_slippage
+FROM fx_trades t
+WINDOW JOIN core_price c ON (t.symbol = c.symbol)
     RANGE BETWEEN 10 milliseconds FOLLOWING AND 10 milliseconds FOLLOWING
-GROUP BY t.counterparty;  -- ERROR: GROUP BY not supported
+GROUP BY t.symbol;  -- ERROR: GROUP BY not supported
 ```
 
-```questdb-sql title="Correct - use CTE then GROUP BY"
-WITH trades_with_future_mid AS (
+```questdb-sql title="Correct - use CTE then GROUP BY" demo
+WITH trades_with_future_bid AS (
     SELECT
-        t.counterparty,
+        t.symbol,
         t.price,
-        first(m.mid_price) AS future_mid
-    FROM trades t
-    WINDOW JOIN market_data m ON (t.symbol = m.symbol)
+        first(c.bid_price) AS future_bid
+    FROM fx_trades t
+    WINDOW JOIN core_price c ON (t.symbol = c.symbol)
         RANGE BETWEEN 10 milliseconds FOLLOWING AND 10 milliseconds FOLLOWING
         INCLUDE PREVAILING
-    WHERE t.timestamp > dateadd('d', -1, now())
+    WHERE t.timestamp IN '$now-1h..$now'
 )
 SELECT
-    counterparty,
+    symbol,
     count(*) AS trade_count,
-    avg(future_mid - price) AS avg_slippage
-FROM trades_with_future_mid
-GROUP BY counterparty;
+    avg(future_bid - price) AS avg_slippage
+FROM trades_with_future_bid
+GROUP BY symbol;
 ```
 
 This pattern applies to any aggregation over WINDOW JOIN results - always perform the join first in a CTE, then aggregate in the outer query.
@@ -348,8 +472,11 @@ This pattern applies to any aggregation over WINDOW JOIN results - always perfor
 
 1. **Use symbol-based joins**: When possible, join on symbol columns to enable
    the Fast Join optimization
-2. **Narrow time windows**: Smaller windows mean less data to aggregate
-3. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
+2. **Prefer static bounds**: Static (constant) bounds enable the Fast Join and
+   vectorized (SIMD) execution paths. Dynamic window bounds disable these
+   optimizations, so use them only when per-row window sizes are needed
+3. **Narrow time windows**: Smaller windows mean less data to aggregate
+4. **Filter the left table**: Use `WHERE` clauses to reduce the number of rows
    processed
-4. **Parallel execution**: WINDOW JOIN automatically leverages parallel
+5. **Parallel execution**: WINDOW JOIN automatically leverages parallel
    execution based on your worker configuration
