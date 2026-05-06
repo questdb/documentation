@@ -130,7 +130,7 @@ csvstack *.csv > singleFile.csv
 
 #### Configure `COPY`
 
-- Enable `COPY` and [configure](/docs/configuration/overview/#copy-settings) the `COPY`
+- Enable `COPY` and [configure](/docs/configuration/copy-settings/) the `COPY`
   directories to suit your server.
 - `cairo.sql.copy.root` must be set for `COPY` to work.
 
