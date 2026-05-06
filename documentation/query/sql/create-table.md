@@ -162,7 +162,7 @@ By default, created tables are
 WAL-enabled tables, it is still possible to create non-WAL-enabled tables.
 
 `CREATE TABLE`'s
-[global configuration setting](/docs/configuration/overview/#cairo-engine) allows you to
+[global configuration setting](/docs/configuration/cairo-engine/) allows you to
 alter the default behaviour via `cairo.wal.enabled.default`:
 
 - `true`: Creates a WAL table (default)
@@ -974,7 +974,7 @@ its volume.
 ### Configuration
 
 The secondary table target volume is defined by `cairo.volumes` in
-[`server.conf`](/docs/configuration/overview/#cairo-engine). The default setting contains
+[`server.conf`](/docs/configuration/cairo-engine/). The default setting contains
 an empty list, which means the feature is not enabled.
 
 To enable the feature, define as many volume pairs as you need, with syntax

@@ -121,7 +121,7 @@ enabling high write throughput.
 WAL behavior can be tuned via server configuration:
 
 - `cairo.wal.enabled.default` — WAL enabled by default (default: `true`)
-- Parallel threads for WAL application — see [WAL configuration](/docs/configuration/overview/#wal-table-configurations)
+- Parallel threads for WAL application — see [WAL configuration](/docs/configuration/wal/)
 
 To convert an existing table between WAL and non-WAL:
 

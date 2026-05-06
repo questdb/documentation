@@ -65,7 +65,7 @@ line.http.enabled=true
 ## Server-Side Configuration
 
 The HTTP receiver configuration can be completely customized using
-[QuestDB configuration keys for ILP](/docs/configuration/overview/#influxdb-line-protocol-ilp).
+[QuestDB configuration keys for ILP](/docs/configuration/ingestion/).
 
 Configure the thread pools, buffer and queue sizes, receiver IP address and
 port, load balancing, and more.
