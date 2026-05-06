@@ -246,6 +246,16 @@ SELECT backup_instance_name;
 
 Returns `null` if no backup has been run yet.
 
+### Replication WAL cleanup integration
+
+When replication is enabled, the
+[WAL cleaner](/docs/high-availability/wal-cleanup/) uses backup manifests to
+determine which replicated WAL data in object storage can be safely deleted.
+By default, the cleaner retains replication data for as many backups as your
+[`backup.cleanup.keep.latest.n`](#backup-retention) setting (default 5) and
+deletes everything older. No additional configuration is required — enabling
+backups on a replicated instance is sufficient.
+
 ### Performance characteristics
 
 Backup is designed to prioritize database availability over backup speed. Key
@@ -322,6 +332,31 @@ the object store. Backups are stored under `backup/<backup_instance_name>/`.
 
 To find your instance name, see [Backup instance name](#backup-instance-name).
 
+### Interaction with storage policies
+
+[Storage policies](/docs/concepts/storage-policy/) operate locally — they
+convert partitions to Parquet in place and then drop native (and eventually
+local Parquet) files on a schedule. Backups capture whatever is on local disk
+at the time the backup runs:
+
+- Partitions still in native format are backed up as native files.
+- Partitions that have been converted to Parquet (via the `TO PARQUET` stage,
+  after `DROP NATIVE` has fired) are backed up as Parquet files.
+- Once `DROP LOCAL` fires and removes a partition from local disk, subsequent
+  backups will no longer contain that partition — restoring an earlier backup
+  is the only way to recover it.
+
+Plan retention (`backup.cleanup.keep.latest.n`) with your storage policy's
+`DROP LOCAL` TTL in mind: a partition is only recoverable from a backup that
+was taken **before** `DROP LOCAL` removed it from disk. If you need to keep
+historical partitions available for restore, make sure your oldest retained
+backup predates the earliest `DROP LOCAL` fire.
+
+Storage policies run per-instance, so primaries and replicas may disagree on
+which partitions are native vs. Parquet at any given moment. Typically,
+backing up the primary is sufficient (see the bullet on
+primary/replica backups below).
+
 ### Limitations
 
 - **Database-wide only**: Backup captures the entire database. You cannot
@@ -334,6 +369,12 @@ To find your instance name, see [Backup instance name](#backup-instance-name).
   a primary and its replica creates two separate backup sets in the object
   store. Typically, backing up the primary is sufficient since replicas sync
   from the same data.
+- **Same backup object store for all nodes**: When using replication, all
+  nodes in the cluster should use the same `backup.object.store` connection
+  string. The [WAL cleaner](/docs/high-availability/wal-cleanup/) reads
+  backup manifests from every node to determine what replication data can be
+  safely deleted. If nodes back up to different object stores, the cleaner
+  cannot see all manifests and will not trigger correctly.
 
 ### Backup validation
 

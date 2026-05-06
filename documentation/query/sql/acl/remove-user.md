@@ -21,7 +21,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the REMOVE USER keyword](/images/docs/diagrams/removeUser.svg)
+```questdb-sql
+REMOVE USER userName FROM groupName [, groupName ...];
+```
 
 ## Examples
 

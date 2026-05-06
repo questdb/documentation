@@ -386,5 +386,5 @@ things:
   ```
 
   Refer to
-  [InfluxDB Line Protocol's configuration](/docs/configuration/overview/#influxdb-line-protocol-ilp)
+  [InfluxDB Line Protocol's configuration](/docs/configuration/ingestion/)
   documentation for more on these configuration settings.

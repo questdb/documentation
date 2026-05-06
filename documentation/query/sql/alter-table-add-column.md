@@ -22,8 +22,11 @@ first failure. It is therefore possible to add some columns and not others.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of ALTER TABLE with ADD COLUMN keyword](/images/docs/diagrams/alterTableAddColumn.svg)
+```questdb-sql
+ALTER TABLE tableName ADD COLUMN [IF NOT EXISTS] columnName typeDef
+    [, columnName typeDef ...]
+    [OWNED BY ownerName];
+```
 
 ## OWNED BY
 

@@ -8,14 +8,16 @@ Disable storage level data deduplication on inserts
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE DISABLE DEDUP statement](/images/docs/diagrams/disableDedup.svg)
+```questdb-sql
+ALTER TABLE tableName DEDUP DISABLE;
+```
 
 ## Example
 
-Disable deduplication on table `TICKER_PRICE`:
+Disable deduplication on table `fx_trades`:
 
 ```sql
-ALTER TABLE TICKER_PRICE DEDUP DISABLE
+ALTER TABLE fx_trades DEDUP DISABLE;
 ```
 
 See more example at [data deduplication](/docs/concepts/deduplication/#quick-example)

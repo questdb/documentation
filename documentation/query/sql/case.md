@@ -6,7 +6,13 @@ description: CASE SQL keyword reference documentation.
 
 ## Syntax
 
-![Flow chart showing the syntax of CASE](/images/docs/diagrams/case.svg)
+```questdb-sql
+CASE
+    WHEN condition THEN value
+    [WHEN condition THEN value ...]
+    [ELSE value]
+END
+```
 
 ## Description
 
@@ -18,48 +24,40 @@ syntax. The user can define a return value when no condition is met using
 
 ## Examples
 
-Assume the following data
+Tag each trade as bullish or bearish based on its side, using `ELSE` as the
+fallback:
 
-| name  | age |
-| ----- | --- |
-| Tom   | 4   |
-| Jerry | 19  |
-| Anna  | 25  |
-| Jack  | 8   |
-
-```questdb-sql title="CASE with ELSE"
-SELECT
-name,
-CASE
-    WHEN age > 18 THEN 'major'
-    ELSE 'minor'
-END
-FROM my_table
+```questdb-sql title="CASE with ELSE" demo
+SELECT symbol, side,
+    CASE
+        WHEN side = 'buy' THEN 'bullish'
+        ELSE 'bearish'
+    END AS sentiment
+FROM trades
+LIMIT -40;
 ```
 
-Result
+| symbol  | side | sentiment |
+| ------- | ---- | --------- |
+| BTC-USD | buy  | bullish   |
+| ETH-USD | sell | bearish   |
+| BTC-USD | buy  | bullish   |
+| SOL-USD | sell | bearish   |
 
-| name  | case  |
-| ----- | ----- |
-| Tom   | minor |
-| Jerry | major |
-| Anna  | major |
-| Jack  | minor |
+Without `ELSE`, unmatched rows produce `null`:
 
-```questdb-sql title="CASE without ELSE"
-SELECT
-name,
-CASE
-    WHEN age > 18 THEN 'major'
-END
-FROM my_table
+```questdb-sql title="CASE without ELSE" demo
+SELECT symbol, side,
+    CASE
+        WHEN side = 'buy' THEN 'bullish'
+    END AS sentiment
+FROM trades
+LIMIT -40;
 ```
 
-Result
-
-| name  | case  |
-| ----- | ----- |
-| Tom   | null  |
-| Jerry | major |
-| Anna  | major |
-| Jack  | null  |
+| symbol  | side | sentiment |
+| ------- | ---- | --------- |
+| BTC-USD | buy  | bullish   |
+| ETH-USD | sell | null      |
+| BTC-USD | buy  | bullish   |
+| SOL-USD | sell | null      |

@@ -6,73 +6,57 @@ description:
   concise and clear reference documentation.
 ---
 
-ASOF JOIN is a powerful SQL keyword that allows you to join two time-series
-tables.
+ASOF JOIN matches each row in a time-series table with the most recent row in
+another time-series table whose timestamp is at or before the left row's
+timestamp.
 
-It is a variant of the [`JOIN` keyword](/docs/query/sql/join/) and shares
-many of its execution traits.
+It is the most common time-series join in QuestDB - typical use cases include
+attaching the prevailing market quote to each trade, looking up the current
+sensor calibration for each reading, or enriching events with the latest
+known state.
 
-This document will demonstrate how to utilize it, and link to other relevant
-JOIN context.
+ASOF JOIN is a variant of the standard [`JOIN`](/docs/query/sql/join/) keyword
+and shares many of its execution traits.
 
-## JOIN overview
+## Syntax
 
-The JOIN operation is broken into three components:
+```questdb-sql
+SELECT ...
+FROM leftTable
+ASOF JOIN { rightTable | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )]
+    [TOLERANCE intervalLiteral]
+[WHERE ...];
+```
 
-- Select clause
-- Join clause
-- Where clause
+The optional clauses are:
 
-This document will demonstrate the JOIN clause, while the other keywords
-demonstrate their respective clauses.
+- **`ON`** - restricts matches to rows whose key columns are equal (e.g.
+  match by `symbol` so you only join EURUSD trades to EURUSD quotes).
+- **`TOLERANCE`** - rejects matches older than the given interval (e.g.
+  `TOLERANCE 50T` for 50 milliseconds).
 
-Visually, a JOIN operation looks like this:
+For the structure of the surrounding `SELECT` and `WHERE` clauses, see the
+[SELECT](/docs/query/sql/select/) and [WHERE](/docs/query/sql/where/)
+reference pages. For general join behavior (column aliasing, execution order,
+etc.) see the [JOIN reference](/docs/query/sql/join/).
 
-![Flow chart showing the syntax of the high-level syntax of the JOIN keyword](/images/docs/diagrams/joinOverview.svg)
+## How it works
 
-- `selectClause` - see the [SELECT](/docs/query/sql/select/) reference docs
-  for more information.
+`ASOF JOIN` joins two time-series on their timestamp. For each row in the
+first time-series:
 
-- `joinClause` `ASOF JOIN` with an optional `ON` clause which allows only the
-  `=` predicate and an optional `TOLERANCE` clause:
-
-  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofJoin.svg)
-
-- `whereClause` - see the [WHERE](/docs/query/sql/where/) reference docs for
-  more information.
-
-In addition, the following are items of importance:
-
-- Columns from joined tables are combined in a single row.
-
-- Columns with the same name originating from different tables will be
-  automatically aliased into a unique column namespace of the result set.
-
-- Though it is usually preferable to explicitly specify join conditions, QuestDB
-  will analyze `WHERE` clauses for implicit join conditions and will derive
-  transient join conditions where necessary.
-
-### Execution order
-
-Join operations are performed in order of their appearance in a SQL query.
-
-Read more about execution order in the
-[JOIN reference documentation](/docs/query/sql/join/).
-
-## ASOF JOIN
-
-`ASOF JOIN` joins two time-series on their timestamp, using the following
-logic: for each row in the first time-series...
-
-1. consider all timestamps in the second time-series **earlier or equal to**
-the first one
-2. choose **the latest** such timestamp
+1. Consider all timestamps in the second time-series **earlier than or equal
+   to** the first one.
+2. Choose **the latest** such timestamp.
 3. If the optional `TOLERANCE` clause is specified, an additional condition
-   applies: the chosen record from t2 must satisfy
-   `t1.ts - t2.ts <= tolerance_value`. If no record from t2 meets this condition
-   (along with `t2.ts <= t1.ts`), then the row from t1 will not have a match.
+   applies: the chosen record from `t2` must satisfy
+   `t1.ts - t2.ts <= tolerance_value`. If no record from `t2` meets this
+   condition (along with `t2.ts <= t1.ts`), then the row from `t1` will not
+   have a match.
 
-### Example
+## Example
 
 Let's use an example with two tables:
 
@@ -194,7 +178,7 @@ Note the result doesn't really make sense, as we are joining each row in `market
 exact or immediately before timestamp, regardless of the symbol. If our join does not depend only on timestamp, but also
 on matching columns, we need to add extra keywords.
 
-### Using `ON` for matching column value
+## Matching by key with `ON`
 
 By using the `ON` clause, you can point out the key (`symbol` in our example)
 column and get results separate for each key.
@@ -244,7 +228,7 @@ Note how the first few rows for each symbol don't match anything on the
 `core_price` table, as there are no rows with timestamps equal or earlier than
 the timestamp on the `market_data` table for those first rows.
 
-### How ASOF JOIN uses timestamps
+## How ASOF JOIN uses timestamps
 
 `ASOF JOIN` requires tables or subqueries to be ordered by time. The best way to
 meet this requirement is to use a
@@ -253,7 +237,7 @@ you create a table. This not only enforces the chronological order of your data
 but also tells QuestDB which column to use for time-series operations
 automatically.
 
-#### Default behavior
+### Default behavior
 
 By default, an `ASOF JOIN` will always use the designated timestamp of the
 tables involved.
@@ -273,7 +257,7 @@ This makes most `ASOF JOIN` queries simple and intuitive.
 WITH market_subset AS (
   SELECT symbol,bids
   FROM market_data
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
 )
 SELECT *
 FROM market_subset ASOF JOIN core_price ON (symbol);
@@ -285,7 +269,7 @@ timestamp may not work QuestDB responds with an error
 should explicitly include the designated timestamp column in the `SELECT` clause
 to ensure it is used for the join.
 
-#### The standard override method: Using ORDER BY
+### The standard override method: Using ORDER BY
 
 The easiest and safest way to join on a different timestamp column is to use an
 `ORDER BY ... ASC` clause in your subquery.
@@ -300,7 +284,7 @@ Example: Joining on `ingestion_time` instead of the default `trade_ts`
 WITH trades_ordered_by_ingestion AS (
   SELECT symbol, price, ingestion_time
   FROM trades
-  WHERE timestamp in today()
+  WHERE timestamp IN '$today'
   -- This ORDER BY clause tells QuestDB to use 'ingestion_time'
   -- as the new designated timestamp for this subquery.
   ORDER BY ingestion_time ASC
@@ -312,7 +296,7 @@ FROM trades_ordered_by_ingestion
 ASOF JOIN quotes ON (symbol);
 ```
 
-#### Using the timestamp() syntax
+### Using the timestamp() syntax
 
 The `timestamp()` syntax is an expert-level hint for the query engine. It should
 only be used to manually assign a timestamp to a dataset that does not have one,
@@ -350,7 +334,15 @@ To summarize:
    table with no designated timestamp, if and only if you are certain the data
    is already sorted.
 
-### TOLERANCE clause
+## Mixed-precision timestamps
+
+ASOF JOIN handles tables with different timestamp resolutions automatically. For
+example, you can join a `TIMESTAMP` (microsecond) table with a `TIMESTAMP_NS`
+(nanosecond) table without explicit casting — QuestDB aligns the timestamps
+internally. This also applies to [LT JOIN](/docs/query/sql/join/#lt-join) and
+[SPLICE JOIN](/docs/query/sql/join/#splice-join).
+
+## TOLERANCE clause
 
 The `TOLERANCE` clause enhances ASOF and LT JOINs by limiting how far back in
 time the join should look for a match in the right table. The `TOLERANCE`
@@ -369,14 +361,14 @@ TOLERANCE works both with or without the ON clause:
 SELECT market_data.timestamp, market_data.symbol, bids, core_price.*
 FROM market_data
 ASOF JOIN core_price ON (symbol) TOLERANCE 50T
-WHERE market_data.timestamp IN today();
+WHERE market_data.timestamp IN '$today';
 ```
 
 The interval_literal must be a valid QuestDB interval string, like '5s' (5
 seconds), '100T' (100 milliseconds), '2m' (2 minutes), '3h' (3 hours), or '1d'
 (1 day).
 
-#### Supported Units for interval_literal
+### Supported units for interval_literal
 
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
 
@@ -399,7 +391,7 @@ The effective precision of the `TOLERANCE` clause depends on the
 of the tables involved. For example, if a table uses microsecond resolution, specifying nanosecond
 tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
 
-#### Performance impact of TOLERANCE
+### Performance impact of TOLERANCE
 
 Specifying `TOLERANCE` can also improve performance. `ASOF JOIN` execution plans
 often scan backward in time on the right table to find a matching entry for each
@@ -408,12 +400,29 @@ right-table record is older than the left-table record by more than the
 specified tolerance - thus avoiding unnecessary processing of more distant
 records.
 
-### Choose the optimal algorithm with an SQL Hint
+## Choose the optimal algorithm with an SQL Hint
 
 QuestDB has several different algorithms that fit different queries and data
 distributions. If you query is performing poorly, consult the
 [SQL optimizer hints](/docs/concepts/deep-dive/sql-optimizer-hints) page and try out the
 non-default algorithms.
+
+## Cookbook recipes using ASOF JOIN
+
+For practical examples of `ASOF JOIN` in financial analysis workflows:
+
+- [Slippage per fill](/docs/cookbook/sql/finance/slippage/) — pair each trade with the prevailing order book to measure execution quality
+- [Aggregated slippage](/docs/cookbook/sql/finance/slippage-aggregated/) — compare slippage across venues, counterparties, and order types
+- [Implementation shortfall (order)](/docs/cookbook/sql/finance/implementation-shortfall-order/) — calculate total execution cost per order vs arrival price
+
+## LT JOIN
+
+Need to match each row with the most recent row that is **strictly earlier**
+(not equal)?
+
+`LT JOIN` ("less than join") behaves like `ASOF JOIN` but excludes rows whose
+timestamp matches exactly. Read the
+[JOIN reference](/docs/query/sql/join/#lt-join) for details.
 
 ## SPLICE JOIN
 

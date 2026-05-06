@@ -13,44 +13,44 @@ calculations. Functions are organized by category below.
 
 | Function | Description |
 | :------- | :---------- |
-| [count](#count) | Count rows or non-NULL values |
-| [sum](#sum) | Sum of values |
 | [avg](#avg) | Arithmetic mean |
+| [count](#count) | Count rows or non-NULL values |
 | [geomean](#geomean) | Geometric mean |
-| [min](#min) | Minimum value |
 | [max](#max) | Maximum value |
+| [min](#min) | Minimum value |
+| [sum](#sum) | Sum of values |
 
 ### Positional aggregates
 
 | Function | Description |
 | :------- | :---------- |
+| [arg_max](#arg_max) | Value at the row where another column is maximum |
+| [arg_min](#arg_min) | Value at the row where another column is minimum |
 | [first](#first) | First value (by designated timestamp or insertion order) |
 | [first_not_null](#first_not_null) | First non-NULL value |
 | [last](#last) | Last value (by designated timestamp or insertion order) |
 | [last_not_null](#last_not_null) | Last non-NULL value |
-| [arg_min](#arg_min) | Value at the row where another column is minimum |
-| [arg_max](#arg_max) | Value at the row where another column is maximum |
 
 ### Statistical aggregates
 
 | Function | Description |
 | :------- | :---------- |
-| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
-| [stddev_pop](#stddev_pop) | Population standard deviation |
-| [variance / var_samp](#variance--var_samp) | Sample variance |
-| [var_pop](#var_pop) | Population variance |
 | [corr](#corr) | Pearson correlation coefficient |
 | [covar_pop](#covar_pop) | Population covariance |
 | [covar_samp](#covar_samp) | Sample covariance |
 | [mode](#mode) | Most frequent value |
+| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
+| [stddev_pop](#stddev_pop) | Population standard deviation |
+| [var_pop](#var_pop) | Population variance |
+| [variance / var_samp](#variance--var_samp) | Sample variance |
 
 ### Approximate aggregates
 
 | Function | Description |
 | :------- | :---------- |
 | [approx_count_distinct](#approx_count_distinct) | Estimated distinct count using HyperLogLog |
-| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
 | [approx_median](#approx_median) | Approximate median (50th percentile) |
+| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
 
 ### String aggregates
 
@@ -58,6 +58,7 @@ calculations. Functions are organized by category below.
 | :------- | :---------- |
 | [string_agg](#string_agg) | Concatenate values with delimiter |
 | [string_distinct_agg](#string_distinct_agg) | Concatenate distinct values with delimiter |
+
 
 ### Boolean aggregates
 
@@ -79,13 +80,39 @@ calculations. Functions are organized by category below.
 | Function | Description |
 | :------- | :---------- |
 | [count_distinct](#count_distinct) | Exact count of distinct values |
+| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
 | [ksum](#ksum) | Kahan compensated sum (for floating-point precision) |
 | [nsum](#nsum) | Neumaier sum (for floating-point precision) |
-| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
+| [twap](#twap) | Time-weighted average price |
 | [weighted_avg](#weighted_avg) | Weighted arithmetic mean |
 | [weighted_stddev](#weighted_stddev) | Weighted standard deviation (reliability weights) |
 | [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
 | [weighted_stddev_rel](#weighted_stddev_rel) | Weighted standard deviation (reliability weights) |
+
+### Array aggregates
+
+Several aggregates on this page ([first](#first), [first_not_null](#first_not_null),
+[last](#last), [last_not_null](#last_not_null)) accept array columns directly.
+For element-wise aggregation across arrays — summing, averaging, or finding
+min/max position-by-position — see the
+[array functions](/docs/query/functions/array/) page.
+
+| Function | Description |
+| :------- | :---------- |
+| [array_elem_avg](/docs/query/functions/array/#array_elem_avg) | Element-wise average across arrays |
+| [array_elem_max](/docs/query/functions/array/#array_elem_max) | Element-wise maximum across arrays |
+| [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
+| [array_elem_sum](/docs/query/functions/array/#array_elem_sum) | Element-wise sum across arrays |
+
+### Visualization aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [sparkline](/docs/query/functions/visualization/#sparkline) | Vertical block chart of values within a group |
+
+See the [visualization functions](/docs/query/functions/visualization/) page for
+full reference, including the scalar [bar](/docs/query/functions/visualization/#bar)
+function.
 
 ---
 
@@ -177,46 +204,6 @@ SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP B
 | 2        | 67890                 |
 | ...      | ...                   |
 
-## approx_percentile
-
-`approx_percentile(value, percentile, precision)` calculates the approximate
-value for the given non-negative column and percentile using the
-[HdrHistogram](http://hdrhistogram.org/) algorithm.
-
-#### Parameters
-
-- `value` is any numeric non-negative value.
-- `percentile` is a `double` value between 0.0 and 1.0, inclusive.
-- `precision` is an optional `int` value between 0 and 5, inclusive. This is the
-  number of significant decimal digits to which the histogram will maintain
-  value resolution and separation. For example, when the input column contains
-  integer values between 0 and 3,600,000,000 and the precision is set to 3,
-  value quantization within the range will be no larger than 1/1,000th (or 0.1%)
-  of any value. In this example, the function tracks and analyzes the counts of
-  observed response times ranging between 1 microsecond and 1 hour in magnitude,
-  while maintaining a value resolution of 1 microsecond up to 1 millisecond, a
-  resolution of 1 millisecond (or better) up to one second, and a resolution of
-  1 second (or better) up to 1,000 seconds. At its maximum tracked value (1
-  hour), it would still maintain a resolution of 3.6 seconds (or better).
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql title="Approximate percentile"
-SELECT approx_percentile(price, 0.99) FROM trades;
-```
-
-| approx_percentile |
-| :---------------- |
-| 101.5             |
-
-#### See also
-
-- [approx_median](#approx_median) - Shorthand for 50th percentile
-
 ## approx_median
 
 `approx_median(value, precision)` calculates the approximate median (50th
@@ -267,6 +254,46 @@ GROUP BY symbol;
 #### See also
 
 - [approx_percentile](#approx_percentile) - Approximate percentile for any quantile
+
+## approx_percentile
+
+`approx_percentile(value, percentile, precision)` calculates the approximate
+value for the given non-negative column and percentile using the
+[HdrHistogram](http://hdrhistogram.org/) algorithm.
+
+#### Parameters
+
+- `value` is any numeric non-negative value.
+- `percentile` is a `double` value between 0.0 and 1.0, inclusive.
+- `precision` is an optional `int` value between 0 and 5, inclusive. This is the
+  number of significant decimal digits to which the histogram will maintain
+  value resolution and separation. For example, when the input column contains
+  integer values between 0 and 3,600,000,000 and the precision is set to 3,
+  value quantization within the range will be no larger than 1/1,000th (or 0.1%)
+  of any value. In this example, the function tracks and analyzes the counts of
+  observed response times ranging between 1 microsecond and 1 hour in magnitude,
+  while maintaining a value resolution of 1 microsecond up to 1 millisecond, a
+  resolution of 1 millisecond (or better) up to one second, and a resolution of
+  1 second (or better) up to 1,000 seconds. At its maximum tracked value (1
+  hour), it would still maintain a resolution of 3.6 seconds (or better).
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql title="Approximate percentile"
+SELECT approx_percentile(price, 0.99) FROM trades;
+```
+
+| approx_percentile |
+| :---------------- |
+| 101.5             |
+
+#### See also
+
+- [approx_median](#approx_median) - Shorthand for 50th percentile
 
 ## arg_max
 
@@ -702,6 +729,9 @@ SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_ty
 - `count()` or `count(*)` - counts the number of rows irrespective of underlying
   data.
 - `count(column_name)` - counts the number of non-NULL values in a given column.
+- `count(distinct column_name)` - counts the number of distinct non-NULL values
+  in a given column. This is identical to
+  [`count_distinct(column_name)`](#count_distinct).
 
 #### Parameters
 
@@ -773,9 +803,22 @@ SELECT payment_type, count(amount) FROM transactions;
 | card         | 67    |
 | NULL         | 4     |
 
+Count distinct values using standard SQL syntax (identical to `count_distinct`):
+
+```questdb-sql
+SELECT payment_type, count(distinct counterparty) FROM transactions;
+```
+
+| payment_type | count |
+| :----------- | :---- |
+| cash         | 3     |
+| card         | 23    |
+| NULL         | 5     |
+
 :::note
 
 `NULL` values are aggregated with `count()`, but not with `count(column_name)`
+or `count(distinct column_name)`.
 
 :::
 
@@ -788,6 +831,13 @@ SELECT payment_type, count(amount) FROM transactions;
 
 `count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
+
+:::tip
+
+`count_distinct` is available for backwards compatibility. We recommend using
+the standard SQL syntax [`count(distinct column_name)`](#count) instead.
+
+:::
 
 #### Return value
 
@@ -1631,6 +1681,124 @@ SELECT sum(cast(a AS LONG)) FROM my_table;
 - [nsum](#nsum) - Neumaier sum for floating-point precision
 - [avg](#avg) - Arithmetic mean
 
+## twap
+
+`twap(price, timestamp)` - Calculates the time-weighted average price (TWAP)
+using step-function (forward-fill) integration: each observed price is assumed
+to persist until the next observation, and the TWAP is the area under this step
+function divided by the total time span. Unlike
+[VWAP](/docs/cookbook/sql/finance/vwap/), which weights by volume, TWAP gives
+equal weight to every time interval — useful for execution benchmarking,
+algorithmic trading, and fair value reference in illiquid markets. See the
+[TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) for practical examples.
+
+$$
+\text{TWAP} = \frac{\sum_{i=1}^{n-1} p_i \cdot (t_{i+1} - t_i)}{t_n - t_1}
+$$
+
+Where:
+
+- $p_i$ is the price at observation $i$
+- $t_i$ is the timestamp at observation $i$
+
+If all observations share the same timestamp, the function falls back to a
+simple arithmetic mean.
+
+If the price is `NULL`, that observation is skipped.
+
+If the timestamp is `NULL`, that observation is skipped.
+
+If there are no valid observations, the result is `NULL`.
+
+Supports `SAMPLE BY` with `FILL` modes.
+
+#### Parameters
+
+- `price` is any numeric value.
+- `timestamp` is a `timestamp` value. This is typically the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/) but can be any
+  timestamp column.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql demo title="TWAP of trade prices for a single symbol"
+SELECT twap(price, timestamp)
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$yesterday';
+```
+
+| twap     |
+| :------- |
+| 96573.24 |
+
+```questdb-sql demo title="TWAP per symbol"
+SELECT symbol, twap(price, timestamp)
+FROM trades
+WHERE timestamp IN '$yesterday';
+```
+
+| symbol   | twap     |
+| :------- | :------- |
+| BTC-USDT | 96573.24 |
+| ETH-USDT | 2641.87  |
+| SOL-USDT | 148.35   |
+| ...      | ...      |
+
+```questdb-sql demo title="Hourly TWAP"
+SELECT timestamp, symbol, twap(price, timestamp)
+FROM trades
+WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+  AND timestamp IN '$yesterday'
+SAMPLE BY 1h;
+```
+
+| timestamp                   | symbol   | twap     |
+| :-------------------------- | :------- | :------- |
+| 2025-01-01T00:00:00.000000Z | BTC-USDT | 96510.40 |
+| 2025-01-01T00:00:00.000000Z | ETH-USDT | 2638.15  |
+| 2025-01-01T01:00:00.000000Z | BTC-USDT | 96620.88 |
+| 2025-01-01T01:00:00.000000Z | ETH-USDT | 2644.50  |
+| ...                         | ...      | ...      |
+
+#### See also
+
+- [TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) - Practical examples
+  with TWAP-vs-VWAP comparison
+- [avg](#avg) - Arithmetic mean (equal-weighted)
+- [weighted_avg](#weighted_avg) - Weighted arithmetic mean
+
+## var_pop
+
+`var_pop(value)` - Calculates the population variance of a set of values. The
+population variance is a measure of the amount of variation or dispersion of a
+set of values. A low variance indicates that the values tend to be very close to
+the mean, while a high variance indicates that the values are spread out over a
+wider range.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql
+SELECT var_pop(x)
+FROM (SELECT x FROM long_sequence(100));
+```
+
+| var_pop |
+| :------ |
+| 833.25  |
+
 ## variance / var_samp
 
 `var_samp(value)` - Calculates the sample variance of a set of values. The
@@ -1659,33 +1827,6 @@ FROM (SELECT x FROM long_sequence(100));
 | var_samp         |
 | :--------------- |
 | 841.666666666666 |
-
-## var_pop
-
-`var_pop(value)` - Calculates the population variance of a set of values. The
-population variance is a measure of the amount of variation or dispersion of a
-set of values. A low variance indicates that the values tend to be very close to
-the mean, while a high variance indicates that the values are spread out over a
-wider range.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql
-SELECT var_pop(x)
-FROM (SELECT x FROM long_sequence(100));
-```
-
-| var_pop |
-| :------ |
-| 833.25  |
 
 ## weighted_avg
 
