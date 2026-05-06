@@ -1,8 +1,8 @@
 ---
 title: Window Functions Reference
 sidebar_label: Function Reference
-description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, EMA, VWEMA, and more.
-keywords: [window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, row_number, lag, lead, first_value, last_value, min, max, ema, vwema, exponential moving average]
+description: Complete reference for all window functions in QuestDB including avg, sum, ksum, count, stddev, variance, covariance, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, EMA, VWEMA, and more.
+keywords: [window functions, avg, sum, ksum, count, stddev, stddev_pop, stddev_samp, var_pop, var_samp, variance, covar_pop, covar_samp, corr, correlation, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, first_value, last_value, nth_value, min, max, ema, vwema, exponential moving average]
 ---
 
 This page provides detailed documentation for each window function. For an introduction to window functions and how they work, see the [Overview](overview.md). For syntax details on the `OVER` clause, see [OVER Clause Syntax](syntax.md).
@@ -568,6 +568,74 @@ WHERE timestamp IN '[$today]';
 
 ---
 
+### nth_value() {#nth_value}
+
+Returns the `n`-th value (1-based) within the current window frame.
+
+**Syntax:**
+```questdb-sql
+nth_value(value, n) OVER (window_definition)
+```
+
+**Arguments:**
+- `value`: `double` column or expression to retrieve
+- `n`: Positive integer constant — the 1-based position within the frame
+
+**Return value:**
+- `double` — The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
+
+**Description:**
+
+`nth_value()` respects the frame clause: for each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
+
+Common use cases include:
+
+- **Reference value within a window**: Compare the current row to a fixed slot in the window (e.g. the third price in the last 10 trades)
+- **Anchor points**: Pick out a specific row from each partition, such as the second observation in a session
+- **Quantile-style spot checks**: Combine with frame clauses to read a specific position in a sliding range
+
+**Behavior:**
+- `n` must be a compile-time constant. A non-constant expression for `n` is rejected at parse time
+- `n = 1` returns the same value as `first_value(value)` for the same frame
+- `IGNORE NULLS` / `RESPECT NULLS` are not supported
+- `FROM FIRST` / `FROM LAST` are not supported
+- Currently only the `double` overload is available; `LONG` and `TIMESTAMP` arguments are not yet supported
+- Supports both `ROWS` and `RANGE` frames, bounded and unbounded
+- For `RANGE` frames, the query must be ordered by the designated timestamp
+
+**Example:**
+```questdb-sql title="3rd most recent price in 5-row window" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    nth_value(price, 3) OVER (
+        PARTITION BY symbol
+        ORDER BY timestamp
+        ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+    ) AS third_price
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+```questdb-sql title="Compare nth_value with first_value" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    first_value(price) OVER w AS first_price,
+    nth_value(price, 1) OVER w AS nth_1,
+    nth_value(price, 2) OVER w AS nth_2,
+    nth_value(price, 3) OVER w AS nth_3
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW);
+```
+
+For the first row of the partition, `nth_2` and `nth_3` return `NULL` because the frame contains only one row. For the second row, `nth_3` is still `NULL`. From the third row onward all positions are populated.
+
+---
+
 ### stddev_pop() / stddev_samp() / stddev() {#stddev}
 
 Calculates the standard deviation of values over the window frame. `stddev_pop()` computes population standard deviation (divides by N), `stddev_samp()` computes sample standard deviation (divides by N-1). `stddev()` is an alias for `stddev_samp()`.
@@ -714,7 +782,70 @@ WHERE timestamp IN '[$today]';
 
 ## Ranking functions
 
-These functions assign ranks or row numbers. They ignore the frame clause and operate on the entire partition.
+These functions assign ranks, row numbers, or partition-scoped distribution values. They ignore the frame clause and operate on the entire partition.
+
+### cume_dist() {#cume_dist}
+
+Returns the cumulative distribution: the number of rows at or before the current row (including peers) divided by the total number of rows in the partition. The result lies in the range (0, 1].
+
+**Syntax:**
+```questdb-sql
+cume_dist() OVER (window_definition)
+```
+
+**Arguments:**
+- None required
+
+**Return value:**
+- `double` — The cumulative distribution value for the current row's peer group
+
+**Description:**
+
+`cume_dist()` is closely related to `percent_rank()`. Where `percent_rank()` reports relative position using `(rank - 1) / (total_rows - 1)`, `cume_dist()` reports the fraction of rows with `ORDER BY` values *at or before* the current row's value. All peer rows (rows with identical `ORDER BY` values) receive the same `cume_dist`, equal to the position of the last peer divided by total rows.
+
+Use `cume_dist()` to express thresholds in terms of how much of the partition has been seen so far. Common use cases include:
+
+- **Top/bottom percentile filters**: Keep only rows with `cume_dist <= 0.1` to grab the bottom 10% of a distribution
+- **Histogram bucketing**: Group rows by `cume_dist` ranges to build empirical CDFs
+- **Anomaly thresholds**: Flag rows that fall outside the bulk of the partition's distribution
+
+**Behavior:**
+- Without `ORDER BY`, all rows are peers and `cume_dist` is `1.0` for every row
+- The last peer group in a partition always evaluates to `1.0`
+- Framing (`ROWS` / `RANGE` / `GROUPS`) is rejected — `cume_dist` is always partition-scoped
+- `EXCLUDE` is not supported
+
+**Example:**
+```questdb-sql title="Cumulative distribution by price" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    cume_dist() OVER (
+        PARTITION BY symbol
+        ORDER BY price
+    ) AS price_cdf
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+```questdb-sql title="cume_dist with peer rows"
+SELECT ts, val,
+    cume_dist() OVER (ORDER BY val) AS cd
+FROM tab;
+```
+
+| ts | val | cd |
+|----|-----|-----|
+| 1970-01-01T00:00:00.000001Z | 1 | 0.4 |
+| 1970-01-01T00:00:00.000002Z | 1 | 0.4 |
+| 1970-01-01T00:00:00.000003Z | 2 | 0.8 |
+| 1970-01-01T00:00:00.000004Z | 2 | 0.8 |
+| 1970-01-01T00:00:00.000005Z | 3 | 1.0 |
+
+The two rows with `val = 1` are peers, so they share `cume_dist = 2 / 5 = 0.4`. Likewise the rows with `val = 2` share `cume_dist = 4 / 5 = 0.8`.
+
+---
 
 ### dense_rank()
 
@@ -755,6 +886,71 @@ SELECT
 FROM trades
 WHERE timestamp IN '[$today]';
 ```
+
+---
+
+### ntile() {#ntile}
+
+Distributes the rows of an ordered partition into `n` approximately equal buckets and returns the 1-based bucket number for each row.
+
+**Syntax:**
+```questdb-sql
+ntile(n) OVER (window_definition)
+```
+
+**Arguments:**
+- `n`: Positive integer constant — the number of buckets
+
+**Return value:**
+- `long` — Bucket number from `1` to `n`
+
+**Description:**
+
+When the partition row count divides evenly by `n`, every bucket has the same size. When it doesn't, the larger buckets come first: with 10 rows and `n = 3`, the buckets contain 4, 3, and 3 rows.
+
+Use `ntile()` to build distribution-based groupings. Common use cases include:
+
+- **Quartiles, deciles, percentiles**: Use `ntile(4)`, `ntile(10)`, or `ntile(100)` to bucket rows by an ordered measure
+- **Even-sized batches**: Split a partition into `n` worker batches without writing manual range logic
+- **Tiered classification**: Assign records to numbered tiers (top tier, middle tier, bottom tier) by some ranked metric
+
+**Behavior:**
+- `n` must be a compile-time constant. A non-constant expression is rejected at parse time
+- `n` must be a positive integer; `0`, negative values, or `NULL` are rejected
+- Without `ORDER BY`, rows are bucketed in table-scan order
+- When `n` exceeds the partition row count, each row gets its own bucket (numbered `1` through row count) and the higher bucket numbers are unused
+- Framing (`ROWS` / `RANGE` / `GROUPS`) is rejected — `ntile` is always partition-scoped
+- `EXCLUDE` is not supported
+
+**Example:**
+```questdb-sql title="Quartiles per symbol" demo
+SELECT
+    symbol,
+    price,
+    timestamp,
+    ntile(4) OVER (
+        PARTITION BY symbol
+        ORDER BY price
+    ) AS price_quartile
+FROM trades
+WHERE timestamp IN '[$today]';
+```
+
+```questdb-sql title="ntile with uneven distribution"
+SELECT ts, val,
+    ntile(3) OVER (ORDER BY ts) AS bucket
+FROM tab;
+```
+
+| ts | val | bucket |
+|----|-----|--------|
+| 1970-01-01T00:00:00.000001Z | 10.0 | 1 |
+| 1970-01-01T00:00:00.000002Z | 20.0 | 1 |
+| 1970-01-01T00:00:00.000003Z | 30.0 | 2 |
+| 1970-01-01T00:00:00.000004Z | 40.0 | 2 |
+| 1970-01-01T00:00:00.000005Z | 50.0 | 3 |
+
+With 5 rows and `n = 3`, the leading buckets (1 and 2) get an extra row each.
 
 ---
 
@@ -1130,7 +1326,7 @@ WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
 ## Notes
 
 - The order of rows in the result set is not guaranteed to be consistent across query executions. Use an `ORDER BY` clause outside the `OVER` clause to ensure consistent ordering.
-- Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`) and offset functions (`lag`, `lead`) ignore frame specifications.
+- Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`) and offset functions (`lag`, `lead`) ignore frame specifications.
 - For time-based calculations, consider using `RANGE` frames with timestamp columns.
 - Aggregate window functions (`avg`, `sum`, `ksum`, `count`, `min`, `max`) support numeric types: `short`, `int`, `long`, `float`, `double`. The `decimal` type is not supported.
-- `ntile()` and `cume_dist()` are not currently supported.
+- `nth_value()` currently accepts only a `double` first argument; `LONG` and `TIMESTAMP` overloads are not yet available.

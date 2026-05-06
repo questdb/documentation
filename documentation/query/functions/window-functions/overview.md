@@ -2,7 +2,7 @@
 title: Window Functions Overview
 sidebar_label: Overview
 description: Introduction to window functions in QuestDB - perform calculations across related rows without collapsing results.
-keywords: [window functions, over, partition by, moving average, running total, rank, dense_rank, percent_rank, row_number, lag, lead, analytics, ema, vwema, ksum, exponential moving average, stddev, variance, covariance, correlation]
+keywords: [window functions, over, partition by, moving average, running total, rank, dense_rank, percent_rank, ntile, cume_dist, row_number, lag, lead, nth_value, analytics, ema, vwema, ksum, exponential moving average, stddev, variance, covariance, correlation]
 ---
 
 Window functions perform calculations across sets of table rows related to the current row. Unlike aggregate functions that return a single result for a group of rows, window functions return a value for **every row** while considering a "window" of related rows defined by the `OVER` clause.
@@ -55,10 +55,13 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`corr()`](reference.md#corr) | Pearson correlation coefficient | Yes |
 | [`first_value()`](reference.md#first_value) | First value in window | Yes |
 | [`last_value()`](reference.md#last_value) | Last value in window | Yes |
+| [`nth_value()`](reference.md#nth_value) | N-th value in window (`double` only) | Yes |
 | [`row_number()`](reference.md#row_number) | Sequential row number | No |
 | [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
 | [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
 | [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
+| [`cume_dist()`](reference.md#cume_dist) | Cumulative distribution (0 to 1] | No |
+| [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
 | [`lag()`](reference.md#lag) | Value from previous row | No |
 | [`lead()`](reference.md#lead) | Value from following row | No |
 
