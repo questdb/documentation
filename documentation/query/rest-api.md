@@ -27,6 +27,7 @@ The [Web Console](/docs/getting-started/web-console/overview/) is the official W
 - [`/imp`](#imp---import-data) for importing data from `.CSV` files
 - [`/exec`](#exec---execute-queries) to execute a SQL statement
 - [`/exp`](#exp---export-data) to export data
+- [`/ingest`](#ingest---payload-transforms) to ingest data via payload transforms
 
 ## Examples
 
@@ -38,6 +39,7 @@ insert-capable entrypoints:
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/query/rest-api/#imp---import-data)      |
 | [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/query/rest-api/#exec---execute-queries) |
+| [`/ingest?transform=..`](#ingest---payload-transforms) | POST | Execute a payload transform | [Reference](/docs/query/rest-api/#ingest---payload-transforms) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/query/rest-api/) docs.
@@ -695,6 +697,61 @@ curl -G \
   --data-urlencode "bloom_filter_columns=symbol,side" \
   http://localhost:9000/exp > trades_bloom.parquet
 ```
+
+## /ingest - Payload transforms
+
+`/ingest` executes a [payload transform](/docs/ingestion/payload-transforms/)
+against the raw HTTP request body and inserts the resulting rows into the
+transform's target table.
+
+### Overview
+
+`/ingest` expects an HTTP POST request with the raw payload as the request body.
+The `Content-Type` header is not enforced - the body is passed as-is to the
+transform's `payload()` function.
+
+#### Parameters
+
+| Parameter | Required | Description |
+| :--- | :--- | :--- |
+| `transform` | Yes | Name of the payload transform to execute |
+| Any other | No | Overrides a `DECLARE OVERRIDABLE` variable by name |
+
+#### Responses
+
+Success (HTTP 200):
+
+```json
+{"status": "ok", "rows_inserted": 1}
+```
+
+Error (HTTP 400 or 413):
+
+```json
+{"status": "error", "message": "..."}
+```
+
+Requests exceeding the configured `http.ingest.max.request.size` (default 5 MB)
+receive an HTTP 413 (Payload Too Large) response.
+
+### Example
+
+```shell title="Ingest a JSON payload"
+curl -s "https://api.exchange.coinbase.com/products/BTC-USD/book?level=2" | \
+  curl -X POST "http://localhost:9000/ingest?transform=coinbase_book_api" -d @-
+```
+
+For full documentation on creating and managing transforms, see
+[Payload transforms](/docs/ingestion/payload-transforms/).
+
+:::note Enterprise
+
+In [QuestDB Enterprise](/enterprise/) deployments with
+[RBAC](/docs/security/rbac/) enabled, the caller must hold the `HTTP` endpoint
+grant and `INSERT` permission on the target table.
+
+:::
+
 
 ## Error responses
 

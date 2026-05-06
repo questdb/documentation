@@ -204,6 +204,44 @@ memory_metrics();
 | MMAP_O3        | 0         |
 | NATIVE_O3      | 96        |
 
+## payload
+
+`payload()` returns the raw HTTP request body as a `VARCHAR`. It is only
+available inside
+[payload transform](/docs/ingestion/payload-transforms/) queries - calling it in
+any other context produces an error.
+
+**Arguments:**
+
+- `payload()` does not require arguments.
+
+**Return value:**
+
+Returns the HTTP request body as a `VARCHAR` value.
+
+**Examples:**
+
+Typically used with `json_extract()` to parse JSON payloads:
+
+```questdb-sql title="Extract fields from a JSON payload"
+CREATE PAYLOAD TRANSFORM sensor_ingest
+INTO sensor_data
+AS SELECT
+    now() AS ts,
+    json_extract(payload(), '$.device_id')::VARCHAR AS device_id,
+    json_extract(payload(), '$.temperature')::DOUBLE AS temperature;
+```
+
+Can also be stored directly as a raw string:
+
+```questdb-sql title="Store the raw payload"
+CREATE PAYLOAD TRANSFORM raw_events
+INTO event_log
+AS SELECT
+    now() AS ts,
+    payload() AS raw_body;
+```
+
 ## query_activity
 
 **Arguments:**

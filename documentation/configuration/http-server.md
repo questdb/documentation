@@ -32,6 +32,16 @@ Enable or disable the HTTP server.
 
 Sets the clock to always return zero. Used for internal testing.
 
+### http.ingest.max.request.size
+
+- **Default**: `5M`
+- **Reloadable**: no
+
+Maximum request body size for the `/ingest` endpoint used by
+[payload transforms](/docs/ingestion/payload-transforms/). The entire request
+body is held in memory during processing. Requests exceeding this limit receive
+an HTTP 413 (Payload Too Large) response.
+
 ### http.server.keep.alive
 
 - **Default**: `true`

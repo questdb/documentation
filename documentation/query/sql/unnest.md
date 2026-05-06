@@ -164,6 +164,16 @@ JSON `UNNEST` expands a JSON array (stored as `VARCHAR`) into rows with
 explicitly typed columns. The `COLUMNS(...)` clause distinguishes JSON `UNNEST`
 from array `UNNEST`.
 
+:::tip Automate API ingestion
+
+Combine JSON UNNEST with
+[payload transforms](/docs/ingestion/payload-transforms/) to ingest data from
+external APIs directly into QuestDB - no middleware required. See the
+[Coinbase trades example](/docs/ingestion/payload-transforms/#example-coinbase-trades-with-unnest)
+for a complete walkthrough.
+
+:::
+
 ### Syntax
 
 ```questdb-sql
