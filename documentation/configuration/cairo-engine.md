@@ -768,6 +768,14 @@ CALENDAR, `false` corresponds to ALIGN TO FIRST OBSERVATION.
 SAMPLE BY index query page size (maximum values returned in a single scan).
 `0` means to use the symbol block capacity.
 
+### cairo.sql.subsample.max.rows
+
+- **Default**: `100000000`
+- **Reloadable**: no
+
+Maximum number of input rows SUBSAMPLE will buffer. Exceeding this limit
+returns an error. Must be between 1 and 2,147,483,647.
+
 ## Window functions
 
 ### cairo.sql.analytic.initial.range.buffer.size
