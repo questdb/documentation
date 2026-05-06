@@ -8,6 +8,18 @@ description:
 Sets the [time-to-live](/docs/concepts/ttl/) (TTL) period on a materialized
 view, automatically dropping partitions older than the specified duration.
 
+:::caution
+
+**QuestDB Enterprise: TTL is deprecated.** Enterprise rejects any non-zero
+`SET TTL` with
+`TTL settings are deprecated, please, create a storage policy instead`. Use
+[`ALTER MATERIALIZED VIEW SET STORAGE POLICY`](/docs/query/sql/alter-mat-view-set-storage-policy/)
+instead. `SET TTL 0` is still accepted, for clearing a pre-existing TTL before
+attaching a storage policy. See [Storage Policy](/docs/concepts/storage-policy/)
+for the Enterprise replacement.
+
+:::
+
 ## Syntax
 
 ```

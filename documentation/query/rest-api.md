@@ -114,7 +114,7 @@ The `/exec` entrypoint takes a SQL query and returns results as JSON.
 
 We can use this for quick SQL inserts too, but note that there's no support for
 parameterized queries that are necessary to avoid SQL injection issues. Prefer
-[InfluxDB Line Protocol](/docs/configuration/overview/#influxdb-line-protocol-ilp) if you
+[InfluxDB Line Protocol](/docs/configuration/ingestion/) if you
 need high-performance inserts.
 
 <Tabs defaultValue="curl" values={[
@@ -164,7 +164,7 @@ non-representative of the rest of the data, automatic imports can yield errors.
 If the data follows a uniform pattern, the number of lines which are analyzed
 for schema detection can be reduced to improve performance during uploads using
 the `http.text.analysis.max.lines` key. Usage of this setting is described in
-the [HTTP server configuration](/docs/configuration/overview/#http-server) documentation.
+the [HTTP server configuration](/docs/configuration/http-server/) documentation.
 
 :::
 

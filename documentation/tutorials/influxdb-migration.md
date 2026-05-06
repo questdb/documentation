@@ -250,7 +250,7 @@ Now that you know the basics of InfluxDB Line Protocol, you may want to dig
 deeper into customization options for ILP or HTTP, learn more about the
 protocol, or compare QuestDB with Influx:
 
-- [ILP `server.conf` configuration](/docs/configuration/overview/#influxdb-line-protocol-ilp)
+- [ILP `server.conf` configuration](/docs/configuration/ingestion/)
 - [ILP API Overview](/docs/ingestion/ilp/overview/)
 - [Comparing TimescaleDB and QuestDB performance and architecture blog](/blog/timescaledb-vs-questdb-comparison/)
 - [Deep dive of QuestDB vs InfluxDB internals](/blog/2024/02/26/questdb-versus-influxdb/)

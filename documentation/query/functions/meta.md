@@ -323,6 +323,59 @@ Edit `server.conf` and run `reload_config`:
 SELECT reload_config();
 ```
 
+## storage_policies
+
+:::note
+
+Storage policies — and the `storage_policies` view — are available in
+**QuestDB Enterprise** only.
+
+:::
+
+`storage_policies` is a system view that lists every
+[storage policy](/docs/concepts/storage-policy/) currently attached to a table
+or materialized view. Query it like any other table:
+
+```questdb-sql
+SELECT * FROM storage_policies;
+```
+
+**Columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
+| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
+| `drop_native` | _STRING_ | TTL for the `DROP NATIVE` stage. Blank when the stage is not configured. |
+| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
+| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
+| `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
+| `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
+
+**Notes on TTL formatting:**
+
+- TTL values are rendered in just two units: `h` for hours and `m` for
+  **months**. Durations written in the DDL as days, weeks, or years are
+  normalized to hours when stored (e.g., `3 DAYS` → `72h`, `1 WEEK` →
+  `168h`). Month-based durations are stored and rendered with the lowercase
+  `m` suffix — despite the visual collision with "minute", `m` in this view
+  is **months**, and QuestDB's duration shorthand has no unit for minutes.
+
+**Example:**
+
+```questdb-sql title="List all storage policies"
+SELECT * FROM storage_policies;
+```
+
+| table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
+|----------------|------------|-------------|------------|-------------|--------|--------------|
+| trades~12      | 72h        | 240h        | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
+
+The first row is a policy with three active stages (3-day Parquet conversion,
+10-day native drop, 1-month local drop) and is currently enforced. The second
+row has only the `TO PARQUET` stage set and has been temporarily disabled.
+
 ## table_columns
 
 `table_columns('tableName')` returns the schema of a table or a materialized
@@ -423,6 +476,19 @@ Returns a table with the following columns:
   partition will contain the `.detached` extension)
 - `attachable` - _BOOLEAN_, true if the partition is detached and can be
   attached (`name` of the partition will contain the `.attachable` extension)
+- `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
+  has been produced alongside the native files. Set by either
+  [manual Parquet conversion](/docs/query/export-parquet/#in-place-conversion)
+  (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
+  [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
+  (Enterprise). The partition is still served from native storage until it is
+  switched to Parquet-only format
+- `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format
+  (native files have been replaced). Set the same way as
+  `hasParquetGenerated` — either manually or by a storage policy's `DROP
+  NATIVE` stage
+- `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
+  file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
 
 **Examples:**
 
@@ -441,12 +507,12 @@ CREATE TABLE my_table AS (
 table_partitions('my_table');
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
 
 ```questdb-sql title="Get size of a table in disk"
 SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
@@ -460,9 +526,9 @@ SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
 SELECT * FROM table_partitions('my_table') WHERE active = true;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
 
 ## table_storage
 

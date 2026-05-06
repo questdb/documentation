@@ -53,6 +53,14 @@ compilation and SIMD optimizations are limited on ARM. Use `x86_64` instances.
 
 ### Storage
 
+:::caution
+
+Be extremely cautious when enabling [Disk Caching](https://learn.microsoft.com/en-us/azure/virtual-machines/premium-storage-performance#disk-caching). You should not use `ReadWrite` caching for the database files under any circumstances, as it breaks the consistency guarantess that the database relies on. Microsoft explicitly discourages its use for [database deployments](https://learn.microsoft.com/en-us/azure/azure-sql/virtual-machines/windows/storage-configuration?view=azuresql&utm_source=chatgpt.com&tabs=windows2016#new-vms).
+
+Failing to follow this instruction may put your data at risk of corruption,
+
+:::
+
 **Premium SSD v2 (recommended):**
 
 | Workload | Size | IOPS | Throughput |

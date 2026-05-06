@@ -369,7 +369,7 @@ ORDER BY symbol, level;
   extracted from JSON are limited to 4096 bytes per field by default. If your
   JSON contains large string fields (log messages, descriptions, etc.), increase
   the
-  [`cairo.json.unnest.max.value.size`](/docs/configuration/overview/#cairo-engine)
+  [`cairo.json.unnest.max.value.size`](/docs/configuration/cairo-engine/)
   server property. Each VARCHAR/TIMESTAMP column allocates
   `2 x maxValueSize` bytes of native memory per active UNNEST cursor, so
   increase with care.

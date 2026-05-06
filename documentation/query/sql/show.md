@@ -113,6 +113,29 @@ CREATE TABLE sensors (
 ) timestamp(ts) PARTITION BY DAY BYPASS WAL;
 ```
 
+#### Storage policy clause
+
+When a [storage policy](/docs/concepts/storage-policy/) is attached to a table
+(Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in the
+`SHOW CREATE TABLE` output:
+
+```questdb-sql
+SHOW CREATE TABLE sensor_data;
+```
+
+```text
+CREATE TABLE 'sensor_data' (
+    ts TIMESTAMP,
+    value DOUBLE
+) timestamp(ts) PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+```
+
+Stages that are not configured on the policy are omitted from the clause. A
+disabled policy (`ALTER TABLE ... DISABLE STORAGE POLICY`) still renders — the
+disabled state is not part of the DDL. See
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
 #### Enterprise variant
 
 [QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
@@ -251,12 +274,16 @@ Returns partition information for the selected table.
 SHOW PARTITIONS FROM my_table;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+
+See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
+full column list, including `hasParquetGenerated`, `isParquet`, and
+`parquetFileSize`.
 
 ## SHOW PAYLOAD TRANSFORMS
 
