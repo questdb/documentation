@@ -10,6 +10,7 @@ jobs:
   gitleaks:
     runs-on: ubuntu-latest
     env:
+      HAS_GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE != '' }}
       # Hoisted to job-level env because the `secrets` context is not
       # available in step-level `if` expressions; `env` is.
       GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
@@ -17,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
-        if: ${{ env.GITLEAKS_LICENSE != '' }}
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        if: ${{ env.HAS_GITLEAKS_LICENSE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
