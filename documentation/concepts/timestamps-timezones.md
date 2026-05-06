@@ -59,11 +59,11 @@ TICK converts your local time to UTC intervals, enabling efficient
 ```questdb-sql
 -- London business hours (09:00-17:00) for January workdays
 SELECT * FROM trades
-WHERE ts IN '2024-01-[01..31]T09:00@Europe/London#wd;8h';
+WHERE ts IN '[2024-01]T09:00@Europe/London#wd;8h';
 
 -- NYSE trading hours (09:30-16:00 Eastern)
 SELECT * FROM trades
-WHERE ts IN '2024-01-[01..31]T09:30@America/New_York#wd;6h30m';
+WHERE ts IN '[2024-01]T09:30@America/New_York#wd;6h30m';
 
 -- Last 5 business days, Tokyo morning session
 SELECT * FROM trades
@@ -80,7 +80,7 @@ Converting each row forces a full table scan:
 
 ```questdb-sql
 -- Efficient: interval scan (sub-millisecond on billions of rows)
-WHERE ts IN '2024-01-[01..31]T09:00@Europe/London;8h'
+WHERE ts IN '[2024-01]T09:00@Europe/London;8h'
 
 -- Inefficient: full table scan (must read every row)
 WHERE extract(hour FROM to_timezone(ts, 'Europe/London')) BETWEEN 9 AND 17
