@@ -78,37 +78,37 @@ transient join conditions where necessary.
 
 Join operations are performed in order of their appearance in a SQL query. The
 following query performs a join on a table with a very small table (just one row
-in this example) and a bigger table with 10 million rows:
+in this example) and a bigger table with 1 million rows:
 
-```questdb-sql
+```questdb-sql demo title="Small table first (slower)"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 10000000),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -1000000),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM Lookup
-INNER JOIN ManyTrades
-  ON Lookup.symbol = Manytrades.symbol;
+FROM lookup
+INNER JOIN many_trades
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 The performance of this query can be improved by rewriting the query as follows:
 
-```questdb-sql
+```questdb-sql demo title="Large table first (faster)"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 10000000),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -1000000),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-INNER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+INNER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 As a general rule, whenever you have a table significantly larger than the
 other, try to use the large one first. If you use `EXPLAIN` with the queries
-above, you should see the first version needs to Hash over 10 million rows,
+above, you should see the first version needs to Hash over 1 million rows,
 while the second version needs to Hash only over 1 row.
 
 ## Implicit joins
@@ -170,7 +170,7 @@ and `side`:
 
 It is possible to add multiple JOIN ON condition:
 
-```questdb-sql
+```questdb-sql demo title="Multiple JOIN ON conditions"
 WITH
   mayTrades AS (
     SELECT symbol, side, COUNT(*) as total
@@ -186,16 +186,18 @@ WITH
     ORDER BY Symbol
     LIMIT 4
   )
-SELECT *
+SELECT mayTrades.symbol, juneTrades.symbol,
+    mayTrades.side, juneTrades.side,
+    mayTrades.total, juneTrades.total
 FROM mayTrades
-JOIN JuneTrades
+JOIN juneTrades
   ON mayTrades.symbol = juneTrades.symbol
     AND mayTrades.side = juneTrades.side;
 ```
 
 The query can be simplified further since the column names are identical:
 
-```questdb-sql
+```questdb-sql demo title="Shorthand ON with matching column names"
 WITH
   mayTrades AS (
     SELECT symbol, side, COUNT(*) as total
@@ -211,21 +213,23 @@ WITH
     ORDER BY Symbol
     LIMIT 4
   )
-SELECT *
+SELECT mayTrades.symbol, juneTrades.symbol,
+    mayTrades.side, juneTrades.side,
+    mayTrades.total, juneTrades.total
 FROM mayTrades
-JOIN JuneTrades ON (symbol, side);
+JOIN juneTrades ON (symbol, side);
 ```
 
 The result of both queries is the following:
 
 <div className="table-alternate">
 
-| symbol  | symbol1 | side | side1 | total  | total1 |
-| ------- | ------- | ---- | ----- | ------ | ------ |
-| ADA-BTC | ADA-BTC | buy  | buy   | 8079   | 10253  |
-| ADA-BTC | ADA-BTC | sell | sell  | 7678   | 17460  |
-| ADA-USD | ADA-USD | buy  | buy   | 308271 | 312359 |
-| ADA-USD | ADA-USD | sell | sell  | 279624 | 245066 |
+| symbol  | symbol_2 | side | side_2 | total  | total_2 |
+| ------- | -------- | ---- | ------ | ------ | ------- |
+| ADA-BTC | ADA-BTC  | buy  | buy    | 8079   | 10253   |
+| ADA-BTC | ADA-BTC  | sell | sell   | 7678   | 17460   |
+| ADA-USD | ADA-USD  | buy  | buy    | 308271 | 312359  |
+| ADA-USD | ADA-USD  | sell | sell   | 279624 | 245066  |
 
 </div>
 
@@ -250,53 +254,51 @@ for the right table, it returns `NULL` values in right table fields.
 
 The general syntax is as follows:
 
-```questdb-sql title="LEFT JOIN ON"
+```questdb-sql demo title="LEFT JOIN ON"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT OUTER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+LEFT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 In this example, the result will have 100 rows, one for each row on the
-`ManyTrades` subquery. When there is no match with the `Lookup` subquery, the
-columns `Symbol1` and `Description` will be `null`.
+`many_trades` subquery. When there is no match with the `lookup` subquery, the
+columns `symbol_2` and `description` will be `null`.
 
-```sql
--- Omitting 'OUTER' makes no difference:
+```questdb-sql demo title="Omitting OUTER makes no difference"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+LEFT JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 A `LEFT OUTER JOIN` query can also be used to select all rows in the left table
 that do not exist in the right table.
 
-```questdb-sql
+```questdb-sql demo title="LEFT JOIN to find non-matching rows"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT OUTER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol
-WHERE Lookup.Symbol = NULL;
+FROM many_trades
+LEFT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol
+WHERE lookup.symbol = NULL;
 ```
 
-In this case, the result has 71 rows out of the 100 in the larger table, and the
-columns corresponding to the `Lookup` table are all `NULL`.
+In this case, the columns corresponding to the `lookup` table are all `NULL`.
 
 ### RIGHT (OUTER) JOIN
 
@@ -305,16 +307,16 @@ returns **all** records from the right table, and if matched, the records
 from the left table. When there is no match for the left table, it returns
 `NULL` values in left table fields.
 
-```questdb-sql title="RIGHT JOIN ON"
+```questdb-sql demo title="RIGHT JOIN ON"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT 'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-RIGHT OUTER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+RIGHT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 Any `RIGHT JOIN` can be rewritten as a `LEFT JOIN` by swapping the order of
@@ -330,25 +332,25 @@ restructuring the chain or wrapping it in a subquery.
 are combined into one row, while unmatched rows from either side appear
 with `NULL` in the columns of the other table.
 
-```questdb-sql title="FULL JOIN ON"
+```questdb-sql demo title="FULL JOIN ON"
 WITH
-  mayTrades AS (
+  may_trades AS (
     SELECT symbol, COUNT(*) AS may_total
     FROM trades
     WHERE timestamp IN '2024-05'
   ),
-  juneTrades AS (
+  june_trades AS (
     SELECT symbol, COUNT(*) AS june_total
     FROM trades
     WHERE timestamp IN '2024-06'
   )
 SELECT
-  COALESCE(mayTrades.symbol, juneTrades.symbol) AS symbol,
+  COALESCE(may_trades.symbol, june_trades.symbol) AS symbol,
   may_total,
   june_total
-FROM mayTrades
-FULL OUTER JOIN juneTrades
-  ON mayTrades.symbol = juneTrades.symbol;
+FROM may_trades
+FULL OUTER JOIN june_trades
+  ON may_trades.symbol = june_trades.symbol;
 ```
 
 Symbols traded in only one of the two months get `NULL` for the other
@@ -365,16 +367,13 @@ compare row by row if we have any rows with exactly the same values for all the
 columns except the timestamp, and if the timestamps are within 10 seconds from
 each other:
 
-```questdb-sql
--- detect potential duplicates, with same values
--- and within a 10 seconds range
-
+```questdb-sql demo title="Detect potential duplicate trades"
 WITH t AS (
-  SELECT * FROM trades WHERE timestamp IN '2024-06-01'
+  SELECT * FROM trades LIMIT -10000
 )
-SELECT * from t CROSS JOIN t AS t2
+SELECT * FROM t CROSS JOIN t AS t2
 WHERE t.timestamp < t2.timestamp
-  AND datediff('s', t.timestamp , t2.timestamp ) < 10
+  AND datediff('s', t.timestamp, t2.timestamp) < 10
   AND t.symbol = t2.symbol
   AND t.side = t2.side
   AND t.price = t2.price
