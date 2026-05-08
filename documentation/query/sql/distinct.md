@@ -16,23 +16,25 @@ FROM tableName;
 
 ## Examples
 
-The following query will return a list of all unique ratings in the table.
+The following query returns every unique symbol traded in the last hour.
 
-```questdb-sql title="Simple query"
-SELECT DISTINCT movieId
-FROM ratings;
+```questdb-sql demo title="Distinct symbols"
+SELECT DISTINCT symbol
+FROM fx_trades
+WHERE timestamp IN '$now - 1h..$now';
 ```
 
-SELECT DISTINCT can be used in conjunction with more advanced queries and
-filters.
+`SELECT DISTINCT` can be used with aggregation functions and filters.
 
-```questdb-sql title="With aggregate"
-SELECT DISTINCT movieId, count()
-FROM ratings;
+```questdb-sql demo title="With aggregate"
+SELECT DISTINCT symbol, count()
+FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-```questdb-sql title="With filter"
-SELECT DISTINCT movieId, count()
-FROM ratings
-WHERE score > 3;
+```questdb-sql demo title="With filter"
+SELECT DISTINCT symbol, side, count()
+FROM fx_trades
+WHERE timestamp IN '$today'
+  AND price > 1;
 ```
