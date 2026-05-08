@@ -9,9 +9,10 @@ and evaluated from a table.
 
 :::tip
 
-Looking for SELECT best practices? Checkout our
-[**Maximize your SQL efficiency: SELECT best practices**](/blog/2024/03/11/sql-select-statement-best-practices/)
-blog.
+For realistic queries solving specific use cases, see the
+[**Cookbook**](/docs/cookbook/). For SELECT best practices, check out our
+[**SQL SELECT best practices**](/blog/2024/03/11/sql-select-statement-best-practices/)
+blog post.
 
 :::
 
