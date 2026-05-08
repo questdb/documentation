@@ -44,26 +44,26 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | Function | Description | Respects Frame |
 |----------|-------------|----------------|
 | [`avg()`](reference.md#avg) | Average value in window (also supports EMA and VWEMA) | Yes (standard) / No (EMA/VWEMA) |
-| [`count()`](reference.md#count) | Count rows or non-null values | Yes |
-| [`sum()`](reference.md#sum) | Sum of values in window | Yes |
-| [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Yes |
-| [`min()`](reference.md#min) | Minimum value in window | Yes |
-| [`max()`](reference.md#max) | Maximum value in window | Yes |
-| [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Yes |
-| [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Yes |
-| [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Yes |
 | [`corr()`](reference.md#corr) | Pearson correlation coefficient | Yes |
-| [`first_value()`](reference.md#first_value) | First value in window | Yes |
-| [`last_value()`](reference.md#last_value) | Last value in window | Yes |
-| [`nth_value()`](reference.md#nth_value) | N-th value in window (`double` only) | Yes |
-| [`row_number()`](reference.md#row_number) | Sequential row number | No |
-| [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
-| [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
-| [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
+| [`count()`](reference.md#count) | Count rows or non-null values | Yes |
+| [`covar_pop()` / `covar_samp()`](reference.md#covariance) | Covariance between two columns | Yes |
 | [`cume_dist()`](reference.md#cume_dist) | Cumulative distribution (0 to 1] | No |
-| [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
+| [`dense_rank()`](reference.md#dense_rank) | Rank without gaps | No |
+| [`first_value()`](reference.md#first_value) | First value in window | Yes |
+| [`ksum()`](reference.md#ksum) | Sum with Kahan precision | Yes |
 | [`lag()`](reference.md#lag) | Value from previous row | No |
+| [`last_value()`](reference.md#last_value) | Last value in window | Yes |
 | [`lead()`](reference.md#lead) | Value from following row | No |
+| [`max()`](reference.md#max) | Maximum value in window | Yes |
+| [`min()`](reference.md#min) | Minimum value in window | Yes |
+| [`nth_value()`](reference.md#nth_value) | N-th value in window (`double` only) | Yes |
+| [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
+| [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
+| [`rank()`](reference.md#rank) | Rank with gaps for ties | No |
+| [`row_number()`](reference.md#row_number) | Sequential row number | No |
+| [`stddev_pop()` / `stddev_samp()` / `stddev()`](reference.md#stddev) | Standard deviation (population or sample) | Yes |
+| [`sum()`](reference.md#sum) | Sum of values in window | Yes |
+| [`var_pop()` / `var_samp()` / `variance()`](reference.md#variance) | Variance (population or sample) | Yes |
 
 **Respects Frame**: Functions marked "Yes" use the frame clause (`ROWS`/`RANGE BETWEEN`). Functions marked "No" operate on the entire partition regardless of frame specification.
 
