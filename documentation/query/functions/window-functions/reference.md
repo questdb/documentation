@@ -29,12 +29,12 @@ avg(value, kind, param, volume) OVER (window_definition)
 
 **Arguments:**
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`) to calculate the average of
-- `kind` (EMA/VWEMA): Smoothing mode - `'alpha'`, `'period'`, or a time unit (`'second'`, `'minute'`, `'hour'`, `'day'`, `'week'`)
+- `kind` (EMA/VWEMA): Smoothing mode. One of `'alpha'`, `'period'`, or a time unit (`'second'`, `'minute'`, `'hour'`, `'day'`, `'week'`)
 - `param` (EMA/VWEMA): Parameter for the smoothing mode (see below)
 - `volume` (VWEMA only): Numeric column representing volume weights
 
 **Return value:**
-- `double` - The average of `value` for rows in the window frame
+- `double`. The average of `value` for rows in the window frame
 
 **Description:**
 
@@ -59,7 +59,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS moving_avg
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 #### Exponential Moving Average (EMA)
@@ -88,7 +88,7 @@ SELECT
         ORDER BY timestamp
     ) AS ema_alpha
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="10-period EMA" demo
@@ -101,7 +101,7 @@ SELECT
         ORDER BY timestamp
     ) AS ema_10
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Time-weighted EMA with 5-minute decay" demo
@@ -114,7 +114,7 @@ SELECT
         ORDER BY timestamp
     ) AS ema_5min
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 :::note EMA behavior
@@ -148,7 +148,7 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_alpha
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="10-period VWEMA" demo
@@ -161,7 +161,7 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_10
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Time-weighted VWEMA with 1-hour decay" demo
@@ -174,7 +174,7 @@ SELECT
         ORDER BY timestamp
     ) AS vwema_1h
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 :::note VWEMA behavior
@@ -195,13 +195,13 @@ corr(y, x) OVER (window_definition)
 ```
 
 **Arguments:**
-- `y`: Numeric column - the dependent variable
-- `x`: Numeric column - the independent variable
+- `y`: Numeric column, the dependent variable
+- `x`: Numeric column, the independent variable
 
 Rows where either `x` or `y` is `NULL` are excluded from the computation.
 
 **Return value:**
-- `double` - The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
+- `double`. The Pearson correlation coefficient. Returns `NULL` when there are fewer than 2 valid pairs, or when either variable has zero variance (all values identical).
 
 **Description:**
 
@@ -254,7 +254,7 @@ count(value) OVER (window_definition)
 - `value`: Counts non-null values only
 
 **Return value:**
-- `long` - Number of rows or non-null values in the window frame
+- `long`. Number of rows or non-null values in the window frame
 
 **Description:**
 
@@ -276,7 +276,7 @@ SELECT
         RANGE BETWEEN '1' SECOND PRECEDING AND CURRENT ROW
     ) AS trades_last_second
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -292,13 +292,13 @@ covar_samp(y, x) OVER (window_definition)
 ```
 
 **Arguments:**
-- `y`: Numeric column - the dependent variable
-- `x`: Numeric column - the independent variable
+- `y`: Numeric column, the dependent variable
+- `x`: Numeric column, the independent variable
 
 Rows where either `x` or `y` is `NULL` are excluded from the computation.
 
 **Return value:**
-- `double` - The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
+- `double`. The covariance of `y` and `x` for rows in the window frame. Returns `NULL` when there are fewer than 1 (pop) or 2 (samp) valid pairs.
 
 **Description:**
 
@@ -341,7 +341,7 @@ OVER ([PARTITION BY partition_expression]
 - `RESPECT NULLS` (default): Include null values
 
 **Return value:**
-- Same type as input - The first value in the window frame (or first non-null with `IGNORE NULLS`)
+- Same type as input. The first value in the window frame (or first non-null with `IGNORE NULLS`)
 
 **Description:**
 
@@ -367,7 +367,7 @@ SELECT
         ORDER BY timestamp
     ) AS first_non_null_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -385,7 +385,7 @@ ksum(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`) to sum
 
 **Return value:**
-- `double` - The sum of `value` for rows in the window frame with improved precision
+- `double`. The sum of `value` for rows in the window frame with improved precision
 
 **Description:**
 
@@ -410,7 +410,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS cumulative_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Sliding window sum with precision" demo
@@ -423,7 +423,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS rolling_sum
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -446,7 +446,7 @@ OVER ([PARTITION BY partition_expression]
 - `RESPECT NULLS` (default): Include null values
 
 **Return value:**
-- Same type as input - The last value in the window frame (or last non-null with `IGNORE NULLS`)
+- Same type as input. The last value in the window frame (or last non-null with `IGNORE NULLS`)
 
 **Description:**
 
@@ -476,7 +476,7 @@ SELECT
         ORDER BY timestamp
     ) AS last_non_null_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -499,7 +499,7 @@ max(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- Same type as input - The maximum value (excluding null) in the window frame
+- Same type as input. The maximum value (excluding null) in the window frame
 
 **Description:**
 
@@ -522,7 +522,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS highest_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -540,7 +540,7 @@ min(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- Same type as input - The minimum value (excluding null) in the window frame
+- Same type as input. The minimum value (excluding null) in the window frame
 
 **Description:**
 
@@ -563,7 +563,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS lowest_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -579,14 +579,14 @@ nth_value(value, n) OVER (window_definition)
 
 **Arguments:**
 - `value`: `double` column or expression to retrieve
-- `n`: Positive integer constant — the 1-based position within the frame
+- `n`: Positive integer constant, the 1-based position within the frame
 
 **Return value:**
-- `double` — The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
+- `double`. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
 
 **Description:**
 
-`nth_value()` respects the frame clause: for each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
+`nth_value()` is similar to `lag()`, but while `lag()` counts the offset relative to the current row, `nth_value()` counts from the start of the frame. For each row, it looks at the rows currently in the frame and returns the `n`-th one. When the frame is smaller than `n` (e.g. `n = 3` but only 2 rows are in scope), the result is `NULL`.
 
 Common use cases include:
 
@@ -598,8 +598,6 @@ Common use cases include:
 - `n` must be a compile-time constant. A non-constant expression for `n` is rejected at parse time
 - `n = 1` returns the same value as `first_value(value)` for the same frame
 - `IGNORE NULLS` / `RESPECT NULLS` are not supported
-- `FROM FIRST` / `FROM LAST` are not supported
-- Currently only the `double` overload is available; `LONG` and `TIMESTAMP` arguments are not yet supported
 - Supports both `ROWS` and `RANGE` frames, bounded and unbounded
 - For `RANGE` frames, the query must be ordered by the designated timestamp
 
@@ -612,10 +610,10 @@ SELECT
     nth_value(price, 3) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
-        ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+        ROWS 4 PRECEDING
     ) AS third_price
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Compare nth_value with first_value" demo
@@ -628,11 +626,11 @@ SELECT
     nth_value(price, 2) OVER w AS nth_2,
     nth_value(price, 3) OVER w AS nth_3
 FROM trades
-WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
-WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW);
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS 2 PRECEDING);
 ```
 
-For the first row of the partition, `nth_2` and `nth_3` return `NULL` because the frame contains only one row. For the second row, `nth_3` is still `NULL`. From the third row onward all positions are populated.
+With a 3-row frame, `nth_3` always equals the current row's `price` because it is the last position in the frame. `nth_1` and `nth_2` return `NULL` until the frame has enough rows to fill those positions.
 
 ---
 
@@ -651,7 +649,7 @@ stddev(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The standard deviation of `value` for rows in the window frame. Returns `NULL` when there are no values (or no non-null values). `stddev_samp()` and `stddev()` also return `NULL` when there is only one value (since N-1 = 0).
+- `double`. The standard deviation of `value` for rows in the window frame. Returns `NULL` when there are no values (or no non-null values). `stddev_samp()` and `stddev()` also return `NULL` when there is only one value (since N-1 = 0).
 
 **Description:**
 
@@ -680,7 +678,7 @@ SELECT
         ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
     ) AS volatility_20
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Z-score via subquery"
@@ -710,7 +708,7 @@ sum(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The sum of `value` for rows in the window frame
+- `double`. The sum of `value` for rows in the window frame
 
 **Description:**
 
@@ -733,7 +731,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS cumulative_amount
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -753,7 +751,7 @@ variance(value) OVER (window_definition)
 - `value`: Numeric column (`short`, `int`, `long`, `float`, `double`)
 
 **Return value:**
-- `double` - The variance of `value` for rows in the window frame. Returns `NULL` when there are no values. `var_samp()` and `variance()` also return `NULL` for a single value.
+- `double`. The variance of `value` for rows in the window frame. Returns `NULL` when there are no values. `var_samp()` and `variance()` also return `NULL` for a single value.
 
 **Description:**
 
@@ -775,7 +773,7 @@ SELECT
         ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
     ) AS price_variance
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -797,7 +795,7 @@ cume_dist() OVER (window_definition)
 - None required
 
 **Return value:**
-- `double` — The cumulative distribution value for the current row's peer group
+- `double`. The cumulative distribution value for the current row's peer group
 
 **Description:**
 
@@ -812,8 +810,7 @@ Use `cume_dist()` to express thresholds in terms of how much of the partition ha
 **Behavior:**
 - Without `ORDER BY`, all rows are peers and `cume_dist` is `1.0` for every row
 - The last peer group in a partition always evaluates to `1.0`
-- Framing (`ROWS` / `RANGE` / `GROUPS`) is rejected — `cume_dist` is always partition-scoped
-- `EXCLUDE` is not supported
+- `ROWS`, `RANGE`, and `EXCLUDE` are rejected. `cume_dist` is always partition-scoped
 
 **Example:**
 ```questdb-sql title="Cumulative distribution by price" demo
@@ -826,8 +823,11 @@ SELECT
         ORDER BY price
     ) AS price_cdf
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
+ORDER BY price DESC;
 ```
+
+The highest prices appear first with `price_cdf = 1.0`, meaning 100% of trades are at or below that price. As you scroll down, the value decreases, showing what fraction of the partition each price level covers.
 
 ```questdb-sql title="cume_dist with peer rows"
 SELECT ts, val,
@@ -837,11 +837,11 @@ FROM tab;
 
 | ts | val | cd |
 |----|-----|-----|
-| 1970-01-01T00:00:00.000001Z | 1 | 0.4 |
-| 1970-01-01T00:00:00.000002Z | 1 | 0.4 |
-| 1970-01-01T00:00:00.000003Z | 2 | 0.8 |
-| 1970-01-01T00:00:00.000004Z | 2 | 0.8 |
-| 1970-01-01T00:00:00.000005Z | 3 | 1.0 |
+| 2026-05-08T09:30:00.000000Z | 1 | 0.4 |
+| 2026-05-08T09:30:01.000000Z | 1 | 0.4 |
+| 2026-05-08T09:30:02.000000Z | 2 | 0.8 |
+| 2026-05-08T09:30:03.000000Z | 2 | 0.8 |
+| 2026-05-08T09:30:04.000000Z | 3 | 1.0 |
 
 The two rows with `val = 1` are peers, so they share `cume_dist = 2 / 5 = 0.4`. Likewise the rows with `val = 2` share `cume_dist = 4 / 5 = 0.8`.
 
@@ -884,7 +884,7 @@ SELECT
         ORDER BY price DESC
     ) AS price_rank
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -899,10 +899,10 @@ ntile(n) OVER (window_definition)
 ```
 
 **Arguments:**
-- `n`: Positive integer constant — the number of buckets
+- `n`: Positive integer constant, the number of buckets
 
 **Return value:**
-- `long` — Bucket number from `1` to `n`
+- `long`. Bucket number from `1` to `n`
 
 **Description:**
 
@@ -919,8 +919,7 @@ Use `ntile()` to build distribution-based groupings. Common use cases include:
 - `n` must be a positive integer; `0`, negative values, or `NULL` are rejected
 - Without `ORDER BY`, rows are bucketed in table-scan order
 - When `n` exceeds the partition row count, each row gets its own bucket (numbered `1` through row count) and the higher bucket numbers are unused
-- Framing (`ROWS` / `RANGE` / `GROUPS`) is rejected — `ntile` is always partition-scoped
-- `EXCLUDE` is not supported
+- `ROWS`, `RANGE`, and `EXCLUDE` are rejected. `ntile` is always partition-scoped
 
 **Example:**
 ```questdb-sql title="Quartiles per symbol" demo
@@ -933,7 +932,7 @@ SELECT
         ORDER BY price
     ) AS price_quartile
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="ntile with uneven distribution"
@@ -944,11 +943,11 @@ FROM tab;
 
 | ts | val | bucket |
 |----|-----|--------|
-| 1970-01-01T00:00:00.000001Z | 10.0 | 1 |
-| 1970-01-01T00:00:00.000002Z | 20.0 | 1 |
-| 1970-01-01T00:00:00.000003Z | 30.0 | 2 |
-| 1970-01-01T00:00:00.000004Z | 40.0 | 2 |
-| 1970-01-01T00:00:00.000005Z | 50.0 | 3 |
+| 2026-05-08T09:30:00.000000Z | 10.0 | 1 |
+| 2026-05-08T09:30:01.000000Z | 20.0 | 1 |
+| 2026-05-08T09:30:02.000000Z | 30.0 | 2 |
+| 2026-05-08T09:30:03.000000Z | 40.0 | 2 |
+| 2026-05-08T09:30:04.000000Z | 50.0 | 3 |
 
 With 5 rows and `n = 3`, the leading buckets (1 and 2) get an extra row each.
 
@@ -1001,7 +1000,7 @@ SELECT
         ORDER BY price DESC
     ) AS price_percentile
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ```questdb-sql title="Compare rank functions" demo
@@ -1012,7 +1011,7 @@ SELECT
     rank() OVER (ORDER BY price DESC) AS rank,
     percent_rank() OVER (ORDER BY price DESC) AS percent_rank
 FROM trades
-WHERE timestamp IN '[$today]'
+WHERE timestamp IN '$today'
     AND symbol = 'BTC-USDT';
 ```
 
@@ -1065,7 +1064,7 @@ SELECT
         ORDER BY price DESC
     ) AS price_rank
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -1107,7 +1106,7 @@ SELECT
         ORDER BY timestamp
     ) AS trade_number
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ---
@@ -1154,7 +1153,7 @@ OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
 - `RESPECT NULLS` (default): Include null values in offset counting
 
 **Return value:**
-- Same type as input - Value from the specified previous row
+- Same type as input. Value from the specified previous row
 
 **Description:**
 
@@ -1184,7 +1183,7 @@ SELECT
         ORDER BY timestamp
     ) AS price_two_rows_back
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -1212,7 +1211,7 @@ OVER ([PARTITION BY partition_expression] [ORDER BY sort_expression])
 - `RESPECT NULLS` (default): Include null values in offset counting
 
 **Return value:**
-- Same type as input - Value from the specified following row
+- Same type as input. Value from the specified following row
 
 **Description:**
 
@@ -1242,7 +1241,7 @@ SELECT
         ORDER BY timestamp
     ) AS price_after_next
 FROM trades
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 This example:
@@ -1268,7 +1267,7 @@ SELECT
         ROWS BETWEEN 3 PRECEDING AND CURRENT ROW
     ) AS bid_moving_avg
 FROM market_data
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ### Cumulative bid size
@@ -1286,7 +1285,7 @@ SELECT
         ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
     ) AS bid_volume_l1_5rows
 FROM market_data
-WHERE timestamp IN '[$today]';
+WHERE timestamp IN '$today';
 ```
 
 ### Time-based rolling sum
@@ -1302,7 +1301,7 @@ SELECT
         RANGE BETWEEN '1' MINUTE PRECEDING AND CURRENT ROW
     ) AS bid_volume_1min
 FROM market_data
-WHERE timestamp IN '[$today]' AND symbol = 'GBPUSD';
+WHERE timestamp IN '$today' AND symbol = 'GBPUSD';
 ```
 
 ### Trade frequency analysis
@@ -1317,7 +1316,7 @@ SELECT
     COUNT(CASE WHEN side = 'buy' THEN 1 END) OVER w AS buys_per_minute,
     COUNT(CASE WHEN side = 'sell' THEN 1 END) OVER w AS sells_per_minute
 FROM trades
-WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WHERE timestamp IN '$today' AND symbol = 'BTC-USDT'
 WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW);
 ```
 
@@ -1329,4 +1328,3 @@ WINDOW w AS (ORDER BY timestamp RANGE BETWEEN 60000000 PRECEDING AND CURRENT ROW
 - Ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`) and offset functions (`lag`, `lead`) ignore frame specifications.
 - For time-based calculations, consider using `RANGE` frames with timestamp columns.
 - Aggregate window functions (`avg`, `sum`, `ksum`, `count`, `min`, `max`) support numeric types: `short`, `int`, `long`, `float`, `double`. The `decimal` type is not supported.
-- `nth_value()` currently accepts only a `double` first argument; `LONG` and `TIMESTAMP` overloads are not yet available.
