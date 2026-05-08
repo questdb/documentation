@@ -230,7 +230,7 @@ ALIGN TO CALENDAR TIME ZONE 'Europe/Berlin';
 Here, `FROM '2026-01-01T00:00:00'` means midnight January 1st in Berlin local time
 (= `2025-12-31T23:00:00Z` UTC).
 
-`FROM-TO` works with both non-keyed and keyed `SAMPLE BY` queries. Keyed queries emit one row per (bucket, key) combination across the full interval. Keyed `FROM-TO` requires `FROM`/`TO` to be constants; bind variables, function calls, or arithmetic expressions are rejected with _FROM-TO intervals are not supported for keyed SAMPLE BY queries_.
+`FROM-TO` works with both non-keyed and keyed `SAMPLE BY` queries. Keyed queries emit one row per (bucket, key) combination across the full interval.
 
 ### `WHERE` clause optimisation
 
