@@ -21,12 +21,12 @@ This page tracks significant updates to the QuestDB documentation.
 - [PIVOT](/docs/query/sql/pivot/) - Fixed examples to use demo server data
 - [Array functions](/docs/query/functions/array/) - Improved page with demo examples
 - [TICK syntax](/docs/query/operators/tick/) - Documented imprecise date support
-- [Configuration reference](/docs/configuration/) - Revamped into 17 dedicated per-subsystem pages with epigraph-style property listings
+- [Configuration reference](/docs/configuration/overview/) - Revamped into 17 dedicated per-subsystem pages with epigraph-style property listings
 
 ### New
 
 - [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
-- [Table/column versioning](/docs/concepts/root-directory-structure/) - Added versioning info to root directory structure
+- [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
 
 ### Reference
 
@@ -63,7 +63,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
-- Added [Parquet bloom filters](/docs/query/sql/alter-table-alter-column-parquet-encoding/) syntax and configuration
+- Added [Parquet bloom filters](/docs/query/sql/alter-table-alter-column-set-parquet/) syntax and configuration
 - Added [`covar_samp()`](/docs/query/functions/window-functions/reference/), [`corr()`](/docs/query/functions/window-functions/reference/), and other statistical window functions
 - Added `array_elem_min()`, `array_elem_max()`, `array_elem_sum()`, `array_elem_avg()` to [array functions](/docs/query/functions/array/)
 - Fixed alphabetical ordering and added missing functions across reference pages
@@ -84,7 +84,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Refreshed page with improved structure and examples
 - [HORIZON JOIN](/docs/query/sql/horizon-join/) - Improved examples
 - [Cookbook](/docs/cookbook/) - Refreshed recipes with lookback patterns, named windows, and updated schema references
-- [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-parquet-encoding/) - Comprehensive documentation for column-level settings
+- [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-set-parquet/) - Comprehensive documentation for column-level settings
 - [Database replication](/docs/configuration/database-replication/) - GCP NFS transport and tuning updates
 - [Ingestion benchmarks](/docs/ingestion/overview/) - Updated benchmark image to Q1 2026
 
@@ -198,7 +198,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
-- [Shared pool configuration](/docs/configuration/overview/#shared-worker) - Updated with network, query, and write shared pool options
+- [Shared pool configuration](/docs/configuration/shared-workers/) - Updated with network, query, and write shared pool options
 - [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
 
 ### Reference

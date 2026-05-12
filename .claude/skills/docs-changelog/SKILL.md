@@ -122,21 +122,21 @@ Format as Docusaurus-compatible MDX, one `## Month YYYY` header per month:
 - Added `weighted_avg()`, `weighted_stddev_rel()`, `weighted_stddev_freq()` functions
 ```
 
-### Step 7: Validate links BEFORE writing
+### Step 7: Soft-validate links during generation
 
-Before generating any internal link, verify the target file exists:
-
-```bash
-ls documentation/path/to/page.md 2>/dev/null || echo "NOT FOUND"
-```
+While drafting the entry, use Glob or `ls` to check that target files exist
+before adding a `/docs/...` link. The mapping is: `/docs/X/Y/` maps to
+`documentation/X/Y.md` or `documentation/X/Y.mdx` or
+`documentation/X/Y/index.md`. Check all three variants.
 
 If a file does not exist, describe the change without a link:
 - "Added TICK syntax documentation for time intervals"
 
-Never generate a markdown link to a path you have not confirmed exists.
-
-Do NOT run `yarn build` to validate links during iteration. Check the
-filesystem directly. Only run a build check once at the end if needed.
+**Common mapping pitfalls:**
+- `/docs/configuration/` needs an `overview.md` or `index.md`, not just the
+  directory
+- Pages with hyphens in the URL may have different filenames
+- Some pages use `.mdx` extension, not `.md`
 
 ### Step 8: Update the changelog file
 
@@ -145,6 +145,15 @@ existing month entries.
 
 The changelog file is `documentation/changelog.mdx` (NOT
 `documentation/docs/changelog.mdx`).
+
+### Step 9: Build to validate links (mandatory)
+
+After writing the changelog, run `yarn build`. This is the only reliable way
+to confirm all links resolve. Glob and `ls` checks in Step 7 catch obvious
+mistakes early, but the build is the hard gate.
+
+If the build reports broken links, fix ALL of them in one pass, then build
+again. Do not report the changelog as ready until the build passes.
 
 ## Writing style
 
