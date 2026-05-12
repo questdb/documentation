@@ -8,6 +8,125 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## May 2026
+
+### Updated
+
+- [Aggregation functions](/docs/query/functions/aggregation/) - Added demo tags and updated examples with runnable queries
+- [LATEST ON](/docs/query/sql/latest-on/) - Added demo tags to examples
+- [JOIN](/docs/query/sql/join/) - Updated examples to use demo data
+- [GROUP BY](/docs/query/sql/group-by/) - Replaced examples with fx_trades demo queries
+- [DISTINCT](/docs/query/sql/distinct/) - Replaced examples with fx_trades demo queries
+- [CAST](/docs/query/sql/cast/) - Added demo tags to examples
+- [PIVOT](/docs/query/sql/pivot/) - Fixed examples to use demo server data
+- [Array functions](/docs/query/functions/array/) - Improved page with demo examples
+- [TICK syntax](/docs/query/operators/tick/) - Documented imprecise date support
+- [Configuration reference](/docs/configuration/) - Revamped into 17 dedicated per-subsystem pages with epigraph-style property listings
+
+### New
+
+- [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
+- [Table/column versioning](/docs/concepts/root-directory-structure/) - Added versioning info to root directory structure
+
+### Reference
+
+- Fixed `timestamp_ns` valid range documentation
+- Added precise microsecond-grained timestamp examples for PHP clients
+- Fixed PIVOT syntax: removed redundant `FOR` from multiple pivot statements
+- Updated Python client to use `sender.new_buffer()` for buffer initialization
+
+## April 2026
+
+### Releases
+
+- [9.3.5](https://questdb.com/release-notes/) - Released April 13, 2026
+
+### New
+
+- [Storage policy](/docs/concepts/storage-policy/) - Documentation for configuring storage policies
+- [UNNEST](/docs/query/sql/unnest/) - SQL reference for unnesting arrays into rows
+- [LATERAL JOIN](/docs/query/sql/lateral-join/) - SQL reference for lateral subqueries
+- [Sparkline and bar visualization functions](/docs/query/functions/visualization/) - Text-based chart functions for terminal and console output
+- [StructArrayExplode transform](/docs/ingestion/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
+
+### Updated
+
+- [SQL reference pages](/docs/query/sql/select/) - Replaced railroad diagrams with code-based syntax blocks across 65 SQL pages, with updated examples
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Updated timezone bucket alignment behavior
+- [Parquet export](/docs/query/export-parquet/) - Added partitioning options for exports
+- [WINDOW JOIN](/docs/query/sql/window-join/) - Documented dynamic window boundaries
+- [HORIZON JOIN](/docs/query/sql/horizon-join/) - Documented multi-RHS table support
+- [JOIN](/docs/query/sql/join/) - Improved join documentation and reorganized page
+- [Web Console](/docs/getting-started/web-console/overview/) - Added table details, updated screenshots
+- [TTL](/docs/concepts/ttl/) - Fixed removal syntax and general improvements
+- [REST API `/exp` endpoint](/docs/query/rest-api/) - Documented timeout parameter, removed outdated warning
+
+### Reference
+
+- Added [Parquet bloom filters](/docs/query/sql/alter-table-alter-column-parquet-encoding/) syntax and configuration
+- Added [`covar_samp()`](/docs/query/functions/window-functions/reference/), [`corr()`](/docs/query/functions/window-functions/reference/), and other statistical window functions
+- Added `array_elem_min()`, `array_elem_max()`, `array_elem_sum()`, `array_elem_avg()` to [array functions](/docs/query/functions/array/)
+- Fixed alphabetical ordering and added missing functions across reference pages
+- Added Azure ReadWrite disk caching warning to deployment docs
+
+## March 2026
+
+### Releases
+
+- [9.3.4](https://questdb.com/release-notes/) - Released March 26, 2026
+
+### New
+
+- [Log returns](/docs/cookbook/sql/finance/log-returns/) and [gamma scalping signal](/docs/cookbook/sql/finance/gamma-scalping-signal/) cookbook recipes
+
+### Updated
+
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Refreshed page with improved structure and examples
+- [HORIZON JOIN](/docs/query/sql/horizon-join/) - Improved examples
+- [Cookbook](/docs/cookbook/) - Refreshed recipes with lookback patterns, named windows, and updated schema references
+- [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-parquet-encoding/) - Comprehensive documentation for column-level settings
+- [Database replication](/docs/configuration/database-replication/) - GCP NFS transport and tuning updates
+- [Ingestion benchmarks](/docs/ingestion/overview/) - Updated benchmark image to Q1 2026
+
+### Reference
+
+- Added [`array_sort()`](/docs/query/functions/array/#array_sort) and [`array_reverse()`](/docs/query/functions/array/#array_reverse) functions
+- Added TLS certificate expiration metrics to [Prometheus monitoring docs](/docs/operations/monitoring-alerting/)
+- Removed obsolete `cairo.sql.backup.*` configuration keys
+- Fixed RLE encoding supported type documentation
+
+## February 2026
+
+### Releases
+
+- [9.3.3](https://questdb.com/release-notes/) - Released February 25, 2026
+
+### New
+
+- [HORIZON JOIN](/docs/query/sql/horizon-join/) - Full reference page for post-trade analysis joins
+- Post-trade analysis recipes: markout, slippage, implementation shortfall, ECN scorecard, last-look, and VPIN
+- Financial indicator recipes: RSI, MACD, Stochastic, Rate of Change, ATR, Donchian Channels, Keltner Channels, Realized Volatility, OBV, Maximum Drawdown, Bid-Ask Spread
+- [TICK Exchange Calendars](/docs/query/operators/tick/) - Enterprise feature for market-hours-aware time intervals
+- [AI Coding Agents](/docs/getting-started/ai-coding-agents/) - Renamed from LLM Coding Assistants, added QuestDB agent skill documentation
+
+### Updated
+
+- [Named windows](/docs/query/functions/window-functions/overview/) - Support for reusable `WINDOW` clause definitions
+- [Parquet export](/docs/query/export-parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
+- [Backup](/docs/operations/backup/) - Documented `backup.schedule.cron` format, improved scheduler visibility
+- [Date/time functions](/docs/query/functions/date-time/) - Page updates and corrections
+- [Window functions](/docs/query/functions/window-functions/overview/) - Added limitation documentation
+- [Database replication](/docs/configuration/database-replication/) - Added workload identity options, OrderBookToArray SMT documentation
+- [Kubernetes secrets](/docs/deployment/docker/) - Documented secrets-from-files for container deployments
+
+### Reference
+
+- Added [`twap()`](/docs/query/functions/aggregation/#twap) aggregate function
+- Added [`array_build()`](/docs/query/functions/array/#array_build) function
+- Documented [`count(distinct)`](/docs/query/functions/aggregation/#count) syntax
+- Updated Java ILP client artifact
+- Added WAL cleaner documentation for replication
+
 ## January 2026
 
 ### Releases
