@@ -90,12 +90,14 @@ git diff <hash>^..<hash> -- '*.md' '*.mdx'
 
 ### Step 5: Categorize changes
 
-Group into:
-- **Releases** - QuestDB releases in the period (from Step 3)
-- **New** - Brand new pages or major new sections (content that did not exist before)
-- **Updated** - Significant updates to existing content (restructured pages, rewritten sections, new examples)
-- **Reference** - Individual functions, parameters, config properties, or syntax additions to existing reference pages
-- **Guides** - Tutorials, how-tos, walkthroughs
+Group into these categories, always in this exact order. Skip a category if
+there are no entries for it, but never reorder:
+
+1. **Releases** - QuestDB releases in the period (from Step 3)
+2. **New** - Brand new pages or major new sections (content that did not exist before)
+3. **Reference** - Individual functions, parameters, config properties, or syntax additions to existing reference pages
+4. **Guides** - Tutorials, how-tos, walkthroughs
+5. **Updated** - Significant updates to existing content (restructured pages, rewritten sections, new examples)
 
 ### Step 6: Generate the entry
 
@@ -113,13 +115,13 @@ Format as Docusaurus-compatible MDX, one `## Month YYYY` header per month:
 - [TICK Syntax](/docs/query/operators/tick/) - New DSL for expressing complex time intervals
 - [Database Views](/docs/concepts/views/) - Virtual tables for query composition
 
-### Updated
-
-- [Materialized Views](/docs/concepts/materialized-views/) - Added `REFRESH PERIOD` compact syntax
-
 ### Reference
 
 - Added `weighted_avg()`, `weighted_stddev_rel()`, `weighted_stddev_freq()` functions
+
+### Updated
+
+- [Materialized Views](/docs/concepts/materialized-views/) - Added `REFRESH PERIOD` compact syntax
 ```
 
 ### Step 7: Soft-validate links during generation

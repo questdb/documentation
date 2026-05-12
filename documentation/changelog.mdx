@@ -10,6 +10,18 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## May 2026
 
+### New
+
+- [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
+- [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
+
+### Reference
+
+- Fixed `timestamp_ns` valid range documentation
+- Added precise microsecond-grained timestamp examples for PHP clients
+- Fixed PIVOT syntax: removed redundant `FOR` from multiple pivot statements
+- Updated Python client to use `sender.new_buffer()` for buffer initialization
+
 ### Updated
 
 - [Aggregation functions](/docs/query/functions/aggregation/) - Added demo tags and updated examples with runnable queries
@@ -22,18 +34,6 @@ This page tracks significant updates to the QuestDB documentation.
 - [Array functions](/docs/query/functions/array/) - Improved page with demo examples
 - [TICK syntax](/docs/query/operators/tick/) - Documented imprecise date support
 - [Configuration reference](/docs/configuration/overview/) - Revamped into 17 dedicated per-subsystem pages with epigraph-style property listings
-
-### New
-
-- [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
-- [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
-
-### Reference
-
-- Fixed `timestamp_ns` valid range documentation
-- Added precise microsecond-grained timestamp examples for PHP clients
-- Fixed PIVOT syntax: removed redundant `FOR` from multiple pivot statements
-- Updated Python client to use `sender.new_buffer()` for buffer initialization
 
 ## April 2026
 
@@ -49,6 +49,14 @@ This page tracks significant updates to the QuestDB documentation.
 - [Sparkline and bar visualization functions](/docs/query/functions/visualization/) - Text-based chart functions for terminal and console output
 - [StructArrayExplode transform](/docs/ingestion/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
 
+### Reference
+
+- Added [Parquet bloom filters](/docs/query/sql/alter-table-alter-column-set-parquet/) syntax and configuration
+- Added [`covar_samp()`](/docs/query/functions/window-functions/reference/), [`corr()`](/docs/query/functions/window-functions/reference/), and other statistical window functions
+- Added `array_elem_min()`, `array_elem_max()`, `array_elem_sum()`, `array_elem_avg()` to [array functions](/docs/query/functions/array/)
+- Fixed alphabetical ordering and added missing functions across reference pages
+- Added Azure ReadWrite disk caching warning to deployment docs
+
 ### Updated
 
 - [SQL reference pages](/docs/query/sql/select/) - Replaced railroad diagrams with code-based syntax blocks across 65 SQL pages, with updated examples
@@ -61,14 +69,6 @@ This page tracks significant updates to the QuestDB documentation.
 - [TTL](/docs/concepts/ttl/) - Fixed removal syntax and general improvements
 - [REST API `/exp` endpoint](/docs/query/rest-api/) - Documented timeout parameter, removed outdated warning
 
-### Reference
-
-- Added [Parquet bloom filters](/docs/query/sql/alter-table-alter-column-set-parquet/) syntax and configuration
-- Added [`covar_samp()`](/docs/query/functions/window-functions/reference/), [`corr()`](/docs/query/functions/window-functions/reference/), and other statistical window functions
-- Added `array_elem_min()`, `array_elem_max()`, `array_elem_sum()`, `array_elem_avg()` to [array functions](/docs/query/functions/array/)
-- Fixed alphabetical ordering and added missing functions across reference pages
-- Added Azure ReadWrite disk caching warning to deployment docs
-
 ## March 2026
 
 ### Releases
@@ -79,6 +79,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [Log returns](/docs/cookbook/sql/finance/log-returns/) and [gamma scalping signal](/docs/cookbook/sql/finance/gamma-scalping-signal/) cookbook recipes
 
+### Reference
+
+- Added [`array_sort()`](/docs/query/functions/array/#array_sort) and [`array_reverse()`](/docs/query/functions/array/#array_reverse) functions
+- Added TLS certificate expiration metrics to [Prometheus monitoring docs](/docs/operations/monitoring-alerting/)
+- Removed obsolete `cairo.sql.backup.*` configuration keys
+- Fixed RLE encoding supported type documentation
+
 ### Updated
 
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Refreshed page with improved structure and examples
@@ -87,13 +94,6 @@ This page tracks significant updates to the QuestDB documentation.
 - [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-set-parquet/) - Comprehensive documentation for column-level settings
 - [Database replication](/docs/configuration/database-replication/) - GCP NFS transport and tuning updates
 - [Ingestion benchmarks](/docs/ingestion/overview/) - Updated benchmark image to Q1 2026
-
-### Reference
-
-- Added [`array_sort()`](/docs/query/functions/array/#array_sort) and [`array_reverse()`](/docs/query/functions/array/#array_reverse) functions
-- Added TLS certificate expiration metrics to [Prometheus monitoring docs](/docs/operations/monitoring-alerting/)
-- Removed obsolete `cairo.sql.backup.*` configuration keys
-- Fixed RLE encoding supported type documentation
 
 ## February 2026
 
@@ -109,6 +109,14 @@ This page tracks significant updates to the QuestDB documentation.
 - [TICK Exchange Calendars](/docs/query/operators/tick/) - Enterprise feature for market-hours-aware time intervals
 - [AI Coding Agents](/docs/getting-started/ai-coding-agents/) - Renamed from LLM Coding Assistants, added QuestDB agent skill documentation
 
+### Reference
+
+- Added [`twap()`](/docs/query/functions/aggregation/#twap) aggregate function
+- Added [`array_build()`](/docs/query/functions/array/#array_build) function
+- Documented [`count(distinct)`](/docs/query/functions/aggregation/#count) syntax
+- Updated Java ILP client artifact
+- Added WAL cleaner documentation for replication
+
 ### Updated
 
 - [Named windows](/docs/query/functions/window-functions/overview/) - Support for reusable `WINDOW` clause definitions
@@ -118,14 +126,6 @@ This page tracks significant updates to the QuestDB documentation.
 - [Window functions](/docs/query/functions/window-functions/overview/) - Added limitation documentation
 - [Database replication](/docs/configuration/database-replication/) - Added workload identity options, OrderBookToArray SMT documentation
 - [Kubernetes secrets](/docs/deployment/docker/) - Documented secrets-from-files for container deployments
-
-### Reference
-
-- Added [`twap()`](/docs/query/functions/aggregation/#twap) aggregate function
-- Added [`array_build()`](/docs/query/functions/array/#array_build) function
-- Documented [`count(distinct)`](/docs/query/functions/aggregation/#count) syntax
-- Updated Java ILP client artifact
-- Added WAL cleaner documentation for replication
 
 ## January 2026
 
@@ -143,13 +143,6 @@ This page tracks significant updates to the QuestDB documentation.
 - [AI Assistant reference](/docs/getting-started/web-console/questdb-ai/) - Documentation for the QuestDB AI Assistant
 - [PIVOT](/docs/query/sql/pivot/) - SQL keyword for rotating rows into columns
 
-### Updated
-
-- [Window functions](/docs/query/functions/window-functions/overview/) - Restructured into dedicated section with improved navigation, added EMA, VWEMA, and ksum() functions
-- [Views and materialized views](/docs/concepts/views/) - Comprehensive documentation overhaul with improved examples and clearer explanations
-- [Designated timestamp](/docs/concepts/designated-timestamp/) - Consolidated timestamp documentation with TICK syntax examples
-- [Enterprise backup](/docs/operations/backup/) - Improved documentation with clearer instructions
-
 ### Reference
 
 - Added [`percent_rank()`](/docs/query/functions/window-functions/reference/#percent_rank) window function
@@ -158,6 +151,13 @@ This page tracks significant updates to the QuestDB documentation.
 - Added [`rnd_symbol_zipf()`](/docs/query/functions/random-value-generator/#rnd_symbol_zipf) and weighted random generators
 - Added [Euclidean and geographic geo functions](/docs/query/functions/spatial/)
 - Extended [date arithmetic](/docs/query/operators/tick/) with sub-day units
+
+### Updated
+
+- [Window functions](/docs/query/functions/window-functions/overview/) - Restructured into dedicated section with improved navigation, added EMA, VWEMA, and ksum() functions
+- [Views and materialized views](/docs/concepts/views/) - Comprehensive documentation overhaul with improved examples and clearer explanations
+- [Designated timestamp](/docs/concepts/designated-timestamp/) - Consolidated timestamp documentation with TICK syntax examples
+- [Enterprise backup](/docs/operations/backup/) - Improved documentation with clearer instructions
 
 ## December 2025
 
@@ -171,15 +171,15 @@ This page tracks significant updates to the QuestDB documentation.
 - [Builtin profiler](/docs/troubleshooting/profiling/) - Documentation for QuestDB's built-in query profiler
 - [WINDOW JOIN](/docs/query/sql/window-join/) - SQL reference for window joins with time-based lookups
 
-### Updated
-
-- [Materialized views](/docs/concepts/materialized-views/) - Added `REFRESH PERIOD (SAMPLE BY INTERVAL)` compact syntax documentation
-- [Time-series optimizations](/docs/architecture/time-series-optimizations/) - Improved explanations
-
 ### Reference
 
 - Added [`weighted_avg()`](/docs/query/functions/aggregation/#weighted_avg), [`weighted_stddev_rel()`](/docs/query/functions/aggregation/#weighted_stddev_rel), [`weighted_stddev_freq()`](/docs/query/functions/aggregation/#weighted_stddev_freq) functions
 - Documented compact period syntax in [SAMPLE BY](/docs/query/sql/sample-by/)
+
+### Updated
+
+- [Materialized views](/docs/concepts/materialized-views/) - Added `REFRESH PERIOD (SAMPLE BY INTERVAL)` compact syntax documentation
+- [Time-series optimizations](/docs/architecture/time-series-optimizations/) - Improved explanations
 
 ## November 2025
 
@@ -195,16 +195,16 @@ This page tracks significant updates to the QuestDB documentation.
 - [DECIMAL datatype](/docs/query/datatypes/decimal/) - Documentation for precise decimal arithmetic
 - [PGWire OIDC integration](/docs/security/oidc/) - Authentication via OpenID Connect
 
+### Reference
+
+- Added `first()` and `last()` support for additional datatypes
+- Added `first_not_null()` and `last_not_null()` array support
+
 ### Updated
 
 - [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
 - [Shared pool configuration](/docs/configuration/shared-workers/) - Updated with network, query, and write shared pool options
 - [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
-
-### Reference
-
-- Added `first()` and `last()` support for additional datatypes
-- Added `first_not_null()` and `last_not_null()` array support
 
 ## October 2025
 
@@ -217,15 +217,15 @@ This page tracks significant updates to the QuestDB documentation.
 - [PGWire for C/C++](/docs/query/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
 - [Table and column naming rules](/docs/query/sql/create-table/#table-name) - Guidelines for valid identifiers
 
+### Reference
+
+- Added `w` (week) unit to [SAMPLE BY](/docs/query/sql/sample-by/) reference
+
 ### Updated
 
 - [Architecture guide](/docs/architecture/questdb-architecture/) - Refreshed with current implementation details
 - [Nanoseconds](/docs/query/datatypes/overview/#timestamp-and-date-considerations) - Added nanosecond timestamp precision documentation
 - [`TRUNCATE TABLE`](/docs/query/sql/truncate/) - Added `IF EXISTS` clause
-
-### Reference
-
-- Added `w` (week) unit to [SAMPLE BY](/docs/query/sql/sample-by/) reference
 
 ## September 2025
 
