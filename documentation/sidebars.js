@@ -664,6 +664,7 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
+        "operations/upgrade",
         "operations/backup",
         "operations/logging-metrics",
         "operations/monitoring-alerting",
