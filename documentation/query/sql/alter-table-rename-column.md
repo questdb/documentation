@@ -14,8 +14,9 @@ Rename a column in an existing table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of the ALTER TABLE RENAME COLUMN keywords](/images/docs/diagrams/alterTableRenameColumn.svg)
+```questdb-sql
+ALTER TABLE tableName RENAME COLUMN columnName TO newColumnName;
+```
 
 ## Example
 

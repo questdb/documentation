@@ -21,7 +21,9 @@ see the [RBAC operations](/docs/security/rbac) page.
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP SERVICE ACCOUNT keyword](/images/docs/diagrams/dropServiceAccount.svg)
+```questdb-sql
+DROP SERVICE ACCOUNT [IF EXISTS] accountName;
+```
 
 ## Description
 

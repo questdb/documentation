@@ -14,7 +14,9 @@ data manually.
 
 ## Syntax
 
-![Flow chart showing the syntax of ALTER TABLE with ATTACH PARTITION keyword](/images/docs/diagrams/alterTableAttachPartition.svg)
+```questdb-sql
+ALTER TABLE tableName ATTACH PARTITION LIST partitionName [, partitionName ...];
+```
 
 The `WHERE` clause is not supported when attaching partitions.
 

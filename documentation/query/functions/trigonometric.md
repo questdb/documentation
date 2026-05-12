@@ -14,13 +14,14 @@ Positive and negative infinity values are expressed as `'Infinity'` or
 
 :::
 
-## sin
+## acos
 
-`sin(angleRadians)` returns the trigonometric sine of an angle.
+`acos(value)` returns the arccosine of a value.
 
 ### Arguments
 
-- `angleRadians` is a numeric value indicating the angle in radians.
+- `value` is a numeric value whose arccosine is to be returned. The returned
+  angle is between 0.0 and pi inclusively.
 
 ### Return value
 
@@ -28,102 +29,18 @@ Return value type is `double`.
 
 ### Description
 
-Special case: if the argument is `NaN` or an infinity, then the result is
-`Null`.
+Special cases: if the argument is `NaN` or its absolute value is greater than 1,
+then the result is `Null`.
 
 ### Examples
 
 ```questdb-sql
-SELECT pi()/2 angle, sin(pi()/2) sin;
+SELECT acos(0.0) acos;
 ```
 
-| angle          | sin |
-| -------------- | --- |
-| 1.570796326794 | 1   |
-
-## cos
-
-`cos(angleRadians)` returns the trigonometric cosine of an angle.
-
-### Arguments
-
-- `angleRadians` numeric value for the angle, in radians.
-
-### Return value
-
-Return value type is `double`.
-
-### Description
-
-Special case: if the argument is `NaN` or an infinity, then the result is
-`Null`.
-
-### Examples
-
-```questdb-sql
-SELECT pi()/2 angle, cos(pi()/2) cos;
-```
-
-| angle          | cos                   |
-| -------------- | --------------------- |
-| 1.570796326794 | 6.123233995736766e-17 |
-
-## tan
-
-`tan(angleRadians)` returns the trigonometric tangent of an angle.
-
-### Arguments
-
-- `angleRadians` numeric value for the angle, in radians.
-
-### Return value
-
-Return value type is `double`.
-
-### Description
-
-Special case: if the argument is `NaN` or an infinity, then the result is
-`Null`.
-
-### Examples
-
-```questdb-sql
-SELECT pi()/2 angle, tan(pi()/2) tan;
-```
-
-| angle          | tan               |
-| -------------- | ----------------- |
-| 1.570796326794 | 16331239353195370 |
-
-## cot
-
-`cot(angleRadians)` returns the trigonometric cotangent of an angle.
-
-### Arguments
-
-- `angleRadians` numeric value for the angle, in radians.
-
-### Return value
-
-Return value type is `double`.
-
-### Description
-
-Special case: if the argument is `NaN`, 0, or an infinity, then the result is
-`Null`.
-
-<!-- - If the argument is 0, then the result is positive infin.
-Currently returning null TBD-->
-
-### Examples
-
-```questdb-sql
-SELECT pi()/2 angle, cot(pi()/2) cot;
-```
-
-| angle          | cot                   |
-| -------------- | --------------------- |
-| 1.570796326794 | 6.123233995736766e-17 |
+| acos           |
+| -------------- |
+| 1.570796326794 |
 
 ## asin
 
@@ -150,34 +67,6 @@ SELECT asin(1.0) asin;
 ```
 
 | asin           |
-| -------------- |
-| 1.570796326794 |
-
-## acos
-
-`acos(value)` returns the arccosine of a value.
-
-### Arguments
-
-- `value` is a numeric value whose arccosine is to be returned. The returned
-  angle is between 0.0 and pi inclusively.
-
-### Return value
-
-Return value type is `double`.
-
-### Description
-
-Special cases: if the argument is `NaN` or its absolute value is greater than 1,
-then the result is `Null`.
-
-### Examples
-
-```questdb-sql
-SELECT acos(0.0) acos;
-```
-
-| acos           |
 | -------------- |
 | 1.570796326794 |
 
@@ -285,28 +174,62 @@ SELECT atan2(1.0, 1.0) atan2;
 | -------------- |
 | 0.785398163397 |
 
-## radians
+## cos
 
-`radians(angleDegrees)` converts an angle measured in degrees to the equivalent
-angle measured in radians.
+`cos(angleRadians)` returns the trigonometric cosine of an angle.
 
 ### Arguments
 
-- `angleDegrees` numeric value for the angle in degrees.
+- `angleRadians` numeric value for the angle, in radians.
 
 ### Return value
 
 Return value type is `double`.
 
+### Description
+
+Special case: if the argument is `NaN` or an infinity, then the result is
+`Null`.
+
 ### Examples
 
 ```questdb-sql
-SELECT radians(180);
+SELECT pi()/2 angle, cos(pi()/2) cos;
 ```
 
-| radians        |
-| -------------- |
-| 3.141592653589 |
+| angle          | cos                   |
+| -------------- | --------------------- |
+| 1.570796326794 | 6.123233995736766e-17 |
+
+## cot
+
+`cot(angleRadians)` returns the trigonometric cotangent of an angle.
+
+### Arguments
+
+- `angleRadians` numeric value for the angle, in radians.
+
+### Return value
+
+Return value type is `double`.
+
+### Description
+
+Special case: if the argument is `NaN`, 0, or an infinity, then the result is
+`Null`.
+
+<!-- - If the argument is 0, then the result is positive infin.
+Currently returning null TBD-->
+
+### Examples
+
+```questdb-sql
+SELECT pi()/2 angle, cot(pi()/2) cot;
+```
+
+| angle          | cot                   |
+| -------------- | --------------------- |
+| 1.570796326794 | 6.123233995736766e-17 |
 
 ## degrees
 
@@ -352,3 +275,80 @@ SELECT pi();
 | pi             |
 | -------------- |
 | 3.141592653589 |
+
+## radians
+
+`radians(angleDegrees)` converts an angle measured in degrees to the equivalent
+angle measured in radians.
+
+### Arguments
+
+- `angleDegrees` numeric value for the angle in degrees.
+
+### Return value
+
+Return value type is `double`.
+
+### Examples
+
+```questdb-sql
+SELECT radians(180);
+```
+
+| radians        |
+| -------------- |
+| 3.141592653589 |
+
+## sin
+
+`sin(angleRadians)` returns the trigonometric sine of an angle.
+
+### Arguments
+
+- `angleRadians` is a numeric value indicating the angle in radians.
+
+### Return value
+
+Return value type is `double`.
+
+### Description
+
+Special case: if the argument is `NaN` or an infinity, then the result is
+`Null`.
+
+### Examples
+
+```questdb-sql
+SELECT pi()/2 angle, sin(pi()/2) sin;
+```
+
+| angle          | sin |
+| -------------- | --- |
+| 1.570796326794 | 1   |
+
+## tan
+
+`tan(angleRadians)` returns the trigonometric tangent of an angle.
+
+### Arguments
+
+- `angleRadians` numeric value for the angle, in radians.
+
+### Return value
+
+Return value type is `double`.
+
+### Description
+
+Special case: if the argument is `NaN` or an infinity, then the result is
+`Null`.
+
+### Examples
+
+```questdb-sql
+SELECT pi()/2 angle, tan(pi()/2) tan;
+```
+
+| angle          | tan               |
+| -------------- | ----------------- |
+| 1.570796326794 | 16331239353195370 |

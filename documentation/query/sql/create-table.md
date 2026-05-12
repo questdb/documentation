@@ -7,11 +7,74 @@ description: CREATE TABLE SQL keywords reference documentation.
 To create a new table in the database, the `CREATE TABLE` keywords followed by
 column definitions are used.
 
+`CREATE TABLE` has three creation modes:
+
+1. **[Providing the table schema](#syntax)** -
+   define each column and its type yourself.
+2. **[CREATE TABLE AS SELECT](#create-table-as)** -
+   derive both schema and data from a query.
+3. **[CREATE TABLE LIKE](#create-table-like)** -
+   clone the structure (but not the data) of an existing table.
+
+The first two modes accept the same set of optional clauses:
+
+- [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
+- [`PARTITION BY`](#partitioning) - partition unit and WAL mode
+- [`TTL`](#time-to-live-ttl) - time-to-live for partitions
+- [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
+- [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
+  [`ALTER TABLE DEDUP ENABLE`](/docs/query/sql/alter-table-enable-deduplication/))
+- [`WITH`](#with-table-parameter) - table parameters
+- [`IN VOLUME`](#table-target-volume) - target volume for storage
+- [`OWNED BY`](#owned-by) - Enterprise RBAC owner
+
 ## Syntax
 
-To create a table by manually entering parameters and settings:
+```questdb-sql title="Providing the table schema"
+CREATE [ATOMIC | BATCH n [o3MaxLag value]]
+TABLE [IF NOT EXISTS] tableName
+    (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
+    [TIMESTAMP (columnName)
+        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+            [BYPASS WAL | WAL]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [WITH tableParameter]
+    [IN VOLUME 'alias']
+    [OWNED BY ownerName];
+```
 
-![Flow chart showing the syntax of the CREATE TABLE keyword](/images/docs/diagrams/createTableDef.svg)
+```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
+CREATE [ATOMIC | BATCH n [o3MaxLag value]]
+TABLE [IF NOT EXISTS] tableName
+    AS (selectQuery)
+    [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
+    [, INDEX (columnRef [CAPACITY n]) ...]
+    [TIMESTAMP (columnName)
+        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+            [BYPASS WAL | WAL]
+            [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+    [DEDUP UPSERT KEYS (columnName [, columnName ...])]
+    [WITH tableParameter]
+    [IN VOLUME 'alias']
+    [OWNED BY ownerName];
+```
+
+Where `policyStage` is one of:
+
+```
+TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration
+```
+
+Stages are Enterprise-only, all optional, and their durations must be positive
+and in ascending order. `TTL` and `STORAGE POLICY` are mutually exclusive — see
+[Storage Policy](#storage-policy).
+
+```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
+CREATE TABLE tableName (LIKE sourceTableName);
+```
 
 :::note
 
@@ -20,10 +83,6 @@ functions which are described in the
 [meta functions](/docs/query/functions/meta/) documentation page.
 
 :::
-
-To create a table by cloning the metadata of an existing table:
-
-![Flow chart showing the syntax of the CREATE TABLE LIKE keyword](/images/docs/diagrams/createTableLike.svg)
 
 ## Examples
 
@@ -103,7 +162,7 @@ By default, created tables are
 WAL-enabled tables, it is still possible to create non-WAL-enabled tables.
 
 `CREATE TABLE`'s
-[global configuration setting](/docs/configuration/overview/#cairo-engine) allows you to
+[global configuration setting](/docs/configuration/cairo-engine/) allows you to
 alter the default behaviour via `cairo.wal.enabled.default`:
 
 - `true`: Creates a WAL table (default)
@@ -194,6 +253,49 @@ Refer to the [section on TTL in Concepts](/docs/concepts/ttl/) for detailed
 information on the behavior of this feature.
 
 :::
+
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
+rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
+it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+
+:::
+
+## Storage Policy
+
+:::note
+
+Storage policies are available in **QuestDB Enterprise** only.
+
+:::
+
+A [storage policy](/docs/concepts/storage-policy/) automates the partition
+lifecycle by defining when partitions are converted to Parquet locally, when
+native data is removed, and when local copies are dropped. Place the
+`STORAGE POLICY(...)` clause after `PARTITION BY`:
+
+```questdb-sql title="With storage policy (Enterprise)"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+WAL;
+```
+
+A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
+positive, and they must be in ascending order. `DROP REMOTE` is reserved
+syntax and is currently rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`.
+
+To modify a storage policy after table creation, see
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 ## Deduplication
 
@@ -316,10 +418,21 @@ QuestDB. For best results, we recommend using only alphanumeric characters along
 ## Type definition
 
 When specifying a column, a name and
-[type definition](/docs/query/datatypes/overview/) must be provided. The `symbol`
-type may have additional optional parameters applied.
+[type definition](/docs/query/datatypes/overview/) must be provided.
 
-![Flow chart showing the syntax of the different column types](/images/docs/diagrams/columnTypeDef.svg)
+```questdb-sql
+columnTypeDef ::=
+    -- Types with parameters
+      DECIMAL(<precision>, <scale>)
+    | DOUBLE[][]...  -- array: one [] pair per dimension
+    | GEOHASH(<size>)
+    | SYMBOL [CAPACITY distinctValueEstimate] [CACHE | NOCACHE]
+             [INDEX [CAPACITY valueBlockSize]]
+    -- Simple types
+    | BINARY | BOOLEAN | BYTE | CHAR | DATE | DOUBLE | FLOAT
+    | INT | IPV4 | LONG | LONG256 | SHORT | STRING
+    | TIMESTAMP | TIMESTAMP_NS | UUID | VARCHAR
+```
 
 ### Symbols
 
@@ -361,29 +474,33 @@ CREATE TABLE trades (
 ) TIMESTAMP(timestamp);
 ```
 
-### Per-column Parquet encoding and compression
+### Per-column Parquet encoding, compression, and bloom filters
 
-![Flow chart showing the syntax of per-column Parquet encoding and compression](/images/docs/diagrams/parquetEncodingDef.svg)
+```questdb-sql
+PARQUET(encoding [, compression[(level)]])
+```
 
-Column definitions may include an optional `PARQUET(encoding [, compression[(level)]])`
-clause. These settings only affect
+Column definitions may include an optional
+`PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
+settings only affect
 [Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
-ignored for native partitions. Both encoding and compression are optional — use
-`default` for the encoding when specifying compression only.
+ignored for native partitions. Encoding, compression, and bloom filter are all
+optional — use `default` for the encoding when specifying compression only.
 
 ```questdb-sql title="CREATE TABLE with per-column Parquet config"
 CREATE TABLE sensors (
     ts TIMESTAMP,
     temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
     humidity FLOAT PARQUET(rle_dictionary),
-    device_id VARCHAR PARQUET(default, lz4_raw),
+    device_id VARCHAR PARQUET(default, lz4_raw, BLOOM_FILTER),
     status INT
 ) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
 When omitted, columns use the global defaults: a type-appropriate encoding and
 the server-wide compression codec
-(`cairo.partition.encoder.parquet.compression.codec`).
+(`cairo.partition.encoder.parquet.compression.codec`). Bloom filters are not
+generated unless explicitly enabled.
 
 #### Supported encodings
 
@@ -452,14 +569,61 @@ For more details on Parquet compression, see the
 [Apache Parquet compression documentation](https://parquet.apache.org/docs/file-format/data-pages/compression/).
 
 To modify encoding or compression on existing tables, see
-[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-parquet-encoding/).
+[ALTER TABLE ALTER COLUMN SET PARQUET](/docs/query/sql/alter-table-alter-column-set-parquet/).
+
+#### Bloom filters
+
+The optional `BLOOM_FILTER` keyword enables
+bloom filter generation for a column
+when partitions are converted to Parquet. Bloom filters allow QuestDB to skip
+row groups that do not contain matching values, significantly speeding up
+equality and `IN` queries on large Parquet partitions.
+
+`BLOOM_FILTER` can appear in several positions:
+
+```questdb-sql title="As the sole argument (default encoding/compression)"
+CREATE TABLE t (
+  a VARCHAR PARQUET(BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+```questdb-sql title="With encoding and compression"
+CREATE TABLE t (
+  a INT PARQUET(delta_binary_packed, zstd(3), BLOOM_FILTER),
+  ts TIMESTAMP
+) TIMESTAMP(ts) PARTITION BY DAY;
+```
+
+The false positive probability (FPP) for bloom filters is a global setting
+(`cairo.partition.encoder.parquet.bloom.filter.fpp`, default `0.01`) and cannot
+be configured per column. See
+the [Configuration reference](/docs/configuration/overview/) for all
+configuration options.
+
+:::note
+
+When converting partitions with an explicit `bloom_filter_columns` option in
+[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+the explicit list overrides per-column `BLOOM_FILTER` metadata.
+
+:::
 
 ### Casting types
 
 `castDef` - casts the type of a specific column. `columnRef` must reference
 existing column in the `selectSql`
 
-![Flow chart showing the syntax of the cast function](/images/docs/diagrams/castDef.svg)
+```questdb-sql
+cast(columnRef AS columnTypeDef)
+```
 
 ```questdb-sql
 CREATE TABLE test AS (
@@ -473,7 +637,9 @@ Index definitions (`indexDef`) are used to create an
 [index](/docs/concepts/deep-dive/indexes/) for a table column. The referenced table column
 must be of type [symbol](/docs/concepts/symbol/).
 
-![Flow chart showing the syntax of the index function](/images/docs/diagrams/indexDef.svg)
+```questdb-sql
+INDEX (columnRef [CAPACITY valueBlockSize])
+```
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -634,7 +800,9 @@ CREATE TABLE new_table (LIKE my_table);
 
 ## WITH table parameter
 
-![Flow chart showing the syntax of keyword to specify WITH table parameter](/images/docs/diagrams/createTableWithMaxRowParam.svg)
+```questdb-sql
+WITH maxUncommittedRows = rowCount
+```
 
 The parameter influences how often commits of out-of-order data occur. It may be
 set during table creation using the `WITH` keyword.
@@ -675,7 +843,9 @@ The `IN VOLUME` clause is used to create a table in a different volume than the
 standard. The table is created in the specified target volume, and a symbolic
 link is created in the table's standard volume to point to it.
 
-![Flow chart showing the syntax of keywords to specify a table target volume](/images/docs/diagrams/tableTargetVolumeDef.svg)
+```questdb-sql
+[,] IN VOLUME ['secondaryVolumeAlias']
+```
 
 The use of the comma (`,`) depends on the existence of the `WITH` clause:
 
@@ -737,7 +907,7 @@ its volume.
 ### Configuration
 
 The secondary table target volume is defined by `cairo.volumes` in
-[`server.conf`](/docs/configuration/overview/#cairo-engine). The default setting contains
+[`server.conf`](/docs/configuration/cairo-engine/). The default setting contains
 an empty list, which means the feature is not enabled.
 
 To enable the feature, define as many volume pairs as you need, with syntax

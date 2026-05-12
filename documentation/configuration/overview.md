@@ -3,32 +3,18 @@ title: Configuration
 description: Server configuration keys reference documentation.
 ---
 
-import { ConfigTable } from "@theme/ConfigTable"
-import sharedWorkerConfig from "./configuration-utils/\_shared-worker.config.json"
-import httpConfig from "./configuration-utils/\_http.config.json"
-import cairoConfig from "./configuration-utils/\_cairo.config.json"
-import parallelSqlConfig from "./configuration-utils/\_parallel-sql.config.json"
-import walConfig from "./configuration-utils/\_wal.config.json"
-import csvImportConfig from "./configuration-utils/\_csv-import.config.json"
-import parquetExportConfig from "./configuration-utils/\_parquet-export.config.json"
-import postgresConfig from "./configuration-utils/\_postgres.config.json"
-import tcpConfig from "./configuration-utils/\_tcp.config.json"
-import udpConfig from "./configuration-utils/\_udp.config.json"
-import replicationConfig from "./configuration-utils/\_replication.config.json"
-import iamConfig from "./configuration-utils/\_iam.config.json"
-import oidcConfig from "./configuration-utils/\_oidc.config.json"
-import logConfig from "./configuration-utils/\_log.config.json"
-import matViewConfig from "./configuration-utils/\_mat-view.config.json"
-import configValidationConfig from "./configuration-utils/\_config-validation.config.json"
-import telemetryConfig from "./configuration-utils/\_telemetry.config.json"
+import Tabs from "@theme/Tabs"
+import TabItem from "@theme/TabItem"
 
 This page describes methods for configuring QuestDB server settings.
 
-Configuration can be set either:
+Configuration can be set using:
 
-- In the `server.conf` configuration file available in the
+- The `server.conf` configuration file available in the
   [root directory](/docs/concepts/deep-dive/root-directory-structure/)
-- Using environment variables
+- Environment variables
+- [Command-line options](#command-line-options) for startup behavior such as
+  root directory, service tags, and web console redeployment
 
 When a key is absent from both the config file and the environment variables,
 the default value is used.
@@ -216,11 +202,318 @@ All reloadable properties can be also queried from the server:
 (SHOW PARAMETERS) WHERE reloadable = true;
 ```
 
-## Keys and default values
+## Command-line options
 
-This section lists the configuration keys available to QuestDB by topic or
-subsystem. Parameters for specifying buffer and memory page sizes are provided
-in the format `n<unit>`, where `<unit>` can be one of the following:
+QuestDB may be started, stopped and passed configuration options from the
+command line. On Windows, the QuestDB server can also start an
+[interactive session](#interactive-session-windows).
+
+### Options
+
+The following sections describe the options that may be passed to QuestDB when
+starting the server from the command line.
+
+<!-- prettier-ignore-start -->
+
+<Tabs defaultValue="nix"
+values={[
+  { label: "Linux", value: "nix" },
+  { label: "macOS (Homebrew)", value: "macos" },
+  { label: "Windows", value: "windows" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="nix">
+
+```shell
+./questdb.sh [start|stop|status] [-d dir] [-f] [-n] [-t tag]
+```
+
+</TabItem>
+
+<TabItem value="macos">
+
+```shell
+questdb [start|stop|status] [-d dir] [-f] [-n] [-t tag]
+```
+
+</TabItem>
+
+<TabItem value="windows">
+
+```shell
+questdb.exe [start|stop|status|install|remove] \
+  [-d dir] [-f] [-j JAVA_HOME] [-t tag]
+```
+
+</TabItem>
+
+</Tabs>
+
+#### Start
+
+`start` - starts QuestDB as a service.
+
+| Option | Description                                                                                                                                                                                                             |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-d`   | Expects a `dir` directory value which is a folder that will be used as QuestDB's root directory. For more information and the default values, see the [default root](#default-root-directory) section below.          |
+| `-t`   | Expects a `tag` string value which will be as a tag for the service. This option allows users to run several QuestDB services and manage them separately. If this option is omitted, the default tag will be `questdb`. |
+| `-f`   | Force re-deploying the [Web Console](/docs/getting-started/web-console/overview/). Without this option, the [Web Console](/docs/getting-started/web-console/overview/) is cached and deployed only when missing.                                                          |
+| `-n`   | Do not respond to the HUP signal. This keeps QuestDB alive after you close the terminal window where you started it.                                                                                                    |
+| `-j`   | **Windows only!** This option allows to specify a path to `JAVA_HOME`.                                                                                                                                                  |
+
+:::note
+
+- When running multiple QuestDB services, a tag must be used to disambiguate
+  between services for `start` and `stop` commands. There will be conflicting
+  ports and root directories if only the tag flag is specified when starting
+  multiple services. Each new service should have its own config file or should
+  be started with separate port and root directory options.
+
+- When running QuestDB as Windows service you can check status in both:
+  - Windows Event Viewer - look for events with "QuestDB" source in Windows Logs
+    | Application .
+  - service log file - `$dataDir\log\service-%Y-%m-%dT%H-%M-%S.txt` (default is
+    `C:\Windows\System32\qdbroot\log\service-%Y-%m-%dT%H-%M-%S.txt` )
+
+:::
+
+<!-- prettier-ignore-start -->
+
+
+<Tabs defaultValue="nix"
+values={[
+  { label: "Linux", value: "nix" },
+  { label: "macOS (Homebrew)", value: "macos" },
+  { label: "Windows", value: "windows" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="nix">
+
+```shell
+./questdb.sh start [-d dir] [-f] [-n] [-t tag]
+```
+
+</TabItem>
+
+<TabItem value="macos">
+
+```shell
+questdb start [-d dir] [-f] [-n] [-t tag]
+```
+
+</TabItem>
+
+<TabItem value="windows">
+
+```shell
+questdb.exe start [-d dir] [-f] [-j JAVA_HOME] [-t tag]
+```
+
+</TabItem>
+
+</Tabs>
+
+##### Default root directory
+
+By default, QuestDB's [root directory](/docs/concepts/deep-dive/root-directory-structure/)
+will be the following:
+
+<!-- prettier-ignore-start -->
+
+<Tabs defaultValue="nix" values={[
+  { label: "Linux", value: "nix" },
+  { label: "macOS (Homebrew)", value: "macos" },
+  { label: "Windows", value: "windows" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="nix">
+
+```shell
+$HOME/.questdb
+```
+
+</TabItem>
+
+<TabItem value="macos">
+
+Path on Macs with Apple Silicon (M1 or M2) chip:
+
+```shell
+/opt/homebrew/var/questdb
+```
+
+Path on Macs with Intel chip:
+
+```shell
+/usr/local/var/questdb
+```
+
+</TabItem>
+
+<TabItem value="windows">
+
+```shell
+C:\Windows\System32\qdbroot
+```
+
+</TabItem>
+
+</Tabs>
+
+#### Stop
+
+`stop` - stops a service.
+
+| Option | Description                                                                                                        |
+| ------ | ------------------------------------------------------------------------------------------------------------------ |
+| `-t`   | Expects a `tag` string value which to stop a service by tag. If this is omitted, the default tag will be `questdb` |
+
+<!-- prettier-ignore-start -->
+
+<Tabs defaultValue="nix" values={[
+  { label: "Linux", value: "nix" },
+  { label: "macOS (Homebrew)", value: "macos" },
+  { label: "Windows", value: "windows" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="nix">
+
+```shell
+./questdb.sh stop
+```
+
+</TabItem>
+
+<TabItem value="macos">
+
+```shell
+questdb stop
+```
+
+</TabItem>
+
+<TabItem value="windows">
+
+```shell
+questdb.exe stop
+```
+
+</TabItem>
+
+</Tabs>
+
+#### Status
+
+`status` - shows the status for a service.
+
+| Option | Description                                                                                                    |
+| ------ | -------------------------------------------------------------------------------------------------------------- |
+| `-t`   | Expects a `tag` string value which to stop a service by tag. If this is omitted, the default will be `questdb` |
+
+<!-- prettier-ignore-start -->
+
+<Tabs defaultValue="nix" values={[
+  { label: "Linux", value: "nix" },
+  { label: "macOS (Homebrew)", value: "macos" },
+  { label: "Windows", value: "windows" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="nix">
+
+```shell
+./questdb.sh status
+```
+
+</TabItem>
+
+<TabItem value="macos">
+
+```shell
+questdb status
+```
+
+</TabItem>
+
+<TabItem value="windows">
+
+```shell
+questdb.exe status
+```
+
+</TabItem>
+
+</Tabs>
+
+#### Install (Windows)
+
+`install` - installs the Windows QuestDB service. The service will start
+automatically at startup.
+
+```shell
+questdb.exe install
+```
+
+#### Remove (Windows)
+
+`remove` - removes the Windows QuestDB service. It will no longer start at
+startup.
+
+```shell
+questdb.exe remove
+```
+
+### Interactive session (Windows)
+
+You can start QuestDB interactively by running `questdb.exe`. This will launch
+QuestDB interactively in the active `Shell` window. QuestDB will be stopped when
+the Shell is closed.
+
+#### Default root directory
+
+When started interactively, QuestDB's root directory defaults to the `current`
+directory.
+
+#### Stop
+
+To stop, press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal or close it
+directly.
+
+## Config validation
+
+The database startup phase checks for configuration issues, such as invalid or
+deprecated settings. Issues may be classified as advisories or errors. Advisory
+issues are [logged](/docs/concepts/deep-dive/root-directory-structure/#log-directory)
+without causing the database to stop its startup sequence: These are usually
+setting deprecation warnings. Configuration errors can optionally cause the
+database to fail its startup.
+
+### config.validation.strict
+
+- **Default**: `false`
+- **Reloadable**: no
+
+When enabled, startup fails if there are configuration errors.
+
+_We recommend enabling strict validation._
+
+## Configuration reference
+
+The full configuration reference is divided by subsystem. Each page lists
+every available property with its default value, whether it can be reloaded
+at runtime, and a description.
+
+Parameters for specifying buffer and memory page sizes use the format
+`n<unit>`, where `<unit>` can be:
 
 - `m` for **MB**
 - `k` for **kB**
@@ -231,265 +524,22 @@ For example:
 http.net.connection.sndbuf=2m
 ```
 
-### Shared worker
-
-QuestDB uses three specialized worker pools to handle different workloads:
-- **Network pool**: handles HTTP, PostgreSQL, and ILP server I/O
-- **Query pool**: executes parallel query operations (filters, group-by)
-- **Write pool**: manages WAL apply jobs, table writes, materialized view refresh, and housekeeping tasks
-
-<ConfigTable rows={sharedWorkerConfig} />
-
-### HTTP server
-
-This section describes configuration settings for the
-[Web Console](/docs/getting-started/web-console/overview/) and the REST API available by default on port
-`9000`. For details on the use of this component, refer to the
-[web console documentation](/docs/getting-started/web-console/overview/) page.
-
-<ConfigTable rows={httpConfig} />
-
-### Cairo engine
-
-This section describes configuration settings for the Cairo SQL engine in
-QuestDB.
-
-<ConfigTable rows={cairoConfig} />
-
-### WAL table configurations
-
-The following WAL tables settings on parallel threads are configurable for
-applying WAL data to the table storage:
-
-<ConfigTable rows={walConfig} />
-
-### COPY settings
-
-#### Import 
-
-This section describes configuration settings for using `COPY` to import large
-CSV files, or export parquet files.
-
-Settings for `COPY FROM` (import):
-
-<ConfigTable
-  rows={csvImportConfig}
-  pick={[
-    "cairo.sql.copy.root",
-    "cairo.sql.copy.work.root",
-    "cairo.iouring.enabled",
-    "cairo.sql.copy.buffer.size",
-    "cairo.sql.copy.log.retention.days",
-    "cairo.sql.copy.max.index.chunk.size",
-    "cairo.sql.copy.queue.capacity",
-  ]}
-/>
-
-**CSV import configuration for Docker**
-
-For QuestDB instances using Docker:
-
-- `cairo.sql.copy.root` must be defined using one of the following settings:
-  - The environment variable `QDB_CAIRO_SQL_COPY_ROOT`.
-  - The `cairo.sql.copy.root` in `server.conf`.
-- The path for the source CSV file is mounted.
-- The source CSV file path and the path defined by `QDB_CAIRO_SQL_COPY_ROOT` are
-  identical.
-- It is optional to define `QDB_CAIRO_SQL_COPY_WORK_ROOT`.
-
-The following is an example command to start a QuestDB instance on Docker, in
-order to import a CSV file:
-
-```shell
-docker run -p 9000:9000 \
--v "/tmp/questdb:/var/lib/questdb" \
--v "/tmp/questdb/my_input_root:/var/lib/questdb/questdb_import" \
--e QDB_CAIRO_SQL_COPY_ROOT=/var/lib/questdb/questdb_import \
-questdb/questdb
-```
-
-Where:
-
-- `-v "/tmp/questdb/my_input_root:/var/lib/questdb/questdb_import"`: Defining a
-  source CSV file location to be `/tmp/questdb/my_input_root` on local machine
-  and mounting it to `/var/lib/questdb/questdb_import` in the container.
-- `-e QDB_CAIRO_SQL_COPY_ROOT=/var/lib/questdb/questdb_import`: Defining the
-  copy root directory to be `/var/lib/questdb/questdb_import`.
-
-It is important that the two path are identical
-(`/var/lib/questdb/questdb_import` in the example).
-
-
-#### Export
-
-<ConfigTable rows={parquetExportConfig} />
-
-Parquet export is also generally impacted by query execution and parquet conversion parameters.
-
-If not overridden, the following default setting will be used.
-
-<ConfigTable
-    rows={cairoConfig}
-    pick={[
-        "cairo.partition.encoder.parquet.raw.array.encoding.enabled",
-        "cairo.partition.encoder.parquet.version",
-        "cairo.partition.encoder.parquet.statistics.enabled",
-        "cairo.partition.encoder.parquet.compression.codec",
-        "cairo.partition.encoder.parquet.compression.level",
-        "cairo.partition.encoder.parquet.row.group.size",
-        "cairo.partition.encoder.parquet.data.page.size"
-    ]}
-/>
-
-### Parallel SQL execution
-
-This section describes settings that can affect the level of parallelism during
-SQL execution, and therefore can also have an impact on performance.
-
-<ConfigTable rows={parallelSqlConfig} />
-
-### Postgres wire protocol
-
-This section describes configuration settings for client connections using
-PostgresSQL wire protocol.
-
-<ConfigTable rows={postgresConfig} />
-
-### InfluxDB Line Protocol (ILP)
-
-This section describes ingestion settings for incoming messages using InfluxDB
-Line Protocol.
-
-| Property                     | Default | Description                                                                                                                                                                |
-| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| line.default.partition.by    | DAY     | Table partition strategy to be used with tables that are created automatically by InfluxDB Line Protocol. Possible values are: `HOUR`, `DAY`, `WEEK`, `MONTH`, and `YEAR`. |
-| line.auto.create.new.columns | true    | When enabled, automatically creates new columns when they appear in the ingested data. When disabled, messages with new columns will be rejected.                          |
-| line.auto.create.new.tables  | true    | When enabled, automatically creates new tables when they appear in the ingested data. When disabled, messages for non-existent tables will be rejected.                    |
-| line.log.message.on.error    | true    | Controls whether malformed ILP messages are printed to the server log when errors occur.                                                                                   |
-
-#### HTTP specific settings
-
-ILP over HTTP is the preferred way of ingesting data.
-
-| Property               | Default | Description                                                                                                                                       |
-| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| line.http.enabled      | true    | Enable ILP over HTTP. Default port is 9000. Enabled by default within open source versions, defaults to false and must be enabled for Enterprise. |
-| line.http.ping.version | v2.2.2  | Version information for the ping response of ILP over HTTP.                                                                                       |
-| HTTP properties        | Various | See [HTTP settings](/docs/configuration/overview/#http-server) for general HTTP configuration. ILP over HTTP inherits from HTTP settings.                  |
-
-#### TCP specific settings
-
-<ConfigTable rows={tcpConfig} />
-
-#### UDP specific settings
-
-:::note
-
-The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend ILP
-over HTTP instead, or less frequently
-[ILP over TCP](/docs/ingestion/ilp/overview/).
-
-:::
-
-<ConfigTable rows={udpConfig} />
-
-### Database replication
-
-:::note
-
-Replication is [Enterprise](/enterprise/) only.
-
-:::
-
-Replication enables high availability clusters.
-
-For setup instructions, see the
-[replication operations](/docs/high-availability/setup/) guide.
-
-For an overview of the concept, see the
-[replication concept](/docs/high-availability/overview/) page.
-
-For a tuning guide see, the
-[replication tuning guide](/docs/high-availability/tuning/).
-
-<ConfigTable rows={replicationConfig} />
-
-### Identity and Access Management (IAM)
-
-:::note
-
-Identity and Access Management is available within
-[QuestDB Enterprise](/enterprise/).
-
-:::
-
-Identity and Access Management (IAM) ensures that data can be accessed only by
-authorized users. The below configuration properties relate to various
-authentication and authorization features.
-
-For a full explanation of IAM, see the
-[Identity and Access Management (IAM) documentation](/docs/security/rbac).
-
-<ConfigTable rows={iamConfig} />
-
-### OpenID Connect (OIDC)
-
-:::note
-
-OpenID Connect is [Enterprise](/enterprise/) only.
-
-:::
-
-OpenID Connect (OIDC) support is part of QuestDB's Identity and Access
-Management. The database can be integrated with any OAuth2/OIDC Identity
-Provider (IdP).
-
-For detailed information about OIDC, see the
-[OpenID Connect (OIDC) integration guide](/docs/security/oidc).
-
-<ConfigTable rows={oidcConfig} />
-
-### Config Validation
-
-The database startup phase checks for configuration issues, such as invalid or
-deprecated settings. Issues may be classified as advisories or errors. Advisory
-issues are [logged](/docs/concepts/deep-dive/root-directory-structure/#log-directory)
-without causing the database to stop its startup sequence: These are usually
-setting deprecation warnings. Configuration errors can optionally cause the
-database to fail its startup.
-
-<ConfigTable rows={configValidationConfig} />
-
-_We recommended enabling strict validation._
-
-### Telemetry
-
-QuestDB sends anonymous telemetry data with information about usage which helps
-us improve the product over time. We do not collect any personally-identifying
-information, and we do not share any of this data with third parties.
-
-<ConfigTable rows={telemetryConfig} />
-
-## Materialized views
-
-:::info
-
-Materialized View support is now generally available (GA) and ready for production use.
-
-If you are using versions earlier than `8.3.1`, we suggest you upgrade at your earliest convenience.
-
-:::
-
-The following settings are available in `server.conf`:
-
-<ConfigTable rows={matViewConfig} />
-
-## Logging & Metrics
-
-The following settings are available in `server.conf`:
-
-<ConfigTable rows={logConfig} />
-
-Further settings are available in `log.conf`. For more information, and details
-of our Prometheus metrics, please visit the
-[Logging & Metrics](/docs/operations/logging-metrics/) documentation.
+| Section | Description &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Enterprise only |
+|---------|-------------|:----------:|
+| [Cairo engine](/docs/configuration/cairo-engine/) | SQL engine settings | |
+| [COPY settings](/docs/configuration/copy-settings/) | CSV import and Parquet export | |
+| [HTTP server](/docs/configuration/http-server/) | Web Console and REST API | |
+| [IAM](/docs/configuration/iam/) | Identity and Access Management | ✓ |
+| [Ingestion (ILP/HTTP)](/docs/configuration/ingestion/) | InfluxDB Line Protocol settings | |
+| [Logging & Metrics](/docs/configuration/logging-metrics/) | Log levels and metrics | |
+| [Materialized views](/docs/configuration/materialized-views/) | Materialized view refresh settings | |
+| [Minimal HTTP server](/docs/configuration/http-min-server/) | Health check and metrics endpoint | |
+| [OpenID Connect (OIDC)](/docs/configuration/oidc/) | OIDC integration | ✓ |
+| [Parallel SQL execution](/docs/configuration/parallel-sql-execution/) | Query parallelism settings | |
+| [Postgres wire protocol](/docs/configuration/postgres-wire-protocol/) | PostgreSQL wire protocol connections | |
+| [Replication](/docs/configuration/database-replication/) | High availability cluster replication | ✓ |
+| [Shared workers](/docs/configuration/shared-workers/) | Worker thread pools | |
+| [Storage policy](/docs/configuration/storage-policy/) | Partition lifecycle management | ✓ |
+| [Telemetry](/docs/configuration/telemetry/) | Anonymous usage telemetry | |
+| [TLS encryption](/docs/configuration/tls/) | TLS settings for all interfaces | ✓ |
+| [WAL table configurations](/docs/configuration/wal/) | Write-Ahead Log settings | |

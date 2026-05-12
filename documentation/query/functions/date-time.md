@@ -15,7 +15,7 @@ QuestDB has three temporal types with different precision:
 | :--- | :-------- | :---------------- |
 | `DATE` | milliseconds | ±2.9 million years |
 | `TIMESTAMP` | microseconds | ±290,000 years |
-| `TIMESTAMP_NS` | nanoseconds | ±2,920 years |
+| `TIMESTAMP_NS` | nanoseconds | ±292 years |
 
 All three are stored as signed 64-bit integers representing offsets from the
 Unix epoch. `TIMESTAMP` is recommended for most use cases as it offers the
@@ -59,9 +59,9 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 | :------- | :---------- |
 | [now](#now) | Current timestamp (stable within query) |
 | [now_ns](#now_ns) | Current timestamp with nanosecond precision (stable within query) |
+| [sysdate](#sysdate) | Current date with millisecond precision |
 | [systimestamp](#systimestamp) | Current timestamp (changes per row) |
 | [systimestamp_ns](#systimestamp_ns) | Current timestamp with nanosecond precision (changes per row) |
-| [sysdate](#sysdate) | Current date with millisecond precision |
 | [today](#today-tomorrow-yesterday) | Interval for current day |
 | [tomorrow](#today-tomorrow-yesterday) | Interval for next day |
 | [yesterday](#today-tomorrow-yesterday) | Interval for previous day |
@@ -70,29 +70,29 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 | Function | Description |
 | :------- | :---------- |
-| [extract](#extract) | Extract any time unit from timestamp |
-| [year](#year) | Extract year from timestamp |
-| [month](#month) | Extract month (1-12) |
 | [day](#day) | Extract day of month (1-31) |
-| [hour](#hour) | Extract hour (0-23) |
-| [minute](#minute) | Extract minute (0-59) |
-| [second](#second) | Extract second (0-59) |
-| [millis](#millis) | Extract milliseconds (0-999) |
-| [micros](#micros) | Extract microseconds (0-999) |
-| [nanos](#nanos) | Extract nanoseconds (0-999) |
 | [day_of_week](#day_of_week) | Day number (1=Monday to 7=Sunday) |
 | [day_of_week_sunday_first](#day_of_week_sunday_first) | Day number (1=Sunday to 7=Saturday) |
 | [days_in_month](#days_in_month) | Number of days in the month |
-| [week_of_year](#week_of_year) | Week number in year |
+| [extract](#extract) | Extract any time unit from timestamp |
+| [hour](#hour) | Extract hour (0-23) |
 | [is_leap_year](#is_leap_year) | Check if year is a leap year |
+| [micros](#micros) | Extract microseconds (0-999) |
+| [millis](#millis) | Extract milliseconds (0-999) |
+| [minute](#minute) | Extract minute (0-59) |
+| [month](#month) | Extract month (1-12) |
+| [nanos](#nanos) | Extract nanoseconds (0-999) |
+| [second](#second) | Extract second (0-59) |
+| [week_of_year](#week_of_year) | Week number in year |
+| [year](#year) | Extract year from timestamp |
 
 ### Arithmetic
 
 | Function | Description |
 | :------- | :---------- |
+| [date_trunc](#date_trunc) | Truncate timestamp to specified precision |
 | [dateadd](#dateadd) | Add time period to timestamp |
 | [datediff](#datediff) | Difference between timestamps |
-| [date_trunc](#date_trunc) | Truncate timestamp to specified precision |
 | [timestamp_ceil](#timestamp_ceil) | Round timestamp up to unit boundary |
 | [timestamp_floor](#timestamp_floor) | Round timestamp down to unit/interval boundary |
 
@@ -100,10 +100,10 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 | Function | Description |
 | :------- | :---------- |
-| [to_timestamp](#to_timestamp) | Parse string to timestamp (microsecond) |
-| [to_timestamp_ns](#to_timestamp_ns) | Parse string to timestamp (nanosecond) |
 | [to_date](#to_date) | Parse string to date |
 | [to_str](#to_str) | Format timestamp as string |
+| [to_timestamp](#to_timestamp) | Parse string to timestamp (microsecond) |
+| [to_timestamp_ns](#to_timestamp_ns) | Parse string to timestamp (nanosecond) |
 | [to_timezone](#to_timezone) | Convert timestamp to timezone |
 | [to_utc](#to_utc) | Convert timestamp to UTC |
 
@@ -112,15 +112,15 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 | Function | Description |
 | :------- | :---------- |
 | [interval](#interval) | Create interval from two timestamps |
-| [interval_start](#interval_start) | Extract interval lower bound |
 | [interval_end](#interval_end) | Extract interval upper bound |
+| [interval_start](#interval_start) | Extract interval lower bound |
 
 ### Utilities
 
 | Function | Description |
 | :------- | :---------- |
-| [timestamp_shuffle](#timestamp_shuffle) | Generate random timestamp in range |
 | [pg_postmaster_start_time](#pg_postmaster_start_time) | Server start time (PostgreSQL compatibility) |
+| [timestamp_shuffle](#timestamp_shuffle) | Generate random timestamp in range |
 
 ---
 
@@ -582,33 +582,6 @@ SELECT interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
 - [interval_end](#interval_end) - Extract interval upper bound
 - [TICK syntax](/docs/query/operators/tick/) - For filtering with optimized interval scans
 
-## interval_start
-
-`interval_start(interval)` - extracts the lower bound of the interval.
-
-Use to extract bounds from intervals returned by functions or stored in columns.
-
-**Arguments:**
-
-- `interval` is an `interval`.
-
-**Return value:**
-
-Return value type is `timestamp` or `timestamp_ns`, depending on the type of values in the interval.
-
-**Examples:**
-
-```questdb-sql title="Extract an interval lower bound" demo
-SELECT
-  interval_start(
-    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
-  )
-```
-
-| interval_start              |
-| :-------------------------- |
-| 2024-10-08T11:09:47.573000Z |
-
 ## interval_end
 
 `interval_end(interval)` - extracts the upper bound of the interval.
@@ -635,6 +608,33 @@ SELECT
 | interval_end                |
 | :-------------------------- |
 | 2024-10-09T11:09:47.573000Z |
+
+## interval_start
+
+`interval_start(interval)` - extracts the lower bound of the interval.
+
+Use to extract bounds from intervals returned by functions or stored in columns.
+
+**Arguments:**
+
+- `interval` is an `interval`.
+
+**Return value:**
+
+Return value type is `timestamp` or `timestamp_ns`, depending on the type of values in the interval.
+
+**Examples:**
+
+```questdb-sql title="Extract an interval lower bound" demo
+SELECT
+  interval_start(
+    interval('2024-10-08T11:09:47.573Z', '2024-10-09T11:09:47.573Z')
+  )
+```
+
+| interval_start              |
+| :-------------------------- |
+| 2024-10-08T11:09:47.573000Z |
 
 ## is_leap_year
 
@@ -994,75 +994,6 @@ SELECT second(ts), count() FROM transactions;
 | 58     | 9876  |
 | 59     | 2567  |
 
-## today, tomorrow, yesterday
-
-- `today()` - returns an interval representing the current day.
-
-- `tomorrow()` - returns an interval representing the next day.
-
-- `yesterday()` - returns an interval representing the previous day.
-
-Interval is in the UTC/GMT+0 timezone.
-
-These functions return intervals for use in projections or comparisons. For
-filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
-(`$today`, `$tomorrow`, `$yesterday`) which enables
-[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
-
-**Arguments:**
-
-No arguments taken.
-
-**Return value:**
-
-Return value is of type `interval`.
-
-**Examples:**
-
-```questdb-sql title="Using today"
-SELECT true as in_today FROM long_sequence(1)
-WHERE now() IN today();
-```
-
-## today, tomorrow, yesterday with timezone
-
-- `today(timezone)` - returns an interval representing the current day with
-  timezone adjustment.
-
-- `tomorrow(timezone)` - returns an interval representing the next day timezone
-  adjustment.
-
-- `yesterday(timezone)` - returns an interval representing the previous day
-  timezone adjustment.
-
-**Arguments:**
-
-`timezone` is a `string` matching a timezone.
-
-**Return value:**
-
-Return value is of type `interval`.
-
-**Examples:**
-
-```questdb-sql title="Using today" demo
-SELECT today() as today, today('CEST') as adjusted;
-```
-
-| today                                                    | adjusted                                                 |
-| :------------------------------------------------------- | :------------------------------------------------------- |
-| ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
-
-This function allows the user to specify their local timezone and receive a UTC
-interval that corresponds to their 'day'.
-
-In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM`
-`UTC` the day before.
-
-#### See also
-
-- [TICK syntax](/docs/query/operators/tick/) - Use `$today`, `$tomorrow`, `$yesterday` for optimized filtering
-
 ## sysdate
 
 `sysdate()` - returns the timestamp of the host system as a `date` with
@@ -1174,6 +1105,75 @@ VALUES(systimestamp_ns(), 123.5);
 | ts                             | reading |
 | :----------------------------- | :------ |
 | 2020-01-02T19:28:48.727516132Z | 123.5   |
+
+## today, tomorrow, yesterday
+
+- `today()` - returns an interval representing the current day.
+
+- `tomorrow()` - returns an interval representing the next day.
+
+- `yesterday()` - returns an interval representing the previous day.
+
+Interval is in the UTC/GMT+0 timezone.
+
+These functions return intervals for use in projections or comparisons. For
+filtering in WHERE clauses, prefer [TICK syntax](/docs/query/operators/tick/)
+(`$today`, `$tomorrow`, `$yesterday`) which enables
+[interval scan](/docs/concepts/deep-dive/interval-scan/) optimization.
+
+**Arguments:**
+
+No arguments taken.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today"
+SELECT true as in_today FROM long_sequence(1)
+WHERE now() IN today();
+```
+
+## today, tomorrow, yesterday with timezone
+
+- `today(timezone)` - returns an interval representing the current day with
+  timezone adjustment.
+
+- `tomorrow(timezone)` - returns an interval representing the next day timezone
+  adjustment.
+
+- `yesterday(timezone)` - returns an interval representing the previous day
+  timezone adjustment.
+
+**Arguments:**
+
+`timezone` is a `string` matching a timezone.
+
+**Return value:**
+
+Return value is of type `interval`.
+
+**Examples:**
+
+```questdb-sql title="Using today" demo
+SELECT today() as today, today('CEST') as adjusted;
+```
+
+| today                                                    | adjusted                                                 |
+| :------------------------------------------------------- | :------------------------------------------------------- |
+| ('2024-10-08T00:00:00.000Z', '2024-10-08T23:59:59.999Z') | ('2024-10-07T22:00:00.000Z', '2024-10-08T21:59:59.999Z') |
+
+This function allows the user to specify their local timezone and receive a UTC
+interval that corresponds to their 'day'.
+
+In this example, `CEST` is a +2h offset, so the `CEST` day started at `10:00 PM`
+`UTC` the day before.
+
+#### See also
+
+- [TICK syntax](/docs/query/operators/tick/) - Use `$today`, `$tomorrow`, `$yesterday` for optimized filtering
 
 ## timestamp_ceil
 

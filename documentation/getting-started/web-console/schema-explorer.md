@@ -5,21 +5,21 @@ description: Browse and explore your database structure with the Schema Explorer
 
 import Screenshot from "@theme/Screenshot"
 
-The **Schema Explorer** is the navigation panel on the left side of the Web Console that helps you browse and understand your database structure. It provides a hierarchical view of all tables and materialized views with detailed information about their columns, data types, storage configuration, and relationships.
+The **Schema Explorer** is the navigation panel on the left side of the Web Console that helps you browse and understand your database structure. It provides a hierarchical view of all data sources with detailed information about their columns, data types, storage configuration, and relationships.
 
 You can toggle the Schema Explorer by using the database icon on the left.
 
 <Screenshot
   alt="Schema Explorer in the Web Console"
   src="images/docs/console/schema-explorer.webp"
-  height={614}
-  width={383}
+  height={551}
+  width={319}
 
 />
 
 ## Tree View
 
-The Schema Explorer displays database objects in an expandable tree structure. When you expand a table or materialized view, the following information is available:
+The Schema Explorer displays database objects in an expandable tree structure. When you expand a table, a view, or a materialized view, the following information is available:
 
 ### Folders
 
@@ -36,22 +36,24 @@ All table columns are displayed with their names and data types, each represente
 - **WAL**: Indicates whether Write-Ahead Log is enabled or disabled for the table
 
 :::tip
-Table and materialized view icons visually indicate key storage details such as partitioning and WAL status. Hover over these icons to see detailed information including partitioning strategy, ordering configuration, and WAL status, allowing you to quickly assess critical storage details without expanding the full table structure.
+Icons of the data sources visually indicate key storage details such as partitioning and WAL status. Hover over these icons to see detailed information including partitioning strategy, ordering configuration, and WAL status, allowing you to quickly assess critical storage details without expanding the full table structure.
 ::: 
 
 #### Base Tables
 For materialized views, shows the underlying source tables
 
 ### Context Menu
-Right-clicking on any table or materialized view opens a context menu with the following actions:
+Right-clicking on any data source opens a context menu with the following actions:
 <Screenshot
   alt="Table context menu for quick actions"
   src="images/docs/console/table-context-menu.webp"
-  height={614}
-  width={383}
+  height={150}
+  width={488}
 
 />
+- **View details**: Opens [Table details panel](/docs/getting-started/web-console/table-details) for viewing detailed information about the data source
 - **Copy schema**: Copies the schema of the table to the clipboard
+- **Explain schema with AI**: If [AI Assistant](/docs/getting-started/web-console/questdb-ai) is enabled, this action starts a conversation about the schema of the data source
 - **Resume WAL**: If WAL is suspended for a table, a warning icon is shown to the right of the table name. You can resume WAL from a specific transaction number by clicking on the context menu item.
   
 :::info

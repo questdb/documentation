@@ -10,14 +10,20 @@ Upgrading from QuestDB Open Source to QuestDB Enterprise is straightforward:
 **download the Enterprise binaries, swap them in, and restart**. Your data
 stays in place and works immediately.
 
+:::info Looking to upgrade to a newer version?
+This page covers switching from Open Source to Enterprise. To upgrade QuestDB to
+a newer release, see [Upgrade QuestDB](/docs/operations/upgrade/).
+:::
+
 ## What you get with QuestDB Enterprise
 
 - **TLS encryption** for all network interfaces
 - **Role-based access control (RBAC)** with users, groups, and permissions
 - **Single Sign-On (SSO)** via OpenID Connect
 - **Database replication** for high availability
-- **Multi-tier storage** with seamless object storage integration
-- **Automated backup and recovery** for data protection
+- **[Storage policies](/docs/concepts/storage-policy/)** for automated partition
+  lifecycle management (convert to Parquet, then drop on a schedule)
+- **Automated [backup and recovery](/docs/operations/backup/)** for data protection
 
 ## Upgrade steps
 

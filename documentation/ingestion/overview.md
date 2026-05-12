@@ -85,7 +85,7 @@ For bulk imports or one-time data loads, use the
 <Screenshot
   alt="Screenshot of the UI for import"
   height={535}
-  src="images/docs/console/import-ui.webp"
+  src="images/docs/console/import-csv.webp"
   width={800}
 />
 

@@ -189,3 +189,5 @@ partition as a single unit.
 - [DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/) — Move to cold storage
 - [ATTACH PARTITION](/docs/query/sql/alter-table-attach-partition/) — Restore detached data
 - [TTL](/docs/concepts/ttl/) — Automatic partition cleanup by age
+- [Storage Policy](/docs/concepts/storage-policy/) — Graduated partition
+  lifecycle (convert to Parquet, then drop) in QuestDB Enterprise
