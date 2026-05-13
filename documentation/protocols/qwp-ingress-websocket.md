@@ -5,6 +5,8 @@ description:
   ingest protocol.
 ---
 
+import QwpMessageHeader from "../partials/_qwp.message-header.partial.mdx"
+
 :::info Audience
 
 This is a **wire-protocol specification** for client implementers building a
@@ -195,17 +197,7 @@ def zigzag_decode(n):
 
 ### Message header (12 bytes, fixed)
 
-```text
-Offset  Size  Type    Field           Description
-------  ----  ------  -------------   --------------------------------
-0       4     int32   magic           "QWP1" (0x31505751)
-4       1     uint8   version         Protocol version (0x01)
-5       1     uint8   flags           Encoding flags
-6       2     uint16  table_count     Number of table blocks
-8       4     uint32  payload_length  Payload size in bytes
-```
-
-**Total message size** = 12 + payload_length.
+<QwpMessageHeader />
 
 ### Flags byte
 
@@ -835,6 +827,79 @@ batch size.
 The symbol dictionary limit applies per column in per-table dictionary mode and
 per connection in global delta dictionary mode. Exceeding it causes the server
 to reject the message with `PARSE_ERROR`.
+
+## Client operation
+
+This section describes the high-level batching and I/O behavior a client
+implements. The full client-side substrate (on-disk store-and-forward, frame
+sequence numbers, ACK-driven trim, reconnect/replay semantics) is specified in
+the [connect string reference](/docs/client-configuration/connect-string).
+
+### Double-buffered async I/O
+
+The client uses double-buffered microbatches:
+
+1. The user thread writes rows to the **active** buffer.
+2. When a buffer reaches its threshold (row count, byte size, or age), the
+   client seals it and enqueues it for sending.
+3. A dedicated I/O thread sends batches over the WebSocket.
+4. The client swaps to the other buffer so writing can continue without
+   blocking.
+
+### Auto-flush triggers
+
+| Trigger              | Default    |
+|----------------------|------------|
+| Row count            | 1,000 rows |
+| Byte size            | disabled   |
+| Time since first row | 100 ms     |
+
+### Failover and high availability
+
+Ingress senders use a reconnect loop regardless of whether store-and-forward
+is configured. The two storage modes share identical failover semantics; they
+differ only in where unacknowledged data lives:
+
+- **`sf_dir` set** (store-and-forward): segments are memory-mapped files under
+  `sf_dir`. Unacknowledged data survives sender restarts and is replayed by
+  the next sender bound to the same slot.
+- **`sf_dir` unset** (memory mode): segments are allocated in process memory.
+  Unacknowledged data is lost if the sender process dies. The reconnect loop
+  still spans transient server outages such as rolling upgrades, but the RAM
+  buffer caps how much data can accumulate during the outage.
+
+Connect-string keys that control ingress failover are documented in the
+[reconnect and failover](/docs/client-configuration/connect-string#reconnect-keys)
+section of the connect string reference:
+
+| Key                              | Default   | Description                               |
+|----------------------------------|-----------|-------------------------------------------|
+| `reconnect_max_duration_millis`  | `300000`  | Total outage budget before giving up.     |
+| `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
+| `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
+| `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
+
+Key behaviors:
+
+- **Ingress is zone-blind.** It pins QWP v1 and never reads `SERVER_INFO`, so
+  every host's zone tier is equivalent and selection is based on health state
+  only. The `zone=` connect-string key is accepted but silently ignored, so a
+  connect string shared with egress clients works unchanged on ingress.
+- **Authentication errors are terminal** at any host (`401`/`403`). The
+  reconnect loop does not continue past them.
+- **`421 + X-QuestDB-Role`** is a role reject: transient if the role is
+  `PRIMARY_CATCHUP`, topology-level otherwise.
+- **All other upgrade errors are transient** and feed into the reconnect loop,
+  including `404`, `426`, `503`, generic 4xx/5xx, TCP/TLS failures,
+  mid-stream send/recv errors, and an upgrade response that advertises a QWP
+  version outside the client's supported range (per-endpoint, so a host on a
+  rolling upgrade does not lock the client out of compatible peers).
+
+:::note Enterprise
+
+Multi-host failover with automatic reconnect requires QuestDB Enterprise.
+
+:::
 
 ## Examples
 
