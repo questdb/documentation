@@ -24,6 +24,9 @@ all_queries.sql
 failed_queries.sql
 query_validation_report.txt
 
+# Claude Code local settings (personal permissions, not shared)
+.claude/settings.local.json
+
 # Misc
 .DS_Store
 .env.local
