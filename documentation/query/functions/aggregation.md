@@ -467,8 +467,8 @@ LIMIT 5;
 **Syntax:**
 
 ```questdb-sql
-array_agg(value [, ordered]) -> DOUBLE[]
-array_agg(array [, ordered]) -> DOUBLE[]
+array_agg(value) -> DOUBLE[]
+array_agg(array) -> DOUBLE[]
 ```
 
 Collects row values into a single `DOUBLE[]` array per group. This is the
@@ -482,16 +482,17 @@ When called with a scalar argument, each row's value becomes one element of the
 output array. When called with a `DOUBLE[]` argument, non-null input arrays are
 concatenated into a single flat `DOUBLE[]`.
 
+`array_agg` always executes in parallel across threads while preserving input
+order.
+
 #### Parameters
 
 | Parameter | Type | Description |
 | :-------- | :--- | :---------- |
 | `value` | `DOUBLE` (or castable) | Scalar to collect. Each row's value becomes one element. NULL values are preserved. |
-| `array` | `DOUBLE[]` | Array to concatenate. Non-null arrays are appended into a flat `DOUBLE[]`. NULL and empty arrays are skipped. |
-| `ordered` | `BOOLEAN` (optional, default `true`) | `true` preserves input order. `false` enables parallel execution, but output order is non-deterministic. |
+| `array` | `DOUBLE[]` | One-dimensional array to concatenate. Non-null arrays are appended into a flat `DOUBLE[]`. NULL and empty arrays are skipped. Multi-dimensional arrays (e.g. `DOUBLE[][]`) are rejected. |
 
-Only one of `value` or `array` is used per call. The `ordered` parameter can be
-added as a second argument to either form.
+Only one of `value` or `array` is used per call.
 
 #### Return value
 
@@ -545,21 +546,6 @@ SAMPLE BY 1s;
 
 Produces one array per 1-second bucket containing all trade prices in that
 interval.
-
-**Parallel execution for large datasets:**
-
-```questdb-sql title="array_agg - parallel (unordered) execution"
-SELECT timestamp, array_agg(price, false) AS prices
-FROM trades
-WHERE symbol = 'BTC-USDT'
-  AND timestamp IN '$now - 5s..$now'
-SAMPLE BY 1s;
-```
-
-Passing `false` as the second argument drops the ordering guarantee, allowing
-QuestDB to execute the aggregation in parallel across threads. The array
-elements are the same but their order within each bucket is non-deterministic.
-Use this when element order does not matter and throughput is the priority.
 
 **Concatenate arrays within a time bucket:**
 
