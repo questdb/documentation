@@ -20,6 +20,9 @@ echo "Cookbook root: $COOKBOOK_ROOT"
 echo "Output dir: $OUTPUT_DIR"
 echo ""
 
+# Shared assets directory (logo, QR codes)
+ASSETS_DIR="$(dirname "$SCRIPT_DIR")/whitepaper-generator"
+
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
@@ -36,12 +39,11 @@ pandoc "$OUTPUT_DIR/cookbook-combined.md" \
     -o "$OUTPUT_DIR/questdb-cookbook.pdf" \
     --pdf-engine=xelatex \
     --template="$SCRIPT_DIR/template.tex" \
+    --resource-path="$ASSETS_DIR:$SCRIPT_DIR:$OUTPUT_DIR" \
     --toc \
     --toc-depth=3 \
     --highlight-style=tango \
     --variable=colorlinks:true \
-    --variable=linkcolor:blue \
-    --variable=urlcolor:blue \
     --metadata title="QuestDB Cookbook" \
     --metadata subtitle="SQL Recipes for Time-Series Data" \
     --metadata date="$(date '+%B %Y')"

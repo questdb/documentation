@@ -1,31 +1,32 @@
-% QuestDB Cookbook PDF Template
+% QuestDB Whitepaper PDF Template
 % For pandoc + XeLaTeX
 
 \documentclass[11pt,a4paper]{report}
 
 % Page geometry
-\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+\usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=3cm]{geometry}
 
 % Font setup (XeLaTeX)
 \usepackage{fontspec}
 \setmainfont{Helvetica Neue}
 \setmonofont{Menlo}[Scale=0.85]
 
-% Colors - QuestDB brand (consistent with whitepaper template)
+% Colors - QuestDB brand
 \usepackage{xcolor}
 \definecolor{questdb-pink}{RGB}{209,70,113}
 \definecolor{questdb-dark}{RGB}{38,40,51}
 \definecolor{questdb-gray}{RGB}{100,100,110}
+\definecolor{quote-border}{RGB}{209,70,113}
 
-% Paragraph spacing
+% Paragraph spacing (no indent, space between paragraphs)
 \usepackage{parskip}
 
 % Headers and footers
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\textcolor{questdb-gray}{\small\textbf{QuestDB Cookbook}}}
-\fancyhead[R]{\textcolor{questdb-gray}{\small\leftmark}}
+\fancyhead[L]{\textcolor{questdb-gray}{\small\textbf{QuestDB} $if(date)$\enspace|\enspace $date$$endif$}}
+\fancyhead[R]{\textcolor{questdb-gray}{\small $subtitle$}}
 \fancyfoot[C]{\textcolor{questdb-gray}{\thepage}}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -34,22 +35,6 @@
 \setcounter{secnumdepth}{0}
 \setcounter{tocdepth}{3}
 
-% Prevent orphaned headings at bottom of page
-\widowpenalty=10000
-\clubpenalty=10000
-
-% Custom centered section page command (for cookbook category dividers)
-\newcommand{\sectionpage}[1]{%
-  \clearpage
-  \thispagestyle{empty}
-  \vspace*{\fill}
-  \begin{center}
-    {\Huge\bfseries\textcolor{questdb-pink}{#1}}
-  \end{center}
-  \vspace*{\fill}
-  \clearpage
-}
-
 % Hyperlinks
 \usepackage{hyperref}
 \hypersetup{
@@ -57,7 +42,7 @@
   linkcolor=questdb-pink,
   urlcolor=questdb-pink,
   citecolor=questdb-pink,
-  pdftitle={QuestDB Cookbook},
+  pdftitle={$title$},
   pdfauthor={QuestDB},
 }
 
@@ -66,23 +51,64 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{calc}
+\usepackage{tabularx}
+
+% Compact tables: smaller font, tighter padding, row separators
+\usepackage{etoolbox}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+
+% Compact tables with alternating row shading for readability.
+% Pandoc's longtable only generates header/footer rules, not inter-row
+% rules. Alternating row colors visually separate rows without needing
+% \hline between every row.
+\AtBeginEnvironment{longtable}{%
+  \small%
+  \setlength{\tabcolsep}{3pt}%
+  \renewcommand{\arraystretch}{1.35}%
+  \rowcolors{2}{gray!8}{white}%
+}
 
 % Graphics
 \usepackage{graphicx}
 
-% Reset Pandoc's default height=\textheight for images
+% Reset Pandoc's default height=\textheight which stretches images
+% to full page height. Keep aspect ratio and let width control size.
 \setkeys{Gin}{keepaspectratio}
 
-% Force images inline (no floating)
+% Force images to stay inline (no floating). Pandoc wraps images in
+% figure environments which LaTeX can float away from context.
 \usepackage{float}
 \floatplacement{figure}{H}
+
+% For blockquotes styling
+\usepackage{mdframed}
+\renewenvironment{quote}{%
+  \begin{mdframed}[
+    linewidth=2pt,
+    linecolor=quote-border,
+    leftline=true,
+    rightline=false,
+    topline=false,
+    bottomline=false,
+    innerleftmargin=12pt,
+    innerrightmargin=12pt,
+    innertopmargin=8pt,
+    innerbottommargin=8pt,
+    backgroundcolor=white,
+    skipabove=12pt,
+    skipbelow=12pt
+  ]
+  \itshape
+}{%
+  \end{mdframed}
+}
 
 % Pandoc requirements
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 
-% Code blocks (Shaded environment for pandoc)
+% Code blocks
 \usepackage{fancyvrb}
-\usepackage{mdframed}
 \newenvironment{Shaded}{%
   \begin{mdframed}[
     backgroundcolor=questdb-dark!5,
@@ -128,10 +154,12 @@
 \newcommand{\AlertTok}[1]{#1}
 \newcommand{\ErrorTok}[1]{#1}
 
-% Section styling with orphan prevention
-\usepackage{titlesec}
-\usepackage{needspace}
+% Prevent orphaned headings at bottom of page (heading with no content)
+\widowpenalty=10000
+\clubpenalty=10000
 
+% Section styling - larger, colored
+\usepackage{titlesec}
 \titleformat{\chapter}[display]
   {\normalfont\huge\bfseries\color{questdb-dark}}
   {}
@@ -139,19 +167,13 @@
   {}
 \titlespacing*{\chapter}{0pt}{-30pt}{20pt}
 
+\usepackage{needspace}
 \titleformat{\section}
   {\normalfont\Large\bfseries\color{questdb-dark}\needspace{6\baselineskip}}
   {}
   {0pt}
   {}
 \titlespacing*{\section}{0pt}{24pt}{12pt}
-
-\titleformat{\subsection}
-  {\normalfont\large\bfseries\color{questdb-dark}\needspace{5\baselineskip}}
-  {}
-  {0pt}
-  {}
-\titlespacing*{\subsection}{0pt}{18pt}{8pt}
 
 \titleformat{\subsubsection}
   {\normalfont\normalsize\bfseries\color{questdb-dark}\needspace{4\baselineskip}}
@@ -160,7 +182,14 @@
   {}
 \titlespacing*{\subsubsection}{0pt}{14pt}{6pt}
 
-% Title variables
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{questdb-dark}\needspace{5\baselineskip}}
+  {}
+  {0pt}
+  {}
+\titlespacing*{\subsection}{0pt}{18pt}{8pt}
+
+% Title variables from pandoc metadata
 $if(title)$
 \title{$title$}
 $endif$
@@ -170,24 +199,32 @@ $endif$
 
 \begin{document}
 
+% ============================================================
 % Title page
+% ============================================================
 \begin{titlepage}
 \centering
 
 \vspace*{3cm}
 
 % Logo
-\includegraphics[width=6cm]{questdb-logo.pdf}
+$if(logo)$
+\includegraphics[width=6cm]{$logo$}
+$else$
+{\fontsize{48}{52}\selectfont\textcolor{questdb-pink}{\textbf{QuestDB}}}
+$endif$
 
 \vspace{2cm}
 
 % Title
-{\fontsize{28}{34}\selectfont\textbf{QuestDB Cookbook}\par}
+{\fontsize{28}{34}\selectfont\textbf{$title$}\par}
 
 \vspace{0.8cm}
 
 % Subtitle
-{\fontsize{16}{20}\selectfont\textcolor{questdb-gray}{SQL Recipes for Time-Series Data}\par}
+$if(subtitle)$
+{\fontsize{16}{20}\selectfont\textcolor{questdb-gray}{$subtitle$}\par}
+$endif$
 
 \vspace{1.5cm}
 
@@ -196,19 +233,26 @@ $endif$
 
 \vfill
 
-% QR code
+% QR code on title page
+$if(qrcode)$
 \begin{center}
-\includegraphics[width=2.5cm]{qr-cookbook.png}
+\includegraphics[width=2.5cm]{$qrcode$}
 \end{center}
+$endif$
 
 \vspace{1cm}
 
 \end{titlepage}
 
+% ============================================================
 % Table of contents
+% ============================================================
 \tableofcontents
 \newpage
 
+% ============================================================
+% Body
+% ============================================================
 $body$
 
 \end{document}
