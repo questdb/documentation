@@ -45,11 +45,11 @@ module.exports = {
     },
 
     // ===================
-    // INGESTION REFERENCE
+    // CONNECT
     // ===================
     {
       type: "category",
-      label: "Ingestion Reference",
+      label: "Connect",
       items: [
         {
           id: "ingestion/overview",
@@ -57,14 +57,23 @@ module.exports = {
           label: "Overview",
         },
         {
+          id: "client-configuration/connect-string",
+          type: "doc",
+          label: "Connect string",
+        },
+        {
+          id: "ingestion/clients/date-to-timestamp-conversion",
+          type: "doc",
+          label: "Date to Timestamp",
+        },
+        {
           type: "category",
-          label: "Language Clients",
-          collapsed: true,
+          label: "Client Libraries",
           items: [
             {
-              id: "ingestion/clients/configuration-string",
+              id: "ingestion/clients/java",
               type: "doc",
-              label: "Configuration String",
+              label: "Java",
             },
             {
               id: "ingestion/clients/python",
@@ -75,11 +84,6 @@ module.exports = {
               id: "ingestion/clients/go",
               type: "doc",
               label: "Go",
-            },
-            {
-              id: "ingestion/clients/java",
-              type: "doc",
-              label: "Java",
             },
             {
               id: "ingestion/clients/rust",
@@ -101,32 +105,16 @@ module.exports = {
               type: "doc",
               label: ".NET",
             },
-            {
-              id: "ingestion/clients/date-to-timestamp-conversion",
-              type: "doc",
-              label: "Date to Timestamp",
-            },
           ],
         },
         {
           type: "category",
-          label: "Message Brokers",
-          collapsed: true,
-          items: [
-            "ingestion/message-brokers/kafka",
-            "ingestion/message-brokers/telegraf",
-            "ingestion/message-brokers/redpanda",
-            "ingestion/message-brokers/flink",
-          ],
-        },
-        {
-          type: "category",
-          label: "Protocols",
-          collapsed: true,
+          label: "Compatibility Protocols",
           items: [
             {
               type: "category",
               label: "InfluxDB Line Protocol (ILP)",
+              collapsed: true,
               items: [
                 {
                   id: "ingestion/ilp/overview",
@@ -143,91 +131,136 @@ module.exports = {
                   type: "doc",
                   label: "Advanced Settings",
                 },
+                {
+                  id: "ingestion/java-embedded",
+                  type: "doc",
+                  label: "Java Embedded",
+                },
+                {
+                  type: "category",
+                  label: "Message Brokers",
+                  collapsed: true,
+                  items: [
+                    "ingestion/message-brokers/kafka",
+                    "ingestion/message-brokers/telegraf",
+                    "ingestion/message-brokers/redpanda",
+                    "ingestion/message-brokers/flink",
+                  ],
+                },
               ],
             },
             {
-              id: "ingestion/java-embedded",
-              type: "doc",
-              label: "Java Embedded",
+              type: "category",
+              label: "PostgreSQL Wire Protocol (PGWire)",
+              collapsed: true,
+              items: [
+                {
+                  id: "query/pgwire/overview",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "query/pgwire/large-result-sets",
+                  type: "doc",
+                  label: "Large Result Sets",
+                },
+                {
+                  id: "query/pgwire/python",
+                  type: "doc",
+                  label: "Python",
+                },
+                {
+                  id: "query/pgwire/go",
+                  type: "doc",
+                  label: "Go",
+                },
+                {
+                  id: "query/pgwire/java",
+                  type: "doc",
+                  label: "Java",
+                },
+                {
+                  id: "query/pgwire/rust",
+                  type: "doc",
+                  label: "Rust",
+                },
+                {
+                  id: "query/pgwire/nodejs",
+                  type: "doc",
+                  label: "Node.js",
+                },
+                {
+                  id: "query/pgwire/dotnet",
+                  type: "doc",
+                  label: ".NET",
+                },
+                {
+                  id: "query/pgwire/php",
+                  type: "doc",
+                  label: "PHP",
+                },
+                {
+                  id: "query/pgwire/r",
+                  type: "doc",
+                  label: "R",
+                },
+                {
+                  id: "query/pgwire/c-and-cpp",
+                  type: "doc",
+                  label: "C/C++",
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "REST API",
+              collapsed: true,
+              items: [
+                "query/rest-api",
+                "ingestion/import-csv",
+                "query/export-parquet",
+              ],
             },
           ],
         },
-        "ingestion/import-csv",
-      ],
-    },
-
-    // ===================
-    // QUERY & SQL REFERENCE
-    // ===================
-    {
-      type: "category",
-      label: "Query & SQL Reference",
-      items: [
-        "query/overview",
         {
+          label: "Wire Protocols",
           type: "category",
-          label: "PostgreSQL Wire Protocol",
           collapsed: true,
           items: [
             {
-              id: "query/pgwire/overview",
+              id: "protocols/overview",
               type: "doc",
               label: "Overview",
             },
             {
-              id: "query/pgwire/large-result-sets",
+              id: "protocols/qwp-ingress-websocket",
               type: "doc",
-              label: "Large Result Sets",
+              label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "query/pgwire/python",
+              id: "protocols/qwp-ingress-udp",
               type: "doc",
-              label: "Python",
+              label: "QWP Ingress (UDP)",
             },
             {
-              id: "query/pgwire/go",
+              id: "protocols/qwp-egress-websocket",
               type: "doc",
-              label: "Go",
-            },
-            {
-              id: "query/pgwire/java",
-              type: "doc",
-              label: "Java",
-            },
-            {
-              id: "query/pgwire/rust",
-              type: "doc",
-              label: "Rust",
-            },
-            {
-              id: "query/pgwire/nodejs",
-              type: "doc",
-              label: "Node.js",
-            },
-            {
-              id: "query/pgwire/dotnet",
-              type: "doc",
-              label: ".NET",
-            },
-            {
-              id: "query/pgwire/php",
-              type: "doc",
-              label: "PHP",
-            },
-            {
-              id: "query/pgwire/r",
-              type: "doc",
-              label: "R",
-            },
-            {
-              id: "query/pgwire/c-and-cpp",
-              type: "doc",
-              label: "C/C++",
+              label: "QWP Egress (WebSocket)",
             },
           ],
         },
-        "query/rest-api",
-        "query/export-parquet",
+      ],
+    },
+
+    // ===================
+    // SQL REFERENCE
+    // ===================
+    {
+      type: "category",
+      label: "SQL Reference",
+      items: [
+        "query/overview",
         {
           type: "category",
           label: "Data Types",

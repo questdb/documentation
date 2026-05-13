@@ -200,7 +200,7 @@ WHERE walEnabled
 
 **Resolution:**
 
-- Use the [official client libraries](/docs/ingestion/overview/#first-party-clients)
+- Use the [official client libraries](/docs/ingestion/overview/#client-libraries)
   which handle batching automatically
 - For custom ILP clients, configure auto-flush by row count or time interval
   rather than flushing after each row

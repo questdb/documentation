@@ -170,7 +170,7 @@ PreparedStatement ps = connection.prepareStatement("INSERT INTO my_table VALUES 
 ps.setObject(1, uuid);
 ```
 
-[QuestDB Client Libraries](/docs/ingestion/overview/#first-party-clients) can
+[QuestDB Client Libraries](/docs/ingestion/overview/#client-libraries) can
 send `UUIDs` as `strings` to be converted to UUIDs by the server.
 
 ## IPv4

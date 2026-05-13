@@ -209,7 +209,7 @@ As of QuestDB 7.4.2, InfluxDB Line Protocol operates over HTTP instead of TCP.
 
 As such, ILP is optimal out-of-the box.
 
-See your [ILP client](/docs/ingestion/overview/#first-party-clients) for
+See your [ILP client](/docs/ingestion/overview/#client-libraries) for
 language-specific configurations.
 
 ### Postgres Wire Protocol

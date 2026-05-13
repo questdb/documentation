@@ -41,7 +41,7 @@ const resources: Array<Resource> = [
     },
   },
   {
-    href: '/docs/ingestion/overview/#first-party-clients',
+    href: '/docs/ingestion/overview/#client-libraries',
     name: 'Language clients',
     description:
       'Explore our language clients and how to use them to ingest data into QuestDB.',
