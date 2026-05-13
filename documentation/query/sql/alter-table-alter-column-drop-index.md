@@ -8,8 +8,9 @@ Removes an existing [index](/docs/concepts/deep-dive/indexes/) from a column of 
 
 
 ## Syntax
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of the ALTER TABLE with DROP INDEX keyword](/images/docs/diagrams/dropIndex.svg)
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName DROP INDEX;
+```
 
 Removing an index is an atomic, non-blocking, and non-waiting operation. Once
 the operation is completed, the SQL engine stops using the index for SQL
@@ -18,10 +19,10 @@ executions, and all its associated files are deleted.
 This operation is similar to:
 
 ```sql
-UPDATE tab SET column=column;
+UPDATE tableName SET columnName = columnName;
 ```
 
-Where `column` is a symbol column that has an [index](/docs/concepts/deep-dive/indexes/)
+Where `columnName` is a symbol column that has an [index](/docs/concepts/deep-dive/indexes/)
 before the operation, and no index afterwards. Readers of the table might be
 using the index in transaction A, in the meantime, a writer creates transaction
 B containing the new version of the column, minus the index (metadata is set to
@@ -34,5 +35,5 @@ change at all).
 ## Example
 
 ```questdb-sql title="Removing an index"
-ALTER TABLE trades ALTER COLUMN instrument DROP INDEX;
+ALTER TABLE trades ALTER COLUMN side DROP INDEX;
 ```

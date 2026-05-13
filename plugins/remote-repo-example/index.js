@@ -15,7 +15,7 @@ const sources = [
   "questdb/go-questdb-client/main",
   "questdb/nodejs-questdb-client/main",
   "questdb/net-questdb-client/main",
-  "questdb/questdb/master",
+  "questdb/java-questdb-client/master",
 ]
 
 module.exports = () => ({
@@ -59,10 +59,12 @@ module.exports = () => ({
         }
         const codeUrl = `${rawRoot}/${path}`
         const codeRequest = await nodeFetch(codeUrl)
-        if (codeRequest.status != 200)
-          throw new Error(
-            `Could not load code from ${codeUrl}: Error ${codeRequest.status}`,
+        if (codeRequest.status != 200) {
+          console.warn(
+            `[remote-repo-example] Skipping ${codeUrl}: Error ${codeRequest.status}`,
           )
+          continue
+        }
         const code = await codeRequest.text()
         const id = `${name}/${lang}`
         examples[id] = {

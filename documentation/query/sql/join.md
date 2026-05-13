@@ -5,10 +5,10 @@ description: JOIN SQL keyword reference documentation.
 ---
 
 QuestDB supports the type of joins you can frequently find in
-[relational databases](/glossary/relational-database/): `INNER`, `LEFT (OUTER)`,
-`CROSS`. Additionally, it implements joins which are particularly useful for
-time-series analytics: `ASOF`, `LT`, `SPLICE`, and `WINDOW`. `FULL` joins are
-not yet implemented and are on our roadmap.
+[relational databases](/glossary/relational-database/): `INNER`,
+`LEFT [OUTER]`, `RIGHT [OUTER]`, `FULL [OUTER]`, `CROSS`, and `LATERAL`.
+Additionally, it implements joins which are particularly useful for
+time-series analytics: `ASOF`, `LT`, `SPLICE`, `HORIZON`, and `WINDOW`.
 
 All supported join types can be combined in a single SQL statement; QuestDB
 SQL's optimizer determines the best execution order and algorithms.
@@ -20,27 +20,51 @@ joins and there are no limitations on the number of joins, either.
 
 High-level overview:
 
-![Flow chart showing the syntax of the high-level syntax of the JOIN keyword](/images/docs/diagrams/joinOverview.svg)
+```questdb-sql
+selectClause joinClause [WHERE whereClause];
+```
 
 - `selectClause` - see [SELECT](/docs/query/sql/select/) for more
   information.
 - `whereClause` - see [WHERE](/docs/query/sql/where/) for more information.
 - The specific syntax for `joinClause` depends on the type of `JOIN`:
 
-  - `INNER` and `LEFT` `JOIN` has a mandatory `ON` clause allowing arbitrary
-    `JOIN` predicates, `operator`:
+`INNER`, `LEFT`, `RIGHT`, and `FULL` `JOIN` have a mandatory `ON` clause
+allowing arbitrary join predicates. The `OUTER` keyword is optional in
+`LEFT`, `RIGHT`, and `FULL`:
 
-  ![Flow chart showing the syntax of the INNER, LEFT JOIN keyword](/images/docs/diagrams/InnerLeftJoin.svg)
+```questdb-sql
+[INNER | LEFT [OUTER] | RIGHT [OUTER] | FULL [OUTER]] JOIN
+    { table | (subQuery) }
+    ON ( column operator anotherColumn [AND column operator anotherColumn ...]
+       | (column [, column ...]) );
+```
 
-  - `ASOF`, `LT`, and `SPLICE` `JOIN` has optional `ON` clause allowing only the
-    `=` predicate. 
-  - `ASOF` and `LT` join additionally allows an optional `TOLERANCE` clause:
+`ASOF`, `LT`, and `SPLICE` `JOIN` have an optional `ON` clause allowing only
+the `=` predicate. `ASOF` and `LT` additionally allow an optional `TOLERANCE`
+clause:
 
-  ![Flow chart showing the syntax of the ASOF, LT, and SPLICE JOIN keyword](/images/docs/diagrams/AsofLtSpliceJoin.svg)
+```questdb-sql
+{ ASOF | LT } JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )]
+    [TOLERANCE intervalLiteral];
 
-  - `CROSS JOIN` does not allow any `ON` clause:
+SPLICE JOIN { table | (subQuery) }
+    [ON ( column = anotherColumn [AND column = anotherColumn ...]
+        | (column [, column ...]) )];
+```
 
-  ![Flow chart showing the syntax of the CROSS JOIN keyword](/images/docs/diagrams/crossJoin.svg)
+`CROSS JOIN` does not allow any `ON` clause:
+
+```questdb-sql
+CROSS JOIN { table | (subQuery) };
+```
+
+`HORIZON JOIN`, `WINDOW JOIN`, and `LATERAL JOIN` are specialized joins with
+their own dedicated syntax - see [HORIZON JOIN](/docs/query/sql/horizon-join/),
+[WINDOW JOIN](/docs/query/sql/window-join/), and
+[LATERAL JOIN](/docs/query/sql/lateral-join/) for details.
 
 Columns from joined tables are combined in a single row. Columns with the same
 name originating from different tables will be automatically aliased to create a
@@ -54,37 +78,37 @@ transient join conditions where necessary.
 
 Join operations are performed in order of their appearance in a SQL query. The
 following query performs a join on a table with a very small table (just one row
-in this example) and a bigger table with 10 million rows:
+in this example) and a bigger table with 1 million rows:
 
-```questdb-sql
+```questdb-sql demo title="Small table first (slower)"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 10000000),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -1000000),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM Lookup
-INNER JOIN ManyTrades
-  ON Lookup.symbol = Manytrades.symbol;
+FROM lookup
+INNER JOIN many_trades
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 The performance of this query can be improved by rewriting the query as follows:
 
-```questdb-sql
+```questdb-sql demo title="Large table first (faster)"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 10000000),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -1000000),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-INNER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+INNER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 As a general rule, whenever you have a table significantly larger than the
 other, try to use the large one first. If you use `EXPLAIN` with the queries
-above, you should see the first version needs to Hash over 10 million rows,
+above, you should see the first version needs to Hash over 1 million rows,
 while the second version needs to Hash only over 1 row.
 
 ## Implicit joins
@@ -146,7 +170,7 @@ and `side`:
 
 It is possible to add multiple JOIN ON condition:
 
-```questdb-sql
+```questdb-sql demo title="Multiple JOIN ON conditions"
 WITH
   mayTrades AS (
     SELECT symbol, side, COUNT(*) as total
@@ -162,16 +186,18 @@ WITH
     ORDER BY Symbol
     LIMIT 4
   )
-SELECT *
+SELECT mayTrades.symbol, juneTrades.symbol,
+    mayTrades.side, juneTrades.side,
+    mayTrades.total, juneTrades.total
 FROM mayTrades
-JOIN JuneTrades
+JOIN juneTrades
   ON mayTrades.symbol = juneTrades.symbol
     AND mayTrades.side = juneTrades.side;
 ```
 
 The query can be simplified further since the column names are identical:
 
-```questdb-sql
+```questdb-sql demo title="Shorthand ON with matching column names"
 WITH
   mayTrades AS (
     SELECT symbol, side, COUNT(*) as total
@@ -187,39 +213,29 @@ WITH
     ORDER BY Symbol
     LIMIT 4
   )
-SELECT *
+SELECT mayTrades.symbol, juneTrades.symbol,
+    mayTrades.side, juneTrades.side,
+    mayTrades.total, juneTrades.total
 FROM mayTrades
-JOIN JuneTrades ON (symbol, side);
+JOIN juneTrades ON (symbol, side);
 ```
 
 The result of both queries is the following:
 
 <div className="table-alternate">
 
-| symbol  | symbol1 | side | side1 | total  | total1 |
-| ------- | ------- | ---- | ----- | ------ | ------ |
-| ADA-BTC | ADA-BTC | buy  | buy   | 8079   | 10253  |
-| ADA-BTC | ADA-BTC | sell | sell  | 7678   | 17460  |
-| ADA-USD | ADA-USD | buy  | buy   | 308271 | 312359 |
-| ADA-USD | ADA-USD | sell | sell  | 279624 | 245066 |
+| symbol  | symbol_2 | side | side_2 | total  | total_2 |
+| ------- | -------- | ---- | ------ | ------ | ------- |
+| ADA-BTC | ADA-BTC  | buy  | buy    | 8079   | 10253   |
+| ADA-BTC | ADA-BTC  | sell | sell   | 7678   | 17460   |
+| ADA-USD | ADA-USD  | buy  | buy    | 308271 | 312359  |
+| ADA-USD | ADA-USD  | sell | sell   | 279624 | 245066  |
 
 </div>
 
-## ASOF JOIN
+## Standard SQL joins
 
-ASOF JOIN is a powerful time-series join extension.
-
-It has its own page, [ASOF JOIN](/docs/query/sql/asof-join/).
-
-## WINDOW JOIN
-
-WINDOW JOIN aggregates data from a related table within a time-based window
-around each row. It is useful for calculating rolling statistics, moving
-averages, or aggregating readings within time windows.
-
-It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).
-
-## (INNER) JOIN
+### (INNER) JOIN
 
 `(INNER) JOIN` returns rows from two tables where the records on the compared
 column have matching values in both tables. `JOIN` is interpreted as
@@ -230,7 +246,7 @@ The query we just saw above is an example. It returns the `symbol`, `side` and
 `total` from the `juneTrades` subquery. Both tables are matched based on the
 `symbol` and `side`, as specified on the `ON` condition.
 
-## LEFT (OUTER) JOIN
+### LEFT (OUTER) JOIN
 
 `LEFT OUTER JOIN` or simply `LEFT JOIN` returns **all** records from the left
 table, and if matched, the records of the right table. When there is no match
@@ -238,55 +254,110 @@ for the right table, it returns `NULL` values in right table fields.
 
 The general syntax is as follows:
 
-```questdb-sql title="LEFT JOIN ON"
+```questdb-sql demo title="LEFT JOIN ON"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT OUTER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+LEFT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 In this example, the result will have 100 rows, one for each row on the
-`ManyTrades` subquery. When there is no match with the `Lookup` subquery, the
-columns `Symbol1` and `Description` will be `null`.
+`many_trades` subquery. When there is no match with the `lookup` subquery, the
+columns `symbol_2` and `description` will be `null`.
 
-```sql
--- Omitting 'OUTER' makes no difference:
+```questdb-sql demo title="Omitting OUTER makes no difference"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol;
+FROM many_trades
+LEFT JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
 ```
 
 A `LEFT OUTER JOIN` query can also be used to select all rows in the left table
 that do not exist in the right table.
 
-```questdb-sql
+```questdb-sql demo title="LEFT JOIN to find non-matching rows"
 WITH
-  Manytrades AS
-    (SELECT * FROM trades limit 100),
-  Lookup AS
-    (SELECT  'BTC-USD' AS Symbol, 'Bitcoin/USD Pair' AS Description)
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
 SELECT *
-FROM ManyTrades
-LEFT OUTER JOIN Lookup
-  ON Lookup.symbol = Manytrades.symbol
-WHERE Lookup.Symbol = NULL;
+FROM many_trades
+LEFT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol
+WHERE lookup.symbol = NULL;
 ```
 
-In this case, the result has 71 rows out of the 100 in the larger table, and the
-columns corresponding to the `Lookup` table are all `NULL`.
+In this case, the columns corresponding to the `lookup` table are all `NULL`.
 
-## CROSS JOIN
+### RIGHT (OUTER) JOIN
+
+`RIGHT OUTER JOIN` or simply `RIGHT JOIN` is the mirror of `LEFT JOIN`: it
+returns **all** records from the right table, and if matched, the records
+from the left table. When there is no match for the left table, it returns
+`NULL` values in left table fields.
+
+```questdb-sql demo title="RIGHT JOIN ON"
+WITH
+  many_trades AS
+    (SELECT * FROM trades LIMIT -100),
+  lookup AS
+    (SELECT 'BTC-USDT' AS symbol, 'Bitcoin/USDT Pair' AS description)
+SELECT *
+FROM many_trades
+RIGHT OUTER JOIN lookup
+  ON lookup.symbol = many_trades.symbol;
+```
+
+Any `RIGHT JOIN` can be rewritten as a `LEFT JOIN` by swapping the order of
+the tables, which is generally considered more idiomatic. `RIGHT JOIN` is
+useful when the left side of the join is itself the result of earlier joins
+in the query — rewriting it as `LEFT JOIN` would otherwise require
+restructuring the chain or wrapping it in a subquery.
+
+### FULL (OUTER) JOIN
+
+`FULL OUTER JOIN` or simply `FULL JOIN` is the union of `LEFT JOIN` and
+`RIGHT JOIN`: it returns **all** records from both tables. Matched rows
+are combined into one row, while unmatched rows from either side appear
+with `NULL` in the columns of the other table.
+
+```questdb-sql demo title="FULL JOIN ON"
+WITH
+  may_trades AS (
+    SELECT symbol, COUNT(*) AS may_total
+    FROM trades
+    WHERE timestamp IN '2024-05'
+  ),
+  june_trades AS (
+    SELECT symbol, COUNT(*) AS june_total
+    FROM trades
+    WHERE timestamp IN '2024-06'
+  )
+SELECT
+  COALESCE(may_trades.symbol, june_trades.symbol) AS symbol,
+  may_total,
+  june_total
+FROM may_trades
+FULL OUTER JOIN june_trades
+  ON may_trades.symbol = june_trades.symbol;
+```
+
+Symbols traded in only one of the two months get `NULL` for the other
+month's total. This makes `FULL JOIN` a natural fit for reconciliation
+queries that need to find rows present in one dataset but not the other.
+
+### CROSS JOIN
 
 `CROSS JOIN` returns the Cartesian product of the two tables being joined and
 can be used to create a table with all possible combinations of columns.
@@ -296,16 +367,13 @@ compare row by row if we have any rows with exactly the same values for all the
 columns except the timestamp, and if the timestamps are within 10 seconds from
 each other:
 
-```questdb-sql
--- detect potential duplicates, with same values
--- and within a 10 seconds range
-
+```questdb-sql demo title="Detect potential duplicate trades"
 WITH t AS (
-  SELECT * FROM trades WHERE timestamp IN '2024-06-01'
+  SELECT * FROM trades LIMIT -10000
 )
-SELECT * from t CROSS JOIN t AS t2
+SELECT * FROM t CROSS JOIN t AS t2
 WHERE t.timestamp < t2.timestamp
-  AND datediff('s', t.timestamp , t2.timestamp ) < 10
+  AND datediff('s', t.timestamp, t2.timestamp) < 10
   AND t.symbol = t2.symbol
   AND t.side = t2.side
   AND t.price = t2.price
@@ -318,9 +386,29 @@ WHERE t.timestamp < t2.timestamp
 
 :::
 
-## LT JOIN
+### LATERAL JOIN
 
-Similar to [`ASOF JOIN`](/docs/query/sql/asof-join/), `LT JOIN` joins two different time-series measured. For
+`LATERAL JOIN` allows a subquery on the right-hand side of a join to reference
+columns from tables that appear earlier in the `FROM` clause. It is useful for
+top-N per group queries, per-row aggregates, and dynamic filters whose
+thresholds come from the outer row.
+
+It has its own page, [LATERAL JOIN](/docs/query/sql/lateral-join/).
+
+## Time-series joins
+
+### ASOF JOIN
+
+ASOF JOIN matches each row in a time-series table with the most recent row in
+another time-series table whose timestamp is at or before the left row's
+timestamp. Typical use cases include attaching the prevailing market quote to
+each trade, or enriching events with the latest known state.
+
+It has its own page, [ASOF JOIN](/docs/query/sql/asof-join/).
+
+### LT JOIN
+
+Similar to [`ASOF JOIN`](/docs/query/sql/asof-join/), `LT JOIN` joins two different time-series. For
 each row in the first time-series, the `LT JOIN` takes from the second
 time-series a timestamp that meets both of the following criteria:
 
@@ -329,7 +417,7 @@ time-series a timestamp that meets both of the following criteria:
 
 In other words: `LT JOIN` won't join records with equal timestamps.
 
-### Example
+#### Example
 
 Consider the following tables:
 
@@ -403,7 +491,7 @@ order to get preceding values for every row.
 The `ON` clause can also be used in combination with `LT JOIN` to join both by
 timestamp and column values.
 
-### TOLERANCE clause
+#### TOLERANCE clause
 
 The `TOLERANCE` clause enhances LT JOIN by limiting how far back in time the join should look for a match in the right
 table. The `TOLERANCE` parameter accepts a time interval value (e.g., 2s, 100ms, 1d).
@@ -424,7 +512,7 @@ LT JOIN table2 TOLERANCE 10s
 The interval_literal must be a valid QuestDB interval string, like '5s' (5 seconds), '100ms' (100 milliseconds),
 '2m' ( 2 minutes), '3h' (3 hours), or '1d' (1 day).
 
-#### Supported Units for interval_literal
+##### Supported Units for interval_literal
 
 The `TOLERANCE` interval literal supports the following time unit qualifiers:
 
@@ -442,18 +530,18 @@ For example, '100U' is 100 microseconds, '50T' is 50 milliseconds, '2s' is 2 sec
 units for the `TOLERANCE` clause.
 
 The effective precision of the `TOLERANCE` clause depends on the
-[designated timestamp resolution](/docs/concepts/designated-timestamp/#resolution)
+[designated timestamp resolution](/docs/concepts/designated-timestamp/#timestamp-resolution)
 of the tables involved. For example, if a table uses microsecond resolution, specifying nanosecond
 tolerance (e.g., `500n`) will not provide nanosecond-level matching precision.
 
 See [`ASOF JOIN documentation`](/docs/query/sql/asof-join#tolerance-clause) for more examples with the `TOLERANCE` clause.
 
-## SPLICE JOIN
+### SPLICE JOIN
 
-`SPLICE JOIN` is a full `ASOF JOIN`. It will return all the records from both
-tables. For each record from left table splice join will find prevailing record
-from right table and for each record from right table - prevailing record from
-left table.
+`SPLICE JOIN` is a full `ASOF JOIN`. It returns all records from both tables.
+For each record from the left table, it finds the prevailing record from the
+right table, and for each record from the right table, the prevailing record
+from the left table.
 
 Considering the following tables:
 
@@ -512,3 +600,19 @@ This query returns the following results:
 
 Note that the above query does not use the optional `ON` clause. In case you
 need additional filtering on the two tables, the `ON` clause can also be used.
+
+### HORIZON JOIN
+
+HORIZON JOIN is a specialized time-series join for markout analysis and event
+impact studies. It combines ASOF JOIN matching with a set of time offsets,
+computing aggregations at each offset in a single pass.
+
+It has its own page, [HORIZON JOIN](/docs/query/sql/horizon-join/).
+
+### WINDOW JOIN
+
+WINDOW JOIN aggregates data from a related table within a time-based window
+around each row. It is useful for calculating rolling statistics, moving
+averages, or aggregating readings within time windows.
+
+It has its own page, [WINDOW JOIN](/docs/query/sql/window-join/).

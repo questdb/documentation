@@ -130,7 +130,7 @@ csvstack *.csv > singleFile.csv
 
 #### Configure `COPY`
 
-- Enable `COPY` and [configure](/docs/configuration/overview/#copy-settings) the `COPY`
+- Enable `COPY` and [configure](/docs/configuration/copy-settings/) the `COPY`
   directories to suit your server.
 - `cairo.sql.copy.root` must be set for `COPY` to work.
 
@@ -497,7 +497,7 @@ TRUNCATE TABLE table_name;
 or import into another empty table and then use `INSERT INTO SELECT`:
 
 ```questdb-sql
-INSERT INTO table_name batch 100000
+INSERT BATCH 100000 INTO table_name
 SELECT * FROM other_table;
 ```
 

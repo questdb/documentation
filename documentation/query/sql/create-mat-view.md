@@ -20,13 +20,17 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
 AS [ ( ] query [ ) ]
 [ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) [ TTL n timeUnit ] ]
+[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+      [ TTL n timeUnit
+      | STORAGE POLICY ( policyStage [, policyStage ...] ) ] ]
 [ OWNED BY ownerName ]
 ```
 
 Where:
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
+- `policyStage`: `TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration`
+  (Enterprise only; all stages optional; durations must be positive and in ascending order)
 - `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
 
 ## Parameters
@@ -42,6 +46,7 @@ Where:
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
+| `STORAGE POLICY` | Partition lifecycle automation (Enterprise) — mutually exclusive with `TTL` |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
 ## Rules and defaults
@@ -96,7 +101,7 @@ Refreshes incrementally after each base table transaction:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH IMMEDIATE AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Best for: Real-time dashboards where data freshness matters.
@@ -108,7 +113,7 @@ Checks for new data and refreshes on a timer schedule:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH EVERY 10m AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Every 10 minutes, QuestDB checks if the base table has new data and performs an
@@ -119,7 +124,7 @@ With start time and timezone:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH EVERY 1h START '2025-01-01T00:00:00Z' TIME ZONE 'Europe/Berlin' AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 | Option | Description |
@@ -141,7 +146,7 @@ Refreshes only when explicitly triggered:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH MANUAL AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 Trigger refresh with [`REFRESH MATERIALIZED VIEW`](/docs/query/sql/refresh-mat-view/).
@@ -155,7 +160,7 @@ Skips the initial full refresh on creation. Applies to any strategy:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH IMMEDIATE DEFERRED AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 The view remains empty until:
@@ -173,7 +178,7 @@ define an in-flight time window that won't refresh until complete.
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_daily
 REFRESH PERIOD (LENGTH 1d TIME ZONE 'Europe/London' DELAY 2h) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1d;
 ```
 
 | Option | Description |
@@ -191,7 +196,7 @@ Matches period to the `SAMPLE BY` interval:
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly
 REFRESH PERIOD (SAMPLE BY INTERVAL) AS
-SELECT timestamp, symbol, avg(price) FROM trades
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades
 SAMPLE BY 1h ALIGN TO CALENDAR TIME ZONE 'Europe/London';
 ```
 
@@ -205,7 +210,7 @@ Combine `PERIOD` with `EVERY` or `MANUAL`:
 ```questdb-sql title="Period with timer refresh"
 CREATE MATERIALIZED VIEW hourly_stats
 REFRESH EVERY 15m PERIOD (LENGTH 1h DELAY 5m) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h;
 ```
 
 This configuration:
@@ -218,7 +223,7 @@ The `DELAY` allows late-arriving data to be included before the period closes.
 ```questdb-sql title="Period with manual refresh"
 CREATE MATERIALIZED VIEW trades_daily
 REFRESH MANUAL PERIOD (LENGTH 1d TIME ZONE 'UTC' DELAY 1h) AS
-SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1d;
+SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1d;
 ```
 
 With `MANUAL`, refresh only occurs when you run
@@ -249,7 +254,7 @@ Specify storage partitioning with `PARTITION BY`:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY;
 ```
 
@@ -268,7 +273,7 @@ Limit data retention with `TTL`:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY TTL 7 DAYS;
 ```
 
@@ -276,6 +281,45 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
+
+:::note
+
+In QuestDB Enterprise, `TTL` is deprecated — `CREATE MATERIALIZED VIEW ... TTL`
+is rejected with `TTL settings are deprecated, please, create a storage policy
+instead`. Use `STORAGE POLICY` instead. If a legacy materialized view has a TTL
+set, clear it with `ALTER MATERIALIZED VIEW SET TTL 0` before setting a storage
+policy.
+
+:::
+
+## Storage Policy
+
+:::note
+
+Storage policies are available in **QuestDB Enterprise** only.
+
+:::
+
+A [storage policy](/docs/concepts/storage-policy/) automates the partition
+lifecycle by defining when partitions are converted to Parquet locally, when
+native data is removed, and when local copies are dropped. Place the
+`STORAGE POLICY(...)` clause after `PARTITION BY`:
+
+```questdb-sql title="With storage policy (Enterprise)"
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
+) PARTITION BY DAY
+  STORAGE POLICY(TO PARQUET 7d, DROP NATIVE 14d);
+```
+
+A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
+positive, and they must be in ascending order. `DROP REMOTE` is reserved
+syntax and is currently rejected at SQL parse time with
+`'DROP REMOTE' is not supported yet`.
+
+To modify a storage policy after creation, see
+[ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
 
 ## Complete example
 
@@ -355,7 +399,7 @@ Assign ownership to a user, group, or service account:
 ```questdb-sql
 CREATE GROUP analysts;
 CREATE MATERIALIZED VIEW trades_hourly AS (
-  SELECT timestamp, symbol, avg(price) FROM trades SAMPLE BY 1h
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) OWNED BY analysts;
 ```
 
@@ -390,6 +434,7 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 | `base table does not exist` | Referenced table doesn't exist |
 | `query is not supported` | Query doesn't meet constraints (missing SAMPLE BY, uses FILL, etc.) |
 | `permission denied` | Missing required permission (Enterprise) |
+| `TTL settings are deprecated, please, create a storage policy instead` | `TTL` clause used in QuestDB Enterprise — use `STORAGE POLICY` instead |
 
 ## See also
 
@@ -397,4 +442,5 @@ GRANT DROP MATERIALIZED VIEW ON trades_hourly TO user1;
 - [REFRESH MATERIALIZED VIEW](/docs/query/sql/refresh-mat-view/)
 - [DROP MATERIALIZED VIEW](/docs/query/sql/drop-mat-view/)
 - [ALTER MATERIALIZED VIEW SET REFRESH](/docs/query/sql/alter-mat-view-set-refresh/)
+- [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)

@@ -4,12 +4,44 @@ sidebar_label: COPY
 description: COPY SQL keyword reference documentation.
 ---
 
+## Overview
+
+The `COPY` command has two distinct modes of operation, each with its own
+syntax and use case:
+
+1. **[Import mode](#import-mode-copy-from)** (`COPY ... FROM`) - load data
+   from a delimited text file (CSV) into a QuestDB table.
+2. **[Export mode](#export-mode-copy-to)** (`COPY ... TO`) - export a table or
+   query result to Parquet files.
+
+A separate [`COPY '<id>' CANCEL`](#cancelling-a-running-operation) form
+cancels a running import or export.
+
+## Import mode (COPY FROM)
+
+Copies tables from a delimited text file saved in the defined root directory
+into QuestDB.
+
+### Syntax
+
+```questdb-sql title="Import a CSV file"
+COPY tableName FROM 'fileName'
+    [WITH
+        [HEADER { true | false }]
+        [TIMESTAMP columnName]
+        [FORMAT timestampFormat]
+        [DELIMITER delimiter]
+        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }]
+        [ON ERROR { SKIP_ROW | SKIP_COLUMN | ABORT }]];
+```
+
+
 :::caution
 
-For partitioned tables, the best `COPY` performance can be achieved only on a
-machine with a local, physically attached SSD. It is possible to use a network
-block storage, such as an AWS EBS volume to perform the operation, with the
-following impact:
+For partitioned tables, the best `COPY FROM` performance can be achieved only
+on a machine with a local, physically attached SSD. It is possible to use a
+network block storage, such as an AWS EBS volume to perform the operation,
+with the following impact:
 
 - Users need to configure the maximum IOPS and throughput setting values for the
   volume.
@@ -17,21 +49,9 @@ following impact:
 
 :::
 
-## Syntax
+### Import modes
 
-![Flow chart showing the syntax of the COPY keyword](/images/docs/diagrams/copy.svg)
-
-## Description
-
-The `COPY` command has two modes of operation:
-
-1. **Import mode**: `COPY table_name FROM 'file.csv'`, copying data from a delimited text file into QuestDB.
-2. **Export mode**: `COPY table_name TO 'output_directory'` or `COPY (query) TO 'output_directory'`, exporting data to Parquet files.
-
-## Import mode (COPY-FROM)
-
-Copies tables from a delimited text file saved in the defined root directory
-into QuestDB. `COPY` has the following import modes:
+`COPY FROM` has the following import modes:
 
 - Parallel import, used for copying partitioned tables:
 
@@ -60,9 +80,6 @@ request(s) will be rejected.
 
 :::
 
-`COPY '<id>' CANCEL` cancels the copying operation defined by the import `id`,
-while an import is taking place.
-
 ### Import root
 
 `COPY` requires a defined root directory where CSV files are saved and copied
@@ -77,7 +94,7 @@ operation. There are two root directories to be defined:
   `root_directory/tmp` directory.
 
 Use the [configuration keys](/docs/configuration/overview/) to edit these properties in
-[`COPY` configuration settings](/docs/configuration/overview/#copy-settings):
+[`COPY` configuration settings](/docs/configuration/copy-settings/):
 
 ```shell title="Example"
 cairo.sql.copy.root=/Users/UserName/Desktop
@@ -202,9 +219,32 @@ SELECT * FROM 'sys.text_import_log' WHERE id = '55ca24e5ba328050' LIMIT -1;
 | 2022-08-03T14:04:42.268502Z | 55ca24e5ba328050 | weather | weather.csv | null  | cancelled | import cancelled [phase=partition_import, msg=`Cancelled`] | 0            | 0             | 0      |
 
 
-## Export mode (COPY-TO)
+## Export mode (COPY TO)
 
-Exports data from a table or query result set to Parquet format. The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
+Exports data from a table or query result set to Parquet format.
+
+### Syntax
+
+```questdb-sql title="Export a table"
+COPY tableName TO 'destinationPath'
+    [WITH
+        [FORMAT PARQUET]
+        [PARTITION_BY { NONE | HOUR | DAY | WEEK | MONTH | YEAR }]
+        [COMPRESSION_CODEC { UNCOMPRESSED | SNAPPY | GZIP | LZ4 | ZSTD | LZ4_RAW }]
+        [COMPRESSION_LEVEL n]
+        [ROW_GROUP_SIZE n]
+        [DATA_PAGE_SIZE n]
+        [STATISTICS_ENABLED { true | false }]
+        [PARQUET_VERSION { 1 | 2 }]
+        [RAW_ARRAY_ENCODING { true | false }]];
+```
+
+```questdb-sql title="Export a query result"
+COPY (selectQuery) TO 'destinationPath'
+    [WITH /* same options as above */];
+```
+
+ The export is performed asynchronously and non-blocking, allowing writes to continue during the export process.
 
 **Key features:**
 
@@ -260,6 +300,8 @@ All export options are specified using the `WITH` clause after the `TO` destinat
 - `STATISTICS_ENABLED true/false`: Enable Parquet column statistics for better query performance. Default: `true`.
 - `PARQUET_VERSION <n>`: Parquet format version. Valid values: `1` (v1.0) or `2` (v2.0). Default: `2`.
 - `RAW_ARRAY_ENCODING true/false`: Use raw encoding for arrays (compatibility for parquet readers). Default: `true`.
+- `BLOOM_FILTER_COLUMNS '<cols>'`: Comma-separated list of column names for bloom filter generation. Default: none (no bloom filters generated).
+- `BLOOM_FILTER_FPP <value>`: False positive probability for bloom filters. Lower values produce larger but more accurate filters. Default: `0.01`.
 
 ## Examples
 
@@ -292,7 +334,7 @@ If partitioning of `NONE` is used, then a single parquet file will be generated 
 Export the results of a query:
 
 ```questdb-sql title="Export filtered data"
-COPY (SELECT * FROM trades WHERE timestamp IN today() AND symbol = 'BTC-USD')
+COPY (SELECT * FROM trades WHERE timestamp IN '$today' AND symbol = 'BTC-USDT')
 TO 'btc_today'
 WITH FORMAT PARQUET;
 ```
@@ -313,9 +355,9 @@ The underlying table does not already need to be partitioned. Likewise, you can 
 
 ```questdb-sql title=Export queries with partitions
 COPY (
-    SELECT generate_series as date 
+    SELECT generate_series as date
     FROM generate_series('2025-01-01', '2025-02-01', '1d')
-) 
+)
 TO 'dates'
 WITH FORMAT PARQUET
 PARTITION_BY DAY;
@@ -329,6 +371,17 @@ This creates separate Parquet files for each day's data in subdirectories named 
     - 2025-01-02.parquet
     - 2025-01-03.parquet
     - ...
+
+#### Export with bloom filters
+
+Generate bloom filters for specific
+columns to enable row group pruning when the exported file is queried:
+
+```questdb-sql title="Export with bloom filters on symbol and side columns"
+COPY trades TO 'trades_bloom'
+WITH FORMAT PARQUET
+BLOOM_FILTER_COLUMNS 'symbol,side';
+```
 
 #### Export with custom Parquet options
 
@@ -361,7 +414,7 @@ COPY (
         last(price) AS close,
         sum(amount) AS volume
     FROM trades
-    WHERE timestamp > dateadd('d', -7, now())
+    WHERE timestamp IN '$now-7d..$now'
     SAMPLE BY 1h
 )
 TO 'ohlcv_7d'
@@ -373,9 +426,9 @@ WITH FORMAT PARQUET;
 Check all recent exports:
 
 ```questdb-sql title="View export history"
-SELECT ts, table, destination, status, rows_exported
+SELECT ts, "table", destination, status, rows_exported
 FROM sys.copy_export_log
-WHERE ts > dateadd('d', -1, now())
+WHERE ts IN '$now-1d..$now'
 ORDER BY ts DESC;
 ```
 
@@ -386,3 +439,25 @@ Sample output:
 | 2024-10-01T14:23:15.123456Z | trades | trades_export    | finished | 1000000       |
 | 2024-10-01T13:45:22.654321Z | query  | btc_today        | finished | 45672         |
 | 2024-10-01T12:30:11.987654Z | trades | trades_daily     | finished | 1000000       |
+
+## Cancelling a running operation
+
+Both imports and exports return an `id` that can be used to cancel the
+operation while it is in progress. The same syntax works for either mode -
+QuestDB looks up the id against running imports first, and falls back to
+running exports.
+
+```questdb-sql
+COPY 'operationId' CANCEL;
+```
+
+For example, after starting an import or export:
+
+```questdb-sql
+COPY '55ca24e5ba328050' CANCEL;
+```
+
+Within a few seconds the operation should stop and a row with `cancelled`
+status appears in the corresponding log table
+([`sys.text_import_log`](#logs) for imports,
+[`sys.copy_export_log`](#logs-1) for exports).

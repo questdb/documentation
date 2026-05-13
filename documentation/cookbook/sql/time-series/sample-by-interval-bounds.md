@@ -25,7 +25,7 @@ SELECT
     max(price),
     sum(quantity) AS volume
 FROM fx_trades
-WHERE symbol = 'EURUSD' AND timestamp IN today()
+WHERE symbol = 'EURUSD' AND timestamp IN '$today'
 SAMPLE BY 15m;
 ```
 

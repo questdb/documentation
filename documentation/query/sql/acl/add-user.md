@@ -6,24 +6,25 @@ description:
   Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 To add user to one or more groups in the database, the `ADD USER` keywords are
 used.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
 ---
 
 ## Syntax
 
-![Flow chart showing the syntax of the ADD USER keyword](/images/docs/diagrams/addUser.svg)
+```questdb-sql
+ADD USER userName TO groupName [, groupName ...];
+```
 
 ## Description
 

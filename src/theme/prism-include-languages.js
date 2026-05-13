@@ -1,12 +1,12 @@
 import ExecutionEnvironment from "@docusaurus/ExecutionEnvironment"
 import siteConfig from "@generated/docusaurus.config"
-import { constants, dataTypes, functions, keywords } from "@questdb/sql-grammar"
+import { constants, dataTypes, functions, keywords } from "@questdb/sql-parser/grammar"
 
 const functionPattern = new RegExp(
   `(${functions
-      .filter(fn => !keywords.includes(fn))
-      .map(fn => fn.replace(/[\\\{\}\*\+\?\|\^\$\.\[\]\(\)]/g, '\\$&'))
-      .join('|')})(?=\\s*\\()`,
+    .filter(fn => !keywords.includes(fn))
+    .map(fn => fn.replace(/[\\\{\}\*\+\?\|\^\$\.\[\]\(\)]/g, '\\$&'))
+    .join('|')})(?=\\s*\\()`,
   'i'
 )
 

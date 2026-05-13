@@ -149,13 +149,15 @@ const config = {
         return {
           resolve: {
             alias: {
-              react: path.resolve("/node_modules/react"),
+              react: path.resolve(__dirname, "node_modules/react"),
+              "@questdb/sql-parser/grammar": path.resolve(__dirname, "node_modules/@questdb/sql-parser/dist/grammar/index.js"),
             },
           },
         }
       },
     }),
     require.resolve("./plugins/fetch-latest-release/index"),
+    require.resolve("./plugins/fetch-java-client-release/index"),
     require.resolve("./plugins/fetch-repo/index"),
     require.resolve("./plugins/remote-repo-example/index"),
     require.resolve("./plugins/raw-markdown/index"),
@@ -219,7 +221,7 @@ const config = {
           className: "mobile-only",
         },
         {
-          to: "https://questdb.com//blog/",
+          to: "https://questdb.com/blog/",
           label: "Blog",
           position: "left",
           className: "mobile-only",
@@ -271,7 +273,7 @@ const config = {
       disableSwitch: true,
       respectPrefersColorScheme: false, // the user preference is also overriden, see ssr.template.js
     },
-    image: "/images/og.gif",
+    image: "/images/og.png",
     prism: {
       defaultLanguage: "questdb-sql",
       additionalLanguages: [
@@ -307,8 +309,8 @@ const config = {
       {
         blog: false,
         docs: {
-          include: ["**/*!(.partial).{md,mdx}"],
-          exclude: ["/glossary/"],
+          include: ["**/*.{md,mdx}"],
+          exclude: ["**/*.partial.mdx"],
           path: "documentation",
           routeBasePath: "/",
           editUrl: ({ docPath }) => {

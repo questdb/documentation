@@ -11,11 +11,13 @@ const DOCS_CATEGORIES = {
   functions: path.join(DOCS_DIR, 'query', 'functions'),
   operators: path.join(DOCS_DIR, 'query', 'operators'),
   sql: path.join(DOCS_DIR, 'query', 'sql'),
-  concepts: path.join(DOCS_DIR, 'concepts')
+  concepts: path.join(DOCS_DIR, 'concepts'),
+  cookbook: path.join(DOCS_DIR, 'cookbook', 'sql')
 }
 
 const SINGLE_FILE_CATEGORIES = {
-  schema: [path.join(DOCS_DIR, 'schema-design-essentials.md')]
+  schema: [path.join(DOCS_DIR, 'schema-design-essentials.md')],
+  monitoring: [path.join(DOCS_DIR, 'operations', 'monitoring-alerting.md')]
 }
 
 /**
@@ -45,13 +47,14 @@ function extractFrontmatterAndContent(raw) {
   if (match) {
     try {
       frontmatter = yaml.load(match[1]) || {}
-    } catch (_) {}
+    } catch (_) { }
     mainContent = match[2]
   }
 
   return {
     title: frontmatter.title || null,
     slug: frontmatter.slug || null,
+    description: frontmatter.description || null,
     content: mainContent
   }
 }
@@ -80,17 +83,23 @@ function extractHeaders(content) {
 function generateUrl(relativePath, slug) {
   if (slug) {
     // e.g., guides/schema-design-essentials.md with slug "schema-design-essentials"
-    // -> guides/schema-design-essentials/index.md
+    // -> guides/schema-design-essentials.md
     const dir = path.dirname(relativePath)
     const cleanSlug = slug.startsWith('/') ? slug.substring(1) : slug
     const urlPath = dir === '.' ? cleanSlug : `${dir}/${cleanSlug}`
-    return `${BASE_URL}/${urlPath}/index.md`
+    if (!urlPath) return `${BASE_URL}/index.md`
+    return `${BASE_URL}/${urlPath}.md`
   }
 
   // Default: convert path to URL
-  // reference/function/aggregation.md -> reference/function/aggregation/index.md
-  const urlPath = relativePath.replace(/\.md$/, '')
-  return `${BASE_URL}/${urlPath}/index.md`
+  // reference/function/aggregation.md -> reference/function/aggregation.md
+  // cookbook/sql/finance/index.md -> cookbook/sql/finance.md
+  let urlPath = relativePath.replace(/\.md$/, '')
+  if (urlPath.endsWith('/index')) {
+    urlPath = urlPath.replace(/\/index$/, '')
+  }
+  if (!urlPath || urlPath === 'index') return `${BASE_URL}/index.md`
+  return `${BASE_URL}/${urlPath}.md`
 }
 
 /**
@@ -120,7 +129,7 @@ function processMarkdownFile(filePath, categoryPath) {
   const content = readFileIfExists(filePath)
   if (!content) return null
 
-  const { title, slug, content: mainContent } = extractFrontmatterAndContent(content)
+  const { title, slug, description, content: mainContent } = extractFrontmatterAndContent(content)
   const headers = extractHeaders(mainContent)
 
   // Get relative path from DOCS_DIR
@@ -130,6 +139,7 @@ function processMarkdownFile(filePath, categoryPath) {
   return {
     path: relativePath,
     title: title || path.basename(filePath, '.md'),
+    description: description,
     headers: headers,
     url: url
   }
@@ -188,13 +198,15 @@ function generateTocList(allMetadata) {
     const items = new Set()
 
     metadata.forEach(file => {
-      // Add document title
-      items.add(file.title)
-
-      // Add headers (prefixed with document title for context)
-      file.headers.forEach(header => {
-        items.add(`${file.title} - ${header}`)
-      })
+      if (category === 'cookbook') {
+        const desc = file.description ? ` :: ${file.description}` : ''
+        items.add(`${file.title}${desc}`)
+      } else {
+        items.add(file.title)
+        file.headers.forEach(header => {
+          items.add(`${file.title} - ${header}`)
+        })
+      }
     })
 
     tocList[category] = Array.from(items).sort()

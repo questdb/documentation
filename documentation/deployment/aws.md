@@ -1,241 +1,281 @@
 ---
-title: Deploying to Amazon Web Services (AWS)
+title: Deploying QuestDB on AWS
 sidebar_label: AWS
 description:
-  This document explains what to hardware to use, and how to provision QuestDB on Amazon Web Services (AWS).
+  Deploy QuestDB on Amazon Web Services using EC2, with instance sizing, storage, and networking recommendations.
 ---
 
-import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
-import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
 
+## Quick reference
 
-## Hardware recommendations
+| Component | Recommended | Notes |
+|-----------|-------------|-------|
+| Instance | `m7i.xlarge` or `r7i.2xlarge` | 4-8 vCPUs, 16-64 GiB RAM |
+| Storage | `gp3`, 200+ GiB | 16000 IOPS / 1000 MBps |
+| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
-<MinimumHardware />
+---
 
-### Elastic Compute Cloud (EC2) with Elastic Block Storage (EBS)
+## Infrastructure
 
-We recommend starting with `M8` instances, with an upgrade to
-`R8` instances if extra RAM is needed. You can use either `i` (Intel) or `a` (AMD) instances. 
+Plan your infrastructure before launching. This section covers instance types,
+storage, and networking requirements.
 
-These should be deployed with an `x86_64` Linux distribution, such as Ubuntu.
+### Instance sizing
 
-For storage, we recommend using `gp3` disks, as these provide a better price-to-performance
-ratio compared to `gp2` or `io1` offerings.`5000 IOPS/300 MBps` is a good starting point until
-you have tested your workload.
+| Workload | Instance | vCPUs | RAM | Use case |
+|----------|----------|-------|-----|----------|
+| Development | `m7i.large` | 2 | 8 GiB | Testing, small datasets |
+| Production (starter) | `m7i.xlarge` | 4 | 16 GiB | Light ingestion, moderate queries |
+| Production (standard) | `r7i.2xlarge` | 8 | 64 GiB | High ingestion, complex queries |
+| Production (heavy) | `r7i.4xlarge` | 16 | 128 GiB | Heavy workloads, large datasets |
 
-<FileSystemChoice />
+**Choosing an instance family:**
 
-### Elastic File System (EFS)
+- **`m7i` / `m7a`** - Balanced compute and memory. Good starting point.
+- **`r7i` / `r7a`** - Memory-optimized. Better for large datasets or complex queries.
+- **`m8i` / `r8i`** - Latest generation. Best performance if available in your region.
 
-QuestDB **does not** support `EFS` for its primary storage. Do not use it instead of `EBS`.
+Intel (`i`) and AMD (`a`) variants perform similarly. Choose based on
+availability and pricing.
 
-You can use it as object store, but we would recommend using `S3` instead, as a simpler, 
-and cheaper, alternative.
+**ARM instances (Graviton):**
 
-### Simple Storage Service (S3)
+Graviton instances (`r7g`, `r8g`) cost less and perform well for ingestion.
+However, queries using JIT compilation or SIMD vectorization run slower on ARM.
+Choose Graviton when your workload is primarily ingestion or cost is a priority.
 
-QuestDB supports `S3` as its replication object-store in the Enterprise edition.
+**Storage-optimized instances:**
 
-This requires very little provisioning - simply create a bucket or virtual subdirectory and follow
-the [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to configure replication.
+Instances with local NVMe (`i7i`, `i8i`) provide fastest disk I/O but lose data
+on termination. Only use with QuestDB Enterprise, which replicates to S3.
 
-### Minimum specification
+### Storage
 
-- **Instance**: `m8i.xlarge` or `m8a.xlarge` `(4 vCPUs, 16 GiB RAM)`
-- **Storage**
-    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
-    - **Data disk**: `gp3 (100 GiB)` volume provisioned with `3000 IOPS/125 MBps`.
-- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
-- **File System**: `ext4`
+**EBS configuration:**
 
-### Better specification
+| Workload | Volume | Size | IOPS | Throughput |
+|----------|--------|------|------|------------|
+| Development | `gp3` | 50 GiB | 3000 | 125 MBps |
+| Production | `gp3` | 200+ GiB | 16000 | 1000 MBps |
+| High I/O | `gp3` | 500+ GiB | 16000+ | 1000+ MBps |
 
-- **Instance**: `r8i.2xlarge` or `r8a.2xlarge` `(8 vCPUs, 64 GiB RAM)`
-- **Storage**
-    - **OS disk**: `gp3 (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
-    - **Data disk**: `gp3 (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
-- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
-- **File System**: `zfs` with `lz4` compression.
+Use `gp3` volumes. They offer better price-performance than `gp2` or `io1`.
+Separate your OS disk (30 GiB) from your data disk.
 
 :::note
-
-If the above instance types are not available in your region, then simply downgrade to an earlier version i.e. `8 -> 7 -> 6`.
-
+EBS throughput is limited by instance type. Smaller instances cannot sustain
+high IOPS or throughput regardless of volume provisioning. Check your instance's
+EBS bandwidth limits in the [AWS documentation](https://docs.aws.amazon.com/ec2/latest/instancetypes/gp.html)
+before provisioning storage.
 :::
 
-### AWS Graviton
+**File system:**
 
-QuestDB can also be deployed on AWS Graviton (ARM) instances, which have a strong price-to-performance ratio.
+Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
+compression, `ext4` or `xfs` offer slightly better performance.
 
-For example, `r8g` instances are cheaper than `r6i` instances, and will offer superior performance for most Java-centric code.
-Queries which rely on the `JIT` compiler (native WHERE filters) or vectorisation optimisations will potentially run slower.
-Ingestion speed is generally unaffected.
+**Unsupported storage:**
 
-Therefore, if your use case is ingestion-centric, or your queries do not heavily leverage SIMD/JIT, `r8g` instances
-may offer better performance and better value overall.
+- **EFS** - Not supported. Network latency is too high for database workloads.
+- **S3** - Not supported as primary storage. Use for replication (Enterprise only).
 
-### Storage Optimised Instances (Enterprise)
+### Networking
 
-AWS offers storage-optimised instances (e.g. `i7i`), which include locally-attached NVMe devices. Workloads which
-are disk-limited (for example, heavy out-of-order writes) will benefit significantly from the faster storage.
+**Security group rules:**
 
-However, it is not recommended to use locally-attached NVMe on QuestDB OSS, as instance termination or failure
-will lead to data loss. QuestDB Enterprise replicates data eagerly to object storage (`S3`), preserving
-data in the event of an instance failure, and can therefore can safely leverage the faster disks.
+| Port | Protocol | Source | Purpose |
+|------|----------|--------|---------|
+| 22 | TCP | Your IP | SSH access |
+| 9000 | TCP | Your IP / VPC | Web Console & REST API |
+| 8812 | TCP | Your IP / VPC | PostgreSQL wire protocol |
+| 9009 | TCP | Application servers | InfluxDB line protocol |
+| 9003 | TCP | Monitoring servers | Health check & Prometheus |
 
-## Launching QuestDB on EC2
+:::warning
+Never expose ports 9000, 8812, or 9009 to `0.0.0.0/0`. Restrict access to known
+IP ranges or use a bastion host.
+:::
 
-Once you have provisioned your `EC2` instance with attached `EBS` storage, you can simply
-follow the setup instructions for a [Docker](docker.md) or [systemd](systemd.md) installation.
+**VPC recommendations:**
 
-You can also keep it simple - just [download](https://questdb.com/download/) the binary and run it directly.
-QuestDB is a single self-contained binary and easy to deploy.
+- Deploy QuestDB in a private subnet
+- Use a NAT gateway for outbound access (package updates, etc.)
+- Use VPC endpoints for S3 if using Enterprise replication
+- Consider placement groups for low-latency application access
 
-## Launching QuestDB on the AWS Marketplace
+---
 
-[AWS Marketplace](https://aws.amazon.com/marketplace) is a digital catalog with software listings from independent
-software vendors that runs on AWS. This guide describes how to launch QuestDB
-via the AWS Marketplace using the official listing. This document also describes
-usage instructions after you have launched the instance, including hints for
-authentication, the available interfaces, and tips for accessing the REST API
-and [Web Console](/docs/getting-started/web-console/overview/).
+## Deployment
 
-The QuestDB listing can be found in the AWS Marketplace under the databases
-category. To launch a QuestDB instance:
+Choose your deployment method:
 
-1. Navigate to the
-   [QuestDB listing](https://aws.amazon.com/marketplace/search/results?searchTerms=questdb)
-2. Click **Continue to Subscribe** and subscribe to the offering
-3. **Configure** a version, an AWS region and click **Continue to** **Launch**
-4. Choose an instance type and network configuration and click **Launch**
+- **[AWS Marketplace](#aws-marketplace)** - Pre-configured AMI, fastest setup
+- **[Manual EC2](#manual-ec2)** - Full control, use your own AMI
 
-An information panel displays the ID of the QuestDB instance with launch
-configuration details and hints for locating the instance in the EC2 console.
+### AWS Marketplace
 
-The default user is `admin` and password is `quest` to log in to the Web Console.
+The QuestDB AMI comes pre-configured and ready to run.
 
-## QuestDB configuration
+**Steps:**
 
-Connect to the instance where QuestDB is deployed using SSH. The server
-configuration file is at the following location on the AMI:
+1. Go to the [QuestDB Marketplace listing](https://aws.amazon.com/marketplace/search/results?searchTerms=questdb)
+2. Click **Continue to Subscribe** and accept terms
+3. Click **Continue to Configure**, select your region
+4. Click **Continue to Launch**
+5. Select instance type, VPC, subnet, and security group
+6. Click **Launch**
 
-```bash
+**After launch:**
+
+Connect to the Web Console at `http://<instance-public-ip>:9000`
+
+Default credentials:
+- **Web Console**: `admin` / `quest`
+- **PostgreSQL**: `admin` / random (check `/var/lib/questdb/conf/server.conf`)
+
+:::warning
+Change default credentials immediately. See [Security](#security) below.
+:::
+
+**Configuration file location:**
+
+```
 /var/lib/questdb/conf/server.conf
 ```
 
-For details on the server properties and using this file, see the
-[server configuration documentation](/docs/configuration/overview/).
+### Manual EC2
 
-The default ports used by QuestDB interfaces are as follows:
+Deploy QuestDB on any EC2 instance you configure yourself.
 
-- [Web Console](/docs/getting-started/web-console/overview/) &amp; REST API is available on port `9000`
-- PostgreSQL wire protocol available on `8812`
-- InfluxDB line protocol `9009` (TCP and UDP)
-- Health monitoring &amp; Prometheus `/metrics` `9003`
+**Steps:**
 
-### Postgres credentials
+1. Launch an EC2 instance with your preferred AMI (Ubuntu 22.04+ recommended)
+2. Attach a `gp3` EBS volume for data
+3. Configure the security group per the [Networking](#networking) section
+4. SSH into the instance
+5. Install QuestDB via [Docker](/docs/deployment/docker/) or [systemd](/docs/deployment/systemd/)
 
-Generated credentials can be found in the server configuration file:
+You can also download the binary directly:
 
 ```bash
-/var/lib/questdb/conf/server.conf
+curl -L https://questdb.com/download -o questdb.tar.gz
+tar xzf questdb.tar.gz
+./questdb.sh start
 ```
 
-The default Postgres username is `admin` and a password is randomly generated
-during startup:
+---
+
+## Security
+
+### Change default credentials
+
+Update credentials immediately after deployment.
+
+**Web Console and REST API** - edit `server.conf`:
 
 ```ini
-pg.user=admin
-pg.password=...
+http.user=your_username
+http.password=your_secure_password
 ```
 
-To use the credentials that are randomly generated and stored in the
-`server.conf`file, restart the database using the command
-`sudo systemctl restart questdb`.
+**PostgreSQL** - edit `server.conf`:
 
-### InfluxDB line protocol credentials
+```ini
+pg.user=your_username
+pg.password=your_secure_password
+```
 
-The credentials for InfluxDB line protocol can be found at
+**InfluxDB line protocol** - edit `conf/auth.json`. See
+[ILP authentication](/docs/ingestion/ilp/overview/#authentication).
+
+Restart after changes:
 
 ```bash
-/var/lib/questdb/conf/full_auth.json
+sudo systemctl restart questdb
 ```
 
-For details on authentication using this protocol, see the
-[InfluxDB line protocol authentication guide](/docs/ingestion/ilp/overview/#authentication).
+### Disable unused interfaces
 
-### Disabling authentication
+Reduce attack surface by disabling protocols you don't use:
 
-If you would like to disable authentication for Postgres wire protocol or
-InfluxDB line protocol, comment out the following lines in the server
-configuration file:
-
-```ini title="/var/lib/questdb/conf/server.conf"
-# pg.password=...
-
-# line.tcp.auth.db.path=conf/auth.txt
+```ini title="server.conf"
+pg.enabled=false           # Disable PostgreSQL
+line.tcp.enabled=false     # Disable ILP
+http.enabled=false         # Disable Web Console & REST API
+http.security.readonly=true  # Or make HTTP read-only
 ```
 
-### Disabling interfaces
+---
 
-Interfaces may be **disabled completely** with the following configuration:
+## Operations
 
-```ini title="/var/lib/questdb/conf/server.conf"
-# disable postgres
-pg.enabled=false
+### Upgrading
 
-# disable InfluxDB line protocol over TCP and UDP
-line.tcp.enabled=false
-line.udp.enabled=false
+**Marketplace AMI:**
 
-# disable HTTP (web console and REST API)
-http.enabled=false
-```
+1. Stop QuestDB:
+   ```bash
+   sudo systemctl stop questdb
+   ```
 
-The HTTP interface may alternatively be set to **readonly**:
+2. Back up data:
+   ```bash
+   sudo cp -r /var/lib/questdb /var/lib/questdb.backup
+   ```
 
-```ini title="/var/lib/questdb/conf/server.conf"
-# set HTTP interface to readonly
-http.security.readonly=true
-```
-
-## Upgrading QuestDB
-
-:::note
-
-- Check the [release notes](https://github.com/questdb/questdb/releases) and
-  ensure that necessary [backup](/docs/operations/backup/) is completed.
-
-:::
-
-You can perform the following steps to upgrade your QuestDB version on an
-official AWS QuestDB AMI:
-
-- Stop the service:
-
-```shell
-systemctl stop questdb.service
-```
-
-- Download and copy over the new binary
+3. Download new version:
 
 <InterpolateReleaseData
 renderText={(release) => (
-<CodeBlock className="language-shell">
-{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz \\
-tar xzvf questdb-${release.name}-no-jre-bin.tar.gz
-cp questdb-${release.name}-no-jre-bin/questdb.jar /usr/local/bin/questdb.jar
-cp questdb-${release.name}-no-jre-bin/questdb.jar /usr/local/bin/questdb-${release.name}.jar`}
+<CodeBlock className="language-bash">
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz
+tar xzf questdb-${release.name}-no-jre-bin.tar.gz
+sudo cp questdb-${release.name}-no-jre-bin/questdb.jar /usr/local/bin/questdb.jar`}
 </CodeBlock>
 )}
 />
 
-- Restart the service again:
+4. Restart:
+   ```bash
+   sudo systemctl start questdb
+   ```
 
-```shell
-systemctl restart questdb.service
-systemctl status questdb.service
+**Manual deployments:** Follow upgrade steps for [Docker](/docs/deployment/docker/)
+or [systemd](/docs/deployment/systemd/).
+
+### Monitoring
+
+**Health check:**
+
+```bash
+curl http://localhost:9003/status
 ```
+
+**Prometheus metrics:**
+
+```bash
+curl http://localhost:9003/metrics
+```
+
+**CloudWatch integration:**
+
+Use the CloudWatch agent to collect:
+- System metrics (CPU, memory, disk I/O)
+- QuestDB logs from `/var/lib/questdb/log/`
+- Custom metrics scraped from the Prometheus endpoint
+
+---
+
+## Enterprise on AWS
+
+QuestDB Enterprise adds production features for AWS:
+
+- **S3 replication** - Continuous backup for durability
+- **Cold storage** - Move old partitions to S3, query on-demand
+- **High availability** - Automatic failover across instances
+
+See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/).

@@ -1,1 +1,167 @@
-<svg height="100%" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="100%" xmlns:vectornator="http://vectornator.io" version="1.1" viewBox="0 0 170.1 141.75" fill-rule="evenodd" clip-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient y1="93.625" id="LinearGradient" x1="29.53" y2="73.947" x2="29.53" gradientUnits="userSpaceOnUse" gradientTransform="translate(13.734 -10.067)"><stop stop-color="#d14671" offset="0"/><stop stop-color="#fff" offset="1"/></linearGradient></defs><g id="layer1 copy" vectornator:layerName="layer1 copy"><path d="M51.505 15.84h80.27c1.089 0 1.972.45 1.972 1.003v85.065c0 .554-.883 1.003-1.972 1.003h-80.27c-1.09 0-1.973-.449-1.973-1.003V16.843c0-.553.883-1.002 1.973-1.002z" fill-rule="evenodd" fill="#464353" opacity="1"/><text x="0" font-family="sans-serif" y="0" text-anchor="middle" vectornator:text="Table" fill="#fff" font-size="5" vectornator:width="14.953" opacity="1" transform="translate(84.163 20.331)"><tspan x="7.477" y="5" textLength="11.953">Table</tspan></text><path d="M44.703 101.564l.297-.319 2.401-2.574.21-.227c.03-.031.032-.068.007-.1a.23.23 0 00-.137-.073.45.45 0 00-.092-.01l-1.428-.006c-.135 0-.246-.058-.247-.128l-.039-6.31c0-.07-.11-.127-.246-.128l-2.016-.01c-.136 0-.247.056-.246.127l.038 6.31c0 .07-.11.125-.244.125l-1.46-.007a.448.448 0 00-.091.009c-.063.013-.112.039-.136.072-.025.032-.022.069.008.1l.216.229 2.458 2.596.304.322c.042.044.128.072.222.072s.18-.027.22-.07z" fill-rule="evenodd" fill="#d14671" opacity="1"/><path d="M96.045 55.807h31.872c.432 0 .783.218.783.488v41.41c0 .27-.351.488-.783.488H96.045c-.432 0-.783-.219-.783-.488v-41.41c0-.27.35-.488.783-.488z" fill-rule="evenodd" fill="#5f5e67" opacity="1"/><path d="M43.264 90.831V56.308c0-.469.012-.849.027-.849h2.31c.015 0 .027.38.027.849V90.83c0 .469-.012.849-.027.849h-2.31c-.015 0-.027-.38-.027-.849z" fill-rule="evenodd" fill="url(#LinearGradient)" opacity="1"/><path stroke="#61cfee" fill-rule="evenodd" stroke-width=".5" d="M55.535 55.807h31.872c.432 0 .783.218.783.488v41.41c0 .27-.35.488-.783.488H55.535c-.432 0-.783-.219-.783-.488v-41.41c0-.27.35-.488.783-.488z" fill="#5f5e67" stroke-linecap="round" opacity="1" stroke-linejoin="round"/><path d="M58.687 60.019h25.568c.347 0 .628.026.628.059v5.02c0 .032-.281.058-.628.058H58.687c-.347 0-.628-.026-.628-.059v-5.02c0-.032.281-.058.628-.058z" fill-rule="evenodd" fill-opacity=".204" fill="#d14671" opacity="1"/><path d="M58.687 66.306h25.568c.347 0 .628.027.628.06v5.019c0 .033-.281.06-.628.06H58.687c-.347 0-.628-.027-.628-.06v-5.02c0-.032.281-.059.628-.059z" fill-rule="evenodd" fill-opacity=".404" fill="#d14671" opacity="1"/><path d="M58.687 72.409h25.568c.347 0 .628.026.628.06v5.019c0 .032-.281.059-.628.059H58.687c-.347 0-.628-.027-.628-.06v-5.019c0-.033.281-.06.628-.06z" fill-rule="evenodd" fill-opacity=".577" fill="#d14671" opacity="1"/><path d="M58.687 78.697h25.568c.347 0 .628.026.628.059v5.02c0 .032-.281.058-.628.058H58.687c-.347 0-.628-.026-.628-.059v-5.02c0-.032.281-.058.628-.058z" fill-rule="evenodd" fill-opacity=".691" fill="#d14671" opacity="1"/><path d="M58.745 84.834h25.567c.347 0 .628.027.628.06v5.019c0 .033-.28.06-.628.06H58.745c-.347 0-.629-.027-.629-.06v-5.02c0-.032.282-.059.629-.059z" fill-rule="evenodd" fill-opacity=".842" fill="#d14671" opacity="1"/><path d="M58.745 91.122h25.567c.347 0 .628.027.628.06V96.2c0 .032-.28.059-.628.059H58.745c-.347 0-.629-.027-.629-.06V91.18c0-.032.282-.059.629-.059z" fill-rule="evenodd" fill="#d14671" opacity="1"/><text x="0" font-family="sans-serif" y="0" text-anchor="middle" vectornator:text="designated timestamp column" fill="#fff" font-size="5" vectornator:width="27.465" opacity="1" transform="translate(57.738 36.618)"><tspan x="13.733" y="5" textLength="24.465">designated </tspan> <tspan x="13.733" y="11" textLength="23.061"> timestamp </tspan> <tspan x="13.733" y="17" textLength="16.118"> column</tspan></text><text x="0" font-family="sans-serif" y="0" text-anchor="middle" vectornator:text="timestamp colum" fill="#fff" font-size="5" vectornator:width="26.061" opacity="1" transform="translate(98.921 36.618)"><tspan x="13.031" y="11" textLength="23.061">timestamp </tspan> <tspan x="13.031" y="17" textLength="13.337"> colum</tspan></text><path d="M99.169 59.426h25.567c.347 0 .628.027.628.06v5.019c0 .032-.281.059-.628.059H99.169c-.347 0-.629-.027-.629-.06v-5.019c0-.032.282-.059.629-.059z" fill-rule="evenodd" fill-opacity=".204" fill="#d14671" opacity="1"/><path d="M99.226 78.69h25.568c.347 0 .628.027.628.06v5.019c0 .033-.281.059-.628.059H99.226c-.347 0-.628-.026-.628-.06V78.75c0-.032.281-.059.628-.059z" fill-rule="evenodd" fill-opacity=".404" fill="#d14671" opacity="1"/><path d="M99.169 71.816h25.567c.347 0 .628.027.628.06v5.019c0 .032-.281.059-.628.059H99.169c-.347 0-.629-.026-.629-.06v-5.019c0-.032.282-.059.629-.059z" fill-rule="evenodd" fill-opacity=".577" fill="#d14671" opacity="1"/><path d="M99.169 91.122h25.567c.347 0 .628.027.628.06V96.2c0 .032-.281.059-.628.059H99.169c-.347 0-.629-.027-.629-.06V91.18c0-.032.282-.059.629-.059z" fill-rule="evenodd" fill-opacity=".691" fill="#d14671" opacity="1"/><path d="M99.226 84.834h25.568c.347 0 .628.027.628.06v5.019c0 .033-.281.06-.628.06H99.226c-.347 0-.628-.027-.628-.06v-5.02c0-.032.281-.059.628-.059z" fill-rule="evenodd" fill-opacity=".842" fill="#d14671" opacity="1"/><path d="M99.226 66.306h25.568c.347 0 .628.027.628.06v5.019c0 .033-.281.06-.628.06H99.226c-.347 0-.628-.027-.628-.06v-5.02c0-.032.281-.059.628-.059z" fill-rule="evenodd" fill="#d14671" opacity="1"/><path d="M50.438 105.424h36.846c.5 0 .906.114.906.253v21.433c0 .14-.406.253-.906.253H50.438c-.5 0-.906-.113-.906-.253v-21.433c0-.139.406-.253.906-.253zm45.726 0h36.682c.497 0 .901.114.901.253v21.433c0 .14-.404.253-.901.253H96.164c-.498 0-.902-.113-.902-.253v-21.433c0-.139.404-.253.902-.253z" fill-rule="evenodd" fill="#464353" opacity="1"/><text x="0" font-family="sans-serif" y="0" text-anchor="middle" vectornator:text="ordered timestamp values" fill="#fff" font-size="5" vectornator:width="29.693" opacity="1" transform="translate(54.47 108.721)"><tspan x="15.541" y="5" textLength="18.623">ordered </tspan> <tspan x="15.541" y="11" textLength="24.451"> timestamp </tspan> <tspan x="14.846" y="17" textLength="14.453"> values</tspan></text><text x="0" font-family="sans-serif" y="0" text-anchor="middle" vectornator:text="unordered timestamp values" fill="#fff" font-size="5" vectornator:width="30.886" opacity="1" transform="translate(100.114 108.721)"><tspan x="16.138" y="5" textLength="24.185">unordered </tspan> <tspan x="16.138" y="11" textLength="24.451"> timestamp </tspan> <tspan x="15.443" y="17" textLength="14.453"> values</tspan></text></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 440" width="650" height="440">
+  <defs>
+    <style>
+      .title { font: 14px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .label { font: 13px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #d9d9d9; }
+      .cell { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .table-outline { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .header { fill: #32343e; }
+      .grid { stroke: #3b3d4a; stroke-width: 1; }
+      .window { fill: #e289a4; opacity: 0.35; }
+      .current { fill: none; stroke: #0cc0df; stroke-width: 2; }
+      .pointer { fill: #0cc0df; }
+      .link-line { stroke: #0cc0df; stroke-width: 2; fill: none; }
+      .note { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .partition-box { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .partition-header { fill: #32343e; }
+      .partition-label { font: 13px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .partition-count { font: 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .connector { stroke: #0cc0df; stroke-width: 2; stroke-dasharray: 4 2; fill: none; opacity: 0.6; }
+      .designated-badge { fill: #e289a4; }
+      .badge-text { font: 10px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #ffffff; }
+    </style>
+    <marker id="link-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0,0 10,4 0,8" fill="#0cc0df"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="60" y="28">
+    CREATE TABLE trades (
+    <tspan x="60" dy="18">  ts <tspan fill="#e289a4">TIMESTAMP</tspan>, symbol SYMBOL, price DOUBLE, amount DOUBLE</tspan>
+    <tspan x="60" dy="18">) <tspan fill="#e289a4">TIMESTAMP(ts)</tspan> PARTITION BY DAY;</tspan>
+  </text>
+  <text class="note" x="60" y="90">Designated timestamp determines partition placement for each row.</text>
+
+  <!-- Left table: trades -->
+  <rect class="table-outline" x="55" y="110" width="450" height="196"/>
+  <rect class="header" x="55" y="110" width="450" height="36"/>
+  <line class="grid" x1="160" y1="110" x2="160" y2="306"/>
+  <line class="grid" x1="260" y1="110" x2="260" y2="306"/>
+  <line class="grid" x1="360" y1="110" x2="360" y2="306"/>
+  <line class="grid" x1="55" y1="146" x2="505" y2="146"/>
+  <line class="grid" x1="55" y1="178" x2="505" y2="178"/>
+  <line class="grid" x1="55" y1="210" x2="505" y2="210"/>
+  <line class="grid" x1="55" y1="242" x2="505" y2="242"/>
+  <line class="grid" x1="55" y1="274" x2="505" y2="274"/>
+
+  <!-- Designated badge on ts column -->
+  <rect class="designated-badge" x="67" y="118" width="76" height="20" rx="3"/>
+  <text class="badge-text" x="105" y="132" text-anchor="middle">DESIGNATED</text>
+
+  <text class="label" x="107" y="144" text-anchor="middle">ts</text>
+  <text class="label" x="210" y="132" text-anchor="middle">symbol</text>
+  <text class="label" x="310" y="132" text-anchor="middle">price</text>
+  <text class="label" x="432" y="132" text-anchor="middle">amount</text>
+
+  <text class="cell" x="67" y="167">01-01 09:00</text>
+  <text class="cell" x="210" y="167" text-anchor="middle">EURUSD</text>
+  <text class="cell" x="310" y="167" text-anchor="middle">1.0842</text>
+  <text class="cell" x="432" y="167" text-anchor="middle">1.5</text>
+
+  <text class="cell" x="67" y="199">01-01 09:01</text>
+  <text class="cell" x="210" y="199" text-anchor="middle">GBPUSD</text>
+  <text class="cell" x="310" y="199" text-anchor="middle">1.2650</text>
+  <text class="cell" x="432" y="199" text-anchor="middle">10.0</text>
+
+  <text class="cell" x="67" y="231">01-02 10:15</text>
+  <text class="cell" x="210" y="231" text-anchor="middle">EURUSD</text>
+  <text class="cell" x="310" y="231" text-anchor="middle">1.0856</text>
+  <text class="cell" x="432" y="231" text-anchor="middle">2.0</text>
+
+  <text class="cell" x="67" y="263">01-02 14:30</text>
+  <text class="cell" x="210" y="263" text-anchor="middle">GBPUSD</text>
+  <text class="cell" x="310" y="263" text-anchor="middle">1.2673</text>
+  <text class="cell" x="432" y="263" text-anchor="middle">5.0</text>
+
+  <text class="cell" x="67" y="295">01-03 08:45</text>
+  <text class="cell" x="210" y="295" text-anchor="middle">EURUSD</text>
+  <text class="cell" x="310" y="295" text-anchor="middle">1.0871</text>
+  <text class="cell" x="432" y="295" text-anchor="middle">0.5</text>
+
+  <!-- Window highlight on left table -->
+  <rect class="window" x="55" y="146" width="450" height="32">
+    <animate attributeName="y" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="146;146;178;178;210;210;242;242;274;274"/>
+  </rect>
+
+  <!-- Current row outline + pointer -->
+  <rect class="current" x="55" y="146" width="450" height="32">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0 0;0 0;0 32;0 32;0 64;0 64;0 96;0 96;0 128;0 128"/>
+  </rect>
+  <polygon class="pointer" points="39,162 49,156 49,168">
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0 0;0 0;0 32;0 32;0 64;0 64;0 96;0 96;0 128;0 128"/>
+  </polygon>
+
+  <!-- On disk label (below partition boxes) -->
+  <text class="note" x="325" y="432" text-anchor="middle">On disk: partitioned by DAY</text>
+
+  <!-- Animated connectors from rows to partitions -->
+  <!-- Connector to Partition 1 (01-01) -->
+  <line class="connector" x1="110" y1="310" x2="110" y2="360" marker-end="url(#link-arrow)" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0.6;0.6;0.6;0.6;0;0;0;0;0;0"/>
+  </line>
+
+  <!-- Connector to Partition 2 (01-02) -->
+  <line class="connector" x1="250" y1="310" x2="280" y2="360" marker-end="url(#link-arrow)" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0.6;0.6;0.6;0.6;0;0"/>
+  </line>
+
+  <!-- Connector to Partition 3 (01-03) -->
+  <line class="connector" x1="375" y1="310" x2="450" y2="360" marker-end="url(#link-arrow)" opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;0;0;0.6;0.6"/>
+  </line>
+
+  <!-- Partition 1: 2026-01-01 -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;1;1;1;1;1;1;1;1;1"/>
+    <rect class="partition-box" x="55" y="370" width="120" height="44"/>
+    <rect class="partition-header" x="55" y="370" width="120" height="24"/>
+    <text class="partition-label" x="115" y="387" text-anchor="middle">2026-01-01/</text>
+    <text class="partition-count" x="115" y="406" text-anchor="middle">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;1;0;0;0;0;0;0;0;0"/>
+      1 row
+    </text>
+    <text class="partition-count" x="115" y="406" text-anchor="middle">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;1;1;1;1;1;1;1;1"/>
+      2 rows
+    </text>
+  </g>
+
+  <!-- Partition 2: 2026-01-02 -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;1;1;1;1;1"/>
+    <rect class="partition-box" x="220" y="370" width="120" height="44"/>
+    <rect class="partition-header" x="220" y="370" width="120" height="24"/>
+    <text class="partition-label" x="280" y="387" text-anchor="middle">2026-01-02/</text>
+    <text class="partition-count" x="280" y="406" text-anchor="middle">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0;0;0;1;0;0;0;0"/>
+      1 row
+    </text>
+    <text class="partition-count" x="280" y="406" text-anchor="middle">
+      <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+        values="0;0;0;0;0;0;1;1;1;1"/>
+      2 rows
+    </text>
+  </g>
+
+  <!-- Partition 3: 2026-01-03 -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="10s" repeatCount="indefinite" calcMode="discrete"
+      values="0;0;0;0;0;0;0;0;0;1"/>
+    <rect class="partition-box" x="385" y="370" width="120" height="44"/>
+    <rect class="partition-header" x="385" y="370" width="120" height="24"/>
+    <text class="partition-label" x="445" y="387" text-anchor="middle">2026-01-03/</text>
+    <text class="partition-count" x="445" y="406" text-anchor="middle">1 row</text>
+  </g>
+</svg>

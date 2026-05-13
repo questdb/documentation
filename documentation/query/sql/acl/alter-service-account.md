@@ -6,23 +6,38 @@ description:
   in QuestDB Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 `ALTER SERVICE ACCOUNT` modifies service account settings.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
 ---
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER SERVICE ACCOUNT keyword](/images/docs/diagrams/alterServiceAccount.svg)
+```questdb-sql title="Enable / disable"
+ALTER SERVICE ACCOUNT serviceAccountName { ENABLE | DISABLE };
+```
+
+```questdb-sql title="Set or remove password"
+ALTER SERVICE ACCOUNT serviceAccountName WITH { PASSWORD password | NO PASSWORD };
+```
+
+```questdb-sql title="Create token"
+ALTER SERVICE ACCOUNT serviceAccountName CREATE TOKEN TYPE
+    { JWK | REST WITH TTL timeUnit [REFRESH] };
+```
+
+```questdb-sql title="Drop token"
+ALTER SERVICE ACCOUNT serviceAccountName DROP TOKEN TYPE
+    { JWK | REST [token] };
+```
 
 ## Description
 

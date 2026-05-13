@@ -10,11 +10,17 @@ over time. If stale data is no longer required, users can delete old data from
 QuestDB to either save disk space or adhere to a data retention policy. This is
 achieved in QuestDB by removing data partitions from a table.
 
-QuestDB offers two approaches for data retention:
+QuestDB offers three approaches for data retention:
 
-- **Automatic**: Use [Time To Live (TTL)](/docs/concepts/ttl/) to automatically
-  drop partitions when data ages beyond a specified threshold. This is the
-  simplest approach for most use cases.
+- **TTL** _(automatic, open source)_: Use
+  [Time To Live (TTL)](/docs/concepts/ttl/) to automatically drop partitions when
+  data ages beyond a specified threshold. This is the simplest approach and is
+  available in both open source and Enterprise editions.
+- **Storage policy** _(automatic, Enterprise only)_: Use a
+  [storage policy](/docs/concepts/storage-policy/) to automate the partition
+  lifecycle — convert to Parquet locally and drop old data on a schedule. This is
+  the recommended approach for QuestDB Enterprise users who need graduated data
+  tiering beyond simple deletion.
 - **Manual**: Use `DROP PARTITION` commands as described on this page for
   explicit control over which partitions to remove and when.
 
@@ -118,10 +124,10 @@ FROM long_sequence(120);
 
 For reference, the following functions are used to generate the example data:
 
-- [timestamp sequence](/docs/query/functions/timestamp-generator/#timestamp_sequence)
+- [timestamp_sequence](/docs/query/functions/row-generator/#timestamp_sequence)
   with 1 hour stepping
-- [row generator](/docs/query/functions/row-generator/#long_sequence) with
-  `long_sequence()` function which creates a `x:long` column
+- [long_sequence](/docs/query/functions/row-generator/#long_sequence) which
+  creates a `x:long` column
 
 The result of partitioning is visible when listing as directories on disk:
 

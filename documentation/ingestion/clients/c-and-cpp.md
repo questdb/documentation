@@ -97,7 +97,7 @@ int main()
     auto sender = questdb::ingress::line_sender::from_conf(
         "http::addr=localhost:9000;");
 
-    questdb::ingress::line_sender_buffer buffer;
+    questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
     buffer
         .table("trades")
         .symbol("symbol","ETH-USD")
@@ -143,7 +143,7 @@ int main()
         auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
 
         // Add rows to the buffer of the sender with the same timestamp
-        questdb::ingress::line_sender_buffer buffer;
+        questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
         buffer
             .table("trades")
             .symbol("symbol", "ETH-USD")

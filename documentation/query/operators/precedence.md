@@ -55,8 +55,8 @@ See the next section for the current precedence.
 | [`&`](bitwise.md#-and)                                   | bitwise and                  | 8          | bitwise AND of two numbers        |
 | [`^`](bitwise.md#-xor)                                   | bitwise xor                  | 9          | bitwise XOR of two numbers        |
 | [`\|`](bitwise.md#-or)                                   | bitwise or                   | 10         | bitwise OR of two numbers         |
-| [`IN`](date-time.md#in-timerange)                        | in                           | 11         | check if value in list or range   |
-| [`BETWEEN`](date-time.md#between-value1-and-value2)      | between                      | 11         | check if timestamp in range       |
+| [`IN`](date-time.md#in-with-timestamp-intervals)         | in                           | 11         | check if value in list or range   |
+| [`BETWEEN`](date-time.md#between--and)                   | between                      | 11         | check if timestamp in range       |
 | [`WITHIN`](spatial.md#within)                            | within geohash               | 11         | prefix matches geohash            |
 | [`<`](comparison.md#-lesser-than)                        | lesser than                  | 12         | lt comparison                     |
 | [`<=`](comparison.md#-lesser-than-or-equal-to)           | lesser than or equal to      | 12         | leq comparison                    |

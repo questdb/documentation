@@ -6,23 +6,36 @@ description:
   Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 `GRANT` - grants permissions to a user, group or service account.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
 ---
 
 ## Syntax
 
-![Flow chart showing the syntax of the GRANT keyword](/images/docs/diagrams/grant.svg)
+```questdb-sql title="Database scope"
+GRANT permission [, permission ...] TO entityName
+    [WITH GRANT OPTION]
+    [WITH VERIFICATION];
+```
+
+```questdb-sql title="Table or column scope"
+GRANT permission [, permission ...]
+    ON { ALL TABLES
+       | tableName [(columnName [, columnName ...])]
+         [, tableName [(columnName [, columnName ...])] ...] }
+    TO entityName
+    [WITH GRANT OPTION]
+    [WITH VERIFICATION];
+```
 
 ## Description
 

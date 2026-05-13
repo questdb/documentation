@@ -6,23 +6,32 @@ description:
   Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 `REVOKE` - revoke permission from user, group or service account.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
 ---
 
 ## Syntax
 
-![Flow chart showing the syntax of the REVOKE keyword](/images/docs/diagrams/revoke.svg)
+```questdb-sql title="Database scope"
+REVOKE permission [, permission ...] FROM entityName;
+```
+
+```questdb-sql title="Table or column scope"
+REVOKE permission [, permission ...]
+    ON { ALL TABLES
+       | tableName [(columnName [, columnName ...])]
+         [, tableName [(columnName [, columnName ...])] ...] }
+    FROM entityName;
+```
 
 ## Description
 

@@ -6,6 +6,13 @@ description: Calculate Bollinger Bands using window functions for volatility ana
 
 Calculate Bollinger Bands for volatility analysis and mean reversion trading. Bollinger Bands consist of a moving average with upper and lower bands set at a specified number of standard deviations above and below it. They help identify overbought/oversold conditions and measure market volatility.
 
+:::tip Measuring band width
+To objectively measure when bands are contracting (a "squeeze"), see the [Bollinger BandWidth recipe](/docs/cookbook/sql/finance/bollinger-bandwidth/) which calculates band width as a percentage and compares it to historical levels.
+:::
+
+:::note
+Bollinger Bands can be calculated using either population standard deviation (stddev) or sample standard deviation (stddev_samp), producing slightly different results. This recipe uses stddev.
+:::
 
 ## Solution: Calculate variance using window functions
 
@@ -23,21 +30,16 @@ WITH OHLC AS (
       last(price) AS close,
       sum(quantity) AS volume
  FROM fx_trades
- WHERE symbol = 'EURUSD' AND timestamp IN yesterday()
+ WHERE symbol = 'EURUSD' AND timestamp IN '$yesterday'
  SAMPLE BY 15m
 ), stats AS (
   SELECT
     timestamp,
     close,
-    AVG(close) OVER (
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS sma20,
-    AVG(close * close) OVER (
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS avg_close_sq
+    AVG(close) OVER w AS sma20,
+    AVG(close * close) OVER w AS avg_close_sq
   FROM OHLC
+  WINDOW w AS (ORDER BY timestamp ROWS 19 PRECEDING)
 )
 SELECT
   timestamp,
@@ -67,9 +69,11 @@ The core of the Bollinger Bands calculation is the rolling standard deviation. P
 
 **Different period lengths:**
 ```sql
--- 10-period Bollinger Bands (change 19 to 9)
-AVG(close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS sma10,
-AVG(close * close) OVER (ORDER BY timestamp ROWS 9 PRECEDING) AS avg_close_sq
+-- 10-period Bollinger Bands (change ROWS 19 to ROWS 9)
+AVG(close) OVER w AS sma10,
+AVG(close * close) OVER w AS avg_close_sq
+...
+WINDOW w AS (ORDER BY timestamp ROWS 9 PRECEDING)
 ```
 
 **Different band multipliers:**
@@ -102,24 +106,17 @@ WITH OHLC AS (
       sum(quantity) AS volume
  FROM fx_trades
  WHERE symbol IN ('EURUSD', 'GBPUSD')
-   AND timestamp IN yesterday()
+   AND timestamp IN '$yesterday'
  SAMPLE BY 15m
 ), stats AS (
   SELECT
     timestamp,
     symbol,
     close,
-    AVG(close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS sma20,
-    AVG(close * close) OVER (
-      PARTITION BY symbol
-      ORDER BY timestamp
-      ROWS 19 PRECEDING
-    ) AS avg_close_sq
+    AVG(close) OVER w AS sma20,
+    AVG(close * close) OVER w AS avg_close_sq
   FROM OHLC
+  WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ROWS 19 PRECEDING)
 )
 SELECT
   timestamp,
@@ -134,7 +131,8 @@ ORDER BY symbol, timestamp;
 
 Note the addition of `PARTITION BY symbol` to calculate separate Bollinger Bands for each symbol.
 
-:::info Related Documentation
+:::info Related documentation
+- [Bollinger BandWidth recipe](/docs/cookbook/sql/finance/bollinger-bandwidth/)
 - [Window functions](/docs/query/functions/window-functions/syntax/)
 - [AVG window function](/docs/query/functions/window-functions/reference/#avg)
 - [SQRT function](/docs/query/functions/numeric/#sqrt)

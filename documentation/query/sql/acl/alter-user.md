@@ -6,23 +6,36 @@ description:
   Enterprise."
 ---
 
-For full documentation of the Access Control List and Role-based Access Control,
-see the [RBAC operations](/docs/security/rbac) page.
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
----
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
 
 `ALTER USER` modifies user settings.
 
+For full documentation of the Access Control List and Role-based Access Control,
+see the [RBAC operations](/docs/security/rbac) page.
+
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER USER keyword](/images/docs/diagrams/alterUser.svg)
+```questdb-sql title="Enable / disable"
+ALTER USER userName { ENABLE | DISABLE };
+```
+
+```questdb-sql title="Set or remove password"
+ALTER USER userName WITH { PASSWORD password | NO PASSWORD };
+```
+
+```questdb-sql title="Create token"
+ALTER USER userName CREATE TOKEN TYPE
+    { JWK | REST WITH TTL timeUnit [REFRESH] };
+```
+
+```questdb-sql title="Drop token"
+ALTER USER userName DROP TOKEN TYPE
+    { JWK | REST [token] };
+```
 
 ## Description
 

@@ -82,3 +82,69 @@ The QuestDB Helm chart supports a variety of configuration options. Run the foll
 ```shell
 helm show values questdb/questdb
 ```
+
+## Using Kubernetes secrets
+
+QuestDB supports reading sensitive configuration values directly from mounted
+secret files using the `_FILE` suffix convention. This eliminates the need for
+shell scripts or init containers to inject secrets as environment variables.
+
+For example, to configure the PostgreSQL wire protocol password from a
+Kubernetes secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: questdb-secrets
+type: Opaque
+data:
+  pg-password: bXktc2VjcmV0LXBhc3N3b3Jk  # base64 encoded
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: questdb
+spec:
+  serviceName: questdb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: questdb
+  template:
+    metadata:
+      labels:
+        app: questdb
+    spec:
+      containers:
+        - name: questdb
+          image: questdb/questdb:latest
+          env:
+            - name: QDB_PG_PASSWORD_FILE
+              value: /run/secrets/pg-password
+          volumeMounts:
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+      volumes:
+        - name: secrets
+          secret:
+            secretName: questdb-secrets
+            items:
+              - key: pg-password
+                path: pg-password
+```
+
+:::note
+
+This example focuses on secret mounting and omits the `volumeClaimTemplates`
+needed for persistent storage. For production deployments, use the
+[QuestDB Helm chart](#get-the-questdb-helm-chart) which handles storage
+configuration automatically.
+
+:::
+
+For the full list of supported properties, see
+[Secrets from files](/docs/configuration/overview/#secrets-from-files) in the
+configuration reference.

@@ -147,6 +147,7 @@ For timezone handling at query time, see
 | `LONG` | 64 bits | -9.2E18 to 9.2E18 |
 | `FLOAT` | 32 bits | Single precision IEEE 754 |
 | `DOUBLE` | 64 bits | Double precision IEEE 754 |
+| `DECIMAL` | 1-32 bytes | [Variable based on precision](/docs/query/datatypes/decimal/#storage) |
 
 Choose the smallest type that fits your data to save storage.
 
@@ -226,6 +227,31 @@ QuestDB automatically refreshes the view as new data arrives. Queries against
 the view are instant regardless of base table size.
 
 See [Materialized Views](/docs/concepts/materialized-views/) for details.
+
+## Views
+
+When query performance is acceptable, or for less frequent queries where you don't need materialization, use views to abstract complex queries:
+
+```questdb-sql
+CREATE VIEW recent_trades AS (
+  SELECT * FROM trades
+  WHERE timestamp > dateadd('d', -7, now())
+);
+```
+
+Views can be parameterized using `DECLARE OVERRIDABLE`:
+
+```questdb-sql
+CREATE VIEW trades_above AS (
+  DECLARE OVERRIDABLE @min_price := 100
+  SELECT * FROM trades WHERE price >= @min_price
+);
+
+-- Override at query time
+DECLARE @min_price := 500 SELECT * FROM trades_above;
+```
+
+See [Views](/docs/concepts/views/) for details.
 
 ## Common mistakes
 

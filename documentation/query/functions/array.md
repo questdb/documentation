@@ -16,9 +16,9 @@ don't contribute to either count or sum.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
@@ -28,6 +28,175 @@ SELECT array_avg(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | --------- |
 | 1.5       |
 
+**Average bid price across all 40 order book levels:**
+
+```questdb-sql demo title="array_avg - average bid price"
+SELECT symbol, array_avg(bids[1]) AS avg_bid_price
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+## array_build
+
+`array_build(nArrays, size, filler1 [, filler2, ...])` constructs a `DOUBLE`
+array at runtime, where the length and contents can vary per row.
+
+Use `array_build` when the `ARRAY[...]` literal syntax is not enough, for
+example when you need to:
+
+- **Fill an array with a scalar** - create a zero vector, or fill every
+  position with a computed value (like `array_max`)
+- **Stack arrays into a 2D matrix** - combine several 1D arrays into a single
+  `DOUBLE[][]` for downstream array operations
+
+#### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `nArrays` | How many sub-arrays the output has. Must be an integer literal (not a column, expression, or bind variable). `1` produces a 1D `DOUBLE[]`. `2` or more produces a 2D `DOUBLE[][]` with `nArrays` sub-arrays, each of length `size`. |
+| `size` | Length of each sub-array. Can be an `INT`/`LONG` value, or a `DOUBLE[]` array whose element count is used as the length. |
+| `filler1 .. fillerN` | One filler per sub-array (exactly `nArrays` fillers required). A **scalar** (`DOUBLE`/`INT`/`LONG`) is repeated for every position. A **`DOUBLE[]` array** is copied position-by-position: if shorter than `size`, remaining positions are `NULL`; if longer, excess elements are ignored. |
+
+All arguments except `nArrays` can be constants, declared variables, column
+references, or expressions evaluated per row.
+
+#### Return type
+
+- `DOUBLE[]` when `nArrays` is `1`
+- `DOUBLE[][]` when `nArrays` is `2` or more, where the first dimension has length
+  `nArrays`, the second has length `size`
+
+The output is always 1D or 2D. Passing a large `nArrays` (e.g. 100) produces a
+2D array with 100 rows, not a 100-dimensional array.
+
+#### Examples
+
+**Create an array filled with a scalar value:**
+
+```questdb-sql demo title="array_build - scalar fill"
+SELECT array_build(1, 3, 0) FROM long_sequence(1);
+```
+
+| array_build    |
+| -------------- |
+| [0.0,0.0,0.0]  |
+
+**Variable-length fill - size from a column:**
+
+```questdb-sql demo title="array_build - variable-length fill"
+SELECT x, array_build(1, x::int, -1) FROM long_sequence(3);
+```
+
+| x | array_build        |
+|---|--------------------|
+| 1 | [-1.0]             |
+| 2 | [-1.0,-1.0]        |
+| 3 | [-1.0,-1.0,-1.0]   |
+
+Each row gets an array whose length equals `x`, filled with `-1`.
+
+**Broadcast a computed value across an array:**
+
+On the [demo `market_data` table](/docs/cookbook/demo-data-schema/#market_data-table),
+`bids` is a `DOUBLE[][]` where `bids[1]` contains bid prices. The following
+creates an array the same length as `bids[1]`, filled with its maximum value:
+
+```questdb-sql demo title="array_build - broadcast computed scalar"
+SELECT array_build(1, bids[1], array_max(bids[1]))
+FROM market_data
+LIMIT 1;
+```
+
+Here `bids[1]` in the `size` position is a `DOUBLE[]`, so its element count
+determines the output length. The filler `array_max(bids[1])` is a scalar, so
+it is repeated in every position.
+
+**Copy an existing array:**
+
+When both `size` and the filler are the same `DOUBLE[]`, the filler is copied
+position-by-position, effectively cloning the array:
+
+```questdb-sql demo title="array_build - copy an array"
+SELECT array_build(1, bids[1], bids[1])
+FROM market_data
+LIMIT 1;
+```
+
+The result is a new `DOUBLE[]` with the same length and values as `bids[1]`.
+
+**NULL padding when the filler array is shorter than `size`:**
+
+```questdb-sql demo title="array_build - NULL padding"
+SELECT array_build(1, 5, ARRAY[10.0, 20.0, 30.0]) FROM long_sequence(1);
+```
+
+| array_build                    |
+| ------------------------------ |
+| [10.0,20.0,30.0,null,null]      |
+
+Positions beyond the filler's length are filled with `NULL`.
+
+**2D array with scalar fill:**
+
+```questdb-sql demo title="array_build - 2D scalar fill"
+SELECT array_build(2, 3, 1.0, 0.0) FROM long_sequence(1);
+```
+
+| array_build                    |
+| ------------------------------ |
+| [[1.0,1.0,1.0],[0.0,0.0,0.0]]  |
+
+Two fillers are required because `nArrays` is `2`. The first filler (`1.0`)
+fills the first row, the second (`0.0`) fills the second row.
+
+**Combine existing arrays into a 2D matrix:**
+
+```questdb-sql demo title="array_build - 2D from market data"
+SELECT array_build(2, bids[1], bids[1], asks[1])
+FROM market_data
+LIMIT 1;
+```
+
+Here `bids[1]` appears twice: in the `size` position it provides the output
+length (40 elements), and as the first filler it supplies the bid prices.
+`asks[1]` is the second filler. The result is a `DOUBLE[2][40]` where the first
+row contains bid prices and the second row contains ask prices.
+
+**Stack multiple array columns into a 2D array:**
+
+When a table has several `DOUBLE[]` columns, `array_build` can stack them into
+a single 2D array. The `market_data` table on the
+[demo instance](/docs/cookbook/demo-data-schema/#market_data-table) stores order
+book snapshots with `bids` and `asks` as `DOUBLE[][]` columns (run
+`SHOW COLUMNS FROM market_data;` on demo to see the schema). Each contains
+price and volume sub-arrays: `bids[1]` = bid prices, `bids[2]` = bid volumes,
+and likewise for `asks`.
+
+The following packs all four sub-arrays into a single `DOUBLE[4][N]` array:
+
+```questdb-sql demo title="array_build - stack 4 arrays"
+SELECT array_build(4, bids[1], bids[1], bids[2], asks[1], asks[2])
+FROM market_data
+LIMIT 1;
+```
+
+The `size` argument (`bids[1]`) is a `DOUBLE[]`, so its element count
+determines the sub-array length. Each of the four fillers is also a `DOUBLE[]`,
+copied position-by-position into its respective sub-array.
+
+#### Constraints and edge cases
+
+- `nArrays` must be at least `1`. Passing `0` raises an error.
+- `size = 0` produces an empty array. `size < 0` raises an error. If `size`
+  evaluates to `NULL`, the result is a `NULL` array.
+- Fillers must be scalars or 1D `DOUBLE[]` arrays. Multi-dimensional array
+  fillers are not accepted.
+- `NULL` values inside a filler array are copied as-is. A `NULL` filler array
+  fills the entire row with `NULL`.
+- Both `nArrays` and `size` are capped at 268,435,455. The total element count
+  (`nArrays × size`) must also fit within memory limits.
+
 ## array_count
 
 `array_count(array)` returns the number of finite elements in the array. `NULL`
@@ -35,9 +204,9 @@ elements do not contribute to the count.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT
@@ -49,6 +218,15 @@ SELECT
 | ---| --- |
 | 2  |  0  |
 
+**Count the number of price levels on each side of the book:**
+
+```questdb-sql demo title="array_count - order book levels"
+SELECT symbol, array_count(bids[1]) AS bid_levels, array_count(asks[1]) AS ask_levels
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
 ## array_cum_sum
 
 `array_cum_sum(array)` returns a 1D array of the cumulative sums over the array,
@@ -58,9 +236,9 @@ elements behave as if they were zero.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
@@ -70,6 +248,257 @@ SELECT array_cum_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
 | ---------------------- |
 | ARRAY[1.0,2.0,4.0,6.0] |
 
+**Cumulative bid volume (depth of book):**
+
+```questdb-sql demo title="array_cum_sum - cumulative book depth"
+SELECT symbol, array_cum_sum(bids[2]) AS cumulative_bid_volume
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+Each position shows the total volume available at that level and above.
+
+## array_elem_avg
+
+`array_elem_avg(array1, array2 [, ...])` or `array_elem_avg(array)` returns an
+array where each element is the average of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+Uses Kahan compensated summation to minimize floating-point rounding errors.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] - two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` - a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_avg(ARRAY[10.0, 20.0, 30.0], ARRAY[30.0, 40.0, 50.0]);
+```
+
+| array_elem_avg     |
+| ------------------ |
+| [20.0,30.0,40.0]   |
+
+**Aggregate - average bid volume per level each hour:**
+
+```questdb-sql demo title="array_elem_avg - average bid volume per level"
+SELECT timestamp, symbol, array_elem_avg(bids[2]) AS avg_bid_volume
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 1h;
+```
+
+Each position in the result holds the average volume at that book level across
+all snapshots in the hour.
+
+## array_elem_max
+
+`array_elem_max(array1, array2 [, ...])` or `array_elem_max(array)` returns an
+array where each element is the maximum of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] - two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` - a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_max(ARRAY[1.0, 5.0, 3.0], ARRAY[4.0, 2.0, 6.0]);
+```
+
+| array_elem_max  |
+| --------------- |
+| [4.0,5.0,6.0]   |
+
+```questdb-sql
+SELECT array_elem_max(
+    ARRAY[[1.0, 8.0, 3.0], [5.0, 2.0, 9.0]],
+    ARRAY[[4.0, 6.0, 7.0], [3.0, 8.0, 1.0]]
+);
+```
+
+| array_elem_max                     |
+| ---------------------------------- |
+| [[4.0,8.0,7.0],[5.0,8.0,9.0]]      |
+
+**Aggregate - best bid price at each level over the hour:**
+
+```questdb-sql demo title="array_elem_max - best bid per level"
+SELECT timestamp, symbol, array_elem_max(bids[1]) AS best_bid_per_level
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 1h;
+```
+
+Each position holds the highest bid price seen at that book level during the hour.
+
+## array_elem_min
+
+`array_elem_min(array1, array2 [, ...])` or `array_elem_min(array)` returns an
+array where each element is the minimum of the corresponding elements across the
+inputs. Works in two modes:
+
+- **Multi-argument (per-row):** pass two or more `DOUBLE[]` expressions. The
+  function returns a single array that is the element-wise minimum of all
+  arguments.
+- **Aggregate (GROUP BY / SAMPLE BY):** pass a single `DOUBLE[]` column. The
+  function aggregates across rows, returning one result array per group.
+
+`NULL` arrays are skipped entirely. `NULL` elements within an array are skipped
+at that position. If every input at a given position is `NULL`, the result at
+that position is `NULL`.
+
+When input arrays have different lengths, the output length is the maximum
+across all inputs. Positions beyond the end of a shorter array receive no
+contribution from that array.
+
+N-dimensional arrays are supported. The output shape is the per-dimension
+maximum of all inputs. In multi-argument mode, all arguments must have the same
+number of dimensions.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1` - a `DOUBLE[]` array
+- `array2` - a `DOUBLE[]` array
+- `...` - additional `DOUBLE[]` arrays (optional)
+
+**Aggregate mode:**
+
+- `array` - a `DOUBLE[]` column
+
+#### Examples
+
+**Multi-argument - element-wise minimum of two arrays:**
+
+```questdb-sql
+SELECT array_elem_min(ARRAY[1.0, 5.0, 3.0], ARRAY[4.0, 2.0, 6.0]);
+```
+
+| array_elem_min  |
+| --------------- |
+| [1.0,2.0,3.0]   |
+
+**Multi-argument - arrays of different lengths:**
+
+```questdb-sql
+SELECT array_elem_min(
+    ARRAY[100.0, 200.0, 150.0],
+    ARRAY[120.0, 180.0, 160.0, 90.0]
+);
+```
+
+| array_elem_min              |
+| --------------------------- |
+| [100.0,180.0,150.0,90.0]    |
+
+The fourth position has only one contributing value.
+
+**Multi-argument - NULL elements are skipped:**
+
+```questdb-sql
+SELECT array_elem_min(ARRAY[100.0, null], ARRAY[null, 200.0]);
+```
+
+| array_elem_min |
+| -------------- |
+| [100.0,200.0]  |
+
+Each position takes the minimum over the values that are present (1 value each
+here, not 2).
+
+**Aggregate - worst bid price at each level over the hour:**
+
+```questdb-sql demo title="array_elem_min - worst bid per level"
+SELECT timestamp, symbol, array_elem_min(bids[1]) AS worst_bid_per_level
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 1h;
+```
+
+Each position holds the lowest bid price seen at that book level during the hour.
+
+**Multi-argument - 2D arrays:**
+
+```questdb-sql
+SELECT array_elem_min(
+    ARRAY[[1.0, 8.0, 3.0], [5.0, 2.0, 9.0]],
+    ARRAY[[4.0, 6.0, 7.0], [3.0, 8.0, 1.0]]
+);
+```
+
+| array_elem_min                     |
+| ---------------------------------- |
+| [[1.0,6.0,3.0],[3.0,2.0,1.0]]      |
+
+## array_elem_sum
+
+`array_elem_sum(array1, array2 [, ...])` or `array_elem_sum(array)` returns an
+array where each element is the sum of the corresponding elements across the
+inputs. Works in both
+[multi-argument and aggregate modes](#array_elem_min), with the same NULL handling,
+different-length, and multi-dimensional behavior as `array_elem_min`.
+
+Uses Kahan compensated summation to minimize floating-point rounding errors.
+
+#### Parameters
+
+**Multi-argument mode:**
+
+- `array1`, `array2` [, `...`] - two or more `DOUBLE[]` arrays
+
+**Aggregate mode:**
+
+- `array` - a `DOUBLE[]` column
+
+#### Examples
+
+```questdb-sql
+SELECT array_elem_sum(
+    ARRAY[1.0, 2.0, 3.0],
+    ARRAY[10.0, 20.0, 30.0]
+);
+```
+
+| array_elem_sum    |
+| ----------------- |
+| [11.0,22.0,33.0]  |
+
+**Aggregate - total bid volume per level over the hour:**
+
+```questdb-sql demo title="array_elem_sum - total volume per level"
+SELECT timestamp, symbol, array_elem_sum(bids[2]) AS total_bid_volume_per_level
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$today'
+SAMPLE BY 1h;
+```
+
+Each position holds the sum of all bid volumes seen at that level during the hour.
+
 ## array_max
 
 `array_max(array)` returns the maximum value from all the array elements. `NULL`
@@ -78,9 +507,9 @@ contains no finite values, the function returns `NULL`.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_max(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
@@ -90,6 +519,15 @@ SELECT array_max(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
 | --------- |
 | 5.0       |
 
+**Best bid and best ask from the full order book arrays:**
+
+```questdb-sql demo title="array_max - best bid and ask"
+SELECT symbol, array_max(bids[1]) AS best_bid, array_min(asks[1]) AS best_ask
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
 ## array_min
 
 `array_min(array)` returns the minimum value from all the array elements. `NULL`
@@ -98,9 +536,9 @@ contains no finite values, the function returns `NULL`.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_min(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
@@ -110,6 +548,15 @@ SELECT array_min(ARRAY[ [1.0, 5.0], [3.0, 2.0] ]);
 | --------- |
 | 1.0       |
 
+**Worst price on each side of the book:**
+
+```questdb-sql demo title="array_min - deepest book levels"
+SELECT symbol, array_min(bids[1]) AS worst_bid, array_max(asks[1]) AS worst_ask
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
 ## array_position
 
 `array_position(array, elem)` returns the position of `elem` inside the 1D `array`. If
@@ -118,8 +565,8 @@ position of the first `NULL` element, if any.
 
 #### Parameters
 
-- `array` — the 1D array
-- `elem` — the element to look for
+- `array` - the 1D array
+- `elem` - the element to look for
 
 #### Examples
 
@@ -133,24 +580,164 @@ SELECT
 | -- | ---- |
 | 1  | NULL |
 
-## array_sum
+**Verify best_bid is always the first element of bids[1]:**
 
-`array_sum(array)` returns the sum of all the array elements. `NULL` elements
-behave as if they were zero.
-
-#### Parameter
-
-- `array` — the array
-
-#### Example
-
-```questdb-sql
-SELECT array_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```questdb-sql demo title="array_position - find best_bid in the book"
+SELECT symbol, array_position(bids[1], best_bid) AS best_bid_position
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
 ```
 
-| array_sum |
-| --------- |
-| 6.0       |
+Returns `1` for every row, confirming `best_bid` equals `bids[1][1]`.
+
+## array_reverse
+
+**Syntax:**
+
+```questdb-sql
+array_reverse(array) -> DOUBLE[]
+```
+
+Reverses the element order within the innermost dimension of a `DOUBLE[]`
+array. Unlike [array_sort](#array_sort), which reorders elements by value,
+`array_reverse` preserves whatever ordering the array already has and flips it.
+This is useful when elements are ordered by an external criterion (such as
+ingestion timestamp, another column's values, or a prior sort) and you need
+the opposite direction.
+
+For multi-dimensional arrays, each sub-array is reversed independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to reverse. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Reverse a simple array:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[1.0, 2.0, 3.0]);
+```
+
+| array_reverse |
+| :------------ |
+| [3.0, 2.0, 1.0] |
+
+**Reverse bid prices to get worst-to-best order:**
+
+```questdb-sql demo title="array_reverse - bids worst to best"
+SELECT symbol, array_reverse(bids[1]) AS bids_worst_to_best
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+`bids[1]` stores prices best-first (descending). Reversing gives ascending order
+from the deepest level to top of book.
+
+**Reverse each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_reverse(ARRAY[[1.0, 2.0], [3.0, 4.0]]);
+```
+
+| array_reverse |
+| :------------ |
+| [[2.0, 1.0], [4.0, 3.0]] |
+
+#### See also
+
+- [array_sort](#array_sort) - Sort array elements by value
+
+## array_sort
+
+**Syntax:**
+
+```questdb-sql
+array_sort(array) -> DOUBLE[]
+array_sort(array, descending) -> DOUBLE[]
+array_sort(array, descending, nullsFirst) -> DOUBLE[]
+```
+
+Sorts the elements of a `DOUBLE[]` array by value along the innermost
+dimension. Useful when you need elements ordered by value, for example to find
+the median, compute percentiles, or prepare input for
+[insertion_point](#insertion_point).
+
+For multi-dimensional arrays, each sub-array is sorted independently.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `array` | `DOUBLE[]` or `DOUBLE[][]` | The input array to sort. |
+| `descending` | `BOOLEAN` (optional, default `false`) | `true` sorts in descending order. |
+| `nullsFirst` | `BOOLEAN` (optional) | `true` places null values before non-null values. Default: nulls last for ascending, nulls first for descending. |
+
+#### Return value
+
+`DOUBLE[]` with the same dimensionality as the input. Returns NULL if the input
+is NULL. Empty arrays return empty arrays.
+
+#### Examples
+
+**Sort ask prices descending:**
+
+```questdb-sql demo title="array_sort - asks descending"
+SELECT symbol, array_sort(asks[1], true) AS asks_desc
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+`asks[1]` is stored ascending (best ask first). Sorting descending gives the
+same result as `array_reverse` here, but `array_sort` works on unsorted arrays
+too.
+
+**Descending sort:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[3.0, 1.0, 2.0], true);
+```
+
+| array_sort |
+| :--------- |
+| [3.0, 2.0, 1.0] |
+
+**Control null placement:**
+
+```questdb-sql
+SELECT
+  array_sort(ARRAY[1.0, null, 2.0]) AS default_nulls,
+  array_sort(ARRAY[1.0, null, 2.0], false, true) AS nulls_first;
+```
+
+| default_nulls | nulls_first |
+| :------------ | :---------- |
+| [1.0, 2.0, null] | [null, 1.0, 2.0] |
+
+**Sort each row of a 2D array independently:**
+
+```questdb-sql
+SELECT array_sort(ARRAY[[3.0, 1.0, 2.0], [6.0, 4.0, 5.0]]);
+```
+
+| array_sort |
+| :--------- |
+| [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] |
+
+#### See also
+
+- [array_reverse](#array_reverse) - Reverse array element order
+- [insertion_point](#insertion_point) - Binary search on a sorted array
 
 ## array_stddev
 
@@ -161,9 +748,9 @@ non-finite values (NaN, Infinity) are ignored. If the array contains fewer than
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_stddev(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
@@ -172,6 +759,17 @@ SELECT array_stddev(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
 | array_stddev |
 | ------------ |
 | 1.29099445   |
+
+**Price dispersion across bid levels:**
+
+```questdb-sql demo title="array_stddev - bid price dispersion"
+SELECT symbol, array_stddev(bids[1]) AS bid_price_dispersion
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+A higher value means prices are more spread out across the 40 book levels.
 
 ## array_stddev_pop
 
@@ -183,9 +781,9 @@ returns `NULL`.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_stddev_pop(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
@@ -194,6 +792,15 @@ SELECT array_stddev_pop(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
 | array_stddev_pop |
 | ---------------- |
 | 1.11803399       |
+
+**Population stddev of ask volumes (treating the 40 levels as the full population):**
+
+```questdb-sql demo title="array_stddev_pop - ask volume dispersion"
+SELECT symbol, array_stddev_pop(asks[2]) AS ask_volume_stddev
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
 
 ## array_stddev_samp
 
@@ -205,9 +812,9 @@ the function returns `NULL`.
 
 #### Parameter
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT array_stddev_samp(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
@@ -217,6 +824,43 @@ SELECT array_stddev_samp(ARRAY[ [1.0, 2.0], [3.0, 4.0] ]);
 | ----------------- |
 | 1.29099445        |
 
+**Sample stddev of bid prices across levels:**
+
+```questdb-sql demo title="array_stddev_samp - bid price sample stddev"
+SELECT symbol, array_stddev_samp(bids[1]) AS bid_price_stddev
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+## array_sum
+
+`array_sum(array)` returns the sum of all the array elements. `NULL` elements
+behave as if they were zero.
+
+#### Parameter
+
+- `array` - the array
+
+#### Examples
+
+```questdb-sql
+SELECT array_sum(ARRAY[ [1.0, 1.0], [2.0, 2.0] ]);
+```
+
+| array_sum |
+| --------- |
+| 6.0       |
+
+**Total bid-side liquidity (sum of all bid volumes):**
+
+```questdb-sql demo title="array_sum - total bid volume"
+SELECT symbol, array_sum(bids[2]) AS total_bid_volume
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
 ## dim_length
 
 `dim_length(array, dim)` returns the length of the n-dimensional array along
@@ -224,10 +868,10 @@ dimension `dim`.
 
 #### Parameters
 
-- `array` — the array
-- `dim` — the dimension (1-based) whose length to get
+- `array` - the array
+- `dim` - the dimension (1-based) whose length to get
 
-#### Example
+#### Examples
 
 Get the length of the array along the 1st dimension.
 
@@ -239,6 +883,20 @@ SELECT dim_length(ARRAY[42, 42], 1);
 | ------------ |
 |       2      |
 
+**Inspect the structure of the order book arrays:**
+
+```questdb-sql demo title="dim_length - order book dimensions"
+SELECT
+  dim_length(bids, 1) AS num_sub_arrays,
+  dim_length(bids, 2) AS levels_per_sub_array
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+Returns `2` and `40`: the bids array has 2 sub-arrays (prices, volumes), each
+with 40 levels.
+
 ## dot_product
 
 `dot_product(left_array, right_array)` returns the dot-product of the two
@@ -247,10 +905,10 @@ arrays, which must be of the same shape. The result is equal to
 
 #### Parameters
 
-- `left_array` — the left array
-- `right_array` — the right array
+- `left_array` - the left array
+- `right_array` - the right array
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT dot_product(
@@ -263,6 +921,19 @@ SELECT dot_product(
 | ----------- |
 | 54.0        |
 
+**Volume-weighted average bid price (VWAP):**
+
+```questdb-sql demo title="dot_product - VWAP of bid side"
+SELECT symbol,
+  dot_product(bids[1], bids[2]) / array_sum(bids[2]) AS vwap_bid
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+The dot product of prices and volumes divided by total volume gives the
+volume-weighted average price across all 40 bid levels.
+
 ## flatten
 
 `flatten(array)` flattens all the array's elements into a 1D array, in row-major
@@ -270,9 +941,9 @@ order.
 
 #### Parameters
 
-- `array` — the array
+- `array` - the array
 
-#### Example
+#### Examples
 
 Flatten a 2D array.
 
@@ -283,6 +954,18 @@ SELECT flatten(ARRAY[[1, 2], [3, 4]]);
 |      flatten      |
 | ----------------- |
 | [1.0,2.0,3.0,4.0] |
+
+**Flatten the 2D bids array into a single 1D array (prices then volumes):**
+
+```questdb-sql demo title="flatten - flatten order book"
+SELECT symbol, flatten(bids) AS bids_flat
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+The result is a 1D array of 80 elements: the 40 bid prices followed by the 40
+bid volumes.
 
 ## insertion_point
 
@@ -299,9 +982,9 @@ an unsorted array is unspecified.
 
 #### Parameters
 
-- `array` — the 1D array
-- `value` — the value whose insertion point to look for
-- `ahead_of_equal` (optional, default `false`) — when true (false), returns the
+- `array` - the 1D array
+- `value` - the value whose insertion point to look for
+- `ahead_of_equal` (optional, default `false`) - when true (false), returns the
   insertion point before (after) any elements equal to `value`
 
 #### Examples
@@ -316,6 +999,18 @@ SELECT
 | i1 | i2 | i3 |
 | -- | -- | -- |
 | 3  | 3  | 2  |
+
+**Find where the best bid would slot into the ask book:**
+
+```questdb-sql demo title="insertion_point - bid in ask book"
+SELECT symbol, insertion_point(asks[1], best_bid) AS bid_in_ask_book
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+Since `asks[1]` is sorted ascending and the best bid is below the best ask,
+this returns `1` because the bid would go before all ask levels.
 
 ## matmul
 
@@ -388,11 +1083,11 @@ It fills the holes created by shifting with `fill_value`, the default being
 
 #### Parameters
 
-- `array` — the array
-- `distance` — the shift distance
-— `fill_value` — the value to place in empty slots after shifting
+- `array` - the array
+- `distance` - the shift distance
+- `fill_value` - the value to place in empty slots after shifting
 
-#### Example
+#### Examples
 
 ```questdb-sql
 SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], 1);
@@ -417,6 +1112,19 @@ SELECT shift(ARRAY[ [1.0, 2.0], [3.0, 4.0] ], -1, 10.0);
 |             shift            |
 | ---------------------------- |
 | ARRAY[[2.0,10.0],[4.0,10.0]] |
+
+**Level-to-level price differences in the bid book:**
+
+```questdb-sql demo title="shift - price differences between levels"
+SELECT symbol, bids[1] - shift(bids[1], 1, 0.0) AS bid_level_diffs
+FROM market_data
+WHERE symbol = 'EURUSD'
+LIMIT -3;
+```
+
+Subtracting the shifted array from the original reveals the price drop between
+consecutive bid levels. The first element shows the full price (shifted in `0.0`
+as fill), subsequent elements show the tick-by-tick decrease.
 
 ## transpose
 

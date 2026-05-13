@@ -306,7 +306,7 @@ Specify a partitioning scheme larger than the sampling interval:
 
 ```questdb-sql
 CREATE MATERIALIZED VIEW my_view AS (
-  SELECT timestamp, symbol, sum(amount) FROM trades SAMPLE BY 8h
+  SELECT timestamp, symbol, sum(amount) AS total_amount FROM trades SAMPLE BY 8h
 ) PARTITION BY DAY;
 ```
 
@@ -335,6 +335,16 @@ CREATE MATERIALIZED VIEW trades_hourly AS (
 ```
 
 The view's TTL is independent of the base table's TTL.
+
+:::note
+
+In QuestDB Enterprise, TTL is superseded by
+[storage policies](/docs/concepts/storage-policy/). Use
+[`STORAGE POLICY(...)`](/docs/query/sql/alter-mat-view-set-storage-policy/) on
+a materialized view instead of `TTL` for graduated lifecycle management
+(convert to Parquet, then drop).
+
+:::
 
 ### Initial refresh
 
@@ -592,7 +602,10 @@ the replica's view was not fully up-to-date.
     Sets the time limit for incremental refresh on a materialized view
   - [`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/):
     Sets the time-to-live (TTL) period on a materialized view
+  - [`ALTER MATERIALIZED VIEW SET STORAGE POLICY`](/docs/query/sql/alter-mat-view-set-storage-policy/):
+    Attaches a [storage policy](/docs/concepts/storage-policy/) to a
+    materialized view (QuestDB Enterprise)
 
 - **Configuration**
-  - [Materialized views configs](/docs/configuration/overview/#materialized-views):
+  - [Materialized views configs](/docs/configuration/materialized-views/):
     Server configuration options for materialized views from `server.conf`

@@ -22,7 +22,9 @@ If you are a Windows user and require backup functionality, please
 
 ## CHECKPOINT syntax
 
-![Flow chart showing the syntax of the CHECKPOINT keyword](/images/docs/diagrams/checkpoint.svg)
+```questdb-sql
+CHECKPOINT { CREATE | RELEASE };
+```
 
 ## CHECKPOINT overview
 
@@ -79,6 +81,19 @@ file, typically `/var/lib/questdb/_restore` is present.
 The restore procedure will use `/var/lib/questdb/.checkpoint` to adjust the
 database files and remove extra data copies. After the restore is successful the
 database is avaialble as normal with no extra intervantion required.
+
+## Checkpoint history (Enterprise)
+
+In QuestDB Enterprise with replication enabled, each `CHECKPOINT RELEASE`
+automatically records the per-table transaction state to the shared replication
+object store. The [WAL cleaner](/docs/high-availability/wal-cleanup/) uses these
+records to determine which replicated WAL data can be safely deleted from object
+storage.
+
+Checkpoint history tracking is enabled by default when replication is active.
+No additional configuration is required. See the
+[WAL Cleanup guide](/docs/high-availability/wal-cleanup/#checkpoint-integration)
+for details.
 
 ## CHECKPOINT examples
 

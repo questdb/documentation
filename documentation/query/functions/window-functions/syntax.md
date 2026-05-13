@@ -1,21 +1,27 @@
 ---
-title: OVER Clause Syntax
-sidebar_label: OVER Syntax
-description: Complete syntax reference for the OVER clause in window functions - partitioning, ordering, and frame specifications.
-keywords: [over, partition by, order by, rows, range, frame, window functions]
+title: Window Function Syntax
+sidebar_label: Syntax
+description: Complete syntax reference for window functions including the OVER clause, named windows with the WINDOW clause, and window inheritance.
+keywords: [over, partition by, order by, rows, range, frame, window functions, window clause, named windows]
 ---
 
-The `OVER` clause defines the window for a window function. This page covers the complete syntax for partitioning, ordering, and frame specifications. For an introduction to window functions, see the [Overview](overview.md).
+The `OVER` clause defines the window for a window function. The `WINDOW` clause lets you define reusable named windows and build on them with inheritance. This page covers the complete syntax for both. For an introduction to window functions, see the [Overview](overview.md).
 
 ## Syntax
 
 ```sql
+-- Inline window definition
 function_name(arguments) [IGNORE NULLS | RESPECT NULLS] OVER (
     [PARTITION BY column [, ...]]
     [ORDER BY column [ASC | DESC] [, ...]]
     [frame_clause]
     [exclusion_clause]
 )
+
+-- Named window definition
+function_name(arguments) OVER window_name
+...
+WINDOW window_name AS ([base_window_name] [window_definition]) [, ...]
 ```
 
 Where `frame_clause` is one of:
@@ -56,6 +62,8 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 | `CUMULATIVE` | Shorthand for `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
 | `EXCLUDE` | Optionally excludes rows from the frame |
 
+Multiple window functions can share a definition using the [`WINDOW` clause](#named-windows-window-clause).
+
 ## PARTITION BY
 
 `PARTITION BY` divides the result set into groups. The window function operates independently on each partition.
@@ -64,9 +72,10 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 SELECT
     symbol,
     price,
+    timestamp,
     avg(price) OVER (PARTITION BY symbol) AS avg_price_per_symbol
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -87,13 +96,13 @@ SELECT
         ORDER BY timestamp
     ) AS seq
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
 **Important:**
 - This is independent of the query-level `ORDER BY`
-- Required for ranking functions (`row_number`, `rank`, `dense_rank`)
+- Required for ranking functions (`row_number`, `rank`, `dense_rank`, `percent_rank`)
 - Required for `RANGE` frames
 - Required for `CUMULATIVE`
 - Without `ORDER BY`, all rows in the partition are peers
@@ -199,7 +208,7 @@ SELECT
         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
     ) AS moving_avg_3
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -267,7 +276,7 @@ SELECT
         RANGE BETWEEN '2' SECOND PRECEDING AND CURRENT ROW
     ) AS volume_2sec
 FROM market_data
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
 
@@ -296,7 +305,7 @@ SELECT
         CUMULATIVE
     ) AS running_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 This is equivalent to:
@@ -311,7 +320,7 @@ SELECT
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     ) AS running_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 **VWAP example:**
@@ -319,7 +328,7 @@ WHERE timestamp IN today();
 For high-frequency data, VWAP is typically calculated over OHLC using typical price:
 
 ```questdb-sql title="Volume-weighted average price over OHLC" demo
-DECLARE @symbol := 'BTC-USD'
+DECLARE @symbol := 'BTC-USDT'
 
 WITH ohlc AS (
     SELECT
@@ -331,13 +340,13 @@ WITH ohlc AS (
         sum(amount) AS volume
     FROM trades
     WHERE timestamp IN '2024-05-22' AND symbol = @symbol
-    SAMPLE BY 1m ALIGN TO CALENDAR
+    SAMPLE BY 1m
 )
 SELECT
     ts, open, high, low, close, volume,
-    sum((high + low + close) / 3 * volume) OVER (ORDER BY ts CUMULATIVE)
-        / sum(volume) OVER (ORDER BY ts CUMULATIVE) AS vwap
-FROM ohlc;
+    sum((high + low + close) / 3 * volume) OVER w / sum(volume) OVER w AS vwap
+FROM ohlc
+WINDOW w AS (ORDER BY ts CUMULATIVE);
 ```
 
 ### Frame shorthand syntax
@@ -361,7 +370,7 @@ SELECT
     sum(price) OVER (ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS sum2,
     sum(price) OVER (ORDER BY timestamp CUMULATIVE) AS sum3
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 ## Frame boundaries
@@ -451,9 +460,151 @@ SELECT
         EXCLUDE CURRENT ROW
     ) AS cumulative_sum_excluding_current
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '[$today]'
 LIMIT 100;
 ```
+
+## Named windows (WINDOW clause)
+
+When multiple window functions share the same window definition, you can define the window once and reference it by name. This reduces repetition and improves readability.
+
+**Syntax:**
+```sql
+SELECT
+    columns,
+    window_function() OVER window_name,
+    another_function() OVER window_name
+FROM table
+WINDOW window_name AS (window_definition) [, ...]
+ORDER BY column
+LIMIT n;
+```
+
+The `WINDOW` clause appears after `WHERE` and before `ORDER BY`.
+
+**Example:**
+```questdb-sql title="Named window for repeated definitions" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w AS avg_price,
+    min(price) OVER w AS min_price,
+    max(price) OVER w AS max_price
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Multiple named windows
+
+You can define multiple windows in a single `WINDOW` clause:
+
+```questdb-sql title="Multiple named windows" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER short_window AS avg_10,
+    avg(price) OVER long_window AS avg_50
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW
+    short_window AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),
+    long_window AS (ORDER BY timestamp ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Mixing inline and named windows
+
+You can use both named windows and inline `OVER (...)` definitions in the same query:
+
+```questdb-sql title="Mixed inline and named windows" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w AS moving_avg,
+    row_number() OVER (PARTITION BY symbol ORDER BY timestamp) AS seq
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+### Works with CTEs and subqueries
+
+Named windows work within CTEs and subqueries:
+
+```questdb-sql title="Named window in CTE" demo
+WITH price_stats AS (
+    SELECT
+        timestamp,
+        symbol,
+        price,
+        avg(price) OVER w AS moving_avg,
+        price - avg(price) OVER w AS deviation
+    FROM trades
+    WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+    WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)
+)
+SELECT * FROM price_stats
+WHERE deviation > 10
+LIMIT 100;
+```
+
+### Window inheritance
+
+A named window can reference another named window as its base, inheriting its `PARTITION BY`, `ORDER BY`, and frame clauses. The child window can then add or override clauses on top.
+
+```questdb-sql title="Inheriting from a base window" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w1 AS symbol_avg,
+    avg(price) OVER w2 AS moving_avg
+FROM trades
+WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
+WINDOW
+    w1 AS (ORDER BY timestamp),
+    w2 AS (w1 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+Here `w2` inherits `ORDER BY timestamp` from `w1` and adds a frame clause.
+
+Chained inheritance is supported — a window can inherit from a window that itself inherits from another:
+
+```questdb-sql title="Chained inheritance" demo
+SELECT
+    timestamp,
+    symbol,
+    price,
+    avg(price) OVER w3 AS moving_avg
+FROM trades
+WHERE timestamp IN '[$today]'
+WINDOW
+    w1 AS (PARTITION BY symbol),
+    w2 AS (w1 ORDER BY timestamp),
+    w3 AS (w2 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+**Merge rules** follow the SQL standard:
+
+| Clause | Behavior |
+| --- | --- |
+| `PARTITION BY` | Always inherited from the base. The child **cannot** specify its own. |
+| `ORDER BY` | Child's takes precedence if specified, otherwise inherited from the base. |
+| Frame | Child's takes precedence if specified, otherwise inherited from the base. |
+
+**Restrictions:**
+
+- The base window must be defined **earlier** in the `WINDOW` clause (no forward references).
+- A child window that references a base **cannot** include its own `PARTITION BY`.
+- Circular and self-references are not allowed.
 
 ## Performance considerations
 
@@ -484,7 +635,7 @@ WITH prices_and_avg AS (
         avg(price) OVER (ORDER BY timestamp) AS moving_avg_price,
         timestamp
     FROM trades
-    WHERE timestamp IN today()
+    WHERE timestamp IN '[$today]'
 )
 SELECT * FROM prices_and_avg
 WHERE moving_avg_price > 100;
@@ -494,14 +645,15 @@ WHERE moving_avg_price > 100;
 
 Without `ORDER BY`, the function operates on the entire partition. All rows show the same value:
 
-```questdb-sql title="Empty OVER - same value for all rows"
+```questdb-sql title="Empty OVER - same value for all rows" demo
 -- Potential issue: all rows show the same sum
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER () AS total_sum
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 With `PARTITION BY` but no `ORDER BY`, all rows within each partition show the same value:
@@ -511,9 +663,10 @@ With `PARTITION BY` but no `ORDER BY`, all rows within each partition show the s
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER (PARTITION BY symbol) AS symbol_total
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
 For cumulative or moving calculations, you need both `PARTITION BY` and `ORDER BY`:
@@ -522,26 +675,12 @@ For cumulative or moving calculations, you need both `PARTITION BY` and `ORDER B
 SELECT
     symbol,
     price,
+    timestamp,
     sum(price) OVER (
         PARTITION BY symbol
         ORDER BY timestamp
     ) AS cumulative_sum
 FROM trades
-WHERE timestamp IN today();
+WHERE timestamp IN '[$today]';
 ```
 
-### Syntax error in WHERE clause
-
-Note the placement of `WHERE` - it should not have a semicolon before it:
-
-```questdb-sql title="Incorrect - syntax error"
-SELECT symbol, price
-FROM trades;
-WHERE timestamp IN today();
-```
-
-```questdb-sql title="Correct"
-SELECT symbol, price
-FROM trades
-WHERE timestamp IN today();
-```

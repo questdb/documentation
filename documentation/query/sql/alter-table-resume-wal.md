@@ -9,8 +9,10 @@ recovery from errors.
 
 ## Syntax
 
-![Flow chart showing the syntax of the ALTER TABLE keyword](/images/docs/diagrams/alterTable.svg)
-![Flow chart showing the syntax of ALTER TABLE with RESUME WAL keyword](/images/docs/diagrams/resumeWal.svg)
+```questdb-sql
+ALTER TABLE tableName RESUME WAL
+    [FROM { TRANSACTION | TXN } sequencerTxn];
+```
 
 ## Description
 

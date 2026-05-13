@@ -5,7 +5,7 @@ description:
   A list of error codes that QuestDB may generate, with explanations and suggested actions.
 ---
 
-# Replication Errors
+## Replication Errors
 
 Error codes may appear during start-up if an instance is misconfigured.
 
@@ -17,7 +17,7 @@ If these two IDs are out of sync, the primary instance will raise an error.
 
 For additional information, refer to the [replication overview](/docs/high-availability/overview) and [replication setup guide](/docs/high-availability/setup), especially its "Disaster Recovery" section.
 
-## ER001
+### ER001
 
 This code indicates that a point in time recovery completed successfully.
 
@@ -31,7 +31,7 @@ To resolve, shut down the database and reconfigure the `replication.object.store
 
 Once restarted, if the old location is no longer needed, you can delete it.
 
-## ER002
+### ER002
 
 The database cannot read or write its local copy of the replication sync ID stored in the `_replication_sync_id.d` file.
 
@@ -43,7 +43,7 @@ To do so, place an empty `_migrate_primary` file into your databases installatio
 
 This will trigger the database instance to resync with the latest state in the object store and restart as primary.
 
-## ER003
+### ER003
 
 When you create a replica from a snapshot that is too old, this error may occur. 
 
@@ -56,7 +56,7 @@ The workflow to enable replication on the primary instance and create replicas i
 See the [checkpointing](/docs/query/sql/checkpoint/) page for more details
 on how to create and restore snapshots.
 
-## ER004
+### ER004
 
 This error is very similar to ER003. 
 
@@ -71,7 +71,7 @@ Use a snapshot you created after enabling replication on the primary instance.
 See the workflow in ER003 for detailed steps.
 
 
-## ER005
+### ER005
 
 A primary instance started which is not in sync with the configured object store.
 
@@ -88,7 +88,7 @@ To do so, place an empty `_migrate_primary` file in your database installation d
 This will update the primary instance to the latest state from the object
 store and have it take over as the new primary instance.
 
-## ER006
+### ER006
 
 This error occurs when you start a primary instance and discover another instance is already acting as the primary.
 
@@ -101,7 +101,52 @@ You have the following options:
 * Reconfigure it as `replication.role=replica` and restart it
 * Perform a planned primary migration and resume the primary role on this instance
 
-# Operating system error codes
+### ER007
+
+This error indicates a Data ID mismatch between the local database and the backup or replication object store.
+
+Each QuestDB database has a unique Data ID (stored in `<install_root>/db/.data_id`) that identifies it for backup and replication purposes. This error occurs when:
+
+* Attempting to back up to an object store that contains backups from a different database instance
+* A replication object store contains data from a different primary instance
+
+To resolve:
+
+* **For backup creation**: Verify the `backup.object.store` points to the correct location for this database instance. If intentionally backing up to a new location, the location must be empty.
+* **For replication**: Verify the `replication.object.store` configuration matches the primary instance that owns the data.
+
+Note: Restore operations check for an empty database separately. If the target
+database already has a Data ID, restore fails with: "The local database is not
+empty. It already has an associated data ID."
+
+#### Starting fresh with a new Data ID
+
+A Data ID is automatically generated when QuestDB first starts with an empty
+database. To intentionally start fresh:
+
+**Recommended**: Create a new, empty database directory and configure QuestDB
+to use it.
+
+**Alternative**: Delete the existing `.data_id` file (stop QuestDB first):
+
+```bash
+# Stop QuestDB first!
+rm <install_root>/db/.data_id
+# Restart QuestDB - a new Data ID will be generated
+```
+
+:::warning
+
+Changing the Data ID on a database with existing data will:
+- Break any existing replication configuration
+- Make existing backups incompatible for restore
+- Cause ER007 errors when connecting to the original object store
+
+:::
+
+See the [Backup and Restore guide](/docs/operations/backup/) for more information.
+
+## Operating system error codes
 
 Refer to the [OS error codes](/docs/troubleshooting/os-error-codes/) page for any
 file or network related errors that QuestDB may raise.

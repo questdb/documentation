@@ -6,23 +6,24 @@ description:
   Enterprise."
 ---
 
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  RBAC provides fine-grained database permissions management.
+</EnterpriseNote>
+
 `DROP GROUP` - remove an existing group.
 
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
-:::note
-
-Role-based Access Control (RBAC) operations are only available in QuestDB
-Enterprise.
-
-:::
-
 ---
 
 ## Syntax
 
-![Flow chart showing the syntax of the DROP GROUP keyword](/images/docs/diagrams/dropGroup.svg)
+```questdb-sql
+DROP GROUP [IF EXISTS] groupName;
+```
 
 ## Description
 

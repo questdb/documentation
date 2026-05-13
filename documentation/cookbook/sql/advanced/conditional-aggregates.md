@@ -33,7 +33,7 @@ SELECT
   sum(CASE WHEN amount <= 1.0 THEN amount END) as small_trade_volume,
   sum(amount) as total_volume
 FROM trades
-WHERE timestamp >= dateadd('d', -1, now())
+WHERE timestamp IN '$now - 1d..$now'
   AND symbol IN ('BTC-USDT', 'ETH-USDT')
 GROUP BY symbol;
 ```

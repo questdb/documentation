@@ -28,11 +28,10 @@ WITH sampled AS (
      AND symbol = @symbol
 ), cumulative AS (
      SELECT timestamp, symbol,
-           SUM(traded_value)
-                OVER (ORDER BY timestamp) AS cumulative_value,
-           SUM(volume)
-                OVER (ORDER BY timestamp) AS cumulative_volume
+           SUM(traded_value) OVER w AS cumulative_value,
+           SUM(volume) OVER w AS cumulative_volume
      FROM sampled
+     WINDOW w AS (ORDER BY timestamp)
 )
 SELECT timestamp as time, cumulative_value/cumulative_volume AS vwap_yesterday FROM cumulative;
 ```
@@ -52,11 +51,10 @@ WITH sampled AS (
      AND symbol = @symbol
 ), cumulative AS (
      SELECT timestamp, symbol,
-           SUM(traded_value)
-                OVER (ORDER BY timestamp) AS cumulative_value,
-           SUM(volume)
-                OVER (ORDER BY timestamp) AS cumulative_volume
+           SUM(traded_value) OVER w AS cumulative_value,
+           SUM(volume) OVER w AS cumulative_volume
      FROM sampled
+     WINDOW w AS (ORDER BY timestamp)
 )
 SELECT dateadd('d',-1,timestamp) as time, cumulative_value/cumulative_volume AS vwap_today FROM cumulative;
 ```

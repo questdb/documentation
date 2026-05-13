@@ -1,44 +1,126 @@
 ---
 title: Aggregate functions
 sidebar_label: Aggregate
-description: Aggregate functions reference documentation.
+description: SQL aggregate functions for summarizing data including count, sum, avg, min, max, statistical functions, and more.
 ---
 
 This page describes the available functions to assist with performing aggregate
-calculations.
+calculations. Functions are organized by category below.
+
+## Function categories
+
+### Basic aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [avg](#avg) | Arithmetic mean |
+| [count](#count) | Count rows or non-NULL values |
+| [geomean](#geomean) | Geometric mean |
+| [max](#max) | Maximum value |
+| [min](#min) | Minimum value |
+| [sum](#sum) | Sum of values |
+
+### Positional aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [arg_max](#arg_max) | Value at the row where another column is maximum |
+| [arg_min](#arg_min) | Value at the row where another column is minimum |
+| [first](#first) | First value (by designated timestamp or insertion order) |
+| [first_not_null](#first_not_null) | First non-NULL value |
+| [last](#last) | Last value (by designated timestamp or insertion order) |
+| [last_not_null](#last_not_null) | Last non-NULL value |
+
+### Statistical aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [corr](#corr) | Pearson correlation coefficient |
+| [covar_pop](#covar_pop) | Population covariance |
+| [covar_samp](#covar_samp) | Sample covariance |
+| [mode](#mode) | Most frequent value |
+| [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
+| [stddev_pop](#stddev_pop) | Population standard deviation |
+| [var_pop](#var_pop) | Population variance |
+| [variance / var_samp](#variance--var_samp) | Sample variance |
+
+### Approximate aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [approx_count_distinct](#approx_count_distinct) | Estimated distinct count using HyperLogLog |
+| [approx_median](#approx_median) | Approximate median (50th percentile) |
+| [approx_percentile](#approx_percentile) | Approximate percentile using HdrHistogram |
+
+### String aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [string_agg](#string_agg) | Concatenate values with delimiter |
+| [string_distinct_agg](#string_distinct_agg) | Concatenate distinct values with delimiter |
 
 
-:::note
+### Boolean aggregates
 
-QuestDB does not support using aggregate functions as arguments to other
-functions. For example, this is not allowed:
+| Function | Description |
+| :------- | :---------- |
+| [bool_and](#bool_and) | True if all values are true |
+| [bool_or](#bool_or) | True if any value is true |
 
-```questdb-sql
-SELECT datediff('d', min(timestamp), max(timestmap)) FROM trades;
-```
+### Bitwise aggregates
 
-Running it will result in the following error:
+| Function | Description |
+| :------- | :---------- |
+| [bit_and](#bit_and) | Bitwise AND of all non-NULL values |
+| [bit_or](#bit_or) | Bitwise OR of all non-NULL values |
+| [bit_xor](#bit_xor) | Bitwise XOR of all non-NULL values |
 
-`Aggregate function cannot be passed as an argument`
+### Specialized aggregates
 
-You can work around this limitation by using CTEs or subqueries:
+| Function | Description |
+| :------- | :---------- |
+| [count_distinct](#count_distinct) | Exact count of distinct values |
+| [haversine_dist_deg](#haversine_dist_deg) | Total traveled distance from lat/lon points |
+| [ksum](#ksum) | Kahan compensated sum (for floating-point precision) |
+| [nsum](#nsum) | Neumaier sum (for floating-point precision) |
+| [twap](#twap) | Time-weighted average price |
+| [weighted_avg](#weighted_avg) | Weighted arithmetic mean |
+| [weighted_stddev](#weighted_stddev) | Weighted standard deviation (reliability weights) |
+| [weighted_stddev_freq](#weighted_stddev_freq) | Weighted standard deviation (frequency weights) |
+| [weighted_stddev_rel](#weighted_stddev_rel) | Weighted standard deviation (reliability weights) |
 
-```questdb-sql title="CTE workaround"
--- CTE
-WITH minmax AS (
-  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
-)
-SELECT datediff('d', min_date, max_date) FROM minmax;
+### Array aggregates
 
--- Subquery
-SELECT datediff('d', min_date, max_date)
-FROM (
-  SELECT min(timestamp) AS min_date, max(timestamp) AS max_date FROM trades
-);
+Several aggregates on this page ([first](#first), [first_not_null](#first_not_null),
+[last](#last), [last_not_null](#last_not_null)) accept array columns directly.
+For element-wise aggregation across arrays — summing, averaging, or finding
+min/max position-by-position — see the
+[array functions](/docs/query/functions/array/) page.
 
-```
+| Function | Description |
+| :------- | :---------- |
+| [array_elem_avg](/docs/query/functions/array/#array_elem_avg) | Element-wise average across arrays |
+| [array_elem_max](/docs/query/functions/array/#array_elem_max) | Element-wise maximum across arrays |
+| [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
+| [array_elem_sum](/docs/query/functions/array/#array_elem_sum) | Element-wise sum across arrays |
 
-:::
+### Visualization aggregates
+
+| Function | Description |
+| :------- | :---------- |
+| [sparkline](/docs/query/functions/visualization/#sparkline) | Vertical block chart of values within a group |
+
+See the [visualization functions](/docs/query/functions/visualization/) page for
+full reference, including the scalar [bar](/docs/query/functions/visualization/#bar)
+function.
+
+---
+
+QuestDB supports implicit `GROUP BY`. When aggregate functions are used with
+non-aggregated columns, QuestDB automatically groups by those columns. Examples
+in this documentation often omit `GROUP BY` for brevity.
+
+---
 
 ## approx_count_distinct
 
@@ -75,15 +157,9 @@ Return value type is `long`.
 _Please note that exact example values will vary as they are approximations
 derived from the HyperLogLog algorithm._
 
-```questdb-sql title="Estimate count of distinct symbols with precision 5"
-SELECT approx_count_distinct(symbol, 5) FROM trades;
+```questdb-sql demo title="Estimate count of distinct symbols with precision 5"
+SELECT approx_count_distinct(symbol, 5) FROM fx_trades;
 ```
-
-| approx_count_distinct |
-| :-------------------- |
-| 1234567               |
-
-
 
 ```questdb-sql title="Estimate count of distinct user_id (int) values by date"
 SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
@@ -94,8 +170,6 @@ SELECT date, approx_count_distinct(user_id) FROM sessions GROUP BY date;
 | 2023-01-01 | 2358                  |
 | 2023-01-02 | 2491                  |
 | ...        | ...                   |
-
-
 
 ```questdb-sql title="Estimate count of distinct product_id values by region"
 SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
@@ -108,8 +182,6 @@ SELECT region, approx_count_distinct(product_id) FROM sales GROUP BY region;
 | East   | 1675                  |
 | West   | 1543                  |
 
-
-
 ```questdb-sql title="Estimate count of distinct order_ids with precision 8"
 SELECT approx_count_distinct(order_id, 8) FROM orders;
 ```
@@ -117,8 +189,6 @@ SELECT approx_count_distinct(order_id, 8) FROM orders;
 | approx_count_distinct |
 | :-------------------- |
 | 3456789               |
-
-
 
 ```questdb-sql title="Estimate count of distinct transaction_ids by store_id"
 SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP BY store_id;
@@ -129,6 +199,61 @@ SELECT store_id, approx_count_distinct(transaction_id) FROM transactions GROUP B
 | 1        | 56789                 |
 | 2        | 67890                 |
 | ...      | ...                   |
+
+## approx_median
+
+`approx_median(value, precision)` calculates the approximate median (50th
+percentile) of a set of non-negative numeric values using the
+[HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to
+calling `approx_percentile(value, 0.5, precision)`.
+
+The function will throw an error if any negative values are encountered in the
+input. All input values must be non-negative.
+
+#### Parameters
+
+- `value` is any non-negative numeric value.
+- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is
+  the number of significant decimal digits to which the histogram will maintain
+  value resolution and separation. Higher precision leads to more accurate
+  results with increased memory usage. Defaults to 1 (lower accuracy, high
+  efficiency).
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql demo title="Approximate median price by symbol"
+SELECT symbol, approx_median(price) FROM trades
+WHERE timestamp IN '$today'
+GROUP BY symbol;
+```
+
+| symbol   | approx_median |
+| :------- | :------------ |
+| ETH-BTC  | 0.0283        |
+| BTC-USDT | 77824.0       |
+| SOL-BTC  | 0.0010        |
+| ...      | ...           |
+
+```questdb-sql demo title="Approximate median with higher precision"
+SELECT symbol, approx_median(price, 3) FROM trades
+WHERE timestamp IN '$today'
+GROUP BY symbol;
+```
+
+| symbol   | approx_median |
+| :------- | :------------ |
+| ETH-BTC  | 0.02861       |
+| BTC-USDT | 79680.0       |
+| SOL-BTC  | 0.00110       |
+| ...      | ...           |
+
+#### See also
+
+- [approx_percentile](#approx_percentile) - Approximate percentile for any quantile
 
 ## approx_percentile
 
@@ -158,60 +283,178 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Approximate percentile"
-SELECT approx_percentile(price, 0.99) FROM trades;
+```questdb-sql demo title="Approximate 99th percentile of price"
+SELECT approx_percentile(price, 0.99, 3) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
 | approx_percentile |
 | :---------------- |
-| 101.5             |
+| 211.24            |
 
-## approx_median
+#### See also
 
-`approx_median(value, precision)` calculates the approximate median (50th
-percentile) of a set of non-negative numeric values using the
-[HdrHistogram](http://hdrhistogram.org/) algorithm. This is equivalent to
-calling `approx_percentile(value, 0.5, precision)`.
+- [approx_median](#approx_median) - Shorthand for 50th percentile
 
-The function will throw an error if any negative values are encountered in the
-input. All input values must be non-negative.
+## arg_max
+
+`arg_max(value, key)` returns the value of the first argument at the row where
+the second argument reaches its maximum value. This function is useful for
+finding values at extreme points in time-series and grouped data.
 
 #### Parameters
 
-- `value` is any non-negative numeric value.
-- `precision` (optional) is an `int` value between 0 and 5, inclusive. This is
-  the number of significant decimal digits to which the histogram will maintain
-  value resolution and separation. Higher precision leads to more accurate
-  results with increased memory usage. Defaults to 1 (lower accuracy, high
-  efficiency).
+- `value` is the column or expression whose value to return.
+- `key` is the column or expression used to determine which row to select (the
+  row with the maximum key value).
 
 #### Return value
 
-Return value type is `double`.
+Return value type matches the type of the `value` argument.
+
+#### Null handling
+
+- Rows where `key` is `NULL` are ignored during aggregation.
+- If the value at the maximum key row is `NULL`, the result is `NULL`.
+- If all keys in a group are `NULL`, the result is `NULL`.
+
+#### Supported type combinations
+
+The function supports the following type combinations for `value` and `key`:
+
+| Value Type | Key Types                   |
+| :--------- | :-------------------------- |
+| double     | double, long, timestamp     |
+| long       | double, timestamp           |
+| timestamp  | double, long, uuid          |
+| uuid       | timestamp                   |
 
 #### Examples
 
-```questdb-sql title="Calculate approximate median price by symbol" demo
-SELECT symbol, approx_median(price) FROM trades
-WHERE timestamp in today()
-GROUP BY symbol;
+```questdb-sql demo title="Find when the highest price occurred today"
+SELECT arg_max(timestamp, price) AS peak_time FROM trades
+WHERE timestamp IN '$today';
 ```
 
-| symbol  | approx_median |
-| :------ | :----------- |
-| BTC-USD | 39265.31     |
-| ETH-USD | 2615.46      |
+| peak_time                   |
+| :-------------------------- |
+| 2026-05-08T11:30:13.194999Z |
 
-```questdb-sql title="Calculate approximate median with higher precision" demo
-SELECT symbol, approx_median(price, 3) FROM trades
-WHERE timestamp in today()
-GROUP BY symbol;
+```questdb-sql demo title="Find when each symbol hit its high today"
+SELECT symbol, arg_max(timestamp, price) AS peak_time
+FROM trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| symbol  | approx_median |
-| :------ | :----------- |
-| BTC-USD | 39265.312    |
-| ETH-USD | 2615.459     |
+| symbol    | peak_time                   |
+| :-------- | :-------------------------- |
+| ETH-BTC   | 2026-05-08T02:59:54.918999Z |
+| BTC-USDT  | 2026-05-08T11:30:13.194999Z |
+| SOL-BTC   | 2026-05-08T03:49:39.657999Z |
+| ADA-USDT  | 2026-05-08T10:43:44.374000Z |
+| AVAX-USDT | 2026-05-08T09:29:03.172000Z |
+
+```questdb-sql demo title="Find the price at each symbol's peak volume today"
+SELECT symbol, arg_max(price, amount) AS price_at_peak_volume
+FROM trades
+WHERE timestamp IN '$today'
+LIMIT 5;
+```
+
+| symbol    | price_at_peak_volume |
+| :-------- | :------------------- |
+| ETH-BTC   | 0.02865              |
+| BTC-USDT  | 79461.7              |
+| SOL-BTC   | 0.0011062            |
+| ADA-USDT  | 0.2604               |
+| AVAX-USDT | 9.571                |
+
+#### See also
+
+- [arg_min](#arg_min) - Value at the row where another column is minimum
+- [max](#max) - Returns the maximum value itself
+- [last](#last) - Returns the last value by timestamp order
+
+## arg_min
+
+`arg_min(value, key)` returns the value of the first argument at the row where
+the second argument reaches its minimum value. This function is useful for
+finding values at extreme points in time-series and grouped data.
+
+#### Parameters
+
+- `value` is the column or expression whose value to return.
+- `key` is the column or expression used to determine which row to select (the
+  row with the minimum key value).
+
+#### Return value
+
+Return value type matches the type of the `value` argument.
+
+#### Null handling
+
+- Rows where `key` is `NULL` are ignored during aggregation.
+- If the value at the minimum key row is `NULL`, the result is `NULL`.
+- If all keys in a group are `NULL`, the result is `NULL`.
+
+#### Supported type combinations
+
+The function supports the following type combinations for `value` and `key`:
+
+| Value Type | Key Types                   |
+| :--------- | :-------------------------- |
+| double     | double, long, timestamp     |
+| long       | double, timestamp           |
+| timestamp  | double, long, uuid          |
+| uuid       | timestamp                   |
+
+#### Examples
+
+```questdb-sql demo title="Find when the lowest price occurred today"
+SELECT arg_min(timestamp, price) AS bottom_time FROM trades
+WHERE timestamp IN '$today';
+```
+
+| bottom_time                 |
+| :-------------------------- |
+| 2026-05-08T11:10:07.520999Z |
+
+```questdb-sql demo title="Find when each symbol hit its low today"
+SELECT symbol, arg_min(timestamp, price) AS trough_time
+FROM trades
+WHERE timestamp IN '$today'
+LIMIT 5;
+```
+
+| symbol    | trough_time                 |
+| :-------- | :-------------------------- |
+| ETH-BTC   | 2026-05-08T10:55:22.411000Z |
+| BTC-USDT  | 2026-05-08T03:05:18.441999Z |
+| SOL-BTC   | 2026-05-08T11:10:07.520999Z |
+| ADA-USDT  | 2026-05-08T03:05:18.430000Z |
+| AVAX-USDT | 2026-05-08T03:05:18.536000Z |
+
+```questdb-sql demo title="Find the price at each symbol's lowest volume today"
+SELECT symbol, arg_min(price, amount) AS price_at_min_volume
+FROM trades
+WHERE timestamp IN '$today'
+LIMIT 5;
+```
+
+| symbol    | price_at_min_volume |
+| :-------- | :------------------ |
+| ETH-BTC   | 0.02863             |
+| BTC-USDT  | 80023.2             |
+| SOL-BTC   | 0.0011083           |
+| ADA-USDT  | 0.263               |
+| AVAX-USDT | 9.474               |
+
+#### See also
+
+- [arg_max](#arg_max) - Value at the row where another column is maximum
+- [min](#min) - Returns the minimum value itself
+- [first](#first) - Returns the first value by timestamp order
 
 ## avg
 
@@ -228,23 +471,228 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Average transaction amount"
-SELECT avg(amount) FROM transactions;
+```questdb-sql demo title="Average trade price"
+SELECT avg(price) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| avg  |
-| :--- |
-| 22.4 |
-
-```questdb-sql title="Average transaction amount by payment_type"
-SELECT payment_type, avg(amount) FROM transactions;
+```questdb-sql demo title="Average trade price by symbol"
+SELECT symbol, avg(price) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | avg   |
-| :----------- | :---- |
-| cash         | 22.1  |
-| card         | 27.4  |
-| NULL         | 18.02 |
+#### See also
+
+- [sum](#sum) - Sum of values
+- [weighted_avg](#weighted_avg) - Weighted arithmetic mean
+
+## bit_and
+
+`bit_and(value)` returns the bitwise AND of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise AND of all status flags"
+SELECT bit_and(flags) FROM events;
+```
+
+| bit_and |
+| :------ |
+| 4       |
+
+```questdb-sql title="Bitwise AND of status flags by category"
+SELECT category, bit_and(status_flags) FROM items;
+```
+
+| category | bit_and |
+| :------- | :------ |
+| A        | 1       |
+| B        | 0       |
+| C        | 5       |
+
+#### See also
+
+- [bit_or](#bit_or) - Bitwise OR of all non-NULL values
+- [bit_xor](#bit_xor) - Bitwise XOR of all non-NULL values
+
+## bit_or
+
+`bit_or(value)` returns the bitwise OR of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise OR of all permissions"
+SELECT bit_or(permissions) FROM users;
+```
+
+| bit_or |
+| :----- |
+| 15     |
+
+```questdb-sql title="Bitwise OR of permissions by role"
+SELECT role, bit_or(permissions) FROM users;
+```
+
+| role    | bit_or |
+| :------ | :----- |
+| admin   | 255    |
+| editor  | 31     |
+| viewer  | 1      |
+
+#### See also
+
+- [bit_and](#bit_and) - Bitwise AND of all non-NULL values
+- [bit_xor](#bit_xor) - Bitwise XOR of all non-NULL values
+
+## bit_xor
+
+`bit_xor(value)` returns the bitwise XOR of all non-NULL values in an integer
+column.
+
+#### Parameters
+
+- `value` is a `byte`, `short`, `int`, or `long` column.
+
+#### Return value
+
+Return value type matches the type of the argument.
+
+#### Examples
+
+```questdb-sql title="Bitwise XOR of all checksums"
+SELECT bit_xor(checksum) FROM data;
+```
+
+| bit_xor |
+| :------ |
+| 42      |
+
+```questdb-sql title="Bitwise XOR by partition"
+SELECT partition_id, bit_xor(value) FROM records;
+```
+
+| partition_id | bit_xor |
+| :----------- | :------ |
+| 1            | 170     |
+| 2            | 85      |
+
+#### See also
+
+- [bit_and](#bit_and) - Bitwise AND of all non-NULL values
+- [bit_or](#bit_or) - Bitwise OR of all non-NULL values
+
+## bool_and
+
+`bool_and(value)` returns `true` if all non-NULL values in the group are `true`,
+otherwise returns `false`. This function is useful for checking if a condition
+holds across all rows in a group.
+
+#### Parameters
+
+- `value` is a boolean column or expression.
+
+#### Return value
+
+Return value type is `boolean`.
+
+#### Examples
+
+```questdb-sql title="Check if all orders are fulfilled"
+SELECT bool_and(is_fulfilled) FROM orders;
+```
+
+| bool_and |
+| :------- |
+| false    |
+
+```questdb-sql title="Check if all items passed QA by batch"
+SELECT batch_id, bool_and(passed_qa) FROM items;
+```
+
+| batch_id | bool_and |
+| :------- | :------- |
+| 1        | true     |
+| 2        | false    |
+| 3        | true     |
+
+```questdb-sql title="Check if all prices are above threshold"
+SELECT symbol, bool_and(price > 100) FROM trades;
+```
+
+| symbol  | bool_and |
+| :------ | :------- |
+| BTC-USD | true     |
+| ETH-USD | false    |
+
+#### See also
+
+- [bool_or](#bool_or) - True if any value is true
+
+## bool_or
+
+`bool_or(value)` returns `true` if any non-NULL value in the group is `true`,
+otherwise returns `false`. This function is useful for checking if a condition
+holds for at least one row in a group.
+
+#### Parameters
+
+- `value` is a boolean column or expression.
+
+#### Return value
+
+Return value type is `boolean`.
+
+#### Examples
+
+```questdb-sql title="Check if any order has errors"
+SELECT bool_or(has_error) FROM orders;
+```
+
+| bool_or |
+| :------ |
+| true    |
+
+```questdb-sql title="Check if any item failed QA by batch"
+SELECT batch_id, bool_or(failed_qa) FROM items;
+```
+
+| batch_id | bool_or |
+| :------- | :------ |
+| 1        | false   |
+| 2        | true    |
+| 3        | false   |
+
+```questdb-sql title="Check if any trade exceeded volume threshold"
+SELECT symbol, bool_or(volume > 1000000) FROM trades;
+```
+
+| symbol  | bool_or |
+| :------ | :------ |
+| BTC-USD | true    |
+| ETH-USD | true    |
+
+#### See also
+
+- [bool_and](#bool_and) - True if all values are true
 
 ## corr
 
@@ -272,29 +720,37 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Correlation between price and quantity"
-SELECT corr(price, quantity) FROM transactions;
+```questdb-sql demo title="Correlation between price and quantity"
+SELECT corr(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| corr |
-| :--- |
-| 0.89 |
+| corr   |
+| :----- |
+| 0.0070 |
 
-```questdb-sql title="Correlation between price and quantity grouped by payment type"
-SELECT payment_type, corr(price, quantity) FROM transactions GROUP BY payment_type;
+```questdb-sql demo title="Correlation between price and quantity by symbol"
+SELECT symbol, corr(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | avg  |
-| :----------- | :--- |
-| cash         | 0.85 |
-| card         | 0.92 |
-| NULL         | 0.78 |
+| symbol | corr    |
+| :----- | :------ |
+| USDCAD | 0.0019  |
+| NZDUSD | 0.0065  |
+| EURUSD | -0.0001 |
+| EURCHF | 0.0170  |
+| USDZAR | 0.0085  |
 
 ## count
 
 - `count()` or `count(*)` - counts the number of rows irrespective of underlying
   data.
 - `count(column_name)` - counts the number of non-NULL values in a given column.
+- `count(distinct column_name)` - counts the number of distinct non-NULL values
+  in a given column. This is identical to
+  [`count_distinct(column_name)`](#count_distinct).
 
 #### Parameters
 
@@ -321,61 +777,60 @@ Return value type is `long`.
 
 #### Examples
 
-Count of rows in the `transactions` table:
+Count of rows in the `fx_trades` table:
 
-```questdb-sql
-SELECT count() FROM transactions;
+```questdb-sql demo title="Count all rows"
+SELECT count() FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| count |
-| :---- |
-| 100   |
+Count of rows aggregated by `symbol`:
 
-Count of rows in the `transactions` table aggregated by the `payment_type`
-value:
-
-```questdb-sql
-SELECT payment_type, count() FROM transactions;
+```questdb-sql demo title="Count by symbol"
+SELECT symbol, count() FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | count |
-| :----------- | :---- |
-| cash         | 25    |
-| card         | 70    |
-| NULL         | 5     |
+Count non-NULL values in a specific column:
 
-Count non-NULL transaction amounts:
-
-```questdb-sql
-SELECT count(amount) FROM transactions;
+```questdb-sql demo title="Count non-NULL prices"
+SELECT symbol, count(price) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| count |
-| :---- |
-| 95    |
+Count distinct values using standard SQL syntax (identical to `count_distinct`):
 
-Count non-NULL transaction amounts by `payment_type`:
-
-```questdb-sql
-SELECT payment_type, count(amount) FROM transactions;
+```questdb-sql demo title="Count distinct ECNs per symbol"
+SELECT symbol, count(distinct ecn) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| payment_type | count |
-| :----------- | :---- |
-| cash         | 24    |
-| card         | 67    |
-| NULL         | 4     |
 
 :::note
 
 `NULL` values are aggregated with `count()`, but not with `count(column_name)`
+or `count(distinct column_name)`.
 
 :::
+
+#### See also
+
+- [count_distinct](#count_distinct) - Exact count of distinct values
+- [approx_count_distinct](#approx_count_distinct) - Estimated distinct count for large datasets
 
 ## count_distinct
 
 `count_distinct(column_name)` - counts distinct non-`NULL` values in `varchar`,
 `symbol`, `long256`, `UUID`, `IPv4`, `long`, `int` or `string` columns.
+
+:::tip
+
+`count_distinct` is available for backwards compatibility. We recommend using
+the standard SQL syntax [`count(distinct column_name)`](#count) instead.
+
+:::
 
 #### Return value
 
@@ -383,29 +838,29 @@ Return value type is `long`.
 
 #### Examples
 
-- Count of distinct sides in the transactions table. Side column can either be
-  `BUY` or `SELL` or `NULL`.
+Count of distinct sides (buy/sell):
 
-```questdb-sql
-SELECT count_distinct(side) FROM transactions;
+```questdb-sql demo title="Count distinct sides"
+SELECT count_distinct(side) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
 | count_distinct |
 | :------------- |
 | 2              |
 
-- Count of distinct counterparties in the transactions table aggregated by
-  `payment_type` value.
+Count of distinct ECNs per symbol:
 
-```questdb-sql
-SELECT payment_type, count_distinct(counterparty) FROM transactions;
+```questdb-sql demo title="Count distinct ECNs by symbol"
+SELECT symbol, count_distinct(ecn) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | count_distinct |
-| :----------- | :------------- |
-| cash         | 3              |
-| card         | 23             |
-| NULL         | 5              |
+#### See also
+
+- [count](#count) - Count all rows or non-NULL values
+- [approx_count_distinct](#approx_count_distinct) - Estimated distinct count for large datasets
 
 ## covar_pop
 
@@ -435,23 +890,16 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Population covariance between price and quantity"
-SELECT covar_pop(price, quantity) FROM transactions;
+```questdb-sql demo title="Population covariance between price and quantity"
+SELECT covar_pop(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| covar_pop |
-| :-------- |
-| 15.2      |
-
-```questdb-sql title="Population covariance between price and quantity grouped by payment type"
-SELECT payment_type, covar_pop(price, quantity) FROM transactions GROUP BY payment_type;
+```questdb-sql demo title="Population covariance by symbol"
+SELECT symbol, covar_pop(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| payment_type | covar_pop |
-| :----------- | :-------- |
-| cash         | 14.8      |
-| card         | 16.2      |
-| NULL         | 13.5      |
 
 ## covar_samp
 
@@ -479,23 +927,16 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Sample covariance between price and quantity"
-SELECT covar_samp(price, quantity) FROM transactions;
+```questdb-sql demo title="Sample covariance between price and quantity"
+SELECT covar_samp(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| covar_samp |
-| :--------- |
-| 15.8       |
-
-```questdb-sql title="Sample covariance between price and quantity grouped by payment type"
-SELECT payment_type, covar_samp(price, quantity) FROM transactions GROUP BY payment_type;
+```questdb-sql demo title="Sample covariance by symbol"
+SELECT symbol, covar_samp(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| payment_type | covar_samp |
-| :----------- | :--------- |
-| cash         | 15.4       |
-| card         | 16.8       |
-| NULL         | 14.1       |
 
 ## first
 
@@ -554,6 +995,12 @@ SELECT first(symbol) FROM trades_unordered;
 | :---- |
 | AAPL  |
 
+#### See also
+
+- [first_not_null](#first_not_null) - First non-NULL value
+- [last](#last) - Last value by timestamp order
+- [arg_min](#arg_min) - Value at the row where another column is minimum
+
 ## first_not_null
 
 - `first_not_null(column_name)` - returns the first non-NULL value of a column.
@@ -611,6 +1058,72 @@ SELECT first_not_null(symbol) FROM trades_unordered;
 | :------------- |
 | MSFT           |
 
+#### See also
+
+- [first](#first) - First value (may be NULL)
+- [last_not_null](#last_not_null) - Last non-NULL value
+
+## geomean
+
+`geomean(value)` calculates the geometric mean of a set of positive values. The
+geometric mean is computed using the formula `exp(avg(ln(x)))`, which prevents
+overflow issues with large products by using logarithms.
+
+The geometric mean is useful for calculating average growth rates, ratios, and
+other multiplicative quantities.
+
+#### Parameters
+
+- `value` is a `double` column or expression. Other numeric types are implicitly
+  converted to `double`.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Null and edge case handling
+
+| Input           | Result | Reason                           |
+| :-------------- | :----- | :------------------------------- |
+| Negative values | `NULL` | Geometric mean undefined         |
+| Zero values     | `NULL` | `ln(0)` is undefined             |
+| NULL values     | Skipped | Standard aggregate behavior     |
+| Empty group     | `NULL` | Standard aggregate behavior      |
+
+#### Examples
+
+```questdb-sql title="Geometric mean of growth rates"
+SELECT geomean(growth_rate) FROM quarterly_data;
+```
+
+| geomean |
+| :------ |
+| 1.12    |
+
+```questdb-sql title="Geometric mean of returns by asset"
+SELECT asset, geomean(return_factor) FROM portfolio;
+```
+
+| asset  | geomean |
+| :----- | :------ |
+| stocks | 1.08    |
+| bonds  | 1.03    |
+| crypto | 1.25    |
+
+```questdb-sql title="Comparing arithmetic and geometric means"
+SELECT avg(return_factor) AS arithmetic_mean,
+       geomean(return_factor) AS geometric_mean
+FROM investments;
+```
+
+| arithmetic_mean | geometric_mean |
+| :-------------- | :------------- |
+| 1.15            | 1.12           |
+
+#### See also
+
+- [avg](#avg) - Arithmetic mean
+
 ## haversine_dist_deg
 
 `haversine_dist_deg(lat, lon, ts)` - calculates the traveled distance for a
@@ -630,7 +1143,7 @@ Return value type is `double`.
 
 ```questdb-sql title="Calculate the aggregate traveled distance for each car_id"
 SELECT car_id, haversine_dist_deg(lat, lon, k)
-  FROM table rides
+FROM rides;
 ```
 
 ## ksum
@@ -651,14 +1164,10 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Kahan compensated sum of random doubles"
 SELECT ksum(a)
 FROM (SELECT rnd_double() a FROM long_sequence(100));
 ```
-
-| ksum              |
-| :---------------- |
-| 52.79143968514029 |
 
 ## last
 
@@ -718,6 +1227,11 @@ SELECT last(symbol) FROM trades_unordered;
 | :---- |
 | GOOGL |
 
+#### See also
+
+- [last_not_null](#last_not_null) - Last non-NULL value
+- [first](#first) - First value by timestamp order
+- [arg_max](#arg_max) - Value at the row where another column is maximum
 
 ## last_not_null
 
@@ -776,8 +1290,10 @@ SELECT last_not_null(symbol) FROM trades_unordered;
 | :------------ |
 | GOOGL         |
 
+#### See also
 
-
+- [last](#last) - Last value (may be NULL)
+- [first_not_null](#first_not_null) - First non-NULL value
 
 ## max
 
@@ -794,23 +1310,21 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-```questdb-sql title="Highest transaction amount"
-SELECT max(amount) FROM transactions;
+```questdb-sql demo title="Highest trade price"
+SELECT max(price) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| max  |
-| :--- |
-| 55.3 |
-
-```questdb-sql title="Highest transaction amount by payment_type"
-SELECT payment_type, max(amount) FROM transactions;
+```questdb-sql demo title="Highest trade price by symbol"
+SELECT symbol, max(price) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | amount |
-| :----------- | :----- |
-| cash         | 31.5   |
-| card         | 55.3   |
-| NULL         | 29.2   |
+#### See also
+
+- [min](#min) - Returns the minimum value
+- [arg_max](#arg_max) - Returns another column's value at the row where this column is maximum
 
 ## min
 
@@ -827,24 +1341,21 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-```questdb-sql title="Lowest transaction amount"
-SELECT min(amount) FROM transactions;
+```questdb-sql demo title="Lowest trade price"
+SELECT min(price) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| min  |
-| :--- |
-| 12.5 |
-
-```questdb-sql title="Lowest transaction amount, by payment_type"
-SELECT payment_type, min(amount) FROM transactions;
+```questdb-sql demo title="Lowest trade price by symbol"
+SELECT symbol, min(price) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
 
-| payment_type | min  |
-| :----------- | :--- |
-| cash         | 12.5 |
-| card         | 15.3 |
-| NULL         | 22.2 |
+#### See also
 
+- [max](#max) - Returns the maximum value
+- [arg_min](#arg_min) - Returns another column's value at the row where this column is minimum
 
 ## mode
 
@@ -892,23 +1403,22 @@ SELECT symbol, mode(value) as mode FROM dataset;
 
 On demo:
 
-```questdb-sql title="mode() on demo" demo
+```questdb-sql demo title="Most frequent side per symbol"
 SELECT symbol, mode(side)
 FROM trades
-WHERE timestamp IN today()
+WHERE timestamp IN '$today'
 ORDER BY symbol ASC;
 ```
 
-| symbol    | mode(side) |
-|-----------|------------|
-| ADA-USD   | buy        |
-| ADA-USDT  | buy        |
-| AVAX-USD  | sell       |
-| AVAX-USDT | sell       |
-| BTC-USD   | sell       |
-| BTC-USDT  | sell       |
-| ...       | ...        |
-
+| symbol    | mode   |
+| --------- | ------ |
+| ADA-USDT  | sell   |
+| AVAX-USDT | buy    |
+| BTC-USDT  | buy    |
+| DOT-USDT  | sell   |
+| ETH-BTC   | buy    |
+| ETH-USDT  | buy    |
+| ...       | ...    |
 
 ## nsum
 
@@ -927,14 +1437,10 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Neumaier sum of random doubles"
 SELECT nsum(a)
 FROM (SELECT rnd_double() a FROM long_sequence(100));
 ```
-
-| nsum             |
-| :--------------- |
-| 49.5442334742831 |
 
 ## stddev / stddev_samp
 
@@ -957,14 +1463,14 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Sample standard deviation"
 SELECT stddev_samp(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp     |
-| :-------------- |
-| 29.011491975882 |
+| stddev_samp        |
+| :----------------- |
+| 29.011491975882016 |
 
 ## stddev_pop
 
@@ -984,13 +1490,13 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Population standard deviation"
 SELECT stddev_pop(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp       |
-| :---------------- |
+| stddev_pop       |
+| :--------------- |
 | 28.86607004772212 |
 
 ## string_agg
@@ -1009,7 +1515,7 @@ Return value type is `varchar`.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Concatenate values with delimiter"
 SELECT string_agg(x::varchar, ',')
 FROM (SELECT x FROM long_sequence(5));
 ```
@@ -1043,41 +1549,38 @@ Return value type is `string`.
 
 #### Examples
 
-Suppose we want to find all the distinct sky cover types observed in the weather
-tablein our public demo:
+Suppose we want to find all the distinct symbols observed in the trades
+table in our public demo:
 
-```questdb-sql title="string_distinct_agg example" demo
+```questdb-sql demo title="All distinct symbols as a comma-separated list"
 SELECT string_distinct_agg(symbol, ',') AS distinct_symbols
 FROM trades
-WHERE timestamp in today();
+WHERE timestamp IN '$today';
 ```
 
-This query will return a single string containing all the distinct symbol values
+| distinct_symbols                                                                          |
+| :---------------------------------------------------------------------------------------- |
+| ETH-USDT,SOL-USDT,ADA-USDT,BTC-USDT,UNI-USDT,AVAX-USDT,LTC-USDT,XLM-USDT,DOT-USDT,... |
+
+This query returns a single string containing all the distinct symbol values
 separated by commas. Even though the `symbol` column may have many rows with
 repeated values, `string_distinct_agg` aggregates only the unique non-NULL
-values. The result is a comma-separated list of all distinct symbols observed.
-
-Result:
-
-| distinct_symbols                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,ADA-USDT,ADA-USD,XLM-USDT,XLM-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
+values.
 
 You can also group the aggregation by another column.
 
 To find out which symbols are observed for each side:
 
-```questdb-sql title="string_distinct_agg example with GROUP BY" demo
+```questdb-sql demo title="Distinct symbols by side"
 SELECT side, string_distinct_agg(symbol, ',') AS distinct_symbols
 FROM trades
-WHERE timestamp in today();
+WHERE timestamp IN '$today';
 ```
 
-| side | distinct_symbols                                                                                                                                                                                            |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| buy  | BTC-USDT,BTC-USD,ETH-USDT,ETH-USD,ADA-USDT,ADA-USD,SOL-USDT,SOL-USD,LTC-USDT,LTC-USD,UNI-USDT,UNI-USD,DOT-USDT,DOT-USD,XLM-USDT,XLM-USD,SOL-BTC,AVAX-USDT,AVAX-USD,SOL-ETH,ETH-BTC,LTC-BTC,DAI-USDT,DAI-USD |
-| sell | ETH-USDT,ETH-USD,SOL-USDT,SOL-USD,XLM-USDT,XLM-USD,BTC-USDT,BTC-USD,LTC-USDT,LTC-USD,AVAX-USDT,AVAX-USD,DOT-USDT,DOT-USD,SOL-BTC,ADA-USDT,ADA-USD,SOL-ETH,ETH-BTC,UNI-USDT,UNI-USD,DAI-USDT,DAI-USD,LTC-BTC |
-
+| side | distinct_symbols                                                                     |
+| :--- | :----------------------------------------------------------------------------------- |
+| buy  | ETH-USDT,SOL-USDT,ADA-USDT,BTC-USDT,UNI-USDT,AVAX-USDT,LTC-USDT,XLM-USDT,DOT-... |
+| sell | ADA-USDT,ETH-USDT,BTC-USDT,LTC-USDT,SOL-USDT,UNI-USDT,SOL-BTC,AVAX-USDT,XLM-...   |
 
 Note we don't need to add `GROUP BY side` as it is implicit. But you can add it,
 if you prefer that syntax.
@@ -1096,22 +1599,16 @@ Return value type is the same as the type of the argument.
 
 #### Examples
 
-```questdb-sql title="Sum all quantities in the transactions table"
-SELECT sum(quantity) FROM transactions;
+```questdb-sql demo title="Sum all quantities"
+SELECT sum(quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| sum |
-| :-- |
-| 100 |
-
-```questdb-sql title="Sum all quantities in the transactions table, aggregated by item"
-SELECT item, sum(quantity) FROM transactions;
+```questdb-sql demo title="Sum quantities by symbol"
+SELECT symbol, sum(quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| item   | count |
-| :----- | :---- |
-| apple  | 53    |
-| orange | 47    |
 
 #### Overflow
 
@@ -1119,8 +1616,134 @@ SELECT item, sum(quantity) FROM transactions;
 argument to wider type.
 
 ```questdb-sql title="Cast as long to avoid overflow"
-SELECT sum(cast(a AS LONG)) FROM table;
+SELECT sum(cast(a AS LONG)) FROM my_table;
 ```
+
+#### See also
+
+- [ksum](#ksum) - Kahan compensated sum for floating-point precision
+- [nsum](#nsum) - Neumaier sum for floating-point precision
+- [avg](#avg) - Arithmetic mean
+
+## twap
+
+`twap(price, timestamp)` - Calculates the time-weighted average price (TWAP)
+using step-function (forward-fill) integration: each observed price is assumed
+to persist until the next observation, and the TWAP is the area under this step
+function divided by the total time span. Unlike
+[VWAP](/docs/cookbook/sql/finance/vwap/), which weights by volume, TWAP gives
+equal weight to every time interval — useful for execution benchmarking,
+algorithmic trading, and fair value reference in illiquid markets. See the
+[TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) for practical examples.
+
+$$
+\text{TWAP} = \frac{\sum_{i=1}^{n-1} p_i \cdot (t_{i+1} - t_i)}{t_n - t_1}
+$$
+
+Where:
+
+- $p_i$ is the price at observation $i$
+- $t_i$ is the timestamp at observation $i$
+
+If all observations share the same timestamp, the function falls back to a
+simple arithmetic mean.
+
+If the price is `NULL`, that observation is skipped.
+
+If the timestamp is `NULL`, that observation is skipped.
+
+If there are no valid observations, the result is `NULL`.
+
+Supports `SAMPLE BY` with `FILL` modes.
+
+#### Parameters
+
+- `price` is any numeric value.
+- `timestamp` is a `timestamp` value. This is typically the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/) but can be any
+  timestamp column.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql demo title="TWAP of trade prices for a single symbol"
+SELECT twap(price, timestamp)
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$yesterday';
+```
+
+| twap     |
+| :------- |
+| 80636.70 |
+
+```questdb-sql demo title="TWAP per symbol"
+SELECT symbol, twap(price, timestamp)
+FROM trades
+WHERE timestamp IN '$yesterday';
+```
+
+| symbol    | twap     |
+| :-------- | :------- |
+| ETH-BTC   | 0.0287   |
+| BTC-USDT  | 80636.70 |
+| SOL-BTC   | 0.0010   |
+| ADA-USDT  | 0.2650   |
+| AVAX-USDT | 9.5341   |
+| ...       | ...      |
+
+```questdb-sql demo title="Hourly TWAP"
+SELECT timestamp, symbol, twap(price, timestamp)
+FROM trades
+WHERE symbol IN ('BTC-USDT', 'ETH-USDT')
+  AND timestamp IN '$yesterday'
+SAMPLE BY 1h;
+```
+
+| timestamp                   | symbol   | twap     |
+| :-------------------------- | :------- | :------- |
+| 2026-05-07T00:00:00.000000Z | BTC-USDT | 81242.47 |
+| 2026-05-07T00:00:00.000000Z | ETH-USDT | 2344.47  |
+| 2026-05-07T01:00:00.000000Z | BTC-USDT | 81153.52 |
+| 2026-05-07T01:00:00.000000Z | ETH-USDT | 2328.97  |
+| ...                         | ...      | ...      |
+
+#### See also
+
+- [TWAP cookbook recipe](/docs/cookbook/sql/finance/twap/) - Practical examples
+  with TWAP-vs-VWAP comparison
+- [avg](#avg) - Arithmetic mean (equal-weighted)
+- [weighted_avg](#weighted_avg) - Weighted arithmetic mean
+
+## var_pop
+
+`var_pop(value)` - Calculates the population variance of a set of values. The
+population variance is a measure of the amount of variation or dispersion of a
+set of values. A low variance indicates that the values tend to be very close to
+the mean, while a high variance indicates that the values are spread out over a
+wider range.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`.
+
+#### Examples
+
+```questdb-sql demo title="Population variance"
+SELECT var_pop(x)
+FROM (SELECT x FROM long_sequence(100));
+```
+
+| var_pop |
+| :------ |
+| 833.25  |
 
 ## variance / var_samp
 
@@ -1142,41 +1765,14 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql
+```questdb-sql demo title="Sample variance"
 SELECT var_samp(x)
 FROM (SELECT x FROM long_sequence(100));
 ```
 
-| stddev_samp      |
-| :--------------- |
-| 841.666666666666 |
-
-## var_pop
-
-`var_pop(value)` - Calculates the population variance of a set of values. The
-population variance is a measure of the amount of variation or dispersion of a
-set of values. A low variance indicates that the values tend to be very close to
-the mean, while a high variance indicates that the values are spread out over a
-wider range.
-
-#### Parameters
-
-- `value` is any numeric value.
-
-#### Return value
-
-Return value type is `double`.
-
-#### Examples
-
-```questdb-sql
-SELECT var_pop(x)
-FROM (SELECT x FROM long_sequence(100));
-```
-
-| stddev_samp |
-| :---------- |
-| 833.25      |
+| var_samp            |
+| :------------------ |
+| 841.6666666666666   |
 
 ## weighted_avg
 
@@ -1213,13 +1809,10 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Weighted average of transaction prices"
-SELECT weighted_avg(price, quantity) FROM transactions;
+```questdb-sql demo title="Weighted average price by trade quantity"
+SELECT weighted_avg(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
-
-| weighted_avg |
-|:-------------|
-| 25.3         |
 
 ## weighted_stddev
 
@@ -1276,24 +1869,16 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Weighted standard deviation of binned prices"
-SELECT weighted_stddev_freq(price_bucket, trade_count) FROM price_histogram;
+```questdb-sql demo title="Weighted standard deviation (frequency) of price by quantity"
+SELECT weighted_stddev_freq(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| weighted_stddev_freq |
-| :------------------- |
-| 3.42                 |
-
-```questdb-sql title="Weighted standard deviation of bucketed trade data by symbol"
-SELECT symbol, weighted_stddev_freq(price_bucket, trade_count)
-FROM trade_histogram
-GROUP BY symbol;
+```questdb-sql demo title="Weighted standard deviation (frequency) by symbol"
+SELECT symbol, weighted_stddev_freq(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| symbol  | weighted_stddev_freq |
-| :------ | :------------------- |
-| BTC-USD | 115.67               |
-| ETH-USD | 22.18                |
 
 ## weighted_stddev_rel
 
@@ -1341,24 +1926,16 @@ Return value type is `double`.
 
 #### Examples
 
-```questdb-sql title="Weighted standard deviation of prices by trade volume"
-SELECT weighted_stddev(price, volume) FROM trades;
+```questdb-sql demo title="Weighted standard deviation of price by quantity"
+SELECT weighted_stddev(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today';
 ```
 
-| weighted_stddev |
-| :-------------- |
-| 2.45            |
-
-```questdb-sql title="Weighted standard deviation grouped by symbol"
-SELECT symbol, weighted_stddev(price, volume)
-FROM trades
-GROUP BY symbol;
+```questdb-sql demo title="Weighted standard deviation by symbol"
+SELECT symbol, weighted_stddev(price, quantity) FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 5;
 ```
-
-| symbol  | weighted_stddev |
-| :------ | :-------------- |
-| BTC-USD | 125.34          |
-| ETH-USD | 18.92           |
 
 ## See also
 

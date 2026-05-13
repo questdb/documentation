@@ -9,7 +9,9 @@ the table itself.
 
 ## Syntax
 
-![Flow chart showing the syntax of the TRUNCATE TABLE keyword](/images/docs/diagrams/truncateTable.svg)
+```questdb-sql
+TRUNCATE TABLE [IF EXISTS] tableName;
+```
 
 ### IF EXISTS
 

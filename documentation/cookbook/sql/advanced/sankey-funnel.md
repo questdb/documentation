@@ -43,7 +43,7 @@ WITH PrevEvents AS (
     timestamp,
     lag(timestamp) OVER (PARTITION BY visitor_id ORDER BY timestamp) AS prev_ts
   FROM
-    events WHERE timestamp > dateadd('d', -7, now())
+    events WHERE timestamp IN '$now - 7d..$now'
     AND metric_name = 'page_view'
 ), VisitorSessions AS (
   SELECT *,

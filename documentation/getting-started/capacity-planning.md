@@ -151,7 +151,7 @@ into 2 parts:
 - Suffix (including the merged row):`2023-01-01T75959-999999.2` with 1,001 rows
 
 See
-[Splitting and squashing time partitions](/docs/concepts/partitions/#splitting-and-squashing-time-partitions)
+[Splitting and squashing time partitions](/docs/concepts/partitions/#partition-splitting-and-squashing)
 for more information.
 
 ## CPU and RAM configuration
@@ -182,7 +182,7 @@ for other database processes to use.
 ### CPU cores
 
 By default, QuestDB tries to use all available CPU cores.
-[The guide on shared worker configuration](/docs/configuration/overview/#shared-worker)
+[The guide on shared worker configuration](/docs/configuration/shared-workers/)
 explains how to change the default settings. Assuming that the disk is not
 bottlenecked on IOPS, the throughput of read-only queries scales proportionally
 with the number of available cores. As a result, a machine with more cores will

@@ -8,7 +8,12 @@ Updates data in a database table.
 
 ## Syntax
 
-![Flow chart showing the syntax of the UPDATE keyword](/images/docs/diagrams/update.svg)
+```questdb-sql
+UPDATE tableName [alias]
+SET columnName = expression [, columnName = expression ...]
+    [FROM joinTable [JOIN joinTable2 ON joinCondition] ...]
+    [WHERE filter];
+```
 
 :::note
 
@@ -34,7 +39,7 @@ UPDATE book SET mid = (bid + ask)/2 WHERE symbol = 'AAPL';
 ```
 
 ```questdb-sql title="Update with subquery"
-UPDATE spreads s SET s.spread = p.ask - p.bid FROM prices p WHERE s.symbol = p.symbol;
+UPDATE spreads s SET spread = p.ask - p.bid FROM prices p WHERE s.symbol = p.symbol;
 ```
 
 ```questdb-sql title="Update with multiple joins"

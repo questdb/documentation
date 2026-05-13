@@ -20,7 +20,7 @@ While InfluxDB clients are supported, we recommend using the QuestDB clients.
 
 <Screenshot
   alt="A chart showing high-cardinality ingestion performance of InfluxDB, TimescaleDB, and QuestDB"
-  src="images/benchmark/benchmark_all_q1_2024.webp"
+  src="images/benchmark/benchmark_all_q1_2026.webp"
   width={650}
   title="Benchmark results for QuestDB 7.3.10, InfluxDB 2.7.4 and Timescale 2.14.2"
 />
@@ -171,7 +171,7 @@ data arrives we recommend transforming it in QuestDB.
 For example, if you query a table with several metrics:
 
 ```questdb-sql
-SELECT * FROM diagnostics WHERE timestamp = '2016-01-01T00:00:00.000000Z' AND driver='Andy' AND name='truck_150')
+SELECT * FROM diagnostics WHERE timestamp = '2016-01-01T00:00:00.000000Z' AND driver='Andy' AND name='truck_150'
 ```
 
 Your result may be something like this:
@@ -250,7 +250,7 @@ Now that you know the basics of InfluxDB Line Protocol, you may want to dig
 deeper into customization options for ILP or HTTP, learn more about the
 protocol, or compare QuestDB with Influx:
 
-- [ILP `server.conf` configuration](/docs/configuration/overview/#influxdb-line-protocol-ilp)
+- [ILP `server.conf` configuration](/docs/configuration/ingestion/)
 - [ILP API Overview](/docs/ingestion/ilp/overview/)
 - [Comparing TimescaleDB and QuestDB performance and architecture blog](/blog/timescaledb-vs-questdb-comparison/)
 - [Deep dive of QuestDB vs InfluxDB internals](/blog/2024/02/26/questdb-versus-influxdb/)
