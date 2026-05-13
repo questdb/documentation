@@ -26,6 +26,9 @@ ASSETS_DIR="$(dirname "$SCRIPT_DIR")/whitepaper-generator"
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
+# Make shared assets (logo, QR) findable by XeLaTeX
+export TEXINPUTS="$ASSETS_DIR:$SCRIPT_DIR:$TEXINPUTS"
+
 # Step 1: Preprocess markdown files
 echo "Step 1: Preprocessing markdown files..."
 python3 "$SCRIPT_DIR/preprocess.py" \

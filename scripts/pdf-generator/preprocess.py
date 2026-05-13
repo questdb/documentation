@@ -15,10 +15,11 @@ from collections import OrderedDict
 
 
 def parse_sidebar_items(sidebars_content: str) -> list[str]:
-    """Extract cookbook file paths from sidebars.js."""
+    """Extract cookbook file paths from sidebars.js, deduplicating."""
     cookbook_pattern = r'"(cookbook/[^"]+)"'
     matches = re.findall(cookbook_pattern, sidebars_content)
-    return matches
+    # Preserve order, remove duplicates (category link + explicit item)
+    return list(dict.fromkeys(matches))
 
 
 def extract_frontmatter(content: str) -> tuple[dict, str]:
@@ -103,6 +104,21 @@ def transform_admonitions(content: str) -> str:
     return re.sub(pattern, replace_admonition, content, flags=re.DOTALL)
 
 
+def truncate_overview_pages(content: str) -> str:
+    """For overview/index pages, remove the recipe listing section.
+
+    These pages have an introductory section followed by a linked index
+    of recipes (## Recipes, ## Indicators, etc.) that works on the web
+    but is redundant in the PDF since the recipes follow immediately.
+    Cut at the first H2 that is a recipe index."""
+    index_headings = ['## Recipes', '## Indicators', '## Available recipes']
+    for heading in index_headings:
+        idx = content.find(heading)
+        if idx > 0:
+            return content[:idx].rstrip()
+    return content
+
+
 def remove_docusaurus_links(content: str) -> str:
     """Convert Docusaurus internal links to plain text."""
     content = re.sub(r'\[([^\]]+)\]\(/docs/[^)]+\)', r'\1', content)
@@ -120,8 +136,8 @@ def adjust_header_levels(content: str, level_increase: int) -> str:
     return re.sub(r'^(#{1,6})\s+(.+)$', increase_level, content, flags=re.MULTILINE)
 
 
-def process_file(filepath: Path, header_level: int = 1) -> tuple[str, str]:
-    """Process a single markdown file. Returns (title, processed_body)."""
+def process_file(filepath: Path, header_level: int = 1) -> tuple[str, str, bool]:
+    """Process a single markdown file. Returns (title, processed_body, is_overview)."""
     content = filepath.read_text(encoding='utf-8')
     frontmatter, body = extract_frontmatter(content)
 
@@ -130,9 +146,15 @@ def process_file(filepath: Path, header_level: int = 1) -> tuple[str, str]:
     body = transform_code_blocks(body)
     body = transform_admonitions(body)
     body = remove_docusaurus_links(body)
+
+    # For overview/index pages, cut the recipe listing section
+    is_overview = filepath.stem in ('index', 'post-trade-overview') or filepath.stem.endswith('-overview')
+    if is_overview:
+        body = truncate_overview_pages(body)
+
     body = adjust_header_levels(body, header_level)
 
-    return title, body
+    return title, body, is_overview
 
 
 def format_category_name(name: str) -> str:
@@ -196,7 +218,7 @@ def main():
     intro_path = cookbook_root / "index.md"
     if intro_path.exists():
         print("Processing: Introduction")
-        title, body = process_file(intro_path, header_level=1)
+        title, body, _ = process_file(intro_path, header_level=1)
         combined.append(f"# Introduction\n\n{body}\n\n\\newpage\n\n")
 
     # Group files by category and subcategory
@@ -236,10 +258,11 @@ def main():
                         print(f"  Warning: File not found: {filepath}")
                         continue
 
-                    title, body = process_file(filepath, header_level=1)
+                    title, body, is_overview = process_file(filepath, header_level=1)
                     online_url = get_online_url(rel_path)
                     print(f"  Chapter: {title}")
-                    combined.append(f"# {title}\n\n{body}\n\n[View this recipe online]({online_url})\n\n\\newpage\n\n")
+                    link = f"\n\n[View this recipe online]({online_url})" if not is_overview else ""
+                    combined.append(f"# {title}\n\n{body}{link}\n\n\\newpage\n\n")
             else:
                 # Subcategory as chapter
                 subcategory_name = format_category_name(subcategory)
@@ -252,10 +275,11 @@ def main():
                         print(f"    Warning: File not found: {filepath}")
                         continue
 
-                    title, body = process_file(filepath, header_level=2)
+                    title, body, is_overview = process_file(filepath, header_level=2)
                     online_url = get_online_url(rel_path)
                     print(f"    Section: {title}")
-                    combined.append(f"\\newpage\n\n## {title}\n\n{body}\n\n[View this recipe online]({online_url})\n\n")
+                    link = f"\n\n[View this recipe online]({online_url})" if not is_overview else ""
+                    combined.append(f"\\newpage\n\n## {title}\n\n{body}{link}\n\n")
 
                 combined.append("\\newpage\n\n")
 
@@ -263,7 +287,7 @@ def main():
     demo_schema_path = cookbook_root / "demo-data-schema.md"
     if demo_schema_path.exists():
         print("\nAppendix: Demo Data Schema")
-        title, body = process_file(demo_schema_path, header_level=1)
+        title, body, _ = process_file(demo_schema_path, header_level=1)
         online_url = get_online_url("cookbook/demo-data-schema")
         combined.append(f"\\sectionpage{{Appendix}}\n\n# Demo Data Schema\n\n{body}\n\n[See the schema page online]({online_url})\n\n")
 
