@@ -125,7 +125,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
 ```
 
 No `sf_dir`, so memory mode. The default `128 MiB` cap absorbs short
-network blips. A process crash loses the unacked tail.
+network blips. A sender crash loses the unacked tail.
 
 ### Single-node durable producer
 

@@ -29,8 +29,8 @@ Unacked frames live in a malloc'd ring in process memory. Default cap is
 
 - The producer process is short-lived or ephemeral (a CLI job, a CI
   worker, a serverless function).
-- A process restart is acceptable as a fresh start — you don't need
-  in-flight data to survive a crash.
+- A sender restart is acceptable as a fresh start — losing any in-flight
+  data when the sender stops is acceptable.
 - You only need to tolerate **transient** network blips and short server
   outages (think: rolling upgrades, brief network partitions).
 - Your data volume comfortably fits in RAM during the longest outage you
@@ -46,8 +46,8 @@ Unacked frames are written to mmap'd files under
 - The producer process is long-running and outage budgets are measured
   in minutes (the default `reconnect_max_duration_millis` is 5 minutes
   for a reason).
-- You need in-flight data to survive process restarts — process crash, OOM
-  kill, host reboot, planned redeploy.
+- In-flight data must not be lost when the sender stops or its host
+  reboots — crash, OOM kill, planned redeploy.
 - You ingest at rates where minutes of buffering exceeds RAM you can
   spare.
 - You operate unattended at the edge (sensors, ETL jobs) where the
@@ -60,13 +60,12 @@ string.
 
 ## Comparison at a glance
 
-| Question | Memory mode | SF mode |
+| Aspect | Memory mode | SF mode |
 |---|---|---|
-| Where is buffered data? | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
+| Buffered data location | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
 | Default capacity | `128 MiB` | `10 GiB` |
-| Survives a process crash? | No | Yes |
-| Survives `kill -9`? | No | Yes |
-| Survives a host reboot? | No | Yes (if the disk does) |
+| Unacked data after a sender crash (`kill -9`, OOM) | Lost | Recovered and replayed on restart |
+| Unacked data after the sender's host reboots | Lost | Recovered, if the disk persists |
 | Cross-sender rescue (orphan adoption) | n/a | Yes (opt-in) |
 | Setup cost | Zero | Provisioning a writable directory |
 | Operational cost | Zero | Sizing, monitoring, lock collisions |
@@ -166,7 +165,7 @@ If you are currently using HTTP or TCP ILP ingest, the comparison is:
 | Capability | HTTP ILP | TCP ILP | QWP WebSocket + SF |
 |---|---|---|---|
 | Non-blocking producer | No (request waits) | No (TCP backpressure) | Yes (buffer absorbs publishes) |
-| Survives process crash | No | No | Yes (SF mode) |
+| No data loss on a sender crash | No | No | Yes (SF mode) |
 | Server outage tolerance | Best-effort retry | None | Reconnect loop with multi-minute budget |
 | Multi-host failover | Yes (HTTP only) | No | Yes |
 | Cross-region durability ack | No | No | Yes (`request_durable_ack=on`) |
@@ -189,7 +188,7 @@ replaces and extends it.
 ```mermaid
 graph TD
     Q1{Will the producer outlive any single outage you care about?}
-    Q2{Does data need to survive a process crash or kill -9?}
+    Q2{A sender crash must not lose in-flight data?}
     Q3{Is object-store durability required before ack?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 

@@ -15,9 +15,11 @@ disconnect or restart.
 
 The goal is **producer-never-blocks-on-the-wire**. Your call to `flush()`
 returns as soon as data is published into the substrate. Acknowledgements
-arrive asynchronously. A network outage, a server restart, even a process
-crash leaves your producer code unaffected — the I/O thread quietly
-reconnects and replays what remains.
+arrive asynchronously. A network outage or a server restart leaves your
+producer code unaffected — the I/O thread quietly reconnects and replays
+what remains. In SF mode, even a crash of the sender process itself loses
+no unacked data: the next sender on the slot recovers it from disk and
+replays it.
 
 ## Two modes
 
@@ -28,8 +30,8 @@ SF runs in either of two modes selected by the connect string:
 | Trigger | `sf_dir` is **unset** | `sf_dir` is set |
 | Storage | malloc'd ring in process RAM | mmap'd files under `<sf_dir>/<sender_id>/` |
 | Default capacity | `128 MiB` | `10 GiB` |
-| Survives process exit | No | Yes |
-| Survives process crash | No | Yes — replay on next start |
+| Unacked data if the sender crashes | Lost | Recovered and replayed on restart |
+| Unacked data if the sender's host reboots | Lost | Recovered, if the disk persists |
 | Tolerates transient network blips | Yes | Yes |
 | Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
 | Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
