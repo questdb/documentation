@@ -252,7 +252,7 @@ try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
    - `uuidColumn(name, lo, hi)` (two longs)
    - `long256Column(name, l0, l1, l2, l3)` (four longs, least significant first)
    - `decimalColumn(name, Decimal256)` or `decimalColumn(name, CharSequence)`
-   - `doubleArray(name, ...)` and `longArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
+   - `doubleArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
 
    The server also accepts GEOHASH and DATE on ingress, but the Java client
    does not yet expose sender methods for them. IPv4 and BINARY are not
@@ -283,13 +283,11 @@ For 1D and 2D arrays, pass a Java array directly:
 ```java
 double[] prices = {1.0842, 1.0843, 1.0841};
 sender.table("book").doubleArray("levels", prices).atNow();
-
-long[] counts = {100, 200, 300};
-sender.table("book").longArray("depths", counts).atNow();
 ```
 
-For higher-dimensional arrays, use the `DoubleArray` or `LongArray` class to
-avoid GC overhead. Create the instance once and reuse it:
+For higher-dimensional arrays, use the `DoubleArray` class to avoid GC
+overhead. Create the instance once and reuse it across rows by calling
+`clear()` before populating each row:
 
 ```java
 import io.questdb.client.cutlass.line.array.DoubleArray;
@@ -297,6 +295,7 @@ import io.questdb.client.cutlass.line.array.DoubleArray;
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
      DoubleArray ary = new DoubleArray(3, 3, 3)) {
     for (int i = 0; i < ROW_COUNT; i++) {
+        ary.clear();  // reset write position, reuse native memory
         for (int v = 0; v < 27; v++) {
             ary.append(v);
         }
@@ -306,6 +305,13 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
     }
 }
 ```
+
+The constructor `new DoubleArray(d1, d2, ...)` defines the shape. Values are
+appended in row-major order: the last dimension varies fastest. For a 2D array
+with shape `(3, 2)`, `append()` fills positions `[0,0], [0,1], [1,0], [1,1],
+[2,0], [2,1]`. You can also use `set(value, i, j, ...)` to write at specific
+coordinates. Call `reshape(d1, d2, ...)` to change the shape without
+reallocating.
 
 :::note
 Arrays require QuestDB 9.0.0 or later.
@@ -324,12 +330,22 @@ sender.table("trades")
       .doubleColumn("price", 1.0842)
       .at(Instant.now());
 
-// Or with explicit units for high-throughput paths:
+// Explicit microseconds for high-throughput paths:
 sender.table("trades")
       .symbol("symbol", "EURUSD")
       .doubleColumn("price", 1.0842)
       .at(System.currentTimeMillis() * 1000, ChronoUnit.MICROS);
+
+// Nanosecond precision (creates a timestamp_ns column):
+sender.table("ticks")
+      .symbol("symbol", "EURUSD")
+      .doubleColumn("price", 1.0842)
+      .at(System.nanoTime(), ChronoUnit.NANOS);
 ```
+
+Using `ChronoUnit.NANOS` with `at()` or `timestampColumn()` creates a
+`timestamp_ns` column. Using any other unit creates a standard `TIMESTAMP`
+column (microsecond precision).
 
 **Server-assigned** (server uses its wall-clock time):
 
@@ -434,6 +450,20 @@ The `QwpQueryClient` sends SQL statements over the
 [QWP egress](/docs/protocols/qwp-egress-websocket/) endpoint (`/read/v1`).
 Results arrive as columnar batches via a callback handler.
 
+`execute()` is **blocking**: it sends the query, drives the WebSocket receive
+loop on the calling thread, invokes the handler callbacks (`onBatch`,
+`onEnd`, `onError`, or `onExecDone`), and returns only after the query
+completes. This means you can safely sequence operations:
+
+```java
+client.execute("CREATE TABLE t (...) ...", ddlHandler);
+// Table exists by this point
+client.execute("INSERT INTO t VALUES ...", dmlHandler);
+// Data is committed by this point
+client.execute("SELECT * FROM t", selectHandler);
+// Results have been fully consumed by this point
+```
+
 ### Executing SELECT queries
 
 ```java
@@ -479,23 +509,49 @@ values out if you need them after the callback returns.
 
 | Accessor | Column types |
 |----------|-------------|
-| `getLongValue(col, row)` | LONG, TIMESTAMP, `timestamp_ns`, DATE |
-| `getIntValue(col, row)` | INT |
-| `getDoubleValue(col, row)` | DOUBLE |
-| `getFloatValue(col, row)` | FLOAT |
 | `getBoolValue(col, row)` | BOOLEAN |
 | `getByteValue(col, row)` | BYTE |
 | `getShortValue(col, row)` | SHORT |
 | `getCharValue(col, row)` | CHAR |
+| `getIntValue(col, row)` | INT, IPv4 |
+| `getLongValue(col, row)` | LONG, TIMESTAMP, `timestamp_ns`, DATE |
+| `getFloatValue(col, row)` | FLOAT |
+| `getDoubleValue(col, row)` | DOUBLE |
 | `getSymbol(col, row)` | SYMBOL (returns cached `String`) |
 | `getStrA(col, row)` / `getStrB(col, row)` | VARCHAR (reusable `CharSequence` views) |
-| `getBinaryA(col, row)` / `getBinaryB(col, row)` | BINARY (reusable views) |
+| `getString(col, row)` | VARCHAR (heap-allocating `String`) |
 | `getString(col, row, CharSink)` | VARCHAR (copy into sink) |
-| `getUuid(col, row, Uuid)` | UUID |
-| `getLong256(col, row, Long256Sink)` | LONG256 |
+| `getBinaryA(col, row)` / `getBinaryB(col, row)` | BINARY (reusable native views) |
+| `getBinary(col, row)` | BINARY (heap-allocating `byte[]`) |
+| `getUuid(col, row, Uuid)` | UUID (zero-allocation, into sink) |
+| `getUuidHi(col, row)` / `getUuidLo(col, row)` | UUID (individual 64-bit halves) |
+| `getLong256(col, row, Long256Sink)` | LONG256 (into sink) |
+| `getLong256Word(col, row, wordIndex)` | LONG256 (individual 64-bit word) |
+| `getGeohashValue(col, row)` | GEOHASH (raw long value) |
+| `getGeohashPrecisionBits(col)` | GEOHASH (precision metadata, per column) |
+| `getDecimal128High(col, row)` / `getDecimal128Low(col, row)` | DECIMAL128 (two longs) |
+| `getDecimalScale(col)` | DECIMAL (scale metadata, per column) |
+| `getDoubleArrayElements(col, row)` | DOUBLE_ARRAY (flattened `double[]`, row-major) |
+| `getArrayNDims(col, row)` | DOUBLE_ARRAY (dimension count) |
+| `isNull(col, row)` | All types |
 
-Column metadata is available via `batch.getColumnInfo(col)` (name, type) and
-`batch.getColumnCount()`.
+Column metadata is available via `batch.getColumnName(col)`,
+`batch.getColumnWireType(col)`, and `batch.getColumnCount()`.
+
+**Reading array columns:**
+
+`getDoubleArrayElements(col, row)` returns a flattened `double[]` in row-major
+order. Use `getArrayNDims(col, row)` to discover the dimensionality. For
+example, reading a 2D `DOUBLE[][]` column:
+
+```java
+int nDims = batch.getArrayNDims(colIndex, row);  // e.g. 2
+double[] flat = batch.getDoubleArrayElements(colIndex, row);
+// flat contains all elements in row-major order
+```
+
+Alternatively, you can extract individual elements in SQL (e.g.,
+`SELECT bids[1][1] FROM market_data`) and read them as scalar doubles.
 
 ### DDL and DML statements
 
