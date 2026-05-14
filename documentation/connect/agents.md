@@ -197,5 +197,5 @@ multi-host failover, and store-and-forward for free.
   [REST API](/docs/query/rest-api/)
 - **Ingest interfaces**: [Ingestion overview](/docs/ingestion/overview/),
   [QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/)
-- **Operating safely**: [Security overview](/docs/security/),
-  [RBAC](/docs/security/rbac/) (Enterprise)
+- **Operating safely**: [RBAC](/docs/security/rbac/) (Enterprise),
+  [TLS](/docs/security/tls/)
