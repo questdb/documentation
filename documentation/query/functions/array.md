@@ -6,10 +6,8 @@ description: Array functions reference documentation.
 
 This page documents functions for n-dimensional arrays. This isn't an exhaustive
 list of all functions that may take an array parameter. For example, financial
-functions are listed in [their own section](/docs/query/functions/finance/),
-whether or not they can take an array parameter. To collect row values into
-arrays during GROUP BY or SAMPLE BY, see
-[array aggregates](/docs/query/functions/aggregation/#array-aggregates).
+functions are listed in [their own section](/docs/query/functions/finance/), whether or
+not they can take an array parameter.
 
 ## array_avg
 
