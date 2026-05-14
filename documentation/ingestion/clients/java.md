@@ -71,6 +71,8 @@ Add the dependency:
 ### Ingest data
 
 ```java
+import io.questdb.client.Sender;
+
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
     sender.table("trades")
           .symbol("symbol", "ETH-USD")
@@ -91,6 +93,10 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
 ### Query data
 
 ```java
+import io.questdb.client.cutlass.qwp.client.QwpQueryClient;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
+
 try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
     client.connect();
     client.execute(
@@ -286,6 +292,8 @@ For higher-dimensional arrays, use the `DoubleArray` or `LongArray` class to
 avoid GC overhead. Create the instance once and reuse it:
 
 ```java
+import io.questdb.client.cutlass.line.array.DoubleArray;
+
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
      DoubleArray ary = new DoubleArray(3, 3, 3)) {
     for (int i = 0; i < ROW_COUNT; i++) {
@@ -364,10 +372,11 @@ Customize via connect string:
 ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 ```
 
-**Explicit flush**: disable auto-flush and call `flush()` yourself:
+**Explicit flush**: you can call `flush()` at any time to send buffered data
+immediately, even with auto-flush enabled:
 
 ```java
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;auto_flush=off;")) {
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
     for (Trade trade : trades) {
         sender.table("trades")
               .symbol("symbol", trade.symbol())
@@ -375,9 +384,15 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;auto_flush=off;"
               .longColumn("quantity", trade.quantity())
               .at(trade.timestamp());
     }
-    sender.flush();
+    sender.flush();  // send everything now, regardless of auto-flush thresholds
 }
 ```
+
+:::note
+Disabling auto-flush entirely (`auto_flush=off`) is not supported on the
+WebSocket transport. Use the auto-flush row count and interval settings to
+control batch size instead.
+:::
 
 The client also flushes when closed. However, if the flush fails at close
 time, the client does not retry. Always flush explicitly before closing.
@@ -464,7 +479,7 @@ values out if you need them after the callback returns.
 
 | Accessor | Column types |
 |----------|-------------|
-| `getLongValue(col, row)` | LONG, TIMESTAMP, TIMESTAMP_NANOS, DATE |
+| `getLongValue(col, row)` | LONG, TIMESTAMP, `timestamp_ns`, DATE |
 | `getIntValue(col, row)` | INT |
 | `getDoubleValue(col, row)` | DOUBLE |
 | `getFloatValue(col, row)` | FLOAT |
