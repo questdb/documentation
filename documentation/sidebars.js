@@ -668,19 +668,13 @@ module.exports = {
           label: "Overview",
         },
         {
-          id: "high-availability/setup",
-          type: "doc",
-          label: "Setup Guide",
-        },
-        {
-          id: "high-availability/tuning",
-          type: "doc",
-          label: "Tuning",
-        },
-        {
-          id: "high-availability/wal-cleanup",
-          type: "doc",
-          label: "WAL Cleanup",
+          type: "category",
+          label: "Replication",
+          items: [
+            "high-availability/setup",
+            "high-availability/tuning",
+            "high-availability/wal-cleanup",
+          ],
         },
         {
           type: "category",

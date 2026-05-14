@@ -7,13 +7,6 @@ description:
   observability, and orphan adoption.
 ---
 
-:::note Java-only today
-
-Client-side store-and-forward support is currently available in the Java
-client. Additional language clients are on the roadmap.
-
-:::
-
 This page is the operator-facing guide for SF in production: how to
 provision the slot directory, what to watch, and how to tune the limits.
 For the underlying model see

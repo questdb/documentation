@@ -254,6 +254,13 @@ Data committed to the primary but not yet replicated will be lost. Use planned
 migration if the primary is still functional.
 :::
 
+:::tip Keep clients connected across the switch
+Promoting a replica only helps if your applications can find the new primary.
+Configure clients with a multi-host address list so they fail over
+automatically — see
+[Client failover](/docs/high-availability/client-failover/concepts/).
+:::
+
 ### Point-in-time recovery
 
 Restore the database to a specific historical timestamp.
@@ -273,3 +280,7 @@ Restore the database to a specific historical timestamp.
 
 - [Tuning guide](/docs/high-availability/tuning/) - Optimize replication
   performance
+- [Client failover](/docs/high-availability/client-failover/concepts/) -
+  Configure your applications with a multi-host address list so they follow a
+  primary promotion automatically. Replication moves the data; client failover
+  keeps your clients connected to it.

@@ -6,13 +6,6 @@ description:
   substrate — storage, reconnect, durable-ack, and error-handling.
 ---
 
-:::note Java-only today
-
-Client-side store-and-forward support is currently available in the Java
-client. Additional language clients are on the roadmap.
-
-:::
-
 This page is the configuration reference for the SF connect-string keys.
 For the model behind each knob, read
 [Concepts](/docs/high-availability/store-and-forward/concepts/); for
@@ -78,7 +71,7 @@ Opt in to object-store-durable trim. See
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `error_inbox_capacity` | int (≥16) | `256` | Bounded SPSC queue capacity for async error notifications. Overflow drops the oldest entry and increments `getDroppedErrorNotifications`. |
-| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the Java connect-string parser — use the fluent `LineSenderBuilder` API today. |
+| `on_server_error`, `on_schema_error`, `on_parse_error`, `on_internal_error`, `on_security_error`, `on_write_error` | enum | per category | Override the default policy (`HALT` or `DROP_AND_CONTINUE`) for a category. Reserved in the spec but not yet recognised by the connect-string parser. |
 
 The per-category defaults are documented in
 [Concepts § Error frames](/docs/high-availability/store-and-forward/concepts/#error-frames).
@@ -132,7 +125,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
 ```
 
 No `sf_dir`, so memory mode. The default `128 MiB` cap absorbs short
-network blips. A JVM crash loses the unacked tail.
+network blips. A process crash loses the unacked tail.
 
 ### Single-node durable producer
 

@@ -7,13 +7,6 @@ description:
   egress retry budgets.
 ---
 
-:::note Java-only today
-
-Client-side failover support is currently available in the Java client.
-Additional language clients are on the roadmap.
-
-:::
-
 This page is the configuration reference for client failover. For the model
 behind these keys — host-health states, zone tiers, role filtering, and the
 two retry loops — read [Concepts](/docs/high-availability/client-failover/concepts/)

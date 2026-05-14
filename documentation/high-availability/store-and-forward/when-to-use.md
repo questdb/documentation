@@ -7,13 +7,6 @@ description:
   orphan adoption.
 ---
 
-:::note Java-only today
-
-Client-side store-and-forward support is currently available in the Java
-client. Additional language clients are on the roadmap.
-
-:::
-
 The QWP WebSocket transport always uses a store-and-forward (SF) substrate.
 What changes between deployments is **where** that substrate keeps unacked
 data and **what durability bar** it acknowledges against. This page is the
@@ -53,7 +46,7 @@ Unacked frames are written to mmap'd files under
 - The producer process is long-running and outage budgets are measured
   in minutes (the default `reconnect_max_duration_millis` is 5 minutes
   for a reason).
-- You need in-flight data to survive process restarts — JVM crash, OOM
+- You need in-flight data to survive process restarts — process crash, OOM
   kill, host reboot, planned redeploy.
 - You ingest at rates where minutes of buffering exceeds RAM you can
   spare.
@@ -71,7 +64,7 @@ string.
 |---|---|---|
 | Where is buffered data? | Process RAM | Disk (`<sf_dir>/<sender_id>/`) |
 | Default capacity | `128 MiB` | `10 GiB` |
-| Survives a JVM crash? | No | Yes |
+| Survives a process crash? | No | Yes |
 | Survives `kill -9`? | No | Yes |
 | Survives a host reboot? | No | Yes (if the disk does) |
 | Cross-sender rescue (orphan adoption) | n/a | Yes (opt-in) |
@@ -196,7 +189,7 @@ replaces and extends it.
 ```mermaid
 graph TD
     Q1{Will the producer outlive any single outage you care about?}
-    Q2{Does data need to survive a JVM crash or kill -9?}
+    Q2{Does data need to survive a process crash or kill -9?}
     Q3{Is object-store durability required before ack?}
     Q4{Multiple senders share sf_dir, with dynamic sender_id?}
 

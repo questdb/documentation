@@ -10,17 +10,10 @@ description:
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
-  Client failover is most useful with QuestDB Enterprise primary-replica
-  replication. OSS users with a single instance gain limited benefit from
-  multi-host configuration.
+  Client failover is most useful with QuestDB Enterprise
+  [primary-replica replication](/docs/high-availability/overview/). OSS users
+  with a single instance gain limited benefit from multi-host configuration.
 </EnterpriseNote>
-
-:::note Java-only today
-
-Client-side failover support is currently available in the Java client.
-Additional language clients are on the roadmap.
-
-:::
 
 When a QuestDB cluster fails over from one primary to another — whether through
 a planned promotion, a rolling upgrade, or an unplanned outage — clients with a

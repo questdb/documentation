@@ -7,13 +7,6 @@ description:
   unacknowledged frames against a fresh connection.
 ---
 
-:::note Java-only today
-
-Client-side store-and-forward support is currently available in the Java
-client. Additional language clients are on the roadmap.
-
-:::
-
 Store-and-forward (SF) is the client-side substrate that sits between your
 application code and the QWP wire transport. It absorbs publishes into a
 local ring of fixed-size segments, drains them over a WebSocket connection
@@ -22,7 +15,7 @@ disconnect or restart.
 
 The goal is **producer-never-blocks-on-the-wire**. Your call to `flush()`
 returns as soon as data is published into the substrate. Acknowledgements
-arrive asynchronously. A network outage, a server restart, even a JVM
+arrive asynchronously. A network outage, a server restart, even a process
 crash leaves your producer code unaffected — the I/O thread quietly
 reconnects and replays what remains.
 
@@ -35,8 +28,8 @@ SF runs in either of two modes selected by the connect string:
 | Trigger | `sf_dir` is **unset** | `sf_dir` is set |
 | Storage | malloc'd ring in process RAM | mmap'd files under `<sf_dir>/<sender_id>/` |
 | Default capacity | `128 MiB` | `10 GiB` |
-| Survives JVM exit | No | Yes |
-| Survives JVM crash | No | Yes — replay on next start |
+| Survives process exit | No | Yes |
+| Survives process crash | No | Yes — replay on next start |
 | Tolerates transient network blips | Yes | Yes |
 | Tolerates multi-minute server outages | Bounded by RAM cap | Bounded by disk cap |
 | Recovers another sender's stale slot | n/a | Opt-in via `drain_orphans=on` |
@@ -240,7 +233,7 @@ on-disk and watermarked values, so already-durable-acked frames inside
 the lowest surviving segment are not re-replayed.
 
 The file is **optional** — a conformant client may choose not to maintain
-it. The Java reference client does.
+it. The reference client does.
 
 ## Orphan adoption
 
@@ -254,7 +247,7 @@ opens a separate WebSocket connection, runs the same recovery + replay
 flow, and exits when the orphan is fully drained.
 
 This is the rescue path for a sender that died without draining cleanly
-— a JVM crash, an OOM kill, a host reboot. The replacement process picks
+— a process crash, an OOM kill, a host reboot. The replacement process picks
 the orphan's slot lock and clears its disk footprint. Without
 `drain_orphans=on` the dead sender's data persists on disk indefinitely
 until an operator intervenes.
