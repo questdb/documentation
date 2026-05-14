@@ -682,6 +682,24 @@ module.exports = {
           type: "doc",
           label: "WAL Cleanup",
         },
+        {
+          type: "category",
+          label: "Client Failover",
+          items: [
+            "high-availability/client-failover/concepts",
+            "high-availability/client-failover/configuration",
+          ],
+        },
+        {
+          type: "category",
+          label: "Store-and-Forward",
+          items: [
+            "high-availability/store-and-forward/concepts",
+            "high-availability/store-and-forward/when-to-use",
+            "high-availability/store-and-forward/operating-and-tuning",
+            "high-availability/store-and-forward/configuration",
+          ],
+        },
       ],
     },
 
