@@ -313,10 +313,6 @@ with shape `(3, 2)`, `append()` fills positions `[0,0], [0,1], [1,0], [1,1],
 coordinates. Call `reshape(d1, d2, ...)` to change the shape without
 reallocating.
 
-:::note
-Arrays require QuestDB 9.0.0 or later.
-:::
-
 ### Designated timestamp
 
 The [designated timestamp](/docs/concepts/designated-timestamp/) column
