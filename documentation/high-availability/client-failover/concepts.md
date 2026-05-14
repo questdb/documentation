@@ -56,7 +56,7 @@ host.
 | `Unknown` | The host has not been tried in this round, or its classification was reset. |
 | `TransientReject` | The server returned `421` with `X-QuestDB-Role: PRIMARY_CATCHUP` — it is a primary that is still catching up after promotion. Expected to recover. |
 | `TransportError` | TCP/TLS handshake failed, an HTTP upgrade returned a transient error code, or an established connection broke mid-stream. |
-| `TopologyReject` | The server returned `421` with a role that cannot satisfy the requested `target=` filter — for example, a `REPLICA` when you asked for `target=primary`. The host will not become writable without a topology change. |
+| `TopologyReject` | The server returned `421` with any role other than `PRIMARY_CATCHUP` (`PRIMARY`, `REPLICA`, `STANDALONE`, or an unrecognised token), or — on egress — a successfully-upgraded host whose `SERVER_INFO` role does not satisfy the requested `target=` filter. The host will not become usable without a topology change. |
 
 A lower state in the table above is preferred when the client picks the next
 host to try.
@@ -72,8 +72,9 @@ Each host is also classified relative to the client's configured `zone=`:
 | `Other` | Server advertised a different zone. |
 
 Zone information is advertised by the server on a successful upgrade and
-(starting in QWP v2) on `421` rejects. The client remembers it for the lifetime
-of the connection.
+on `421` rejects. Once observed, the client remembers a host's zone tier for
+the lifetime of that client — it persists across rounds and reconnects until
+the host re-advertises a different zone.
 
 `target=primary` collapses every host's zone tier to `Same` — writers must
 follow the primary regardless of geography. Ingress is currently zone-blind in
@@ -152,7 +153,7 @@ page for how the reconnect loop interacts with the disk-backed segment ring.
 
 ### Egress (queries)
 
-The egress failover loop wraps each `Execute()` call on the read-side query
+The egress failover loop wraps each `execute()` call on the read-side query
 client. It is interactive: a slow failover is worse than a clear error, so
 the budget is short:
 
@@ -188,12 +189,12 @@ The host is demoted in the priority lattice; the client walks to the next host
 within the same round. No exponential backoff is consumed.
 
 - `421` + `X-QuestDB-Role: PRIMARY_CATCHUP` → `TransientReject`
-- `421` + any other recognised role → `TopologyReject`
-- `SERVER_INFO.Role` does not match the requested `target=`
+- `421` + any other non-empty role, including unrecognised tokens → `TopologyReject`
+- `SERVER_INFO.Role` does not match the requested `target=` (egress only)
 
 If every host in a round role-rejects, ingress pays one fixed backoff sleep
 (reset to `InitialBackoff`, no doubling) and starts a fresh round; egress
-fails the current `Execute()` call.
+fails the current `execute()` call.
 
 ### Transient — enter backoff
 
