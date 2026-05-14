@@ -1,6 +1,7 @@
 ---
-title: Java Client Documentation
-description: "Reference for the questdb-client Maven artifact — the Java ILP ingestion client for QuestDB, covering setup, configuration, authentication, and error handling."
+title: Java client for QuestDB
+sidebar_label: Java
+description: "QuestDB Java client for high-throughput data ingestion and streaming SQL queries over the QWP binary protocol."
 ---
 
 import Tabs from "@theme/Tabs"
@@ -9,43 +10,39 @@ import TabItem from "@theme/TabItem"
 
 import CodeBlock from "@theme/CodeBlock"
 
-import { RemoteRepoExample } from "@theme/RemoteRepoExample"
-
 :::note
 
-This is the reference for the QuestDB Java Client when QuestDB is used as a
-server.
-
-For embedded QuestDB, please check our
-[Java Embedded Guide](/docs/ingestion/java-embedded/).
+This is the reference for the QuestDB Java client when QuestDB is used as a
+server. For embedded QuestDB, see the
+[Java embedded guide](/docs/ingestion/java-embedded/).
 
 :::
 
-The QuestDB Java client is distributed as a separate Maven artifact
-(`org.questdb:questdb-client`).
+The QuestDB Java client connects to QuestDB over the
+[QWP binary protocol](/docs/protocols/qwp-ingress-websocket/) (WebSocket). It
+supports high-throughput data ingestion and streaming SQL queries on the same
+transport.
 
-The client provides the following benefits:
+Key capabilities:
 
-- **Automatic table creation**: No need to define your schema upfront.
-- **Concurrent schema changes**: Seamlessly handle multiple data streams with
-  on-the-fly schema modifications
-- **Optimized batching**: Use strong defaults or curate the size of your batches
-- **Health checks and feedback**: Ensure your system's integrity with built-in
-  health monitoring
-- **Automatic write retries**: Reuse connections and retry after interruptions
+- **Ingestion**: column-oriented batched writes with automatic table creation,
+  schema evolution, and optional store-and-forward durability.
+- **Querying**: streaming SQL result sets, DDL/DML execution, bind parameters,
+  and byte-credit flow control.
+- **Failover**: multi-endpoint connections with automatic reconnect across
+  rolling upgrades and primary migrations.
 
-:::info
+:::tip Legacy transports
 
-This page focuses on our high-performance ingestion client, which is optimized
-for **writing** data to QuestDB. For retrieving data, we recommend using a
-[PostgreSQL-compatible Java library](/docs/query/pgwire/java/) or our
-[HTTP query endpoint](/docs/query/overview/#rest-http-api).
+The client also supports ILP ingestion over HTTP and TCP for backward
+compatibility. This page documents the recommended WebSocket (QWP) path. For
+ILP transport details, see the [ILP overview](/docs/ingestion/ilp/overview/).
 
 :::
 
 ## Quick start
 
-Add the QuestDB Java client as a dependency in your project's build configuration file.
+Add the dependency:
 
 <Tabs defaultValue="maven" values={[ { label: "Maven", value: "maven" },
 { label: "Gradle", value: "gradle" }, ]}
@@ -71,217 +68,10 @@ Add the QuestDB Java client as a dependency in your project's build configuratio
   </TabItem>
 </Tabs>
 
-The code below creates a client instance configured to use HTTP transport to
-connect to a QuestDB server running on localhost, port 9000. It then sends two
-rows, each containing one symbol and two floating-point values. The client asks
-the server to assign a timestamp to each row based on the server's wall-clock
-time.
-
-<RemoteRepoExample name="ilp-http" lang="java" header={false} />
-
-The client is configured using a configuration string. See
-[Ways to create the client](#ways-to-create-the-client) for all configuration
-methods, and [Configuration options](#configuration-options) for available
-settings.
-
-## Authenticate and encrypt
-
-This sample configures the client to use HTTP transport with TLS enabled for a
-connection to a QuestDB server. It also instructs the client to authenticate
-using HTTP Basic Authentication.
-
-When using QuestDB Enterprise, you can authenticate using a REST bearer token as
-well. Please check the [RBAC docs](/docs/security/rbac/#authentication) for
-more info.
-
-<RemoteRepoExample name="ilp-http-auth" lang="java" header={false} />
-
-## Ways to create the client
-
-There are three ways to create a client instance:
-
-1. **From a configuration string.** This is the most common way to create a
-   client instance. It describes the entire client configuration in a single
-   string, and allows sharing the same configuration across clients in different
-   languages. The general format is:
-
-   ```text
-   <protocol>::<key>=<value>;<key>=<value>;...;
-   ```
-
-   [Transport protocol](/docs/ingestion/ilp/overview/#transport-selection)
-   can be one of these:
-
-   - `http` — ILP/HTTP
-   - `https` — ILP/HTTP with TLS encryption
-   - `tcp` — ILP/TCP
-   - `tcps` — ILP/TCP with TLS encryption
-
-   The key `addr` sets the hostname and port of the QuestDB server. Port
-   defaults to 9000 for HTTP(S) and 9009 for TCP(S). The minimum configuration
-   includes the transport and the address.
-
-   ```java
-   try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;")) {
-       // ...
-   }
-   ```
-
-   For all available options, see
-   [Configuration options](#configuration-options).
-
-2. **From an environment variable.** The `QDB_CLIENT_CONF` environment variable
-   is used to set the configuration string. Moving configuration parameters to
-   an environment variable allows you to avoid hard-coding sensitive information
-   such as tokens and passwords in your code.
-
-   ```bash
-   export QDB_CLIENT_CONF="http::addr=localhost:9000;auto_flush_rows=5000;retry_timeout=10000;"
-   ```
-
-   ```java
-   try (Sender sender = Sender.fromEnv()) {
-       // ...
-   }
-   ```
-
-3. **Using the Java builder API.** This provides type-safe configuration.
-
-   ```java
-   try (Sender sender = Sender.builder(Sender.Transport.HTTP)
-           .address("localhost:9000")
-           .autoFlushRows(5000)
-           .retryTimeoutMillis(10000)
-           .build()) {
-       // ...
-   }
-   ```
-   
-## Configuring multiple URLs
-
-:::note
-
-This feature requires QuestDB OSS 9.1.0+ or Enterprise 3.0.4+.
-
-:::
-
-The ILP client can be configured with multiple _possible_ endpoints to send your data to. Only one endpoint is used at
-a time.
-
-To configure this feature, simply provide multiple `addr` entries. For example:
-
+### Ingest data
 
 ```java
-try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;addr=localhost:9999;")) {
-   // ...
-}
-```
-
-On initialisation, if `protocol_version=auto`, the sender will identify the first instance that is writeable. Then it will _stick_ to this instance and write
-any subsequent data to it.
-
-In the event that the instance becomes unavailable for writes, the client will retry the other possible endpoints, and when it finds 
-a new writeable instance, will _stick_ to it instead. This unavailability is characterised by failures to connect or locate the instance,
-or the instance returning an error code due to it being read-only.
-
-By configuring multiple addresses, you can continue to capture data if your primary instance
-fails, without having to reconfigure the clients. This backup instance can be hot or cold, and so long as it is assigned a known address, it will be written to as soon as it is started.
-
-Enterprise users can leverage this feature to transparently handle replication failover, without the need to introduce a load-balancer or
-reconfigure clients.
-
-:::tip
-
-You may wish to increase the value of `retry_timeout` if you expect your backup instance to take a large amount of time to become writeable.
-
-For example, when performing a primary migration (Enterprise replication), with default settings, you might want to increase this
-to `30s` or higher.
-
-:::
-
-
-## General usage pattern
-
-1. Create a client instance via `Sender.fromConfig()`.
-2. Use `table(CharSequence)` to select a table for inserting a new row.
-3. Use `symbol(CharSequence, CharSequence)` to add all symbols. You must add
-   symbols before adding other column types.
-4. Use the following options to add all the remaining columns:
-
-   - `stringColumn(CharSequence, CharSequence)`
-   - `longColumn(CharSequence, long)`
-   - `doubleColumn(CharSequence, double)`
-   - `boolColumn(CharSequence, boolean)`
-   - `arrayColumn()` -- several variants, see below
-   - `timestampColumn(CharSequence, Instant)`, or
-     `timestampColumn(CharSequence, long, ChronoUnit)`
-   - `decimalColumn(CharSequence, Decimal256)` or
-     `decimalColumn(CharSequence, CharSequence)` (string literal)
-
-:::caution
-Decimal values require QuestDB version 9.2.0 or later.
-
-Create decimal columns ahead of time with `DECIMAL(precision, scale)` so QuestDB can ingest the values
-with the expected precision. See the
-[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals) page for a refresher on
-precision and scale.
-:::
-
-5. Use `at(Instant)` or `at(long timestamp, ChronoUnit unit)` or `atNow()` to
-   set a designated timestamp.
-6. Optionally: You can use `flush()` to send locally buffered data into a
-   server.
-7. Repeat from step 2 to start a new row.
-8. Use `close()` to dispose the Sender after you no longer need it.
-
-## Ingest arrays
-
-To ingest a 1D or 2D array, simply construct a Java array of the appropriate
-type (`double[]`, `double[][]`) and supply it to the `arrayColumn()` method. In
-order to avoid GC overheads, create the array instance once, and then populate
-it with the data of each row.
-
-For arrays of higher dimensionality, use the `DoubleArray` class. Here's a basic
-example for a 3D array:
-
-```java
-// or "tcp::addr=localhost:9009;protocol_version=2;"
-try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
-     DoubleArray ary = new DoubleArray(3, 3, 3);
-) {
-    for (int i = 0; i < ROW_COUNT; i++) {
-        for (int value = 0; value < 3 * 3 * 3; value++) {
-            ary.append(value);
-        }
-        sender.table("tango")
-              .doubleArray("array", ary)
-              .at(getTimestamp(), ChronoUnit.MICROS);
-    }
-}
-```
-
-The `ary.append(value)` method allows you to populate the array in the row-major
-order, without having to compute every coordinate individually. You can also use
-`ary.set(value, coords...)` to set a value at specific coordinates.
-
-:::note
-Arrays are supported from QuestDB version 9.0.0, and require updated
-client libraries.
-:::
-
-## Flush the buffer
-
-The client accumulates the data into an internal buffer and doesn't immediately
-send it to the server. It can flush the buffer to the server either
-automatically or on explicit request.
-
-### Flush explicitly
-
-You can configure the client to not use automatic flushing, and issue explicit
-flush requests by calling `sender.flush()`:
-
-```java
-try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush=off")) {
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
     sender.table("trades")
           .symbol("symbol", "ETH-USD")
           .symbol("side", "sell")
@@ -298,191 +88,733 @@ try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;auto_flush=off
 }
 ```
 
-:::note
+### Query data
 
-Calling `sender.flush()` will flush the buffer even with auto-flushing enabled,
-but this isn't a typical way to use the client.
+```java
+try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
+    client.connect();
+    client.execute(
+        "SELECT ts, sym, price, qty FROM trades WHERE sym = 'ETH-USD' LIMIT 10",
+        new QwpColumnBatchHandler() {
+            @Override
+            public void onBatch(QwpColumnBatch batch) {
+                batch.forEachRow(row -> System.out.printf(
+                    "ts=%d sym=%s price=%.4f qty=%d%n",
+                    row.getLongValue(0),
+                    row.getSymbol(1),
+                    row.getDoubleValue(2),
+                    row.getLongValue(3)
+                ));
+            }
+
+            @Override
+            public void onEnd(long totalRows) {
+                System.out.println("done: " + totalRows + " rows");
+            }
+
+            @Override
+            public void onError(byte status, String message) {
+                System.err.println("query failed: " + message);
+            }
+        }
+    );
+}
+```
+
+## Authentication and TLS
+
+Authentication happens at the HTTP level during the WebSocket upgrade, before
+any binary frames are exchanged. The same mechanisms work for both `Sender`
+(ingestion) and `QwpQueryClient` (querying).
+
+### HTTP basic auth
+
+```java
+// Ingestion
+try (Sender sender = Sender.fromConfig(
+        "wss::addr=db.example.com:9000;username=admin;password=quest;")) {
+    // ...
+}
+
+// Querying
+try (QwpQueryClient client = QwpQueryClient.fromConfig(
+        "wss::addr=db.example.com:9000;username=admin;password=quest;")) {
+    client.connect();
+    // ...
+}
+```
+
+### Token auth (Enterprise)
+
+```java
+try (Sender sender = Sender.fromConfig(
+        "wss::addr=db.example.com:9000;token=your_bearer_token;")) {
+    // ...
+}
+```
+
+### TLS with custom trust store
+
+```java
+try (Sender sender = Sender.fromConfig(
+        "wss::addr=db.example.com:9000;tls_roots=/path/to/truststore.jks;tls_roots_password=changeit;")) {
+    // ...
+}
+```
+
+For OIDC authentication (Enterprise), see
+[OpenID Connect](/docs/security/oidc/).
+
+## Creating the client
+
+### From a connect string
+
+The connect string format is `<schema>::<key>=<value>;<key>=<value>;...;`
+
+For ingestion, use `ws` (plain) or `wss` (TLS):
+
+```java
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+    // ...
+}
+```
+
+For querying:
+
+```java
+try (QwpQueryClient client = QwpQueryClient.fromConfig("ws::addr=localhost:9000;")) {
+    client.connect();
+    // ...
+}
+```
+
+For the full list of connect-string keys, see the
+[connect string reference](/docs/client-configuration/connect-string/).
+
+### From an environment variable
+
+Set `QDB_CLIENT_CONF` to avoid hard-coding credentials:
+
+```bash
+export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
+```
+
+```java
+try (Sender sender = Sender.fromEnv()) {
+    // ...
+}
+```
+
+### Using the builder API
+
+The builder provides type-safe configuration:
+
+```java
+try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+        .address("localhost:9000")
+        .autoFlushRows(500)
+        .autoFlushIntervalMillis(50)
+        .build()) {
+    // ...
+}
+```
+
+For `QwpQueryClient`, use the factory methods or configure post-construction:
+
+```java
+try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
+    client.withInitialCredit(256 * 1024);
+    client.connect();
+    // ...
+}
+```
+
+## Data ingestion
+
+### General usage pattern
+
+1. Create a `Sender` via `Sender.fromConfig()` or the builder.
+2. Call `table(name)` to select a table.
+3. Call column methods to add values:
+   - `symbol(name, value)` 
+   - `stringColumn(name, value)`
+   - `boolColumn(name, value)`
+   - `byteColumn(name, byte)`, `shortColumn(name, short)`, `intColumn(name, int)`
+   - `longColumn(name, long)`, `floatColumn(name, float)`, `doubleColumn(name, double)`
+   - `charColumn(name, char)`
+   - `timestampColumn(name, Instant)` or `timestampColumn(name, long, ChronoUnit)`
+   - `uuidColumn(name, lo, hi)` (two longs)
+   - `long256Column(name, l0, l1, l2, l3)` (four longs, least significant first)
+   - `decimalColumn(name, Decimal256)` or `decimalColumn(name, CharSequence)`
+   - `doubleArray(name, ...)` and `longArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
+5. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the row.
+6. Repeat from step 2, or call `flush()` to send buffered data.
+7. Call `close()` when done (or use try-with-resources).
+
+```java
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+    sender.table("trades")
+          .symbol("symbol", "EURUSD")
+          .symbol("side", "buy")
+          .doubleColumn("price", 1.0842)
+          .longColumn("quantity", 100_000)
+          .at(Instant.now());
+}
+```
+
+Tables and columns are created automatically if they do not exist.
+
+### Ingest arrays
+
+For 1D and 2D arrays, pass a Java array directly:
+
+```java
+double[] prices = {1.0842, 1.0843, 1.0841};
+sender.table("book").doubleArray("levels", prices).atNow();
+
+long[] counts = {100, 200, 300};
+sender.table("book").longArray("depths", counts).atNow();
+```
+
+For higher-dimensional arrays, use the `DoubleArray` or `LongArray` class to
+avoid GC overhead. Create the instance once and reuse it:
+
+```java
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
+     DoubleArray ary = new DoubleArray(3, 3, 3)) {
+    for (int i = 0; i < ROW_COUNT; i++) {
+        for (int v = 0; v < 27; v++) {
+            ary.append(v);
+        }
+        sender.table("book")
+              .doubleArray("cube", ary)
+              .at(getTimestamp(), ChronoUnit.MICROS);
+    }
+}
+```
+
+:::note
+Arrays require QuestDB 9.0.0 or later.
+:::
+
+### Designated timestamp
+
+The [designated timestamp](/docs/concepts/designated-timestamp/) column
+controls time-based partitioning and ordering. There are two ways to set it:
+
+**User-assigned** (recommended for deduplication and exactly-once delivery):
+
+```java
+sender.table("trades")
+      .symbol("symbol", "EURUSD")
+      .doubleColumn("price", 1.0842)
+      .at(Instant.now());
+
+// Or with explicit units for high-throughput paths:
+sender.table("trades")
+      .symbol("symbol", "EURUSD")
+      .doubleColumn("price", 1.0842)
+      .at(System.currentTimeMillis() * 1000, ChronoUnit.MICROS);
+```
+
+**Server-assigned** (server uses its wall-clock time):
+
+```java
+sender.table("trades")
+      .symbol("symbol", "EURUSD")
+      .doubleColumn("price", 1.0842)
+      .atNow();
+```
+
+:::note
+QuestDB works best when data arrives in chronological order (sorted by
+timestamp).
+:::
+
+### Decimal columns
+
+:::caution
+Decimal values require QuestDB 9.2.0 or later. Create decimal columns ahead
+of time with `DECIMAL(precision, scale)` so QuestDB ingests values with the
+expected precision. See the
+[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
+page for details.
+:::
+
+### Flushing
+
+The client accumulates rows in an internal buffer and sends them in batches.
+
+**Auto-flush** (default): the client flushes when either threshold is reached:
+
+| Trigger    | WebSocket default | HTTP default |
+|------------|-------------------|--------------|
+| Row count  | 1,000 rows        | 75,000 rows  |
+| Time       | 100 ms            | 1,000 ms     |
+
+Customize via connect string:
+
+```text
+ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
+```
+
+**Explicit flush**: disable auto-flush and call `flush()` yourself:
+
+```java
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;auto_flush=off;")) {
+    for (Trade trade : trades) {
+        sender.table("trades")
+              .symbol("symbol", trade.symbol())
+              .doubleColumn("price", trade.price())
+              .longColumn("quantity", trade.quantity())
+              .at(trade.timestamp());
+    }
+    sender.flush();
+}
+```
+
+The client also flushes when closed. However, if the flush fails at close
+time, the client does not retry. Always flush explicitly before closing.
+
+### Store-and-forward
+
+With store-and-forward enabled, unacknowledged data is persisted to disk and
+replayed after reconnection, surviving sender process restarts.
+
+```text
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
+```
+
+Without `sf_dir`, unacknowledged data lives in process memory and is lost if
+the sender process dies. The reconnect loop still spans transient server
+outages (rolling upgrades), but the RAM buffer caps how much data can
+accumulate.
+
+### Durable acknowledgement
+
+:::note Enterprise
+
+Durable acknowledgement requires QuestDB Enterprise with primary replication
+configured.
 
 :::
 
-### Flush automatically
+By default, the server confirms a batch when it is committed to the local
+[WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
+uploaded to object storage:
 
-By default, the client automatically flushes the buffer according to a simple
-policy. With HTTP, it will automatically flush at the time you append a new
-row, if either of these has become true:
+```text
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+```
 
-- reached 75,000 rows
-- hasn't been flushed for 1 second
+## Querying and SQL execution
 
-Both parameters can be customized in order to achieve a good tradeoff between
-throughput (large batches) and latency (small batches).
+The `QwpQueryClient` sends SQL statements over the
+[QWP egress](/docs/protocols/qwp-egress-websocket/) endpoint (`/read/v1`).
+Results arrive as columnar batches via a callback handler.
 
-This configuration string will cause the client to auto-flush every 10 rows or
-every 10 seconds, whichever comes first:
+### Executing SELECT queries
 
-`http::addr=localhost:9000;auto_flush_rows=10;auto_flush_interval=10000;`
+```java
+try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
+    client.connect();
+    client.execute(
+        "SELECT ts, sym, price FROM trades WHERE sym = 'EURUSD' LIMIT 100",
+        new QwpColumnBatchHandler() {
+            @Override
+            public void onBatch(QwpColumnBatch batch) {
+                for (int row = 0; row < batch.getRowCount(); row++) {
+                    long ts = batch.getLongValue(0, row);
+                    String sym = batch.getSymbol(1, row);
+                    double price = batch.getDoubleValue(2, row);
+                    // process row...
+                }
+            }
 
-With TCP, the client flushes its internal buffer whenever it gets full.
+            @Override
+            public void onEnd(long totalRows) { }
 
-The client will also flush automatically when it is being closed and there's
-still some data in the buffer. However, **if the network operation fails at this
-time, the client won't retry it.** Always explicitly flush the buffer before
-closing the client.
+            @Override
+            public void onError(byte status, String message) {
+                System.err.printf("error: 0x%02X %s%n", status & 0xFF, message);
+            }
+        }
+    );
+}
+```
+
+The `QwpColumnBatch` object is valid only during the `onBatch` callback. Copy
+values out if you need them after the callback returns.
+
+**Convenience accessors**: `batch.forEachRow(row -> ...)` provides a
+`RowView` with single-argument accessors (`row.getLongValue(col)`,
+`row.getSymbol(col)`, etc.) for compact read paths.
+
+**Null checking**: call `batch.isNull(col, row)` before reading a value.
+
+### Reading result batches
+
+`QwpColumnBatch` provides typed accessors for all QuestDB column types:
+
+| Accessor | Column types |
+|----------|-------------|
+| `getLongValue(col, row)` | LONG, TIMESTAMP, TIMESTAMP_NANOS, DATE |
+| `getIntValue(col, row)` | INT |
+| `getDoubleValue(col, row)` | DOUBLE |
+| `getFloatValue(col, row)` | FLOAT |
+| `getBoolValue(col, row)` | BOOLEAN |
+| `getByteValue(col, row)` | BYTE |
+| `getShortValue(col, row)` | SHORT |
+| `getCharValue(col, row)` | CHAR |
+| `getSymbol(col, row)` | SYMBOL (returns cached `String`) |
+| `getStrA(col, row)` / `getStrB(col, row)` | VARCHAR (reusable `CharSequence` views) |
+| `getBinaryA(col, row)` / `getBinaryB(col, row)` | BINARY (reusable views) |
+| `getString(col, row, CharSink)` | VARCHAR (copy into sink) |
+| `getUuid(col, row, Uuid)` | UUID |
+| `getLong256(col, row, Long256Sink)` | LONG256 |
+
+Column metadata is available via `batch.getColumnInfo(col)` (name, type) and
+`batch.getColumnCount()`.
+
+### DDL and DML statements
+
+Non-SELECT statements (CREATE TABLE, INSERT, UPDATE, ALTER, DROP, TRUNCATE)
+are executed through the same `execute()` method. The server responds with
+`EXEC_DONE` instead of result batches:
+
+```java
+client.execute(
+    "CREATE TABLE trades ("
+    + "ts TIMESTAMP, sym SYMBOL, price DOUBLE, qty LONG"
+    + ") TIMESTAMP(ts) PARTITION BY DAY WAL",
+    new QwpColumnBatchHandler() {
+        @Override
+        public void onBatch(QwpColumnBatch batch) { }
+
+        @Override
+        public void onEnd(long totalRows) { }
+
+        @Override
+        public void onError(byte status, String message) {
+            System.err.println("failed: " + message);
+        }
+
+        @Override
+        public void onExecDone(short opType, long rowsAffected) {
+            System.out.printf("done: opType=%d rows=%d%n", opType, rowsAffected);
+        }
+    }
+);
+```
+
+`rowsAffected` reports the count for INSERT/UPDATE/DELETE. Pure DDL (CREATE,
+DROP, ALTER, TRUNCATE) reports 0.
+
+### Bind parameters
+
+Parameterized queries use typed bind values, avoiding SQL injection and
+enabling server-side factory cache reuse across repeated calls:
+
+```java
+String sql = "SELECT ts, sym, price, qty FROM trades "
+    + "WHERE sym = $1 AND price >= $2 LIMIT 1000";
+
+for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
+    client.execute(
+        sql,
+        binds -> binds
+            .setVarchar(0, symbol)
+            .setDouble(1, 1.0),
+        handler
+    );
+}
+```
+
+Bind indices are 0-based (`$1` maps to index 0). Available setters include
+`setBoolean`, `setByte`, `setShort`, `setInt`, `setLong`, `setFloat`,
+`setDouble`, `setString`, `setVarchar`, `setTimestampMicros`, `setDate`,
+`setUuid`, `setDecimal64/128/256`, `setSymbol`, `setNull`, and more.
+
+To pass a NULL bind value:
+
+```java
+binds -> binds.setNull(0)
+```
+
+:::note Server leniency
+
+The current server accepts a SYMBOL wire type for bind parameters and treats
+it as VARCHAR. Compliant clients should send VARCHAR. A future revision may
+reject SYMBOL bind type codes.
+
+:::
+
+### Flow control
+
+For large result sets, byte-credit flow control prevents the server from
+overwhelming the client:
+
+```java
+try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)
+        .withInitialCredit(256 * 1024)) {
+    client.connect();
+    // Server pauses after streaming ~256 KiB, auto-replenishes after each batch
+}
+```
+
+A credit of `0` (the default) means unbounded: the server streams as fast as
+the network allows.
+
+### Compression
+
+Negotiate zstd compression to reduce network bandwidth for large result sets:
+
+```java
+try (QwpQueryClient client = QwpQueryClient.fromConfig(
+        "ws::addr=localhost:9000;compression=zstd;compression_level=3;")) {
+    client.connect();
+    // Batches are automatically decompressed
+}
+```
 
 ## Error handling
 
-HTTP automatically retries failed, recoverable requests: network errors, some
-server errors, and timeouts. Non-recoverable errors include invalid data,
-authentication errors, and other client-side errors.
+### Ingestion errors
 
-:::note
+WebSocket ingestion uses an asynchronous error model. Batch rejections are
+delivered via the `SenderErrorHandler` callback, not thrown from `flush()`:
 
-If you have configured multiple addresses, retries will be run against different instances.
-
-:::
-
-Retrying is especially useful during transient network issues or when the server
-goes offline for a short period. Configure the retrying behavior through the
-`retry_timeout` configuration option or via the builder API with
-`retryTimeoutMillis(long timeoutMillis)`. The client continues to retry after
-recoverable errors until it either succeeds or the specified timeout expires. If
-it hits the timeout without success, the client throws a `LineSenderException`.
-
-The client won't retry requests while it's being closed and attempting to flush
-the data left over in the buffer.
-
-The TCP transport has no mechanism to notify the client it encountered an
-error; instead it just disconnects. When the client detects this, it throws a
-`LineSenderException` and becomes unusable.
-
-## Recover after a client-side error
-
-With HTTP transport, the client always prepares a full row in RAM before trying
-to send it. It also remains usable after an exception has occurred. This allows
-you to cancel sending a row, for example due to a validation error, and go on
-with the next row.
-
-With TCP transport, you don't have this option. If you get an exception, you
-can't continue with the same client instance, and don't have insight into which
-rows were accepted by the server.
-
-:::caution
-
-Error handling behaviour changed with the release of QuestDB 9.1.0.
-
-Previously, failing all retries would cause an exception and release the buffered data.
-
-Now the buffer will not be released. If you wish to re-use the same sender with fresh data, you must call the
-new `reset()` function.
-
-:::
-
-## Designated timestamp considerations
-
-The concept of [designated timestamp](/docs/concepts/designated-timestamp/) is
-important when ingesting data into QuestDB.
-
-There are two ways to assign a designated timestamp to a row:
-
-1. User-assigned timestamp: the client assigns a specific timestamp to the row.
-
-   ```java
-   java.time.Instant timestamp = Instant.now(); // or any other timestamp
-   sender.table("trades")
-         .symbol("symbol", "ETH-USD")
-         .symbol("side", "sell")
-         .doubleColumn("price", 2615.54)
-         .doubleColumn("amount", 0.00044)
-         .at(timestamp);
-   ```
-
-   The `Instant` class is part of the `java.time` package and is used to
-   represent a specific moment in time. The `sender.at()` method can accept a
-   long timestamp representing the elapsed time since the beginning of the
-   [Unix epoch](https://en.wikipedia.org/wiki/Unix_time), as well as a
-   `ChronoUnit` to specify the time unit. This approach is useful in
-   high-throughput scenarios where instantiating an `Instant` object for each
-   row is not feasible due to performance considerations.
-
-2. Server-assigned timestamp: the server automatically assigns a timestamp to
-   the row based on the server's wall-clock time at the time of ingesting the
-   row. Example:
-
-   ```java
-   sender.table("trades")
-         .symbol("symbol", "ETH-USD")
-         .symbol("side", "sell")
-         .doubleColumn("price", 2615.54)
-         .doubleColumn("amount", 0.00044)
-         .atNow();
-   ```
-
-We recommend using the event's original timestamp when ingesting data into
-QuestDB. Using ingestion-time timestamps precludes the ability to deduplicate
-rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
-:::note
-
-QuestDB works best when you send data in chronological order (sorted by
-timestamp).
-
-:::
-
-## Protocol Version
-
-To enhance data ingestion performance, QuestDB _version 9.0.0_ introduced an
-upgraded version "2" to the text-based InfluxDB Line Protocol which encodes
-arrays and f64 values in binary form. Arrays are supported only in this upgraded
-protocol version.
-
-You can select the protocol version with the `protocol_version` setting in the
-configuration string.
-
-HTTP transport automatically negotiates the protocol version by default.
-In order to avoid the slight latency cost at connection time, you can explicitly
-configure the protocol version by setting `protocol_version=2|1;`.
-
-TCP transport does not negotiate the protocol version and uses version 1 by
-default. You must explicitly set `protocol_version=2;` in order to ingest
-arrays, as in this example:
-
-```text
-tcp::addr=localhost:9009;protocol_version=2;
+```java
+try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+        .address("localhost:9000")
+        .errorHandler(error -> {
+            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
+                error.getCategory(), error.getTableName(), error.getServerMessage());
+        })
+        .build()) {
+    // ...
+}
 ```
 
-## Configuration options
+Each `SenderError` carries:
 
-Client can be configured either by using a configuration string as shown in the
-examples above, or by using the builder API.
+- **Category**: `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`,
+  `SECURITY_ERROR`, `WRITE_ERROR`, `PROTOCOL_VIOLATION`, or `UNKNOWN`.
+- **Policy**: `DROP_AND_CONTINUE` (batch dropped, sender continues) or `HALT`
+  (sender halted, next API call throws `LineSenderServerException`).
+- **Server message**: human-readable error text.
+- **Table name**: the rejected table (null for multi-table batches).
 
-The builder API is available via the `Sender.builder(Transport transport)`
-method.
+The error handler runs on a dedicated dispatcher thread, never on the I/O or
+producer thread.
 
-For a breakdown of available options, see the
-[Configuration string](/docs/ingestion/clients/configuration-string/) page.
+**Recovery after errors**: call `reset()` to clear buffers and continue with
+fresh data. On WebSocket, `reset()` does not recover from terminal failures
+(auth failure, reconnect budget exhaustion). In those cases, close the sender
+and create a new one.
+
+### Query errors
+
+Query errors arrive via the `onError` callback:
+
+```java
+@Override
+public void onError(byte status, String message) {
+    System.err.printf("query failed: 0x%02X %s%n", status & 0xFF, message);
+}
+```
+
+Status codes:
+
+| Code   | Name            | Description                                       |
+|--------|-----------------|---------------------------------------------------|
+| `0x03` | SCHEMA_MISMATCH | Bind parameter type incompatible with placeholder |
+| `0x05` | PARSE_ERROR     | SQL syntax error or malformed message             |
+| `0x06` | INTERNAL_ERROR  | Server-side execution failure                     |
+| `0x08` | SECURITY_ERROR  | Authorization failure                             |
+| `0x0A` | CANCELLED       | Query terminated by CANCEL                        |
+| `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                |
+
+Errors can arrive before any data (parse failure) or mid-stream (storage
+failure, server shutdown). When `onError` is called, no further frames arrive
+for that query.
+
+### Connection-level errors
+
+- **Authentication failure**: `401`/`403` HTTP response before the WebSocket
+  upgrade completes. Terminal across all endpoints.
+- **Malformed frames**: `QwpDecodeException` or WebSocket close with a
+  terminal code.
+- **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
+  roles that do not match the `target=` filter.
+
+## Failover and high availability
+
+:::note Enterprise
+
+Multi-host failover with automatic reconnect requires QuestDB Enterprise.
+
+:::
+
+### Multiple endpoints
+
+Specify comma-separated addresses in the connect string:
+
+```text
+ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+```
+
+The client tries endpoints in order. On connection loss, it walks the list
+to find the next healthy endpoint.
+
+### Ingestion failover
+
+The ingestion sender uses a reconnect loop with exponential backoff. Key
+connect-string options:
+
+| Key                              | Default   | Description                               |
+|----------------------------------|-----------|-------------------------------------------|
+| `reconnect_max_duration_millis`  | `300000`  | Total outage budget before giving up.     |
+| `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
+| `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
+| `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
+
+Ingress is zone-blind: it pins QWP v1 and does not read `SERVER_INFO`. The
+`zone=` key is accepted but ignored, so a connect string shared with egress
+clients works unchanged.
+
+With store-and-forward (`sf_dir` set), unacknowledged data survives sender
+restarts. Without it, unacknowledged data lives in process memory and is lost
+if the sender process dies.
+
+### Query failover
+
+The query client drives a per-query reconnect loop. When a transport error
+occurs mid-stream, the client reconnects and replays the query. `batch_seq`
+restarts at 0 on the new connection.
+
+Key connect-string options:
+
+| Key                           | Default | Description                               |
+|-------------------------------|---------|-------------------------------------------|
+| `failover`                    | `on`    | Master switch for per-query reconnect.    |
+| `failover_max_attempts`       | `8`     | Max reconnect attempts per query.         |
+| `failover_backoff_initial_ms` | `50`    | First post-failure sleep.                 |
+| `failover_backoff_max_ms`     | `1000`  | Cap on per-attempt sleep.                 |
+| `failover_max_duration_ms`    | `30000` | Total wall-clock budget per query.        |
+
+**Handling partial results**: when failover occurs mid-stream, the
+`onFailoverReset` callback fires before replayed batches arrive. Use it to
+clear any accumulated state:
+
+```java
+@Override
+public void onFailoverReset(QwpServerInfo newNode) {
+    // Clear partial results; the server will re-send from the beginning
+    results.clear();
+}
+```
+
+If you do not clear state, you will see overlapping data (the server replays
+the full result set).
+
+### Connection events
+
+For ingestion, register a `SenderConnectionListener` to observe connection
+state transitions:
+
+```java
+Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+    .address("db-primary:9000")
+    .address("db-replica:9000")
+    .connectionListener(event -> {
+        System.out.printf("%s host=%s:%d%n",
+            event.getKind(), event.getHost(), event.getPort());
+    })
+    .build();
+```
+
+Event kinds: `CONNECTED`, `DISCONNECTED`, `RECONNECTED`, `FAILED_OVER`,
+`ENDPOINT_ATTEMPT_FAILED`, `ALL_ENDPOINTS_UNREACHABLE`, `AUTH_FAILED`
+(terminal), `RECONNECT_BUDGET_EXHAUSTED` (terminal).
+
+### Error classification
+
+- **Authentication errors** (`401`/`403`): terminal at any host. The
+  reconnect loop stops immediately.
+- **Role reject** (`421 + X-QuestDB-Role`): transient if the role is
+  `PRIMARY_CATCHUP`, topology-level otherwise.
+- **Version mismatch** at upgrade: per-endpoint, not terminal. The client
+  tries the next endpoint.
+- **All other errors** (TCP/TLS failures, `404`, `503`, mid-stream errors):
+  transient, fed into the reconnect loop.
+
+For the full list of connect-string keys, see the
+[reconnect and failover](/docs/client-configuration/connect-string#reconnect-keys)
+and
+[multi-host failover](/docs/client-configuration/connect-string#failover-keys)
+sections of the connect string reference.
+
+## Parallel queries
+
+:::note Phase 1 limitation
+
+The current implementation supports a single in-flight query per connection.
+The wire protocol allows multiple concurrent queries (demultiplexed by
+request ID); multi-query support is planned for a future release.
+
+:::
+
+To run queries in parallel, create separate `QwpQueryClient` instances. Each
+instance manages its own WebSocket connection.
+
+Neither `Sender` nor `QwpQueryClient` is thread-safe. For multi-threaded
+workloads, use one instance per thread or use an object pool.
+
+## Configuration reference
+
+For the full list of connect-string keys and their defaults, see the
+[connect string reference](/docs/client-configuration/connect-string/).
+
+Common WebSocket-specific options:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `auto_flush_rows` | `1000` | Rows before auto-flush. |
+| `auto_flush_interval` | `100` | Milliseconds before auto-flush. |
+| `auto_flush_bytes` | disabled | Bytes before auto-flush. |
+| `sf_dir` | unset | Store-and-forward directory. |
+| `sender_id` | `default` | Sender slot identity for SF. |
+| `request_durable_ack` | `off` | Request durable upload ACK (Enterprise). |
+| `reconnect_max_duration_millis` | `300000` | Ingress reconnect budget. |
+| `failover` | `on` | Egress per-query reconnect switch. |
+| `compression` | `raw` | Egress batch compression (`raw`, `zstd`). |
 
 ## Compatible JDKs
 
 The client relies on some JDK internal libraries, which certain specialised JDK
 offerings may not support.
 
-Here is a list of known incompatible JDKs:
+Known incompatible JDKs:
 
-- Azul Zing 17
-  - A fix is in progress. You can use Azul Zulu 17 in the meantime.
+- Azul Zing 17 (use Azul Zulu 17 instead)
 
-## Other considerations
+## Migration from ILP (HTTP/TCP)
 
-- Refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
-  about transactions, error control, delivery guarantees, health check, or table
-  and column auto-creation.
-- The method `flush()` can be called to force sending the internal buffer to a
-  server, even when the buffer is not full yet.
-- The Sender is not thread-safe. For multiple threads to send data to QuestDB,
-  each thread should have its own Sender instance. An object pool can also be
-  used to re-use Sender instances.
-- The Sender instance has to be closed after it is no longer in use. The Sender
-  implements the `java.lang.AutoCloseable` interface, and therefore the
-  [try-with-resource](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html)
-  pattern can be used to ensure that the Sender is closed.
+If you are migrating from the ILP-based client, the row-building API is
+unchanged. The main differences:
+
+| Aspect | HTTP (ILP) | WebSocket (QWP) |
+|--------|-----------|-----------------|
+| Connect string schema | `http::` / `https::` | `ws::` / `wss::` |
+| Auto-flush rows | 75,000 | 1,000 |
+| Auto-flush interval | 1,000 ms | 100 ms |
+| Error model | Synchronous (`flush()` throws) | Async (`SenderErrorHandler` callback) |
+| Buffer capacity | Configurable | Not configurable (internal cursor) |
+| Store-and-forward | Not available | Available (`sf_dir`) |
+| Multi-endpoint failover | Limited | Full reconnect loop with backoff |
+| Querying | Not available | `QwpQueryClient` |
+
+To migrate, change your connect string from `http::` to `ws::` (or `https::`
+to `wss::`), register a `SenderErrorHandler` for async error handling, and
+adjust auto-flush settings if needed.

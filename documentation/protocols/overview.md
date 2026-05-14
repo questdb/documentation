@@ -21,7 +21,7 @@ from scratch. End users should see the
 
 :::
 
-## QWP — QuestWire Protocol
+## QWP — QuestDB Wire Protocol
 
 QWP is QuestDB's native wire protocol for both ingest and query traffic. The
 specifications below are normative — if a client's behaviour conflicts with
