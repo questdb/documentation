@@ -178,7 +178,10 @@ details:
    endpoint.
 4. **Send `QUERY_REQUEST`.** Assign a fresh `request_id` (client-owned,
    unique within the connection), include SQL text, bind parameters, and
-   `initial_credit` (`0` for unbounded streaming).
+   `initial_credit` (`0` for unbounded streaming). The WebSocket binary
+   frame body starts directly with `msg_kind = 0x10` — see
+   [Message structure](#message-structure); client-to-server frames carry
+   no 12-byte QWP header.
 5. **Drain frames demuxed by `request_id`.** The server streams
    `RESULT_BATCH(seq=0, schema mode 0x00)`, then
    `RESULT_BATCH(seq=1+, schema mode 0x01)`, until a terminator:
@@ -204,28 +207,49 @@ query on the new connection).
 
 ## Message structure
 
-The egress header is byte-identical to the
-[ingress header](/docs/protocols/qwp-ingress-websocket/#message-structure)
-(12 bytes, little-endian):
+Egress framing is **asymmetric**:
 
-<QwpMessageHeader />
+- **Server → client** frames carry the full 12-byte QWP header followed
+  by the payload. The header is byte-identical to the
+  [ingress header](/docs/protocols/qwp-ingress-websocket/#message-structure):
 
-The **first byte of the payload** is the message kind. The remaining payload
-depends on the kind.
+  <QwpMessageHeader />
+
+- **Client → server** frames carry **only the payload**, starting directly
+  with `msg_kind`. There is no 12-byte QWP header on outbound client frames.
 
 ```text
 +------------------------------------------+
-| Header (12 bytes)                        |
+| WebSocket frame body, server -> client:  |
+|   Header (12 bytes)                      |
+|   Payload                                |
+|     msg_kind: uint8                      |
+|     (kind-specific body)                 |
 +------------------------------------------+
-| Payload                                  |
-|   msg_kind: uint8                        |
-|   (kind-specific body)                   |
+
++------------------------------------------+
+| WebSocket frame body, client -> server:  |
+|   Payload                                |
+|     msg_kind: uint8                      |
+|     (kind-specific body)                 |
 +------------------------------------------+
 ```
 
-Placing `msg_kind` in the payload (rather than the header) keeps the header
-codec shared with ingress. Endpoint disambiguation is sufficient because
-connections are direction-pure.
+:::warning Asymmetric framing — common stumbling block
+
+If you copy the ingress framing (which is symmetric — header on both
+directions) into an egress client, the server reads the QWP magic's first
+byte (`0x51`, the ASCII `Q`) as an unknown `msg_kind` and closes the
+WebSocket with code 1006. Client frames must start directly with
+`msg_kind`.
+
+The header is retained server-to-client because `RESULT_BATCH` uses the
+header's `flags` byte (Gorilla, delta dict, zstd) and `payload_length`.
+Client-to-server frames have no analogous needs: version is fixed from the
+upgrade, `table_count` doesn't apply to control kinds, and the WebSocket
+frame already carries the payload length.
+
+:::
 
 ### Flags byte
 
@@ -847,25 +871,19 @@ Client sends `SELECT id, value FROM sensors LIMIT 2` with no bind parameters
 and unbounded credit.
 
 ```text
-QUERY_REQUEST:
-  Header:
-    51 57 50 31              # Magic: "QWP1"
-    01                       # Version: 1
-    00                       # Flags
-    00 00                    # table_count = 0
-    XX XX XX XX              # payload_length
+QUERY_REQUEST  (client -> server; WebSocket binary frame body
+                — no QWP header, see "Message structure" above):
 
-  Payload:
-    10                       # msg_kind = QUERY_REQUEST
-    01 00 00 00 00 00 00 00  # request_id = 1
-    24                       # sql_length = 36
-    53 45 4C 45 43 54 20 69  # "SELECT i"
-    64 2C 20 76 61 6C 75 65  # "d, value"
-    20 46 52 4F 4D 20 73 65  # " FROM se"
-    6E 73 6F 72 73 20 4C 49  # "nsors LI"
-    4D 49 54 20 32           # "MIT 2"
-    00                       # initial_credit = 0 (unbounded)
-    00                       # bind_count = 0
+  10                       # msg_kind = QUERY_REQUEST
+  01 00 00 00 00 00 00 00  # request_id = 1
+  24                       # sql_length = 36
+  53 45 4C 45 43 54 20 69  # "SELECT i"
+  64 2C 20 76 61 6C 75 65  # "d, value"
+  20 46 52 4F 4D 20 73 65  # " FROM se"
+  6E 73 6F 72 73 20 4C 49  # "nsors LI"
+  4D 49 54 20 32           # "MIT 2"
+  00                       # initial_credit = 0 (unbounded)
+  00                       # bind_count = 0
 ```
 
 Server responds with one result batch and end-of-stream:
