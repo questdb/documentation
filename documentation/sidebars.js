@@ -239,11 +239,6 @@ module.exports = {
               label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "protocols/qwp-ingress-udp",
-              type: "doc",
-              label: "QWP Ingress (UDP)",
-            },
-            {
               id: "protocols/qwp-egress-websocket",
               type: "doc",
               label: "QWP Egress (WebSocket)",
@@ -673,19 +668,31 @@ module.exports = {
           label: "Overview",
         },
         {
-          id: "high-availability/setup",
-          type: "doc",
-          label: "Setup Guide",
+          type: "category",
+          label: "Replication",
+          items: [
+            "high-availability/setup",
+            "high-availability/tuning",
+            "high-availability/wal-cleanup",
+          ],
         },
         {
-          id: "high-availability/tuning",
-          type: "doc",
-          label: "Tuning",
+          type: "category",
+          label: "Client Failover",
+          items: [
+            "high-availability/client-failover/concepts",
+            "high-availability/client-failover/configuration",
+          ],
         },
         {
-          id: "high-availability/wal-cleanup",
-          type: "doc",
-          label: "WAL Cleanup",
+          type: "category",
+          label: "Store-and-Forward",
+          items: [
+            "high-availability/store-and-forward/concepts",
+            "high-availability/store-and-forward/when-to-use",
+            "high-availability/store-and-forward/operating-and-tuning",
+            "high-availability/store-and-forward/configuration",
+          ],
         },
       ],
     },

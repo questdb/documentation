@@ -22,11 +22,8 @@ table blocks, where every column's values are stored contiguously. Batched
 messages, schema references, and Gorilla-compressed timestamps reduce wire
 overhead for sustained streaming workloads.
 
-This page covers WebSocket ingress only. Related specifications:
-[QWP ingress (UDP)](/docs/protocols/qwp-ingress-udp/) for fire-and-forget
-datagram ingestion, and
-[QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/) for streaming
-query results back to clients.
+This page covers WebSocket ingress only. For streaming query results back to
+clients, see [QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/).
 
 ## Why implement a QWP client
 
@@ -607,8 +604,7 @@ Dictionary-encoded strings for low-cardinality columns.
 
 WebSocket clients set `FLAG_DELTA_SYMBOL_DICT` (`0x08`) on every message
 and use the global delta dictionary mode **exclusively**. The per-table
-dictionary mode is UDP-only — see
-[QWP ingress (UDP)](/docs/protocols/qwp-ingress-udp/) for that format.
+dictionary mode used by UDP datagrams is not covered here.
 
 :::
 

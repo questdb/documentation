@@ -24,11 +24,8 @@ handling, and per-column data encodings are identical. Egress adds a message
 kind byte at the start of each payload, eight new message kinds for the
 request/response lifecycle, and byte-credit flow control.
 
-Related specifications:
-[QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/) for data
-ingestion, and
-[QWP ingress (UDP)](/docs/protocols/qwp-ingress-udp/) for fire-and-forget
-datagram ingestion.
+For data ingestion, see
+[QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/).
 
 ## Overview
 
