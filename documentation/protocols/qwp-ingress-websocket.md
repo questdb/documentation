@@ -22,11 +22,8 @@ table blocks, where every column's values are stored contiguously. Batched
 messages, schema references, and Gorilla-compressed timestamps reduce wire
 overhead for sustained streaming workloads.
 
-This page covers WebSocket ingress only. Related specifications:
-[QWP ingress (UDP)](/docs/protocols/qwp-ingress-udp/) for fire-and-forget
-datagram ingestion, and
-[QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/) for streaming
-query results back to clients.
+This page covers WebSocket ingress only. For streaming query results back to
+clients, see [QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/).
 
 ## Overview
 
@@ -526,8 +523,8 @@ on the dictionary mode.
 
 #### Per-table dictionary mode
 
-Used by UDP because datagrams cannot rely on a connection-scoped dictionary
-persisting across messages.
+Used by the UDP transport, where datagrams cannot rely on a connection-scoped
+dictionary persisting across messages. WebSocket clients do not use this mode.
 
 ```text
 +----------------------------------------------+

@@ -239,11 +239,6 @@ module.exports = {
               label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "protocols/qwp-ingress-udp",
-              type: "doc",
-              label: "QWP Ingress (UDP)",
-            },
-            {
               id: "protocols/qwp-egress-websocket",
               type: "doc",
               label: "QWP Egress (WebSocket)",

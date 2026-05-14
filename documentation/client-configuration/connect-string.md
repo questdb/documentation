@@ -175,7 +175,7 @@ The schema prefix selects the QWP transport.
 | ------ | --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `ws`   | WebSocket       | `9000`       | QWP over plain WebSocket. Use for development or trusted networks.                                                   |
 | `wss`  | WebSocket + TLS | `9000`       | QWP over TLS-secured WebSocket. Recommended for production.                                                          |
-| `udp`  | UDP             | `9007`       | Fire-and-forget metrics ingest, single table per datagram. See [QWP Ingress (UDP)](/docs/protocols/qwp-ingress-udp/). |
+| `udp`  | UDP             | `9007`       | Fire-and-forget metrics ingest, single table per datagram. |
 
 The default port is applied when `addr` omits `:port`. Note that `wss` does
 **not** default to `443`: both `ws` and `wss` use `9000` unless overridden.

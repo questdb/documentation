@@ -30,7 +30,6 @@ a spec, the spec wins.
 | Protocol | Transport | Purpose |
 | --- | --- | --- |
 | [QWP Ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket) | WebSocket | Columnar binary ingest with optional store-and-forward |
-| [QWP Ingress (UDP)](/docs/protocols/qwp-ingress-udp) | UDP | Fire-and-forget metrics ingest, MTU-bounded |
 | [QWP Egress (WebSocket)](/docs/protocols/qwp-egress-websocket) | WebSocket | Streaming SQL query results |
 
 ## Versioning
