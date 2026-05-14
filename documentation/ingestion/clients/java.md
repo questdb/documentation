@@ -247,6 +247,12 @@ try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
    - `long256Column(name, l0, l1, l2, l3)` (four longs, least significant first)
    - `decimalColumn(name, Decimal256)` or `decimalColumn(name, CharSequence)`
    - `doubleArray(name, ...)` and `longArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
+
+   The QWP wire format supports additional types (GEOHASH, IPv4, BINARY, DATE)
+   that the Java client does not yet expose for ingestion. To write these types,
+   create the columns via DDL and use a
+   [third-party client or the wire protocol directly](/docs/protocols/qwp-ingress-websocket/#column-types).
+
 5. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the row.
 6. Repeat from step 2, or call `flush()` to send buffered data.
 7. Call `close()` when done (or use try-with-resources).
