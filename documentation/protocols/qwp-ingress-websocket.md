@@ -28,6 +28,45 @@ datagram ingestion, and
 [QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/) for streaming
 query results back to clients.
 
+## Why implement a QWP client
+
+If your language already has a QuestDB client, use it — the
+[language client guides](/docs/ingestion/overview) list what's available. The
+rest of this section is for implementers writing a new one (e.g., to bring
+QWP to JavaScript, Rust, Ruby, .NET, or an embedded runtime that the existing
+clients don't cover).
+
+Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
+QWP trades a denser binary encoding for higher throughput and lower CPU on
+both ends:
+
+- **One schema, many batches.** After the first message defines a table's
+  columns, subsequent messages reference the schema by an integer ID — no
+  per-row type tags, no per-batch column names.
+- **Columnar wire format.** Each column's values are contiguous in the
+  message, so the server commits them column-at-a-time without row-by-row
+  parsing. This is the same shape QuestDB uses on disk.
+- **Gorilla timestamps.** Steady-cadence timestamps collapse from 8 bytes to
+  as little as 1 bit each via delta-of-delta encoding.
+- **Global symbol delta dictionary.** Low-cardinality string columns send
+  each distinct value once per connection, then reference it by varint ID.
+- **Multi-table batches.** A single WebSocket frame can carry rows for many
+  tables in one trip across the wire.
+- **Server-acknowledged commits.** Every batch gets an OK frame carrying the
+  per-table sequencer transaction it landed in, so the client knows
+  precisely what's durable. An optional `X-QWP-Request-Durable-Ack` opt-in
+  on the upgrade extends this to cluster-durable acks (Enterprise only).
+
+A minimum-viable client that supports BOOLEAN, LONG, DOUBLE, TIMESTAMP, and
+VARCHAR — the five types that cover most real workloads — is on the order of
+~500 lines in a typed language, plus a WebSocket library. Adding the
+remaining ~20 types is mostly extending switch statements; the framing,
+schema registry, and ack loop stay the same.
+
+The authoritative reference implementation is
+[`java-questdb-client`](https://github.com/questdb/java-questdb-client). It's
+worth keeping open in a tab as you read this page.
+
 ## Overview
 
 QWP encodes data in a column-major layout: all values for a single column are
@@ -79,7 +118,8 @@ using custom headers.
 | `X-QWP-Version` | The QWP version selected for this connection. |
 
 The server selects the version as `min(clientMax, serverMax)`. The selected
-version is never higher than either side's maximum.
+version is never higher than either side's maximum. The server may also
+consider the `X-QWP-Client-Id` when selecting the version.
 
 ### Connection-level contract
 
@@ -108,6 +148,45 @@ Supported methods:
 
 A failed authentication results in a `401` or `403` HTTP response before the
 WebSocket connection is established. No QWP-level auth handshake exists.
+
+## Client lifecycle
+
+The end-to-end shape of a QWP client session, before the encoding details:
+
+1. **Open WebSocket.** Issue an HTTP `GET` to `/write/v4` (or `/api/v4/write`)
+   with the standard `Upgrade: websocket` headers, plus:
+   - `X-QWP-Max-Version: 1` — highest version supported.
+   - `X-QWP-Client-Id: <name>/<version>` — recommended, helps server-side
+     diagnostics and version negotiation.
+   - Authentication header (`Authorization: Basic …` or `Authorization: Bearer …`).
+   - `X-QWP-Request-Durable-Ack: true` — optional, opt-in for cluster-durable
+     acks (Enterprise).
+2. **Verify the upgrade.** On `101 Switching Protocols`, read the response
+   headers:
+   - `X-QWP-Version` — the version the connection runs on. Use it for the
+     `version` byte in every outgoing message header. Reject the connection
+     if it's outside the range your client supports.
+   - `X-QWP-Durable-Ack: enabled` — confirms durable-ack frames will follow,
+     iff you opted in. If you opted in and this header is absent, fail the
+     connection (don't silently wait for acks the server will never send).
+3. **Send binary frames.** Each frame is one QWP message:
+   `12-byte header` + payload (`Delta Symbol Dictionary` if any, then one or
+   more `Table Block`s). The first frame for a given table carries a full
+   schema; subsequent frames for the same column set reference it by
+   schema ID.
+4. **Drain server responses.** The server sends an OK (or error) binary frame
+   per request, in send order. Match responses to requests by their position
+   in your in-flight queue — the server-assigned `sequence` field in each
+   response is the authoritative confirmation. If you opted in to durable
+   ack, you'll also receive periodic `STATUS_DURABLE_ACK` frames carrying
+   cumulative per-table watermarks.
+5. **Close.** Send a WebSocket `Close` frame after the last expected OK has
+   been drained.
+
+Every reconnect resets connection-scoped state on both sides: schema IDs,
+symbol dictionary, and sequence counter. Clients that want sender-restart
+durability layer a store-and-forward buffer on top — see the
+[connect string reference](/docs/client-configuration/connect-string#sf-keys).
 
 ## Encoding primitives
 
@@ -502,69 +581,55 @@ Values [true, false, true, true, false, false, false, true]:
 VARCHAR, and BINARY share the same wire format:
 
 ```text
-+------------------------------------------------+
-| [Null flag + bitmap (see Null handling)]       |
-+------------------------------------------------+
-| Offset array: (value_count + 1) x uint32       |
-|   offset[0] = 0                                |
-|   offset[i+1] = end of value[i]                |
-+------------------------------------------------+
-| Data: concatenated bytes                       |
-+------------------------------------------------+
++--------------------------------------------------+
+| [Null flag + bitmap (see Null handling)]         |
++--------------------------------------------------+
+| Offset array: (value_count + 1) x uint32 LE      |
+|   offset[0] = 0                                  |
+|   offset[i+1] = end of value[i]                  |
++--------------------------------------------------+
+| Data: concatenated bytes                         |
++--------------------------------------------------+
 ```
 
 - `value_count = row_count - null_count`
-- Offsets are uint32, little-endian
+- Offsets are uint32, little-endian (all multi-byte numeric values in QWP are
+  little-endian — restated here because the diagram is often skimmed).
 - Value `i` spans bytes `[offset[i], offset[i+1])`
 - For VARCHAR, the bytes are valid UTF-8. For BINARY, the bytes are opaque.
 - The uint32 offsets bound individual values to 2^31 - 1 bytes.
 
 ### Symbol
 
-Dictionary-encoded strings for low-cardinality columns. The wire format depends
-on the dictionary mode.
+Dictionary-encoded strings for low-cardinality columns.
 
-#### Per-table dictionary mode
+:::info WebSocket uses global delta dictionaries only
 
-Used by UDP because datagrams cannot rely on a connection-scoped dictionary
-persisting across messages.
+WebSocket clients set `FLAG_DELTA_SYMBOL_DICT` (`0x08`) on every message
+and use the global delta dictionary mode **exclusively**. The per-table
+dictionary mode is UDP-only — see
+[QWP ingress (UDP)](/docs/protocols/qwp-ingress-udp/) for that format.
 
-```text
-+----------------------------------------------+
-| [Null flag + bitmap (see Null handling)]     |
-+----------------------------------------------+
-| dictionary_size: varint                      |
-+----------------------------------------------+
-| Dictionary entries:                          |
-|   For each entry:                            |
-|     entry_length: varint                     |
-|     entry_data: UTF-8 bytes                  |
-+----------------------------------------------+
-| Value indices:                               |
-|   For each non-null row:                     |
-|     dict_index: varint                       |
-+----------------------------------------------+
-```
+:::
 
-Dictionary indices are 0-based. When a null bitmap is present, only non-null
-rows have indices written.
-
-#### Global delta dictionary mode (WebSocket)
-
-When `FLAG_DELTA_SYMBOL_DICT` (0x08) is set, symbol columns use global integer
-IDs instead of per-table dictionaries. The dictionary entries are sent in the
-message-level [delta symbol dictionary](#delta-symbol-dictionary) section.
-Column data consists of varint-encoded global IDs only:
+The dictionary entries themselves are sent in the message-level
+[delta symbol dictionary](#delta-symbol-dictionary) section. Column data for a
+SYMBOL column is then just a sequence of varint-encoded global IDs, one per
+non-null row:
 
 ```text
++--------------------------------------------+
+| [Null flag + bitmap (see Null handling)]   |
 +--------------------------------------------+
 | For each non-null row:                     |
 |   global_id:   varint   Global symbol ID   |
 +--------------------------------------------+
 ```
 
-WebSocket clients set `FLAG_DELTA_SYMBOL_DICT` on every message and use this
-mode exclusively.
+The client owns the global ID assignment. Each new string gets the next
+sequential integer, starting from `0` on a fresh connection. Only the new
+entries since the previous message are transmitted; the server accumulates the
+dictionary for the lifetime of the connection.
 
 ### Timestamp encoding
 
@@ -630,10 +695,17 @@ handling section:
 
 #### Gorilla delta-of-delta algorithm
 
+The first two timestamps are written in full as int64 values. Starting from
+the third timestamp (index `i = 2`), each subsequent value is encoded as a
+delta-of-deltas:
+
 ```python
-delta_i = t[i] - t[i - 1]
-dod_i   = delta_i - delta_prev
+delta_i  = t[i] - t[i - 1]
+dod_i    = delta_i - delta_{i-1}    # delta_{i-1} = t[i-1] - t[i-2]
 ```
+
+The very first encoded DoD applies at `i = 2`, where `delta_{i-1} = t[1] - t[0]`.
+There is no implicit zero-delta anchor before that.
 
 Encoding buckets (bits are written LSB-first):
 
@@ -696,7 +768,16 @@ N-dimensional arrays, row-major order:
 ### Decimal types (DECIMAL64, DECIMAL128, DECIMAL256)
 
 Decimal values are stored as two's complement integers. A 1-byte scale prefix
-is shared by all values in the column.
+is shared by all values in the column. The scale is the number of decimal
+digits to the right of the decimal point — i.e., the real value is reconstructed
+as:
+
+```text
+value = unscaled_int / 10^scale
+```
+
+For example, with `scale = 3` an unscaled int64 of `12345` decodes to `12.345`.
+The scale is base-10, not base-2.
 
 ```text
 +----------------------------------------------+
@@ -722,6 +803,27 @@ is shared by all values in the column.
 Every response starts with a 1-byte status code. OK and error responses include
 an 8-byte sequence number that correlates the response with the original
 request.
+
+### Sequence numbering
+
+The QWP wire encoder does **not** put a sequence number into the request
+header — the message header at offset 0 ends at offset 12 with `payload_length`,
+and that is the entire client-side framing. The server assigns the sequence
+number itself: it counts inbound binary frames on the connection (starting at
+`0`) and echoes the assigned `wireSeq` in the `sequence` field of every OK and
+error frame.
+
+Two consequences for client implementers:
+
+- **Frames must be sent in strict order.** The server assumes "the Nth frame
+  received is wireSeq = N", so any reordering by the client breaks the mapping
+  between requests and responses.
+- **Match responses by send order.** The client tracks an ordered list of
+  outstanding messages; the next OK/error response always corresponds to the
+  oldest unacknowledged message, and the `sequence` field is the server's
+  authoritative confirmation of which one.
+
+On a fresh connection both sides start at `0`. On reconnect both sides reset.
 
 ### OK response
 
@@ -802,6 +904,16 @@ The durable-ack has no sequence field. It carries cumulative per-table
 watermarks that advance as uploads complete. Only tables whose durable
 watermark advanced since the last durable-ack are included.
 
+The durable-ack watermark always trails the regular OK watermark. Empty
+messages (those that produced no WAL commit, for example messages that only
+reference materialized views) are trivially durable; their sequence advances
+the durable watermark as soon as all preceding messages are durable.
+
+Reconnects discard any in-flight durable-ack tracking. The new connection
+re-OKs replayed batches and the server re-emits cumulative durable-ack
+watermarks from scratch, so the client's trim watermark must restart against
+the new connection's wire sequencing.
+
 Servers without replication silently ignore the request header and never emit
 durable-ack frames. There is no durable-failure status; persistent upload
 failures surface only as absence of a durable-ack frame.
@@ -827,6 +939,30 @@ batch size.
 The symbol dictionary limit applies per column in per-table dictionary mode and
 per connection in global delta dictionary mode. Exceeding it causes the server
 to reject the message with `PARSE_ERROR`.
+
+### Practical WebSocket frame cap
+
+The 16 MB max batch is a **QWP protocol ceiling**, not an effective server-side
+cap. The HTTP receive buffer used by the WebSocket plumbing is typically
+smaller, and it is checked **before** the QWP parser ever sees the payload:
+
+| Server config key       | Default | Effect                                                              |
+|-------------------------|---------|---------------------------------------------------------------------|
+| `http.recv.buffer.size` | 2 MiB   | Maximum WebSocket frame the server will accept on `/write/v4`. |
+
+A WebSocket binary frame larger than this is rejected immediately with close
+code `1009 MESSAGE_TOO_BIG` and the connection is dropped — the client will
+observe an abrupt disconnect (`ECANCELED`, EPIPE, or similar depending on the
+WebSocket library) partway through the send.
+
+The effective per-message size limit is therefore
+`min(http.recv.buffer.size, 16 MiB) − WebSocket frame overhead (≤ 14 bytes)`.
+
+**Recommendation for client implementers:** keep individual QWP messages
+comfortably under the server's `http.recv.buffer.size` — for the default
+2 MiB recv buffer, a 1.9 MiB / ~25k-row ceiling per message is a safe target.
+Operators who want larger batches must raise `http.recv.buffer.size` on the
+server (e.g., `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom).
 
 ## Client operation
 
@@ -975,29 +1111,6 @@ CD CC CC CC CC CC F4 3F  # value = 1.3
 66 6F 6F                 # "foo" (row 0)
 62 61 72                 # "bar" (row 2)
 62 61 7A                 # "baz" (row 3)
-```
-
-### Symbol column with per-table dictionary
-
-3 rows with values: "us", "eu", "us":
-
-```text
-# Null flag
-00                       # null_flag: 0x00 (no nulls)
-
-# Dictionary
-02                       # Dictionary size: 2 entries
-
-02                       # Entry 0 length: 2
-75 73                    # "us"
-
-02                       # Entry 1 length: 2
-65 75                    # "eu"
-
-# Value indices
-00                       # Row 0: index 0 ("us")
-01                       # Row 1: index 1 ("eu")
-00                       # Row 2: index 0 ("us")
 ```
 
 ### Gorilla timestamps with delta symbol dictionary
