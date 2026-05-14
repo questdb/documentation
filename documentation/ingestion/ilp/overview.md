@@ -18,6 +18,21 @@ import { Clients } from "../../../src/components/Clients"
 
 QuestDB implements the InfluxDB Line Protocol to ingest data.
 
+:::tip Use QWP for new clients
+
+ILP is now a **compatibility protocol** in QuestDB. It exists for users
+coming from InfluxDB, Telegraf, or Kafka / Flink pipelines that already
+emit ILP. New deployments should prefer the
+[QuestDB Wire Protocol (QWP)](/docs/protocols/qwp-ingress-websocket/) —
+binary on the wire, type-rich (full QuestDB type system, no suffix
+encoding), faster, and with multi-host failover and store-and-forward
+built into the client. See the
+[ingestion overview](/docs/ingestion/overview/) for a side-by-side
+comparison and the list of languages with native QWP clients available
+today.
+
+:::
+
 The InfluxDB Line Protocol is for **data ingestion only**.
 
 For building queries, see the

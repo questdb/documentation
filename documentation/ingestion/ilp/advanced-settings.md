@@ -9,6 +9,18 @@ description:
 This documentation provides aid for those venturing outside of the path laid
 down by their language clients.
 
+:::tip Consider QWP first
+
+This page is for operators tuning the legacy ILP transport. For new
+deployments, prefer the
+[QuestDB Wire Protocol (QWP)](/docs/protocols/qwp-ingress-websocket/) —
+the native binary protocol with multi-host failover, store-and-forward,
+and the full QuestDB type system built in. See the
+[ingestion overview](/docs/ingestion/overview/) for languages with
+native QWP support.
+
+:::
+
 For the introductory InfluxDB Line Protocol materials, including authentication,
 see the [ILP overview](/docs/ingestion/ilp/overview/).
 

@@ -109,6 +109,17 @@ module.exports = {
         },
         {
           type: "category",
+          label: "Message Brokers",
+          collapsed: true,
+          items: [
+            "ingestion/message-brokers/kafka",
+            "ingestion/message-brokers/telegraf",
+            "ingestion/message-brokers/redpanda",
+            "ingestion/message-brokers/flink",
+          ],
+        },
+        {
+          type: "category",
           label: "Compatibility Protocols",
           items: [
             {
@@ -130,22 +141,6 @@ module.exports = {
                   id: "ingestion/ilp/advanced-settings",
                   type: "doc",
                   label: "Advanced Settings",
-                },
-                {
-                  id: "ingestion/java-embedded",
-                  type: "doc",
-                  label: "Java Embedded",
-                },
-                {
-                  type: "category",
-                  label: "Message Brokers",
-                  collapsed: true,
-                  items: [
-                    "ingestion/message-brokers/kafka",
-                    "ingestion/message-brokers/telegraf",
-                    "ingestion/message-brokers/redpanda",
-                    "ingestion/message-brokers/flink",
-                  ],
                 },
               ],
             },
@@ -222,6 +217,11 @@ module.exports = {
               ],
             },
           ],
+        },
+        {
+          id: "ingestion/java-embedded",
+          type: "doc",
+          label: "Java Embedded",
         },
         {
           label: "Wire Protocols",
