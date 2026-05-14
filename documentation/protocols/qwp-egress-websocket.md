@@ -27,6 +27,45 @@ request/response lifecycle, and byte-credit flow control.
 For data ingestion, see
 [QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/).
 
+## Why implement a QWP query client
+
+If your language already has a QuestDB client, use it — the
+[language client guides](/docs/query/overview) list what's available. The
+rest of this section is for implementers writing a new one (e.g., to bring
+QWP query support to JavaScript, Rust, .NET, or runtimes that the existing
+clients don't cover).
+
+Compared with the row-oriented HTTP `/exec` JSON endpoint, QWP egress trades
+a denser binary encoding for higher throughput and lower CPU on both ends:
+
+- **Columnar result batches.** Each batch is a single QWP table block — the
+  same shape QuestDB uses on disk. No per-row type tags, no JSON parsing.
+- **Server-driven schemas.** After the first batch carries the schema in
+  full mode, subsequent batches reference it by integer ID. No repeated
+  column metadata on the wire.
+- **Per-connection symbol dictionary.** Repeated queries on the same
+  connection (BI dashboards refreshing identical SELECTs) reuse prior
+  symbol IDs without retransmitting strings.
+- **Byte-credit flow control.** The client tells the server how many bytes
+  it's ready to receive; the server pauses production when the window is
+  exhausted. Bounded memory for arbitrarily large result sets.
+- **zstd compression (optional).** Negotiated at the upgrade,
+  applied per-batch when it shrinks the payload.
+- **Bind parameters.** Typed binds prevent SQL injection and let the
+  server reuse plans without re-parsing.
+- **Multi-host failover (Enterprise).** Connect strings can list multiple
+  endpoints with role/zone preferences; clients reconnect and replay
+  on transport failure.
+
+A minimum-viable client that supports SELECTs with the common column types
+(BOOLEAN, LONG, DOUBLE, TIMESTAMP, VARCHAR, SYMBOL) plus simple binds is
+on the order of ~600 lines in a typed language, plus a WebSocket library
+and (optionally) a zstd dependency.
+
+The authoritative reference implementation is
+[`java-questdb-client`](https://github.com/questdb/java-questdb-client). It's
+worth keeping open in a tab as you read this page.
+
 ## Overview
 
 Key properties:
@@ -71,7 +110,7 @@ Version and compression are negotiated at the HTTP upgrade:
 | `X-QWP-Max-Version`     | No       | Maximum QWP version the client supports. Defaults to 1 if absent.           |
 | `X-QWP-Client-Id`       | No       | Free-form client identifier (e.g., `java-egress/1.0.0`).                   |
 | `X-QWP-Accept-Encoding` | No       | Comma-separated list of acceptable result batch body encodings (see below). |
-| `X-QWP-Max-Batch-Rows`  | No       | Client-preferred per-batch row cap. `0` or absent = server default.         |
+| `X-QWP-Max-Batch-Rows`  | No       | Client-preferred per-batch row cap; the server clamps to its own hard limit, so this only ever asks for *smaller* batches (lower latency to first row, more per-batch overhead). `0` or absent = server default. |
 
 **Server response headers:**
 
@@ -112,6 +151,56 @@ Absent `X-QWP-Accept-Encoding`, the server defaults to `raw`.
 Version 1 is the initial egress release. Version 2 adds an unsolicited
 `SERVER_INFO` frame (see [SERVER_INFO](#server_info-0x18)) delivered as the first
 WebSocket frame after the upgrade. A v1 client never sees it.
+
+## Client lifecycle
+
+The end-to-end shape of a QWP query client session, before the encoding
+details:
+
+1. **Open WebSocket to `/read/v1`.** Standard `Upgrade: websocket` headers,
+   plus:
+   - `X-QWP-Max-Version: 2` — request v2 to receive `SERVER_INFO`; the
+     server downgrades to v1 if it doesn't support v2.
+   - `X-QWP-Client-Id: <name>/<version>` — recommended.
+   - `X-QWP-Accept-Encoding: zstd, raw` — optional; opt into compression.
+   - `X-QWP-Max-Batch-Rows: <n>` — optional; request smaller batches than
+     the server default (for lower latency to first row).
+   - Authentication header (`Authorization: Basic …` or `Authorization: Bearer …`).
+2. **Verify the upgrade.** On `101 Switching Protocols`:
+   - `X-QWP-Version` is the negotiated version. Use it as the `version`
+     byte in every outgoing message header.
+   - `X-QWP-Content-Encoding` is the server's chosen compression (absent
+     means `raw`).
+3. **(v2 only) Read `SERVER_INFO`.** The first WebSocket binary frame
+   carries the server's role, cluster/node identity, and zone (if
+   advertised). Apply your `target=` / `zone=` filter before sending a
+   `QUERY_REQUEST`; if the role doesn't match, close and try the next
+   endpoint.
+4. **Send `QUERY_REQUEST`.** Assign a fresh `request_id` (client-owned,
+   unique within the connection), include SQL text, bind parameters, and
+   `initial_credit` (`0` for unbounded streaming).
+5. **Drain frames demuxed by `request_id`.** The server streams
+   `RESULT_BATCH(seq=0, schema mode 0x00)`, then
+   `RESULT_BATCH(seq=1+, schema mode 0x01)`, until a terminator:
+   - `RESULT_END` — cursor exhausted, success.
+   - `EXEC_DONE` — non-SELECT statement, no rows; carries `rows_affected`.
+   - `QUERY_ERROR` — failure at any point in the lifecycle; terminal.
+   The server may interpose a `CACHE_RESET` between a terminator and the
+   next query's first frame; clients must process it before assuming
+   schema-ID or symbol-dict continuity.
+6. **Flow control.** If you set a non-zero `initial_credit`, send
+   `CREDIT(request_id, additional_bytes)` frames to keep the byte window
+   open. The server pauses production when the budget reaches zero (with
+   a one-batch row floor to guarantee progress).
+7. **Cancel (optional).** Send `CANCEL(request_id)` to abort. Continue
+   draining in-flight `RESULT_BATCH` frames until the terminator
+   (`QUERY_ERROR(CANCELLED)` or, if it raced, `RESULT_END`).
+8. **Close.** Send a WebSocket `Close` frame after the last expected
+   terminator has been drained.
+
+Reconnects reset connection-scoped state on both sides: schema registry,
+symbol dictionary, and `batch_seq` (which restarts at `0` for any replayed
+query on the new connection).
 
 ## Message structure
 
@@ -505,12 +594,22 @@ results should treat these sentinels as indistinguishable from explicit NULL:
 |----------------------------------------------|---------------------|
 | INT, IPv4                                    | `Integer.MIN_VALUE` (INT); `0` (IPv4) |
 | LONG, DATE, TIMESTAMP, TIMESTAMP_NANOS, DECIMAL64 | `Long.MIN_VALUE`    |
-| FLOAT                                        | `NaN`               |
-| DOUBLE                                       | `NaN`               |
+| FLOAT                                        | any `NaN` (incl. `0.0f / 0.0f`) |
+| DOUBLE                                       | any `NaN` (incl. `0.0 / 0.0`) |
 | GEOHASH (all widths)                         | All-ones (`-1`)     |
 | UUID                                         | Both halves `Long.MIN_VALUE` |
 | LONG256                                      | All four longs `Long.MIN_VALUE` |
 | BOOLEAN, BYTE, SHORT, CHAR                   | No null sentinel; these types cannot carry NULL in QuestDB |
+
+A consequence of reusing in-engine sentinels on the wire is that some bit
+patterns cannot be expressed as non-null:
+
+- **IPv4 `0.0.0.0`** is the IPv4 null sentinel; a non-null `0.0.0.0` cannot be
+  round-tripped and decodes as NULL.
+- **GEOHASH "all ones"** is the geohash null sentinel; a geohash whose bit
+  pattern is all-ones cannot be round-tripped and decodes as NULL.
+- **FLOAT / DOUBLE `NaN`** of any bit pattern (including non-canonical NaNs
+  like `0.0 / 0.0`) decodes as NULL. There is no separate "QWP NaN".
 
 ### Array element nulls
 
@@ -713,6 +812,32 @@ OK (0x00) is not used in egress; success terminates with `RESULT_END` or
 | Schema registry soft cap         | 4,096         | Per connection. Exceeding triggers CACHE_RESET.    |
 
 Soft caps are implementation-defined and may be tuned by the server operator.
+
+### Practical WebSocket frame cap
+
+The 16 MiB `RESULT_BATCH` limit and 1 MiB SQL limit are **QWP protocol
+ceilings**, not effective server-side caps. The HTTP receive buffer for the
+`/read/v1` endpoint applies to **client → server** frames (`QUERY_REQUEST`,
+`CANCEL`, `CREDIT`) and is checked before the QWP parser sees the payload:
+
+| Server config key       | Default | Effect                                                                                     |
+|-------------------------|---------|--------------------------------------------------------------------------------------------|
+| `http.recv.buffer.size` | 2 MiB   | Maximum WebSocket frame the server will accept on `/read/v1`.                              |
+
+A client-side frame larger than this is rejected with WebSocket close code
+`1009 MESSAGE_TOO_BIG` and the connection is dropped — the client observes an
+abrupt disconnect (`ECANCELED`, `EPIPE`, or similar) before any
+`QUERY_ERROR` arrives.
+
+**For client implementers:** a `QUERY_REQUEST` carries SQL text plus all bind
+parameter values. Keep the total under `http.recv.buffer.size` minus
+WebSocket frame overhead (≤ 14 bytes). With the default 2 MiB recv buffer,
+~1.9 MiB of SQL + binds is a safe ceiling. Long SQL or large array binds are
+the realistic triggers.
+
+`RESULT_BATCH` frames (server → client) are bounded by the server's own
+producer-side configuration; sizing the client's WebSocket library to handle
+up to 16 MiB receive frames covers any well-configured server.
 
 ## Examples
 
