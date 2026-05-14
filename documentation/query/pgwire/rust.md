@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/rust
 title: Rust PGWire Guide
 description:
   Rust clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -28,9 +29,9 @@ connection pooling.
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [Rust client](/docs/ingestion/clients/rust/) for data ingestion using ILP.
+official [Rust client](/docs/connect/clients/rust/) for data ingestion using ILP.
 
 :::
 

@@ -18,7 +18,7 @@ first.
 `zone` is accepted everywhere but only takes effect on egress; `target` is an
 egress-only key and is rejected as an unknown key on an ingress connect string.
 They are documented in full on the
-[connect-string reference](/docs/client-configuration/connect-string#failover-keys);
+[connect-string reference](/docs/connect/clients/connect-string#failover-keys);
 the table below summarises the failover-relevant subset.
 
 | Key | Type | Default | Notes |
@@ -42,7 +42,7 @@ The ingress reconnect loop is driven by store-and-forward connect-string
 keys. See
 [Store-and-forward configuration](/docs/high-availability/store-and-forward/configuration/#reconnect-keys)
 and the
-[connect-string reference](/docs/client-configuration/connect-string#sf-keys)
+[connect-string reference](/docs/connect/clients/connect-string#sf-keys)
 for the full list. The failover-relevant keys are:
 
 | Key | Type | Default | Notes |
@@ -68,7 +68,7 @@ network), and retrying for five minutes only hides it.
 
 The egress failover loop wraps each `execute()` call on the read-side query
 client. The full key list lives on the
-[connect-string reference](/docs/client-configuration/connect-string#egress-flow);
+[connect-string reference](/docs/connect/clients/connect-string#egress-flow);
 the user-visible knobs are:
 
 | Key | Type | Default | Notes |
@@ -151,8 +151,8 @@ try (QwpQueryClient client = QwpQueryClient.fromConfig(
 
 | Key | Concept | Reference |
 |---|---|---|
-| `addr`, `zone`, `target`, `auth_timeout_ms` | Host selection, role filter | [connect-string #failover-keys](/docs/client-configuration/connect-string#failover-keys) |
-| `reconnect_*`, `initial_connect_retry` | Ingress retry budget | [connect-string #reconnect-keys](/docs/client-configuration/connect-string#reconnect-keys) |
-| `failover`, `failover_*` | Egress retry budget | [connect-string #egress-flow](/docs/client-configuration/connect-string#egress-flow) |
-| `username` / `password` / `token` | Authentication | [connect-string #auth](/docs/client-configuration/connect-string#auth) |
-| `tls_*` | TLS configuration | [connect-string #tls](/docs/client-configuration/connect-string#tls) |
+| `addr`, `zone`, `target`, `auth_timeout_ms` | Host selection, role filter | [connect-string #failover-keys](/docs/connect/clients/connect-string#failover-keys) |
+| `reconnect_*`, `initial_connect_retry` | Ingress retry budget | [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys) |
+| `failover`, `failover_*` | Egress retry budget | [connect-string #egress-flow](/docs/connect/clients/connect-string#egress-flow) |
+| `username` / `password` / `token` | Authentication | [connect-string #auth](/docs/connect/clients/connect-string#auth) |
+| `tls_*` | TLS configuration | [connect-string #tls](/docs/connect/clients/connect-string#tls) |

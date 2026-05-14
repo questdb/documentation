@@ -46,7 +46,7 @@ SELECT CAST(ts_column AS TIMESTAMP_NS) FROM my_table;
 
 To convert language-specific datetime objects (Python `datetime`, Java
 `Instant`, etc.) into QuestDB timestamps, see the
-[Date to Timestamp conversion](/docs/ingestion/clients/date-to-timestamp-conversion)
+[Date to Timestamp conversion](/docs/connect/clients/date-to-timestamp-conversion)
 reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 ---

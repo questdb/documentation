@@ -1,4 +1,5 @@
 ---
+slug: /connect/wire-protocols/qwp-ingress-websocket
 title: QWP ingress (WebSocket)
 description:
   Wire-protocol specification for QuestDB's WebSocket-based columnar binary
@@ -11,8 +12,8 @@ import QwpMessageHeader from "../partials/_qwp.message-header.partial.mdx"
 
 This is a **wire-protocol specification** for client implementers building a
 new QuestDB ingest client from scratch. End users should see the
-[language client guides](/docs/ingestion/overview) and the
-[connect string reference](/docs/client-configuration/connect-string).
+[language client guides](/docs/connect/overview) and the
+[connect string reference](/docs/connect/clients/connect-string).
 
 :::
 
@@ -23,12 +24,12 @@ messages, schema references, and Gorilla-compressed timestamps reduce wire
 overhead for sustained streaming workloads.
 
 This page covers WebSocket ingress only. For streaming query results back to
-clients, see [QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/).
+clients, see [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/).
 
 ## Why implement a QWP client
 
 If your language already has a QuestDB client, use it — the
-[language client guides](/docs/ingestion/overview) list what's available. The
+[language client guides](/docs/connect/overview) list what's available. The
 rest of this section is for implementers writing a new one (e.g., to bring
 QWP to JavaScript, Rust, Ruby, .NET, or an embedded runtime that the existing
 clients don't cover).
@@ -138,9 +139,9 @@ handshake, before any QWP binary frames are exchanged.
 Supported methods:
 
 - **HTTP basic auth** (OSS and Enterprise): see
-  [Authentication in QuestDB Open Source](/docs/query/rest-api/#authentication-in-questdb-open-source).
+  [Authentication in QuestDB Open Source](/docs/connect/compatibility/rest-api/#authentication-in-questdb-open-source).
 - **Token-based auth** (Enterprise only): see
-  [Authentication (RBAC)](/docs/query/rest-api/#authentication-rbac).
+  [Authentication (RBAC)](/docs/connect/compatibility/rest-api/#authentication-rbac).
 - **OIDC** (Enterprise only): see [OpenID Connect](/docs/security/oidc/).
 
 A failed authentication results in a `401` or `403` HTTP response before the
@@ -183,7 +184,7 @@ The end-to-end shape of a QWP client session, before the encoding details:
 Every reconnect resets connection-scoped state on both sides: schema IDs,
 symbol dictionary, and sequence counter. Clients that want sender-restart
 durability layer a store-and-forward buffer on top — see the
-[connect string reference](/docs/client-configuration/connect-string#sf-keys).
+[connect string reference](/docs/connect/clients/connect-string#sf-keys).
 
 ## Encoding primitives
 
@@ -965,7 +966,7 @@ server (e.g., `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom).
 This section describes the high-level batching and I/O behavior a client
 implements. The full client-side substrate (on-disk store-and-forward, frame
 sequence numbers, ACK-driven trim, reconnect/replay semantics) is specified in
-the [connect string reference](/docs/client-configuration/connect-string).
+the [connect string reference](/docs/connect/clients/connect-string).
 
 ### Double-buffered async I/O
 
@@ -1001,7 +1002,7 @@ differ only in where unacknowledged data lives:
   buffer caps how much data can accumulate during the outage.
 
 Connect-string keys that control ingress failover are documented in the
-[reconnect and failover](/docs/client-configuration/connect-string#reconnect-keys)
+[reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)
 section of the connect string reference:
 
 | Key                              | Default   | Description                               |

@@ -1,4 +1,5 @@
 ---
+slug: /connect/agents
 title: Agents
 description:
   How AI agents operate QuestDB — which protocols they use, what tooling
@@ -29,9 +30,9 @@ it ships with.
 
 | Interface                                                 | Best for                                                                              | Why                                                                                                                                                                          |
 |-----------------------------------------------------------|---------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [**QWP egress**](/docs/protocols/qwp-egress-websocket/)   | The primary path for executing SQL — DDL, exploratory SELECT, and large result streaming. | Binary, columnar, byte-credit flow control, multi-host failover. Use a native [client library](/docs/ingestion/overview/) when one exists for the agent's runtime; otherwise an agent can implement one directly against the protocol spec. |
-| [**QWP ingress**](/docs/protocols/qwp-ingress-websocket/) | The primary path for ingesting data — agentic ETL, sensor feeds, bulk loads.          | Native binary protocol with multi-host failover and store-and-forward built into the client.                                                                                  |
-| [**REST API**](/docs/query/rest-api/)                     | Schema discovery and small ad-hoc queries (a few hundred rows or fewer).             | HTTP + JSON. Every agent framework supports it; no SDK to install. `SHOW TABLES` / `SHOW COLUMNS` and other lookups map naturally to function-calling tools.                  |
+| [**QWP egress**](/docs/connect/wire-protocols/qwp-egress-websocket/)   | The primary path for executing SQL — DDL, exploratory SELECT, and large result streaming. | Binary, columnar, byte-credit flow control, multi-host failover. Use a native [client library](/docs/connect/overview/) when one exists for the agent's runtime; otherwise an agent can implement one directly against the protocol spec. |
+| [**QWP ingress**](/docs/connect/wire-protocols/qwp-ingress-websocket/) | The primary path for ingesting data — agentic ETL, sensor feeds, bulk loads.          | Native binary protocol with multi-host failover and store-and-forward built into the client.                                                                                  |
+| [**REST API**](/docs/connect/compatibility/rest-api/)                     | Schema discovery and small ad-hoc queries (a few hundred rows or fewer).             | HTTP + JSON. Every agent framework supports it; no SDK to install. `SHOW TABLES` / `SHOW COLUMNS` and other lookups map naturally to function-calling tools.                  |
 
 **QWP egress is the recommended path for any sustained SQL work** —
 exploratory or production. Reach for REST when the agent is doing schema
@@ -106,7 +107,7 @@ Pick the transport by data volume:
   consumable by the agent without an SDK.
 - **Large result sets** — exporting data into another system, materializing
   analytics output — should go through a
-  [QWP egress client](/docs/protocols/qwp-egress-websocket/). Byte-credit
+  [QWP egress client](/docs/connect/wire-protocols/qwp-egress-websocket/). Byte-credit
   flow control prevents the agent from being overwhelmed mid-export, and
   the binary columnar format keeps wire size low.
 
@@ -132,12 +133,12 @@ recommended path for all writes**:
 
 - **Bulk upload and sustained ingestion** (agentic ETL, a streaming sensor
   feed fronted by an LLM, batch loads from another system): use a
-  [QWP client library](/docs/ingestion/overview/). The agent generates
+  [QWP client library](/docs/connect/overview/). The agent generates
   setup code; the runtime gets throughput, multi-host failover, and
   store-and-forward for free.
 - **No native client for the agent's runtime?** The agent can implement an
   uploader directly against the
-  [QWP ingress wire spec](/docs/protocols/qwp-ingress-websocket/) — the
+  [QWP ingress wire spec](/docs/connect/wire-protocols/qwp-ingress-websocket/) — the
   protocol is fully documented for clean-room implementations and a
   minimum-viable client is on the order of a few hundred lines.
 - **Quick one-off inserts** during exploration: `INSERT INTO ...` via REST
@@ -173,7 +174,7 @@ can't reach.
 **Correct path:** parse the file in the agent's runtime, then push the
 rows to QuestDB through a QWP ingress client.
 
-1. Check the [Ingestion overview](/docs/ingestion/overview/) for the
+1. Check the [Ingestion overview](/docs/connect/overview/) for the
    current list of QWP client libraries supported in the agent's runtime
    language.
 2. **Native client available** — the agent reads the file locally
@@ -181,21 +182,61 @@ rows to QuestDB through a QWP ingress client.
    CSV reader for CSV) and streams rows to QuestDB through the client.
 3. **No native client for that runtime** — the agent can implement an
    uploader directly against the
-   [QWP ingress wire spec](/docs/protocols/qwp-ingress-websocket/). The
+   [QWP ingress wire spec](/docs/connect/wire-protocols/qwp-ingress-websocket/). The
    protocol is fully documented for clean-room implementations and a
    minimum-viable client (BOOLEAN, LONG, DOUBLE, TIMESTAMP, VARCHAR) is
-   on the order of a few hundred lines.
+   on the order of a few hundred lines. See the next recipe for the two
+   patterns that matter for throughput.
 
 This works regardless of where QuestDB runs — Docker, cloud,
 `demo.questdb.io`, remote VM — and gives the agent throughput,
 multi-host failover, and store-and-forward for free.
 
+### Writing a fast QWP ingress uploader
+
+If the agent is implementing a QWP ingress client against the
+[wire spec](/docs/connect/wire-protocols/qwp-ingress-websocket/) — because no native
+client exists for its runtime, or as a bespoke one-off uploader — two
+patterns make the difference between a slow client and a fast one. An LLM
+left to its own devices tends to default to the slow shape because it
+"looks correct" and the bottleneck only shows up under load.
+
+**Pipeline frames; don't wait for each ack.** QWP allows many frames in
+flight per connection (up to the
+[max in-flight batches](/docs/connect/wire-protocols/qwp-ingress-websocket/#protocol-limits)
+limit, 128 by default). Acks arrive asynchronously on the same connection,
+in send order, and the server-assigned `sequence` field correlates each
+ack with its frame. A lock-step `send → await OK → send next` loop wastes
+a round-trip time per batch and caps throughput at a small fraction of
+what the link supports. Decouple the writer (which streams frames into
+the WebSocket) from the reader (which drains OK frames and advances the
+ack watermark), and let the writer keep pushing while the reader catches
+up. The writer only needs to check **transport-level** backpressure — the
+socket's send buffer fill, or a bounded queue between encoder and sender —
+not application-level acks.
+
+**Encode column-major, not row-major.** QWP's wire format lays out all
+values for column 0 first, then all values for column 1, and so on. Source
+data from columnar formats (Parquet, Arrow, columnar DB exports) is
+already in this shape; preserve it end-to-end. An encoder that
+materialises an intermediate row-major buffer — pseudocode
+`for row in rows: for col in cols: emit(row[col])` — pays for the
+allocation, breaks CPU cache locality, and prevents the bulk memcpy / SIMD
+path that fixed-width column buffers would otherwise allow. The right
+shape is `for col in cols: bulkCopy(columnBuffers[col])` — one tight loop
+per column, often a single bulk copy for fixed-width types.
+
+These two changes compound: a pipelined, column-major client is often
+several-fold faster than a lock-step, row-major one — sometimes the
+difference between "the client is the bottleneck" and "the link
+saturates".
+
 ## Next steps
 
 - **Quickstart**: [AI Coding Agents](/docs/getting-started/ai-coding-agents/)
-- **Query interfaces**: [QWP egress (WebSocket)](/docs/protocols/qwp-egress-websocket/),
-  [REST API](/docs/query/rest-api/)
-- **Ingest interfaces**: [Ingestion overview](/docs/ingestion/overview/),
-  [QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/)
+- **Query interfaces**: [QWP egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/),
+  [REST API](/docs/connect/compatibility/rest-api/)
+- **Ingest interfaces**: [Ingestion overview](/docs/connect/overview/),
+  [QWP ingress (WebSocket)](/docs/connect/wire-protocols/qwp-ingress-websocket/)
 - **Operating safely**: [RBAC](/docs/security/rbac/) (Enterprise),
   [TLS](/docs/security/tls/)

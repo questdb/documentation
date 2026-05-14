@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/python
 title: Python PGWire Guide
 description:
   Python clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -30,9 +31,9 @@ for the best performance when querying data.
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [Python client](/docs/ingestion/clients/python/) for data ingestion using ILP.
+official [Python client](/docs/connect/clients/python/) for data ingestion using ILP.
 
 :::
 
@@ -102,7 +103,7 @@ asyncio.run(connect_to_questdb())
 To set the timezone to UTC, you can set the `TZ` environment variable before running your script.
 This is important for time-series data to ensure consistent timestamps.
 
-See the [Timestamp Handling](/docs/query/pgwire/overview#timestamp-handling) chapter for additional context on how
+See the [Timestamp Handling](/docs/connect/compatibility/pgwire/overview#timestamp-handling) chapter for additional context on how
 on how QuestDB handles timezones.
 :::
 
@@ -300,7 +301,7 @@ asyncio.run(parameterized_query())
 ```
 
 ### Batch Inserts with `executemany()`
-While we recommend using the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/) for ingestion, you can also use
+While we recommend using the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) for ingestion, you can also use
 the `executemany()` method to insert multiple rows in a single query. It is highly efficient for executing the same
 parameterized statements multiple times with different sets of data. This method is significantly faster than executing
 individual statements in a loop because it reduces network round-trips and allows for potential batching optimizations
@@ -715,7 +716,7 @@ When you need to insert multiple rows containing array data, such as a series of
 offers a more performant way to do so compared to inserting row by row with execute().
 
 :::tip
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB.
 
 If you cannot use ILP for some reason, you should prefer [asyncpg](#inserting-arrays) over psycopg3 for performance
@@ -1197,4 +1198,4 @@ QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum 
 
 ## Additional Resources
 - [Polars Integration with QuestDB](/docs/integrations/data-processing/polars)
-- [QuestDB Client for fast ingestion](/docs/ingestion/clients/python/)
+- [QuestDB Client for fast ingestion](/docs/connect/clients/python/)

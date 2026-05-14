@@ -440,7 +440,7 @@ Returns a table with the following columns:
   attached (`name` of the partition will contain the `.attachable` extension)
 - `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
   has been produced alongside the native files. Set by either
-  [manual Parquet conversion](/docs/query/export-parquet/#in-place-conversion)
+  [manual Parquet conversion](/docs/connect/compatibility/export-parquet/#in-place-conversion)
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
   [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
   (Enterprise). The partition is still served from native storage until it is

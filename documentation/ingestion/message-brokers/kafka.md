@@ -1,4 +1,5 @@
 ---
+slug: /connect/message-brokers/kafka
 title: Ingestion from Kafka Overview
 sidebar_label: Kafka
 description: Apache Kafka and QuestDB Kafka Connector overview and guide. Thorough explanations and examples.
@@ -29,7 +30,7 @@ automatically, and requires minimal configuration.
 The [QuestDB Kafka connector](https://github.com/questdb/kafka-questdb-connector)
 is built on the [Kafka Connect framework](https://docs.confluent.io/platform/current/connect/index.html)
 and uses InfluxDB Line Protocol for high-performance data transfer. It works
-with Kafka-compatible systems like [Redpanda](/docs/ingestion/message-brokers/redpanda/).
+with Kafka-compatible systems like [Redpanda](/docs/connect/message-brokers/redpanda/).
 
 ### Quick start
 
@@ -204,7 +205,7 @@ client.conf.string=https::addr=questdb.example.com:9000;retry_timeout=60000;
 client.conf.string=http::addr=localhost:9000;token=${QUESTDB_TOKEN};
 ```
 
-See the [Java Client configuration guide](/docs/ingestion/clients/java) for all
+See the [Java Client configuration guide](/docs/connect/clients/java) for all
 available client options.
 
 :::danger
@@ -602,7 +603,7 @@ Additional examples are available on GitHub:
 [Apache Flink](https://flink.apache.org/) provide rich APIs for data
 transformation, enrichment, and filtering with built-in fault tolerance.
 
-QuestDB offers a [Flink connector](/docs/ingestion/message-brokers/flink/) for
+QuestDB offers a [Flink connector](/docs/connect/message-brokers/flink/) for
 users who need complex transformations while ingesting from Kafka.
 
 **Use stream processing when you need:**

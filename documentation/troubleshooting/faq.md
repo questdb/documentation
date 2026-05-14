@@ -181,7 +181,7 @@ you cannot navigate backwards or access result positions as you might with
 scrollable cursors in PostgreSQL.
 
 For more information and for tips to work around, see the
-[PostgreSQL compatability section](/docs/query/pgwire/overview/#forward-only-cursors)
+[PostgreSQL compatability section](/docs/connect/compatibility/pgwire/overview/#forward-only-cursors)
 in our Query & SQL overview.
 
 ## My table has corrupted WAL data due to a previous full disk or kernel limits error. What do I do?

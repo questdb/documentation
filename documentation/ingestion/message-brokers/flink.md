@@ -1,4 +1,5 @@
 ---
+slug: /connect/message-brokers/flink
 title: QuestDB Flink connector
 sidebar_label: Flink
 description:

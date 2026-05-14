@@ -47,7 +47,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [UNNEST](/docs/query/sql/unnest/) - SQL reference for unnesting arrays into rows
 - [LATERAL JOIN](/docs/query/sql/lateral-join/) - SQL reference for lateral subqueries
 - [Sparkline and bar visualization functions](/docs/query/functions/visualization/) - Text-based chart functions for terminal and console output
-- [StructArrayExplode transform](/docs/ingestion/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
+- [StructArrayExplode transform](/docs/connect/message-brokers/kafka/) - Kafka SMT for exploding struct arrays
 
 ### Reference
 
@@ -61,13 +61,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [SQL reference pages](/docs/query/sql/select/) - Replaced railroad diagrams with code-based syntax blocks across 65 SQL pages, with updated examples
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Updated timezone bucket alignment behavior
-- [Parquet export](/docs/query/export-parquet/) - Added partitioning options for exports
+- [Parquet export](/docs/connect/compatibility/export-parquet/) - Added partitioning options for exports
 - [WINDOW JOIN](/docs/query/sql/window-join/) - Documented dynamic window boundaries
 - [HORIZON JOIN](/docs/query/sql/horizon-join/) - Documented multi-RHS table support
 - [JOIN](/docs/query/sql/join/) - Improved join documentation and reorganized page
 - [Web Console](/docs/getting-started/web-console/overview/) - Added table details, updated screenshots
 - [TTL](/docs/concepts/ttl/) - Fixed removal syntax and general improvements
-- [REST API `/exp` endpoint](/docs/query/rest-api/) - Documented timeout parameter, removed outdated warning
+- [REST API `/exp` endpoint](/docs/connect/compatibility/rest-api/) - Documented timeout parameter, removed outdated warning
 
 ## March 2026
 
@@ -93,7 +93,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [Cookbook](/docs/cookbook/) - Refreshed recipes with lookback patterns, named windows, and updated schema references
 - [Per-column Parquet encoding and compression](/docs/query/sql/alter-table-alter-column-set-parquet/) - Comprehensive documentation for column-level settings
 - [Database replication](/docs/configuration/database-replication/) - GCP NFS transport and tuning updates
-- [Ingestion benchmarks](/docs/ingestion/overview/) - Updated benchmark image to Q1 2026
+- [Ingestion benchmarks](/docs/connect/overview/) - Updated benchmark image to Q1 2026
 
 ## February 2026
 
@@ -120,7 +120,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Named windows](/docs/query/functions/window-functions/overview/) - Support for reusable `WINDOW` clause definitions
-- [Parquet export](/docs/query/export-parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
+- [Parquet export](/docs/connect/compatibility/export-parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
 - [Backup](/docs/operations/backup/) - Documented `backup.schedule.cron` format, improved scheduler visibility
 - [Date/time functions](/docs/query/functions/date-time/) - Page updates and corrections
 - [Window functions](/docs/query/functions/window-functions/overview/) - Added limitation documentation
@@ -202,7 +202,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
+- [Parquet export](/docs/connect/compatibility/export-parquet/) - Complete documentation for exporting data to Parquet format
 - [Shared pool configuration](/docs/configuration/shared-workers/) - Updated with network, query, and write shared pool options
 - [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
 
@@ -214,7 +214,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
-- [PGWire for C/C++](/docs/query/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
+- [PGWire for C/C++](/docs/connect/compatibility/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
 - [Table and column naming rules](/docs/query/sql/create-table/#table-name) - Guidelines for valid identifiers
 
 ### Reference
@@ -232,7 +232,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Partitioning](/docs/concepts/partitions/) - Improved formatting and explanations
-- [Go client examples](/docs/ingestion/clients/go/) - Updated to v4 API
+- [Go client examples](/docs/connect/clients/go/) - Updated to v4 API
 
 ## August 2025
 
@@ -266,7 +266,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [ILP clients](/docs/ingestion/overview/) - Array support added to Python, C++, Rust, Java, and .NET clients
+- [ILP clients](/docs/connect/overview/) - Array support added to Python, C++, Rust, Java, and .NET clients
 - [WAL metrics](/docs/operations/monitoring-alerting/) - Added metrics for detecting WAL apply lag
 
 ## Earlier updates

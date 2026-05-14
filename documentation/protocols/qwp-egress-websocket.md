@@ -1,4 +1,5 @@
 ---
+slug: /connect/wire-protocols/qwp-egress-websocket
 title: QWP egress (WebSocket)
 description:
   Wire-protocol specification for QuestDB's WebSocket-based streaming
@@ -12,20 +13,20 @@ import QwpMessageHeader from "../partials/_qwp.message-header.partial.mdx"
 This is a **wire-protocol specification** for client implementers building a
 new QuestDB query client from scratch. End users should see the
 [language client guides](/docs/query/overview) and the
-[connect string reference](/docs/client-configuration/connect-string).
+[connect string reference](/docs/connect/clients/connect-string).
 
 :::
 
 QWP egress streams SQL query results to clients over
 [WebSocket](https://datatracker.ietf.org/doc/html/rfc6455), reusing the same
 columnar binary encoding as
-[QWP ingress](/docs/protocols/qwp-ingress-websocket/). The column types, null
+[QWP ingress](/docs/connect/wire-protocols/qwp-ingress-websocket/). The column types, null
 handling, and per-column data encodings are identical. Egress adds a message
 kind byte at the start of each payload, eight new message kinds for the
 request/response lifecycle, and byte-credit flow control.
 
 For data ingestion, see
-[QWP ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket/).
+[QWP ingress (WebSocket)](/docs/connect/wire-protocols/qwp-ingress-websocket/).
 
 ## Why implement a QWP query client
 
@@ -126,7 +127,7 @@ header version byte must equal the negotiated version.
 
 Authentication is handled at the HTTP level during the WebSocket upgrade,
 identical to ingress. See the
-[ingress authentication section](/docs/protocols/qwp-ingress-websocket/#authentication)
+[ingress authentication section](/docs/connect/wire-protocols/qwp-ingress-websocket/#authentication)
 for supported methods.
 
 ### Batch body compression
@@ -211,7 +212,7 @@ Egress framing is **asymmetric**:
 
 - **Server → client** frames carry the full 12-byte QWP header followed
   by the payload. The header is byte-identical to the
-  [ingress header](/docs/protocols/qwp-ingress-websocket/#message-structure):
+  [ingress header](/docs/connect/wire-protocols/qwp-ingress-websocket/#message-structure):
 
   <QwpMessageHeader />
 
@@ -318,7 +319,7 @@ previous use.
 ### Bind parameters
 
 A bind parameter is encoded exactly as a one-row column under the
-[ingress column data encoding](/docs/protocols/qwp-ingress-websocket/#column-data-encoding).
+[ingress column data encoding](/docs/connect/wire-protocols/qwp-ingress-websocket/#column-data-encoding).
 Each block begins with a `type_code` (uint8), followed by the standard
 `null_flag` byte and either zero or one value.
 
@@ -741,10 +742,10 @@ the query. `batch_seq` restarts at 0 on the new connection.
 The connect-string keys that control egress failover
 (`failover_max_attempts`, `failover_backoff_initial_ms`,
 `failover_backoff_max_ms`, `failover_max_duration_ms`) are documented in the
-[reconnect and failover](/docs/client-configuration/connect-string#reconnect-keys)
+[reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)
 section of the connect string reference. The shared failover primitives
 (host-health model, backoff, role filter, error classification) are covered in
-[multi-host failover](/docs/client-configuration/connect-string#failover-keys).
+[multi-host failover](/docs/connect/clients/connect-string#failover-keys).
 
 Key behaviors:
 

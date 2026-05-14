@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/export-parquet
 title: Parquet Export
 sidebar_label: Parquet Export
 description:
@@ -35,11 +36,11 @@ The `/exp` REST API endpoint executes a query and streams the result as a Parque
 
 :::tip
 
-See also the [/exp documentation](/docs/query/rest-api/#exp---export-data).
+See also the [/exp documentation](/docs/connect/compatibility/rest-api/#exp---export-data).
 
 :::
 
-You can use the same parameters as when doing a [CSV export](/docs/query/rest-api/#exp---export-data), but passing `parquet` as the `fmt` parameter value.
+You can use the same parameters as when doing a [CSV export](/docs/connect/compatibility/rest-api/#exp---export-data), but passing `parquet` as the `fmt` parameter value.
 
 ```bash
 curl -G \
@@ -71,7 +72,7 @@ See also the [COPY-TO documentation](/docs/query/sql/copy).
 :::
 
 You can use the `COPY` command from the web console, from any pgwire-compliant client,
-or using the [`exec` endpoint](/docs/query/rest-api/#exec---execute-queries) of the REST API.
+or using the [`exec` endpoint](/docs/connect/compatibility/rest-api/#exec---execute-queries) of the REST API.
 
 You can export a query:
 
@@ -301,7 +302,7 @@ Bloom filters can be enabled per-column via the `BLOOM_FILTER` keyword in
 or per-export via `bloom_filter_columns` in
 [`CONVERT PARTITION`](#bloom-filters-for-in-place-conversion),
 [`COPY TO`](/docs/query/sql/copy/), and the
-[REST `/exp` endpoint](/docs/query/rest-api/#parquet-export-parameters).
+[REST `/exp` endpoint](/docs/connect/compatibility/rest-api/#parquet-export-parameters).
 
 The false positive probability (FPP) determines the trade-off between filter
 size and accuracy. It is configured globally:

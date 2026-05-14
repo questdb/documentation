@@ -13,7 +13,7 @@ operational guidance read
 [Operating and tuning](/docs/high-availability/store-and-forward/operating-and-tuning/).
 
 Shared keys (authentication, TLS, address list) are documented on the
-[connect-string reference](/docs/client-configuration/connect-string).
+[connect-string reference](/docs/connect/clients/connect-string).
 The keys below are the SF-specific subset.
 
 ## Storage keys
@@ -37,7 +37,7 @@ Size values accept integer bytes or unit suffixes (`K`, `M`, `G`, `T`)
 using binary multipliers.
 
 These keys are also documented on the central
-[connect-string reference](/docs/client-configuration/connect-string#sf-keys).
+[connect-string reference](/docs/connect/clients/connect-string#sf-keys).
 
 ## Reconnect keys
 
@@ -54,7 +54,7 @@ and host-walk semantics are documented in
 | `close_flush_timeout_millis` | int (ms) | `5000` | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 
 Cross-reference:
-[connect-string #reconnect-keys](/docs/client-configuration/connect-string#reconnect-keys).
+[connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys).
 
 ## Durable-ack keys
 
@@ -80,7 +80,7 @@ The per-category defaults are documented in
 ## Other relevant keys
 
 These keys are not SF-specific but affect SF behaviour. See the
-[connect-string reference](/docs/client-configuration/connect-string) for the
+[connect-string reference](/docs/connect/clients/connect-string) for the
 canonical entries.
 
 | Key | Type | Default | Description |
@@ -191,8 +191,8 @@ down. Suitable for edge / IoT producers on unreliable links.
 
 | Group | Connect-string reference |
 |---|---|
-| Storage (`sf_dir`, `sender_id`, …) | [#sf-keys](/docs/client-configuration/connect-string#sf-keys) |
-| Reconnect (`reconnect_*`, `initial_connect_retry`, `close_flush_timeout_millis`) | [#reconnect-keys](/docs/client-configuration/connect-string#reconnect-keys) |
-| Failover (`addr`, `zone`, `target`, `auth_timeout_ms`) | [#failover-keys](/docs/client-configuration/connect-string#failover-keys) |
-| Auth (`username`, `password`, `token`) | [#auth](/docs/client-configuration/connect-string#auth) |
-| TLS (`tls_*`) | [#tls](/docs/client-configuration/connect-string#tls) |
+| Storage (`sf_dir`, `sender_id`, …) | [#sf-keys](/docs/connect/clients/connect-string#sf-keys) |
+| Reconnect (`reconnect_*`, `initial_connect_retry`, `close_flush_timeout_millis`) | [#reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys) |
+| Failover (`addr`, `zone`, `target`, `auth_timeout_ms`) | [#failover-keys](/docs/connect/clients/connect-string#failover-keys) |
+| Auth (`username`, `password`, `token`) | [#auth](/docs/connect/clients/connect-string#auth) |
+| TLS (`tls_*`) | [#tls](/docs/connect/clients/connect-string#tls) |

@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/c-and-cpp
 title: C & C++ Client Documentation
 description:
   "Dive into QuestDB using the C & C++ ingestion client for high-performance,
@@ -185,7 +186,7 @@ int main()
 Now, both events use the same timestamp. We recommend using the event's
 original timestamp when ingesting data into QuestDB. Using ingestion-time
 timestamps precludes the ability to deduplicate rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ### Array Insertion
 
@@ -599,7 +600,7 @@ error:
 Now, both events use the same timestamp. We recommend using the event's
 original timestamp when ingesting data into QuestDB. Using ingestion-time
 timestamps precludes the ability to deduplicate rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ### Array Insertion
 
@@ -781,7 +782,7 @@ share the same codebase. Please refer to the
 for the full details on configuration.
 
 Alternatively, for a breakdown of Configuration string options available across
-all clients, see the [Configuration string](/docs/ingestion/clients/configuration-string/) page.
+all clients, see the [Connect string](/docs/connect/clients/connect-string/) page.
 
 ### Don't forget to flush
 
@@ -802,7 +803,7 @@ QuestDB instances), call `sender.flush_and_keep(&buffer)` or
 ### Transactional flush
 
 As described in
-[ILP overview](/docs/ingestion/ilp/overview#http-transaction-semantics), the
+[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
 To ensure in advance that a flush will not affect more than one table, call
@@ -836,7 +837,7 @@ version 9.0.0.
 
 ## Next Steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 

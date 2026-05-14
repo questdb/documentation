@@ -70,10 +70,10 @@ kubectl port-forward my-questdb-0 9000
 
 The following ports may also be used:
 
-- 9000: [REST API](/docs/query/rest-api/) and
+- 9000: [REST API](/docs/connect/compatibility/rest-api/) and
   [Web Console](/docs/getting-started/web-console/overview/)
-- 8812: [Postgres](/docs/query/pgwire/overview/)
-- 9009: [InfluxDB line protocol](/docs/ingestion/ilp/overview/)
+- 8812: [Postgres](/docs/connect/compatibility/pgwire/overview/)
+- 9009: [InfluxDB line protocol](/docs/connect/compatibility/ilp/overview/)
 
 ## Customizing the deployment
 

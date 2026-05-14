@@ -1,4 +1,5 @@
 ---
+slug: /connect/wire-protocols/overview
 title: Wire protocols overview
 description:
   QuestDB's wire-protocol specifications for client implementers.
@@ -16,8 +17,8 @@ filled in.
 This section documents QuestDB's wire protocols at the byte-on-the-wire
 level for **client implementers** — engineers building a new QuestDB client
 from scratch. End users should see the
-[language client guides](/docs/ingestion/overview) and the
-[connect string reference](/docs/client-configuration/connect-string).
+[language client guides](/docs/connect/overview) and the
+[connect string reference](/docs/connect/clients/connect-string).
 
 :::
 
@@ -29,8 +30,8 @@ a spec, the spec wins.
 
 | Protocol | Transport | Purpose |
 | --- | --- | --- |
-| [QWP Ingress (WebSocket)](/docs/protocols/qwp-ingress-websocket) | WebSocket | Columnar binary ingest with optional store-and-forward |
-| [QWP Egress (WebSocket)](/docs/protocols/qwp-egress-websocket) | WebSocket | Streaming SQL query results |
+| [QWP Ingress (WebSocket)](/docs/connect/wire-protocols/qwp-ingress-websocket) | WebSocket | Columnar binary ingest with optional store-and-forward |
+| [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket) | WebSocket | Streaming SQL query results |
 
 ## Versioning
 

@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/r
 title: R PGwire Guide
 description:
   R clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -29,7 +30,7 @@ interface.
 :::tip
 
 For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/) instead of PGWire. PGWire should primarily be used for
+the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
 querying data in QuestDB.
 
 :::

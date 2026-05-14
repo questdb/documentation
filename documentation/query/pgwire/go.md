@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/go
 title: Go PGWire Guide
 description:
   Go clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -27,9 +28,9 @@ for performance. For best performance when querying data from QuestDB with Go, w
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [Go client](/docs/ingestion/clients/go/) for data ingestion using ILP.
+official [Go client](/docs/connect/clients/go/) for data ingestion using ILP.
 
 :::
 

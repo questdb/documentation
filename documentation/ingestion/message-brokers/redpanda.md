@@ -1,4 +1,5 @@
 ---
+slug: /connect/message-brokers/redpanda
 title: Redpanda
 description:
   Guide for using Redpanda with QuestDB via the QuestDB Kafka connector. Also
@@ -9,7 +10,7 @@ description:
 [Redpanda](https://redpanda.com/) is an open-source, Kafka-compatible streaming
 platform that uses C++ and Raft to replace Java and Zookeeper. Since it is Kafka
 compatible, it can be used with the
-[QuestDB Kafka connector](/docs/ingestion/message-brokers/kafka/#questdb-kafka-connect-connector),
+[QuestDB Kafka connector](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector),
 providing an alternative data [streaming](/glossary/stream-processing) option.
 
 This guide also covers [Redpanda Connect](#redpanda-connect), a stream processing
@@ -253,7 +254,7 @@ from the Kafka message metadata.
 
 The connector can be also configured to use a custom timestamp field from the
 Kafka message. See the
-[QuestDB Kafka Connector reference manual](/docs/ingestion/message-brokers/kafka/#designated-timestamps)
+[QuestDB Kafka Connector reference manual](/docs/connect/message-brokers/kafka/#designated-timestamps)
 for details.
 
 A possible improvement could be to explicitly create the target table in QuestDB
@@ -261,17 +262,17 @@ instead of relying on the connector to create it implicitly. This way, you can
 control the schema, [partitioning](/glossary/database-partitioning/) and data
 types of the table. It also enables QuestDB's native
 [deduplication feature](/docs/concepts/deduplication). Deduplication is required
-for [Exactly-Once](/docs/ingestion/message-brokers/kafka/#fault-tolerance)
+for [Exactly-Once](/docs/connect/message-brokers/kafka/#fault-tolerance)
 processing semantics.
 
 ## See also
 
-- [QuestDB Kafka Connector reference manual](/docs/ingestion/message-brokers/kafka/)
+- [QuestDB Kafka Connector reference manual](/docs/connect/message-brokers/kafka/)
 
 ## Redpanda Connect
 
 Redpanda Connect is a stream processing tool that can be used to build data pipelines.
-It's a lightweight alternative to [Apache Kafka Connect](/docs/ingestion/message-brokers/kafka/#questdb-kafka-connect-connector).
+It's a lightweight alternative to [Apache Kafka Connect](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector).
 This guide shows the steps to use the Redpanda Connect to write JSON data
 as rows into a QuestDB table. 
 

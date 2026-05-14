@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/go
 title: Go Client Documentation
 description:
   "Dive into QuestDB using the Go ingestion client for high-performance,
@@ -31,7 +32,7 @@ some common insert patterns.
 :::info
 
 This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Go library](/docs/query/pgwire/go/) or our
+For retrieving data, we recommend using a [PostgreSQL-compatible Go library](/docs/connect/compatibility/pgwire/go/) or our
 [HTTP query endpoint](/docs/query/overview/#rest-http-api).
 
 :::
@@ -197,7 +198,7 @@ func main() {
 
 We recommended to use User-assigned timestamps when ingesting data into QuestDB.
 Using the current timestamp hinder the ability to deduplicate rows which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 <!-- ## Decimal insertion
 
@@ -273,11 +274,11 @@ For all the extra options you can use, please check
 [the client docs](https://pkg.go.dev/github.com/questdb/go-questdb-client/#LineSenderFromConf)
 
 Alternatively, for a breakdown of Configuration string options available across
-all clients, see the [Configuration string](/docs/ingestion/clients/configuration-string/) page.
+all clients, see the [Connect string](/docs/connect/clients/connect-string/) page.
 
 ## Next Steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 

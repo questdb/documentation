@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/ilp/columnset-types
 title: InfluxDB Line Protocol Columnset Value Types
 sidebar_label: Columnset value types
 description:
@@ -13,10 +14,10 @@ details about type casting.
 This page documents InfluxDB line-protocol type extensions QuestDB layers
 on top of the InfluxDB type model (the `i`, `t`, `n`, etc. suffixes and the
 cast tables below). The native
-[QuestDB Wire Protocol (QWP)](/docs/protocols/qwp-ingress-websocket/)
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/qwp-ingress-websocket/)
 supports the entire QuestDB type system directly — no suffix encoding, no
 implicit casts — and is the recommended choice for new clients. See the
-[ingestion overview](/docs/ingestion/overview/) for languages with native
+[ingestion overview](/docs/connect/overview/) for languages with native
 QWP support.
 
 :::

@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/connect-string
 title: Connect string reference
 description:
   Configuration knobs for QuestDB native clients (QWP over WebSocket).
@@ -12,7 +13,7 @@ options under the same names, so configuration is portable across
 implementations.
 
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
-`tcps`), see the [ILP overview](/docs/ingestion/ilp/overview/).
+`tcps`), see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 **On this page:**
 
@@ -97,7 +98,7 @@ The Java client accepts a connect string in three ways:
   ```
 
 Other language clients expose equivalent entry points; see each
-[client library page](/docs/ingestion/overview/#client-libraries) for the
+[client library page](/docs/connect/overview/#client-libraries) for the
 per-language syntax.
 
 ## Common patterns {#common-patterns}
@@ -532,7 +533,7 @@ transport-level OK ACK alone cannot close.
   because the server only flushes pending durable acks on inbound recv
   events. Default: `200` (ms). Set to `0` or a negative value to disable.
 
-See the [QWP Egress (WebSocket)](/docs/protocols/qwp-egress-websocket/)
+See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
 wire protocol for the underlying mechanism.
 
 ## Error handling {#error-handling}

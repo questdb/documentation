@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/import-csv
 title: CSV Import
 sidebar_label: CSV Import
 description:
@@ -9,7 +10,7 @@ description:
 
 :::tip
 CSV import is for bulk/batch loading. For streaming data, use
-[InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/) instead.
+[InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead.
 :::
 
 There are three methods for CSV import:
@@ -623,7 +624,7 @@ The REST API is better suited when the following conditions are true:
 For database migrations, or uploading one large CSV file into QuestDB, users may
 consider using the `COPY` SQL command. See
 [COPY command documentation](/docs/query/sql/copy/) and
-[Guide on CSV import](/docs/ingestion/import-csv/#import-csv-via-copy-sql) for more
+[Guide on CSV import](/docs/connect/compatibility/import-csv/#import-csv-via-copy-sql) for more
 details.
 
 :::
@@ -772,4 +773,4 @@ curl -F data=@weather.csv 'http://localhost:9000/imp'
 ```
 
 For more information on the `/imp` entry point, refer to the
-[REST API documentation](/docs/query/rest-api/#imp---import-data).
+[REST API documentation](/docs/connect/compatibility/rest-api/#imp---import-data).

@@ -14,7 +14,7 @@ As a result, the InfluxDB clients work with QuestDB.
 This guide demonstrates how to use **InfluxDB's clients** with QuestDB.
 
 If you don't use the InfluxDB clients and want to use the QuestDB clients, see
-the [ingestion overview](/docs/ingestion/overview/).
+the [ingestion overview](/docs/connect/overview/).
 
 While InfluxDB clients are supported, we recommend using the QuestDB clients.
 
@@ -223,7 +223,7 @@ group:
 You can use the [INSERT](/docs/query/sql/insert/) keyword to output the
 processed result into a new table.
 
-Also, if you leverage [Telegraf](/docs/ingestion/message-brokers/telegraf/), you can do
+Also, if you leverage [Telegraf](/docs/connect/message-brokers/telegraf/), you can do
 this with a small configuration change:
 
 ```shell
@@ -251,6 +251,6 @@ deeper into customization options for ILP or HTTP, learn more about the
 protocol, or compare QuestDB with Influx:
 
 - [ILP `server.conf` configuration](/docs/configuration/ingestion/)
-- [ILP API Overview](/docs/ingestion/ilp/overview/)
+- [ILP API Overview](/docs/connect/compatibility/ilp/overview/)
 - [Comparing TimescaleDB and QuestDB performance and architecture blog](/blog/timescaledb-vs-questdb-comparison/)
 - [Deep dive of QuestDB vs InfluxDB internals](/blog/2024/02/26/questdb-versus-influxdb/)

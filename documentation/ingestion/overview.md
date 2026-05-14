@@ -1,4 +1,5 @@
 ---
+slug: /connect/overview
 title: Connect to QuestDB
 sidebar_label: Overview
 description:
@@ -17,10 +18,10 @@ Pick the path that matches your environment.
 | Your situation                                                          | Use                                                              |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Greenfield app — want the best throughput, durability, and feature set  | [**Client Libraries**](#client-libraries)                        |
-| Existing InfluxDB collectors, Telegraf, or Kafka / Flink pipelines      | [Compatibility → ILP](/docs/ingestion/ilp/overview/)             |
-| Postgres-shaped data layer, BI tools, ORMs                              | [Compatibility → PGWire](/docs/query/pgwire/overview/)           |
-| HTTP scripts, ad-hoc `curl`, or CSV imports                             | [Compatibility → REST API](/docs/query/rest-api/)                |
-| Building a new QuestDB client library (QWP spec)                        | [Wire Protocols](/docs/protocols/overview/)                      |
+| Existing InfluxDB collectors, Telegraf, or Kafka / Flink pipelines      | [Compatibility → ILP](/docs/connect/compatibility/ilp/overview/)             |
+| Postgres-shaped data layer, BI tools, ORMs                              | [Compatibility → PGWire](/docs/connect/compatibility/pgwire/overview/)           |
+| HTTP scripts, ad-hoc `curl`, or CSV imports                             | [Compatibility → REST API](/docs/connect/compatibility/rest-api/)                |
+| Building a new QuestDB client library (QWP spec)                        | [Wire Protocols](/docs/connect/wire-protocols/overview/)                      |
 
 ## Client Libraries
 
@@ -55,7 +56,7 @@ Highlights:
 - **Store-and-forward** — survives server outages, including full server
   destruction. Sub-200 ns offload latency.
 - **One configuration** — a single
-  [connect string](/docs/client-configuration/connect-string/) drives every
+  [connect string](/docs/connect/clients/connect-string/) drives every
   option, portable across all languages.
 - **Schema-flexible** — automatic table creation and on-the-fly column
   additions.
@@ -69,14 +70,14 @@ Pick a language:
 Use these if you have existing tooling that speaks them, or if a native client
 library isn't a fit for your environment.
 
-- **[InfluxDB Line Protocol (ILP)](/docs/ingestion/ilp/overview/)** — the
+- **[InfluxDB Line Protocol (ILP)](/docs/connect/compatibility/ilp/overview/)** — the
   text-based ingest protocol used by InfluxDB. Works with Telegraf, Kafka,
   Redpanda, Flink, and any collector that already emits ILP.
-- **[PostgreSQL Wire Protocol (PGWire)](/docs/query/pgwire/overview/)** — query
+- **[PostgreSQL Wire Protocol (PGWire)](/docs/connect/compatibility/pgwire/overview/)** — query
   QuestDB from any Postgres-compatible driver (psycopg, JDBC, pgx, …), BI
   tools (Tableau, Grafana, Metabase), and ORMs.
-- **[REST API](/docs/query/rest-api/)** — HTTP / JSON endpoints for ad-hoc
-  queries, scripting, and bulk [CSV import](/docs/ingestion/import-csv/).
+- **[REST API](/docs/connect/compatibility/rest-api/)** — HTTP / JSON endpoints for ad-hoc
+  queries, scripting, and bulk [CSV import](/docs/connect/compatibility/import-csv/).
 
 These remain fully supported. They are grouped as *compatibility* because they
 predate QWP and exist primarily to integrate with tooling that already speaks
@@ -90,7 +91,7 @@ fire-and-forget metrics. Read these if you are **building a new QuestDB
 client library** in a language we don't yet support, or embedding QuestDB
 connectivity into an existing framework.
 
-See the [Wire Protocols reference](/docs/protocols/overview/).
+See the [Wire Protocols reference](/docs/connect/wire-protocols/overview/).
 
 ## Next steps
 

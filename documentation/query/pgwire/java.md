@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/java
 title: Java PGWire Guide
 description:
   Java clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -29,9 +30,9 @@ driver with connection pooling.
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [Java client](/docs/ingestion/clients/java/) for data ingestion using ILP.
+official [Java client](/docs/connect/clients/java/) for data ingestion using ILP.
 
 :::
 
@@ -216,7 +217,7 @@ QuestDB, via the PostgreSQL wire protocol, supports array data types, including 
 
 :::tip
 Inserting large amounts of data using the JDBC driver can be inefficient. For high-throughput ingestion, consider using
-QuestDB's [Java ILP client](/docs/ingestion/clients/java/) or the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/).
+QuestDB's [Java ILP client](/docs/connect/clients/java/) or the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/).
 :::
 
 When you need to insert multiple rows containing array data, such as a series of order book snapshots,

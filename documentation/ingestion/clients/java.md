@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/java
 title: Java client for QuestDB
 sidebar_label: Java
 description: "QuestDB Java client for high-throughput data ingestion and streaming SQL queries over the QWP binary protocol."
@@ -14,12 +15,12 @@ import CodeBlock from "@theme/CodeBlock"
 
 This is the reference for the QuestDB Java client when QuestDB is used as a
 server. For embedded QuestDB, see the
-[Java embedded guide](/docs/ingestion/java-embedded/).
+[Java embedded guide](/docs/connect/java-embedded/).
 
 :::
 
 The QuestDB Java client connects to QuestDB over the
-[QWP binary protocol](/docs/protocols/qwp-ingress-websocket/) (WebSocket). It
+[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket). It
 supports high-throughput data ingestion and streaming SQL queries on the same
 transport.
 
@@ -36,7 +37,7 @@ Key capabilities:
 
 The client also supports ILP ingestion over HTTP and TCP for backward
 compatibility. This page documents the recommended WebSocket (QWP) path. For
-ILP transport details, see the [ILP overview](/docs/ingestion/ilp/overview/).
+ILP transport details, see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 :::
 
@@ -195,7 +196,7 @@ try (QwpQueryClient client = QwpQueryClient.fromConfig("ws::addr=localhost:9000;
 ```
 
 For the full list of connect-string keys, see the
-[connect string reference](/docs/client-configuration/connect-string/).
+[connect string reference](/docs/connect/clients/connect-string/).
 
 ### From an environment variable
 
@@ -443,7 +444,7 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 ## Querying and SQL execution
 
 The `QwpQueryClient` sends SQL statements over the
-[QWP egress](/docs/protocols/qwp-egress-websocket/) endpoint (`/read/v1`).
+[QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint (`/read/v1`).
 Results arrive as columnar batches via a callback handler.
 
 `execute()` is **blocking**: it sends the query, drives the WebSocket receive
@@ -823,9 +824,9 @@ Event kinds: `CONNECTED`, `DISCONNECTED`, `RECONNECTED`, `FAILED_OVER`,
   transient, fed into the reconnect loop.
 
 For the full list of connect-string keys, see the
-[reconnect and failover](/docs/client-configuration/connect-string#reconnect-keys)
+[reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)
 and
-[multi-host failover](/docs/client-configuration/connect-string#failover-keys)
+[multi-host failover](/docs/connect/clients/connect-string#failover-keys)
 sections of the connect string reference.
 
 ## Parallel queries
@@ -847,7 +848,7 @@ workloads, use one instance per thread or use an object pool.
 ## Configuration reference
 
 For the full list of connect-string keys and their defaults, see the
-[connect string reference](/docs/client-configuration/connect-string/).
+[connect string reference](/docs/connect/clients/connect-string/).
 
 Common WebSocket-specific options:
 

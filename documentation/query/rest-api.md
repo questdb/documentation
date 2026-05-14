@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/rest-api
 title: REST API
 sidebar_label: REST HTTP API
 description: REST API reference documentation.
@@ -36,11 +37,11 @@ insert-capable entrypoints:
 
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
-| [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/query/rest-api/#imp---import-data)      |
-| [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/query/rest-api/#exec---execute-queries) |
+| [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
+| [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
 
 For details such as content type, query parameters and more, refer to the
-[REST API](/docs/query/rest-api/) docs.
+[REST API](/docs/connect/compatibility/rest-api/) docs.
 
 ### `/imp`: Uploading Tabular Data
 
@@ -143,7 +144,7 @@ need high-performance inserts.
 
 :::tip
 For a complete guide including text loader configuration and troubleshooting,
-see [CSV Import](/docs/ingestion/import-csv/#import-csv-via-rest).
+see [CSV Import](/docs/connect/compatibility/import-csv/#import-csv-via-rest).
 :::
 
 `/imp` streams tabular text data directly into a table. It supports CSV, TAB and
@@ -177,7 +178,7 @@ Content-Type with following optional URL parameters which must be URL encoded:
 | `delimiter`          | No       |                  | URL encoded delimiter character. When set, import will try to detect the delimiter automatically. Since automatic delimiter detection requires at least two lines (rows) to be present in the file, this parameter may be used to allow single line file import. |
 | `fmt`                | No       | `tabular`        | Can be set to `json` to get the response formatted as such.                                                                                                                                                                                                      |
 | `forceHeader`        | No       | `false`          | `true` or `false`. When `false`, QuestDB will try to infer if the first line of the file is the header line. When set to `true`, QuestDB will expect that line to be the header line.                                                                            |
-| `name`               | No       | Name of the file | Name of the table to create, [see below](/docs/query/rest-api/#names).                                                                                                                                                                                           |
+| `name`               | No       | Name of the file | Name of the table to create, [see below](/docs/connect/compatibility/rest-api/#names).                                                                                                                                                                                           |
 | `overwrite`          | No       | `false`          | `true` or `false`. When set to true, any existing data or structure will be overwritten.                                                                                                                                                                         |
 | `partitionBy`        | No       | `NONE`           | See [partitions](/docs/concepts/partitions/#creating-partitioned-tables).                                                                                                                                                                                        |
 | `o3MaxLag`           | No       |                  | Sets upper limit on the created table to be used for the in-memory out-of-order buffer. Can be also set globally via the `cairo.o3.max.lag` configuration property.                                                                                              |

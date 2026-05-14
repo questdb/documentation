@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/rust
 title: Rust Client Documentation
 description:
   "Dive into QuestDB using the Rust ingestion client for high-performance,
@@ -23,7 +24,7 @@ are some of the highlights:
 
 This page focuses on our high-performance ingestion client, which is optimized
 for **writing** data to QuestDB. For retrieving data, we recommend using a
-[PostgreSQL-compatible Rust library](/docs/query/pgwire/rust/) or our
+[PostgreSQL-compatible Rust library](/docs/connect/compatibility/pgwire/rust/) or our
 [HTTP query endpoint](/docs/query/overview/#rest-http-api).
 
 :::
@@ -147,7 +148,7 @@ fn main() -> Result<()> {
 
 Avoid using `at_now()` instead of `at(some_timestamp)`. This removes the ability
 to deduplicate rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::
 
@@ -279,7 +280,7 @@ general structure is:
 full details on configuration.
 
 Alternatively, for breakdown of available params, see the
-[Configuration string](/docs/ingestion/clients/configuration-string/) page.
+[Connect string](/docs/connect/clients/connect-string/) page.
 
 ## Don't forget to flush
 
@@ -299,7 +300,7 @@ QuestDB instances), call `sender.flush_and_keep(&mut buffer)` instead.
 ## Transactional flush
 
 As described in
-[ILP overview](/docs/ingestion/ilp/overview#http-transaction-semantics), the
+[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
 In order to ensure in advance that a flush will not affect more than one table,
@@ -334,7 +335,7 @@ state, and it is permanently unusable. You must drop it and create a new sender.
 You can inspect the sender's error state by calling `sender.must_close()`.
 
 For more details about the HTTP and TCP transports, please refer to the
-[ILP overview](/docs/ingestion/ilp/overview#transport-selection).
+[ILP overview](/docs/connect/compatibility/ilp/overview#transport-selection).
 
 ## Protocol Version
 
@@ -386,7 +387,7 @@ These features are opt-in:
 
 ## Next steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 

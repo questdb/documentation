@@ -178,7 +178,7 @@ set, retaining HTTP for backward compatibility while the QWP path
 becomes the primary.
 
 For specifically the multi-host HA path on HTTP ILP, see the existing
-[ILP overview "Multiple URLs for High Availability"](/docs/ingestion/ilp/overview/#multiple-urls-for-high-availability)
+[ILP overview "Multiple URLs for High Availability"](/docs/connect/compatibility/ilp/overview/#multiple-urls-for-high-availability)
 section. QWP failover (documented in
 [Client failover concepts](/docs/high-availability/client-failover/concepts/))
 replaces and extends it.

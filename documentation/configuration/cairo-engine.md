@@ -54,8 +54,8 @@ When `false`, disables the `reload_config()` SQL function.
 
 A global timeout in seconds for long-running queries. Per-query overrides are
 available via the HTTP header
-[`Statement-Timeout`](/docs/query/rest-api/#headers) or the Postgres
-[`options`](/docs/query/pgwire/overview/)
+[`Statement-Timeout`](/docs/connect/compatibility/rest-api/#headers) or the Postgres
+[`options`](/docs/connect/compatibility/pgwire/overview/)
 connection property.
 
 ## Commit and write behavior
