@@ -16,7 +16,7 @@ new QuestDB ingest client from scratch. End users should see the
 
 :::
 
-QuestWire Protocol (QWP) is QuestDB's columnar binary protocol for
+QuestDB Wire Protocol (QWP) is QuestDB's columnar binary protocol for
 high-throughput data ingestion over WebSocket. Each message carries one or more
 table blocks, where every column's values are stored contiguously. Batched
 messages, schema references, and Gorilla-compressed timestamps reduce wire

@@ -627,6 +627,7 @@ module.exports = {
         "configuration/oidc",
         "configuration/parallel-sql-execution",
         "configuration/postgres-wire-protocol",
+        "configuration/qwp",
         "configuration/database-replication",
         "configuration/shared-workers",
         "configuration/storage-policy",
