@@ -57,19 +57,14 @@ module.exports = {
           label: "Overview",
         },
         {
-          id: "client-configuration/connect-string",
-          type: "doc",
-          label: "Connect string",
-        },
-        {
-          id: "ingestion/clients/date-to-timestamp-conversion",
-          type: "doc",
-          label: "Date to Timestamp",
-        },
-        {
           type: "category",
           label: "Client Libraries",
           items: [
+            {
+              id: "client-configuration/connect-string",
+              type: "doc",
+              label: "Connect string",
+            },
             {
               id: "ingestion/clients/java",
               type: "doc",
@@ -105,7 +100,17 @@ module.exports = {
               type: "doc",
               label: ".NET",
             },
+            {
+              id: "ingestion/clients/date-to-timestamp-conversion",
+              type: "doc",
+              label: "Date to Timestamp",
+            },
           ],
+        },
+        {
+          id: "connect/agents",
+          type: "doc",
+          label: "Agents",
         },
         {
           type: "category",
