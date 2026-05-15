@@ -29,6 +29,7 @@ For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 - [Store-and-forward](#sf-keys)
 - [Reconnect and failover](#reconnect-keys)
 - [Durable ACK](#durable-ack)
+- [Query client keys](#egress-keys)
 - [Error handling](#error-handling)
 - [Key index](#key-index)
 
@@ -215,6 +216,18 @@ TLS is enabled by selecting the `wss` schema.
   certificates. If omitted, the system default trust store is used.
 - `tls_roots_password` — password for the keystore file. Required when
   `tls_roots` is set.
+
+:::note Client support varies
+
+`tls_roots` / `tls_roots_password` are a Java-keystore feature. Some clients
+(for example, Go) verify against the operating-system trust store only and
+**reject these keys at parse time**; to trust a private CA there, install it
+in the host trust store. Mutual TLS (client certificates) is likewise not
+supported by every client. Check the relevant
+[client library page](/docs/connect/overview/#client-libraries) for
+specifics.
+
+:::
 
 See also the [server-side TLS configuration](/docs/security/tls/).
 
@@ -537,6 +550,31 @@ transport-level OK ACK alone cannot close.
 
 See the [QWP Egress (WebSocket)](/docs/connect/wire-protocols/qwp-egress-websocket/)
 wire protocol for the underlying mechanism.
+
+## Query client keys {#egress-keys}
+
+*Applies to: egress (query client).*
+
+These keys are accepted by the QWP query client's connect string (the
+egress / `QwpQueryClient` path). They are not sender keys.
+
+- `compression` — result-batch compression the client advertises. Options:
+  `raw` (default — no compression, the accept-encoding header is omitted so
+  pre-compression servers see an unchanged handshake), `zstd` (demand
+  zstd), `auto` (accept zstd if the server offers it).
+- `compression_level` — zstd level hint. Range `1`–`22`. Ignored when
+  `compression=raw`. Default is the client's library default.
+- `initial_credit` — byte-credit flow-control budget. `0` (default) means
+  unbounded: the server streams as fast as the network allows. Set a
+  non-zero budget to bound server push on a memory-constrained client.
+- `max_batch_rows` — upper bound on rows per result batch.
+- `buffer_pool_size` — size of the client-side decode buffer pool.
+
+Equivalent options exist on the query client's builder API (for example,
+`WithQwpQueryCompression`, `WithQwpQueryCompressionLevel`,
+`WithQwpQueryInitialCredit` in the Go client). See the
+[client library page](/docs/connect/overview/#client-libraries) for the
+per-language names.
 
 ## Error handling {#error-handling}
 

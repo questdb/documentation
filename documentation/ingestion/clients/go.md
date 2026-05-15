@@ -175,12 +175,42 @@ client, err := qdb.NewQwpQueryClient(ctx,
 	qdb.WithQwpQueryBearerToken("your_bearer_token"))
 ```
 
-### TLS with a custom trust store
+The client takes a **static** bearer token; it does not acquire or refresh
+OIDC tokens. With [OpenID Connect](/docs/security/oidc/), the application
+obtains the access token from the identity provider and is responsible for
+rotating it before it expires. An expired or revoked token is not refreshed
+in place: the next connect or reconnect fails with a `SECURITY_ERROR` (or a
+`401`/`403` on the WebSocket upgrade — terminal across all endpoints). To
+rotate, construct a new sender or client with the fresh token.
 
-TLS is enabled by the `wss` schema (or `qdb.WithTls()`). Trust-store keys are
-documented in the [TLS section](/docs/connect/clients/connect-string#tls) of
-the connect string reference. For OIDC authentication (Enterprise), see
-[OpenID Connect](/docs/security/oidc/).
+### Production example (TLS + auth + multi-host)
+
+The realistic Enterprise shape combines `wss`, credentials, and a multi-host
+`addr` list in a single connect string:
+
+```go
+sender, err := qdb.LineSenderFromConf(ctx,
+	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
+		"username=ingest;password=secret;")
+
+client, err := qdb.QwpQueryClientFromConf(ctx,
+	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
+		"token=your_bearer_token;target=replica;")
+```
+
+### TLS trust store and mTLS
+
+TLS is enabled by the `wss` schema (or `qdb.WithTls()`). The Go client
+verifies the server certificate against the **operating-system trust
+store**. It does **not** support a custom trust store: the `tls_roots` /
+`tls_roots_password` connect-string keys (a Java-keystore feature) are
+rejected by the Go connect-string parser. To trust a private CA, install it
+in the host trust store. Mutual TLS (client certificates) is **not
+supported** by this client — authenticate with a bearer token or basic auth
+over `wss` instead. For test-only certificate-verification bypass, see
+`tls_verify` in the
+[TLS section](/docs/connect/clients/connect-string#tls) of the connect
+string reference.
 
 ## Creating the client
 
@@ -398,9 +428,9 @@ if err != nil {
 	panic(err)
 }
 
-err = qs.Table("trades").
+err = qs.Table("trade_fees").
 	Symbol("symbol", "ETH-USD").
-	Decimal128Column("price", price).
+	Decimal128Column("settled_price", price).
 	Decimal128Column("commission", commission).
 	AtNow(ctx)
 ```
@@ -497,10 +527,20 @@ configured.
 :::
 
 By default, the server confirms a batch when it is committed to the local
-[WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
-uploaded to object storage, add `request_durable_ack=on;` to the connect
-string. See the
+[WAL](/docs/concepts/write-ahead-log/). Durable acknowledgement instead waits
+until the batch has been durably uploaded to object storage. See the
 [durable ACK keys](/docs/connect/clients/connect-string#durable-ack).
+
+:::caution Not yet implemented in the Go client
+
+Durable-ack mode is a deferred follow-up in this client. Passing
+`request_durable_ack=on;` (or `=true`) in the connect string is **rejected at
+construction** with an `InvalidConfigStr` error; the only accepted value
+today is `request_durable_ack=off` (the default). Until the feature ships,
+the sender confirms on the transport-level OK ACK and ignores
+`STATUS_DURABLE_ACK` frames.
+
+:::
 
 ## Querying and SQL execution
 
@@ -553,14 +593,20 @@ for batch, err := range q.Batches() {
 }
 ```
 
-:::caution Copy values out before the iteration ends
+:::caution Copy aliasing values out before the iteration ends
 
-A `*QwpColumnBatch` is valid only during its iteration of the loop.
-`String(col, row)` returns a freshly allocated Go string and is safe to
-retain. `Str`, `Binary`, `Float64Array`, `Int64Array`, and the `QwpColumn`
-`*Range` accessors return slices that **alias the receive buffer** and become
-invalid on the next iteration. Copy those before the loop advances, and never
-store the batch itself.
+A `*QwpColumnBatch` is valid only during its iteration of the loop. Never
+store the batch itself; use `batch.CopyAll()` for a retainable snapshot.
+Which accessors alias the receive buffer and which return caller-owned data:
+
+- **Alias the buffer** (copy with `bytes.Clone` before the loop advances if
+  you keep them): `Str(col, row)` and `Binary(col, row)`.
+- **Safe to retain:** `String(col, row)` returns a freshly allocated Go
+  string. `Float64Array`, `Int64Array`, the `*Into` accessors, and the
+  `QwpColumn` `*Range` accessors return caller-owned slices (freshly
+  allocated, or appended into a buffer you supply).
+- The fixed-width scalar accessors (`Int64`, `Float64`, …) return values,
+  not views.
 
 :::
 
@@ -617,8 +663,13 @@ Representations to be aware of:
   `time.Time`: microseconds, nanoseconds, and milliseconds since epoch
   respectively. Convert with `time.UnixMicro` / `time.Unix(0, ns)` as needed.
 - `UUID` is two `int64` halves (`UuidHi` / `UuidLo`); reassemble client-side.
-- A decimal value is `Decimal128Hi`/`Decimal128Lo` plus the per-column
-  `DecimalScale(col)`; apply the scale yourself.
+- Decimals come back as the unscaled integer plus the per-column
+  `DecimalScale(col)`: read `DECIMAL64` with `Int64`, `DECIMAL128` with
+  `Decimal128Hi`/`Decimal128Lo`, and `DECIMAL256` with `Long256Word`
+  (words 0–3); apply the scale yourself.
+- `GEOHASH` result columns expose only metadata in this release
+  (`GeohashPrecisionBits(col)`); there is no public value accessor for a
+  GEOHASH cell. Cast it to a string or long in SQL if you need the value.
 - A typed accessor on a NULL cell returns the zero value (`0`, `false`, `""`,
   `nil`), which is indistinguishable from a real zero. Call `IsNull(col, row)`
   first whenever NULL is meaningful.
@@ -632,8 +683,8 @@ Non-SELECT statements run through `Exec`, which returns an `ExecResult`:
 
 ```go
 res, err := client.Exec(ctx,
-	"CREATE TABLE trades (ts TIMESTAMP, sym SYMBOL, price DOUBLE) "+
-		"TIMESTAMP(ts) PARTITION BY DAY WAL")
+	"CREATE TABLE trades (ts TIMESTAMP, symbol SYMBOL, side SYMBOL, "+
+		"price DOUBLE, amount DOUBLE) TIMESTAMP(ts) PARTITION BY DAY WAL")
 if err != nil {
 	return err
 }
@@ -685,8 +736,11 @@ maps to `$1`. Setters include `BooleanBind`, `ByteBind`, `ShortBind`,
 `TimestampMicrosBind`, `TimestampNanosBind`, `VarcharBind`, `UuidBind`,
 `Long256Bind`, `GeohashBind`, `DecimalBind` (and `Decimal64/128/256Bind`),
 plus a `Null...Bind` variant for each type. There is no symbol bind: use
-`VarcharBind` for symbol parameters. A gap, a duplicate index, or any
-out-of-order call latches an error that surfaces from `Query` or `Exec`.
+`VarcharBind` for symbol parameters. **Not bindable:** `BINARY` (no setter);
+`ARRAY` / `DOUBLE[]` / `LONG[]` (bind frames carry no array shape — pass a
+SQL array literal in the statement instead); `IPv4` (bind it as `INT` with
+`IntBind`). A gap, a duplicate index, or any out-of-order call latches an
+error that surfaces from `Query` or `Exec`.
 
 ### Flow control
 
@@ -735,12 +789,19 @@ sender, err := qdb.NewLineSender(ctx,
 	}))
 ```
 
-Each `SenderError` carries the `Category`
-(`CategorySchemaMismatch`, `CategoryParseError`, `CategoryInternalError`,
-`CategorySecurityError`, `CategoryWriteError`, `CategoryProtocolViolation`, or
-`CategoryUnknown`), the `AppliedPolicy` (`PolicyDropAndContinue` or
-`PolicyHalt`), the server message, the rejected table, and the `[FromFsn,
-ToFsn]` span that correlates the rejection with `FlushAndGetSequence`.
+Full `SenderError` field set, for logging, alerting, and support
+correlation:
+
+| Field              | Type        | Use                                                                                                                                                                                   |
+| ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Category`         | `Category`  | Stable named class (`CategorySchemaMismatch`, `CategoryParseError`, `CategoryInternalError`, `CategorySecurityError`, `CategoryWriteError`, `CategoryProtocolViolation`, `CategoryUnknown`). The recommended switch target. |
+| `ServerStatusByte` | `int`       | Numeric wire status (e.g. `0x03`). `NoStatusByte` (`-1`) for `CategoryProtocolViolation`.                                                                                              |
+| `AppliedPolicy`    | `Policy`    | `PolicyHalt` or `PolicyDropAndContinue` — what the send loop did.                                                                                                                      |
+| `ServerMessage`    | `string`    | Human-readable server text. **≤ 1024 UTF-8 bytes**, English, may be empty. Safe to log; not a stable pattern-match key (switch on `Category` / `ServerStatusByte`). May echo table / column names — sanitise before forwarding to third-party error trackers. |
+| `TableName`        | `string`    | Rejected table; empty for unknown or multi-table batches.                                                                                                                             |
+| `FromFsn`,`ToFsn`  | `int64`     | Inclusive FSN span; join to `FlushAndGetSequence` to identify the rejected rows.                                                                                                       |
+| `MessageSequence`  | `int64`     | Server per-frame sequence — the correlation key for support tickets and server-log matching. `NoMessageSequence` (`-1`) for protocol violations.                                       |
+| `DetectedAt`       | `time.Time` | Client-side receipt time, for ops timelines (not for correlation).                                                                                                                     |
 
 The per-category policy is configurable. Resolution precedence is the policy
 resolver, then the per-category policy, then the connect-string `on_*_error`
@@ -780,7 +841,8 @@ for batch, err := range q.Batches() {
 	if err != nil {
 		var qe *qdb.QwpQueryError
 		if errors.As(err, &qe) {
-			log.Printf("query failed: 0x%02X %s", qe.Status, qe.Message)
+			log.Printf("query %d failed: 0x%02X %s",
+				qe.RequestId, qe.Status, qe.Message)
 		}
 		break
 	}
@@ -788,17 +850,22 @@ for batch, err := range q.Batches() {
 }
 ```
 
-| Code   | Name            | Description                                       |
-| ------ | --------------- | ------------------------------------------------- |
-| `0x03` | SCHEMA_MISMATCH | Bind parameter type incompatible with placeholder |
-| `0x05` | PARSE_ERROR     | SQL syntax error or malformed message             |
-| `0x06` | INTERNAL_ERROR  | Server-side execution failure                     |
-| `0x08` | SECURITY_ERROR  | Authorization failure                             |
-| `0x0A` | CANCELLED       | Query terminated by `Cancel`                      |
-| `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                |
+| Code   | Name            | Description                                          |
+| ------ | --------------- | ---------------------------------------------------- |
+| `0x03` | SCHEMA_MISMATCH | Bind parameter type incompatible with placeholder    |
+| `0x05` | PARSE_ERROR     | SQL syntax error or malformed message                |
+| `0x06` | INTERNAL_ERROR  | Server-side execution failure                        |
+| `0x08` | SECURITY_ERROR  | Authorization failure                                |
+| `0x09` | WRITE_ERROR     | Write failure (e.g. table not accepting writes; DML) |
+| `0x0A` | CANCELLED       | Query terminated by `Cancel`                         |
+| `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                   |
 
-Errors can arrive before any data or mid-stream. Once an error is yielded, no
-further batches arrive for that query.
+`QwpQueryError` also carries `RequestId` (the client-assigned query id — the
+correlation key for support tickets and server-log matching) and `Message`
+(server-supplied UTF-8, English, may be empty; safe to log, but switch on
+`Status`, not on message text). Errors can arrive before any data or
+mid-stream. Once an error is yielded, no further batches arrive for that
+query.
 
 ### Connection-level errors
 
@@ -932,7 +999,26 @@ crashed sibling senders. The query client exposes `ServerInfo()` and
 There is no per-transition connection callback: connect, disconnect,
 reconnect, and failover are not delivered as events. Observe reconnect and
 failover through these counters, and terminal failures through the
-[ingestion error handler](#ingestion-errors).
+[ingestion error handler](#ingestion-errors). Poll the counters from a
+background goroutine:
+
+```go
+go func() {
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for range t.C {
+		log.Printf("qwp: reconnects=%d/%d replayed=%d stalls=%d",
+			qs.TotalReconnectsSucceeded(), qs.TotalReconnectAttempts(),
+			qs.TotalFramesReplayed(), qs.TotalBackpressureStalls())
+		if e := qs.LastTerminalError(); e != nil {
+			// Page on-call: the sender has stopped draining.
+			log.Printf("qwp TERMINAL: %s", e)
+		}
+	}
+}()
+```
+
+where `qs` is the `qdb.QwpSender` from the type assertion shown earlier.
 
 For background and worked configurations, see
 [client failover concepts](/docs/high-availability/client-failover/concepts/),
