@@ -275,7 +275,20 @@ causes performance degradation. Must be a power of 2.
 - **Reloadable**: no
 
 Approximation of the number of rows for a single index key. Must be a power
-of 2.
+of 2. Applies to bitmap indexes only; posting indexes manage their own block
+layout.
+
+### cairo.mat.view.covering.index.enabled
+
+- **Default**: `false`
+- **Reloadable**: no
+
+When `false`, the SQL planner skips the covering-index path for
+[materialized view](/docs/concepts/materialized-views/) refresh queries
+and uses the regular plan instead. Set to `true` to opt the refresh
+back into covering for setups where the covering path is faster (small,
+highly selective filters with `INCLUDE` columns). Ad-hoc queries against
+the view are unaffected and use covering when eligible.
 
 ### cairo.parallel.index.threshold
 
@@ -292,12 +305,57 @@ Minimum number of rows before parallel indexation is used.
 Enables parallel indexation. Works in conjunction with
 `cairo.parallel.index.threshold`.
 
+### cairo.posting.index.auto.include.timestamp
+
+- **Default**: `true`
+- **Reloadable**: no
+
+When `true` and the user supplies an `INCLUDE` clause on a
+[posting index](/docs/concepts/deep-dive/posting-index/), the designated
+timestamp is automatically appended to the `INCLUDE` list if not already
+present. Has no effect on bare `INDEX TYPE POSTING` declarations — those
+have no covering layer regardless of this setting.
+
+### cairo.posting.index.indexer.spill.bytes.max
+
+- **Default**: `268435456` (256 MiB)
+- **Reloadable**: no
+
+Caps the per-key spill arena used by one-shot
+[posting index](/docs/concepts/deep-dive/posting-index/) build paths —
+`ALTER ADD INDEX`, `REINDEX`, snapshot restore, and O3 partition rewrites
+on posting-indexed wide columns. When the cap is reached, the writer
+drains pending state into a fresh sparse generation and continues.
+Steady-state WAL ingestion is unaffected. Set to `0` or a negative value
+to disable back-pressure entirely.
+
+### cairo.posting.index.row.id.encoding
+
+- **Default**: `adaptive`
+- **Reloadable**: no
+
+Default row ID encoding for posting indexes when no encoding variant is
+specified. Valid values: `adaptive` (trial-encodes both delta +
+Frame-of-Reference and Elias-Fano per stride and picks the smaller), `delta`
+(delta + Frame-of-Reference only), `ef` (Elias-Fano only).
+
+### cairo.posting.seal.gen.threshold
+
+- **Default**: `16`
+- **Reloadable**: no
+
+Maximum number of unsealed generations per partition before
+[posting index](/docs/concepts/deep-dive/posting-index/) sealing is triggered.
+Sealing compacts active generations into a single dense generation with a
+stride-indexed layout.
+
 ### cairo.spin.lock.timeout
 
 - **Default**: `1000`
 - **Reloadable**: no
 
-Timeout in milliseconds when attempting to acquire BitmapIndexReaders.
+Timeout in milliseconds when attempting to acquire index readers (bitmap and
+posting).
 
 ### cairo.work.steal.timeout.nanos
 

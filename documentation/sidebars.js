@@ -544,6 +544,7 @@ module.exports = {
           collapsed: true,
           items: [
             "concepts/deep-dive/indexes",
+            "concepts/deep-dive/posting-index",
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",

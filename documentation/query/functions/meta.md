@@ -355,14 +355,20 @@ Returns a `table` with the following columns:
 - `type` - type of the column
 - `indexed` - if indexing is applied to this column
 - `indexBlockCapacity` - how many row IDs to store in a single storage block on
-  disk
+  disk (bitmap indexes only)
 - `symbolCached` - whether this `symbol` column is cached
 - `symbolCapacity` - how many distinct values this column of `symbol` type is
   expected to have
+- `symbolTableSize` - current number of distinct values stored in this
+  `symbol` column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
 - `upsertKey` - if this column is a part of UPSERT KEYS list for table
   [deduplication](/docs/concepts/deduplication)
+- `indexType` - the [index type](/docs/concepts/deep-dive/indexes/)
+  (`POSTING`, `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
+- `indexInclude` - comma-separated names of columns included in a
+  [posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar
 
 For more details on the meaning and use of these values, see the
 [CREATE TABLE](/docs/query/sql/create-table/) documentation.
@@ -373,12 +379,12 @@ For more details on the meaning and use of these values, see the
 table_columns('my_table');
 ```
 
-| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated | upsertKey |
-| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- | --------- |
-| symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      | false     |
-| price  | DOUBLE    | false   | 0                  | false        | 0              | false      | false     |
-| ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       | false     |
-| s      | VARCHAR   | false   | 0                  | false        | 0              | false      | false     |
+| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude |
+| ------ | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- | --------- | ------------ |
+| symb   | SYMBOL    | true    | 1048576            | false        | 256            | 0               | false      | false     | BITMAP    |              |
+| price  | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
+| ts     | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |              |
+| s      | VARCHAR   | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
 
 ```questdb-sql title="Get designated timestamp column"
 SELECT "column", type, designated FROM table_columns('my_table') WHERE designated = true;
