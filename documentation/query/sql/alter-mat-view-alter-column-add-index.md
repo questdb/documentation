@@ -83,8 +83,11 @@ similar timestamp-only covering queries against the view itself.
 :::warning
 
 The covering-index path is disabled for view refresh queries by default
-— even when the posting index on the view's symbol column produces a
-covering layout, the planner skips it during refresh unless
+because the async group-by and filter paths through the covering index
+are currently slower than the regular plan in some workloads — opting
+the refresh out preserves predictable refresh latency until that gap is
+closed. Even when the posting index on the view's symbol column
+produces a covering layout, the planner skips it during refresh unless
 [`cairo.mat.view.covering.index.enabled`](/docs/configuration/cairo-engine/#cairomatviewcoveringindexenabled)
 is set to `true`. Ad-hoc queries you issue against the view itself are
 unaffected and use covering when eligible.

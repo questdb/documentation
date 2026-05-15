@@ -366,6 +366,17 @@ your symbol set is high-cardinality.
 These hints control whether the query optimizer uses indexes (bitmap or posting)
 for symbol column lookups.
 
+:::note
+
+The async group-by and filter code paths through the covering index are
+currently slower than the regular plan in some workloads. A follow-up
+release will close this gap. In the meantime, if
+[`EXPLAIN`](/docs/query/sql/explain/) shows a query has started picking
+the covering path and you observe a slowdown, apply `no_covering` (or
+`no_index` to disable indexing entirely) on the affected query.
+
+:::
+
 ### no_covering
 
 Disables the [covering index](/docs/concepts/deep-dive/posting-index/)

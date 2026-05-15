@@ -165,6 +165,20 @@ columns in a query's `SELECT` list are either:
 the main column files entirely. This is significantly faster for selective
 queries on wide tables.
 
+:::caution
+
+The async group-by and filter code paths through the covering index are
+currently slower than the regular plan in some workloads. A follow-up
+release will close this gap, and the optimizer will continue to improve
+as more feedback comes in.
+
+If you notice a query slowdown after [`EXPLAIN`](/docs/query/sql/explain/)
+shows it has started picking the covering path, opt that query out with
+[`/*+ no_covering */` or `/*+ no_index */`](/docs/concepts/deep-dive/sql-optimizer-hints/#index-hints)
+while the optimizations land.
+
+:::
+
 ### Supported column types in INCLUDE
 
 All column types except the indexed symbol column itself can be included:
