@@ -358,3 +358,48 @@ your symbol set is high-cardinality.
   - superseded by `asof_index`
 - `asof_memoized_search`
   - superseded by `asof_memoized`
+
+-----
+
+## Index hints
+
+These hints control whether the query optimizer uses indexes (bitmap or posting)
+for symbol column lookups.
+
+:::note
+
+The async group-by and filter code paths through the covering index are
+currently slower than the regular plan in some workloads. A follow-up
+release will close this gap. In the meantime, if
+[`EXPLAIN`](/docs/query/sql/explain/) shows a query has started picking
+the covering path and you observe a slowdown, apply `no_covering` (or
+`no_index` to disable indexing entirely) on the affected query.
+
+:::
+
+### no_covering
+
+Disables the [covering index](/docs/concepts/deep-dive/posting-index/)
+optimization, forcing the query to read from column files instead of the
+index sidecar. The index is still used for row ID lookup, but column values
+are read from the main column files.
+
+```questdb-sql
+SELECT /*+ no_covering */ price FROM trades WHERE symbol = 'AAPL';
+```
+
+This is useful for benchmarking covering index performance or working around
+a specific issue with the covering path.
+
+### no_index
+
+Completely disables all index usage for the query, including bitmap index,
+posting index, and covering index. The query falls back to a full table scan
+with a filter applied to every row. Also implies `no_covering`.
+
+```questdb-sql
+SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
+```
+
+This is useful for benchmarking index effectiveness or forcing a table scan
+when you know the filter selectivity is low (many rows match).
