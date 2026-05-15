@@ -87,6 +87,12 @@ sym = 'X'`. The expanded list is what `SHOW CREATE TABLE` round-trips, so
 `cairo.posting.index.auto.include.timestamp` server property
 (default `true`).
 
+This auto-include applies only when the table has a designated timestamp.
+Tables without one (typically `BYPASS WAL` tables that omit the
+`TIMESTAMP(...)` clause) can still use posting indexes and `INCLUDE`
+normally — the auto-include simply becomes a no-op and the covered
+list contains only the columns you list.
+
 :::
 
 :::note
