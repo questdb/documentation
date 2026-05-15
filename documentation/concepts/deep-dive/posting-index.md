@@ -438,12 +438,19 @@ generation contains a sparse block of key→rowID mappings. Periodically,
 generations are **sealed** into a single dense generation with stride-indexed
 layout for optimal read performance.
 
-Sealing happens automatically when the active generation count reaches a
-threshold (`cairo.posting.seal.gen.threshold`, default 16) or when a
-partition is closed. Sealed data is written stride-by-stride (256 keys per
-stride). Within the delta + Frame-of-Reference family, the writer
-trial-encodes each stride in two sub-layouts and keeps whichever produces
-fewer bytes:
+Sealing happens automatically in two cases. When a partition is **closed**
+(retired by the next partition becoming active), it is compacted if it
+carries more than `cairo.posting.seal.gen.threshold` (default 16) unsealed
+generations. While a partition is still **active**, WAL fast-lag commits
+append a new sparse generation to the live `.pv` rather than re-sealing,
+so the active partition can accumulate up to the internal cap of 143
+generations before `flushAllPending` forces an inline seal. As a result,
+the 16-generation threshold mostly governs partition retirement, and the
+active partition typically only reaches it once it is closed.
+
+Sealed data is written stride-by-stride (256 keys per stride). Within the
+delta + Frame-of-Reference family, the writer trial-encodes each stride in
+two sub-layouts and keeps whichever produces fewer bytes:
 
 - **Delta sub-layout** — per-key delta encoding, then per-block
   Frame-of-Reference bitpacking. Wins when there are roughly ten or more
@@ -486,5 +493,14 @@ file. Decompression is transparent to the query engine.
   regular page-frame scan.
 - `REINDEX` on WAL tables requires dropping and re-adding the index
   (this applies to all index types, not just posting).
+- `ALTER TABLE … ADD INDEX TYPE POSTING INCLUDE (col, …)` may hard-fail
+  when the partition is large enough that the seal phase would need
+  more native memory than `RSS_MEM_LIMIT` allows **and** at least one
+  `INCLUDE` column is variable-width (`STRING`, `VARCHAR`, `BINARY`).
+  Fixed-width `INCLUDE` columns (numerics, `UUID`, `TIMESTAMP`, etc.)
+  stream through transparently. Workarounds: drop the variable-width
+  `INCLUDE` column from the index, reduce partition size, or raise
+  `RSS_MEM_LIMIT`. The indexer spill budget is tunable via
+  [`cairo.posting.index.indexer.spill.bytes.max`](/docs/configuration/cairo-engine/#cairopostingindexindexerspillbytesmax).
 
 :::

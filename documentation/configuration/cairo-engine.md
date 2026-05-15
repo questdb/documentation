@@ -278,6 +278,18 @@ Approximation of the number of rows for a single index key. Must be a power
 of 2. Applies to bitmap indexes only; posting indexes manage their own block
 layout.
 
+### cairo.mat.view.covering.index.enabled
+
+- **Default**: `false`
+- **Reloadable**: no
+
+When `false`, the SQL planner skips the covering-index path for
+[materialized view](/docs/concepts/materialized-views/) refresh queries
+and uses the regular plan instead. Set to `true` to opt the refresh
+back into covering for setups where the covering path is faster (small,
+highly selective filters with `INCLUDE` columns). Ad-hoc queries against
+the view are unaffected and use covering when eligible.
+
 ### cairo.parallel.index.threshold
 
 - **Default**: `100000`
@@ -302,6 +314,22 @@ When `true`, the designated timestamp column is automatically added to the
 covering index for any
 [posting index](/docs/concepts/deep-dive/posting-index/), including bare
 `INDEX TYPE POSTING` declarations with no `INCLUDE` clause.
+
+### cairo.posting.index.indexer.spill.bytes.max
+
+- **Default**: `268435456` (256 MiB)
+- **Reloadable**: no
+
+Maximum bytes the per-key spill arena may hold during one-shot
+[posting index](/docs/concepts/deep-dive/posting-index/) build paths
+(`ALTER ADD INDEX`, `REINDEX`, snapshot restore, and O3 partition
+rewrites on posting-indexed wide columns). When exceeded, the writer
+drains pending state into a fresh sparse generation and frees the
+arena. A seal-phase streaming fallback bounds peak heap to the largest
+single key's row count. Set to 0 or a negative value to disable the
+back-pressure entirely and recover the legacy "accumulate until seal"
+behaviour. Steady-state WAL ingestion is unaffected — back-pressure
+only kicks in on the one-shot build paths above.
 
 ### cairo.posting.index.row.id.encoding
 

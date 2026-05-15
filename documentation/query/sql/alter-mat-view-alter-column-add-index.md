@@ -77,6 +77,17 @@ similar timestamp-only covering queries against the view itself.
 
 :::
 
+:::warning
+
+**Covering index is disabled for view refresh by default.** Even when a
+posting index on a view's symbol column produces a covering layout, the
+SQL planner skips that path during the view's refresh queries unless
+[`cairo.mat.view.covering.index.enabled`](/docs/configuration/cairo-engine/#cairomatviewcoveringindexenabled)
+is set to `true`. Ad-hoc queries you issue against the materialized
+view still use covering when eligible.
+
+:::
+
 ## Behavior
 
 | Aspect | Description |
