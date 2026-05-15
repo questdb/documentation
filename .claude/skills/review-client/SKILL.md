@@ -1,6 +1,6 @@
 ---
 name: review-client
-description: Review a pull request that changes QuestDB **QWP** client documentation (the WebSocket transport, `ws::` / `wss::`) from the perspective of an agent or developer building an application against the client. Validates that the docs answer the concrete questions someone writing code would hit on day one — null handling, concurrency, DDL/DML/streaming SQL, acks (sync vs async, optional vs required), failover behavior and backpressure, connection notifications, mid-stream stream restarts, connect-string clarity, and the absence of content dependencies on legacy ILP pages scheduled for removal. Legacy ILP (`http::` / `tcp::`) client pages are explicitly out of scope. Requires a PR number as input.
+description: Review a pull request that changes QuestDB **QWP** client documentation (the WebSocket transport, `ws::` / `wss::`) from the perspective of an agent or developer building an application against the client. Validates that the docs answer the concrete questions someone writing code would hit on day one — null handling, concurrency, DDL/DML/streaming SQL, acks (sync vs async, optional vs required), failover behavior and backpressure, connection notifications, mid-stream stream restarts, connect-string clarity, Enterprise connection patterns (TLS + auth + multi-host worked examples, OIDC token acquisition and refresh, explicit "not supported" statements when applicable), exhaustive type coverage on bind-parameter and column-setter surfaces (no "and more" handwaves), the absence of content dependencies on legacy ILP pages scheduled for removal, a consistent capital-markets data model across every QWP client page (no `foo`/`bar` placeholders, no schema drift between languages), and field-level documentation of the diagnostic payload on every error object (status, message stability, affected scope, correlation ID, PII safety). Legacy ILP (`http::` / `tcp::`) client pages are explicitly out of scope. Requires a PR number as input.
 argument-hint: <PR-number>
 ---
 
@@ -211,7 +211,7 @@ Reference exact line numbers and quote short snippets when calling out a gap.
     PR introduces a new transport (e.g., QWP) alongside legacy (e.g., ILP),
     is there a side-by-side that a maintainer of existing code can scan?
 18. **No content dependencies on legacy ILP pages.** Legacy ILP client
-    documentation (`documentation/ingestion/clients/{go,c-and-cpp,dotnet,nodejs,python}.md`,
+    documentation (`documentation/ingestion/clients/{c-and-cpp,dotnet,nodejs,python}.md`,
     `documentation/connect/compatibility/ilp/**`, `documentation/ingestion/clients/date-to-timestamp-conversion.md`,
     and similar ILP-era support material) is on a deprecation path and
     will be removed. Outbound links from a QWP client page to legacy ILP
@@ -229,42 +229,157 @@ Reference exact line numbers and quote short snippets when calling out a gap.
     that were authored for ILP. Fix shape suggestion: "move this
     explanation onto the QWP page, or root it in a shared concepts page
     under `/docs/concepts/`."
+19. **Enterprise connection patterns and OIDC.** The page shows at least
+    one worked example combining TLS (`wss::`), credentials, and
+    multi-host `addr=...` — the realistic production shape — not just
+    three separate one-liners. For each Enterprise auth path the client
+    supports (HTTP basic, bearer token, OIDC, mTLS), there is either
+    (a) a concrete example showing how an application obtains and
+    passes the credential, or (b) an explicit one-line statement that
+    the path is not supported by this client, with a pointer to the
+    closest alternative. **Silence is not acceptable** — a reader must
+    not have to grep the page to discover that OIDC token refresh, mTLS
+    client certificates, or token rotation is unsupported. Special
+    attention to OIDC: the [OpenID Connect](/docs/security/oidc/) page
+    documents the server-side flow; the client page must answer "how
+    does the application acquire a token to pass to the client" and
+    "what happens when the token expires mid-session — does the client
+    refresh, does it fail, does it expect the app to register a
+    callback?" A bare "for OIDC, see the security page" is **not**
+    coverage — flag as Partial at best.
+20. **Bind-parameter type coverage and limitations.** Where the page
+    documents bind parameters (or the per-language equivalent), it
+    enumerates **all** supported bind types — not a sample ending in
+    "and more" or "…". For every QuestDB column type a reader might
+    expect to bind (BOOLEAN, BYTE, SHORT, CHAR, INT, IPv4, LONG, FLOAT,
+    DOUBLE, TIMESTAMP, timestamp_ns, DATE, SYMBOL, VARCHAR, BINARY,
+    UUID, LONG256, DECIMAL64/128/256, GEOHASH, DOUBLE[]/ARRAY), the
+    page either (a) shows the setter / API and the type code, or
+    (b) lists the type explicitly under "unsupported as bind parameter"
+    with a one-line rationale (e.g., "ARRAY: bind ARGS frames don't
+    carry array shape; use SQL array literals instead"). Verdict
+    ladder: complete enumeration → Covered; sample-and-handwave ("and
+    more", "…", "see source") → ⚠️ Partial; no list at all → ❌
+    Missing. The same principle — enumerate or call out as unsupported
+    — applies wherever the page documents a type-keyed surface
+    (ingestion column setters, result-batch accessors). The
+    bind-parameter table is the most common place coverage drifts
+    because the API is younger than the type system.
+21. **Consistent capital-markets data model across clients.** Every code
+    example uses a capital-markets domain (trades, quotes, order books,
+    FX, market data). **Reject** generic placeholders — `foo`, `bar`,
+    `baz`, `my_table`, `t1`, `Example`, `Test`. The placeholder pattern
+    is a tell that the example was written in isolation and was never
+    cross-read against sibling client pages. Beyond the per-page check,
+    examples must be **consistent across the full set of QWP client
+    pages**: same table names, same column names, same column types,
+    same symbol values. When the PR ships one client page and the other
+    QWP client pages already exist, compare schemas — flag every
+    inconsistency the reader would hit when porting between languages:
+
+    | Class of drift | Examples |
+    |---|---|
+    | Table name | `trades` vs `Trades` vs `market_trades` |
+    | Column name | `qty` vs `quantity` vs `amount`; `symbol` vs `sym` vs `instrument` |
+    | Column type | `LONG` vs `DOUBLE` for size; `SYMBOL` vs `VARCHAR` for ticker |
+    | Symbol value | `EURUSD` vs `EUR/USD` vs `EUR-USD`; `ETH-USD` vs `ETHUSD` |
+    | Timestamp precision | microseconds vs nanoseconds for the same notional event |
+
+    Verdict ladder: domain-correct, placeholder-free, schema matches
+    every other QWP client page → ✅ Covered; domain-correct but
+    schema drifts from siblings → ⚠️ Partial (cite the specific
+    drift); generic placeholders or non-capital-markets domain
+    (sensors, IoT, logs) → ❌ Missing. Fix shape: pick the schema
+    used by the page with the most polished example and align the
+    others, or call out one canonical schema in this skill / a README
+    under `documentation/ingestion/clients/` so future client docs land
+    on it without negotiation.
+22. **Diagnostic information on the error object/event.** Item 16
+    enumerates the error categories and the surfacing / recovery
+    model. This item demands the next level of detail: **what
+    structured information is on the error and how user code reads
+    it**, so a real production handler can log, alert, debug, and
+    correlate with server-side state.
+
+    For every error path the client exposes, the page documents:
+    - **Server message text** — which field or parameter carries it
+      (`SenderError.getServerMessage()`, the `message` parameter on
+      `onError`, `QwpWsSenderError.message`, etc.), whether it is
+      stable enough to pattern-match on, localized vs English, and
+      whether it is capped in length.
+    - **Status code** — both numeric (e.g. `0x05`) and named (e.g.
+      `PARSE_ERROR`), and how user code reads each.
+    - **Affected scope** — table name on ingest errors, FSN range
+      (`from_fsn`/`to_fsn`) or batch identifier on async ingest
+      rejections, failing SQL / bind index on query parse errors,
+      query ID on mid-stream query failures.
+    - **Server correlation / request ID** for support tickets, if the
+      protocol carries one; otherwise an explicit statement that no
+      such ID is surfaced.
+    - **PII / secret safety** — whether the message text is safe to
+      forward to end-user UIs or third-party error trackers, or
+      whether the application must sanitise first.
+
+    Verdict ladder: every bullet covered on every error path → ✅
+    Covered; primary fields named but stability / PII / correlation
+    silent → ⚠️ Partial; only "the message is human-readable text"
+    with no field-by-field guidance → ❌ Missing. The fix shape is
+    almost always a small table next to the error-handling code
+    example listing the fields, their types, and one-line guidance per
+    field — much more readable than burying these properties in
+    prose.
 
 ### Step 4: Produce the review
 
-Format the output as one section per changed file. Within each file group
-findings by checklist section (Ingestion / Failover / Connect string /
-Cross-cutting). Use this structure:
+Format the output as one section per changed file. **Within each file,
+order findings by severity, worst first** — ❌ Missing, then ⚠️ Partial,
+then ✅ Covered at the bottom. This is the load-bearing rule of the output
+format: human readers scan top-down looking for action items, and a doc
+author should be able to stop reading as soon as the ❌/⚠️ blocks end.
+
+Do **not** group by checklist section (Ingestion / Failover / Connect
+string / Cross-cutting). Instead, tag each finding with its section in
+parentheses after the title — `(Ingestion)`, `(Failover)`, `(Connect
+string)`, `(Cross-cutting)` — so the author still knows which category an
+item belongs to without losing the severity ordering.
+
+Within a severity bucket, order by impact (the gap a reader would hit
+first or hardest comes first). When in doubt, follow the checklist's own
+ordering as a tiebreaker.
+
+The ✅ Covered block at the bottom may be terser than the ❌/⚠️ blocks
+above it — one-line confirmations with citation are fine. The point of
+keeping Covered findings in the output at all is to let the author see
+that the item *was* checked and reassure them no follow-up is needed; it
+is not to re-justify the verdict.
+
+Use this structure:
 
 ```markdown
 ## documentation/ingestion/clients/<lang>.md
 
-### Ingestion
-- ❌ **Missing — inserting NULL values.** The column-method list (lines
-  245-256) shows typed setters but never says how to write null. No
-  example. Recommend adding either an explicit `setNull(name)` example or
-  a one-liner stating that omitted columns are stored as null.
-- ⚠️ **Partial — multiple publishers.** Line 845 states `Sender` is not
-  thread-safe, but the statement is under "Parallel queries" where a
-  reader looking for ingestion guidance would not look. Move or duplicate
-  under "Data ingestion."
-- ✅ **Covered — DDL.** Lines 559-582 show CREATE TABLE with
-  `onExecDone`.
-
-### Failover
-- ❌ **Missing — duplicate-data hazard on mid-stream failover.** The
-  `onFailoverReset` callback is mentioned (lines 784-790) but the page
+- ❌ **Missing — inserting NULL values (Ingestion).** The column-method
+  list (lines 245-256) shows typed setters but never says how to write
+  null. No example. Recommend adding either an explicit `setNull(name)`
+  example or a one-liner stating that omitted columns are stored as null.
+- ❌ **Missing — duplicate-data hazard on mid-stream failover (Failover).**
+  The `onFailoverReset` callback is mentioned (lines 784-790) but the page
   does not say *what happens if you don't wire it*. Add an explicit
   warning: "Without an onFailoverReset handler that clears accumulated
   results, the application will observe duplicate rows after a mid-stream
   reconnect."
-- ...
-
-### Connect string
-- ...
-
-### Cross-cutting
-- ...
+- ⚠️ **Partial — multiple publishers (Ingestion).** Line 845 states
+  `Sender` is not thread-safe, but the statement is under "Parallel
+  queries" where a reader looking for ingestion guidance would not look.
+  Move or duplicate under "Data ingestion."
+- ⚠️ **Partial — OIDC (Cross-cutting).** Line 172 is a bare "see the
+  security page" pointer; the client page must answer how the app
+  acquires the token and what happens on expiry.
+- ✅ **Covered — DDL (Ingestion).** Lines 559-582 show CREATE TABLE with
+  `onExecDone`.
+- ✅ **Covered — thread safety statement (Cross-cutting).** Stated at
+  l.236-244 next to the ingestion code.
+- ✅ **Covered — connect-string reference link (Connect string).** l.198.
 ```
 
 End with a short summary: total counts (Covered / Partial / Missing), the
