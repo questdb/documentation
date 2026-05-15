@@ -56,7 +56,7 @@ Arithmetic operations on window functions (e.g., `sum(...) OVER (...) / sum(...)
 | [`lead()`](reference.md#lead) | Value from following row | No |
 | [`max()`](reference.md#max) | Maximum value in window | Yes |
 | [`min()`](reference.md#min) | Minimum value in window | Yes |
-| [`nth_value()`](reference.md#nth_value) | N-th value in window (`double` only) | Yes |
+| [`nth_value()`](reference.md#nth_value) | N-th value in window | Yes |
 | [`ntile()`](reference.md#ntile) | Bucket number from 1 to N | No |
 | [`percent_rank()`](reference.md#percent_rank) | Relative rank (0 to 1) | No |
 | [`rank()`](reference.md#rank) | Rank with gaps for ties | No |

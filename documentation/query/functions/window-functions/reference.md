@@ -578,11 +578,11 @@ nth_value(value, n) OVER (window_definition)
 ```
 
 **Arguments:**
-- `value`: `double` column or expression to retrieve
+- `value`: Column or expression to retrieve (`double`, `long`, or `timestamp`)
 - `n`: Positive integer constant, the 1-based position within the frame
 
 **Return value:**
-- `double`. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
+- Same type as input. The `n`-th value in the window frame, or `NULL` when the frame contains fewer than `n` rows
 
 **Description:**
 
