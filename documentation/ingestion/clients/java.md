@@ -406,13 +406,10 @@ timestamp).
 
 ### Decimal columns
 
-:::caution
-Decimal values require QuestDB 9.2.0 or later. Create decimal columns ahead
-of time with `DECIMAL(precision, scale)` so QuestDB ingests values with the
-expected precision. See the
+Create decimal columns ahead of time with `DECIMAL(precision, scale)` so
+QuestDB ingests values with the expected precision. See the
 [decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
 page for details.
-:::
 
 ### Flushing
 
