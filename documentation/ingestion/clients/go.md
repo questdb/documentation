@@ -195,9 +195,16 @@ sender, err := qdb.LineSenderFromConf(ctx,
 
 // Querying: prefer a replica to offload the primary
 client, err := qdb.QwpQueryClientFromConf(ctx,
-	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
+	"wss::addr=db-1.example.com:9000,db-2.example.com:9000,db-3.example.com:9000;"+
 		"token=your_bearer_token;target=replica;")
 ```
+
+With `target=replica`, the client skips any endpoint whose role is PRIMARY.
+If a replica gets promoted to primary (e.g., after the old primary dies),
+the client has one fewer eligible endpoint. In a two-node cluster with
+`target=replica`, a single promotion leaves zero eligible endpoints and the
+client cannot query. Use `target=any` for two-node setups, or provide at
+least three endpoints when using `target=replica`.
 
 ### TLS trust store
 
@@ -948,7 +955,16 @@ the producer; you do not change the ingestion loop for it.
 ### Query failover
 
 The query client drives a per-query reconnect loop. On a mid-stream transport
-error it reconnects and replays the query.
+error it reconnects to another endpoint and replays the query.
+
+:::warning Failover requires multiple endpoints
+
+Failover rotates across endpoints. With a single `addr`, there is no other
+host to try, and the loop exhausts after one attempt regardless of
+`failover_max_attempts`. For failover to be useful, provide at least two
+addresses.
+
+:::
 
 | Key                           | Default | Description                       |
 | ----------------------------- | ------- | --------------------------------- |
@@ -988,6 +1004,13 @@ If you do not need transparent continuation, the simple loop is correct:
 returning on any error treats a reset as terminal, which the client supports
 explicitly. When the failover budget is consumed, `Batches()` (and `Exec`)
 return `*QwpFailoverExhaustedError`.
+
+After failover exhaustion, the query client enters a terminal state.
+Subsequent `Query` or `Exec` calls fail until you `Close` the client and
+create a new one. This differs from ingestion, where the `LineSender` has a
+continuous reconnect loop (`reconnect_max_duration_millis`, default 5
+minutes) that spans full outages transparently. The query client reconnects
+only within the scope of a single query.
 
 ### Observability
 

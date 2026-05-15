@@ -809,8 +809,8 @@ if the sender process dies.
 ### Query failover
 
 The query client drives a per-query reconnect loop. When a transport error
-occurs mid-stream, the client reconnects and replays the query. `batch_seq`
-restarts at 0 on the new connection.
+occurs mid-stream, the client reconnects to another endpoint and replays the
+query. `batch_seq` restarts at 0 on the new connection.
 
 Key connect-string options:
 
@@ -821,6 +821,15 @@ Key connect-string options:
 | `failover_backoff_initial_ms` | `50`    | First post-failure sleep.                 |
 | `failover_backoff_max_ms`     | `1000`  | Cap on per-attempt sleep.                 |
 | `failover_max_duration_ms`    | `30000` | Total wall-clock budget per query.        |
+
+:::warning Failover requires multiple endpoints
+
+Failover rotates across endpoints. With a single `addr`, there is no other
+host to try, and the loop exhausts after one attempt regardless of
+`failover_max_attempts`. For failover to be useful, provide at least two
+addresses.
+
+:::
 
 **Handling partial results**: when failover occurs mid-stream, the
 `onFailoverReset` callback fires before replayed batches arrive. Use it to
@@ -836,6 +845,31 @@ public void onFailoverReset(QwpServerInfo newNode) {
 
 If you do not clear state, you will see overlapping data (the server replays
 the full result set).
+
+`onFailoverReset` is a mid-stream event only. It does not fire during
+`connect()` or between queries. If the connection drops between queries,
+the next `execute()` call handles the reconnect internally.
+
+**Terminal failure**: when all endpoints are unreachable and the failover
+budget is exhausted, the error is delivered via `onError` and the
+`QwpQueryClient` enters a terminal state. Subsequent `execute()` calls
+throw `IllegalStateException`. Close the client and create a new one:
+
+```java
+try {
+    client.execute(sql, handler);
+} catch (IllegalStateException e) {
+    client.close();
+    client = QwpQueryClient.fromConfig("ws::addr=...");
+    client.connect();
+    client.execute(sql, handler);
+}
+```
+
+This differs from ingestion, where the `Sender` has a continuous reconnect
+loop (`reconnect_max_duration_millis`, default 5 minutes) that spans full
+outages transparently. The query client does not have an equivalent; it
+reconnects only within the scope of a single `execute()` call.
 
 ### Connection events
 
