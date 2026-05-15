@@ -195,12 +195,36 @@ WebSocket upgrade request.
 - `username` — username for HTTP basic authentication.
 - `password` — password for HTTP basic authentication.
 - `token` — bearer token sent as `Authorization: Bearer <token>`. Mutually
-  exclusive with `username` / `password`.
+  exclusive with `username` / `password`. For OIDC-issued tokens, see
+  [OIDC](#oidc).
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
   Does not cover TCP connect, TLS handshake, or post-upgrade frame reads —
   those use OS or hard-coded defaults. Default: `15000` (15 s).
 
-For mutual TLS, configure trusted roots in the [TLS](#tls) section.
+**Mutual TLS (mTLS).** Not supported. The client validates the server's
+certificate against a trust store but cannot present a client certificate;
+the TLS handshake is server-authenticated only. `tls_roots` /
+`tls_roots_password` configure server-cert trust, not client identity. Use
+`token=<access_token>` (bearer / OIDC) or `username=` / `password=` for
+client authentication.
+
+### OIDC {#oidc}
+
+The client does not perform OIDC flows itself — there is no issuer
+discovery, no client registration, and no token refresh. To authenticate
+against a QuestDB Enterprise server configured with an OIDC provider,
+obtain an access token out-of-band and pass it as `token=<access_token>`;
+the server validates the token against its configured OIDC provider and
+resolves the principal and groups from the token claims.
+
+```
+wss::addr=questdb.example.com:443;token=<access_token>;
+```
+
+The token is static for the lifetime of the connection. The application
+is responsible for refreshing the token and creating a new client (or
+reconnecting with an updated connect string) before expiry. `oidc_*`
+connect-string keys are not supported.
 
 ## TLS {#tls}
 
@@ -222,10 +246,13 @@ TLS is enabled by selecting the `wss` schema.
 `tls_roots` / `tls_roots_password` are a Java-keystore feature. Some clients
 (for example, Go) verify against the operating-system trust store only and
 **reject these keys at parse time**; to trust a private CA there, install it
-in the host trust store. Mutual TLS (client certificates) is likewise not
-supported by every client. Check the relevant
+in the host trust store. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
 specifics.
+
+Mutual TLS (client certificates) is not supported by QuestDB — the server
+does not negotiate client certificates regardless of client. See
+[Authentication](#auth) for the supported credential paths.
 
 :::
 
