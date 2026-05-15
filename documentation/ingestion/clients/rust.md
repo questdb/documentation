@@ -633,6 +633,17 @@ ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 The client picks an endpoint, connects, and walks the list to find the next
 healthy peer when the current connection breaks.
 
+:::tip Strongly recommend sf_dir for multi-host deployments
+
+Without `sf_dir`, `flush()` blocks when the connection is down and the
+in-memory queue fills up. After `sf_append_deadline_millis` (default 30s),
+it returns `SubmitTimedOut`. With `sf_dir`, `flush()` writes to disk and
+returns quickly while the reconnect loop replays to the new primary in the
+background. For any deployment where failover may take more than a few
+seconds, `sf_dir` is strongly recommended.
+
+:::
+
 ### Reconnect knobs
 
 | Key | Default | Description |
@@ -653,7 +664,15 @@ unchanged.
 The Rust client does not currently expose connection-state event callbacks
 (the equivalent of Java's `SenderConnectionListener`). Connection lifecycle is
 observable through `log` crate output and through error notifications
-delivered to the polling API or the `qwp_ws_error_handler` callback.
+delivered to the polling API or the `qwp_ws_error_handler` callback. To see
+reconnect events, enable logging for the `questdb` target:
+
+```rust
+// e.g., with the env_logger crate
+env_logger::Builder::from_env(
+    env_logger::Env::default().default_filter_or("questdb=info")
+).init();
+```
 
 ### Error classification
 
@@ -745,6 +764,73 @@ To migrate an existing sender, change the connect string from `http::` to
 `ws::` (or `https::` to `wss::`), drop any `auto_flush_*` keys, install a
 `qwp_ws_error_handler` or poll `poll_qwp_ws_error()`, and call `close_drain()`
 before dropping the sender.
+
+## Full example: multi-host ingestion with failover
+
+This example shows a production ingestion loop with store-and-forward,
+multi-host failover, and proper error handling including the retry pattern
+around `flush()`.
+
+```rust
+use questdb::ingress::{Sender, TimestampNanos};
+use std::{thread, time::Duration};
+
+fn main() -> questdb::Result<()> {
+    // Multi-host with store-and-forward for failover durability.
+    // Without sf_dir, flush() blocks during an outage and times out
+    // after sf_append_deadline_millis (default 30s). With sf_dir,
+    // flush() writes to disk and returns quickly while the reconnect
+    // loop replays to the new primary in the background.
+    let mut sender = Sender::from_conf(
+        "wss::addr=db-primary:9000,db-replica:9000;\  // Enterprise: wss, multi-host
+         token=your_bearer_token;\                     // Enterprise: token auth
+         tls_verify=unsafe_off;\                       // test only!
+         sf_dir=/var/lib/myapp/qdb-sf;\
+         sender_id=ingest-1;\
+         reconnect_max_duration_millis=300000;"
+    )?;
+
+    let mut buffer = sender.new_buffer();
+
+    loop {
+        buffer
+            .table("book")?
+            .symbol("ticker", "EURUSD")?
+            .column_f64("price", 1.0842)?
+            .column_f64("size", 100_000.0)?
+            .at(TimestampNanos::now())?;
+
+        // flush() can still return SubmitTimedOut if the SF queue
+        // fills to sf_max_total_bytes during a prolonged outage.
+        // The buffer is retained on error; retry on the next pass.
+        match sender.flush(&mut buffer) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("flush error: {e}");
+                // Check if the sender is terminal (auth failure,
+                // reconnect budget exhausted). If so, recreate it.
+                if sender.must_close() {
+                    eprintln!("sender is terminal, exiting");
+                    break;
+                }
+                // Otherwise the buffer still holds the rows;
+                // the next flush() retries them.
+            }
+        }
+
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    sender.close_drain()?;
+    Ok(())
+}
+
+// Without store-and-forward (sf_dir not set), the same code works for
+// short outages but flush() will return SubmitTimedOut if the in-memory
+// queue fills before the reconnect loop succeeds. For any multi-host
+// deployment where failover may take more than a few seconds, sf_dir
+// is strongly recommended.
+```
 
 ## Next steps
 
