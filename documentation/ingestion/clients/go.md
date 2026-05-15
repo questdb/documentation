@@ -9,6 +9,10 @@ description:
 
 import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
+import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
+
+import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
+
 The QuestDB Go client connects to QuestDB over the
 [QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/)
 (WebSocket). It supports high-throughput data ingestion and streaming SQL
@@ -175,13 +179,11 @@ client, err := qdb.NewQwpQueryClient(ctx,
 	qdb.WithQwpQueryBearerToken("your_bearer_token"))
 ```
 
-The client takes a **static** bearer token; it does not acquire or refresh
-OIDC tokens. With [OpenID Connect](/docs/security/oidc/), the application
-obtains the access token from the identity provider and is responsible for
-rotating it before it expires. An expired or revoked token is not refreshed
-in place: the next connect or reconnect fails with a `SECURITY_ERROR` (or a
-`401`/`403` on the WebSocket upgrade — terminal across all endpoints). To
-rotate, construct a new sender or client with the fresh token.
+<OidcClientNote />
+
+For Go, [`coreos/go-oidc`](https://github.com/coreos/go-oidc) or
+[`golang.org/x/oauth2`](https://pkg.go.dev/golang.org/x/oauth2) can handle
+the token acquisition.
 
 ### Production example (TLS + auth + multi-host)
 
@@ -198,16 +200,14 @@ client, err := qdb.QwpQueryClientFromConf(ctx,
 		"token=your_bearer_token;target=replica;")
 ```
 
-### TLS trust store and mTLS
+### TLS trust store
 
 TLS is enabled by the `wss` schema (or `qdb.WithTls()`). The Go client
 verifies the server certificate against the **operating-system trust
 store**. It does **not** support a custom trust store: the `tls_roots` /
 `tls_roots_password` connect-string keys (a Java-keystore feature) are
 rejected by the Go connect-string parser. To trust a private CA, install it
-in the host trust store. Mutual TLS (client certificates) is **not
-supported** by this client — authenticate with a bearer token or basic auth
-over `wss` instead. For test-only certificate-verification bypass, see
+in the host trust store. For test-only certificate-verification bypass, see
 `tls_verify` in the
 [TLS section](/docs/connect/clients/connect-string#tls) of the connect
 string reference.
@@ -242,8 +242,12 @@ sender, err := qdb.LineSenderFromEnv(ctx)
 
 ### Using the options API
 
-The options API provides type-safe configuration. `NewLineSender` requires
-exactly one transport option (`qdb.WithQwp()` here);
+The options API exposes the same options as the connect string, with type-safe
+Go signatures (e.g., `sf_append_deadline_millis` becomes
+`qdb.WithSfAppendDeadline(30*time.Second)`). For the full list of keys, see
+the [connect string reference](/docs/client-configuration/connect-string/).
+
+`NewLineSender` requires exactly one transport option (`qdb.WithQwp()` here);
 `LineSenderFromConf` infers the transport from the `ws`/`wss` schema instead.
 An error handler can only be set through the options API:
 
@@ -484,35 +488,25 @@ replayed after reconnection, surviving sender process restarts:
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 ```
 
+When multiple senders share the same `sf_dir`, each must have a distinct
+`sender_id`. Slots are exclusive: two senders with the same ID will collide.
+Allowed characters: `A-Za-z0-9_-`.
+
 Without `sf_dir`, unacknowledged data lives in process memory and is lost if
 the sender process dies. The reconnect loop still spans transient server
 outages, but the RAM buffer caps how much data can accumulate.
 
-:::caution Replay is at-least-once — enable DEDUP
+<SfDedupWarning />
 
-After a reconnect or a sender restart, the client replays frames the server
-may have accepted but not yet acknowledged. Without
-[DEDUP](/docs/concepts/deduplication/) on the target table, replay produces
-duplicate rows. Tables ingested over a reconnecting or multi-host connection
-**must** declare `DEDUP UPSERT KEYS(...)` covering row identity. See
-[Delivery semantics](/docs/concepts/delivery-semantics/) for the full
-at-least-once / exactly-once model.
+With store-and-forward enabled, `At`/`AtNow`/`Flush` can block when the
+buffer hits its cap. The producer blocks until the wire path drains enough
+capacity, then returns a deadline error (`sf_append_deadline_millis`) if it
+does not drain in time. Treat a blocking call as a signal that the server is
+unreachable or slow, not as a reason to retry in a tight loop.
 
-:::
-
-:::caution Store-and-forward changes how `At` and errors behave
-
-- **`At`/`AtNow`/`Flush` can block.** When the on-disk buffer hits its cap,
-  the producer blocks until the wire path drains it, then returns a deadline
-  error (`sf_append_deadline_millis`) if it does not drain in time. Treat a
-  blocking `At` as a signal that the server is unreachable or slow, not as a
-  reason to retry in a tight loop.
-- **Terminal rejections halt the sender.** A schema, parse, or security
-  rejection latches a terminal error. The next producer call returns it as a
-  typed `*SenderError`; the sender will not drain further. You must `Close`
-  and create a new sender to continue.
-
-:::
+Terminal rejections (schema, parse, or security errors) latch a terminal
+error. The next producer call returns it as a typed `*SenderError`; the
+sender will not drain further. Close it and create a new sender to continue.
 
 For concepts, sizing, and recovery, see
 [store-and-forward](/docs/high-availability/store-and-forward/concepts/) and the

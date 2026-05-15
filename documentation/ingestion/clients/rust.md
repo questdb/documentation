@@ -5,6 +5,10 @@ sidebar_label: Rust
 description: "QuestDB Rust client for high-throughput data ingestion over the QWP binary protocol (WebSocket)."
 ---
 
+import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
+
+import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
+
 The QuestDB Rust client connects to QuestDB over the
 [QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
 It supports high-throughput, column-oriented batched writes with automatic table
@@ -89,23 +93,11 @@ let mut sender = Sender::from_conf(
 )?;
 ```
 
-:::note OIDC
+<OidcClientNote />
 
-The Rust client does not implement any OIDC flow (client-credentials,
-authorization-code, or refresh-token). For OIDC-secured deployments:
-
-1. Acquire a bearer token in your application using an OIDC library such
-   as [`openidconnect`](https://crates.io/crates/openidconnect) or
-   [`oauth2`](https://crates.io/crates/oauth2).
-2. Pass it to the client via `token=...`.
-3. The client does not refresh the token. When it expires mid-session
-   the client surfaces a terminal auth error; rebuild the `Sender` with
-   a fresh token.
-
-The server-side OIDC flow is documented at
-[OpenID Connect](/docs/security/oidc/).
-
-:::
+For Rust, [`openidconnect`](https://crates.io/crates/openidconnect) or
+[`oauth2`](https://crates.io/crates/oauth2) can handle the token
+acquisition.
 
 ### TLS
 
@@ -125,15 +117,6 @@ Supported values:
 | `tls_ca=webpki_and_os_roots` | Combine both. |
 | `tls_roots=/path/to/root-ca.pem` | Load roots from a PEM file. Useful for self-signed certs during testing. |
 | `tls_verify=unsafe_off` | Disable verification. Never use in production. |
-
-:::note mTLS (client certificates) not supported
-
-The Rust client does not currently implement mTLS / client-certificate
-auth. The TLS surface is one-way: the client verifies the server, not
-the other way round. For credential auth, use HTTP basic (`username` +
-`password`) or bearer token (`token`).
-
-:::
 
 ### Authentication timeout
 
@@ -171,7 +154,10 @@ let mut sender = Sender::from_env()?;
 
 ### Using the builder API
 
-The builder lets you configure programmatically:
+The builder exposes the same options as the connect string, with Rust-typed
+signatures (e.g., `sf_append_deadline_millis` becomes
+`sf_append_deadline(Duration::from_secs(30))`). For the full list of keys, see
+the [connect string reference](/docs/client-configuration/connect-string/).
 
 ```rust
 use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};
@@ -279,7 +265,7 @@ fn main() -> Result<()> {
     let mut buffer = sender.new_buffer();
     buffer
         .table("fx_order_book")?
-        .symbol("symbol", "EUR/USD")?
+        .symbol("symbol", "EURUSD")?
         .column_arr("bids", &vec![
             vec![1.0850, 600000.0],
             vec![1.0849, 300000.0],
@@ -459,6 +445,8 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 Without `sf_dir`, unacknowledged data lives in process memory and is lost if
 the sender process exits. The reconnect loop still spans transient server
 outages, but a RAM cap bounds how much data can accumulate.
+
+<SfDedupWarning />
 
 ### SF tuning keys
 

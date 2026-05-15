@@ -1,0 +1,17 @@
+:::note OIDC (Enterprise)
+
+QuestDB client libraries do not implement OIDC flows (client-credentials,
+authorization-code, or refresh-token). For OIDC-secured deployments:
+
+1. Acquire a bearer token in your application using an OIDC library for
+   your language.
+2. Pass it to the client via `token=...` in the connect string.
+3. The client does not refresh the token. When it expires mid-session,
+   the next connect or reconnect fails with `SECURITY_ERROR` (or a
+   `401`/`403` on the WebSocket upgrade, terminal across all endpoints).
+   Close the client and create a new one with a fresh token.
+
+The server-side OIDC flow is documented at
+[OpenID Connect](/docs/security/oidc/).
+
+:::

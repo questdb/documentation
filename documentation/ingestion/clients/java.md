@@ -9,6 +9,10 @@ import Tabs from "@theme/Tabs"
 
 import TabItem from "@theme/TabItem"
 
+import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
+
+import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
+
 import CodeBlock from "@theme/CodeBlock"
 
 :::note
@@ -101,12 +105,12 @@ import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
 try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
     client.connect();
     client.execute(
-        "SELECT ts, sym, price, qty FROM trades WHERE sym = 'ETH-USD' LIMIT 10",
+        "SELECT ts, sym, price, amount FROM trades WHERE sym = 'ETH-USD' LIMIT 10",
         new QwpColumnBatchHandler() {
             @Override
             public void onBatch(QwpColumnBatch batch) {
                 batch.forEachRow(row -> System.out.printf(
-                    "ts=%d sym=%s price=%.4f qty=%d%n",
+                    "ts=%d sym=%s price=%.4f amount=%d%n",
                     row.getLongValue(0),
                     row.getSymbol(1),
                     row.getDoubleValue(2),
@@ -169,8 +173,12 @@ try (Sender sender = Sender.fromConfig(
 }
 ```
 
-For OIDC authentication (Enterprise), see
-[OpenID Connect](/docs/security/oidc/).
+<OidcClientNote />
+
+For Java, libraries such as
+[Nimbus OAuth 2.0 SDK](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
+or [Spring Security OAuth2](https://docs.spring.io/spring-security/reference/servlet/oauth2/index.html)
+can handle the token acquisition.
 
 ## Creating the client
 
@@ -214,7 +222,10 @@ try (Sender sender = Sender.fromEnv()) {
 
 ### Using the builder API
 
-The builder provides type-safe configuration:
+The builder exposes the same options as the connect string. Method names
+follow camelCase convention (e.g., `sf_append_deadline_millis` becomes
+`sfAppendDeadlineMillis()`). For the full list of keys, see the
+[connect string reference](/docs/client-configuration/connect-string/).
 
 ```java
 try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
@@ -240,6 +251,9 @@ try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
 
 ### General usage pattern
 
+`Sender` is not thread-safe. For multi-threaded workloads, create one instance
+per thread or use an object pool.
+
 1. Create a `Sender` via `Sender.fromConfig()` or the builder.
 2. Call `table(name)` to select a table.
 3. Call column methods to add values:
@@ -260,6 +274,11 @@ try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
    supported for ingestion on either the client or the server. All types are
    readable on the [egress side](#reading-result-batches).
 
+   To store a null for a column, omit that column's setter before calling
+   `at()` or `atNow()`. The column set for the batch is the union of all
+   columns seen across rows; a column first used on a later row is backfilled
+   with null for earlier rows.
+
 5. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the row.
 6. Repeat from step 2, or call `flush()` to send buffered data.
 7. Call `close()` when done (or use try-with-resources).
@@ -270,7 +289,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
           .symbol("symbol", "EURUSD")
           .symbol("side", "buy")
           .doubleColumn("price", 1.0842)
-          .longColumn("quantity", 100_000)
+          .longColumn("amount", 100_000)
           .at(Instant.now());
 }
 ```
@@ -394,7 +413,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
         sender.table("trades")
               .symbol("symbol", trade.symbol())
               .doubleColumn("price", trade.price())
-              .longColumn("quantity", trade.quantity())
+              .longColumn("amount", trade.amount())
               .at(trade.timestamp());
     }
     sender.flush();  // send everything now, regardless of auto-flush thresholds
@@ -407,8 +426,9 @@ WebSocket transport. Use the auto-flush row count and interval settings to
 control batch size instead.
 :::
 
-The client also flushes when closed. However, if the flush fails at close
-time, the client does not retry. Always flush explicitly before closing.
+The client also flushes when closed, waiting up to `close_flush_timeout_millis`
+(default 5000) for acknowledgements. If the flush fails at close time, the
+client does not retry. Always flush explicitly before closing.
 
 ### Store-and-forward
 
@@ -419,10 +439,24 @@ replayed after reconnection, surviving sender process restarts.
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 ```
 
+When multiple senders share the same `sf_dir`, each must have a distinct
+`sender_id`. Slots are exclusive: two senders with the same ID will collide.
+Allowed characters: `A-Za-z0-9_-`.
+
 Without `sf_dir`, unacknowledged data lives in process memory and is lost if
 the sender process dies. The reconnect loop still spans transient server
 outages (rolling upgrades), but the RAM buffer caps how much data can
 accumulate.
+
+<SfDedupWarning />
+
+With store-and-forward enabled, `flush()` can block when the buffer hits its
+cap. The producer blocks until the wire path drains enough capacity, up to
+`sf_append_deadline_millis` (default 30 seconds). If the deadline elapses, the
+call fails without dropping data. Terminal rejections (schema, parse, or
+security errors) latch a terminal error on the sender. The next API call
+throws `LineSenderServerException`; close the sender and create a new one to
+continue.
 
 ### Durable acknowledgement
 
@@ -559,7 +593,7 @@ are executed through the same `execute()` method. The server responds with
 ```java
 client.execute(
     "CREATE TABLE trades ("
-    + "ts TIMESTAMP, sym SYMBOL, price DOUBLE, qty LONG"
+    + "ts TIMESTAMP, sym SYMBOL, price DOUBLE, amount LONG"
     + ") TIMESTAMP(ts) PARTITION BY DAY WAL",
     new QwpColumnBatchHandler() {
         @Override
@@ -590,7 +624,7 @@ Parameterized queries use typed bind values, avoiding SQL injection and
 enabling server-side factory cache reuse across repeated calls:
 
 ```java
-String sql = "SELECT ts, sym, price, qty FROM trades "
+String sql = "SELECT ts, sym, price, amount FROM trades "
     + "WHERE sym = $1 AND price >= $2 LIMIT 1000";
 
 for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
@@ -604,24 +638,38 @@ for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
 }
 ```
 
-Bind indices are 0-based (`$1` maps to index 0). Available setters include
-`setBoolean`, `setByte`, `setShort`, `setInt`, `setLong`, `setFloat`,
-`setDouble`, `setString`, `setVarchar`, `setTimestampMicros`, `setDate`,
-`setUuid`, `setDecimal64/128/256`, `setSymbol`, `setNull`, and more.
+Bind indices are 0-based (`$1` maps to index 0). Available setters:
 
-To pass a NULL bind value:
+| Setter | Bind type |
+|--------|-----------|
+| `setBoolean(index, value)` | BOOLEAN |
+| `setByte(index, value)` | BYTE |
+| `setChar(index, value)` | CHAR |
+| `setShort(index, value)` | SHORT |
+| `setInt(index, value)` | INT |
+| `setLong(index, value)` | LONG |
+| `setFloat(index, value)` | FLOAT |
+| `setDouble(index, value)` | DOUBLE |
+| `setDate(index, millis)` | DATE |
+| `setTimestampMicros(index, micros)` | TIMESTAMP |
+| `setTimestampNanos(index, nanos)` | `timestamp_ns` |
+| `setVarchar(index, value)` | VARCHAR, STRING, and SYMBOL columns |
+| `setUuid(index, lo, hi)` or `setUuid(index, UUID)` | UUID |
+| `setLong256(index, l0, l1, l2, l3)` | LONG256 |
+| `setGeohash(index, precisionBits, value)` | GEOHASH |
+| `setDecimal64(index, scale, unscaled)` | DECIMAL64 |
+| `setDecimal128(index, scale, lo, hi)` | DECIMAL128 |
+| `setDecimal256(index, scale, ll, lh, hl, hh)` | DECIMAL256 |
+
+To pass a NULL bind value, either pass `null` to `setVarchar` or use the
+typed `setNull`:
 
 ```java
-binds -> binds.setNull(0)
+binds -> binds.setVarchar(0, null)          // null VARCHAR/SYMBOL
+binds -> binds.setNull(0, TYPE_LONG)        // typed null (requires QWP type code)
+binds -> binds.setNullGeohash(0, 20)        // null GEOHASH with precision
+binds -> binds.setNullDecimal64(0, 4)       // null DECIMAL64 with scale
 ```
-
-:::note Server leniency
-
-The current server accepts a SYMBOL wire type for bind parameters and treats
-it as VARCHAR. Compliant clients should send VARCHAR. A future revision may
-reject SYMBOL bind type codes.
-
-:::
 
 ### Flow control
 
@@ -672,12 +720,15 @@ try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
 
 Each `SenderError` carries:
 
-- **Category**: `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`,
-  `SECURITY_ERROR`, `WRITE_ERROR`, `PROTOCOL_VIOLATION`, or `UNKNOWN`.
-- **Policy**: `DROP_AND_CONTINUE` (batch dropped, sender continues) or `HALT`
-  (sender halted, next API call throws `LineSenderServerException`).
-- **Server message**: human-readable error text.
-- **Table name**: the rejected table (null for multi-table batches).
+| Field | Accessor | Description |
+|-------|----------|-------------|
+| Category | `getCategory()` | `SCHEMA_MISMATCH`, `PARSE_ERROR`, `INTERNAL_ERROR`, `SECURITY_ERROR`, `WRITE_ERROR`, `PROTOCOL_VIOLATION`, or `UNKNOWN` |
+| Policy | `getAppliedPolicy()` | `DROP_AND_CONTINUE` (batch dropped, sender continues) or `HALT` (next API call throws `LineSenderServerException`) |
+| Server message | `getServerMessage()` | Human-readable error text from the server (may be null) |
+| Table name | `getTableName()` | The rejected table (null for multi-table batches) |
+| FSN range | `getFromFsn()` / `getToFsn()` | Frame sequence number span identifying the rejected batch |
+| Message sequence | `getMessageSequence()` | Server's per-frame sequence number (`-1` if not available) |
+| Status byte | `getServerStatusByte()` | Raw QWP status code (`-1` if not available) |
 
 The error handler runs on a dedicated dispatcher thread, never on the I/O or
 producer thread.

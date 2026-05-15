@@ -210,12 +210,12 @@ client authentication.
 
 ### OIDC {#oidc}
 
-The client does not perform OIDC flows itself — there is no issuer
-discovery, no client registration, and no token refresh. To authenticate
-against a QuestDB Enterprise server configured with an OIDC provider,
-obtain an access token out-of-band and pass it as `token=<access_token>`;
-the server validates the token against its configured OIDC provider and
-resolves the principal and groups from the token claims.
+The client does not perform OIDC flows itself: no issuer discovery, no
+client registration, and no token refresh. To authenticate against a
+QuestDB Enterprise server configured with an OIDC provider, obtain an
+access token out-of-band and pass it as `token=<access_token>`; the server
+validates the token against its configured OIDC provider and resolves the
+principal and groups from the token claims.
 
 ```
 wss::addr=questdb.example.com:443;token=<access_token>;
