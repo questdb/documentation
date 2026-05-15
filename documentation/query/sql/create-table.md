@@ -34,6 +34,7 @@ The first two modes accept the same set of optional clauses:
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
+    [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
@@ -45,12 +46,16 @@ TABLE [IF NOT EXISTS] tableName
     [OWNED BY ownerName];
 ```
 
+Inline indexes (including covering indexes with `INCLUDE`) are declared
+on the column itself in `columnTypeDef` — see [Type definition](#type-definition)
+and [Column indexes](#column-indexes).
+
 ```questdb-sql title="Create from a query (CREATE TABLE AS SELECT)"
 CREATE [ATOMIC | BATCH n [o3MaxLag value]]
 TABLE [IF NOT EXISTS] tableName
     AS (selectQuery)
     [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
-    [, INDEX (columnRef [CAPACITY n]) ...]
+    [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
             [BYPASS WAL | WAL]
@@ -427,7 +432,8 @@ columnTypeDef ::=
     | DOUBLE[][]...  -- array: one [] pair per dimension
     | GEOHASH(<size>)
     | SYMBOL [CAPACITY distinctValueEstimate] [CACHE | NOCACHE]
-             [INDEX [CAPACITY valueBlockSize]]
+             [INDEX [ CAPACITY valueBlockSize
+                    | TYPE POSTING [DELTA | EF] [INCLUDE (col, ...)] ]]
     -- Simple types
     | BINARY | BOOLEAN | BYTE | CHAR | DATE | DOUBLE | FLOAT
     | INT | IPV4 | LONG | LONG256 | SHORT | STRING
