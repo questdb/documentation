@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/python
 title: Python Client Documentation
 description:
   Get started with QuestDB, as quickly as possible. Provides instructions and
@@ -35,7 +36,7 @@ It covers basic connection, authentication and some insert patterns.
 
 
 This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Python library](/docs/query/pgwire/python/) or our
+For retrieving data, we recommend using a [PostgreSQL-compatible Python library](/docs/connect/compatibility/pgwire/python/) or our
 [HTTP query endpoint](/docs/query/overview/#rest-http-api).
 
 :::
@@ -196,7 +197,7 @@ if __name__ == '__main__':
 We recommended `User`-assigned timestamps when ingesting data into QuestDB.
 Using `Server`-assigned timestamps hinders the ability to deduplicate rows which
 is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 The same `trades` insert, but via a Pandas dataframe:
 
@@ -443,12 +444,12 @@ For all the extra options you can use, please check
 [the client docs](https://py-questdb-client.readthedocs.io/en/latest/conf.html#sender-conf)
 
 Alternatively, for a breakdown of Configuration string options available across
-all clients, see the [Configuration string](/docs/ingestion/clients/configuration-string/) page.
+all clients, see the [Connect string](/docs/connect/clients/connect-string/) page.
 
 ## Transactional flush
 
 As described at the
-[ILP overview](/docs/ingestion/ilp/overview#http-transaction-semantics), the
+[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics), the
 HTTP transport has some support for transactions.
 
 The python client exposes
@@ -457,7 +458,7 @@ to make working with transactions more convenient
 
 ## Next steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for general
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for general
 details about transactions, error control, delivery guarantees, health check, or
 table and column auto-creation. The
 [Python client docs](https://py-questdb-client.readthedocs.io/en/latest/sender.html)
@@ -475,6 +476,6 @@ Alone? Stuck? Want help? Visit us in our
 [Community Forum](https://community.questdb.com/).
 
 ## Additional resources
-- [QuestDB Python clients guide](/docs/query/pgwire/python/)
+- [QuestDB Python clients guide](/docs/connect/compatibility/pgwire/python/)
 - [Integration with Polars](/docs/integrations/data-processing/polars/)
 - [Integration with Pandas](/docs/integrations/data-processing/pandas/)

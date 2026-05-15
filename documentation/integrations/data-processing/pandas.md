@@ -23,7 +23,7 @@ Protocol.
 
 ## Querying vs. Ingestion
 This page focuses on ingestion, which is the process of inserting data into
-QuestDB. For querying data, see [PGWire client guide](/docs/query/pgwire/python/#integration-with-pandas).
+QuestDB. For querying data, see [PGWire client guide](/docs/connect/compatibility/pgwire/python/#integration-with-pandas).
 
 ## Overview
 

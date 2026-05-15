@@ -128,9 +128,9 @@ Replace `<your-ip>` with your actual public IP address. For production deploymen
 :::
 
 **Default QuestDB Ports:**
-- `9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/query/rest-api/)
-- `8812`: [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
-- `9009`: [InfluxDB line protocol](/docs/ingestion/ilp/overview/) (TCP)
+- `9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/connect/compatibility/rest-api/)
+- `8812`: [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/)
+- `9009`: [InfluxDB line protocol](/docs/connect/compatibility/ilp/overview/) (TCP)
 - `9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
 Add firewall rules for additional ports as needed for your specific use case.
@@ -239,9 +239,9 @@ renderText={(release) => (
 />
 
 **Port mappings explained:**
-- `-p 9000:9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/query/rest-api/)
-- `-p 9009:9009`: [InfluxDB line protocol](/docs/ingestion/ilp/overview/) (TCP)
-- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- `-p 9000:9000`: [Web Console](/docs/getting-started/web-console/overview/) and [REST API](/docs/connect/compatibility/rest-api/)
+- `-p 9009:9009`: [InfluxDB line protocol](/docs/connect/compatibility/ilp/overview/) (TCP)
+- `-p 8812:8812`: [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/)
 - `-p 9003:9003`: [Health monitoring](/docs/operations/logging-metrics/#minimal-http-server) and Prometheus metrics
 
 :::tip Port Selection
@@ -570,7 +570,7 @@ questdb01$ psql -c "SELECT version();"
 
 Expected output should show QuestDB version information, confirming successful database connectivity.
 
-For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/query/pgwire/overview/) documentation.
+For more details on QuestDB's PostgreSQL compatibility, see the [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/) documentation.
 
 ### Manual Backup Test
 

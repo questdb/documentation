@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/ilp/columnset-types
 title: InfluxDB Line Protocol Columnset Value Types
 sidebar_label: Columnset value types
 description:
@@ -7,6 +8,19 @@ description:
 
 This page lists the supported InfluxDB Line Protocol columnset value types and
 details about type casting.
+
+:::tip QWP exposes the full type system natively
+
+This page documents InfluxDB line-protocol type extensions QuestDB layers
+on top of the InfluxDB type model (the `i`, `t`, `n`, etc. suffixes and the
+cast tables below). The native
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/qwp-ingress-websocket/)
+supports the entire QuestDB type system directly — no suffix encoding, no
+implicit casts — and is the recommended choice for new clients. See the
+[ingestion overview](/docs/connect/overview/) for languages with native
+QWP support.
+
+:::
 
 If a target column does not exist, QuestDB will create a column using the same
 type that the ILP client sends.

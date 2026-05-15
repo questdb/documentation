@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/nodejs
 title: JavaScript PGWire Guide
 description:
   JavaScript clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -29,8 +30,8 @@ for performance. Our recommendation is to use the `pg` client for most use cases
 :::tip
 
 For data ingestion, we recommend using QuestDB's first-party clients with
-the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/) instead of PGWire. PGWire should primarily be used for
-querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/ingestion/clients/nodejs/) for data
+the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire. PGWire should primarily be used for
+querying data in QuestDB. QuestDB provides an official [JavaScript client](/docs/connect/clients/nodejs/) for data
 ingestion using ILP.
 
 :::

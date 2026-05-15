@@ -489,7 +489,7 @@ PARQUET(encoding [, compression[(level)]])
 Column definitions may include an optional
 `PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
 settings only affect
-[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+[Parquet partitions](/docs/connect/compatibility/export-parquet/#in-place-conversion) and are
 ignored for native partitions. Encoding, compression, and bloom filter are all
 optional — use `default` for the encoding when specifying compression only.
 
@@ -617,7 +617,7 @@ configuration options.
 :::note
 
 When converting partitions with an explicit `bloom_filter_columns` option in
-[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+[`CONVERT PARTITION`](/docs/connect/compatibility/export-parquet/#bloom-filters-for-in-place-conversion),
 the explicit list overrides per-column `BLOOM_FILTER` metadata.
 
 :::

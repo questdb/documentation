@@ -1,7 +1,10 @@
 ---
+slug: /connect/clients/date-to-timestamp-conversion
 title: Date to Timestamp Conversion in Different Programming Languages
 sidebar_label: Date to Timestamp
-description: Python, Go, JAVA, JavaScript, C/C++, Rust, .Net, PHP, or Ruby.
+description:
+  How to convert language-native date/time values into QuestDB timestamp
+  columns, for each supported client library.
 ---
 
 Most languages have a dedicated type for dates or timestamps, with the notable exception of C. In this guide, we show how to  convert from a literal string representing a date into the native `Date` type, and then
@@ -11,7 +14,7 @@ QuestDB offers clients for Python, Go, Java, C, C++, Rust, C#/.NET, and JavaScri
 can directly use a `Timestamp` type when using the client, while others need to convert the timestamp into a
 long representing the epoch time in microseconds. We add such required conversions into the snippets.
 
-Please refer to the [ingestion overview](/docs/ingestion/overview/) to learn more about the details of the client library for your language.
+Please refer to the [ingestion overview](/docs/connect/overview/) to learn more about the details of the client library for your language.
 
 ## Date to Timestamp in Python
 
@@ -45,7 +48,7 @@ pd_timestamp = pd.Timestamp(datetime_obj)
 print(f"Pandas Timestamp: {pd_timestamp}")
 
 ```
-Learn more about the [QuestDB Python Client](/docs/ingestion/clients/python/)
+Learn more about the [QuestDB Python Client](/docs/connect/clients/python/)
 
 ## Date to Timestamp in Go
 
@@ -89,7 +92,7 @@ func main() {
 }
 
 ```
-Learn more about the [QuestDB Go Client](/docs/ingestion/clients/go/)
+Learn more about the [QuestDB Go Client](/docs/connect/clients/go/)
 
 ## Date to Timestamp in Java
 
@@ -173,7 +176,7 @@ public class Main {
 }
 ```
 
-Learn more about the [QuestDB Java Client](/docs/ingestion/clients/java/)
+Learn more about the [QuestDB Java Client](/docs/connect/clients/java/)
 
 ##  Date to Timestamp in C
 
@@ -207,7 +210,7 @@ int main() {
 }
 ```
 
-Learn more about the [QuestDB C Client](/docs/ingestion/clients/c-and-cpp/#c-1)
+Learn more about the [QuestDB C Client](/docs/connect/clients/c-and-cpp/#c-1)
 
 ## Date to Timestamp in C++
 
@@ -244,7 +247,7 @@ int main() {
     return 0;
 }
 ```
-Learn more about the [QuestDB C++ Client](/docs/ingestion/clients/c-and-cpp/)
+Learn more about the [QuestDB C++ Client](/docs/connect/clients/c-and-cpp/)
 
 ## Date to Timestamp in Rust
 
@@ -276,7 +279,7 @@ fn main() {
 
 }
 ```
-Learn more about the [QuestDB Rust Client](/docs/ingestion/clients/rust/)
+Learn more about the [QuestDB Rust Client](/docs/connect/clients/rust/)
 
 ## Date to Timestamp in C#/.NET
 
@@ -314,7 +317,7 @@ class Program
 }
 
 ```
-Learn more about the [QuestDB .NET Client](/docs/ingestion/clients/dotnet/)
+Learn more about the [QuestDB .NET Client](/docs/connect/clients/dotnet/)
 
 ## Date to Timestamp in JavasScript/Node.js
 
@@ -337,7 +340,7 @@ console.log("Timestamp (microseconds):", timestamp.toString());
 // .timestampColumn("NonDesignatedTimestampColumnName", timestamp)
 ```
 
-Learn more about the [QuestDB Node.js Client](/docs/ingestion/clients/nodejs/)
+Learn more about the [QuestDB Node.js Client](/docs/connect/clients/nodejs/)
 
 ## Date to Timestamp in Ruby
 
@@ -361,7 +364,7 @@ puts "Date: #{date_obj}"
 puts "Timestamp (microseconds): #{timestamp}"
 ```
 
-Learn more about the [ILP text format](/docs/ingestion/ilp/advanced-settings/).
+Learn more about the [ILP text format](/docs/connect/compatibility/ilp/advanced-settings/).
 
 
 ## Date to Timestamp in PHP
@@ -389,5 +392,5 @@ echo "Date: " . $time_precise->format('Y-m-d H:i:s.u') . PHP_EOL;
 echo "Timestamp (microseconds): " . $timestamp_precise . PHP_EOL;
 ```
 
-Learn more about the [ILP text format](/docs/ingestion/ilp/advanced-settings/).
+Learn more about the [ILP text format](/docs/connect/compatibility/ilp/advanced-settings/).
 

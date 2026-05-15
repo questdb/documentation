@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/overview
 title: PostgreSQL Wire Protocol
 description:
   QuestDB supports the PostgreSQL wire protocol (PGWire), allowing you to connect
@@ -22,7 +23,7 @@ tools.
 
 PGWire also supports [INSERT statements](#insert-examples) for lower-volume data
 ingestion. For high-throughput ingestion, use the
-[QuestDB clients](/docs/ingestion/overview/) instead.
+[QuestDB clients](/docs/connect/overview/) instead.
 
 ## Query examples
 
@@ -66,7 +67,7 @@ slow performance.
 
 **Solution:** Use cursor-based fetching to retrieve rows in batches.
 
-See [Handling Large Result Sets](/docs/query/pgwire/large-result-sets/) for
+See [Handling Large Result Sets](/docs/connect/compatibility/pgwire/large-result-sets/) for
 per-language examples.
 
 ### Timestamp handling

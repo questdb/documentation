@@ -29,12 +29,12 @@ const integrations: Array<{
   {
     logo: { ...logos.redpanda, width: 90, svg: RedpandaLogo },
     label: "Redpanda",
-    src: "/docs/ingestion/message-brokers/redpanda/",
+    src: "/docs/connect/message-brokers/redpanda/",
   },
   {
     logo: { ...logos.postgres, svg: PostgresLogo },
     label: "Postgres",
-    src: "/docs/query/pgwire/overview/",
+    src: "/docs/connect/compatibility/pgwire/overview/",
   },
   {
     logo: { ...logos.grafana, svg: GrafanaLogo },
@@ -44,7 +44,7 @@ const integrations: Array<{
   {
     logo: { ...logos.kafka, svg: KafkaLogo },
     label: "Kafka",
-    src: "/docs/ingestion/message-brokers/kafka/",
+    src: "/docs/connect/message-brokers/kafka/",
   },
   {
     logo: { ...logos.python, svg: PythonLogo },
@@ -69,7 +69,7 @@ const integrations: Array<{
   {
     logo: { ...logos.telegraf, svg: TelegrafLogo },
     label: "Telegraf",
-    src: "/docs/ingestion/message-brokers/telegraf/",
+    src: "/docs/connect/message-brokers/telegraf/",
   },
   {
     logo: { ...logos.mindsDB, svg: MindsDBLogo },

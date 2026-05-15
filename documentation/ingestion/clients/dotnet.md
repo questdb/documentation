@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/dotnet
 title: .NET Client Documentation
 description:
   "Get started with QuestDB using the .NET client for efficient,
@@ -31,7 +32,7 @@ perform basic insert operations.
 
 This page focuses on our high-performance ingestion client, which is optimized
 for **writing** data to QuestDB. For retrieving data, we recommend using a
-[PostgreSQL-compatible .NET library](/docs/query/pgwire/dotnet/) or our
+[PostgreSQL-compatible .NET library](/docs/connect/compatibility/pgwire/dotnet/) or our
 [HTTP query endpoint](/docs/query/overview/#rest-http-api).
 
 :::
@@ -176,7 +177,7 @@ class Program
 Now, both events use the same timestamp. We recommend using the event's
 original timestamp when ingesting data into QuestDB. Using ingestion-time
 timestamps precludes the ability to deduplicate rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 <!-- ## Ingest decimals
 
@@ -295,7 +296,7 @@ general structure is:
 [crate documentation](https://docs.rs/questdb-rs/latest/questdb/ingress) for the
 full details on configuration.
 Alternatively, for breakdown of available params, see the
-[Configuration string](/docs/ingestion/clients/configuration-string/) page.
+[Connect string](/docs/connect/clients/connect-string/) page.
 
 
 ## Preparing Data
@@ -386,7 +387,7 @@ You can also let the server assign the timestamp, by calling `AtNow()` instead.
 We recommend using the event's original timestamp when ingesting data into
 QuestDB. Using ingestion-time timestamps precludes the ability to deduplicate
 rows, which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 :::
 
@@ -494,7 +495,7 @@ batch only for a single table.
 :::caution
 
 As described in the
-[ILP overview](/docs/ingestion/ilp/overview#http-transaction-semantics), the
+[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics), the
 HTTP transport has some limitations for transactions when adding new columns.
 
 :::
@@ -648,12 +649,12 @@ using var sender =
 using var sender =
     Sender.New(
         "tcps::addr=localhost:9009;tls_verify=unsafe_off;username=admin;token=NgdiOWDoQNUP18WOnb1xkkEG5TzPYMda5SiUOvT1K0U=;");
-// See: /docs/ingestion/ilp/authenticate
+// See: /docs/connect/compatibility/ilp/authenticate
 ```
 
 ## Next Steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 

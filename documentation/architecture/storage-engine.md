@@ -50,7 +50,7 @@ to optimize writes in the event of out-of-order data or when updating sampling i
 ### Tier Three: Parquet, Locally or in an Object Store
 
 Older partitions (any partition other than the most recent one) can be converted to
-[Parquet](/docs/query/export-parquet) for both interoperability and compression ratio.
+[Parquet](/docs/connect/compatibility/export-parquet) for both interoperability and compression ratio.
 
 Partitions in Parquet format remain fully available for queries. Users don't need to know whether a partition is in QuestDB
 binary format or Parquet format. All the data types available in QuestDB can be converted to Parquet.

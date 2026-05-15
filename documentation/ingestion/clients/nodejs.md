@@ -1,4 +1,5 @@
 ---
+slug: /connect/clients/nodejs
 title: Node.js Client Documentation
 description:
   "Get started with QuestDB using the Node.js client for efficient,
@@ -30,7 +31,7 @@ QuestDB.
 :::info
 
 This page focuses on our high-performance ingestion client, which is optimized for **writing** data to QuestDB.
-For retrieving data, we recommend using a [PostgreSQL-compatible Node.js library](/docs/query/pgwire/nodejs/) or our
+For retrieving data, we recommend using a [PostgreSQL-compatible Node.js library](/docs/connect/compatibility/pgwire/nodejs/) or our
 [HTTP query endpoint](/docs/query/overview/#rest-http-api).
 
 :::
@@ -163,7 +164,7 @@ run().then(console.log).catch(console.error)
 As you can see, both events now are using the same timestamp. We recommended to
 use the original event timestamps when ingesting data into QuestDB. Using the
 current timestamp hinder the ability to deduplicate rows which is
-[important for exactly-once processing](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
 
 ## Decimal insertion
 
@@ -238,11 +239,11 @@ For all the extra options you can use, please check
 [the client docs](https://questdb.github.io/nodejs-questdb-client/classes/SenderOptions.html)
 
 Alternatively, for a breakdown of Configuration string options available across
-all clients, see the [Configuration string](/docs/ingestion/clients/configuration-string/) page.
+all clients, see the [Connect string](/docs/connect/clients/connect-string/) page.
 
 ## Next Steps
 
-Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for details
+Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
 about transactions, error control, delivery guarantees, health check, or table
 and column auto-creation.
 

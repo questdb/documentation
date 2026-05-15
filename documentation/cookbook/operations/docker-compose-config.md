@@ -98,5 +98,5 @@ For a full list of available configuration parameters, see:
 :::info Related Documentation
 - [Server Configuration](/docs/configuration/overview/)
 - [Docker Deployment Guide](/docs/deployment/docker/)
-- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/)
+- [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/)
 :::

@@ -1,4 +1,5 @@
 ---
+slug: /connect/java-embedded
 title: Java (embedded)
 description: Java embedded API reference documentation.
 ---
@@ -449,5 +450,5 @@ caching of records pointless.
 
 ## InfluxDB Line Protocol client library
 
-We have [Java Client Library](/docs/ingestion/clients/java/) to allow fast data
+We have [Java Client Library](/docs/connect/clients/java/) to allow fast data
 ingestion.

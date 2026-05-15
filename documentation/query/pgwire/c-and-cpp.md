@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/c-and-cpp
 title: C/C++ PGWire Guide
 description:
   C and C++ clients for QuestDB over the PostgreSQL wire protocol (PGWire).
@@ -28,7 +29,7 @@ a client that doesn’t work, please
 
 :::tip
 For **data ingestion**, use QuestDB’s high-throughput
-[InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/) instead of PGWire.
+[InfluxDB Line Protocol (ILP)](/docs/connect/overview/) instead of PGWire.
 PGWire is best for **querying**.
 :::
 

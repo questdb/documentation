@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/large-result-sets
 title: Handling Large Result Sets
 sidebar_label: Large Result Sets
 description:
@@ -365,6 +366,6 @@ for row in cursor:  # Streams in batches
 
 ## See also
 
-- [PostgreSQL Wire Protocol Overview](/docs/query/pgwire/overview/)
+- [PostgreSQL Wire Protocol Overview](/docs/connect/compatibility/pgwire/overview/)
 - [Query & SQL Overview](/docs/query/overview/)
 - [Capacity Planning](/docs/getting-started/capacity-planning/)

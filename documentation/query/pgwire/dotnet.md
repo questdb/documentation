@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/pgwire/dotnet
 title: .NET PGWire Guide
 description:
   .NET/C# clients for QuestDB PGWire protocol. Learn how to use the PGWire
@@ -28,9 +29,9 @@ C#, we recommend using Npgsql with connection pooling.
 
 :::tip
 
-For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/ingestion/overview/)
+For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [.NET client](https://questdb.com/docs/ingestion/clients/dotnet/) for data ingestion using ILP.
+official [.NET client](https://questdb.com/docs/connect/clients/dotnet/) for data ingestion using ILP.
 
 :::
 
@@ -812,7 +813,7 @@ the guidelines in this documentation, you can effectively query time-series data
 various .NET applications.
 
 For data ingestion, remember that QuestDB provides an
-official [.NET client](https://questdb.com/docs/ingestion/clients/dotnet/) that uses the InfluxDB Line Protocol (ILP) for
+official [.NET client](https://questdb.com/docs/connect/clients/dotnet/) that uses the InfluxDB Line Protocol (ILP) for
 high-throughput data insertion. For optimal performance, use this client for data ingestion and Npgsql for querying.
 
 QuestDB's SQL extensions for time-series data, such as `SAMPLE BY` and `LATEST ON`, provide powerful tools for analyzing

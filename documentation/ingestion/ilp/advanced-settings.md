@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/ilp/advanced-settings
 title: Advanced InfluxDB Line Protocol settings
 sidebar_label: Advanced settings
 description:
@@ -9,11 +10,23 @@ description:
 This documentation provides aid for those venturing outside of the path laid
 down by their language clients.
 
+:::tip Consider QWP first
+
+This page is for operators tuning the legacy ILP transport. For new
+deployments, prefer the
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/qwp-ingress-websocket/) —
+the native binary protocol with multi-host failover, store-and-forward,
+and the full QuestDB type system built in. See the
+[ingestion overview](/docs/connect/overview/) for languages with
+native QWP support.
+
+:::
+
 For the introductory InfluxDB Line Protocol materials, including authentication,
-see the [ILP overview](/docs/ingestion/ilp/overview/).
+see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 For the the basics of ingestion, instead consult the
-[Ingestion overview](/docs/ingestion/overview/).
+[Ingestion overview](/docs/connect/overview/).
 
 ## Syntax
 
@@ -88,7 +101,7 @@ as the row timestamp. See `cairo.timestamp.locale` and `line.tcp.timestamp`
 :::caution
 
 - While
-  [`columnset` timestamp type units](/docs/ingestion/ilp/columnset-types/#timestamp)
+  [`columnset` timestamp type units](/docs/connect/compatibility/ilp/columnset-types/#timestamp)
   are microseconds, the designated timestamp units are nanoseconds by default,
   and can be overridden via the `line.tcp.timestamp` configuration property.
 
@@ -123,7 +136,7 @@ We recommend populating designated timestamp via trailing value syntax above.
 :::
 
 It is also possible to populate designated timestamp via `columnset`. Please see
-[mixed timestamp](/docs/ingestion/ilp/columnset-types/#timestamp) reference.
+[mixed timestamp](/docs/connect/compatibility/ilp/columnset-types/#timestamp) reference.
 
 ## Irregularly-structured data
 
@@ -239,11 +252,11 @@ of new column or mapping strategy when column already exists. These types are
 limited by existing InfluxDB Line Protocol specification. Wider QuestDB type
 system is available by creating table via SQL upfront. The following are
 supported value types:
-[Integer](/docs/ingestion/ilp/columnset-types/#integer),
-[Long256](/docs/ingestion/ilp/columnset-types/#long256),
-[Float](/docs/ingestion/ilp/columnset-types/#float),
-[String](/docs/ingestion/ilp/columnset-types/#string) and
-[Timestamp](/docs/ingestion/ilp/columnset-types/#timestamp)
+[Integer](/docs/connect/compatibility/ilp/columnset-types/#integer),
+[Long256](/docs/connect/compatibility/ilp/columnset-types/#long256),
+[Float](/docs/connect/compatibility/ilp/columnset-types/#float),
+[String](/docs/connect/compatibility/ilp/columnset-types/#string) and
+[Timestamp](/docs/connect/compatibility/ilp/columnset-types/#timestamp)
 
 ## Inserting NULL values
 
@@ -296,7 +309,7 @@ means that when sending data you should be aware of the performed conversions.
 See:
 
 - [QuestDB Types in SQL](/docs/query/datatypes/overview/)
-- [InfluxDB Line Protocol types and cast conversion tables](/docs/ingestion/ilp/columnset-types/)
+- [InfluxDB Line Protocol types and cast conversion tables](/docs/connect/compatibility/ilp/columnset-types/)
 
 ## Constructing well-formed messages
 

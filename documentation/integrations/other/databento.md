@@ -16,7 +16,7 @@ For a deeper dive, see our [Databento & QuestDB blog](/blog/ingesting-live-marke
 
 - [QuestDB](/download/)
 - [Databento Python client](https://pypi.org/project/databento/)
-- [QuestDB Python client](/docs/ingestion/clients/python/)
+- [QuestDB Python client](/docs/connect/clients/python/)
 - [Grafana](/docs/integrations/visualization/grafana/) (Optional)
 
 Install the required Python libraries:

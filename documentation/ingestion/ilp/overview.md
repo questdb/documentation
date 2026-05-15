@@ -1,4 +1,5 @@
 ---
+slug: /connect/compatibility/ilp/overview
 title: InfluxDB Line Protocol Overview
 sidebar_label: Overview
 description: InfluxDB line protocol reference documentation.
@@ -18,6 +19,21 @@ import { Clients } from "../../../src/components/Clients"
 
 QuestDB implements the InfluxDB Line Protocol to ingest data.
 
+:::tip Use QWP for new clients
+
+ILP is now a **compatibility protocol** in QuestDB. It exists for users
+coming from InfluxDB, Telegraf, or Kafka / Flink pipelines that already
+emit ILP. New deployments should prefer the
+[QuestDB Wire Protocol (QWP)](/docs/connect/wire-protocols/qwp-ingress-websocket/) —
+binary on the wire, type-rich (full QuestDB type system, no suffix
+encoding), faster, and with multi-host failover and store-and-forward
+built into the client. See the
+[ingestion overview](/docs/connect/overview/) for a side-by-side
+comparison and the list of languages with native QWP clients available
+today.
+
+:::
+
 The InfluxDB Line Protocol is for **data ingestion only**.
 
 For building queries, see the
@@ -28,18 +44,18 @@ Each ILP client library also has its own language-specific documentation set.
 This supporting document thus provides an overview to aid in client selection
 and initial configuration:
 
-1. [Client libraries](/docs/ingestion/ilp/overview/#client-libraries)
-2. [Server-Side configuration](/docs/ingestion/ilp/overview/#server-side-configuration)
-3. [Transport selection](/docs/ingestion/ilp/overview/#transport-selection)
-4. [Client-Side configuration](/docs/ingestion/ilp/overview/#client-side-configuration)
-5. [Error handling](/docs/ingestion/ilp/overview/#error-handling)
-6. [Authentication](/docs/ingestion/ilp/overview/#authentication)
-7. [Table and column auto-creation](/docs/ingestion/ilp/overview/#table-and-column-auto-creation)
-8. [Timestamp column name](/docs/ingestion/ilp/overview/#timestamp-column-name)
-9. [HTTP Transaction semantics](/docs/ingestion/ilp/overview/#http-transaction-semantics)
-10. [Exactly-once delivery](/docs/ingestion/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery)
-11. [Multiple URLs for High Availability](/docs/ingestion/ilp/overview/#multiple-urls-for-high-availability)
-12. [Health Check](/docs/ingestion/ilp/overview/#health-check)
+1. [Client libraries](/docs/connect/compatibility/ilp/overview/#client-libraries)
+2. [Server-Side configuration](/docs/connect/compatibility/ilp/overview/#server-side-configuration)
+3. [Transport selection](/docs/connect/compatibility/ilp/overview/#transport-selection)
+4. [Client-Side configuration](/docs/connect/compatibility/ilp/overview/#client-side-configuration)
+5. [Error handling](/docs/connect/compatibility/ilp/overview/#error-handling)
+6. [Authentication](/docs/connect/compatibility/ilp/overview/#authentication)
+7. [Table and column auto-creation](/docs/connect/compatibility/ilp/overview/#table-and-column-auto-creation)
+8. [Timestamp column name](/docs/connect/compatibility/ilp/overview/#timestamp-column-name)
+9. [HTTP Transaction semantics](/docs/connect/compatibility/ilp/overview/#http-transaction-semantics)
+10. [Exactly-once delivery](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery)
+11. [Multiple URLs for High Availability](/docs/connect/compatibility/ilp/overview/#multiple-urls-for-high-availability)
+12. [Health Check](/docs/connect/compatibility/ilp/overview/#health-check)
 
 ## Client libraries
 
@@ -104,7 +120,7 @@ schema::key1=value1;key2=value2;key3=value3;
 It is made up of the following parts:
 
 - **Schema**: One of the specified schemas in the
-  [core parameters](/docs/ingestion/ilp/overview/#core-parameters) section
+  [core parameters](/docs/connect/compatibility/ilp/overview/#core-parameters) section
   below
 - **Key=Value**: Each key-value pair sets a specific parameter for the client
 - **Terminating semicolon**: A semicolon must follow the last key-value pair
@@ -179,7 +195,7 @@ completeness and for users who have specific requirements.
 
 :::
 
-_See the [Authentication](/docs/ingestion/ilp/overview/#authentication)
+_See the [Authentication](/docs/connect/compatibility/ilp/overview/#authentication)
 section below for configuration._
 
 - **auth_timeout**: Timeout for TCP authentication with QuestDB server, in
@@ -281,9 +297,9 @@ provides holistic security out-of-the-box.
 :::
 
 InfluxDB Line Protocol supports authentication via HTTP Basic Authentication,
-using [the HTTP Parameters](/docs/ingestion/ilp/overview/#http-parameters),
+using [the HTTP Parameters](/docs/connect/compatibility/ilp/overview/#http-parameters),
 or via token when using the TCP transport, using
-[the TCP Parameters](/docs/ingestion/ilp/overview/#tcp-parameters).
+[the TCP Parameters](/docs/connect/compatibility/ilp/overview/#tcp-parameters).
 
 A similar pattern is used across all client libraries. If you want to use a TCP
 token, you need to configure your QuestDB server. This document will break down

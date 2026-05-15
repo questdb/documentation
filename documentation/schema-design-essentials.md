@@ -400,7 +400,7 @@ permissions for access control.
 
 ## PostgreSQL compatibility
 
-QuestDB supports the [PostgreSQL wire protocol](/docs/query/pgwire/overview/),
+QuestDB supports the [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/),
 so most PostgreSQL client libraries work. However, QuestDB is not PostgreSQL:
 
 - No `PRIMARY KEY`, `FOREIGN KEY`, or `NOT NULL` constraints
@@ -502,11 +502,11 @@ CREATE TABLE metrics (
 For schema migrations, QuestDB supports [Flyway](https://documentation.red-gate.com/fd/questdb-305791448.html).
 
 You can also use ILP auto-creation for dynamic schemas, though this applies
-default settings. See [ILP Overview](/docs/ingestion/ilp/overview/) for details.
+default settings. See [ILP Overview](/docs/connect/compatibility/ilp/overview/) for details.
 
 ## Next steps
 
 - [Quick Start](/docs/getting-started/quick-start/) — Create your first table and run queries
 - [Capacity Planning](/docs/getting-started/capacity-planning/) — Size your deployment for production
-- [Connect & Ingest](/docs/ingestion/overview/) — Load data into QuestDB
+- [Connect & Ingest](/docs/connect/overview/) — Load data into QuestDB
 - [Materialized Views](/docs/concepts/materialized-views/) — Pre-compute aggregations for fast dashboards

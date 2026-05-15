@@ -1,4 +1,5 @@
 ---
+slug: /connect/message-brokers/telegraf
 title: Telegraf
 description:
   Learn how to use Telegraf to collect system metrics and send this data to

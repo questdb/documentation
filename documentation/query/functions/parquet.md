@@ -6,7 +6,7 @@ description: QuestDB Apache Parquet functions reference documentation.
 
 QuestDB can read and query external [Apache Parquet](/glossary/apache-parquet/) files using SQL.
 
-To export data as Parquet, see [Parquet Export](/docs/query/export-parquet/).
+To export data as Parquet, see [Parquet Export](/docs/connect/compatibility/export-parquet/).
 
 :::info
 Apache Parquet support is in **beta**. Please report issues via [email](mailto:support@questdb.io), [Slack](https://slack.questdb.com/), or [Discourse](https://community.questdb.com/).
