@@ -375,9 +375,47 @@ size (via `buffer.len()`) exceeds a threshold.
 contents (for example, to fan the same buffer out to multiple senders).
 
 On QWP/WebSocket, `flush()` returns once the buffer is accepted by the local
-replay queue, before the server acknowledges it. Server errors observed later
-are reported asynchronously (see
+replay queue, before the server acknowledges it. The call can block if the
+queue is full — see [Backpressure on `flush()`](#backpressure-on-flush). Server
+errors observed later are reported asynchronously (see
 [Asynchronous error handling](#asynchronous-error-handling)).
+
+### Backpressure on `flush()`
+
+`flush()` is not unconditionally non-blocking. The publisher feeds a bounded
+queue with two stacked caps:
+
+1. **In-flight window** — `max_in_flight` (default `128`) unacknowledged
+   frames on the connection. Reached first under steady-state load when the
+   server keeps up but you have many small flushes in flight.
+2. **Queue cap** — `sf_max_total_bytes` (default `128 MiB` in memory mode,
+   `10 GiB` in disk mode). Reached when the server is unreachable long
+   enough that the in-flight count stops being the active limit.
+
+When either cap is hit, `flush()` blocks the caller and retries as the I/O
+loop releases capacity (ACK-driven trim). The wait is bounded by
+`sf_append_deadline_millis` (default `30000`). If the deadline elapses,
+`flush()` returns a `SubmitTimedOut` error — the application can retry, fail
+closed, or shed load. **No data is ever dropped or overwritten** while the
+publisher is parked.
+
+Memory-only and disk-backed modes have identical backpressure semantics: the
+same SFA queue handles both; only the cap default and whether the buffered
+data survives a sender restart differ.
+
+`buffer.column_*` setters and `buffer.table(...)` never block — they only
+mutate the in-process `Buffer`. Backpressure surfaces only at `flush()`.
+
+:::caution Oversized payloads are rejected, not parked
+
+A single flushed payload larger than `sf_max_bytes` (default `4 MiB`) returns
+a `PayloadExceedsByteCapacity` error from `flush()` immediately — it does
+*not* enter the backpressure wait. The error carries the payload length and
+the segment capacity. Fixes: reduce the number of rows you accumulate per
+buffer before flushing, or raise `sf_max_bytes` to fit your largest single
+flushed payload.
+
+:::
 
 ### FSN-based completion
 
@@ -431,7 +469,7 @@ outages, but a RAM cap bounds how much data can accumulate.
 | `sf_max_bytes` | 4 MiB | Per-segment size cap. |
 | `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
 | `sf_durability` | `memory` | `memory` is the only shipping value. `flush` and `append` are reserved for future per-write fsync modes; setting them today fails sender construction. |
-| `sf_append_deadline_millis` | 30000 | Per-append wait budget in `append` mode. |
+| `sf_append_deadline_millis` | 30000 | Maximum time `flush()` blocks waiting for queue capacity to free up. Applies in both memory and disk modes (the SFA queue is shared). On timeout, `flush()` surfaces a `SubmitTimedOut` error; no data is dropped. See [Backpressure on `flush()`](#backpressure-on-flush). |
 | `drain_orphans` | `off` | If `on`, take over stale slots owned by a previous sender. |
 | `max_background_drainers` | 4 | Concurrency cap when draining orphans. |
 
