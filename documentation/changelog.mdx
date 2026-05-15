@@ -14,9 +14,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
 - [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
+- [DECLARE with Grafana time range](/docs/cookbook/integrations/grafana/declare-time-range/) - Pass Grafana dashboard time range into QuestDB `DECLARE` variables
 
 ### Reference
 
+- Added [`ntile()`](/docs/query/functions/window-functions/reference/#ntile), [`cume_dist()`](/docs/query/functions/window-functions/reference/#cume_dist), and [`nth_value()`](/docs/query/functions/window-functions/reference/#nth_value) window functions
 - Fixed `timestamp_ns` valid range documentation
 - Added precise microsecond-grained timestamp examples for PHP clients
 - Fixed PIVOT syntax: removed redundant `FOR` from multiple pivot statements
@@ -33,6 +35,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [PIVOT](/docs/query/sql/pivot/) - Fixed examples to use demo server data
 - [Array functions](/docs/query/functions/array/) - Improved page with demo examples
 - [TICK syntax](/docs/query/operators/tick/) - Documented imprecise date support
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Documented `FILL(PREV(col))` fast-path syntax and updated FROM-TO limitations for keyed queries
+- [Grafana integration](/docs/integrations/visualization/grafana/) - Restructured query macros section with full documentation of all five plugin macros
 - [Configuration reference](/docs/configuration/overview/) - Revamped into 17 dedicated per-subsystem pages with epigraph-style property listings
 
 ## April 2026
