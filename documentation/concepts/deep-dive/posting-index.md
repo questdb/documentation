@@ -91,9 +91,10 @@ sym = 'X'`. The expanded list is what `SHOW CREATE TABLE` round-trips, so
 
 :::note
 
-The `INCLUDE` clause is only supported with inline column syntax and
-`ALTER TABLE`. The out-of-line `INDEX(col TYPE POSTING)` syntax does not
-support `INCLUDE`.
+The `INCLUDE` clause is only supported with inline column syntax in
+`CREATE TABLE` and with `ALTER TABLE`. The out-of-line
+`INDEX(col TYPE POSTING)` syntax and `ALTER MATERIALIZED VIEW` both reject
+`INCLUDE`.
 
 Writing `INDEX INCLUDE (...)` (no explicit `TYPE`) is also accepted and
 implicitly creates a posting index — `INCLUDE` is only valid with
@@ -151,13 +152,6 @@ CREATE TABLE t2 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING EF)
 CREATE TABLE t3 (ts TIMESTAMP, s SYMBOL INDEX TYPE POSTING DELTA)
     TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
-
-:::note
-
-`CAPACITY` is only supported for bitmap indexes. Using `CAPACITY` with a
-posting index will produce an error.
-
-:::
 
 ## Covering index
 
@@ -223,24 +217,16 @@ covering optimization and will be read from column files.
 
 ### Inspecting indexes with SHOW COLUMNS
 
-`SHOW COLUMNS` displays index metadata for each column, including the index
-type and covered columns:
+[`SHOW COLUMNS`](/docs/query/sql/show/#show-columns) reports the index type
+and covered column list per column:
 
-```questdb-sql
-SHOW COLUMNS FROM trades;
-```
+- `indexType` is `POSTING`, `POSTING DELTA`, `POSTING EF`, `BITMAP`, or
+  empty for non-indexed columns.
+- `indexInclude` lists covered column names — including the auto-included
+  designated timestamp.
 
-| column    | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude              |
-|-----------|-----------|---------|--------------------|--------------|----------------|-----------------|------------|-----------|-----------|---------------------------|
-| timestamp | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |                           |
-| symbol    | SYMBOL    | true    | 256                | true         | 256            | 0               | false      | false     | POSTING   | exchange,price,timestamp  |
-| exchange  | SYMBOL    | false   | 256                | true         | 256            | 0               | false      | false     |           |                           |
-| price     | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |                           |
-| quantity  | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |                           |
-
-The `indexType` column shows `POSTING`, `POSTING DELTA`, `POSTING EF`,
-`BITMAP`, or is empty for non-indexed columns. The `indexInclude` column
-lists covered column names — note the auto-included designated timestamp.
+The [`table_columns()`](/docs/query/functions/meta/#table_columns) function
+exposes the same fields programmatically.
 
 ### Verifying covering index usage
 
@@ -294,21 +280,15 @@ doesn't filter on the indexed symbol.
 
 ## Comparison with bitmap index
 
-| Feature | Bitmap index | Posting index |
-|---------|-------------|---------------|
-| Storage size | ~15 bytes/value | ~1 byte/value |
-| Covering index (INCLUDE) | No | Yes |
-| DISTINCT acceleration | No | Yes |
-| Write overhead | Low | Low (without INCLUDE), moderate with INCLUDE |
-| Filtered LATEST ON | Yes | Yes (covering) |
-| Unfiltered LATEST ON | Yes (`LatestByAllIndexed`) | Falls back to deferred-list scan |
-| `CAPACITY` clause | Yes | No (parse error) |
-| Syntax | `INDEX` or `INDEX TYPE BITMAP` | `INDEX TYPE POSTING` |
+For a side-by-side feature comparison and guidance on choosing between the
+two index types, see
+[Choosing an index type](/docs/concepts/deep-dive/indexes/#choosing-an-index-type)
+on the indexes overview page.
 
 In end-to-end benchmarks (geomean across five workloads, sealed indexes), the
 posting index is roughly 13× smaller than the bitmap index and 1.3–1.5×
 faster on point, range, and full-scan reads. Writes are ~9% slower than the
-bitmap index for the index part itself; sidecar writes add overhead
+bitmap index for the index path itself; sidecar writes add overhead
 proportional to the number and type of `INCLUDE` columns.
 
 ## Query patterns accelerated
@@ -377,25 +357,14 @@ WHERE symbol = 'AAPL';
 
 ## SQL optimizer hints
 
-Two hints control index usage:
+Two hints opt a query out of the covering and/or index paths for
+benchmarking or troubleshooting:
 
-### no_covering
+- `no_covering` — read from column files instead of the covering sidecar
+- `no_index` — disable index usage entirely (implies `no_covering`)
 
-Forces the query to read from column files instead of the covering index
-sidecar. Useful for benchmarking or when the covering path has an issue.
-
-```questdb-sql
-SELECT /*+ no_covering */ price FROM trades WHERE symbol = 'AAPL';
-```
-
-### no_index
-
-Completely disables index usage, falling back to a full table scan with
-filter. Also implies `no_covering`.
-
-```questdb-sql
-SELECT /*+ no_index */ price FROM trades WHERE symbol = 'AAPL';
-```
+See [Index hints](/docs/concepts/deep-dive/sql-optimizer-hints/#index-hints)
+for syntax, semantics, and examples.
 
 ## Trade-offs
 
@@ -506,9 +475,6 @@ file. Decompression is transparent to the query engine.
 
 :::warning
 
-- `INCLUDE` is only supported for the posting index type (not bitmap).
-  Writing `INDEX TYPE BITMAP INCLUDE (...)` errors with
-  `INCLUDE is only supported for POSTING index type`.
 - `INCLUDE` cannot list the indexed symbol column itself.
 - `INCLUDE` is not supported with out-of-line `INDEX(col ...)` syntax —
   use inline column syntax or `ALTER TABLE` instead.

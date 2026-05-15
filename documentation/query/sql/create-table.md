@@ -633,15 +633,31 @@ CREATE TABLE test AS (
 
 ## Column indexes
 
-Index definitions (`indexDef`) are used to create an
-[index](/docs/concepts/deep-dive/indexes/) for a table column. The referenced table column
-must be of type [symbol](/docs/concepts/symbol/).
+Index definitions are used to create an
+[index](/docs/concepts/deep-dive/indexes/) for a table column. The
+referenced column must be of type [symbol](/docs/concepts/symbol/).
+
+Each index can be declared either **inline** (on the column itself) or
+**out-of-line** (in a trailing `INDEX(...)` clause):
 
 ```questdb-sql
-INDEX (columnRef [CAPACITY valueBlockSize])
+-- Bitmap (default)
+columnRef SYMBOL INDEX [CAPACITY n]
+INDEX (columnRef [CAPACITY n])
+
+-- Posting (with optional covering and encoding variant)
+columnRef SYMBOL INDEX TYPE POSTING [DELTA | EF] [INCLUDE (col, ...)]
+INDEX (columnRef TYPE POSTING [DELTA | EF])
 ```
 
+`INCLUDE` is only valid with the inline form — see
+[Posting index with covering columns (INCLUDE)](#posting-index-with-covering-columns-include)
+below.
+
 ### Bitmap index (default)
+
+Out-of-line syntax (one or more trailing `INDEX(...)` clauses after the
+column list):
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -652,11 +668,22 @@ CREATE TABLE trades (
 ), INDEX(symbol) TIMESTAMP(timestamp);
 ```
 
+Inline syntax (declared on the column):
+
+```questdb-sql
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL INDEX,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp);
+```
+
 ### Posting index
 
-The posting index offers better compression and read performance than the
-default bitmap index. Use `INDEX TYPE POSTING` with either inline or
-out-of-line syntax:
+The [posting index](/docs/concepts/deep-dive/posting-index/) offers better
+compression and read performance than the default bitmap index. Use
+`INDEX TYPE POSTING` with either inline or out-of-line syntax:
 
 ```questdb-sql
 -- Inline syntax
@@ -679,9 +706,10 @@ TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
 ### Posting index with covering columns (INCLUDE)
 
-The `INCLUDE` clause stores additional column values in the index sidecar
-files. Queries that only need these columns plus the indexed symbol can be
-served entirely from the index, bypassing column files:
+The [`INCLUDE` clause](/docs/concepts/deep-dive/posting-index/#covering-index)
+stores additional column values in the index sidecar files. Queries that
+only need these columns plus the indexed symbol can be served entirely
+from the index, bypassing column files:
 
 ```questdb-sql
 CREATE TABLE trades (
@@ -706,6 +734,14 @@ SELECT timestamp, price FROM trades WHERE symbol = 'AAPL';
 `INCLUDE` is only supported with inline column syntax (not out-of-line
 `INDEX(col ...)`). Use `ALTER TABLE` to add covering columns to an existing
 table.
+
+:::
+
+:::tip
+
+Posting indexes (with or without `INCLUDE`) work on both WAL and `BYPASS WAL`
+tables. The examples above use `WAL` because it is the recommended default,
+but `BYPASS WAL` tables can declare posting indexes in exactly the same way.
 
 :::
 

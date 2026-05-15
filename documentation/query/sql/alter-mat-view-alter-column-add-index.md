@@ -10,10 +10,25 @@ query performance for filtered lookups.
 
 ## Syntax
 
+Bitmap index (default):
+
+```questdb-sql
+ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX [CAPACITY n]
 ```
-ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX [ CAPACITY n ]
-ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX TYPE POSTING
+
+[Posting index](/docs/concepts/deep-dive/posting-index/), with optional
+encoding variant:
+
+```questdb-sql
+ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName
+  ADD INDEX TYPE POSTING [DELTA | EF]
 ```
+
+An explicit `INCLUDE` clause is not accepted on materialized views — the
+parser rejects it. The view's designated timestamp is still auto-included,
+so the bare `INDEX TYPE POSTING` form produces a covering index over the
+timestamp. See the [note below](#materialized-view-include-restriction) for
+details.
 
 ## Parameters
 
@@ -23,6 +38,7 @@ ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName ADD INDEX TYPE POSTING
 | `columnName` | Name of the `SYMBOL` column to index |
 | `CAPACITY` | Optional index capacity for bitmap indexes (advanced; use default unless you understand implications) |
 | `TYPE POSTING` | Use a [posting index](/docs/concepts/deep-dive/posting-index/) instead of the default bitmap index |
+| `DELTA` / `EF` | Force a row-ID encoding variant — see [encoding options](/docs/concepts/deep-dive/posting-index/#encoding-options) |
 
 ## When to use
 
@@ -48,6 +64,8 @@ ALTER MATERIALIZED VIEW trades_hourly
   ALTER COLUMN symbol ADD INDEX TYPE POSTING;
 ```
 
+### Materialized view INCLUDE restriction
+
 :::note
 
 An explicit `INCLUDE` clause for covering indexes is not currently
@@ -55,7 +73,7 @@ accepted on materialized views — the parser rejects it. The view's
 designated timestamp is still auto-added, so `INDEX TYPE POSTING` on a
 view's symbol column produces a covering index over the timestamp,
 which is enough to accelerate `WHERE symbol = … LATEST ON ts` and
-similar timestamp-only covering queries.
+similar timestamp-only covering queries against the view itself.
 
 :::
 

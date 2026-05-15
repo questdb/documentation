@@ -24,6 +24,27 @@ QuestDB supports two index types:
 See [Posting index and covering index](/docs/concepts/deep-dive/posting-index/)
 for the detailed guide on the posting index and its covering query capabilities.
 
+## Choosing an index type
+
+| Feature | Bitmap index | Posting index |
+|---------|-------------|---------------|
+| Storage size | ~15 bytes/value | ~1 byte/value |
+| Covering index (`INCLUDE`) | No | Yes |
+| `DISTINCT` acceleration | No | Yes |
+| Write overhead | Low | Low (without `INCLUDE`), moderate with `INCLUDE` |
+| Filtered `LATEST ON` | Yes | Yes (covering path) |
+| Unfiltered `LATEST ON` | Yes (`LatestByAllIndexed`) | Falls back to deferred-list scan |
+| `CAPACITY` clause | Yes | No (parse error) |
+| Syntax | `INDEX` or `INDEX TYPE BITMAP` | `INDEX TYPE POSTING` |
+
+Use the **bitmap index** when you want a low-overhead general-purpose
+index, or when your hottest query shape is unfiltered `LATEST ON …
+PARTITION BY sym` (bitmap retains the edge there).
+
+Use the **posting index** when reads dominate writes, queries are
+selective on the indexed symbol, and you can list the columns you
+typically select alongside the symbol in `INCLUDE` for covering reads.
+
 ## Index creation and deletion
 
 The following are ways to index a `symbol` column:

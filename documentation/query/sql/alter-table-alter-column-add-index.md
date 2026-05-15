@@ -8,8 +8,18 @@ Indexes an existing [`symbol`](/docs/concepts/symbol/) column.
 
 ## Syntax
 
+Bitmap index (default):
+
 ```questdb-sql
-ALTER TABLE tableName ALTER COLUMN columnName ADD INDEX;
+ALTER TABLE tableName ALTER COLUMN columnName ADD INDEX [CAPACITY n]
+```
+
+[Posting index](/docs/concepts/deep-dive/posting-index/), with optional
+covering columns and encoding variant:
+
+```questdb-sql
+ALTER TABLE tableName ALTER COLUMN columnName
+  ADD INDEX TYPE POSTING [DELTA | EF] [INCLUDE (col, ...)]
 ```
 
 Adding an [index](/docs/concepts/deep-dive/indexes/) is an atomic, non-blocking, and
