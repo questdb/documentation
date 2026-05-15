@@ -231,6 +231,39 @@ try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
 }
 ```
 
+**Enterprise builder with TLS, token auth, and listeners:**
+
+```java
+try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+        .address("db-primary:9000")
+        .address("db-replica:9000")
+        .enableTls()
+        .advancedTls().disableCertificateValidation()  // test only
+        .httpToken("your_bearer_token")                // works for WebSocket too
+        .reconnectMaxDurationMillis(300_000)
+        .reconnectInitialBackoffMillis(100)
+        .reconnectMaxBackoffMillis(5_000)
+        .errorHandler(error -> {
+            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
+                error.getCategory(), error.getTableName(),
+                error.getServerMessage());
+        })
+        .connectionListener(event -> {
+            System.out.printf("connection: %s host=%s:%d%n",
+                event.getKind(), event.getHost(), event.getPort());
+        })
+        .build()) {
+    // ...
+}
+```
+
+:::note
+The token method is named `httpToken()` for historical reasons but works
+on all transports including WebSocket. For production TLS, use
+`advancedTls().customTrustStore(path, password)` instead of
+`disableCertificateValidation()`.
+:::
+
 For `QwpQueryClient`, use the factory methods or configure post-construction:
 
 ```java
@@ -971,3 +1004,151 @@ unchanged. The main differences:
 To migrate, change your connect string from `http::` to `ws::` (or `https::`
 to `wss::`), register a `SenderErrorHandler` for async error handling, and
 adjust auto-flush settings if needed.
+
+## Full example: ingestion and querying with failover
+
+This example combines ingestion with 2D arrays and connection events, then
+queries the data back with the recreate-on-failure pattern for egress. It
+uses the builder API with enterprise TLS and token auth.
+
+```java
+import io.questdb.client.Sender;
+import io.questdb.client.cutlass.line.array.DoubleArray;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
+import io.questdb.client.cutlass.qwp.client.QwpQueryClient;
+import io.questdb.client.cutlass.qwp.client.QwpServerInfo;
+
+import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
+
+// ─── Ingestion (builder API with connection events) ─────────────────
+
+try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+        .address("db-primary:9000")       // Enterprise: multi-host
+        .address("db-replica:9000")       // Enterprise: multi-host
+        .enableTls()                      // Enterprise: wss (TLS)
+        .advancedTls().disableCertificateValidation()  // test only!
+        .httpToken("your_bearer_token")   // Enterprise: token auth (works for WS too)
+        .reconnectMaxDurationMillis(300_000)
+        .reconnectInitialBackoffMillis(100)
+        .reconnectMaxBackoffMillis(5_000)
+        .errorHandler(error -> {
+            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
+                error.getCategory(), error.getTableName(),
+                error.getServerMessage());
+        })
+        .connectionListener(event -> {
+            System.out.printf("connection: %s host=%s:%d%n",
+                event.getKind(), event.getHost(), event.getPort());
+        })
+        .build();
+     DoubleArray bids = new DoubleArray(5, 2);
+     DoubleArray asks = new DoubleArray(5, 2)) {
+
+    for (int i = 0; i < 100; i++) {
+        bids.clear();
+        asks.clear();
+        for (int lvl = 0; lvl < 5; lvl++) {
+            bids.append(1.0842 - 0.0001 * (lvl + 1));  // price
+            bids.append(100_000 + ThreadLocalRandom.current().nextInt(900_000)); // size
+            asks.append(1.0842 + 0.0001 * (lvl + 1));
+            asks.append(100_000 + ThreadLocalRandom.current().nextInt(900_000));
+        }
+        sender.table("book")
+              .symbol("ticker", "EURUSD")
+              .doubleArray("bids", bids)
+              .doubleArray("asks", asks)
+              .at(Instant.now());
+    }
+    sender.flush();
+}
+
+// Connection events you will see:
+//   CONNECTED host=db-primary:9000        — initial connection
+//   DISCONNECTED host=db-primary:9000     — primary goes down
+//   ENDPOINT_ATTEMPT_FAILED host=...      — retry attempts during outage
+//   ALL_ENDPOINTS_UNREACHABLE host=...    — all hosts down (retries continue)
+//   FAILED_OVER host=db-replica:9000      — replica promoted, sender resumes
+
+// The Sender buffers rows in memory during outage and delivers them
+// when a host becomes reachable, within the reconnect budget (default 5 min).
+
+
+// ─── Querying (connect string, with reconnect-on-failure) ───────────
+
+// The QwpQueryClient becomes permanently dead after a total outage
+// exhausts the failover budget. The application must close the dead
+// client and create a new one. This pattern handles that:
+
+String connString =
+    "wss::addr=db-primary:9000,db-replica:9000,db-replica2:9000;"  // Enterprise: wss, multi-host
+    + "token=your_bearer_token;"                                    // Enterprise: token auth
+    + "tls_verify=unsafe_off;"                                      // test only!
+    + "failover=on;"                                                // Enterprise: failover
+    + "failover_max_attempts=8;"
+    + "failover_max_duration_ms=30000;";
+
+QwpQueryClient client = null;
+
+while (true) {
+    // Reconnect if the client is dead
+    if (client == null) {
+        try {
+            client = QwpQueryClient.fromConfig(connString);
+            client.connect();
+        } catch (Exception e) {
+            System.err.println("connect failed: " + e.getMessage());
+            client = null;
+            Thread.sleep(2000);
+            continue;
+        }
+    }
+
+    try {
+        client.execute(
+            "SELECT ts, ticker, bids[1][1] AS best_bid, asks[1][1] AS best_ask "
+                + "FROM book ORDER BY ts DESC LIMIT 10",
+            new QwpColumnBatchHandler() {
+                @Override
+                public void onBatch(QwpColumnBatch batch) {
+                    batch.forEachRow(row -> System.out.printf(
+                        "ts=%s ticker=%s bid=%.5f ask=%.5f%n",
+                        Instant.ofEpochMilli(row.getLongValue(0) / 1000),
+                        row.getSymbol(1),
+                        row.getDoubleValue(2),
+                        row.getDoubleValue(3)));
+                }
+
+                @Override
+                public void onEnd(long totalRows) {
+                    System.out.println("(" + totalRows + " rows)");
+                }
+
+                @Override
+                public void onError(byte status, String message) {
+                    System.err.printf("query error: 0x%02X %s%n",
+                        status & 0xFF, message);
+                }
+
+                @Override
+                public void onFailoverReset(QwpServerInfo newNode) {
+                    // Fires only when failover happens mid-query.
+                    // Clear any accumulated partial results here.
+                    System.out.printf("failover to node=%s role=%s%n",
+                        newNode.getNodeId(),
+                        QwpServerInfo.roleName(newNode.getRole()));
+                }
+            }
+        );
+    } catch (Exception e) {
+        // Failover budget exhausted or client dead — recreate
+        System.err.println("query failed: " + e.getMessage());
+        try { client.close(); } catch (Exception ignored) { }
+        client = null;
+        System.out.println("(will reconnect on next query)");
+    }
+
+    Thread.sleep(2000);
+}
+```

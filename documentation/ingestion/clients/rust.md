@@ -633,14 +633,6 @@ ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 The client picks an endpoint, connects, and walks the list to find the next
 healthy peer when the current connection breaks.
 
-:::warning Failover requires multiple endpoints
-
-Failover rotates across endpoints. With a single `addr`, there is no other
-host to try, and the reconnect loop exhausts after one attempt. For failover
-to be useful, provide at least two addresses.
-
-:::
-
 ### Reconnect knobs
 
 | Key | Default | Description |
