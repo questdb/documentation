@@ -27,7 +27,8 @@ ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName
 An explicit `INCLUDE` clause is not accepted on materialized views — the
 parser rejects it. The view's designated timestamp is still auto-included,
 so the bare `INDEX TYPE POSTING` form produces a covering index over the
-timestamp. See the [note below](#materialized-view-include-restriction) for
+timestamp. See [INCLUDE restriction](#include-restriction) and
+[Covering index during refresh](#covering-index-during-refresh) for
 details.
 
 ## Parameters
@@ -64,7 +65,7 @@ ALTER MATERIALIZED VIEW trades_hourly
   ALTER COLUMN symbol ADD INDEX TYPE POSTING;
 ```
 
-### Materialized view INCLUDE restriction
+### INCLUDE restriction
 
 :::note
 
@@ -77,14 +78,16 @@ similar timestamp-only covering queries against the view itself.
 
 :::
 
+### Covering index during refresh
+
 :::warning
 
-**Covering index is disabled for view refresh by default.** Even when a
-posting index on a view's symbol column produces a covering layout, the
-SQL planner skips that path during the view's refresh queries unless
+The covering-index path is disabled for view refresh queries by default
+— even when the posting index on the view's symbol column produces a
+covering layout, the planner skips it during refresh unless
 [`cairo.mat.view.covering.index.enabled`](/docs/configuration/cairo-engine/#cairomatviewcoveringindexenabled)
-is set to `true`. Ad-hoc queries you issue against the materialized
-view still use covering when eligible.
+is set to `true`. Ad-hoc queries you issue against the view itself are
+unaffected and use covering when eligible.
 
 :::
 

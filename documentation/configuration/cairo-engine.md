@@ -320,16 +320,13 @@ covering index for any
 - **Default**: `268435456` (256 MiB)
 - **Reloadable**: no
 
-Maximum bytes the per-key spill arena may hold during one-shot
-[posting index](/docs/concepts/deep-dive/posting-index/) build paths
-(`ALTER ADD INDEX`, `REINDEX`, snapshot restore, and O3 partition
-rewrites on posting-indexed wide columns). When exceeded, the writer
-drains pending state into a fresh sparse generation and frees the
-arena. A seal-phase streaming fallback bounds peak heap to the largest
-single key's row count. Set to 0 or a negative value to disable the
-back-pressure entirely and recover the legacy "accumulate until seal"
-behaviour. Steady-state WAL ingestion is unaffected — back-pressure
-only kicks in on the one-shot build paths above.
+Caps the per-key spill arena used by one-shot
+[posting index](/docs/concepts/deep-dive/posting-index/) build paths —
+`ALTER ADD INDEX`, `REINDEX`, snapshot restore, and O3 partition rewrites
+on posting-indexed wide columns. When the cap is reached, the writer
+drains pending state into a fresh sparse generation and continues.
+Steady-state WAL ingestion is unaffected. Set to `0` or a negative value
+to disable back-pressure entirely.
 
 ### cairo.posting.index.row.id.encoding
 
