@@ -19,12 +19,14 @@ same work, before reporting the task as done.
 
 ### Step 1: Determine the date range
 
-1. Read `documentation/changelog.mdx` and find the most recent month header
+1. Locate the changelog by globbing for `**/changelog.mdx` under the repo
+   root. Use the resolved absolute path for all subsequent reads and writes.
+2. Read the file and find the most recent month header
    (format: `## Month YYYY`).
-2. If the changelog does not exist or has no date, use 1 month ago. No
+3. If the changelog does not exist or has no date, use 1 month ago. No
    exceptions.
-3. Store this as `SINCE_DATE`.
-4. Never go further back than the calculated date without user confirmation.
+4. Store this as `SINCE_DATE`.
+5. Never go further back than the calculated date without user confirmation.
 
 ### Step 2: Get commits since that date
 
@@ -145,8 +147,10 @@ If a file does not exist, describe the change without a link:
 Prepend the new entry after the frontmatter and intro paragraph but before
 existing month entries.
 
-The changelog file is `documentation/changelog.mdx` (NOT
-`documentation/docs/changelog.mdx`).
+The changelog file is `documentation/changelog.mdx` relative to the
+repository root. Locate it by globbing for `**/changelog.mdx` under the
+content directory if needed. Read the file before writing to confirm the
+resolved path is correct.
 
 ### Step 9: Build to validate links (mandatory)
 
