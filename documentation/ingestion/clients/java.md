@@ -1024,12 +1024,19 @@ import java.util.concurrent.ThreadLocalRandom;
 
 // ─── Ingestion (builder API with connection events) ─────────────────
 
+// Multi-host with store-and-forward for failover durability.
+// Without sf_dir, data buffered during an outage lives in process memory
+// and is lost if the sender process dies. With sf_dir, unacknowledged
+// frames are persisted to disk and replayed after reconnection.
+
 try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
         .address("db-primary:9000")       // Enterprise: multi-host
         .address("db-replica:9000")       // Enterprise: multi-host
         .enableTls()                      // Enterprise: wss (TLS)
         .advancedTls().disableCertificateValidation()  // test only!
         .httpToken("your_bearer_token")   // Enterprise: token auth (works for WS too)
+        .storeAndForwardDir("/var/lib/myapp/qdb-sf")   // durability across outages
+        .senderId("ingest-1")                          // unique per sender process
         .reconnectMaxDurationMillis(300_000)
         .reconnectInitialBackoffMillis(100)
         .reconnectMaxBackoffMillis(5_000)
@@ -1071,8 +1078,10 @@ try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
 //   ALL_ENDPOINTS_UNREACHABLE host=...    — all hosts down (retries continue)
 //   FAILED_OVER host=db-replica:9000      — replica promoted, sender resumes
 
-// The Sender buffers rows in memory during outage and delivers them
-// when a host becomes reachable, within the reconnect budget (default 5 min).
+// With sf_dir set, unacknowledged frames are persisted to disk during
+// the outage and replayed when the new primary becomes reachable.
+// Without sf_dir, the Sender buffers in memory only — the reconnect
+// loop still works, but data is lost if the sender process dies.
 
 
 // ─── Querying (connect string, with reconnect-on-failure) ───────────
