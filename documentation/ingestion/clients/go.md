@@ -9,8 +9,6 @@ description:
 
 import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
-import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
-
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB Go client connects to QuestDB over the
@@ -167,7 +165,10 @@ sender, err := qdb.NewLineSender(ctx,
 	qdb.WithBasicAuth("admin", "quest"))
 ```
 
-### Token auth (Enterprise)
+### Token auth (Enterprise, recommended)
+
+Token authentication avoids the per-request overhead of basic auth and is
+the recommended path for Enterprise deployments.
 
 ```go
 sender, err := qdb.LineSenderFromConf(ctx,
@@ -179,22 +180,20 @@ client, err := qdb.NewQwpQueryClient(ctx,
 	qdb.WithQwpQueryBearerToken("your_bearer_token"))
 ```
 
-<OidcClientNote />
+### Production example (TLS + token + multi-host)
 
-For Go, [`coreos/go-oidc`](https://github.com/coreos/go-oidc) or
-[`golang.org/x/oauth2`](https://pkg.go.dev/golang.org/x/oauth2) can handle
-the token acquisition.
-
-### Production example (TLS + auth + multi-host)
-
-The realistic Enterprise shape combines `wss`, credentials, and a multi-host
-`addr` list in a single connect string:
+A realistic Enterprise deployment combines `wss`, token auth, and a
+multi-host `addr` list. The `target` key controls which server roles the
+client will connect to: `primary` for the authoritative write node,
+`replica` for read-only replicas, or `any` (default) for either.
 
 ```go
+// Ingestion: connect to any writeable node
 sender, err := qdb.LineSenderFromConf(ctx,
 	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
-		"username=ingest;password=secret;")
+		"token=your_bearer_token;")
 
+// Querying: prefer a replica to offload the primary
 client, err := qdb.QwpQueryClientFromConf(ctx,
 	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
 		"token=your_bearer_token;target=replica;")
@@ -245,7 +244,7 @@ sender, err := qdb.LineSenderFromEnv(ctx)
 The options API exposes the same options as the connect string, with type-safe
 Go signatures (e.g., `sf_append_deadline_millis` becomes
 `qdb.WithSfAppendDeadline(30*time.Second)`). For the full list of keys, see
-the [connect string reference](/docs/client-configuration/connect-string/).
+the [connect string reference](/docs/connect/clients/connect-string/).
 
 `NewLineSender` requires exactly one transport option (`qdb.WithQwp()` here);
 `LineSenderFromConf` infers the transport from the `ws`/`wss` schema instead.

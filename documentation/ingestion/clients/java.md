@@ -9,8 +9,6 @@ import Tabs from "@theme/Tabs"
 
 import TabItem from "@theme/TabItem"
 
-import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
-
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 import CodeBlock from "@theme/CodeBlock"
@@ -155,7 +153,10 @@ try (QwpQueryClient client = QwpQueryClient.fromConfig(
 }
 ```
 
-### Token auth (Enterprise)
+### Token auth (Enterprise, recommended)
+
+Token authentication avoids the per-request overhead of basic auth and is
+the recommended path for Enterprise deployments.
 
 ```java
 try (Sender sender = Sender.fromConfig(
@@ -172,13 +173,6 @@ try (Sender sender = Sender.fromConfig(
     // ...
 }
 ```
-
-<OidcClientNote />
-
-For Java, libraries such as
-[Nimbus OAuth 2.0 SDK](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
-or [Spring Security OAuth2](https://docs.spring.io/spring-security/reference/servlet/oauth2/index.html)
-can handle the token acquisition.
 
 ## Creating the client
 
@@ -225,7 +219,7 @@ try (Sender sender = Sender.fromEnv()) {
 The builder exposes the same options as the connect string. Method names
 follow camelCase convention (e.g., `sf_append_deadline_millis` becomes
 `sfAppendDeadlineMillis()`). For the full list of keys, see the
-[connect string reference](/docs/client-configuration/connect-string/).
+[connect string reference](/docs/connect/clients/connect-string/).
 
 ```java
 try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)

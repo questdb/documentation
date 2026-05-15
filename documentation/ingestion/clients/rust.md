@@ -5,8 +5,6 @@ sidebar_label: Rust
 description: "QuestDB Rust client for high-throughput data ingestion over the QWP binary protocol (WebSocket)."
 ---
 
-import OidcClientNote from "../../partials/_oidc-client-note.partial.mdx"
-
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB Rust client connects to QuestDB over the
@@ -85,19 +83,16 @@ let mut sender = Sender::from_conf(
 )?;
 ```
 
-### Token auth (Enterprise)
+### Token auth (Enterprise, recommended)
+
+Token authentication avoids the per-request overhead of basic auth and is
+the recommended path for Enterprise deployments.
 
 ```rust
 let mut sender = Sender::from_conf(
     "wss::addr=db.example.com:9000;token=your_bearer_token;"
 )?;
 ```
-
-<OidcClientNote />
-
-For Rust, [`openidconnect`](https://crates.io/crates/openidconnect) or
-[`oauth2`](https://crates.io/crates/oauth2) can handle the token
-acquisition.
 
 ### TLS
 
@@ -157,7 +152,7 @@ let mut sender = Sender::from_env()?;
 The builder exposes the same options as the connect string, with Rust-typed
 signatures (e.g., `sf_append_deadline_millis` becomes
 `sf_append_deadline(Duration::from_secs(30))`). For the full list of keys, see
-the [connect string reference](/docs/client-configuration/connect-string/).
+the [connect string reference](/docs/connect/clients/connect-string/).
 
 ```rust
 use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};

@@ -195,8 +195,9 @@ WebSocket upgrade request.
 - `username` — username for HTTP basic authentication.
 - `password` — password for HTTP basic authentication.
 - `token` — bearer token sent as `Authorization: Bearer <token>`. Mutually
-  exclusive with `username` / `password`. For OIDC-issued tokens, see
-  [OIDC](#oidc).
+  exclusive with `username` / `password`. Token auth avoids the per-request
+  overhead of basic auth and is the recommended path for Enterprise
+  deployments.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
   Does not cover TCP connect, TLS handshake, or post-upgrade frame reads —
   those use OS or hard-coded defaults. Default: `15000` (15 s).
@@ -205,26 +206,7 @@ WebSocket upgrade request.
 certificate against a trust store but cannot present a client certificate;
 the TLS handshake is server-authenticated only. `tls_roots` /
 `tls_roots_password` configure server-cert trust, not client identity. Use
-`token=<access_token>` (bearer / OIDC) or `username=` / `password=` for
-client authentication.
-
-### OIDC {#oidc}
-
-The client does not perform OIDC flows itself: no issuer discovery, no
-client registration, and no token refresh. To authenticate against a
-QuestDB Enterprise server configured with an OIDC provider, obtain an
-access token out-of-band and pass it as `token=<access_token>`; the server
-validates the token against its configured OIDC provider and resolves the
-principal and groups from the token claims.
-
-```
-wss::addr=questdb.example.com:443;token=<access_token>;
-```
-
-The token is static for the lifetime of the connection. The application
-is responsible for refreshing the token and creating a new client (or
-reconnecting with an updated connect string) before expiry. `oidc_*`
-connect-string keys are not supported.
+`token=<token>` or `username=` / `password=` for client authentication.
 
 ## TLS {#tls}
 
