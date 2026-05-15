@@ -800,8 +800,17 @@ correlation:
 | `ServerMessage`    | `string`    | Human-readable server text. **≤ 1024 UTF-8 bytes**, English, may be empty. Safe to log; not a stable pattern-match key (switch on `Category` / `ServerStatusByte`). May echo table / column names — sanitise before forwarding to third-party error trackers. |
 | `TableName`        | `string`    | Rejected table; empty for unknown or multi-table batches.                                                                                                                             |
 | `FromFsn`,`ToFsn`  | `int64`     | Inclusive FSN span; join to `FlushAndGetSequence` to identify the rejected rows.                                                                                                       |
-| `MessageSequence`  | `int64`     | Server per-frame sequence — the correlation key for support tickets and server-log matching. `NoMessageSequence` (`-1`) for protocol violations.                                       |
+| `MessageSequence`  | `int64`     | Server's per-frame wire sequence for the rejection frame. **Resets on reconnect** — only meaningful within one connection; round-trips verbatim against that connection's server-side logs. Not a standalone correlation key (see below). `NoMessageSequence` (`-1`) for protocol violations.                                       |
 | `DetectedAt`       | `time.Time` | Client-side receipt time, for ops timelines (not for correlation).                                                                                                                     |
+
+The protocol does not surface a server-issued request or connection
+identifier. The closest correlation handle is the `(MessageSequence,
+FromFsn, ToFsn)` tuple plus the connection start time from your
+application logs — `MessageSequence` resets on reconnect, so it only
+disambiguates frames within a single connection. The client sends an
+`X-QWP-Client-Id` header (default `go/<version>`) on the upgrade. When
+filing a support ticket, include the connection start time and the
+`(MessageSequence, FromFsn, ToFsn)` triple.
 
 The per-category policy is configurable. Resolution precedence is the policy
 resolver, then the per-category policy, then the connect-string `on_*_error`
