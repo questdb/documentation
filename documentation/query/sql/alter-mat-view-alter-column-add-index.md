@@ -25,9 +25,11 @@ ALTER MATERIALIZED VIEW viewName ALTER COLUMN columnName
 ```
 
 An explicit `INCLUDE` clause is not accepted on materialized views — the
-parser rejects it. The view's designated timestamp is still auto-included,
-so the bare `INDEX TYPE POSTING` form produces a covering index over the
-timestamp. See [INCLUDE restriction](#include-restriction) and
+parser rejects it. `ADD INDEX TYPE POSTING` on a view's symbol column
+therefore creates a posting index for fast symbol filtering, but the
+view itself does not get a covering layer; selecting columns beyond the
+indexed symbol still reads from the view's column files. See
+[INCLUDE restriction](#include-restriction) and
 [Covering index during refresh](#covering-index-during-refresh) for
 details.
 
@@ -69,12 +71,15 @@ ALTER MATERIALIZED VIEW trades_hourly
 
 :::note
 
-An explicit `INCLUDE` clause for covering indexes is not currently
-accepted on materialized views — the parser rejects it. The view's
-designated timestamp is still auto-added, so `INDEX TYPE POSTING` on a
-view's symbol column produces a covering index over the timestamp,
-which is enough to accelerate `WHERE symbol = … LATEST ON ts` and
-similar timestamp-only covering queries against the view itself.
+An explicit `INCLUDE` clause is not currently accepted on materialized
+views — the parser rejects it. Without `INCLUDE`, an `INDEX TYPE POSTING`
+on a view's symbol column gives you fast filtering on that symbol but
+**no covering layer**: any query that selects columns beyond the indexed
+symbol still reads them from the view's column files.
+
+If a covering layout is what you want, build the covering posting index
+on the **base table** instead and let the view inherit the acceleration
+during refresh (subject to the gate described below).
 
 :::
 
@@ -82,15 +87,16 @@ similar timestamp-only covering queries against the view itself.
 
 :::warning
 
-The covering-index path is disabled for view refresh queries by default
-because the async group-by and filter paths through the covering index
-are currently slower than the regular plan in some workloads — opting
-the refresh out preserves predictable refresh latency until that gap is
-closed. Even when the posting index on the view's symbol column
-produces a covering layout, the planner skips it during refresh unless
+If the *base table* feeding this view has a covering posting index
+(declared with an `INCLUDE` clause), the SQL planner skips the covering
+path during view refresh by default because the async group-by and
+filter paths through the covering index are currently slower than the
+regular plan in some workloads — opting the refresh out preserves
+predictable refresh latency until that gap is closed. To re-enable
+covering for refresh queries, set
 [`cairo.mat.view.covering.index.enabled`](/docs/configuration/cairo-engine/#cairomatviewcoveringindexenabled)
-is set to `true`. Ad-hoc queries you issue against the view itself are
-unaffected and use covering when eligible.
+to `true`. Ad-hoc queries you issue against base tables that have
+covering indexes are not affected by this flag.
 
 :::
 

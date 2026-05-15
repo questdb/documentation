@@ -78,20 +78,22 @@ can be served entirely from the index.
 
 :::tip
 
-The designated timestamp column is automatically included in the covering
-index — even when no explicit `INCLUDE` clause is given. So a bare
-`INDEX TYPE POSTING` already covers `SELECT timestamp, sym FROM t WHERE
-sym = 'X'`. The expanded list is what `SHOW CREATE TABLE` round-trips, so
-`INCLUDE (exchange, price)` renders back as
-`INCLUDE (exchange, price, timestamp)` after creation. Controlled by the
+When you supply an `INCLUDE` clause, the designated timestamp is
+automatically appended to it if you did not already list it — you do
+not need to type it explicitly. `INCLUDE (exchange, price)` renders
+back as `INCLUDE (exchange, price, timestamp)` in `SHOW CREATE TABLE`
+after creation. Controlled by the
 `cairo.posting.index.auto.include.timestamp` server property
 (default `true`).
 
-This auto-include applies only when the table has a designated timestamp.
-Tables without one (typically `BYPASS WAL` tables that omit the
-`TIMESTAMP(...)` clause) can still use posting indexes and `INCLUDE`
-normally — the auto-include simply becomes a no-op and the covered
-list contains only the columns you list.
+This auto-append only applies when an `INCLUDE` clause is given **and**
+the table has a designated timestamp. A bare `INDEX TYPE POSTING`
+(no `INCLUDE`) has no covering layer at all — `SELECT timestamp, sym
+FROM t WHERE sym = 'X'` reads the timestamp from the column file in
+that case. Tables without a designated timestamp (typically `BYPASS WAL`
+tables that omit the `TIMESTAMP(...)` clause) still work normally with
+posting indexes and `INCLUDE`; the auto-append simply has nothing to
+add.
 
 :::
 

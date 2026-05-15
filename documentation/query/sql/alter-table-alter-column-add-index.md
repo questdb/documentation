@@ -40,9 +40,10 @@ ALTER TABLE trades ALTER COLUMN side ADD INDEX;
 ALTER TABLE trades ALTER COLUMN instrument ADD INDEX TYPE POSTING;
 ```
 
-The designated timestamp is auto-included as a covered column even when
-no explicit `INCLUDE` clause is given, so the bare form above already
-covers `SELECT timestamp, instrument FROM trades WHERE instrument = 'X'`.
+The bare form has no covering layer — queries selecting columns other
+than `instrument` still read from the column files. Add an
+[`INCLUDE` clause](#adding-a-posting-index-with-covering-columns) to
+build a covering index.
 
 An encoding variant can also be forced:
 

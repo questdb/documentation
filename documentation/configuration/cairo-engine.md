@@ -310,10 +310,11 @@ Enables parallel indexation. Works in conjunction with
 - **Default**: `true`
 - **Reloadable**: no
 
-When `true`, the designated timestamp column is automatically added to the
-covering index for any
-[posting index](/docs/concepts/deep-dive/posting-index/), including bare
-`INDEX TYPE POSTING` declarations with no `INCLUDE` clause.
+When `true` and the user supplies an `INCLUDE` clause on a
+[posting index](/docs/concepts/deep-dive/posting-index/), the designated
+timestamp is automatically appended to the `INCLUDE` list if not already
+present. Has no effect on bare `INDEX TYPE POSTING` declarations — those
+have no covering layer regardless of this setting.
 
 ### cairo.posting.index.indexer.spill.bytes.max
 
