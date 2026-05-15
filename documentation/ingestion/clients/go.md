@@ -305,6 +305,17 @@ err = qs.Table("trades").
 `GeohashColumn`, `Int64Array1DColumn` / `2D` / `3D`, the decimal columns, and
 `AtNano` for nanosecond designated timestamps.
 
+### Null values
+
+The client has no null setter. To store a null for a column in a given row,
+omit that column's setter before `At`/`AtNow`/`AtNano`. On row commit, every
+column not set in the row is gap-filled with a null, so omitting a column and
+writing an "explicit null" are the same operation.
+
+The buffered column set is the union across the batch: a column first used on
+a later row is backfilled with null for every earlier row still in the send
+buffer.
+
 ### Ingest arrays
 
 For 1D, 2D, and 3D `double` arrays, pass a Go slice directly:
@@ -447,6 +458,18 @@ Without `sf_dir`, unacknowledged data lives in process memory and is lost if
 the sender process dies. The reconnect loop still spans transient server
 outages, but the RAM buffer caps how much data can accumulate.
 
+:::caution Replay is at-least-once — enable DEDUP
+
+After a reconnect or a sender restart, the client replays frames the server
+may have accepted but not yet acknowledged. Without
+[DEDUP](/docs/concepts/deduplication/) on the target table, replay produces
+duplicate rows. Tables ingested over a reconnecting or multi-host connection
+**must** declare `DEDUP UPSERT KEYS(...)` covering row identity. See
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the full
+at-least-once / exactly-once model.
+
+:::
+
 :::caution Store-and-forward changes how `At` and errors behave
 
 - **`At`/`AtNow`/`Flush` can block.** When the on-disk buffer hits its cap,
@@ -477,7 +500,7 @@ By default, the server confirms a batch when it is committed to the local
 [WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
 uploaded to object storage, add `request_durable_ack=on;` to the connect
 string. See the
-[durable ACK keys](/docs/connect/clients/connect-string#egress-flow).
+[durable ACK keys](/docs/connect/clients/connect-string#durable-ack).
 
 ## Querying and SQL execution
 
@@ -864,11 +887,12 @@ error it reconnects and replays the query.
 | `failover_max_attempts`       | `8`     | Max reconnect attempts per query  |
 | `failover_backoff_initial_ms` | `50`    | First post-failure sleep          |
 | `failover_backoff_max_ms`     | `1000`  | Cap on per-attempt sleep          |
+| `failover_max_duration_ms`    | `30000` | Total wall-clock failover budget per query (`0` = unbounded) |
 | `target`                      | `any`   | Role filter: `any`, `primary`, `replica` |
 
 The matching options are `qdb.WithQwpQueryFailover`,
-`qdb.WithQwpQueryFailoverMaxAttempts`, `qdb.WithQwpQueryFailoverBackoff`, and
-`qdb.WithQwpQueryTarget`.
+`qdb.WithQwpQueryFailoverMaxAttempts`, `qdb.WithQwpQueryFailoverBackoff`,
+`qdb.WithQwpQueryFailoverMaxDuration`, and `qdb.WithQwpQueryTarget`.
 
 You only need the pattern below if you **accumulate rows across batches and
 want the query to continue transparently across a reconnect**. When failover
@@ -904,6 +928,11 @@ return `*QwpFailoverExhaustedError`.
 `BackgroundDrainers()` snapshots the goroutines adopting unacked data from
 crashed sibling senders. The query client exposes `ServerInfo()` and
 `CurrentEndpoint()`; `QwpServerInfo.RoleName()` returns the bound node's role.
+
+There is no per-transition connection callback: connect, disconnect,
+reconnect, and failover are not delivered as events. Observe reconnect and
+failover through these counters, and terminal failures through the
+[ingestion error handler](#ingestion-errors).
 
 For background and worked configurations, see
 [client failover concepts](/docs/high-availability/client-failover/concepts/),
