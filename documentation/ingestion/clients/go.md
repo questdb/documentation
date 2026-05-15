@@ -989,6 +989,22 @@ returning on any error treats a reset as terminal, which the client supports
 explicitly. When the failover budget is consumed, `Batches()` (and `Exec`)
 return `*QwpFailoverExhaustedError`.
 
+After failover exhaustion or a total outage (all endpoints down), the query
+client enters a terminal state and returns errors on every subsequent call.
+Close it and create a new one. This differs from ingestion, where the
+`LineSender` has a continuous reconnect loop (`reconnect_max_duration_millis`,
+default 5 minutes) that spans full outages transparently. The query client
+reconnects only within the scope of a single query.
+
+:::warning Failover requires multiple endpoints
+
+Failover rotates across endpoints. With a single `addr`, there is no other
+host to try, and the loop exhausts after one attempt regardless of
+`failover_max_attempts`. For failover to be useful, provide at least two
+addresses.
+
+:::
+
 ### Observability
 
 `QwpSender` exposes counters for dashboards: `TotalReconnectAttempts`,
@@ -1081,3 +1097,154 @@ rejection synchronously; on QWP it does not. To migrate, change the connect
 string from `http::` to `ws::` (or `https::` to `wss::`), register a
 `SenderErrorHandler`, and adjust auto-flush settings if needed. `QwpSender` is
 a superset of `LineSender`, so existing ingestion code keeps working.
+
+## Full example: ingestion and querying with failover
+
+This example combines ingestion with store-and-forward and connection
+observability, then queries the data back with the recreate-on-failure
+pattern for egress.
+
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"time"
+
+	qdb "github.com/questdb/go-questdb-client/v4"
+)
+
+// ─── Ingestion (options API with store-and-forward) ─────────────────
+
+// Multi-host with store-and-forward for failover durability.
+// Without sf_dir, data buffered during an outage lives in process memory
+// and is lost if the sender process dies. With sf_dir, unacknowledged
+// frames are persisted to disk and replayed after reconnection.
+
+func ingestExample() {
+	ctx := context.Background()
+
+	sender, err := qdb.NewLineSender(ctx,
+		qdb.WithQwp(),
+		qdb.WithAddress("db-primary:9000"),          // Enterprise: multi-host
+		qdb.WithAddress("db-replica:9000"),           // Enterprise: multi-host
+		qdb.WithTls(),                                // Enterprise: wss (TLS)
+		qdb.WithBearerToken("your_bearer_token"),     // Enterprise: token auth
+		qdb.WithSfDir("/var/lib/myapp/qdb-sf"),       // durability across outages
+		qdb.WithSenderId("ingest-1"),                 // unique per sender process
+		qdb.WithReconnectPolicy(
+			5*time.Minute,                        // max outage budget
+			100*time.Millisecond,                 // initial backoff
+			5*time.Second),                       // max backoff
+		qdb.WithErrorHandler(func(e *qdb.SenderError) {
+			fmt.Printf("batch rejected: category=%s table=%s msg=%s\n",
+				e.Category, e.TableName, e.ServerMessage)
+		}))
+	if err != nil {
+		panic(err)
+	}
+	defer sender.Close(ctx)
+
+	for i := 0; i < 100; i++ {
+		price := 1.0842 + (rand.Float64()-0.5)*0.002
+		err = sender.Table("book").
+			Symbol("ticker", "EURUSD").
+			Float64Column("price", price).
+			Float64Column("size", 100000+rand.Float64()*900000).
+			At(ctx, time.Now())
+		if err != nil {
+			fmt.Printf("row error: %s\n", err)
+		}
+	}
+	if err := sender.Flush(ctx); err != nil {
+		fmt.Printf("flush error: %s\n", err)
+	}
+}
+
+// With sf_dir set, unacknowledged frames are persisted to disk during
+// the outage and replayed when the new primary becomes reachable.
+// Without sf_dir, the reconnect loop still works but data is lost if
+// the sender process dies.
+//
+// Observability (no per-event callback in Go):
+//   qs := sender.(qdb.QwpSender)
+//   qs.TotalReconnectAttempts()
+//   qs.TotalReconnectsSucceeded()
+//   qs.TotalFramesReplayed()
+//   qs.LastTerminalError()
+
+
+// ─── Querying (connect string, with reconnect-on-failure) ───────────
+
+// The QwpQueryClient becomes permanently dead after a total outage
+// exhausts the failover budget. The application must close the dead
+// client and create a new one. This pattern handles that:
+
+func queryExample() {
+	ctx := context.Background()
+
+	connString :=
+		"wss::addr=db-primary:9000,db-replica:9000,db-replica2:9000;" + // Enterprise: wss, multi-host
+			"token=your_bearer_token;" +                              // Enterprise: token auth
+			"tls_verify=unsafe_off;" +                                // test only!
+			"failover=on;" +                                          // Enterprise: failover
+			"failover_max_attempts=8;" +
+			"failover_max_duration_ms=30000;"
+
+	var client *qdb.QwpQueryClient
+
+	for {
+		// Reconnect if the client is dead
+		if client == nil {
+			var err error
+			client, err = qdb.QwpQueryClientFromConf(ctx, connString)
+			if err != nil {
+				fmt.Printf("connect failed: %s\n", err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+		}
+
+		q := client.Query(ctx,
+			"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
+
+		rowCount := 0
+		for batch, err := range q.Batches() {
+			if err != nil {
+				var reset *qdb.QwpFailoverReset
+				if errors.As(err, &reset) {
+					// Fires only when failover happens mid-query.
+					// Clear any accumulated partial results here.
+					fmt.Println("failover, clearing partial results")
+					rowCount = 0
+					continue
+				}
+				// Any other error is terminal for this client
+				fmt.Printf("query failed: %s\n", err)
+				q.Close()
+				client.Close(ctx)
+				client = nil
+				fmt.Println("(will reconnect on next query)")
+				break
+			}
+			for row := 0; row < batch.RowCount(); row++ {
+				ts := time.UnixMicro(batch.Int64(0, row))
+				ticker := batch.String(1, row)
+				price := batch.Float64(2, row)
+				fmt.Printf("%s  %s  price=%.5f\n",
+					ts.Format("2006-01-02T15:04:05.000Z"), ticker, price)
+				rowCount++
+			}
+		}
+		if client != nil {
+			q.Close()
+			fmt.Printf("(%d rows)\n", rowCount)
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+```
