@@ -340,6 +340,143 @@ Result:
 
 Only the rows where both x and y are not null are considered in the calculation.
 
+## regr_r2
+
+`regr_r2(y, x)` - Calculates the coefficient of determination (R-squared) of
+the linear regression of y on x. R-squared measures how well the regression
+line fits the data, on a scale from 0 (no linear relationship) to 1 (perfect
+linear fit).
+
+- The function requires at least two valid (y, x) pairs to compute a value.
+  - If fewer than two pairs are available, the function returns null.
+- The function returns null when x is constant across all rows (zero variance
+  in the independent variable). This includes the single-row case.
+- The function returns 1 when y is constant and x varies (a horizontal line
+  fits constant y perfectly). This follows the SQL:2003 specification and
+  differs from `corr(y, x)`, which returns null in that case.
+- Supported data types for x and y include `double`, `float`, and `integer`
+  types.
+- The order of arguments in `regr_r2(y, x)` matters.
+  - Ensure that y is the dependent variable and x is the independent variable.
+- `regr_r2(y, x)` equals `corr(y, x) * corr(y, x)` everywhere except the
+  constant-y edge case noted above.
+
+### Calculation
+
+The coefficient of determination $r^2$ is the squared Pearson correlation:
+
+$$
+r^2 = \frac{\left(\sum (x_i - \bar{x})(y_i - \bar{y})\right)^2}{\sum (x_i - \bar{x})^2 \cdot \sum (y_i - \bar{y})^2}
+$$
+
+Where:
+
+- $\bar{x}$ and $\bar{y}$ are the means of x and y across the valid pairs.
+- The numerator is the squared sum of cross-deviations $S_{xy}^2$.
+- The denominator is the product of the sums of squared deviations
+  $S_{xx} \cdot S_{yy}$.
+
+When $S_{xx} = 0$ the function returns null; when $S_{xx} \neq 0$ and
+$S_{yy} = 0$ the function returns 1.
+
+### Arguments
+
+- y: A numeric column representing the dependent variable.
+- x: A numeric column representing the independent variable.
+
+### Return value
+
+Return value type is `double`.
+
+The function returns a value in the range $[0, 1]$. A value close to 1
+indicates a strong linear relationship; a value close to 0 indicates that x
+has little linear predictive power for y.
+
+### Examples
+
+#### Detect a strong trend in fleet telemetry
+
+A common use case is filtering for series whose value is trending with
+statistical confidence, separating real drift from noise:
+
+```questdb-sql
+SELECT robot_id,
+  regr_slope(motor_temp, elapsed_seconds) AS temp_trend,
+  regr_r2(motor_temp, elapsed_seconds) AS r_squared
+FROM telemetry
+WHERE ts > now() - 7d
+GROUP BY robot_id
+HAVING regr_r2(motor_temp, elapsed_seconds) > 0.7
+   AND regr_slope(motor_temp, elapsed_seconds) > 0
+ORDER BY temp_trend DESC;
+```
+
+Only robots whose temperature is rising and whose rise explains more than 70%
+of the variance over the past week are returned.
+
+#### Compute R-squared on a known dataset
+
+Using the same measurements table:
+
+| x   | y   |
+| --- | --- |
+| 1.0 | 2.0 |
+| 2.0 | 3.0 |
+| 3.0 | 5.0 |
+| 4.0 | 4.0 |
+| 5.0 | 6.0 |
+
+```questdb-sql
+SELECT regr_r2(y, x) AS r_squared FROM measurements;
+```
+
+Result:
+
+| r_squared |
+| --------- |
+| 0.81      |
+
+About 81% of the variance in y is explained by a linear relationship with x.
+
+#### Compute R-squared grouped by category
+
+Using the same sales_data table:
+
+| category | advertising_spend | sales |
+| -------- | ---------------- | ----- |
+| A        | 1000             | 15000 |
+| A        | 2000             | 22000 |
+| A        | 3000             | 28000 |
+| B        | 1500             | 18000 |
+| B        | 2500             | 26000 |
+| B        | 3500             | 31000 |
+
+```questdb-sql
+SELECT category, regr_r2(sales, advertising_spend) AS fit_quality
+FROM sales_data
+GROUP BY category;
+```
+
+Both categories show a near-perfect linear relationship between advertising
+spend and sales, with R-squared values close to 1.
+
+#### Handling null values
+
+The function ignores rows where either x or y is null:
+
+```questdb-sql
+SELECT regr_r2(y, x) AS r_squared
+FROM (
+    SELECT 1 AS x, 2 AS y
+    UNION ALL SELECT 2, NULL
+    UNION ALL SELECT NULL, 4
+    UNION ALL SELECT 4, 5
+);
+```
+
+Only the rows where both x and y are not null are considered in the
+calculation.
+
 ## regr_slope
 
 `regr_slope(y, x)` - Calculates the slope of the linear regression line for the
