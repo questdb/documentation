@@ -665,6 +665,7 @@ module.exports = {
       label: "Operations",
       type: "category",
       items: [
+        "operations/upgrade",
         "operations/backup",
         "operations/logging-metrics",
         "operations/monitoring-alerting",
@@ -941,6 +942,7 @@ module.exports = {
                   label: "Grafana",
                   collapsed: true,
                   items: [
+                    "cookbook/integrations/grafana/declare-time-range",
                     "cookbook/integrations/grafana/dynamic-table-queries",
                     "cookbook/integrations/grafana/read-only-user",
                     "cookbook/integrations/grafana/variable-dropdown",
@@ -1035,8 +1037,9 @@ module.exports = {
     },
 
     // ===================
-    // RELEASE NOTES
+    // CHANGELOG & RELEASE NOTES
     // ===================
+    "changelog",
     {
       label: "Release Notes",
       type: "link",

@@ -15,7 +15,7 @@ QuestDB has three temporal types with different precision:
 | :--- | :-------- | :---------------- |
 | `DATE` | milliseconds | ±2.9 million years |
 | `TIMESTAMP` | microseconds | ±290,000 years |
-| `TIMESTAMP_NS` | nanoseconds | ±2,920 years |
+| `TIMESTAMP_NS` | nanoseconds | ±292 years |
 
 All three are stored as signed 64-bit integers representing offsets from the
 Unix epoch. `TIMESTAMP` is recommended for most use cases as it offers the
