@@ -68,7 +68,7 @@ network), and retrying for five minutes only hides it.
 
 The egress failover loop wraps each `execute()` call on the read-side query
 client. The full key list lives on the
-[connect-string reference](/docs/connect/clients/connect-string#egress-flow);
+[connect-string reference](/docs/connect/clients/connect-string#egress-failover);
 the user-visible knobs are:
 
 | Key | Type | Default | Notes |
@@ -153,6 +153,6 @@ try (QwpQueryClient client = QwpQueryClient.fromConfig(
 |---|---|---|
 | `addr`, `zone`, `target`, `auth_timeout_ms` | Host selection, role filter | [connect-string #failover-keys](/docs/connect/clients/connect-string#failover-keys) |
 | `reconnect_*`, `initial_connect_retry` | Ingress retry budget | [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys) |
-| `failover`, `failover_*` | Egress retry budget | [connect-string #egress-flow](/docs/connect/clients/connect-string#egress-flow) |
+| `failover`, `failover_*` | Egress retry budget | [connect-string #egress-failover](/docs/connect/clients/connect-string#egress-failover) |
 | `username` / `password` / `token` | Authentication | [connect-string #auth](/docs/connect/clients/connect-string#auth) |
 | `tls_*` | TLS configuration | [connect-string #tls](/docs/connect/clients/connect-string#tls) |

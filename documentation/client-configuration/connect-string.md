@@ -28,7 +28,7 @@ For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 - [Multi-host failover](#failover-keys)
 - [Store-and-forward](#sf-keys)
 - [Reconnect and failover](#reconnect-keys)
-- [Durable ACK](#egress-flow)
+- [Durable ACK](#durable-ack)
 - [Error handling](#error-handling)
 - [Key index](#key-index)
 
@@ -347,7 +347,8 @@ ACK — the client replays unacknowledged frames against the new primary.
 Without [DEDUP](/docs/concepts/deduplication/) on the target table, those
 replays can produce duplicate rows. Tables ingested through a multi-host
 failover connect string **must** declare `DEDUP UPSERT KEYS(...)` covering
-row identity.
+row identity. See [Delivery semantics](/docs/concepts/delivery-semantics/)
+for the full at-least-once / exactly-once model.
 
 :::
 
@@ -425,7 +426,8 @@ below.
 accepted but did not durable-acknowledge before the previous sender died.
 To prevent duplicate rows in the target table, declare
 [DEDUP](/docs/concepts/deduplication/) `UPSERT KEYS(...)` covering row
-identity.
+identity. See [Delivery semantics](/docs/concepts/delivery-semantics/) for
+the full model and recipe.
 
 ### Backpressure
 
@@ -486,7 +488,7 @@ Auth failures during reconnect (authentication rejected, version mismatch,
 durable-ack mismatch, non-101 upgrade without a role hint) are immediately
 terminal — the loop does not retry them.
 
-### Egress failover
+### Egress failover {#egress-failover}
 
 These keys control the per-`Execute()` reconnect loop on the QWP query
 client. Each query has its own budget; the loop resets between queries.
@@ -502,7 +504,7 @@ Requires QuestDB Enterprise (multi-host).
 - `failover_max_duration_ms` — total wall-clock budget per `Execute()`.
   Default: `30000` (30 s). Set to `0` for unbounded.
 
-## Durable ACK {#egress-flow}
+## Durable ACK {#durable-ack}
 
 *Applies to: ingress.*
 
@@ -576,7 +578,7 @@ description and behaviour notes.
 | `auto_flush_rows`                       | int / `off`                   | `1000`                        | [Auto-flushing](#auto-flush)                                  |
 | `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
-| `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#egress-flow)                                   |
+| `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
 | `error_inbox_capacity`                  | int (≥ 16)                    | `256`                         | [Error handling](#error-handling)                             |
 | `failover`                              | enum (`on` / `off`)           | `on`                          | [Egress failover](#reconnect-keys)                            |
 | `failover_backoff_initial_ms`           | int (ms)                      | `50`                          | [Egress failover](#reconnect-keys)                            |
@@ -600,7 +602,7 @@ description and behaviour notes.
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
-| `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#egress-flow)                                   |
+| `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |

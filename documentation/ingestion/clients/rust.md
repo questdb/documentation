@@ -268,7 +268,8 @@ buffer.table("trades")?.column_f64("price", 1.0842)?.at_now()?;
 
 `at_now()` removes the ability to deduplicate rows. Prefer explicit timestamps
 for production ingestion. See
-[exactly-once delivery](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+[Delivery semantics](/docs/concepts/delivery-semantics/) for why
+server-assigned timestamps defeat exactly-once outcomes.
 
 :::note
 

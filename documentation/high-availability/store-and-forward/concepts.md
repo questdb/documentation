@@ -228,7 +228,9 @@ guarantees no data loss, but cannot distinguish which frames inside that
 lowest segment the previous sender had already received durable acks
 for. Replay therefore re-sends every frame in that segment, producing
 row-level duplicates against a still-alive server unless deduplication is
-enabled on the target table.
+enabled on the target table. See
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the
+at-least-once model and the DEDUP recipe.
 
 With `.ack-watermark`, recovery clamps the seed to the higher of the
 on-disk and watermarked values, so already-durable-acked frames inside

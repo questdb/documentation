@@ -566,6 +566,7 @@ module.exports = {
               label: "Materialized Views",
             },
             "concepts/deduplication",
+            "concepts/delivery-semantics",
             "concepts/ttl",
             "concepts/storage-policy",
             "concepts/write-ahead-log",

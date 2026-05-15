@@ -150,6 +150,9 @@ throughput-oriented workloads that can tolerate minutes of server unavailability
 
 See the [store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/)
 page for how the reconnect loop interacts with the disk-backed segment ring.
+Replay across a primary failover delivers at-least-once — see
+[Delivery semantics](/docs/concepts/delivery-semantics/) for the DEDUP
+requirement on affected tables.
 
 ### Egress (queries)
 
