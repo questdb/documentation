@@ -537,15 +537,63 @@ let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
 
 | Field | Meaning |
 |-------|---------|
-| `category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. |
+| `category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
 | `applied_policy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal). |
 | `status` | Raw QWP status byte. `None` for WebSocket protocol violations. |
-| `message` | Human-readable error text from the server or the close reason. |
-| `message_sequence` | Server's per-frame QWP message sequence. |
-| `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s). |
+| `message` | Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. See [Message stability](#message-stability) and [PII safety](#message-pii) below. |
+| `message_sequence` | Server's per-frame QWP wire sequence for the error frame. Resets on reconnect — only meaningful within one connection. |
+| `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s), client-side. |
 
 `Sender::qwp_ws_errors_dropped()` reports how many diagnostics were lost
 because the bounded log overflowed (typically due to a lagging poll cursor).
+
+#### Message stability {#message-stability}
+
+`message` is a human-readable diagnostic — **not a stable contract.** Its
+text varies across server versions and across provenance:
+
+- **QWP error frames** carry a server-supplied UTF-8 string capped at
+  1024 bytes by the wire spec.
+- **WebSocket protocol violations** are client-synthesized as
+  `"ws-close[<code>]: <reason>"`.
+- The server-supplied text mirrors QuestDB's normal SQL error formatting,
+  which historically reworded across releases.
+- The field may be empty.
+
+Use `category` and `status` for programmatic dispatch. Never pattern-match
+on `message`.
+
+#### PII / secret safety {#message-pii}
+
+`message` may include fragments of the client's own payload — for
+example, an offending column value quoted back by a schema or parse
+rejection — or a server-supplied WebSocket close reason that the
+operator did not control. **Treat `message` as potentially containing
+PII or secrets.**
+
+Log it at the same trust level as the data being sent, and sanitize
+before forwarding to external error trackers (Sentry, Datadog, end-user
+UIs). The other fields on `QwpWsSenderError` are safe to forward as-is —
+they carry only structural metadata.
+
+#### Correlating with server-side logs
+
+The protocol does not currently surface a server-issued request or
+connection identifier in the WebSocket upgrade response. The closest
+correlation tuple is `(message_sequence, from_fsn, to_fsn)`:
+
+- `message_sequence` — per-connection QWP wire sequence the server
+  attached to the error frame. Resets on reconnect.
+- `from_fsn` / `to_fsn` — client-side FSN span of the affected frames.
+  Not generally indexed by server-side logs.
+
+When opening a bug report, supply:
+
+1. The connection start time (from your application logs).
+2. The client's `X-QWP-Client-Id` header value, if your application sets one.
+3. The `(message_sequence, from_fsn, to_fsn)` triple.
+
+There is no globally unique handle.
 
 After a `Halt` policy fires, the sender is terminal. Drop it and create a new
 one. `Sender::must_close()` reports whether the sender has entered a terminal
