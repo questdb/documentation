@@ -89,7 +89,23 @@ let mut sender = Sender::from_conf(
 )?;
 ```
 
-For OIDC authentication, see [OpenID Connect](/docs/security/oidc/).
+:::note OIDC
+
+The Rust client does not implement any OIDC flow (client-credentials,
+authorization-code, or refresh-token). For OIDC-secured deployments:
+
+1. Acquire a bearer token in your application using an OIDC library such
+   as [`openidconnect`](https://crates.io/crates/openidconnect) or
+   [`oauth2`](https://crates.io/crates/oauth2).
+2. Pass it to the client via `token=...`.
+3. The client does not refresh the token. When it expires mid-session
+   the client surfaces a terminal auth error; rebuild the `Sender` with
+   a fresh token.
+
+The server-side OIDC flow is documented at
+[OpenID Connect](/docs/security/oidc/).
+
+:::
 
 ### TLS
 
@@ -109,6 +125,15 @@ Supported values:
 | `tls_ca=webpki_and_os_roots` | Combine both. |
 | `tls_roots=/path/to/root-ca.pem` | Load roots from a PEM file. Useful for self-signed certs during testing. |
 | `tls_verify=unsafe_off` | Disable verification. Never use in production. |
+
+:::note mTLS (client certificates) not supported
+
+The Rust client does not currently implement mTLS / client-certificate
+auth. The TLS surface is one-way: the client verifies the server, not
+the other way round. For credential auth, use HTTP basic (`username` +
+`password`) or bearer token (`token`).
+
+:::
 
 ### Authentication timeout
 
@@ -167,25 +192,77 @@ progress mode, reconnect timing, and `initial_connect_retry`.
 
 ## Data ingestion
 
+### Concurrency
+
+`Sender` is single-owner: every publishing method takes `&mut self`, so
+only one caller can use it at a time. For concurrent producers, create
+one `Sender` per thread, or hand rows to a single owner over a channel.
+
+`Buffer` is decoupled from `Sender`. Build buffers on any thread, then
+call `sender.flush(&mut buffer)` once you have the sender in scope. This
+lets worker threads encode rows in parallel and serialises only the
+publish step.
+
+When several `Sender` instances share an `sf_dir`, give each a distinct
+`sender_id` — slots are exclusive (see
+[Store-and-forward](#store-and-forward)).
+
 ### General usage pattern
 
 1. Call `buffer.table(name)?` to select a table.
-2. Call column methods to add values:
-   - `symbol(name, value)`
-   - `column_bool(name, value)`
-   - `column_i64(name, value)`
-   - `column_f64(name, value)`
-   - `column_str(name, value)`
-   - `column_ts(name, timestamp)`
-   - `column_arr(name, ...)` for arrays
-   - `column_dec(name, ...)` for decimals
-   - `_opt` variants (e.g. `column_f64_opt`) for `Option<T>` ergonomics
+2. Call typed column setters to add values (see
+   [Column setters](#column-setters) below).
 3. Call `at(timestamp)?` or `at_now()?` to finalize the row.
 4. Repeat from step 1, or call `sender.flush(&mut buffer)?` to send.
 
 Tables and columns are created automatically if they do not exist.
 
-For the full column method reference, see the
+### Column setters
+
+Every typed setter has an `_opt` variant taking `Option<T>` that writes
+a null when the value is `None`:
+
+```rust
+buffer.column_f64_opt("price", None)?;          // writes null
+buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
+```
+
+`SYMBOL` has no `_opt` variant — omit the `symbol()` call to leave the
+symbol unset on a row.
+
+| QuestDB type | Setter | NULL variant |
+| --- | --- | --- |
+| `SYMBOL` | `symbol(name, &str)` | — (omit the call) |
+| `BOOLEAN` | `column_bool(name, bool)` | `column_bool_opt(name, Option<bool>)` |
+| `BYTE` | `column_i8(name, i8)` | `column_i8_opt(name, Option<i8>)` |
+| `SHORT` | `column_i16(name, i16)` | `column_i16_opt(name, Option<i16>)` |
+| `INT` | `column_i32(name, i32)` | `column_i32_opt(name, Option<i32>)` |
+| `LONG` | `column_i64(name, i64)` | `column_i64_opt(name, Option<i64>)` |
+| `FLOAT` | `column_f32(name, f32)` | `column_f32_opt(name, Option<f32>)` |
+| `DOUBLE` | `column_f64(name, f64)` | `column_f64_opt(name, Option<f64>)` |
+| `CHAR` | `column_char(name, u16)` (UTF-16 code unit) | `column_char_opt(name, Option<u16>)` |
+| `VARCHAR` | `column_str(name, &str)` | `column_str_opt(name, Option<&str>)` |
+| `BINARY` | `column_binary(name, &[u8])` | `column_binary_opt(name, Option<&[u8]>)` |
+| `UUID` | `column_uuid(name, lo: u64, hi: u64)` | `column_uuid_opt(name, Option<(u64, u64)>)` |
+| `LONG256` | `column_long256(name, &[u8; 32])` (4 LE limbs) | `column_long256_opt(name, Option<&[u8; 32]>)` |
+| `DATE` | `column_date(name, millis: i64)` | `column_date_opt(name, Option<i64>)` |
+| `TIMESTAMP` / `timestamp_ns` (non-designated) | `column_ts(name, TimestampMicros / TimestampNanos)` | `column_ts_opt(name, Option<…>)` |
+| `GEOHASH` | `column_geohash(name, bits: u64, precision_bits: u8)` (1–60 bits) | `column_geohash_opt(name, Option<(u64, u8)>)` |
+| `DECIMAL` (up to 256-bit) | `column_dec(name, &str / rust_decimal / bigdecimal)` | `column_dec_opt(name, …)` |
+| `DECIMAL64` | `column_dec64(name, …)` | `column_dec64_opt(name, …)` |
+| `DECIMAL128` | `column_dec128(name, …)` | `column_dec128_opt(name, …)` |
+| `DOUBLE[]` (arrays) | `column_arr(name, &view)` — slices, vecs up to 3D, [`ndarray`](https://docs.rs/ndarray) views | `column_arr_opt(name, Option<&view>)` |
+| `IPv4` † | `column_ipv4(name, std::net::Ipv4Addr)` | `column_ipv4_opt(name, Option<std::net::Ipv4Addr>)` |
+| `LONG[]` (i64 arrays) † | `column_arr` with `i64` element type | `column_arr_opt` with `i64` element type |
+
+† **Spec-only — currently rejected by the server.** QWP v1 defines these
+wire types and the client encodes them correctly, but server-side ingest
+does not yet accept them. Batches using them will be rejected with a
+descriptive error. Application code written against these setters today
+will start working once the server adds support; no client change is
+needed.
+
+For exact signatures and accepted parameter conversions, see the
 [crate docs](https://docs.rs/questdb-rs/latest/questdb/ingress/struct.Buffer.html).
 
 ### Ingest arrays
@@ -353,7 +430,7 @@ outages, but a RAM cap bounds how much data can accumulate.
 | `sender_id` | `default` | Slot identity. Allowed chars: `A-Za-z0-9_-`. Use distinct ids per sender process. |
 | `sf_max_bytes` | 4 MiB | Per-segment size cap. |
 | `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
-| `sf_durability` | `memory` | `memory`, `flush`, or `append` (strongest). |
+| `sf_durability` | `memory` | `memory` is the only shipping value. `flush` and `append` are reserved for future per-write fsync modes; setting them today fails sender construction. |
 | `sf_append_deadline_millis` | 30000 | Per-append wait budget in `append` mode. |
 | `drain_orphans` | `off` | If `on`, take over stale slots owned by a previous sender. |
 | `max_background_drainers` | 4 | Concurrency cap when draining orphans. |
@@ -552,7 +629,7 @@ Common WebSocket-specific options:
 | `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |
-| `sf_durability` | `memory` | `memory`, `flush`, or `append`. |
+| `sf_durability` | `memory` | Only `memory` is currently accepted (see [SF tuning keys](#sf-tuning-keys)). |
 | `request_durable_ack` | `off` | Wait for durable upload before ACK (Enterprise). |
 | `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
 | `initial_connect_retry` | `off` | Apply reconnect policy to the first connect. |
