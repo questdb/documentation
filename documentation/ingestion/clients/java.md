@@ -284,7 +284,7 @@ per thread or use an object pool.
 1. Create a `Sender` via `Sender.fromConfig()` or the builder.
 2. Call `table(name)` to select a table.
 3. Call column methods to add values:
-   - `symbol(name, value)` 
+   - `symbol(name, value)`
    - `stringColumn(name, value)`
    - `boolColumn(name, value)`
    - `byteColumn(name, byte)`, `shortColumn(name, short)`, `intColumn(name, int)`
@@ -294,17 +294,42 @@ per thread or use an object pool.
    - `uuidColumn(name, lo, hi)` (two longs)
    - `long256Column(name, l0, l1, l2, l3)` (four longs, least significant first)
    - `decimalColumn(name, Decimal256)` or `decimalColumn(name, CharSequence)`
-   - `doubleArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
+   - `ipv4Column(name, int)` (packed 32-bit address) or `ipv4Column(name, CharSequence)`
+     (dotted-quad)
+   - `geoHashColumn(name, long bits, int precisionBits)` or
+     `geoHashColumn(name, CharSequence base32)`
+   - `binaryColumn(name, byte[])`, `binaryColumn(name, long ptr, long len)`, or
+     `binaryColumn(name, DirectByteSlice)`
+   - `doubleArray(name, ...)` and `longArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
 
-   The server also accepts GEOHASH and DATE on ingress, but the Java client
-   does not yet expose sender methods for them. IPv4 and BINARY are not
-   supported for ingestion on either the client or the server. All types are
-   readable on the [egress side](#reading-result-batches).
+   DATE is accepted on ingress server-side but the Java client does not yet
+   expose a `dateColumn()` setter. All types are readable on the
+   [egress side](#reading-result-batches).
 
    To store a null for a column, omit that column's setter before calling
    `at()` or `atNow()`. The column set for the batch is the union of all
    columns seen across rows; a column first used on a later row is backfilled
    with null for earlier rows.
+
+   :::note IPv4 string input is strict
+
+   `ipv4Column(name, CharSequence)` rejects the literal strings `"null"`
+   (case-insensitive) and `"0.0.0.0"` with a `LineSenderException`. Passing
+   a `null` reference is a no-op (the column is left unset, which surfaces
+   as SQL NULL on read). This avoids the previous silent round-trip where
+   `"0.0.0.0"` and `"null"` both stored as IPv4 NULL.
+
+   :::
+
+   :::note GEOHASH precision is locked per column
+
+   The first call to `geoHashColumn` for a column fixes its precision
+   (number of bits). Subsequent rows must use the same precision or the
+   call throws `LineSenderException`. For the string overload, precision
+   is `value.length() * 5` bits; for the bits overload, it is the
+   explicit `precisionBits` argument (1..60).
+
+   :::
 
 5. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the row.
 6. Repeat from step 2, or call `flush()` to send buffered data.
@@ -359,6 +384,22 @@ with shape `(3, 2)`, `append()` fills positions `[0,0], [0,1], [1,0], [1,1],
 [2,0], [2,1]`. You can also use `set(value, i, j, ...)` to write at specific
 coordinates. Call `reshape(d1, d2, ...)` to change the shape without
 reallocating.
+
+`LongArray` works the same way for 64-bit integer arrays — pass a Java
+`long[]`, `long[][]`, or `long[][][]` directly, or use the reusable
+`LongArray` class for higher dimensions:
+
+```java
+import io.questdb.client.cutlass.line.array.LongArray;
+
+try (LongArray counts = new LongArray(3, 3, 3)) {
+    counts.clear();
+    for (int v = 0; v < 27; v++) {
+        counts.append(v);
+    }
+    sender.table("book").longArray("counts", counts).atNow();
+}
+```
 
 ### Designated timestamp
 
@@ -453,6 +494,18 @@ control batch size instead.
 The client also flushes when closed, waiting up to `close_flush_timeout_millis`
 (default 5000) for acknowledgements. If the flush fails at close time, the
 client does not retry. Always flush explicitly before closing.
+
+:::note Server-advertised batch cap
+
+The server advertises its maximum accepted batch size on the WebSocket
+upgrade response (`X-QWP-Max-Batch-Size`). The client parses this header
+on connect and clamps subsequent batches to the advertised cap. A single
+row larger than the cap, or a batch that would exceed the cap at flush
+time, surfaces synchronously as a `LineSenderException` from the
+offending column call or from `flush()` — earlier client versions only
+saw this as a `1009` WebSocket close on the next operation.
+
+:::
 
 ### Store-and-forward
 

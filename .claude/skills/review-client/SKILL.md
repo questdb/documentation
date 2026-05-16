@@ -111,7 +111,60 @@ If a page links to a sibling reference (e.g., `connect-string.md`), read
 that too. The connect-string page is shared across all client docs; treat it
 as in-scope whenever any client page is changed.
 
+For multi-file PRs, the parent does **not** need to read each in-scope file
+end-to-end — the deep reads are delegated to per-file subagents in Step 3.
+The parent only needs the first ~80 lines of each candidate to classify it
+as QWP vs legacy (Step 1). The shared connect-string reference is the one
+exception: the parent should read it once, because every per-file subagent
+will need to cite it.
+
 ### Step 3: Run the checklist
+
+#### Parallelization
+
+The per-file checklist work is independent across files. **For any PR
+touching more than one in-scope QWP file, fan out using the Agent tool**:
+spawn one subagent per in-scope file, each running the full checklist
+against its assigned file, and have the parent consolidate the per-file
+reports into the final review.
+
+Send the subagents in a single message with multiple Agent tool uses so
+they run concurrently. Each subagent's prompt must be self-contained — it
+will not see this skill's text or the conversation history. Include:
+
+- The exact file path to review (absolute path).
+- The PR number and head SHA, for citation context.
+- The full checklist (items 1–22 from this section) inlined into the
+  prompt. Do **not** just reference "the skill's checklist" — the subagent
+  cannot resolve that.
+- The expected output format: one finding per checklist item, severity
+  ordered (❌ → ⚠️ → ✅), with the section tag and exact line citations
+  (per Step 4). The subagent returns the file's section of the review,
+  ready to drop into the consolidated output.
+- The doublecheck requirement from the [Doublecheck](#doublecheck-before-reporting-a-finding)
+  subsection at the end of Step 3.
+- The list of *other* in-scope QWP client files in the PR, so cross-file
+  checks (item 21 schema drift, item 18 sibling-link verification) can
+  reference them. The subagent should read those siblings as needed for
+  comparison, but not produce findings on them — the agent reviewing each
+  sibling will cover its own.
+
+The shared `connect-string.md` reference (always in scope when any QWP
+client page changes) gets its own subagent, evaluated only against the
+checklist items that apply to a reference page (typically 12–14, 18, 19,
+and the parts of 22 that surface in the error-handling section).
+
+If the PR only touches one QWP file, run the checklist inline in the
+parent — fan-out has no benefit and adds latency.
+
+After the subagents return, the parent's job is to (a) consolidate
+findings into the final output structure per Step 4, (b) write the
+end-of-review summary that compares across files (top-three gaps,
+cross-cutting themes, actively misleading items), and (c) doublecheck any
+cross-file claim it added that no single subagent could have verified
+alone.
+
+#### Verdict definitions
 
 For each changed client page, evaluate every item below. Each item gets one
 of three verdicts:
@@ -328,6 +381,53 @@ Reference exact line numbers and quote short snippets when calling out a gap.
     example listing the fields, their types, and one-line guidance per
     field — much more readable than burying these properties in
     prose.
+
+#### Doublecheck before reporting a finding
+
+Every ❌ Missing and ⚠️ Partial verdict must be verified by re-reading
+the cited lines before it goes into the output. **False findings damage
+the review more than missed ones** — they make the docs author waste
+time chasing a non-issue and erode trust in the rest of the report. The
+checklist is long and the same words ("flush", "error", "thread") recur
+across sections; it is easy to write a finding from memory and miss the
+paragraph two sections down that already covers it.
+
+Before finalizing each ❌ / ⚠️ finding, do the following — and only then
+write it into the output:
+
+- **Re-read the cited line range.** Read the exact range you plan to
+  cite, plus enough surrounding lines (5–10 above and below) to confirm
+  the gap is real and the cited text is what you think it is.
+- **Search the whole page for the missing concept.** A finding of the
+  form "the page never mentions X" is invalid if X appears under a
+  different heading. Grep / scan for the relevant identifier (`setNull`,
+  `onFailoverReset`, `sender_id`, `OIDC`, `backpressure`, etc.) across
+  the file before claiming absence.
+- **Confirm section / header attributions.** A finding like "the
+  thread-safety statement is buried under 'Parallel queries'" is wrong
+  if the statement is actually under "Concurrency"; verify the section
+  heading that contains the cited line.
+- **Verify both sides of cross-file claims.** For findings comparing
+  across files (schema drift in item 21, link-target validity in item
+  18, "the Rust page does this correctly" comparisons), re-read both
+  files at the cited locations before reporting. A misattributed
+  comparison undermines the whole cross-file argument.
+- **Confirm exact quotes.** If the finding quotes the page (e.g., "ends
+  literally with 'and more'"), re-confirm the quote is verbatim and
+  appears at the cited line — paraphrased "quotes" are a common
+  failure mode.
+
+✅ Covered findings can be lighter-touch: a citation that points to the
+right region is sufficient verification. The skew toward verifying
+negative findings is intentional — a false ❌ wastes more author
+attention than a false ✅.
+
+When the per-file work is fanned out to subagents (see
+[Parallelization](#parallelization)), each subagent is responsible for
+doublechecking its own findings before returning. The parent must
+additionally doublecheck any cross-file claim it adds to the end-of-review
+summary — those claims didn't exist in any single subagent's output and
+therefore weren't verified upstream.
 
 ### Step 4: Produce the review
 

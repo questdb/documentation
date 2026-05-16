@@ -246,7 +246,8 @@ See also the [server-side TLS configuration](/docs/security/tls/).
 
 The client buffers rows in memory and flushes them to the server in batches.
 Auto-flushing controls when the buffer is sent without an explicit
-`flush()` call.
+`flush()` call. The three triggers below are OR'd — whichever threshold
+trips first sends the batch.
 
 - `auto_flush` — global enable. Options: `on`, `off`. Default: `on`.
   When `off`, the application must call `flush()` explicitly to send
@@ -258,8 +259,17 @@ Auto-flushing controls when the buffer is sent without an explicit
   call (not driven by a wall-clock timer). Set to `off` to disable.
   Default: `100` (100 ms).
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
-  size. Set to `off` to disable. Default: `0` (off). Accepts
-  [size suffixes](#size-suffixes).
+  size. Set to `off` to disable. Default: `8m` (8 MiB). Accepts
+  [size suffixes](#size-suffixes). When set to a positive value, the
+  client clamps the effective threshold down to 90% of the server-
+  advertised `X-QWP-Max-Batch-Size` at handshake (one-way: a configured
+  value smaller than the advertised cap is kept as-is). The 10% margin
+  absorbs encoding overhead such as schema and dict-delta bytes.
+  Setting `off` opts out of byte-based auto-flush entirely — the
+  handshake clamp does not re-enable it, and the application takes
+  responsibility for not producing oversized batches. Older servers
+  that do not advertise the header leave the configured value
+  untouched.
 
 ## Buffer sizing {#buffer}
 
@@ -620,7 +630,7 @@ description and behaviour notes.
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on`                          | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | `0` (off)                     | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_bytes`                      | size                          | `8m` (8 MiB)                  | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (100 ms)                | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000`                        | [Auto-flushing](#auto-flush)                                  |
 | `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |

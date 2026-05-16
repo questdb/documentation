@@ -109,11 +109,13 @@ using custom headers.
 | `X-QWP-Max-Version` | No       | Maximum QWP version the client supports (positive integer). Defaults to 1 if absent. |
 | `X-QWP-Client-Id`   | No       | Free-form client identifier (e.g., `java/1.0.2`, `zig/0.1.0`).                      |
 
-**Server response header:**
+**Server response headers:**
 
-| Header          | Description                                   |
-|-----------------|-----------------------------------------------|
-| `X-QWP-Version` | The QWP version selected for this connection. |
+| Header                 | Description                                                                                                                                                                                                                                                                |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `X-QWP-Version`        | The QWP version selected for this connection.                                                                                                                                                                                                                              |
+| `X-QWP-Max-Batch-Size` | Server's effective per-message payload cap in bytes, computed as `min(http.recv.buffer.size − 14, 16 MiB)` (the protocol ceiling clamped by the actual WebSocket recv buffer minus the worst-case frame header). Clients should size batches to stay under this value. Absent on servers older than the introduction of this header — clients fall back to their locally configured byte budget. |
+| `X-QWP-Durable-Ack`    | `enabled` when the connection will emit `STATUS_DURABLE_ACK` frames. Sent only when the client opted in via `X-QWP-Request-Durable-Ack: true` *and* the server has durable-ack support configured. Absent in every other case.                                            |
 
 The server selects the version as `min(clientMax, serverMax)`. The selected
 version is never higher than either side's maximum. The server may also
@@ -167,6 +169,12 @@ The end-to-end shape of a QWP client session, before the encoding details:
    - `X-QWP-Durable-Ack: enabled` — confirms durable-ack frames will follow,
      iff you opted in. If you opted in and this header is absent, fail the
      connection (don't silently wait for acks the server will never send).
+   - `X-QWP-Max-Batch-Size` (optional, older servers omit it) — server's
+     effective per-message payload cap in bytes. Clients should clamp their
+     batch-size triggers to fit under this value (a safety margin of ~10%
+     absorbs encoding overhead such as schema and dict-delta bytes). When
+     absent, fall back to a locally configured budget or a conservative
+     default such as 1.9 MiB to stay under the typical 2 MiB recv buffer.
 3. **Send binary frames.** Each frame is one QWP message:
    `12-byte header` + payload (`Delta Symbol Dictionary` if any, then one or
    more `Table Block`s). The first frame for a given table carries a full
@@ -521,22 +529,31 @@ The encoder chooses the strategy per column. The decoder must support both.
 When the reference implementation emits sentinel mode (null flag = 0x00), null
 rows are encoded as:
 
-| Type    | Sentinel                                                                          |
-|---------|-----------------------------------------------------------------------------------|
-| BOOLEAN | bit `0` (false)                                                                   |
-| BYTE    | `0x00`                                                                            |
-| SHORT   | `0x0000`                                                                          |
-| CHAR    | `0x0000`                                                                          |
-| GEOHASH | All-ones (`0xFF...FF`), truncated to `ceil(precision_bits / 8)` bytes             |
+| Type    | Sentinel                                                                                                                              |
+|---------|---------------------------------------------------------------------------------------------------------------------------------------|
+| BOOLEAN | bit `0` (false)                                                                                                                       |
+| BYTE    | `0x00`                                                                                                                                |
+| SHORT   | `0x0000`                                                                                                                              |
+| CHAR    | `0x0000`                                                                                                                              |
+| GEOHASH | All-ones (`0xFF...FF`), truncated to `ceil(precision_bits / 8)` bytes                                                                 |
+| IPv4    | `0x00 0x00 0x00 0x00` (the bit pattern 0, i.e. address `0.0.0.0`)                                                                     |
+| UUID    | two little-endian int64 halves, each equal to `Long.MIN_VALUE` (every byte `0x00` except the MSB of each half, which is `0x80`); 16 B |
+| LONG256 | four little-endian int64 words, each equal to `Long.MIN_VALUE`; 32 B (the UUID pattern repeated)                                      |
+
+Alternative implementations may freely choose sentinel mode for GEOHASH,
+IPv4, UUID, or LONG256: the server's decoder recognizes these byte
+patterns as null in sentinel mode regardless of which client emitted them.
+The reference Java client itself currently encodes these types in bitmap
+mode whenever the column contains any null rows.
 
 ### Reference implementation null strategy
 
 The reference Java client uses these strategies per type:
 
-| Strategy | Types                                                                                                                                     |
-|----------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| Sentinel | BOOLEAN, BYTE, SHORT, CHAR, GEOHASH                                                                                                      |
-| Bitmap   | INT, LONG, FLOAT, DOUBLE, VARCHAR, SYMBOL, TIMESTAMP, TIMESTAMP_NANOS, DATE, UUID, LONG256, DECIMAL64, DECIMAL128, DECIMAL256, DOUBLE_ARRAY, LONG_ARRAY |
+| Strategy | Types                                                                                                                                                    |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Sentinel | BOOLEAN, BYTE, SHORT, CHAR                                                                                                                               |
+| Bitmap   | INT, LONG, FLOAT, DOUBLE, VARCHAR, BINARY, SYMBOL, TIMESTAMP, TIMESTAMP_NANOS, DATE, UUID, LONG256, IPv4, GEOHASH, DECIMAL64, DECIMAL128, DECIMAL256, DOUBLE_ARRAY, LONG_ARRAY |
 
 Alternative implementations may make different per-column choices as long as
 the null flag accurately describes the data that follows. A column with no null
@@ -953,13 +970,20 @@ observe an abrupt disconnect (`ECANCELED`, EPIPE, or similar depending on the
 WebSocket library) partway through the send.
 
 The effective per-message size limit is therefore
-`min(http.recv.buffer.size, 16 MiB) − WebSocket frame overhead (≤ 14 bytes)`.
+`min(http.recv.buffer.size − 14, 16 MiB)` — the server folds the 14-byte
+worst-case WebSocket frame header into the value it advertises in the
+[`X-QWP-Max-Batch-Size`](#version-negotiation) response header on the 101
+upgrade. Clients that parse the header can size batches against that exact
+value rather than guessing the operator's `http.recv.buffer.size`.
 
-**Recommendation for client implementers:** keep individual QWP messages
-comfortably under the server's `http.recv.buffer.size` — for the default
-2 MiB recv buffer, a 1.9 MiB / ~25k-row ceiling per message is a safe target.
-Operators who want larger batches must raise `http.recv.buffer.size` on the
-server (e.g., `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom).
+**Recommendation for client implementers:** read `X-QWP-Max-Batch-Size` from
+the 101 response and clamp the batch-size trigger to ~90% of it. The 10%
+margin absorbs schema / dict-delta / framing overhead that wire bytes can
+carry beyond raw column-buffer bytes. Older servers omit the header — fall
+back to ~1.9 MiB (safe against the default 2 MiB recv buffer). Operators who
+want larger batches must raise `http.recv.buffer.size` on the server (e.g.,
+`http.recv.buffer.size=17m` to use the full QWP 16 MB headroom); the next
+handshake will advertise the new ceiling automatically.
 
 ## Client operation
 
