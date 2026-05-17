@@ -6,11 +6,11 @@ description:
   Learn how to connect and query time-series data from C and C++.
 ---
 
-import HighlyAvailableReads from "../../partials/pgwire/_highly_available_reads.partial.mdx"
-import KnownLimitations from "../../partials/pgwire/_known_limitations.partial.mdx"
-import ConnectionIssues from "../../partials/pgwire/_connection_issues.partial.mdx"
-import QueryErrors from "../../partials/pgwire/_query_errors.partial.mdx"
-import TimestampConfusion from "../../partials/pgwire/_timestamp_confusion.partial.mdx"
+import HighlyAvailableReads from "../../../partials/pgwire/_highly_available_reads.partial.mdx"
+import KnownLimitations from "../../../partials/pgwire/_known_limitations.partial.mdx"
+import ConnectionIssues from "../../../partials/pgwire/_connection_issues.partial.mdx"
+import QueryErrors from "../../../partials/pgwire/_query_errors.partial.mdx"
+import TimestampConfusion from "../../../partials/pgwire/_timestamp_confusion.partial.mdx"
 
 
 

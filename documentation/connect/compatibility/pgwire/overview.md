@@ -6,15 +6,15 @@ description:
   using standard PostgreSQL client libraries for querying data.
 ---
 
-import { Clients } from "../../../src/components/Clients"
+import { Clients } from "../../../../src/components/Clients"
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
-import PsqlInsertPartial from "../../partials/_psql.sql.insert.partial.mdx"
-import PythonInsertPartial from "../../partials/_python.sql.insert.partial.mdx"
-import JavaInsertPartial from "../../partials/_java.sql.insert.partial.mdx"
-import NodeInsertPartial from "../../partials/_nodejs.sql.insert.partial.mdx"
-import GoInsertPartial from "../../partials/_go.sql.insert.partial.mdx"
-import RustInsertPartial from "../../partials/_rust.sql.insert.partial.mdx"
+import PsqlInsertPartial from "../../../partials/_psql.sql.insert.partial.mdx"
+import PythonInsertPartial from "../../../partials/_python.sql.insert.partial.mdx"
+import JavaInsertPartial from "../../../partials/_java.sql.insert.partial.mdx"
+import NodeInsertPartial from "../../../partials/_nodejs.sql.insert.partial.mdx"
+import GoInsertPartial from "../../../partials/_go.sql.insert.partial.mdx"
+import RustInsertPartial from "../../../partials/_rust.sql.insert.partial.mdx"
 
 QuestDB implements the PostgreSQL wire protocol (PGWire), allowing you to
 connect using standard PostgreSQL client libraries. This is the recommended way

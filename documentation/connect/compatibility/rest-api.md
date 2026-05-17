@@ -7,14 +7,14 @@ description: REST API reference documentation.
 
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
-import GoImpPartial from "../partials/\_go.imp.insert.partial.mdx"
-import CurlImpPartial from "../partials/\_curl.imp.insert.partial.mdx"
-import NodejsImpPartial from "../partials/\_nodejs.imp.insert.partial.mdx"
-import PythonImpPartial from "../partials/\_python.imp.insert.partial.mdx"
-import CurlExecPartial from "../partials/\_curl.exec.insert.partial.mdx"
-import GoExecPartial from "../partials/\_go.exec.insert.partial.mdx"
-import NodejsExecPartial from "../partials/\_nodejs.exec.insert.partial.mdx"
-import PythonExecPartial from "../partials/\_python.exec.insert.partial.mdx"
+import GoImpPartial from "../../partials/\_go.imp.insert.partial.mdx"
+import CurlImpPartial from "../../partials/\_curl.imp.insert.partial.mdx"
+import NodejsImpPartial from "../../partials/\_nodejs.imp.insert.partial.mdx"
+import PythonImpPartial from "../../partials/\_python.imp.insert.partial.mdx"
+import CurlExecPartial from "../../partials/\_curl.exec.insert.partial.mdx"
+import GoExecPartial from "../../partials/\_go.exec.insert.partial.mdx"
+import NodejsExecPartial from "../../partials/\_nodejs.exec.insert.partial.mdx"
+import PythonExecPartial from "../../partials/\_python.exec.insert.partial.mdx"
 
 The QuestDB REST API is based on standard HTTP features and is understood by
 off-the-shelf HTTP clients. It provides a simple way to interact with QuestDB

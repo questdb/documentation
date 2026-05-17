@@ -52,7 +52,7 @@ module.exports = {
       label: "Connect",
       items: [
         {
-          id: "ingestion/overview",
+          id: "connect/overview",
           type: "doc",
           label: "Overview",
         },
@@ -61,47 +61,47 @@ module.exports = {
           label: "Client Libraries",
           items: [
             {
-              id: "client-configuration/connect-string",
+              id: "connect/clients/connect-string",
               type: "doc",
               label: "Connect string",
             },
             {
-              id: "ingestion/clients/java",
+              id: "connect/clients/java",
               type: "doc",
               label: "Java",
             },
             {
-              id: "ingestion/clients/python",
+              id: "connect/clients/python",
               type: "doc",
               label: "Python",
             },
             {
-              id: "ingestion/clients/go",
+              id: "connect/clients/go",
               type: "doc",
               label: "Go",
             },
             {
-              id: "ingestion/clients/rust",
+              id: "connect/clients/rust",
               type: "doc",
               label: "Rust",
             },
             {
-              id: "ingestion/clients/nodejs",
+              id: "connect/clients/nodejs",
               type: "doc",
               label: "Node.js",
             },
             {
-              id: "ingestion/clients/c-and-cpp",
+              id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
             },
             {
-              id: "ingestion/clients/dotnet",
+              id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
             },
             {
-              id: "ingestion/clients/date-to-timestamp-conversion",
+              id: "connect/clients/date-to-timestamp-conversion",
               type: "doc",
               label: "Date to Timestamp",
             },
@@ -117,10 +117,10 @@ module.exports = {
           label: "Message Brokers",
           collapsed: true,
           items: [
-            "ingestion/message-brokers/kafka",
-            "ingestion/message-brokers/telegraf",
-            "ingestion/message-brokers/redpanda",
-            "ingestion/message-brokers/flink",
+            "connect/message-brokers/kafka",
+            "connect/message-brokers/telegraf",
+            "connect/message-brokers/redpanda",
+            "connect/message-brokers/flink",
           ],
         },
         {
@@ -133,17 +133,17 @@ module.exports = {
               collapsed: true,
               items: [
                 {
-                  id: "ingestion/ilp/overview",
+                  id: "connect/compatibility/ilp/overview",
                   type: "doc",
                   label: "Overview",
                 },
                 {
-                  id: "ingestion/ilp/columnset-types",
+                  id: "connect/compatibility/ilp/columnset-types",
                   type: "doc",
                   label: "Columnset Types",
                 },
                 {
-                  id: "ingestion/ilp/advanced-settings",
+                  id: "connect/compatibility/ilp/advanced-settings",
                   type: "doc",
                   label: "Advanced Settings",
                 },
@@ -155,57 +155,57 @@ module.exports = {
               collapsed: true,
               items: [
                 {
-                  id: "query/pgwire/overview",
+                  id: "connect/compatibility/pgwire/overview",
                   type: "doc",
                   label: "Overview",
                 },
                 {
-                  id: "query/pgwire/large-result-sets",
+                  id: "connect/compatibility/pgwire/large-result-sets",
                   type: "doc",
                   label: "Large Result Sets",
                 },
                 {
-                  id: "query/pgwire/python",
+                  id: "connect/compatibility/pgwire/python",
                   type: "doc",
                   label: "Python",
                 },
                 {
-                  id: "query/pgwire/go",
+                  id: "connect/compatibility/pgwire/go",
                   type: "doc",
                   label: "Go",
                 },
                 {
-                  id: "query/pgwire/java",
+                  id: "connect/compatibility/pgwire/java",
                   type: "doc",
                   label: "Java",
                 },
                 {
-                  id: "query/pgwire/rust",
+                  id: "connect/compatibility/pgwire/rust",
                   type: "doc",
                   label: "Rust",
                 },
                 {
-                  id: "query/pgwire/nodejs",
+                  id: "connect/compatibility/pgwire/nodejs",
                   type: "doc",
                   label: "Node.js",
                 },
                 {
-                  id: "query/pgwire/dotnet",
+                  id: "connect/compatibility/pgwire/dotnet",
                   type: "doc",
                   label: ".NET",
                 },
                 {
-                  id: "query/pgwire/php",
+                  id: "connect/compatibility/pgwire/php",
                   type: "doc",
                   label: "PHP",
                 },
                 {
-                  id: "query/pgwire/r",
+                  id: "connect/compatibility/pgwire/r",
                   type: "doc",
                   label: "R",
                 },
                 {
-                  id: "query/pgwire/c-and-cpp",
+                  id: "connect/compatibility/pgwire/c-and-cpp",
                   type: "doc",
                   label: "C/C++",
                 },
@@ -216,15 +216,15 @@ module.exports = {
               label: "REST API",
               collapsed: true,
               items: [
-                "query/rest-api",
-                "ingestion/import-csv",
-                "query/export-parquet",
+                "connect/compatibility/rest-api",
+                "connect/compatibility/import-csv",
+                "connect/compatibility/export-parquet",
               ],
             },
           ],
         },
         {
-          id: "ingestion/java-embedded",
+          id: "connect/java-embedded",
           type: "doc",
           label: "Java Embedded",
         },
@@ -234,17 +234,17 @@ module.exports = {
           collapsed: true,
           items: [
             {
-              id: "protocols/overview",
+              id: "connect/wire-protocols/overview",
               type: "doc",
               label: "Overview",
             },
             {
-              id: "protocols/qwp-ingress-websocket",
+              id: "connect/wire-protocols/qwp-ingress-websocket",
               type: "doc",
               label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "protocols/qwp-egress-websocket",
+              id: "connect/wire-protocols/qwp-egress-websocket",
               type: "doc",
               label: "QWP Egress (WebSocket)",
             },

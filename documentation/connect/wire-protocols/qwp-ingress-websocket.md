@@ -6,7 +6,7 @@ description:
   ingest protocol.
 ---
 
-import QwpMessageHeader from "../partials/_qwp.message-header.partial.mdx"
+import QwpMessageHeader from "../../partials/_qwp.message-header.partial.mdx"
 
 :::info Audience
 
