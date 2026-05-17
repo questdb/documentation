@@ -137,6 +137,17 @@ ws::addr=node-a:9000,node-b:9000;sf_dir=/var/lib/myapp/qdb-sf;sender_id=ingest-1
 wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ```
 
+### Tolerate a slow or restarting server at startup
+
+```
+ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+```
+
+The 2-minute reconnect budget covers both the *first* connect and any
+subsequent reconnect: setting any explicit `reconnect_*` key implicitly
+turns on `initial_connect_retry`. See
+[Ingress reconnect](#reconnect-keys).
+
 ## Recipes {#recipes}
 
 Goal-to-keys mapping. For complete connect-string templates, see
@@ -160,8 +171,9 @@ caveats), follow the section links from the [Key index](#key-index).
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect budget                     | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` |
-| Retry initial connect                             | ingress   | `initial_connect_retry=on` or `=async` | `reconnect_*`                                                                               |
+| Tune ingress reconnect budget                     | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
 | Tune per-query egress failover                    | egress    | —                                      | `failover_max_attempts`, `failover_backoff_initial_ms`, `failover_backoff_max_ms`, `failover_max_duration_ms` |
@@ -499,12 +511,15 @@ SF mode and memory-only mode share the same loop.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`.
+  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
+  see below.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff. (Alias:
-  `max_backoff_millis`.) Default: `5000` (5 s).
+  `max_backoff_millis`.) Default: `5000` (5 s). Setting this enables
+  `initial_connect_retry=on` implicitly; see below.
 - `reconnect_max_duration_millis` — total time budget for a single outage.
   Once exceeded, the I/O loop gives up and surfaces a terminal error.
-  Default: `300000` (5 min).
+  Default: `300000` (5 min). Setting this enables `initial_connect_retry=on`
+  implicitly; see below.
 - `initial_connect_retry` — whether the initial connect attempt is retried
   on failure. The same loop drives the retry.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -512,6 +527,14 @@ SF mode and memory-only mode share the same loop.
     thread.
   - `async` — return the `Sender` immediately; the I/O thread retries in
     the background, surfacing terminal failures via the error inbox.
+
+  **Implicit promotion.** Setting any explicit `reconnect_*` key without
+  also choosing an `initial_connect_retry` mode promotes
+  `initial_connect_retry` to `on` automatically, so the reconnect budget
+  also covers the *first* connect attempt — not only post-disconnect
+  ones. To keep the historical fail-fast behaviour on first connect while
+  still tuning the reconnect loop, set `initial_connect_retry=off`
+  explicitly; the override is preserved.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Default: `5000` (5 s).
   Set to `0` or `-1` for fast close (skip the drain).
@@ -581,8 +604,10 @@ egress / `QwpQueryClient` path). They are not sender keys.
   `raw` (default — no compression, the accept-encoding header is omitted so
   pre-compression servers see an unchanged handshake), `zstd` (demand
   zstd), `auto` (accept zstd if the server offers it).
-- `compression_level` — zstd level hint. Range `1`–`22`. Ignored when
-  `compression=raw`. Default is the client's library default.
+- `compression_level` — zstd level hint. Range `1`–`22` (server clamps to
+  `1`–`9`). Default `1` — the cheapest server-side CPU; raise it if you
+  measure a meaningful ratio improvement on your payload and the server has
+  the headroom. Ignored when `compression=raw`.
 - `initial_credit` — byte-credit flow-control budget. `0` (default) means
   unbounded: the server streams as fast as the network allows. Set a
   non-zero budget to bound server push on a memory-constrained client.
@@ -643,7 +668,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`                         | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
 | `max_background_drainers`               | int                           | `4`                           | [Store-and-forward](#sf-keys)                                 |
 | `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
