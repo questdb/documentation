@@ -1,850 +1,1181 @@
 ---
 slug: /connect/clients/c-and-cpp
-title: C & C++ Client Documentation
-description:
-  "Dive into QuestDB using the C & C++ ingestion client for high-performance,
-  insert-only operations. Unlock peak time series data ingestion."
-test: "foo"
+title: C & C++ client for QuestDB
+sidebar_label: C & C++
+description: "QuestDB C and C++ client for high-throughput data ingestion over the QWP binary protocol (WebSocket)."
 ---
 
-import { ILPClientsTable } from "@theme/ILPClientsTable"
+import Tabs from "@theme/Tabs"
+import TabItem from "@theme/TabItem"
+import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
-QuestDB supports the C & C++ programming languages, providing a high-performance
-ingestion client tailored for insert-only operations. This integration ensures
-peak efficiency in time series data ingestion and analysis, perfectly suited for
-systems which require top performance and minimal latency.
+The QuestDB C and C++ client connects to QuestDB over the
+[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
+The library is implemented in Rust and exposes both a C11 ABI and a C++17
+header-only wrapper from a single shared/static library. Both APIs support
+high-throughput, column-oriented batched writes with automatic table creation,
+schema evolution, multi-host failover, and optional store-and-forward
+durability.
 
-Key features of the QuestDB C & C++ client include:
+:::tip Legacy transports
 
-- **Automatic table creation**: No need to define your schema upfront.
-- **Concurrent schema changes**: Seamlessly handle multiple data streams with
-  on-the-fly schema modifications
-- **Optimized batching**: Use strong defaults or curate the size of your batches
-- **Health checks and feedback**: Ensure your system's integrity with built-in
-  health monitoring
-- **Automatic write retries**: Reuse connections and retry after interruptions
-
-### Requirements
-
-- Requires a C/C++ compiler and standard libraries.
-- Assumes QuestDB is running. If it's not, refer to
-  [the general quick start](/docs/getting-started/quick-start/).
-
-### Client Installation
-
-You need to add the client as a dependency to your project. Depending on your
-environment, you can do this in different ways. Please check the documentation
-at the
-[client's repository](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
-
-## C++
-
-:::note
-
-This section is for the QuestDB C++ client.
-
-For the QuestDB C Client, see the below seciton.
+The same library also supports ILP ingestion over HTTP and TCP, and QWP over
+UDP for trusted high-throughput networks. This page documents the recommended
+WebSocket (QWP) path. For ILP transport details, see the
+[ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 :::
 
-<ILPClientsTable language="C++" />
+:::info
 
-Explore the full capabilities of the C++ client via the
-[C++ README](https://github.com/questdb/c-questdb-client/blob/main/doc/CPP.md).
+This page focuses on ingestion. For querying QuestDB from C/C++, use the
+[PGWire C++ client](/docs/connect/compatibility/pgwire/c-and-cpp/) or the
+[REST API](/docs/connect/compatibility/rest-api/).
 
-## Authentication
+:::
 
-The QuestDB C++ client supports basic connection and authentication
-configurations.
+## Quick start
 
-Here is an example of how to configure and use the client for data ingestion:
+### Prerequisites
 
-```c
-#include <questdb/ingress/line_sender.hpp>
+- A C11 or C++17 compiler (tested with GCC and Clang).
+- CMake 3.15 or newer.
+- Rust 1.61 or newer (only required when building the library from source).
 
-...
+### Build the library
 
-auto sender = questdb::ingress::line_sender::from_conf(
-    "http::addr=localhost:9000;");
-```
-
-You can also pass the connection configuration via the `QDB_CLIENT_CONF`
-environment variable:
+Clone and build from
+[c-questdb-client](https://github.com/questdb/c-questdb-client):
 
 ```bash
-export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
+git clone https://github.com/questdb/c-questdb-client.git
+cd c-questdb-client
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
-Then you use it like this:
+The build produces both a static (`libquestdb_client.a`) and a shared
+(`libquestdb_client.so` / `.dylib` / `.dll`) library. Headers live in
+`include/questdb/ingress/`.
 
-```cpp
-auto sender = questdb::ingress::line_sender::from_env();
-```
+### Hello world
 
-When using QuestDB Enterprise, authentication can also be done via REST token.
-Please check the [RBAC docs](/docs/security/rbac/#authentication) for more
-info.
-
-### Basic data insertion
-
-Basic insertion (no-auth):
-
-```cpp
-// main.cpp
-#include <questdb/ingress/line_sender.hpp>
-
-int main()
-{
-    auto sender = questdb::ingress::line_sender::from_conf(
-        "http::addr=localhost:9000;");
-
-    questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
-    buffer
-        .table("trades")
-        .symbol("symbol","ETH-USD")
-        .symbol("side","sell")
-        .column("price", 2615.54)
-        .column("amount", 0.00044)
-        .at(questdb::ingress::timestamp_nanos::now());
-
-    // To insert more records, call `buffer.table(..)...` again.
-
-    sender.flush(buffer);
-    return 0;
-}
-```
-
-These are the main steps it takes:
-
-- Use `questdb::ingress::line_sender::from_conf` to get the `sender` object
-- Populate a `Buffer` with one or more rows of data
-- Send the buffer using `sender.flush()`(`Sender::flush`)
-
-In this case, we call `at()`, with the current timestamp.
-
-Let's see now an example with explicit timestamps, custom timeout, basic auth,
-and error control.
-
-```cpp
-#include <questdb/ingress/line_sender.hpp>
-#include <iostream>
-#include <chrono>
-
-int main()
-{
-    try
-    {
-        // Create a sender using HTTP protocol
-        auto sender = questdb::ingress::line_sender::from_conf(
-            "http::addr=localhost:9000;username=admin;password=quest;retry_timeout=20000;");
-
-        // Get the current time as a timestamp
-        auto now = std::chrono::system_clock::now();
-        auto duration = now.time_since_epoch();
-        auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-
-        // Add rows to the buffer of the sender with the same timestamp
-        questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
-        buffer
-            .table("trades")
-            .symbol("symbol", "ETH-USD")
-            .symbol("side", "sell")
-            .column("price", 2615.54)
-            .column("amount", 0.00044)
-            .at(questdb::ingress::timestamp_nanos(nanos));
-
-        buffer
-            .table("trades")
-            .symbol("symbol", "BTC-USD")
-            .symbol("side", "sell")
-            .column("price", 39269.98)
-            .column("amount", 0.001)
-            .at(questdb::ingress::timestamp_nanos(nanos));
-
-        // Transactionality check
-        if (!buffer.transactional()) {
-            std::cerr << "Buffer is not transactional" << std::endl;
-            sender.close();
-            return 1;
-        }
-
-        // Flush and clear the buffer, sending the data to QuestDB
-        sender.flush(buffer);
-
-        // Close the connection after all rows ingested
-        sender.close();
-        return 0;
-    }
-    catch (const questdb::ingress::line_sender_error& err)
-    {
-        std::cerr << "Error running example: " << err.what() << std::endl;
-        return 1;
-    }
-}
-```
-
-Now, both events use the same timestamp. We recommend using the event's
-original timestamp when ingesting data into QuestDB. Using ingestion-time
-timestamps precludes the ability to deduplicate rows, which is
-[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
-### Array Insertion
-
-QuestDB can accept N-dimensional arrays. For now these are limited to the
-`double` element type. The easiest way is to insert an `std::array`, but the
-database can also support `std::vector`, `std::span` (C++20) and additional
-custom array types via a [customization point](https://github.com/questdb/c-questdb-client/blob/main/examples/line_sender_cpp_example_array_custom.cpp).
-
-The customization point can be used to integrate your own (or third party)
-n-dimensional array types by providing `shape` and, optionally if not row-major,
-`strides`.
-
-Please refer to the [Concepts section on n-dimensional arrays](/docs/query/datatypes/array),
-where this is explained in more detail.
-
-:::note
-Arrays are supported from QuestDB version 9.0.0, and require updated
-client libraries.
-:::
-
-In this example, we insert some FX order book data.
-* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
-* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
-
-```cpp
-#include <questdb/ingress/line_sender.hpp>
-#include <iostream>
-#include <vector>
-#include <array>
-
-using namespace std::literals::string_view_literals;
-using namespace questdb::ingress::literals;
-
-struct tensor {
-    std::vector<double> data;
-    std::vector<uintptr_t> shape;
-};
-
-// Customization point for the QuestDB array API (discovered via ADL lookup)
-inline auto to_array_view_state_impl(const tensor& t)
-{
-    return questdb::ingress::array::row_major_view<double>{
-        t.shape.size(), // rank
-        t.shape.data(), // shape
-        t.data.data(), t.data.size() // array data
-    };
-}
-
-int main()
-{
-    try
-    {
-        auto sender = questdb::ingress::line_sender::from_conf(
-            "http::addr=127.0.0.1:9000;");
-
-        questdb::ingress::line_sender_buffer buffer = sender.new_buffer();
-
-        buffer
-            .table("fx_order_book"_tn)
-            .symbol("symbol"_cn, "EUR/USD"_utf8)
-            .column("bids"_cn, tensor{
-                {
-                    1.0850, 600000,
-                    1.0849, 300000,
-                    1.0848, 150000
-                },
-                {3, 2}
-            })
-            .column("asks"_cn, tensor{
-                {
-                    1.0853, 500000,
-                    1.0854, 250000,
-                    1.0855, 125000
-                },
-                {3, 2}
-            })
-            .column("bids_exec_probs"_cn, std::array<double, 3>{
-                0.85, 0.50, 0.25})
-            .column("asks_exec_probs"_cn, std::vector<double>{
-                0.90, 0.55, 0.20})
-            .at(questdb::ingress::timestamp_nanos::now());
-
-        sender.flush(buffer);
-        return true;
-    }
-    catch (const questdb::ingress::line_sender_error& err)
-    {
-        std::cerr << "[ERROR] " << err.what() << std::endl;
-        return false;
-    }
-}
-```
-
-If your type also supports strides, use the
-`questdb::ingress::array::strided_view` instead.
-
-:::note
-The example above uses ILP/HTTP. If instead you're using ILP/TCP you'll need
-to explicity opt into the newer protocol version 2 that supports sending arrays.
-
-```
-tcp::addr=127.0.0.1:9009;protocol_version=2;
-```
-
-Protocol Version 2 along with its support for arrays is available from QuestDB
-version 9.0.0.
-:::
-
-<!-- ### Decimal insertion
-
-:::note
-Decimals are supported from QuestDB version 9.2.0, and require updated
-client libraries.
-:::
-
-:::caution
-Create your decimal columns up front with `DECIMAL(precision, scale)` before ingesting values so
-QuestDB knows the desired precision and scale. See the
-[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals) guide for details.
-:::
-
-Decimals can be written either as strings or in the binary ILP format. Import
-the decimal literals (`using namespace questdb::ingress::decimal;`) and send a
-validated UTF-8 string when you want QuestDB to parse the value for you:
-
-```cpp
-buffer.column("price"_cn, "2615.54"_decimal);
-```
-
-When you already have a fixed-point representation, construct a
-`questdb::ingress::decimal::decimal_view` with the column scale (digits to the
-right of the decimal point) and the unscaled value encoded as big-endian two's
-complement bytes. This preserves full precision and lets you reach the protocol
-limits (scale ≤ 76, mantissa ≤ 32 bytes):
-
-```cpp
-const uint8_t price_unscaled[] = {123};      // 12.3 -> scale 1, unscaled 123
-auto price_value = questdb::ingress::decimal::decimal_view(1, price_unscaled);
-buffer.column("price"_cn, price_value);
-```
-
-For custom fixed-point types, provide a `to_decimal_view_state_impl` overload
-that returns a struct exposing `.view()` so the sender can transform it into a
-`decimal_view`.
-
-You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples).
- -->
-
-## C
-
-:::note
-
-This section is for the QuestDB C client.
-
-Skip to the bottom of this page for information relating to both the C and C++
-clients.
-
-:::
-
-<ILPClientsTable language="C" />
-
-Explore the full capabilities of the C client via the
-[C README](https://github.com/questdb/c-questdb-client/blob/main/doc/C.md).
-
-### Connection
-
-The QuestDB C client supports basic connection and authentication
-configurations. Here is an example of how to configure and use the client for
-data ingestion:
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
 
 ```c
-#include <questdb/ingress/line_sender.h>
-
-...
-
-line_sender_utf8 conf = QDB_UTF8_LITERAL(
-    "http::addr=localhost:9000;");
-
-line_sender_error *error = NULL;
-line_sender *sender = line_sender_from_conf(
-    line_sender_utf8, &error);
-if (!sender) {
-    /* ... handle error ... */
-}
-```
-
-You can also pass the connection configuration via the `QDB_CLIENT_CONF`
-environment variable:
-
-```bash
-export QDB_CLIENT_CONF="http::addr=localhost:9000;username=admin;password=quest;"
-```
-
-Then you use it like this:
-
-```c
-#include <questdb/ingress/line_sender.h>
-...
-line_sender *sender = line_sender_from_env(&error);
-```
-
-### Basic data insertion
-
-```c
-// line_sender_trades_example.c
 #include <questdb/ingress/line_sender.h>
 #include <stdio.h>
-#include <stdint.h>
-
-int main() {
-    // Initialize line sender
-    line_sender_error *error = NULL;
-    line_sender *sender = line_sender_from_conf(
-        QDB_UTF8_LITERAL("http::addr=localhost:9000;username=admin;password=quest;"), &error);
-
-    if (error != NULL) {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Failed to create line sender: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        return 1;
-    }
-
-    // Print success message
-    printf("Line sender created successfully\n");
-
-    // Initialize line sender buffer
-    line_sender_buffer *buffer = line_sender_buffer_new();
-    if (buffer == NULL) {
-        fprintf(stderr, "Failed to create line sender buffer\n");
-        line_sender_close(sender);
-        return 1;
-    }
-
-    // Add data to buffer for ETH-USD trade
-    if (!line_sender_buffer_table(buffer,
-        QDB_TABLE_NAME_LITERAL("trades"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto error;
-    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
-        goto on_error;
-
-    // Flush the buffer to QuestDB
-    if (!line_sender_flush(sender, buffer, &error)) {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Failed to flush data: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        line_sender_buffer_free(buffer);
-        line_sender_close(sender);
-        return 1;
-    }
-
-    // Print success message
-    printf("Data flushed successfully\n");
-
-    // Free resources
-    line_sender_buffer_free(buffer);
-    line_sender_close(sender);
-
-    return 0;
-
-error:
-    {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Error: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        line_sender_buffer_free(buffer);
-        line_sender_close(sender);
-        return 1;
-    }
-}
-```
-
-In this case, we call `line_sender_buffer_at_nanos()` and pass the current
-timestamp. The value returned by `line_sender_now_nanos()` is nanoseconds
-from unix epoch (UTC).
-
-Let's see now an example with timestamps, custom timeout, basic auth, error
-control, and transactional awareness.
-
-```c
-// line_sender_trades_example.c
-#include <questdb/ingress/line_sender.h>
-#include <stdio.h>
-#include <time.h>
-#include <stdint.h>
-
-int main() {
-    // Initialize line sender
-    line_sender_error *error = NULL;
-    line_sender *sender = line_sender_from_conf(
-        QDB_UTF8_LITERAL(
-          "http::addr=localhost:9000;username=admin;password=quest;retry_timeout=20000;"
-          ), &error);
-
-    if (error != NULL) {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Failed to create line sender: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        return 1;
-    }
-
-    // Print success message
-    printf("Line sender created successfully\n");
-
-    // Initialize line sender buffer
-    line_sender_buffer *buffer = line_sender_buffer_new();
-    if (buffer == NULL) {
-        fprintf(stderr, "Failed to create line sender buffer\n");
-        line_sender_close(sender);
-        return 1;
-    }
-
-    // Get current time in nanoseconds
-    int64_t nanos = line_sender_now_nanos();
-
-    // Add data to buffer for ETH-USD trade
-    if (!line_sender_buffer_table(buffer,
-        QDB_TABLE_NAME_LITERAL("trades"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("symbol"), QDB_UTF8_LITERAL("ETH-USD"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error))
-        goto error;
-    if (!line_sender_buffer_at_nanos(buffer, nanos, &error))
-        goto error;
-
-    // Add data to buffer for BTC-USD trade
-    if (!line_sender_buffer_table(buffer,
-        QDB_TABLE_NAME_LITERAL("trades"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("symbol"),
-        QDB_UTF8_LITERAL("BTC-USD"), &error))
-        goto error;
-    if (!line_sender_buffer_symbol(buffer,
-        QDB_COLUMN_NAME_LITERAL("side"), QDB_UTF8_LITERAL("sell"), &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("price"), 39269.98, &error))
-        goto error;
-    if (!line_sender_buffer_column_f64(buffer,
-        QDB_COLUMN_NAME_LITERAL("amount"), 0.001, &error))
-        goto error;
-    if (!line_sender_buffer_at_nanos(buffer, nanos, &error))
-        goto error;
-
-    // If we detect multiple tables within the same buffer, we abort to avoid potential
-    // inconsistency issues. Read below in this page for transaction details
-    if (!line_sender_buffer_transactional(buffer)) {
-        fprintf(stderr, "Buffer is not transactional\n");
-        line_sender_buffer_free(buffer);
-        line_sender_close(sender);
-        return 1;
-    }
-
-    // Flush the buffer to QuestDB
-    if (!line_sender_flush(sender, buffer, &error)) {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Failed to flush data: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        line_sender_buffer_free(buffer);
-        line_sender_close(sender);
-        return 1;
-    }
-
-    // Print success message
-    printf("Data flushed successfully\n");
-
-    // Free resources
-    line_sender_buffer_free(buffer);
-    line_sender_close(sender);
-
-    return 0;
-
-error:
-    {
-        size_t len;
-        const char *msg = line_sender_error_msg(error, &len);
-        fprintf(stderr, "Error: %.*s\n", (int)len, msg);
-        line_sender_error_free(error);
-        line_sender_buffer_free(buffer);
-        line_sender_close(sender);
-        return 1;
-    }
-}
-```
-
-Now, both events use the same timestamp. We recommend using the event's
-original timestamp when ingesting data into QuestDB. Using ingestion-time
-timestamps precludes the ability to deduplicate rows, which is
-[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
-
-### Array Insertion
-
-The sender uses a plain 1-dimensional C array to insert an array of any
-dimensionality. It contains the elements laid out flat in row-major order.
-The shape describes the rank and dimensions of the array.
-
-:::note
-Arrays are supported from QuestDB version 9.0.0, and require updated
-client libraries.
-:::
-
-In this example,  we insert arrays of `double` values for some FX order book data.
-* `bids` and `asks`: 2D arrays of L2 order book depth. Each level contains price and volume.
-* `bids_exec_probs` and `asks_exec_probs`: 1D arrays of calculated execution probabilities for the next minute.
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <questdb/ingress/line_sender.h>
 
-int main()
-{
+int main(void) {
     line_sender_error* err = NULL;
     line_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
 
-    // or "tcp::addr=127.0.0.1:9009;protocol_version=2;"
-    const char* conf_str = "http::addr=127.0.0.1:9000;";
+    const char* conf = "qwpws::addr=localhost:9000;";
+    line_sender_utf8 conf_utf8;
+    if (!line_sender_utf8_init(&conf_utf8, strlen(conf), conf, &err)) goto on_error;
 
-    line_sender_utf8 conf_str_utf8 = {0, NULL};
-    if (!line_sender_utf8_init(
-            &conf_str_utf8, strlen(conf_str), conf_str, &err))
-        goto on_error;
-
-    sender = line_sender_from_conf(conf_str_utf8, &err);
-    if (!sender)
-        goto on_error;
+    sender = line_sender_from_conf(conf_utf8, &err);
+    if (!sender) goto on_error;
 
     buffer = line_sender_buffer_new_for_sender(sender);
-    line_sender_buffer_reserve(buffer, 64 * 1024);
 
-    line_sender_table_name table_name = QDB_TABLE_NAME_LITERAL("fx_order_book");
-    line_sender_column_name symbol_col = QDB_COLUMN_NAME_LITERAL("symbol");
-    line_sender_column_name bids_col = QDB_COLUMN_NAME_LITERAL("bids");
-    line_sender_column_name asks_col = QDB_COLUMN_NAME_LITERAL("asks");
+    line_sender_table_name tbl = QDB_TABLE_NAME_LITERAL("trades");
+    line_sender_column_name symbol_name = QDB_COLUMN_NAME_LITERAL("symbol");
+    line_sender_column_name price_name = QDB_COLUMN_NAME_LITERAL("price");
+    line_sender_column_name amount_name = QDB_COLUMN_NAME_LITERAL("amount");
+    line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("ETH-USD");
 
-    if (!line_sender_buffer_table(buffer, table_name, &err))
-        goto on_error;
+    if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
+    if (!line_sender_buffer_symbol(buffer, symbol_name, symbol_val, &err)) goto on_error;
+    if (!line_sender_buffer_column_f64(buffer, price_name, 2615.54, &err)) goto on_error;
+    if (!line_sender_buffer_column_f64(buffer, amount_name, 0.00044, &err)) goto on_error;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
 
-    line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("EUR/USD");
-    if (!line_sender_buffer_symbol(buffer, symbol_col, symbol_val, &err))
-        goto on_error;
+    if (!line_sender_flush(sender, buffer, &err)) goto on_error;
+    if (!line_sender_qwpws_close_drain(sender, &err)) goto on_error;
 
-    // bids: 3 rows (levels), 2 columns (price, volume)
-    uintptr_t bids_rank = 2;
-    uintptr_t bids_shape[] = {3, 2};
-    double bids_data[] = {
-        1.0850, 600000,
-        1.0849, 300000,
-        1.0848, 150000
-    };
-
-    if (!line_sender_buffer_column_f64_arr_c_major(
-            buffer,
-            bids_col,
-            bids_rank,
-            bids_shape,
-            (const uint8_t*)bids_data,
-            sizeof(bids_data),
-            &err))
-        goto on_error;
-
-    // asks: 3 rows (levels), 2 columns (price, volume)
-    uintptr_t asks_rank = 2;
-    uintptr_t asks_shape[] = {3, 2};
-    double asks_data[] = {
-        1.0853, 500000,
-        1.0854, 250000,
-        1.0855, 125000
-    };
-
-    if (!line_sender_buffer_column_f64_arr_c_major(
-            buffer,
-            asks_col,
-            asks_rank,
-            asks_shape,
-            (const uint8_t*)asks_data,
-            sizeof(asks_data),
-            &err))
-        goto on_error;
-
-    // Timestamp, leave as-is (similar to your example)
-    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
-        goto on_error;
-
-    if (!line_sender_flush(sender, buffer, &err))
-        goto on_error;
-
+    line_sender_buffer_free(buffer);
     line_sender_close(sender);
     return 0;
 
 on_error:;
     size_t err_len = 0;
-    const char* err_msg = line_sender_error_msg(err, &err_len);
-    fprintf(stderr, "Error: %.*s\n", (int)err_len, err_msg);
+    const char* msg = line_sender_error_msg(err, &err_len);
+    fprintf(stderr, "error: %.*s\n", (int)err_len, msg);
     line_sender_error_free(err);
-    line_sender_buffer_free(buffer);
-    line_sender_close(sender);
+    if (buffer) line_sender_buffer_free(buffer);
+    if (sender) line_sender_close(sender);
     return 1;
 }
 ```
 
-If you need to specify strides, you can do this via either the 
-`line_sender_buffer_column_f64_arr_byte_strides` or the
-`line_sender_buffer_column_f64_arr_elem_strides` functions.
+Compile with:
 
-Please refer to the
-[Concepts section on n-dimensional arrays](/docs/query/datatypes/array), where this is
-explained in more detail.
-
-<!-- ### Decimal insertion
-
-:::note
-Decimals are supported from QuestDB version 9.2.0, and require updated
-client libraries.
-:::
-
-:::caution
-Create your decimal columns up front with `DECIMAL(precision, scale)` before ingesting values so
-QuestDB knows the desired precision and scale. See the
-[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals) guide for details.
-:::
-
-QuestDB decimal columns can be populated in two ways. The simplest is to send a
-validated UTF-8 decimal string, which the server parses and stores using the
-column's precision:
-
-```c
-if (!line_sender_buffer_column_dec_str(buffer, price_name, "2615.54", strlen("2615.54"), &err))
-    goto on_error;
+```bash
+gcc -std=c11 hello.c \
+    -I /path/to/c-questdb-client/include \
+    -L /path/to/c-questdb-client/build -lquestdb_client \
+    -o hello
 ```
 
-For better performance you can format the unscaled value and send it in
-binary form. Pass the column scale (digits to the right of the decimal point)
-alongside the mantissa encoded as big-endian two's complement bytes. This
-allows you to reach the full range supported by QuestDB (scale ≤ 76, mantissa ≤
-32 bytes) and avoids loss of precision when you already have a fixed-point
-representation:
+</TabItem>
+<TabItem value="cpp">
 
-```c
-// 12.3 -> scale 1, unscaled value 123 (0x7B)
-const uint8_t price_unscaled_value[] = {123};
-if (!line_sender_buffer_column_dec(
-        buffer, price_name, 1, price_unscaled_value, sizeof(price_unscaled_value), &err))
-    goto on_error;
+```cpp
+#include <questdb/ingress/line_sender.hpp>
+#include <iostream>
+
+namespace qdb = questdb::ingress;
+using namespace questdb::ingress::literals;
+
+int main() {
+    try {
+        auto sender = qdb::line_sender::from_conf(
+            "qwpws::addr=localhost:9000;"_utf8);
+        auto buffer = sender.new_buffer();
+        buffer
+            .table("trades"_tn)
+            .symbol("symbol"_cn, "ETH-USD"_utf8)
+            .column("price"_cn, 2615.54)
+            .column("amount"_cn, 0.00044)
+            .at(qdb::timestamp_nanos::now());
+        sender.flush(buffer);
+        sender.close_drain();
+        return 0;
+    } catch (const qdb::line_sender_error& e) {
+        std::cerr << "error: " << e.what() << "\n";
+        return 1;
+    }
+}
 ```
 
-Negative values follow the same rules—encode the unscaled value using two's
-complement with the most significant byte first.
+Compile with:
 
-You can find more examples in the [c-questdb-client repository](https://github.com/questdb/c-questdb-client/tree/main/examples). -->
-
-## Other Considerations for both C and C++
-
-### Configuration options
-
-The easiest way to configure the line sender is the configuration string. The
-general structure is:
-
-```plain
-<transport>::addr=host:port;param1=val1;param2=val2;...
+```bash
+g++ -std=c++17 hello.cpp \
+    -I /path/to/c-questdb-client/include \
+    -L /path/to/c-questdb-client/build -lquestdb_client \
+    -o hello
 ```
 
-`transport` can be `http`, `https`, `tcp`, or `tcps`. The C/C++ and Rust clients
-share the same codebase. Please refer to the
-[Rust client's documentation](https://docs.rs/questdb-rs/latest/questdb/ingress)
-for the full details on configuration.
+</TabItem>
+</Tabs>
 
-Alternatively, for a breakdown of Configuration string options available across
-all clients, see the [Connect string](/docs/connect/clients/connect-string/) page.
+The four steps are:
 
-### Don't forget to flush
+1. Build a sender from a connect string.
+2. Append rows to a buffer.
+3. Call `flush()` to publish.
+4. Call `close_drain()` before destroying the sender so already-published
+   frames complete on the wire.
 
-The sender and buffer objects are entirely decoupled. This means that the sender
-won't get access to the data in the buffer until you explicitly call
-`sender.flush` or `line_sender_flush`. This may lead to a pitfall where you drop
-a buffer that still has some data in it, resulting in permanent data loss.
+## Authentication and TLS
 
-A common technique is to flush periodically on a timer and/or once the buffer
-exceeds a certain size. You can check the buffer's size by calling
-`buffer.size()` or `line_sender_buffer_size(...)`.
+Authentication happens at the HTTP level during the WebSocket upgrade, before
+any binary frames are exchanged.
 
-The default `flush()` method clears the buffer after sending its data. If you
-want to preserve its contents (for example, to send the same data to multiple
-QuestDB instances), call `sender.flush_and_keep(&buffer)` or
-`line_sender_flush_and_keep(...)` instead.
-
-### Transactional flush
-
-As described in
-[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics), the
-HTTP transport has some support for transactions.
-
-To ensure in advance that a flush will not affect more than one table, call
-`buffer.transactional()` or `line_sender_buffer_transactional(buffer)`, as shown
-in the examples above. This call will return false if the flush wouldn't be
-data-transactional.
-
-### Protocol Version
-
-To enhance data ingestion performance, QuestDB introduced an upgrade to the
-text-based InfluxDB Line Protocol which encodes arrays and `double` values in
-binary form. Arrays are supported only in this upgraded protocol version.
-
-You can select the protocol version with the `protocol_version` setting in the
-configuration string.
-
-HTTP transport automatically negotiates the protocol version by default. In order
-to avoid the slight latency cost at connection time, you can explicitly configure
-the protocol version by setting `protocol_version=2|1;`.
-
-TCP transport does not negotiate the protocol version and uses version 1 by
-default. You must explicitly set `protocol_version=2;` in order to ingest
-arrays, as in this example:
+### HTTP basic auth
 
 ```text
-tcp::addr=localhost:9009;protocol_version=2;
+wss::addr=db.example.com:9000;username=admin;password=quest;
 ```
 
-Protocol Version 2 along with its support for arrays is available from QuestDB
-version 9.0.0.
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
 
-## Next Steps
+```c
+line_sender_utf8 conf = QDB_UTF8_LITERAL(
+    "wss::addr=db.example.com:9000;username=admin;password=quest;");
+line_sender_error* err = NULL;
+line_sender* sender = line_sender_from_conf(conf, &err);
+```
 
-Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for details
-about transactions, error control, delivery guarantees, health check, or table
-and column auto-creation.
+</TabItem>
+<TabItem value="cpp">
 
-With data flowing into QuestDB, now it's time for analysis.
+```cpp
+auto sender = questdb::ingress::line_sender::from_conf(
+    "wss::addr=db.example.com:9000;username=admin;password=quest;"_utf8);
+```
 
-To learn _The Way_ of QuestDB SQL, see the
-[Query & SQL Overview](/docs/query/overview/).
+</TabItem>
+</Tabs>
 
-Alone? Stuck? Want help? Visit us in our
+### Token auth (Enterprise, recommended)
+
+Token authentication avoids the per-request overhead of basic auth and is
+the recommended path for Enterprise deployments.
+
+```text
+wss::addr=db.example.com:9000;token=your_bearer_token;
+```
+
+### TLS
+
+Use the `wss` schema (or its alias `qwpwss`) for TLS. Select where root
+certificates come from with `tls_ca`:
+
+| Key | Description |
+|-----|-------------|
+| `tls_ca=webpki_roots` | Use bundled webpki roots. |
+| `tls_ca=os_roots` | Use the OS certificate store. |
+| `tls_ca=webpki_and_os_roots` | Combine both. |
+| `tls_roots=/path/to/root-ca.pem` | Load roots from a PEM file. Useful for self-signed certs during testing. |
+| `tls_verify=unsafe_off` | Disable verification. Never use in production. |
+
+Example with a custom CA file:
+
+```text
+wss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
+```
+
+### Authentication timeout
+
+`auth_timeout` (default 15000 ms) controls how long the client waits for the
+WebSocket upgrade to complete.
+
+## Creating the client
+
+### From a connect string
+
+The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
+
+Use `qwpws` (plain) or `qwpwss` (TLS). `ws` / `wss` are accepted as aliases.
+The default port is `9000`.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_utf8 conf = QDB_UTF8_LITERAL("qwpws::addr=localhost:9000;");
+line_sender_error* err = NULL;
+line_sender* sender = line_sender_from_conf(conf, &err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto sender = questdb::ingress::line_sender::from_conf(
+    "qwpws::addr=localhost:9000;"_utf8);
+```
+
+</TabItem>
+</Tabs>
+
+For the full list of connect-string keys, see the
+[connect string reference](/docs/connect/clients/connect-string/).
+
+### From an environment variable
+
+Set `QDB_CLIENT_CONF` to keep credentials out of source code:
+
+```bash
+export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
+```
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_error* err = NULL;
+line_sender* sender = line_sender_from_env(&err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto sender = questdb::ingress::line_sender::from_env();
+```
+
+</TabItem>
+</Tabs>
+
+### Using the options API
+
+For callers that prefer typed setters over a connect string, build the sender
+through `line_sender_opts`:
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_error* err = NULL;
+line_sender_utf8 host = QDB_UTF8_LITERAL("localhost");
+line_sender_opts* opts = line_sender_opts_new(
+    line_sender_protocol_qwpws, host, 9000);
+if (!line_sender_opts_qwpws_progress(
+        opts, LINE_SENDER_QWPWS_PROGRESS_BACKGROUND, &err))
+    goto on_error;
+line_sender* sender = line_sender_build(opts, &err);
+line_sender_opts_free(opts);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+namespace qdb = questdb::ingress;
+using namespace questdb::ingress::literals;
+
+qdb::opts opts{qdb::protocol::qwpws, "localhost"_utf8, 9000};
+opts.qwp_ws_progress(qdb::qwp_ws_progress::background)
+    .auth_timeout(15000);
+qdb::line_sender sender{opts};
+```
+
+</TabItem>
+</Tabs>
+
+Most QWP/WebSocket settings are best configured through the connect string. The
+options API mirrors the same keys with C/C++-typed setters; see the function
+prototypes under `bool line_sender_opts_*` in `line_sender.h` for the full set.
+
+## Data ingestion
+
+### Concurrency
+
+`line_sender` is single-owner: only one thread may call publishing methods on a
+given sender at a time. For concurrent producers, create one sender per
+producer thread, or hand rows to a single owner over a queue.
+
+Buffers (`line_sender_buffer`) are independent of senders. Build buffers on any
+thread, then hand them to the sender for flushing. This lets worker threads
+encode rows in parallel and serialises only the publish step.
+
+When several sender instances share an `sf_dir`, give each a distinct
+`sender_id` — slots are exclusive (see [Store-and-forward](#store-and-forward)).
+
+### General usage pattern
+
+1. Call `line_sender_buffer_table(buffer, name, &err)` (C++ `buffer.table(name)`)
+   to select a target table.
+2. Call typed column setters to add values (see
+   [Column setters](#column-setters) below).
+3. Finalize the row with `line_sender_buffer_at_nanos`,
+   `line_sender_buffer_at_micros`, or `line_sender_buffer_at_now` (C++
+   `buffer.at(...)` / `buffer.at_now()`).
+4. Repeat from step 1, or call `line_sender_flush(sender, buffer, &err)` (C++
+   `sender.flush(buffer)`) to publish.
+
+Tables and columns are created automatically if they do not exist.
+
+### Column setters
+
+QWP buffers accept every QuestDB column type. The C ABI exposes each type as a
+separate function; the C++ wrapper overloads `column()` for primitive scalars
+and provides dedicated methods for everything else.
+
+| QuestDB type | C function | C++ method |
+|---|---|---|
+| `SYMBOL` | `line_sender_buffer_symbol` | `buffer.symbol(name, value)` |
+| `BOOLEAN` | `line_sender_buffer_column_bool` | `buffer.column(name, bool)` |
+| `BYTE` (i8) | `line_sender_buffer_column_i8` | `buffer.column_i8(name, value)` |
+| `SHORT` (i16) | `line_sender_buffer_column_i16` | `buffer.column_i16(name, value)` |
+| `INT` (i32) | `line_sender_buffer_column_i32` | `buffer.column_i32(name, value)` |
+| `LONG` (i64) | `line_sender_buffer_column_i64` | `buffer.column(name, int64_t)` |
+| `FLOAT` (f32) | `line_sender_buffer_column_f32` | `buffer.column_f32(name, value)` |
+| `DOUBLE` (f64) | `line_sender_buffer_column_f64` | `buffer.column(name, double)` |
+| `CHAR` | `line_sender_buffer_column_char` | `buffer.column_char(name, code_unit)` |
+| `VARCHAR` | `line_sender_buffer_column_str` | `buffer.column(name, std::string_view)` |
+| `BINARY` | `line_sender_buffer_column_binary` | `buffer.column_binary(name, bytes, len)` |
+| `UUID` | `line_sender_buffer_column_uuid` | `buffer.column_uuid(name, lo, hi)` |
+| `LONG256` | `line_sender_buffer_column_long256` | `buffer.column_long256(name, bytes)` |
+| `IPv4` | `line_sender_buffer_column_ipv4` | `buffer.column_ipv4(name, value)` |
+| `DATE` | `line_sender_buffer_column_date` | `buffer.column_date(name, millis)` |
+| `TIMESTAMP` (non-designated) | `line_sender_buffer_column_ts_micros` | `buffer.column(name, timestamp_micros)` |
+| `TIMESTAMP_NS` (non-designated) | `line_sender_buffer_column_ts_nanos` | `buffer.column(name, timestamp_nanos)` |
+| `GEOHASH` | `line_sender_buffer_column_geohash` | `buffer.column_geohash(name, bits, precision)` |
+| `DECIMAL` (string form) | `line_sender_buffer_column_dec_str` | `buffer.column(name, decimal_str_view)` |
+| `DECIMAL` (binary, generic) | `line_sender_buffer_column_dec` | `buffer.column(name, decimal_view)` |
+| `DECIMAL64` | `line_sender_buffer_column_dec64` / `_dec64_str` | `buffer.column_dec64(name, ...)` |
+| `DECIMAL128` | `line_sender_buffer_column_dec128` / `_dec128_str` | `buffer.column_dec128(name, ...)` |
+| `DOUBLE[]` (arrays) | `line_sender_buffer_column_f64_arr_c_major` / `_byte_strides` / `_elem_strides` | `buffer.column(name, array_view)` |
+| `LONG[]` (i64 arrays) † | `line_sender_buffer_column_i64_arr_*` | `buffer.column(name, array_view)` |
+
+† **Spec-only — currently rejected by the server.** QWP v1 defines the
+`LONG[]` wire type and the client encodes it correctly, but server-side
+ingest does not yet accept it. Batches that include i64-array columns are
+rejected with `"long arrays are not supported, only double arrays"`.
+
+Unlike the Rust client, the C API does not expose `_opt` variants for typed
+nulls — to omit a value, simply do not call the setter for that column.
+
+### Ingest arrays
+
+The client encodes one-dimensional and multidimensional `DOUBLE[]` (and
+`LONG[]`, when the server accepts it) columns. Three layouts are supported:
+
+| Layout | Function (f64) | When to use |
+|---|---|---|
+| Row-major (C-major) | `line_sender_buffer_column_f64_arr_c_major` | Contiguous, row-major (C-style) buffers. |
+| Byte strides | `line_sender_buffer_column_f64_arr_byte_strides` | Non-contiguous data with strides expressed in bytes. |
+| Element strides | `line_sender_buffer_column_f64_arr_elem_strides` | Non-contiguous data with strides expressed in elements. |
+
+```c
+// Row-major 3x2 array of f64.
+uintptr_t shape[2] = {3, 2};
+double values[6] = {1.0850, 600000.0, 1.0849, 300000.0, 1.0848, 150000.0};
+if (!line_sender_buffer_column_f64_arr_c_major(
+        buffer,
+        QDB_COLUMN_NAME_LITERAL("bids"),
+        2,                                     // rank
+        shape,                                 // shape (length == rank)
+        values,                                // data (typed pointer)
+        sizeof(values) / sizeof(values[0]),    // element count
+        &err))
+    goto on_error;
+```
+
+Array ingestion requires QuestDB 9.0.0 or later.
+
+### Decimal columns
+
+:::caution
+
+Decimal ingestion requires QuestDB 9.2.0 or later. Pre-create decimal columns
+with `DECIMAL(precision, scale)` so the server enforces the expected precision.
+See the
+[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
+page.
+
+:::
+
+The simplest path is the string form:
+
+```c
+const char* price = "2615.54";
+if (!line_sender_buffer_column_dec_str(
+        buffer,
+        QDB_COLUMN_NAME_LITERAL("price"),
+        price, strlen(price),
+        &err))
+    goto on_error;
+```
+
+For fixed-width binary forms, use `line_sender_buffer_column_dec64` (one
+`int64_t` unscaled value) and `line_sender_buffer_column_dec128` (a 16-byte
+unscaled little-endian integer).
+
+### Designated timestamp
+
+The [designated timestamp](/docs/concept/designated-timestamp/) column
+controls time-based partitioning and ordering. Two ways to set it:
+
+**User-assigned** (recommended for deduplication and exactly-once delivery):
+
+```c
+// Microsecond precision creates a standard TIMESTAMP column.
+if (!line_sender_buffer_at_micros(buffer, line_sender_now_micros(), &err))
+    goto on_error;
+
+// Nanosecond precision creates a TIMESTAMP_NS column.
+if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+    goto on_error;
+```
+
+**Server-assigned** (server uses its wall-clock time):
+
+```c
+if (!line_sender_buffer_at_now(buffer, &err))
+    goto on_error;
+```
+
+`at_now` removes the ability to deduplicate rows. Prefer explicit timestamps
+for production ingestion. See
+[Delivery semantics](/docs/concept/delivery-semantics/) for why
+server-assigned timestamps defeat exactly-once outcomes.
+
+:::note
+
+QuestDB works best when data arrives in chronological order (sorted by
+timestamp).
+
+:::
+
+## Flushing
+
+The sender and buffer are decoupled. Buffered rows are not on the wire until
+you call `line_sender_flush(sender, buffer, &err)` (C++ `sender.flush(buffer)`).
+
+:::caution No auto-flush
+
+QWP/WebSocket does not implement auto-flushing. You must call `flush()`
+explicitly. The connect-string keys `auto_flush_rows` and `auto_flush_bytes`
+are rejected; the only accepted value is `auto_flush=off`.
+
+A common pattern is to flush periodically on a timer and/or when the buffer
+size (`line_sender_buffer_size(buffer)`) exceeds a threshold.
+
+:::
+
+`flush()` clears the buffer after publishing locally. Use `flush_and_keep()`
+to retain contents (for example, to fan the same buffer out to multiple
+senders).
+
+On QWP/WebSocket, `flush()` returns once the buffer is accepted by the local
+replay queue, before the server acknowledges it. The call can block if the
+queue is full — see [Backpressure on flush](#backpressure-on-flush). Server
+errors observed later are reported asynchronously (see
+[Asynchronous error handling](#asynchronous-error-handling)).
+
+### Backpressure on flush
+
+`flush()` is not unconditionally non-blocking. The publisher feeds a bounded
+queue with two stacked caps:
+
+1. **In-flight window** — `max_in_flight` (default `128`) unacknowledged
+   frames on the connection. Reached first under steady-state load when the
+   server keeps up but you have many small flushes in flight.
+2. **Queue cap** — `sf_max_total_bytes` (default `128 MiB` in memory mode,
+   `10 GiB` in disk mode). Reached when the server is unreachable long
+   enough that the in-flight count stops being the active limit.
+
+When either cap is hit, `flush()` blocks the caller and retries as the I/O
+loop releases capacity (ACK-driven trim). The wait is bounded by
+`sf_append_deadline_millis` (default `30000`). If the deadline elapses,
+`flush()` returns an error with code
+`line_sender_error_server_flush_error` carrying a `SubmitTimedOut`
+diagnostic — the application can retry, fail closed, or shed load.
+**No data is ever dropped or overwritten** while the publisher is parked.
+
+Column setters and `line_sender_buffer_table(...)` never block — they only
+mutate the in-process buffer. Backpressure surfaces only at `flush()`.
+
+:::caution Oversized payloads are rejected, not parked
+
+A single flushed payload larger than `sf_max_bytes` (default `4 MiB`) returns
+an error from `flush()` immediately — it does *not* enter the backpressure
+wait. Fixes: reduce the number of rows you accumulate per buffer before
+flushing, or raise `sf_max_bytes` to fit your largest single flushed payload.
+
+:::
+
+### FSN-based completion
+
+Every published frame is assigned a frame sequence number (FSN). To wait until
+the server has acknowledged a specific frame:
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_qwpws_fsn fsn;
+if (!line_sender_qwpws_flush_and_get_fsn(sender, buffer, &fsn, &err))
+    goto on_error;
+
+if (fsn.has_value) {
+    bool reached = false;
+    if (!line_sender_qwpws_await_acked_fsn(
+            sender, fsn.value, 10000, &reached, &err))
+        goto on_error;
+    if (!reached)
+        fprintf(stderr, "timed out waiting for server ACK\n");
+}
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto fsn = sender.flush_and_get_fsn(buffer);
+if (fsn && !sender.await_acked_fsn(*fsn, std::chrono::seconds{10})) {
+    std::cerr << "timed out waiting for server ACK\n";
+}
+```
+
+</TabItem>
+</Tabs>
+
+Related accessors:
+
+| C function | C++ method | Returns |
+|---|---|---|
+| `line_sender_qwpws_flush_and_get_fsn` | `flush_and_get_fsn(buffer)` | Highest FSN published by this call. `has_value == false` / `std::nullopt` if the buffer was empty. |
+| `line_sender_qwpws_flush_and_keep_and_get_fsn` | `flush_and_keep_and_get_fsn(buffer)` | Same, but keeps the buffer. |
+| `line_sender_qwpws_published_fsn` | `published_fsn()` | Highest FSN published locally. |
+| `line_sender_qwpws_acked_fsn` | `acked_fsn()` | Highest FSN completed (server ACK or drop-and-continue). |
+| `line_sender_qwpws_await_acked_fsn` | `await_acked_fsn(fsn, timeout)` | Block until `acked_fsn()` reaches `fsn`, or the timeout elapses. |
+
+In durable ACK mode, `acked_fsn` advances after durable upload, not on the
+ordinary OK frame.
+
+## Store-and-forward
+
+With store-and-forward (SF) enabled, unacknowledged frames are persisted to
+disk and replayed after reconnection, surviving sender process restarts:
+
+```text
+qwpws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
+```
+
+Without `sf_dir`, unacknowledged data lives in process memory and is lost if
+the sender process exits. The reconnect loop still spans transient server
+outages, but a RAM cap bounds how much data can accumulate.
+
+<SfDedupWarning />
+
+### SF tuning keys
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `sf_dir` | unset | Enables disk-backed SF when set. |
+| `sender_id` | `default` | Slot identity. Allowed chars: `A-Za-z0-9_-`. Use distinct ids per sender process. |
+| `sf_max_bytes` | 4 MiB | Per-segment size cap. |
+| `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
+| `sf_durability` | `memory` | `memory` is the only shipping value. `flush` and `append` are reserved for future per-write fsync modes; setting them today fails sender construction. |
+| `sf_append_deadline_millis` | 30000 | Maximum time `flush()` blocks waiting for queue capacity to free up. Applies in both memory and disk modes (the SFA queue is shared). On timeout, `flush()` surfaces an error; no data is dropped. See [Backpressure on flush](#backpressure-on-flush). |
+| `drain_orphans` | `off` | If `on`, take over stale slots owned by a previous sender. |
+| `max_background_drainers` | 4 | Concurrency cap when draining orphans. |
+
+## Durable acknowledgement
+
+:::note Enterprise
+
+Durable acknowledgement requires QuestDB Enterprise with primary replication
+configured.
+
+:::
+
+By default, the server confirms a batch once it is committed to the local
+[WAL](/docs/concept/write-ahead-log/). To wait for the batch to be durably
+uploaded to object storage:
+
+```text
+qwpws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+```
+
+`durable_ack_keepalive_interval_millis` (default 200) controls how often the
+client probes the server for durable ACK progress when no other traffic is in
+flight.
+
+## Asynchronous error handling
+
+QWP/WebSocket ingestion is asynchronous: `flush()` returns as soon as the
+frame is accepted locally. Server-side rejections and protocol violations are
+reported separately.
+
+There are two ways to observe them.
+
+### Polling
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+for (;;) {
+    line_sender_qwpws_error* qwp_err = NULL;
+    if (!line_sender_qwpws_poll_error(sender, &qwp_err, &err))
+        goto on_error;
+    if (!qwp_err)
+        break;  // no more queued diagnostics
+
+    line_sender_qwpws_error_view view =
+        line_sender_qwpws_error_get_view(qwp_err);
+    fprintf(stderr,
+        "qwp error: category=%d policy=%d status=%d fsn=[%llu..=%llu] msg=%.*s\n",
+        (int)view.category,
+        (int)view.applied_policy,
+        view.has_status ? view.status : -1,
+        (unsigned long long)view.from_fsn,
+        (unsigned long long)view.to_fsn,
+        (int)view.message_len, view.message);
+    line_sender_qwpws_error_free(qwp_err);
+}
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+while (auto err = sender.poll_qwp_ws_error()) {
+    std::cerr
+        << "qwp error: category=" << static_cast<int>(err->category)
+        << " policy=" << static_cast<int>(err->applied_policy)
+        << " status=" << (err->status ? int(*err->status) : -1)
+        << " fsn=[" << err->from_fsn << ".." << err->to_fsn << "]"
+        << " msg=" << err->message << "\n";
+}
+```
+
+</TabItem>
+</Tabs>
+
+### Handler callback
+
+Install a handler on the options object. It runs synchronously from sender
+API calls such as `flush()`. The handler must not call back into the same
+sender.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+static void on_qwp_error(
+        void* user_data,
+        const line_sender_qwpws_error_view* ev)
+{
+    (void)user_data;
+    fprintf(stderr, "qwp error: category=%d msg=%.*s\n",
+        (int)ev->category, (int)ev->message_len, ev->message);
+}
+
+line_sender_utf8 host = QDB_UTF8_LITERAL("localhost");
+line_sender_opts* opts = line_sender_opts_new(
+    line_sender_protocol_qwpws, host, 9000);
+line_sender_opts_qwpws_error_handler(opts, on_qwp_error, NULL, &err);
+line_sender* sender = line_sender_build(opts, &err);
+line_sender_opts_free(opts);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+namespace qdb = questdb::ingress;
+using namespace questdb::ingress::literals;
+
+qdb::opts opts{qdb::protocol::qwpws, "localhost"_utf8, 9000};
+opts.qwp_ws_error_handler([](const qdb::qwp_ws_error& e) {
+    std::cerr << "qwp error: category=" << static_cast<int>(e.category)
+              << " msg=" << e.message << "\n";
+});
+qdb::line_sender sender{opts};
+```
+
+</TabItem>
+</Tabs>
+
+### Error view fields
+
+The `line_sender_qwpws_error_view` struct (and the C++ `qwp_ws_error` struct)
+carries:
+
+| Field | Meaning |
+|---|---|
+| `category` | `schema_mismatch`, `parse_error`, `internal_error`, `security_error`, `write_error`, `protocol_violation`, `unknown`. Use for programmatic dispatch. |
+| `applied_policy` | `drop_and_continue` (batch dropped, sender continues) or `halt` (sender latched terminal). |
+| `status` (`has_status`) | Raw QWP status byte. Absent for WebSocket protocol violations. |
+| `message` / `message_len` | Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. The pointer is **not** NUL-terminated; always read exactly `message_len` bytes. See [Message stability](#message-stability) and [PII safety](#message-pii). |
+| `message_sequence` (`has_message_sequence`) | Server's per-frame QWP wire sequence for the error frame. Resets on reconnect — only meaningful within one connection. |
+| `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s), client-side. |
+
+`line_sender_qwpws_errors_dropped` (C++ `qwp_ws_errors_dropped()`) reports how
+many diagnostics were lost because the bounded log overflowed (typically due
+to a lagging poll cursor).
+
+#### Message stability {#message-stability}
+
+`message` is a human-readable diagnostic — **not a stable contract.** Its
+text varies across server versions and across provenance:
+
+- **QWP error frames** carry a server-supplied UTF-8 string capped at
+  1024 bytes by the wire spec.
+- **WebSocket protocol violations** are client-synthesized as
+  `"ws-close[<code>]: <reason>"`.
+- The server-supplied text mirrors QuestDB's normal SQL error formatting,
+  which historically reworded across releases.
+- The field may be empty.
+
+Use `category` and `status` for programmatic dispatch. Never pattern-match
+on `message`.
+
+#### PII / secret safety {#message-pii}
+
+`message` may include fragments of the client's own payload — for
+example, an offending column value quoted back by a schema or parse
+rejection — or a server-supplied WebSocket close reason that the
+operator did not control. **Treat `message` as potentially containing
+PII or secrets.**
+
+Log it at the same trust level as the data being sent, and sanitize
+before forwarding to external error trackers (Sentry, Datadog, end-user
+UIs). The other fields on the error view are safe to forward as-is —
+they carry only structural metadata.
+
+#### Correlating with server-side logs
+
+The protocol does not currently surface a server-issued request or
+connection identifier in the WebSocket upgrade response. The closest
+correlation tuple is `(message_sequence, from_fsn, to_fsn)`:
+
+- `message_sequence` — per-connection QWP wire sequence the server
+  attached to the error frame. Resets on reconnect.
+- `from_fsn` / `to_fsn` — client-side FSN span of the affected frames.
+  Not generally indexed by server-side logs.
+
+When opening a bug report, supply the connection start time (from your
+application logs), the client's `X-QWP-Client-Id` header value (if your
+application sets one), and the `(message_sequence, from_fsn, to_fsn)` triple.
+
+After a `halt` policy fires, the sender is terminal. Drop it and create a new
+one. `line_sender_must_close(sender)` (C++ `sender.must_close()`) reports
+whether the sender has entered a terminal state.
+
+`drop_and_continue` errors do not halt the sender. The affected batch is
+discarded; subsequent frames are unaffected and the I/O loop keeps running.
+
+For terminal diagnostics, the next failing sender call also returns a
+`line_sender_error*` whose structured QWP/WebSocket diagnostic can be
+copied with `line_sender_error_qwpws_get_view(err, &view)`. The view is
+borrowed from the ordinary error object and is valid until
+`line_sender_error_free()`. Copy exactly `message_len` bytes from
+`view.message` before freeing the error. In C++, the same diagnostic is
+available via `line_sender_error::qwp_ws_diagnostic()` on the thrown
+exception.
+
+## Progress modes
+
+The client drives the WebSocket loop in one of two modes:
+
+| Mode | Behaviour |
+|---|---|
+| `LINE_SENDER_QWPWS_PROGRESS_BACKGROUND` (default) | A sender-owned thread sends frames, receives ACKs, reconnects, and replays. Right choice for most callers. |
+| `LINE_SENDER_QWPWS_PROGRESS_MANUAL` | No background thread. The caller drives progress with `line_sender_qwpws_drive_once` or `line_sender_qwpws_await_acked_fsn`. |
+
+Set it via the connect string (`qwp_ws_progress=manual`) or the options API:
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_utf8 conf = QDB_UTF8_LITERAL(
+    "qwpws::addr=localhost:9000;qwp_ws_progress=manual;");
+line_sender* sender = line_sender_from_conf(conf, &err);
+
+// ... append rows ...
+line_sender_qwpws_fsn fsn;
+if (!line_sender_qwpws_flush_and_get_fsn(sender, buffer, &fsn, &err))
+    goto on_error;
+
+if (fsn.has_value) {
+    bool reached = false;
+    while (!reached) {
+        bool progressed = false;
+        if (!line_sender_qwpws_drive_once(sender, &progressed, &err))
+            goto on_error;
+        line_sender_qwpws_fsn acked;
+        if (!line_sender_qwpws_acked_fsn(sender, &acked, &err))
+            goto on_error;
+        if (acked.has_value && acked.value >= fsn.value)
+            reached = true;
+        else if (!progressed)
+            /* caller-owned park/sleep/yield */;
+    }
+}
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto sender = qdb::line_sender::from_conf(
+    "qwpws::addr=localhost:9000;qwp_ws_progress=manual;"_utf8);
+// ... append rows ...
+auto fsn = sender.flush_and_get_fsn(buffer);
+if (fsn) {
+    while (true) {
+        auto acked = sender.acked_fsn();
+        if (acked && *acked >= *fsn) break;
+        if (!sender.drive_once()) {
+            // caller-owned park/sleep/yield
+        }
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+`drive_once` performs at most one unit of work per call (send one frame,
+drain ready responses, do one storage-maintenance step). For a simpler
+blocking wait in manual mode, call `await_acked_fsn` directly — it drives
+manual progress internally while waiting.
+
+## Failover and high availability
+
+:::note Enterprise
+
+Multi-host failover with automatic reconnect is most useful with QuestDB
+Enterprise primary-replica replication.
+
+:::
+
+### Multiple endpoints
+
+Specify a comma-separated address list (or repeat `addr=`):
+
+```text
+qwpws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+```
+
+The client picks an endpoint, connects, and walks the list to find the next
+healthy peer when the current connection breaks. Duplicate `host:port`
+entries are rejected at parse time.
+
+:::tip Strongly recommend sf_dir for multi-host deployments
+
+Without `sf_dir`, `flush()` blocks when the connection is down and the
+in-memory queue fills up. After `sf_append_deadline_millis` (default 30s),
+it returns an error. With `sf_dir`, `flush()` writes to disk and returns
+quickly while the reconnect loop replays to the new primary in the
+background. For any deployment where failover may take more than a few
+seconds, `sf_dir` is strongly recommended.
+
+:::
+
+### Reconnect knobs
+
+| Key | Default | Description |
+|---|---|---|
+| `reconnect_max_duration_millis` | 300000 | Total outage budget before giving up. |
+| `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
+| `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
+| `initial_connect_retry` | `off` | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). |
+
+By default the first connect fails fast; subsequent disconnects use the
+reconnect policy. Set `initial_connect_retry=on` to apply the same policy to
+the initial connect.
+
+### Error classification
+
+- **Authentication errors** (`401`/`403`): terminal across all endpoints. The
+  reconnect loop stops immediately.
+- **Role reject** (`421 + X-QuestDB-Role`): transient if the role is
+  `PRIMARY_CATCHUP`, topology-level otherwise.
+- **Version mismatch at upgrade**: per-endpoint, not terminal. The client
+  tries the next endpoint.
+- **All other errors** (TCP/TLS failures, `404`, `503`, mid-stream errors):
+  transient, fed into the reconnect loop.
+
+Connection lifecycle events are not surfaced as a structured C/C++ callback.
+The default error handler writes one structured line to stderr per server
+diagnostic; install your own
+[handler](#handler-callback) to integrate with another logging system.
+
+## Closing the sender
+
+Call `line_sender_qwpws_close_drain` (C++ `sender.close_drain()`) before
+freeing the sender for delivery-sensitive shutdown:
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+if (!line_sender_qwpws_close_drain(sender, &err))
+    goto on_error;
+line_sender_close(sender);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+sender.close_drain();   // throws on timeout or terminal failure
+// sender's destructor runs as normal
+```
+
+</TabItem>
+</Tabs>
+
+`close_drain` stops accepting new publications and waits up to
+`close_flush_timeout_millis` (default 5000) for already-published frames to
+ACK. Plain `line_sender_close` (C++ destructor) is best-effort and does
+**not** report delivery failure — use `close_drain` whenever delivery
+matters. With `sf_dir`, anything still un-acked is persisted to disk so a
+later sender can replay it.
+
+## Configuration reference
+
+For the full list of connect-string keys and their defaults, see the
+[connect string reference](/docs/connect/clients/connect-string/).
+
+Common WebSocket-specific options:
+
+| Key | Default | Description |
+|---|---|---|
+| `addr` | required | One or more `host:port` entries, comma-separated or repeated. |
+| `username` / `password` | unset | HTTP basic auth. |
+| `token` | unset | Bearer token auth (Enterprise). |
+| `auth_timeout` | 15000 | WebSocket upgrade timeout (milliseconds). |
+| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss` / `qwpwss` only). |
+| `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
+| `sf_dir` | unset | Enable disk-backed store-and-forward. |
+| `sender_id` | `default` | SF slot identity. |
+| `sf_durability` | `memory` | Only `memory` is currently accepted. |
+| `request_durable_ack` | `off` | Wait for durable upload before ACK (Enterprise). |
+| `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
+| `initial_connect_retry` | `off` | Apply reconnect policy to the first connect. |
+| `close_flush_timeout_millis` | 5000 | Bound on `close_drain` wait. |
+| `qwp_ws_progress` | `background` | `background` or `manual`. |
+| `max_in_flight` | 128 | Max unacknowledged frames in flight on a connection. Acts as the backpressure window: publishers block locally once the window is full. |
+
+## Migration from ILP (HTTP/TCP)
+
+The buffer API is unchanged. To switch a sender to QWP/WebSocket:
+
+| Aspect | HTTP (ILP) | WebSocket (QWP) |
+|---|---|---|
+| Connect string schema | `http::` / `https::` | `qwpws::` / `qwpwss::` (`ws` / `wss` aliases) |
+| Batch trigger | Row/time-based auto-flush (defaults: 75000 rows, 1000 ms) | Explicit `flush()` only |
+| Error model | Synchronous on `flush()` | Async via `line_sender_qwpws_poll_error` / handler |
+| Completion tracking | Implicit per request | Explicit FSN watermarks |
+| Store-and-forward | Not available | Available (`sf_dir`) |
+| Multi-endpoint failover | Not available | Built in (comma-separated `addr`) |
+| Shutdown | `line_sender_close` | `line_sender_qwpws_close_drain`, then `line_sender_close` |
+
+To migrate, change the connect string from `http::` to `qwpws::` (or
+`https::` to `qwpwss::`), drop any `auto_flush_*` keys, install a
+`qwpws_error_handler` or poll `line_sender_qwpws_poll_error`, and call
+`line_sender_qwpws_close_drain` before closing the sender.
+
+## Full example: multi-host ingestion with failover
+
+This example shows a production ingestion loop with store-and-forward,
+multi-host failover, and proper error handling including the retry pattern
+around `flush()`.
+
+```c
+#include <questdb/ingress/line_sender.h>
+#include <stdio.h>
+#include <string.h>
+
+static void on_qwp_error(
+        void* user_data,
+        const line_sender_qwpws_error_view* ev)
+{
+    (void)user_data;
+    fprintf(stderr,
+        "qwp error: category=%d policy=%d msg=%.*s\n",
+        (int)ev->category, (int)ev->applied_policy,
+        (int)ev->message_len, ev->message);
+}
+
+int main(void) {
+    line_sender_error* err = NULL;
+    line_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+
+    /* Multi-host with store-and-forward for failover durability.
+     * Without sf_dir, flush() blocks during an outage and times out
+     * after sf_append_deadline_millis (default 30s). With sf_dir,
+     * flush() writes to disk and returns quickly while the reconnect
+     * loop replays to the new primary in the background. */
+    line_sender_utf8 conf = QDB_UTF8_LITERAL(
+        "wss::addr=db-primary:9000,db-replica:9000;"
+        "token=your_bearer_token;"
+        "sf_dir=/var/lib/myapp/qdb-sf;"
+        "sender_id=ingest-1;"
+        "reconnect_max_duration_millis=300000;");
+    sender = line_sender_from_conf(conf, &err);
+    if (!sender) goto on_error;
+
+    buffer = line_sender_buffer_new_for_sender(sender);
+
+    line_sender_table_name tbl = QDB_TABLE_NAME_LITERAL("book");
+    line_sender_column_name ticker_name = QDB_COLUMN_NAME_LITERAL("ticker");
+    line_sender_column_name price_name = QDB_COLUMN_NAME_LITERAL("price");
+    line_sender_column_name size_name = QDB_COLUMN_NAME_LITERAL("size");
+    line_sender_utf8 ticker_val = QDB_UTF8_LITERAL("EURUSD");
+
+    for (;;) {
+        if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
+        if (!line_sender_buffer_symbol(buffer, ticker_name, ticker_val, &err))
+            goto on_error;
+        if (!line_sender_buffer_column_f64(buffer, price_name, 1.0842, &err))
+            goto on_error;
+        if (!line_sender_buffer_column_f64(buffer, size_name, 100000.0, &err))
+            goto on_error;
+        if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+            goto on_error;
+
+        /* flush() can still return an error if the SF queue fills to
+         * sf_max_total_bytes during a prolonged outage. The buffer is
+         * retained on error; retry on the next pass. */
+        if (!line_sender_flush(sender, buffer, &err)) {
+            size_t err_len = 0;
+            const char* msg = line_sender_error_msg(err, &err_len);
+            fprintf(stderr, "flush error: %.*s\n", (int)err_len, msg);
+            line_sender_error_free(err);
+            err = NULL;
+
+            /* Check if the sender is terminal (auth failure, reconnect
+             * budget exhausted). If so, recreate it. */
+            if (line_sender_must_close(sender)) {
+                fprintf(stderr, "sender is terminal, exiting\n");
+                break;
+            }
+            /* Otherwise the buffer still holds the rows; the next
+             * iteration retries them. */
+        }
+
+        /* Pace the loop as appropriate for your workload. */
+    }
+
+    if (!line_sender_qwpws_close_drain(sender, &err)) goto on_error;
+    line_sender_buffer_free(buffer);
+    line_sender_close(sender);
+    return 0;
+
+on_error:;
+    size_t err_len = 0;
+    const char* msg = line_sender_error_msg(err, &err_len);
+    fprintf(stderr, "error: %.*s\n", (int)err_len, msg);
+    line_sender_error_free(err);
+    if (buffer) line_sender_buffer_free(buffer);
+    if (sender) line_sender_close(sender);
+    return 1;
+}
+```
+
+## Next steps
+
+The header files are extensively commented and serve as the canonical API
+reference. Browse them on GitHub or in your local checkout:
+
+- C: [`include/questdb/ingress/line_sender.h`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.h)
+- C++: [`include/questdb/ingress/line_sender.hpp`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.hpp)
+
+For querying QuestDB from C/C++, see the
+[PGWire C++ client](/docs/connect/compatibility/pgwire/c-and-cpp/) or the
+[REST API](/docs/connect/compatibility/rest-api/).
+
+With data flowing into QuestDB, the next step is querying. See the
+[Query overview](/docs/query/overview/) to learn QuestDB SQL.
+
+Need help? Visit the
 [Community Forum](https://community.questdb.com/).
