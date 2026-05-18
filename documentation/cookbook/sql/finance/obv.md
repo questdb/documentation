@@ -1,6 +1,6 @@
 ---
 title: OBV (On-Balance Volume)
-sidebar_label: OBV
+sidebar_label: On-Balance Volume
 description: Calculate On-Balance Volume to track cumulative buying and selling pressure using volume flow
 ---
 
