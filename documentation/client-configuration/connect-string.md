@@ -122,7 +122,7 @@ wss::addr=questdb.example.com:443;username=admin;password=secret;
 ### Production with a custom trust store
 
 ```
-wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/ssl/truststore.jks;tls_roots_password=changeit;
+wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/questdb/ca-roots;tls_roots_password=changeit;
 ```
 
 ### Ingest with store-and-forward across multiple nodes
@@ -230,17 +230,22 @@ TLS is enabled by selecting the `wss` schema.
   `unsafe_off`. Default: `on`. `unsafe_off` disables verification; **use
   only for testing** — bypassing verification makes the connection
   vulnerable to MITM attacks.
-- `tls_roots` — path to a Java keystore (`.jks`) containing trusted root
-  certificates. If omitted, the system default trust store is used.
-- `tls_roots_password` — password for the keystore file. Required when
-  `tls_roots` is set.
+- `tls_roots` — path to a file of trusted root certificates, used instead
+  of the system trust store. The on-disk format is client-specific — the
+  Java client loads a JKS keystore, the .NET client a PKCS#12 / PFX
+  bundle, and some clients a PEM file. If omitted, the system default
+  trust store is used.
+- `tls_roots_password` — password for the `tls_roots` file, for clients
+  whose trust-store format requires one. Clients that load a passwordless
+  format (for example, PEM) reject this key.
 
 :::note Client support varies
 
-`tls_roots` / `tls_roots_password` are a Java-keystore feature. Some clients
-(for example, Go) verify against the operating-system trust store only and
-**reject these keys at parse time**; to trust a private CA there, install it
-in the host trust store. Check the relevant
+`tls_roots` / `tls_roots_password` support — and the trust-store file
+format expected — vary by client. Some clients (for example, Go) verify
+against the operating-system trust store only and **reject these keys at
+parse time**; to trust a private CA there, install it in the host trust
+store. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
 specifics.
 
@@ -513,8 +518,8 @@ SF mode and memory-only mode share the same loop.
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
   Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
   see below.
-- `reconnect_max_backoff_millis` — cap on per-attempt backoff. (Alias:
-  `max_backoff_millis`.) Default: `5000` (5 s). Setting this enables
+- `reconnect_max_backoff_millis` — cap on per-attempt backoff.
+  Default: `5000` (5 s). Setting this enables
   `initial_connect_retry=on` implicitly; see below.
 - `reconnect_max_duration_millis` — total time budget for a single outage.
   Once exceeded, the I/O loop gives up and surfaces a terminal error.
@@ -658,7 +663,10 @@ description and behaviour notes.
 | `auto_flush_bytes`                      | size                          | `8m` (8 MiB)                  | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (100 ms)                | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000`                        | [Auto-flushing](#auto-flush)                                  |
+| `buffer_pool_size`                      | int                           | `4`                           | [Query client keys](#egress-keys)                             |
 | `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
+| `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
+| `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
 | `error_inbox_capacity`                  | int (≥ 16)                    | `256`                         | [Error handling](#error-handling)                             |
@@ -669,7 +677,9 @@ description and behaviour notes.
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
 | `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `max_background_drainers`               | int                           | `4`                           | [Store-and-forward](#sf-keys)                                 |
+| `max_batch_rows`                        | int                           | server default                | [Query client keys](#egress-keys)                             |
 | `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
 | `max_name_len`                          | int                           | `127`                         | [Buffer sizing](#buffer)                                      |
@@ -693,7 +703,7 @@ description and behaviour notes.
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
-| `tls_roots_password`                    | string                        | — (required if `tls_roots`)   | [TLS](#tls)                                                   |
+| `tls_roots_password`                    | string                        | — (client-specific)           | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |
