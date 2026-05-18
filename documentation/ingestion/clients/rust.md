@@ -208,12 +208,9 @@ buffer.column_f64_opt("price", None)?;          // writes null
 buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
 ```
 
-`SYMBOL` has no `_opt` variant — omit the `symbol()` call to leave the
-symbol unset on a row.
-
 | QuestDB type | Setter | NULL variant |
 | --- | --- | --- |
-| `SYMBOL` | `symbol(name, &str)` | — (omit the call) |
+| `SYMBOL` | `symbol(name, &str)` | `symbol_opt(name, Option<&str>)` |
 | `BOOLEAN` | `column_bool(name, bool)` | `column_bool_opt(name, Option<bool>)` |
 | `BYTE` | `column_i8(name, i8)` | `column_i8_opt(name, Option<i8>)` |
 | `SHORT` | `column_i16(name, i16)` | `column_i16_opt(name, Option<i16>)` |
