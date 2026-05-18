@@ -183,7 +183,7 @@ any binary frames are exchanged.
 ### HTTP basic auth
 
 ```text
-wss::addr=db.example.com:9000;username=admin;password=quest;
+qwpwss::addr=db.example.com:9000;username=admin;password=quest;
 ```
 
 <Tabs defaultValue="c" values={[
@@ -194,7 +194,7 @@ wss::addr=db.example.com:9000;username=admin;password=quest;
 
 ```c
 line_sender_utf8 conf = QDB_UTF8_LITERAL(
-    "wss::addr=db.example.com:9000;username=admin;password=quest;");
+    "qwpwss::addr=db.example.com:9000;username=admin;password=quest;");
 line_sender_error* err = NULL;
 line_sender* sender = line_sender_from_conf(conf, &err);
 ```
@@ -204,7 +204,7 @@ line_sender* sender = line_sender_from_conf(conf, &err);
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_conf(
-    "wss::addr=db.example.com:9000;username=admin;password=quest;"_utf8);
+    "qwpwss::addr=db.example.com:9000;username=admin;password=quest;"_utf8);
 ```
 
 </TabItem>
@@ -216,12 +216,12 @@ Token authentication avoids the per-request overhead of basic auth and is
 the recommended path for Enterprise deployments.
 
 ```text
-wss::addr=db.example.com:9000;token=your_bearer_token;
+qwpwss::addr=db.example.com:9000;token=your_bearer_token;
 ```
 
 ### TLS
 
-Use the `wss` schema (or its alias `qwpwss`) for TLS. Select where root
+Use the `qwpwss` schema (or its alias `wss`) for TLS. Select where root
 certificates come from with `tls_ca`:
 
 | Key | Description |
@@ -230,18 +230,19 @@ certificates come from with `tls_ca`:
 | `tls_ca=os_roots` | Use the OS certificate store. |
 | `tls_ca=webpki_and_os_roots` | Combine both. |
 | `tls_roots=/path/to/root-ca.pem` | Load roots from a PEM file. Useful for self-signed certs during testing. |
-| `tls_verify=unsafe_off` | Disable verification. Never use in production. |
+| `tls_verify=unsafe_off` | Disable verification. Never use in production. Requires the library to be built with the `insecure-skip-verify` Cargo feature; the default builds reject this value. |
 
 Example with a custom CA file:
 
 ```text
-wss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
+qwpwss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
 ```
 
 ### Authentication timeout
 
-`auth_timeout` (default 15000 ms) controls how long the client waits for the
-WebSocket upgrade to complete.
+`auth_timeout_ms` (default 15000) controls how long the client waits for the
+WebSocket upgrade to complete. `auth_timeout` is also accepted for
+compatibility with the HTTP transport's spelling.
 
 ## Creating the client
 
@@ -249,8 +250,8 @@ WebSocket upgrade to complete.
 
 The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
 
-Use `qwpws` (plain) or `qwpwss` (TLS). `ws` / `wss` are accepted as aliases.
-The default port is `9000`.
+Use `qwpws` (plain) or `qwpwss` (TLS). The shorter `ws` / `wss` are
+accepted as aliases. The default port is `9000`.
 
 <Tabs defaultValue="c" values={[
   { label: "C", value: "c" },
@@ -283,7 +284,7 @@ For the full list of connect-string keys, see the
 Set `QDB_CLIENT_CONF` to keep credentials out of source code:
 
 ```bash
-export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
+export QDB_CLIENT_CONF="qwpwss::addr=db.example.com:9000;username=admin;password=quest;"
 ```
 
 <Tabs defaultValue="c" values={[
@@ -337,10 +338,10 @@ line_sender_opts_free(opts);
 namespace qdb = questdb::ingress;
 using namespace questdb::ingress::literals;
 
-qdb::opts opts{qdb::protocol::qwpws, "localhost"_utf8, 9000};
-opts.qwp_ws_progress(qdb::qwp_ws_progress::background)
-    .auth_timeout(15000);
-qdb::line_sender sender{opts};
+qdb::opts options{qdb::protocol::qwpws, "localhost"_utf8, 9000};
+options.qwp_ws_progress(qdb::qwp_ws_progress::background)
+       .auth_timeout(15000);
+qdb::line_sender sender{options};
 ```
 
 </TabItem>
@@ -358,12 +359,14 @@ prototypes under `bool line_sender_opts_*` in `line_sender.h` for the full set.
 given sender at a time. For concurrent producers, create one sender per
 producer thread, or hand rows to a single owner over a queue.
 
-Buffers (`line_sender_buffer`) are independent of senders. Build buffers on any
-thread, then hand them to the sender for flushing. This lets worker threads
-encode rows in parallel and serialises only the publish step.
+Buffers (`line_sender_buffer`) are also single-owner but are not tied to a
+specific sender. Give each encoder thread its own buffer, fill it locally,
+and hand the buffer to the sender thread (or call `flush()` if the same
+thread owns both). This lets worker threads encode rows in parallel and
+serialises only the publish step.
 
 When several sender instances share an `sf_dir`, give each a distinct
-`sender_id` — slots are exclusive (see [Store-and-forward](#store-and-forward)).
+`sender_id`, slots are exclusive (see [Store-and-forward](#store-and-forward)).
 
 ### General usage pattern
 
@@ -412,13 +415,13 @@ and provides dedicated methods for everything else.
 | `DOUBLE[]` (arrays) | `line_sender_buffer_column_f64_arr_c_major` / `_byte_strides` / `_elem_strides` | `buffer.column(name, array_view)` |
 | `LONG[]` (i64 arrays) † | `line_sender_buffer_column_i64_arr_*` | `buffer.column(name, array_view)` |
 
-† **Spec-only — currently rejected by the server.** QWP v1 defines the
+† **Spec-only, currently rejected by the server.** QWP v1 defines the
 `LONG[]` wire type and the client encodes it correctly, but server-side
 ingest does not yet accept it. Batches that include i64-array columns are
 rejected with `"long arrays are not supported, only double arrays"`.
 
 Unlike the Rust client, the C API does not expose `_opt` variants for typed
-nulls — to omit a value, simply do not call the setter for that column.
+nulls, to omit a value, simply do not call the setter for that column.
 
 ### Ingest arrays
 
@@ -528,14 +531,16 @@ size (`line_sender_buffer_size(buffer)`) exceeds a threshold.
 
 :::
 
-`flush()` clears the buffer after publishing locally. Use `flush_and_keep()`
-to retain contents (for example, to fan the same buffer out to multiple
-senders).
+`flush()` clears the buffer after publishing locally. Use
+`line_sender_flush_and_keep` (C++ `sender.flush_and_keep(buffer)`) to retain
+the contents, for example to fan the same buffer out to multiple senders.
 
 On QWP/WebSocket, `flush()` returns once the buffer is accepted by the local
-replay queue, before the server acknowledges it. The call can block if the
-queue is full — see [Backpressure on flush](#backpressure-on-flush). Server
-errors observed later are reported asynchronously (see
+sender queue, before the server acknowledges it. The queue is in process
+memory by default; setting `sf_dir` swaps it for the disk-backed
+store-and-forward queue. Either way, the call can block if the queue is
+full (see [Backpressure on flush](#backpressure-on-flush)). Server errors
+observed later are reported asynchronously (see
 [Asynchronous error handling](#asynchronous-error-handling)).
 
 ### Backpressure on flush
@@ -543,10 +548,10 @@ errors observed later are reported asynchronously (see
 `flush()` is not unconditionally non-blocking. The publisher feeds a bounded
 queue with two stacked caps:
 
-1. **In-flight window** — `max_in_flight` (default `128`) unacknowledged
+1. **In-flight window**, `max_in_flight` (default `128`) unacknowledged
    frames on the connection. Reached first under steady-state load when the
    server keeps up but you have many small flushes in flight.
-2. **Queue cap** — `sf_max_total_bytes` (default `128 MiB` in memory mode,
+2. **Queue cap**, `sf_max_total_bytes` (default `128 MiB` in memory mode,
    `10 GiB` in disk mode). Reached when the server is unreachable long
    enough that the in-flight count stops being the active limit.
 
@@ -555,16 +560,16 @@ loop releases capacity (ACK-driven trim). The wait is bounded by
 `sf_append_deadline_millis` (default `30000`). If the deadline elapses,
 `flush()` returns an error with code
 `line_sender_error_server_flush_error` carrying a `SubmitTimedOut`
-diagnostic — the application can retry, fail closed, or shed load.
+diagnostic, the application can retry, fail closed, or shed load.
 **No data is ever dropped or overwritten** while the publisher is parked.
 
-Column setters and `line_sender_buffer_table(...)` never block — they only
+Column setters and `line_sender_buffer_table(...)` never block, they only
 mutate the in-process buffer. Backpressure surfaces only at `flush()`.
 
 :::caution Oversized payloads are rejected, not parked
 
 A single flushed payload larger than `sf_max_bytes` (default `4 MiB`) returns
-an error from `flush()` immediately — it does *not* enter the backpressure
+an error from `flush()` immediately, it does *not* enter the backpressure
 wait. Fixes: reduce the number of rows you accumulate per buffer before
 flushing, or raise `sf_max_bytes` to fit your largest single flushed payload.
 
@@ -763,12 +768,12 @@ line_sender_opts_free(opts);
 namespace qdb = questdb::ingress;
 using namespace questdb::ingress::literals;
 
-qdb::opts opts{qdb::protocol::qwpws, "localhost"_utf8, 9000};
-opts.qwp_ws_error_handler([](const qdb::qwp_ws_error& e) {
+qdb::opts options{qdb::protocol::qwpws, "localhost"_utf8, 9000};
+options.qwp_ws_error_handler([](const qdb::qwp_ws_error& e) {
     std::cerr << "qwp error: category=" << static_cast<int>(e.category)
               << " msg=" << e.message << "\n";
 });
-qdb::line_sender sender{opts};
+qdb::line_sender sender{options};
 ```
 
 </TabItem>
@@ -785,7 +790,7 @@ carries:
 | `applied_policy` | `drop_and_continue` (batch dropped, sender continues) or `halt` (sender latched terminal). |
 | `status` (`has_status`) | Raw QWP status byte. Absent for WebSocket protocol violations. |
 | `message` / `message_len` | Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. The pointer is **not** NUL-terminated; always read exactly `message_len` bytes. See [Message stability](#message-stability) and [PII safety](#message-pii). |
-| `message_sequence` (`has_message_sequence`) | Server's per-frame QWP wire sequence for the error frame. Resets on reconnect — only meaningful within one connection. |
+| `message_sequence` (`has_message_sequence`) | Server's per-frame QWP wire sequence for the error frame. Resets on reconnect, only meaningful within one connection. |
 | `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s), client-side. |
 
 `line_sender_qwpws_errors_dropped` (C++ `qwp_ws_errors_dropped()`) reports how
@@ -794,7 +799,7 @@ to a lagging poll cursor).
 
 #### Message stability {#message-stability}
 
-`message` is a human-readable diagnostic — **not a stable contract.** Its
+`message` is a human-readable diagnostic, **not a stable contract.** Its
 text varies across server versions and across provenance:
 
 - **QWP error frames** carry a server-supplied UTF-8 string capped at
@@ -810,15 +815,15 @@ on `message`.
 
 #### PII / secret safety {#message-pii}
 
-`message` may include fragments of the client's own payload — for
+`message` may include fragments of the client's own payload, for
 example, an offending column value quoted back by a schema or parse
-rejection — or a server-supplied WebSocket close reason that the
+rejection, or a server-supplied WebSocket close reason that the
 operator did not control. **Treat `message` as potentially containing
 PII or secrets.**
 
 Log it at the same trust level as the data being sent, and sanitize
 before forwarding to external error trackers (Sentry, Datadog, end-user
-UIs). The other fields on the error view are safe to forward as-is —
+UIs). The other fields on the error view are safe to forward as-is -
 they carry only structural metadata.
 
 #### Correlating with server-side logs
@@ -827,9 +832,9 @@ The protocol does not currently surface a server-issued request or
 connection identifier in the WebSocket upgrade response. The closest
 correlation tuple is `(message_sequence, from_fsn, to_fsn)`:
 
-- `message_sequence` — per-connection QWP wire sequence the server
+- `message_sequence`, per-connection QWP wire sequence the server
   attached to the error frame. Resets on reconnect.
-- `from_fsn` / `to_fsn` — client-side FSN span of the affected frames.
+- `from_fsn` / `to_fsn`, client-side FSN span of the affected frames.
   Not generally indexed by server-side logs.
 
 When opening a bug report, supply the connection start time (from your
@@ -870,6 +875,9 @@ Set it via the connect string (`qwp_ws_progress=manual`) or the options API:
 <TabItem value="c">
 
 ```c
+#define _POSIX_C_SOURCE 199309L   /* nanosleep */
+#include <time.h>
+
 line_sender_utf8 conf = QDB_UTF8_LITERAL(
     "qwpws::addr=localhost:9000;qwp_ws_progress=manual;");
 line_sender* sender = line_sender_from_conf(conf, &err);
@@ -888,10 +896,14 @@ if (fsn.has_value) {
         line_sender_qwpws_fsn acked;
         if (!line_sender_qwpws_acked_fsn(sender, &acked, &err))
             goto on_error;
-        if (acked.has_value && acked.value >= fsn.value)
+        if (acked.has_value && acked.value >= fsn.value) {
             reached = true;
-        else if (!progressed)
-            /* caller-owned park/sleep/yield */;
+        } else if (!progressed) {
+            /* Park briefly so the loop does not spin. Replace with
+             * whatever your scheduler/event loop uses. */
+            struct timespec park = {0, 1000 * 1000};
+            nanosleep(&park, NULL);
+        }
     }
 }
 ```
@@ -900,6 +912,8 @@ if (fsn.has_value) {
 <TabItem value="cpp">
 
 ```cpp
+#include <thread>
+
 auto sender = qdb::line_sender::from_conf(
     "qwpws::addr=localhost:9000;qwp_ws_progress=manual;"_utf8);
 // ... append rows ...
@@ -909,7 +923,7 @@ if (fsn) {
         auto acked = sender.acked_fsn();
         if (acked && *acked >= *fsn) break;
         if (!sender.drive_once()) {
-            // caller-owned park/sleep/yield
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
     }
 }
@@ -920,7 +934,7 @@ if (fsn) {
 
 `drive_once` performs at most one unit of work per call (send one frame,
 drain ready responses, do one storage-maintenance step). For a simpler
-blocking wait in manual mode, call `await_acked_fsn` directly — it drives
+blocking wait in manual mode, call `await_acked_fsn` directly, it drives
 manual progress internally while waiting.
 
 ## Failover and high availability
@@ -1015,7 +1029,7 @@ sender.close_drain();   // throws on timeout or terminal failure
 `close_drain` stops accepting new publications and waits up to
 `close_flush_timeout_millis` (default 5000) for already-published frames to
 ACK. Plain `line_sender_close` (C++ destructor) is best-effort and does
-**not** report delivery failure — use `close_drain` whenever delivery
+**not** report delivery failure, use `close_drain` whenever delivery
 matters. With `sf_dir`, anything still un-acked is persisted to disk so a
 later sender can replay it.
 
@@ -1031,8 +1045,8 @@ Common WebSocket-specific options:
 | `addr` | required | One or more `host:port` entries, comma-separated or repeated. |
 | `username` / `password` | unset | HTTP basic auth. |
 | `token` | unset | Bearer token auth (Enterprise). |
-| `auth_timeout` | 15000 | WebSocket upgrade timeout (milliseconds). |
-| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss` / `qwpwss` only). |
+| `auth_timeout_ms` | 15000 | WebSocket upgrade timeout (milliseconds). `auth_timeout` is also accepted. |
+| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`qwpwss` / `wss` only). |
 | `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |
@@ -1050,7 +1064,7 @@ The buffer API is unchanged. To switch a sender to QWP/WebSocket:
 
 | Aspect | HTTP (ILP) | WebSocket (QWP) |
 |---|---|---|
-| Connect string schema | `http::` / `https::` | `qwpws::` / `qwpwss::` (`ws` / `wss` aliases) |
+| Connect string schema | `http::` / `https::` | `qwpws::` / `qwpwss::` (`ws::` / `wss::` aliases) |
 | Batch trigger | Row/time-based auto-flush (defaults: 75000 rows, 1000 ms) | Explicit `flush()` only |
 | Error model | Synchronous on `flush()` | Async via `line_sender_qwpws_poll_error` / handler |
 | Completion tracking | Implicit per request | Explicit FSN watermarks |
@@ -1096,7 +1110,7 @@ int main(void) {
      * flush() writes to disk and returns quickly while the reconnect
      * loop replays to the new primary in the background. */
     line_sender_utf8 conf = QDB_UTF8_LITERAL(
-        "wss::addr=db-primary:9000,db-replica:9000;"
+        "qwpwss::addr=db-primary:9000,db-replica:9000;"
         "token=your_bearer_token;"
         "sf_dir=/var/lib/myapp/qdb-sf;"
         "sender_id=ingest-1;"
@@ -1113,19 +1127,24 @@ int main(void) {
     line_sender_utf8 ticker_val = QDB_UTF8_LITERAL("EURUSD");
 
     for (;;) {
-        if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
-        if (!line_sender_buffer_symbol(buffer, ticker_name, ticker_val, &err))
-            goto on_error;
-        if (!line_sender_buffer_column_f64(buffer, price_name, 1.0842, &err))
-            goto on_error;
-        if (!line_sender_buffer_column_f64(buffer, size_name, 100000.0, &err))
-            goto on_error;
-        if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
-            goto on_error;
+        /* Only encode a fresh row when the previous batch has been flushed.
+         * On flush() failure, the rows stay buffered for the next attempt. */
+        if (line_sender_buffer_row_count(buffer) == 0) {
+            if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
+            if (!line_sender_buffer_symbol(buffer, ticker_name, ticker_val, &err))
+                goto on_error;
+            if (!line_sender_buffer_column_f64(buffer, price_name, 1.0842, &err))
+                goto on_error;
+            if (!line_sender_buffer_column_f64(buffer, size_name, 100000.0, &err))
+                goto on_error;
+            if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+                goto on_error;
+        }
 
         /* flush() can still return an error if the SF queue fills to
-         * sf_max_total_bytes during a prolonged outage. The buffer is
-         * retained on error; retry on the next pass. */
+         * sf_max_total_bytes during a prolonged outage. On success the
+         * buffer is cleared; on failure it is retained so the next
+         * iteration retries the same payload. */
         if (!line_sender_flush(sender, buffer, &err)) {
             size_t err_len = 0;
             const char* msg = line_sender_error_msg(err, &err_len);
@@ -1139,8 +1158,6 @@ int main(void) {
                 fprintf(stderr, "sender is terminal, exiting\n");
                 break;
             }
-            /* Otherwise the buffer still holds the rows; the next
-             * iteration retries them. */
         }
 
         /* Pace the loop as appropriate for your workload. */
