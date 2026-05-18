@@ -8,10 +8,11 @@ const {
   prependFrontmatter,
   normalizeNewLines,
 } = require("./convert-components")
+const { getMarkdownUrl } = require("../../src/utils/markdown-url")
 
 module.exports = () => ({
   name: "raw-markdown",
-  async postBuild({ outDir, plugins }) {
+  async postBuild({ siteConfig, outDir, plugins }) {
     const docsPath = path.join(__dirname, "../../documentation")
     const outputBase = outDir
 
@@ -110,6 +111,32 @@ module.exports = () => ({
 
           fs.writeFileSync(outputFile, processedContent, "utf8")
           fileCount++
+
+          // Advertise the .md companion in the rendered HTML's <head> so
+          // HTML-parsing agents can discover it without sniffing URL patterns.
+          // URL format matches CopyPageButton via the shared getMarkdownUrl
+          // helper. Assumes docusaurus.config.js keeps `trailingSlash: true`
+          // so HTML lands at ${urlPath}/index.html.
+          const htmlPath = urlPath
+            ? path.join(outputBase, urlPath, "index.html")
+            : path.join(outputBase, "index.html")
+          if (fs.existsSync(htmlPath)) {
+            const pageUrl = urlPath
+              ? path.posix.join(siteConfig.baseUrl, urlPath)
+              : siteConfig.baseUrl
+            const mdHref = getMarkdownUrl(pageUrl, siteConfig.baseUrl)
+            const tag = `<link rel="alternate" type="text/markdown" href="${mdHref}">`
+            const html = fs.readFileSync(htmlPath, "utf8")
+            if (!html.includes('type="text/markdown"')) {
+              const idx = html.lastIndexOf("</head>")
+              if (idx === -1) {
+                console.warn(`[raw-markdown] No </head> found in ${htmlPath}; skipping alternate link`)
+              } else {
+                const patched = html.slice(0, idx) + tag + html.slice(idx)
+                fs.writeFileSync(htmlPath, patched, "utf8")
+              }
+            }
+          }
         }
       }
     }
