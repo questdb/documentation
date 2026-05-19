@@ -73,11 +73,8 @@ runnable example binaries (`line_sender_c_example*` for C,
 
 ### Hello world
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 #include <questdb/ingress/line_sender.h>
@@ -152,7 +149,7 @@ gcc -std=c11 hello.c \
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 #include <questdb/ingress/line_sender.hpp>
@@ -233,11 +230,8 @@ any binary frames are exchanged.
 wss::addr=db.example.com:9000;username=admin;password=quest;
 ```
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 line_sender_utf8 conf = QDB_UTF8_LITERAL(
@@ -247,7 +241,7 @@ line_sender* sender = line_sender_from_conf(conf, &err);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_conf(
@@ -311,11 +305,8 @@ The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
 Use `ws` (plain) or `wss` (TLS). `qwpws` / `qwpwss` are accepted as
 aliases. The default port is `9000`.
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 line_sender_utf8 conf = QDB_UTF8_LITERAL("ws::addr=localhost:9000;");
@@ -324,7 +315,7 @@ line_sender* sender = line_sender_from_conf(conf, &err);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_conf(
@@ -345,11 +336,8 @@ Set `QDB_CLIENT_CONF` to keep credentials out of source code:
 export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
 ```
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 line_sender_error* err = NULL;
@@ -357,7 +345,7 @@ line_sender* sender = line_sender_from_env(&err);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_env();
@@ -371,11 +359,8 @@ auto sender = questdb::ingress::line_sender::from_env();
 For callers that prefer typed setters over a connect string, build the sender
 through `line_sender_opts`:
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 line_sender_error* err = NULL;
@@ -390,7 +375,7 @@ line_sender_opts_free(opts);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 namespace qdb = questdb::ingress;
@@ -493,11 +478,8 @@ The C ABI does not expose `_opt` variants for typed nulls (unlike the Rust
 client). To write a null for a column on a given row, **omit the setter for
 that column** — there is no explicit "set null" call.
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 // `amount` is omitted on this row, so it is stored as NULL.
@@ -508,7 +490,7 @@ if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 // `amount` is omitted on this row, so it is stored as NULL.
@@ -689,11 +671,8 @@ flushing, or raise `sf_max_bytes` to fit your largest single flushed payload.
 Every published frame is assigned a frame sequence number (FSN). To wait until
 the server has acknowledged a specific frame:
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 line_sender_qwpws_fsn fsn;
@@ -711,7 +690,7 @@ if (fsn.has_value) {
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 auto fsn = sender.flush_and_get_fsn(buffer);
@@ -795,11 +774,8 @@ There are two ways to observe them.
 
 ### Polling
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 for (;;) {
@@ -824,7 +800,7 @@ for (;;) {
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 while (auto err = sender.poll_qwp_ws_error()) {
@@ -846,11 +822,8 @@ Install a handler on the options object. It runs synchronously from sender
 API calls such as `flush()`. The handler must not call back into the same
 sender.
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 static void on_qwp_error(
@@ -871,7 +844,7 @@ line_sender_opts_free(opts);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 namespace qdb = questdb::ingress;
@@ -976,11 +949,8 @@ The client drives the WebSocket loop in one of two modes:
 
 Set it via the connect string (`qwp_ws_progress=manual`) or the options API:
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 #define _POSIX_C_SOURCE 199309L   /* nanosleep */
@@ -1017,7 +987,7 @@ if (fsn.has_value) {
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 #include <thread>
@@ -1117,11 +1087,8 @@ diagnostic; install your own
 Call `line_sender_qwpws_close_drain` (C++ `sender.close_drain()`) before
 freeing the sender for delivery-sensitive shutdown:
 
-<Tabs defaultValue="c" values={[
-  { label: "C", value: "c" },
-  { label: "C++", value: "cpp" },
-]}>
-<TabItem value="c">
+<Tabs defaultValue="c">
+<TabItem value="c" label="C">
 
 ```c
 if (!line_sender_qwpws_close_drain(sender, &err))
@@ -1130,7 +1097,7 @@ line_sender_close(sender);
 ```
 
 </TabItem>
-<TabItem value="cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 sender.close_drain();   // throws on timeout or terminal failure
