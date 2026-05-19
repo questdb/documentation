@@ -7,10 +7,10 @@ description:
 ---
 
 The QuestDB native client is configured with a single connect string. The
-same string format drives QWP ingress, QWP egress, multi-host failover, and
-the store-and-forward substrate. Per-language clients accept the same
-options under the same names, so configuration is portable across
-implementations.
+same string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
+multi-host failover, and the store-and-forward substrate. Per-language
+clients accept the same options under the same names, so configuration is
+portable across implementations.
 
 A `ws::` / `wss::` connect string is a single input shared by both the
 ingress sender and the egress query client. Each client reads the keys

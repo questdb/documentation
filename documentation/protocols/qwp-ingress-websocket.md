@@ -459,6 +459,26 @@ Use VARCHAR (`0x0F`) for text columns.
 TIMESTAMP and TIMESTAMP_NANOS may use Gorilla encoding when `FLAG_GORILLA` is
 set. See [Timestamp encoding](#timestamp-encoding) below.
 
+:::warning DATE is not timestamp-ish on ingress — and this is deliberately asymmetric with egress
+
+On the **ingress** wire, `DATE` (`0x0B`) is a plain fixed-width `int64`
+column: written exactly like `LONG`, with **no** per-column encoding-flag
+byte and **never** Gorilla-encoded, even when `FLAG_GORILLA` is set. Only
+`TIMESTAMP` (`0x0A`) and `TIMESTAMP_NANOS` (`0x10`) carry the encoding flag
+on ingress.
+
+On the **egress** wire it is the opposite: `DATE` *is* grouped with
+`TIMESTAMP` / `TIMESTAMP_NANOS` and *does* carry the 1-byte encoding flag
+(plus optional Gorilla). See the `FLAG_GORILLA` description in the
+[QWP egress protocol](/docs/connect/wire-protocols/qwp-egress-websocket/).
+
+Reusing one direction's DATE rule for the other shifts every DATE value by
+one byte (a clean ×256) and breaks Gorilla-encoded DATE entirely. Treat
+`DATE` as a generic fixed-width `int64` column on ingress, the same as
+`LONG`.
+
+:::
+
 ## Null handling
 
 Each column's data section begins with a 1-byte **null flag**. The flag tells
@@ -647,6 +667,18 @@ dictionary for the lifetime of the connection.
 
 ### Timestamp encoding
 
+:::warning Applies to TIMESTAMP (`0x0A`) and TIMESTAMP_NANOS (`0x10`) only — DATE is excluded
+
+Everything in this section applies **only** to `TIMESTAMP` (`0x0A`) and
+`TIMESTAMP_NANOS` (`0x10`). Despite "milliseconds since epoch" looking
+timestamp-like, `DATE` (`0x0B`) is a plain `int64` column on the ingress
+wire (written like `LONG`: no encoding flag, never Gorilla), regardless of
+`FLAG_GORILLA`. Do **not** apply the rules below to `DATE`. This is the
+opposite of the egress wire, where `DATE` *is* timestamp-ish — see the DATE
+asymmetry warning in [Column types](#column-types) above.
+
+:::
+
 :::note Gorilla compression
 
 Gorilla is a time-series compression scheme from the
@@ -657,8 +689,9 @@ which are often zero or very small.
 
 :::
 
-When `FLAG_GORILLA` (0x04) is **not** set, timestamp columns are written as
-plain int64 arrays with no encoding flag:
+When `FLAG_GORILLA` (0x04) is **not** set, `TIMESTAMP` and `TIMESTAMP_NANOS`
+columns are written as plain int64 arrays with no encoding flag (`DATE` is
+always written this way regardless of `FLAG_GORILLA`):
 
 ```text
 +----------------------------------------------+

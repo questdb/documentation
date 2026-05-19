@@ -10,25 +10,27 @@ import TabItem from "@theme/TabItem"
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB C and C++ client connects to QuestDB over the
-[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
-The library is implemented in Rust and exposes both a C11 ABI and a C++17
-header-only wrapper from a single shared/static library.
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
+columnar binary protocol carried over WebSocket. The library is implemented in
+Rust and exposes both a C11 ABI and a C++17 header-only wrapper from a single
+shared/static library.
 
 Two complementary APIs live in the same library:
 
-- **Ingestion** (`line_sender_*` in C, `questdb::ingress::line_sender` in C++):
+- **Ingestion** (`line_sender_*` / `questdb::ingress::line_sender`):
   column-oriented batched writes with automatic table creation, schema
   evolution, multi-host failover, and optional store-and-forward durability.
-- **Querying** (`line_reader_*` in C, `questdb::egress::reader` in C++):
+- **Querying** (`line_reader_*` / `questdb::egress::reader`):
   parameterised SQL over the QWP egress endpoint (`/read/v1`), with
   streaming batch results, per-query failover, and credit-based flow
   control. See [Querying and SQL execution](#querying-and-sql-execution).
 
-:::tip Legacy transports
+:::tip Transports
 
-The same library also supports ILP ingestion over HTTP and TCP, and QWP over
-UDP for trusted high-throughput networks. This page documents the recommended
-WebSocket (QWP) path. For ILP transport details, see the
+QWP/WebSocket (`ws::` / `wss::`) is the current default ingest path and the
+focus of this page. The same library also supports the legacy ILP transports
+(`http::` / `https::` / `tcp::` / `tcps::`) and QWP over UDP for trusted
+high-throughput networks. For ILP transport details, see the
 [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 :::
@@ -65,7 +67,9 @@ cmake --build build
 
 The build produces both a static (`libquestdb_client.a`) and a shared
 (`libquestdb_client.so` / `.dylib` / `.dll`) library. Headers live in
-`include/questdb/ingress/`.
+`include/questdb/ingress/`. The same build directory also contains
+runnable example binaries (`line_sender_c_example*` for C,
+`line_sender_cpp_example*` for C++) that are useful as reference workloads.
 
 ### Hello world
 
@@ -127,13 +131,23 @@ on_error:;
 }
 ```
 
+:::caution `QDB_*_LITERAL` is for string literals only
+
+The `QDB_*_LITERAL` macros expand to `sizeof(literal) - 1`; passing a
+`const char*` variable compiles but silently encodes the pointer size
+(typically 7 bytes), not the string length. For runtime strings, use the
+`_init` form — see how `conf` above is initialized with
+`line_sender_utf8_init`. The matching `_table_name_init` and
+`_column_name_init` exist as well.
+
+:::
+
 Compile with:
 
 ```bash
 gcc -std=c11 hello.c \
     -I /path/to/c-questdb-client/include \
     -L /path/to/c-questdb-client/build -lquestdb_client \
-    -Wl,-rpath,/path/to/c-questdb-client/build \
     -o hello
 ```
 
@@ -175,16 +189,22 @@ Compile with:
 g++ -std=c++17 hello.cpp \
     -I /path/to/c-questdb-client/include \
     -L /path/to/c-questdb-client/build -lquestdb_client \
-    -Wl,-rpath,/path/to/c-questdb-client/build \
     -o hello
 ```
 
 </TabItem>
 </Tabs>
 
-`-Wl,-rpath,<build-dir>` bakes the library search path into the binary so it
-loads without `LD_LIBRARY_PATH`. For production builds, prefer CMake
-integration — see the [upstream dependency
+Linking against the shared `libquestdb_client.so` needs no extra libraries.
+The static `libquestdb_client.a` additionally requires `-lpthread -ldl -lm`
+(and TLS deps if the build was configured with rustls or OpenSSL).
+
+If you linked against an in-tree build, the binary needs to find
+`libquestdb_client.so` at runtime — either set
+`LD_LIBRARY_PATH=/path/to/c-questdb-client/build` before running, or add
+`-Wl,-rpath,/path/to/c-questdb-client/build` to the link line.
+
+For production builds, prefer CMake integration — see the [upstream dependency
 guide](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
 
 The four steps are:
@@ -194,6 +214,13 @@ The four steps are:
 3. Call `flush()` to publish.
 4. Call `close_drain()` before destroying the sender so already-published
    frames complete on the wire.
+
+C function names that include `qwpws` — for example
+`line_sender_qwpws_close_drain` in step 4, or `line_sender_qwpws_poll_error`
+in [Asynchronous error handling](#asynchronous-error-handling) — are
+QWP/WebSocket-specific. Unprefixed functions (`line_sender_close`,
+`line_sender_flush`, the buffer setters) work for any transport the library
+supports.
 
 ## Authentication and TLS
 
@@ -413,6 +440,21 @@ When several sender instances share an `sf_dir`, give each a distinct
 
 Tables and columns are created automatically if they do not exist.
 
+A typical ingest loop reuses both the sender and the buffer; a successful
+`line_sender_flush` clears the buffer (a failed flush retains the rows so
+you can retry):
+
+```c
+while (running) {
+    if (!line_sender_buffer_table(buffer, tbl, &err)) break;
+    if (!line_sender_buffer_symbol(buffer, sensor_name, sensor_val, &err)) break;
+    if (!line_sender_buffer_column_f64(buffer, temp_name, read_temp(), &err)) break;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) break;
+    if (!line_sender_flush(sender, buffer, &err)) break;
+    sleep_one_second();
+}
+```
+
 ### Column setters
 
 QWP buffers accept every QuestDB column type. The C ABI exposes each type as a
@@ -586,9 +628,10 @@ you call `line_sender_flush(sender, buffer, &err)` (C++ `sender.flush(buffer)`).
 
 :::caution No auto-flush
 
-QWP/WebSocket does not implement auto-flushing. You must call `flush()`
-explicitly. The connect-string keys `auto_flush_rows` and `auto_flush_bytes`
-are rejected; the only accepted value is `auto_flush=off`.
+The QWP/WebSocket C/C++ client does not implement auto-flushing at all —
+you must call `flush()` explicitly. The connect-string keys
+`auto_flush_rows` and `auto_flush_bytes` are rejected; `auto_flush=off` is
+accepted only as a no-op for compatibility with HTTP/ILP connect strings.
 
 A common pattern is to flush periodically on a timer and/or when the buffer
 exceeds a threshold — by encoded byte size (`line_sender_buffer_size(buffer)`,

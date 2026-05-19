@@ -8,7 +8,8 @@ description: "QuestDB Rust client for high-throughput data ingestion over the QW
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB Rust client connects to QuestDB over the
-[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
+columnar binary protocol carried over WebSocket.
 It supports high-throughput, column-oriented batched writes with automatic table
 creation, schema evolution, multi-host failover, and optional store-and-forward
 durability.

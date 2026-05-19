@@ -11,10 +11,10 @@ import { RemoteRepoExample } from "@theme/RemoteRepoExample"
 
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
-The QuestDB Go client connects to QuestDB over the
-[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/)
-(WebSocket). It supports high-throughput data ingestion and streaming SQL
-queries on the same transport.
+The QuestDB Go client connects to QuestDB over
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
+columnar binary protocol carried over WebSocket. It supports high-throughput
+data ingestion and streaming SQL queries on the same transport.
 
 Key capabilities:
 
@@ -179,6 +179,15 @@ client, err := qdb.NewQwpQueryClient(ctx,
 	qdb.WithQwpQueryTls(),
 	qdb.WithQwpQueryBearerToken("your_bearer_token"))
 ```
+
+The token is a **static credential**: the client sends exactly the string
+you pass and never refreshes or renews it. Acquire it out of band — QuestDB
+Enterprise issues bearer tokens through its
+[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime
+yourself. There is no token-refresh callback: when the token expires or is
+rotated, construct a new sender or query client with the new token. An
+expired or rejected token surfaces as an authentication failure (see
+[Connection-level errors](#connection-level-errors)).
 
 ### Production example (TLS + token + multi-host)
 
@@ -461,9 +470,14 @@ Customize via the connect string or the options API:
 ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 ```
 
-`Flush(ctx)` sends buffered data immediately. On QWP it is a synchronous
-barrier: it returns after the server has acknowledged the flushed frames.
-Write many rows per `Flush`; calling it after every row collapses throughput.
+`Flush(ctx)` sends buffered data immediately. It returns once the rows are
+published into the cursor engine (in memory, or on disk when `sf_dir` is
+set) — it does **not** wait for the server to acknowledge them. Delivery and
+acknowledgement happen asynchronously on the send loop; a server-side
+rejection surfaces on the error handler, never as a `Flush` error (see
+[Ingestion errors](#ingestion-errors)). For explicit server-ack
+confirmation, pair `FlushAndGetSequence` with `AwaitAckedFsn` (below). Write
+many rows per `Flush`; calling it after every row collapses throughput.
 
 :::caution
 If you disable auto-flush (`auto_flush=off` or `qdb.WithAutoFlushDisabled()`),
@@ -983,6 +997,19 @@ for batch, err := range q.Batches() {
 	// ...
 }
 ```
+
+:::warning Without the reset branch, accumulated rows are duplicated
+
+If you accumulate rows across batches and do **not** handle
+`*QwpFailoverReset`, the rows you kept from the prior connection stay in your
+buffer while the server replays the **entire** result set from the beginning
+after the reconnect. The replayed rows are appended to the ones you already
+have, so every pre-failover row ends up in your result set twice. Either
+clear the accumulator on the reset (as shown above), or use the simple
+terminal-on-error loop, which discards everything on any error and so cannot
+duplicate.
+
+:::
 
 If you do not need transparent continuation, the simple loop is correct:
 returning on any error treats a reset as terminal, which the client supports
