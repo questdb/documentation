@@ -55,11 +55,11 @@ recommended.
 For example:
 
 ```
-http::addr=localhost:9000;username=admin;password=secret;
+ws::addr=localhost:9000;username=admin;password=secret;
 ```
 
-This selects the HTTP transport, connects to `localhost:9000`, and provides
-basic-auth credentials.
+This selects the QWP WebSocket transport, connects to `localhost:9000`, and
+provides basic-auth credentials.
 
 For the list of supported schemas, see
 [Protocols and transports](#protocols-and-transports).
@@ -78,7 +78,7 @@ Example with an escaped semicolon in a password (the actual password value
 is `p;ssw;rd`):
 
 ```
-http::addr=localhost:9000;username=admin;password=p;;ssw;;rd;
+ws::addr=localhost:9000;username=admin;password=p;;ssw;;rd;
 ```
 
 ### Loading a connect string
@@ -88,7 +88,7 @@ The Java client accepts a connect string in three ways:
 - From a string literal:
 
   ```java
-  Sender sender = Sender.fromConfig("http::addr=localhost:9000;");
+  Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
   ```
 
 - From an environment variable (reads `QDB_CLIENT_CONF`):
@@ -100,7 +100,7 @@ The Java client accepts a connect string in three ways:
 - From the builder, which accepts the same option keys programmatically:
 
   ```java
-  Sender sender = Sender.builder(Transport.HTTP)
+  Sender sender = Sender.builder(Transport.WS)
       .address("localhost:9000")
       .build();
   ```
