@@ -76,7 +76,7 @@ int main(void) {
     line_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
 
-    const char* conf = "qwpws::addr=localhost:9000;";
+    const char* conf = "ws::addr=localhost:9000;";
     line_sender_utf8 conf_utf8;
     if (!line_sender_utf8_init(&conf_utf8, strlen(conf), conf, &err)) goto on_error;
 
@@ -87,12 +87,15 @@ int main(void) {
 
     line_sender_table_name tbl = QDB_TABLE_NAME_LITERAL("trades");
     line_sender_column_name symbol_name = QDB_COLUMN_NAME_LITERAL("symbol");
+    line_sender_column_name side_name = QDB_COLUMN_NAME_LITERAL("side");
     line_sender_column_name price_name = QDB_COLUMN_NAME_LITERAL("price");
     line_sender_column_name amount_name = QDB_COLUMN_NAME_LITERAL("amount");
     line_sender_utf8 symbol_val = QDB_UTF8_LITERAL("ETH-USD");
+    line_sender_utf8 side_val = QDB_UTF8_LITERAL("sell");
 
     if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
     if (!line_sender_buffer_symbol(buffer, symbol_name, symbol_val, &err)) goto on_error;
+    if (!line_sender_buffer_symbol(buffer, side_name, side_val, &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, price_name, 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, amount_name, 0.00044, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
@@ -137,11 +140,12 @@ using namespace questdb::ingress::literals;
 int main() {
     try {
         auto sender = qdb::line_sender::from_conf(
-            "qwpws::addr=localhost:9000;"_utf8);
+            "ws::addr=localhost:9000;"_utf8);
         auto buffer = sender.new_buffer();
         buffer
             .table("trades"_tn)
             .symbol("symbol"_cn, "ETH-USD"_utf8)
+            .symbol("side"_cn, "sell"_utf8)
             .column("price"_cn, 2615.54)
             .column("amount"_cn, 0.00044)
             .at(qdb::timestamp_nanos::now());
@@ -183,7 +187,7 @@ any binary frames are exchanged.
 ### HTTP basic auth
 
 ```text
-qwpwss::addr=db.example.com:9000;username=admin;password=quest;
+wss::addr=db.example.com:9000;username=admin;password=quest;
 ```
 
 <Tabs defaultValue="c" values={[
@@ -194,7 +198,7 @@ qwpwss::addr=db.example.com:9000;username=admin;password=quest;
 
 ```c
 line_sender_utf8 conf = QDB_UTF8_LITERAL(
-    "qwpwss::addr=db.example.com:9000;username=admin;password=quest;");
+    "wss::addr=db.example.com:9000;username=admin;password=quest;");
 line_sender_error* err = NULL;
 line_sender* sender = line_sender_from_conf(conf, &err);
 ```
@@ -204,7 +208,7 @@ line_sender* sender = line_sender_from_conf(conf, &err);
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_conf(
-    "qwpwss::addr=db.example.com:9000;username=admin;password=quest;"_utf8);
+    "wss::addr=db.example.com:9000;username=admin;password=quest;"_utf8);
 ```
 
 </TabItem>
@@ -212,17 +216,17 @@ auto sender = questdb::ingress::line_sender::from_conf(
 
 ### Token auth (Enterprise, recommended)
 
-Token authentication avoids the per-request overhead of basic auth and is
-the recommended path for Enterprise deployments.
+Token authentication has lower overhead than basic auth and is the
+recommended path for Enterprise deployments.
 
 ```text
-qwpwss::addr=db.example.com:9000;token=your_bearer_token;
+wss::addr=db.example.com:9000;token=your_bearer_token;
 ```
 
 ### TLS
 
-Use the `qwpwss` schema (or its alias `wss`) for TLS. Select where root
-certificates come from with `tls_ca`:
+Use the `wss` schema for TLS. Select where root certificates come from with
+`tls_ca`:
 
 | Key | Description |
 |-----|-------------|
@@ -235,7 +239,7 @@ certificates come from with `tls_ca`:
 Example with a custom CA file:
 
 ```text
-qwpwss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
+wss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
 ```
 
 ### Authentication timeout
@@ -244,14 +248,25 @@ qwpwss::addr=db.example.com:9000;tls_roots=/etc/ssl/qdb-ca.pem;
 WebSocket upgrade to complete. `auth_timeout` is also accepted for
 compatibility with the HTTP transport's spelling.
 
+### Unsupported auth paths
+
+The C/C++ client supports only HTTP basic auth and static bearer-token auth
+(the two methods documented above). The following are **not** supported:
+
+| Path | Status | Workaround |
+|---|---|---|
+| OIDC token acquisition or in-band refresh | Not supported by this client. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). To connect this client to an OIDC-protected QuestDB, acquire an access token out-of-band from your IdP, pass it via `token=...` above, and rebuild the sender when the token nears expiry. |
+| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss://`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls) for the canonical statement. |
+| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, call `line_sender_qwpws_close_drain` / `sender.close_drain()`, free the sender, and build a fresh one with the new token. |
+
 ## Creating the client
 
 ### From a connect string
 
 The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
 
-Use `qwpws` (plain) or `qwpwss` (TLS). The shorter `ws` / `wss` are
-accepted as aliases. The default port is `9000`.
+Use `ws` (plain) or `wss` (TLS). `qwpws` / `qwpwss` are accepted as
+aliases. The default port is `9000`.
 
 <Tabs defaultValue="c" values={[
   { label: "C", value: "c" },
@@ -260,7 +275,7 @@ accepted as aliases. The default port is `9000`.
 <TabItem value="c">
 
 ```c
-line_sender_utf8 conf = QDB_UTF8_LITERAL("qwpws::addr=localhost:9000;");
+line_sender_utf8 conf = QDB_UTF8_LITERAL("ws::addr=localhost:9000;");
 line_sender_error* err = NULL;
 line_sender* sender = line_sender_from_conf(conf, &err);
 ```
@@ -270,7 +285,7 @@ line_sender* sender = line_sender_from_conf(conf, &err);
 
 ```cpp
 auto sender = questdb::ingress::line_sender::from_conf(
-    "qwpws::addr=localhost:9000;"_utf8);
+    "ws::addr=localhost:9000;"_utf8);
 ```
 
 </TabItem>
@@ -284,7 +299,7 @@ For the full list of connect-string keys, see the
 Set `QDB_CLIENT_CONF` to keep credentials out of source code:
 
 ```bash
-export QDB_CLIENT_CONF="qwpwss::addr=db.example.com:9000;username=admin;password=quest;"
+export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
 ```
 
 <Tabs defaultValue="c" values={[
@@ -413,15 +428,44 @@ and provides dedicated methods for everything else.
 | `DECIMAL64` | `line_sender_buffer_column_dec64` / `_dec64_str` | `buffer.column_dec64(name, ...)` |
 | `DECIMAL128` | `line_sender_buffer_column_dec128` / `_dec128_str` | `buffer.column_dec128(name, ...)` |
 | `DOUBLE[]` (arrays) | `line_sender_buffer_column_f64_arr_c_major` / `_byte_strides` / `_elem_strides` | `buffer.column(name, array_view)` |
-| `LONG[]` (i64 arrays) † | `line_sender_buffer_column_i64_arr_*` | `buffer.column(name, array_view)` |
 
-† **Spec-only, currently rejected by the server.** QWP v1 defines the
-`LONG[]` wire type and the client encodes it correctly, but server-side
-ingest does not yet accept it. Batches that include i64-array columns are
-rejected with `"long arrays are not supported, only double arrays"`.
+### Null values
 
-Unlike the Rust client, the C API does not expose `_opt` variants for typed
-nulls, to omit a value, simply do not call the setter for that column.
+The C ABI does not expose `_opt` variants for typed nulls (unlike the Rust
+client). To write a null for a column on a given row, **omit the setter for
+that column** — there is no explicit "set null" call.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+// `amount` is omitted on this row, so it is stored as NULL.
+if (!line_sender_buffer_table(buffer, tbl, &err)) goto on_error;
+if (!line_sender_buffer_symbol(buffer, symbol_name, symbol_val, &err)) goto on_error;
+if (!line_sender_buffer_column_f64(buffer, price_name, 2615.54, &err)) goto on_error;
+if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+// `amount` is omitted on this row, so it is stored as NULL.
+buffer
+    .table("trades"_tn)
+    .symbol("symbol"_cn, "ETH-USD"_utf8)
+    .column("price"_cn, 2615.54)
+    .at(qdb::timestamp_nanos::now());
+```
+
+</TabItem>
+</Tabs>
+
+The designated timestamp cannot be null — every row requires one of
+`at_nanos`, `at_micros`, or `at_now`.
 
 ### Ingest arrays
 
@@ -633,7 +677,7 @@ With store-and-forward (SF) enabled, unacknowledged frames are persisted to
 disk and replayed after reconnection, surviving sender process restarts:
 
 ```text
-qwpws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 ```
 
 Without `sf_dir`, unacknowledged data lives in process memory and is lost if
@@ -669,7 +713,7 @@ By default, the server confirms a batch once it is committed to the local
 uploaded to object storage:
 
 ```text
-qwpws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 ```
 
 `durable_ack_keepalive_interval_millis` (default 200) controls how often the
@@ -879,7 +923,7 @@ Set it via the connect string (`qwp_ws_progress=manual`) or the options API:
 #include <time.h>
 
 line_sender_utf8 conf = QDB_UTF8_LITERAL(
-    "qwpws::addr=localhost:9000;qwp_ws_progress=manual;");
+    "ws::addr=localhost:9000;qwp_ws_progress=manual;");
 line_sender* sender = line_sender_from_conf(conf, &err);
 
 // ... append rows ...
@@ -915,7 +959,7 @@ if (fsn.has_value) {
 #include <thread>
 
 auto sender = qdb::line_sender::from_conf(
-    "qwpws::addr=localhost:9000;qwp_ws_progress=manual;"_utf8);
+    "ws::addr=localhost:9000;qwp_ws_progress=manual;"_utf8);
 // ... append rows ...
 auto fsn = sender.flush_and_get_fsn(buffer);
 if (fsn) {
@@ -951,7 +995,7 @@ Enterprise primary-replica replication.
 Specify a comma-separated address list (or repeat `addr=`):
 
 ```text
-qwpws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 ```
 
 The client picks an endpoint, connects, and walks the list to find the next
@@ -1046,7 +1090,7 @@ Common WebSocket-specific options:
 | `username` / `password` | unset | HTTP basic auth. |
 | `token` | unset | Bearer token auth (Enterprise). |
 | `auth_timeout_ms` | 15000 | WebSocket upgrade timeout (milliseconds). `auth_timeout` is also accepted. |
-| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`qwpwss` / `wss` only). |
+| `tls_ca` / `tls_roots` / `tls_verify` | `webpki_roots` | TLS configuration (`wss` only). |
 | `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |
@@ -1064,7 +1108,7 @@ The buffer API is unchanged. To switch a sender to QWP/WebSocket:
 
 | Aspect | HTTP (ILP) | WebSocket (QWP) |
 |---|---|---|
-| Connect string schema | `http::` / `https::` | `qwpws::` / `qwpwss::` (`ws::` / `wss::` aliases) |
+| Connect string schema | `http::` / `https::` | `ws::` / `wss::` (`qwpws::` / `qwpwss::` aliases) |
 | Batch trigger | Row/time-based auto-flush (defaults: 75000 rows, 1000 ms) | Explicit `flush()` only |
 | Error model | Synchronous on `flush()` | Async via `line_sender_qwpws_poll_error` / handler |
 | Completion tracking | Implicit per request | Explicit FSN watermarks |
@@ -1072,9 +1116,10 @@ The buffer API is unchanged. To switch a sender to QWP/WebSocket:
 | Multi-endpoint failover | Not available | Built in (comma-separated `addr`) |
 | Shutdown | `line_sender_close` | `line_sender_qwpws_close_drain`, then `line_sender_close` |
 
-To migrate, change the connect string from `http::` to `qwpws::` (or
-`https::` to `qwpwss::`), drop any `auto_flush_*` keys, install a
-`qwpws_error_handler` or poll `line_sender_qwpws_poll_error`, and call
+To migrate, change the connect string from `http::` to `ws::` (or
+`https::` to `wss::`), drop any `auto_flush_*` keys, install a
+`line_sender_opts_qwpws_error_handler` (C) / `qwp_ws_error_handler` (C++)
+callback or poll `line_sender_qwpws_poll_error`, and call
 `line_sender_qwpws_close_drain` before closing the sender.
 
 ## Full example: multi-host ingestion with failover
@@ -1110,7 +1155,7 @@ int main(void) {
      * flush() writes to disk and returns quickly while the reconnect
      * loop replays to the new primary in the background. */
     line_sender_utf8 conf = QDB_UTF8_LITERAL(
-        "qwpwss::addr=db-primary:9000,db-replica:9000;"
+        "wss::addr=db-primary:9000,db-replica:9000;"
         "token=your_bearer_token;"
         "sf_dir=/var/lib/myapp/qdb-sf;"
         "sender_id=ingest-1;"
