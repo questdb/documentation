@@ -10,18 +10,19 @@ import TabItem from "@theme/TabItem"
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB C and C++ client connects to QuestDB over the
-[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
-The library is implemented in Rust and exposes both a C11 ABI and a C++17
-header-only wrapper from a single shared/static library. Both APIs support
-high-throughput, column-oriented batched writes with automatic table creation,
-schema evolution, multi-host failover, and optional store-and-forward
-durability.
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
+columnar binary protocol carried over WebSocket. The library is implemented in Rust
+and exposes both a C11 ABI and a C++17 header-only wrapper from a single
+shared/static library. Both APIs support high-throughput, column-oriented batched
+writes with automatic table creation, schema evolution, multi-host failover, and
+optional store-and-forward durability.
 
-:::tip Legacy transports
+:::tip Transports
 
-The same library also supports ILP ingestion over HTTP and TCP, and QWP over
-UDP for trusted high-throughput networks. This page documents the recommended
-WebSocket (QWP) path. For ILP transport details, see the
+QWP/WebSocket (`ws::` / `wss::`) is the current default ingest path and the
+focus of this page. The same library also supports the legacy ILP transports
+(`http::` / `https::` / `tcp::` / `tcps::`) and QWP over UDP for trusted
+high-throughput networks. For ILP transport details, see the
 [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 :::
@@ -200,6 +201,13 @@ The four steps are:
 3. Call `flush()` to publish.
 4. Call `close_drain()` before destroying the sender so already-published
    frames complete on the wire.
+
+C function names that include `qwpws` — for example
+`line_sender_qwpws_close_drain` in step 4, or `line_sender_qwpws_poll_error`
+in [Asynchronous error handling](#asynchronous-error-handling) — are
+QWP/WebSocket-specific. Unprefixed functions (`line_sender_close`,
+`line_sender_flush`, the buffer setters) work for any transport the library
+supports.
 
 ## Authentication and TLS
 
