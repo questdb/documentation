@@ -12,6 +12,13 @@ the store-and-forward substrate. Per-language clients accept the same
 options under the same names, so configuration is portable across
 implementations.
 
+A `ws::` / `wss::` connect string is a single input shared by both the
+ingress sender and the egress query client. Each client reads the keys
+relevant to its direction and **silently ignores the rest** — a key meant
+for the other direction is accepted and skipped, never rejected — so one
+connect string configures both without edits. The *Applies to:* tag on each
+section below marks which direction a key affects.
+
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 `tcps`), see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
 
