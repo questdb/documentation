@@ -2,7 +2,7 @@
 slug: /connect/clients/c-and-cpp
 title: C & C++ client for QuestDB
 sidebar_label: C & C++
-description: "QuestDB C and C++ client for high-throughput data ingestion over the QWP binary protocol (WebSocket)."
+description: "QuestDB C and C++ client for high-throughput ingestion and SQL query execution over the QWP binary protocol (WebSocket)."
 ---
 
 import Tabs from "@theme/Tabs"
@@ -12,10 +12,17 @@ import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 The QuestDB C and C++ client connects to QuestDB over the
 [QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
 The library is implemented in Rust and exposes both a C11 ABI and a C++17
-header-only wrapper from a single shared/static library. Both APIs support
-high-throughput, column-oriented batched writes with automatic table creation,
-schema evolution, multi-host failover, and optional store-and-forward
-durability.
+header-only wrapper from a single shared/static library.
+
+Two complementary APIs live in the same library:
+
+- **Ingestion** (`line_sender_*` in C, `questdb::ingress::line_sender` in C++):
+  column-oriented batched writes with automatic table creation, schema
+  evolution, multi-host failover, and optional store-and-forward durability.
+- **Querying** (`line_reader_*` in C, `questdb::egress::reader` in C++):
+  parameterised SQL over the QWP egress endpoint (`/read/v1`), with
+  streaming batch results, per-query failover, and credit-based flow
+  control. See [Querying and SQL execution](#querying-and-sql-execution).
 
 :::tip Legacy transports
 
@@ -28,9 +35,11 @@ WebSocket (QWP) path. For ILP transport details, see the
 
 :::info
 
-This page focuses on ingestion. For querying QuestDB from C/C++, use the
+The ingestion and query clients are independent — each opens its own
+WebSocket connection. You can also query QuestDB from C/C++ via the
 [PGWire C++ client](/docs/connect/compatibility/pgwire/c-and-cpp/) or the
-[REST API](/docs/connect/compatibility/rest-api/).
+[REST API](/docs/connect/compatibility/rest-api/) when the QWP transport
+is not available.
 
 :::
 
@@ -124,6 +133,7 @@ Compile with:
 gcc -std=c11 hello.c \
     -I /path/to/c-questdb-client/include \
     -L /path/to/c-questdb-client/build -lquestdb_client \
+    -Wl,-rpath,/path/to/c-questdb-client/build \
     -o hello
 ```
 
@@ -165,11 +175,17 @@ Compile with:
 g++ -std=c++17 hello.cpp \
     -I /path/to/c-questdb-client/include \
     -L /path/to/c-questdb-client/build -lquestdb_client \
+    -Wl,-rpath,/path/to/c-questdb-client/build \
     -o hello
 ```
 
 </TabItem>
 </Tabs>
+
+`-Wl,-rpath,<build-dir>` bakes the library search path into the binary so it
+loads without `LD_LIBRARY_PATH`. For production builds, prefer CMake
+integration — see the [upstream dependency
+guide](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
 
 The four steps are:
 
@@ -467,6 +483,10 @@ buffer
 The designated timestamp cannot be null — every row requires one of
 `at_nanos`, `at_micros`, or `at_now`.
 
+On a brand-new table, an omitted column is not inferred from that row.
+The server only adds the column when a later row supplies a non-null
+value for it, so first-row nulls leave the column absent until then.
+
 ### Ingest arrays
 
 The client encodes one-dimensional and multidimensional `DOUBLE[]` (and
@@ -571,7 +591,9 @@ explicitly. The connect-string keys `auto_flush_rows` and `auto_flush_bytes`
 are rejected; the only accepted value is `auto_flush=off`.
 
 A common pattern is to flush periodically on a timer and/or when the buffer
-size (`line_sender_buffer_size(buffer)`) exceeds a threshold.
+exceeds a threshold — by encoded byte size (`line_sender_buffer_size(buffer)`,
+C++ `buffer.size()`) or row count (`line_sender_buffer_row_count(buffer)`,
+C++ `buffer.row_count()`).
 
 :::
 
@@ -882,8 +904,7 @@ correlation tuple is `(message_sequence, from_fsn, to_fsn)`:
   Not generally indexed by server-side logs.
 
 When opening a bug report, supply the connection start time (from your
-application logs), the client's `X-QWP-Client-Id` header value (if your
-application sets one), and the `(message_sequence, from_fsn, to_fsn)` triple.
+application logs) and the `(message_sequence, from_fsn, to_fsn)` triple.
 
 After a `halt` policy fires, the sender is terminal. Drop it and create a new
 one. `line_sender_must_close(sender)` (C++ `sender.must_close()`) reports
@@ -1026,6 +1047,12 @@ By default the first connect fails fast; subsequent disconnects use the
 reconnect policy. Set `initial_connect_retry=on` to apply the same policy to
 the initial connect.
 
+Once `reconnect_max_duration_millis` elapses without a successful
+reconnect, the sender latches terminal: `line_sender_must_close(sender)`
+(C++ `sender.must_close()`) returns `true` and subsequent `flush()` calls
+fail with a "sender is terminal" error. Drop the sender and create a new
+one to continue.
+
 ### Error classification
 
 - **Authentication errors** (`401`/`403`): terminal across all endpoints. The
@@ -1077,12 +1104,1134 @@ ACK. Plain `line_sender_close` (C++ destructor) is best-effort and does
 matters. With `sf_dir`, anything still un-acked is persisted to disk so a
 later sender can replay it.
 
+## Querying and SQL execution
+
+The query client sends SQL over the
+[QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint
+(`/read/v1`). It is a separate object from the ingestion sender — it
+opens its own WebSocket and accepts the same connect-string schemas
+(`ws::` / `wss::`).
+
+A reader connects to one endpoint at a time, executes one query at a
+time, and streams the result as a sequence of column-oriented batches
+until the server emits a terminal frame. DDL, DML, and `SELECT` use the
+same `execute()` entry point and differ only in their terminal frame.
+
+### Quick start
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+#include <questdb/egress/line_reader.h>
+#include <stdio.h>
+#include <stdbool.h>
+
+int main(void) {
+    line_reader_error* err = NULL;
+    line_reader* reader = NULL;
+    line_reader_cursor* cursor = NULL;
+
+    line_sender_utf8 conf = QDB_UTF8_LITERAL("ws::addr=localhost:9000;");
+    reader = line_reader_from_conf(conf, &err);
+    if (!reader) goto on_error;
+
+    line_sender_utf8 sql = QDB_UTF8_LITERAL(
+        "SELECT ts, symbol, price, amount FROM trades "
+        "WHERE symbol = 'ETH-USD' LIMIT 100");
+    cursor = line_reader_execute(reader, sql, &err);
+    if (!cursor) goto on_error;
+
+    int rc;
+    while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) {
+        const size_t rows = line_reader_cursor_row_count(cursor);
+        for (size_t r = 0; r < rows; ++r) {
+            int64_t ts = 0;
+            bool ts_null = false;
+            if (!line_reader_cursor_get_i64(cursor, 0, r, &ts, &ts_null, &err))
+                goto on_error;
+
+            const char* symbol = NULL;
+            size_t symbol_len = 0;
+            bool symbol_null = false;
+            if (!line_reader_cursor_get_symbol(
+                    cursor, 1, r, &symbol, &symbol_len, &symbol_null, &err))
+                goto on_error;
+
+            double price = 0.0;
+            bool price_null = false;
+            if (!line_reader_cursor_get_f64(
+                    cursor, 2, r, &price, &price_null, &err))
+                goto on_error;
+
+            printf("ts=%lld symbol=%.*s price=%g\n",
+                (long long)ts, (int)symbol_len, symbol, price);
+        }
+    }
+    if (rc < 0) goto on_error;
+
+    line_reader_cursor_free(cursor);
+    line_reader_close(reader);
+    return 0;
+
+on_error:;
+    size_t err_len = 0;
+    const char* msg = line_reader_error_msg(err, &err_len);
+    fprintf(stderr, "error: %.*s\n", (int)err_len, msg);
+    line_reader_error_free(err);
+    if (cursor) line_reader_cursor_free(cursor);
+    if (reader) line_reader_close(reader);
+    return 1;
+}
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+#include <questdb/egress/line_reader.hpp>
+#include <iostream>
+
+namespace qdb = questdb::egress;
+using namespace questdb::ingress::literals;
+
+int main() {
+    try {
+        qdb::reader reader{"ws::addr=localhost:9000;"_utf8};
+        auto cur = reader.execute(
+            "SELECT ts, symbol, price, amount FROM trades "
+            "WHERE symbol = 'ETH-USD' LIMIT 100"_utf8);
+
+        while (cur.next_batch()) {
+            const size_t rows = cur.row_count();
+            for (size_t r = 0; r < rows; ++r) {
+                auto ts = cur.get_i64(0, r);
+                auto symbol = cur.get_symbol(1, r);
+                auto price = cur.get_f64(2, r);
+                std::cout
+                    << "ts=" << (ts ? std::to_string(*ts) : "NULL")
+                    << " symbol=" << (symbol ? *symbol : "NULL")
+                    << " price=" << (price ? std::to_string(*price) : "NULL")
+                    << "\n";
+            }
+        }
+        return 0;
+    } catch (const qdb::line_reader_error& e) {
+        std::cerr << "error (code " << static_cast<int>(e.code())
+                  << "): " << e.what() << "\n";
+        return 1;
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+The four steps mirror the ingestion side:
+
+1. Build a `reader` from a connect string.
+2. Call `execute(sql)` (or `prepare(sql)` + binds + `.execute()`) to obtain a `cursor`.
+3. Loop `next_batch()` until it returns `false` / `0`.
+4. Read scalars and views with the typed getters during each batch.
+
+For the full list of connect-string keys accepted by the reader (including
+`target`, `zone`, `failover_*`, `compression`, and the shared TLS / auth
+keys), see the
+[connect string reference](/docs/connect/clients/connect-string/).
+
+### Creating a reader
+
+The reader uses the same connect-string format as the sender. Build it
+from a literal, from `QDB_CLIENT_CONF`, or — in C — through the C ABI
+directly.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+/* From a literal. */
+line_sender_utf8 conf = QDB_UTF8_LITERAL("ws::addr=localhost:9000;");
+line_reader_error* err = NULL;
+line_reader* reader = line_reader_from_conf(conf, &err);
+
+/* From QDB_CLIENT_CONF (credentials out of source code). */
+line_reader* reader2 = line_reader_from_env(&err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+namespace qdb = questdb::egress;
+using namespace questdb::ingress::literals;
+
+// From a literal.
+qdb::reader reader{"ws::addr=localhost:9000;"_utf8};
+
+// From QDB_CLIENT_CONF.
+auto reader2 = qdb::reader::from_env();
+```
+
+</TabItem>
+</Tabs>
+
+Use the same `QDB_CLIENT_CONF` environment variable as the sender — both
+clients parse the same connect-string grammar, so a single shared variable
+works for callers that open one of each in the same process.
+
+### Concurrency
+
+The reader API has three handle types, each with its own thread-mobility
+rule:
+
+| Handle | Concurrent access | Mobility |
+|---|---|---|
+| `line_reader` / `qdb::reader` | Single-threaded. | Movable between threads with an explicit happens-before edge (mutex hand-off, thread spawn/join, release/acquire on the pointer). |
+| `line_reader_query` / `qdb::query` | Single-threaded. | **Pinned** to the thread that created it. |
+| `line_reader_cursor` / `qdb::cursor` | Single-threaded. | **Pinned** to the thread that created it. |
+| `line_reader_error` / `qdb::line_reader_error` | Not concurrent. | Free to move. |
+
+Concurrent operations on the same handle from two threads are always
+undefined behaviour. To query in parallel, **create one reader per
+thread**. Each opens its own WebSocket connection and runs one query at
+a time. A reader can execute many queries sequentially; only one cursor
+may be live on a reader at any given moment.
+
+A narrow set of reader stats are exempt from the one-thread rule because
+they read atomic counters: `line_reader_bytes_received`,
+`line_reader_credit_granted_total`, `line_reader_read_ns`,
+`line_reader_decode_ns`, `line_reader_reset_timing`. Use these (not the
+`_cursor_credit_granted_total` variant) when a monitoring thread polls a
+reader that another thread is actively driving.
+
+### DDL, DML, and SELECT
+
+`execute()` is **blocking**: it sends the query, drives the receive loop
+on the calling thread, and returns a cursor that streams the response.
+DDL, DML, and `SELECT` use the same entry point; they differ only in the
+terminal frame the cursor delivers.
+
+| Statement class | Terminal | `cursor.terminal_kind()` | What to read |
+|---|---|---|---|
+| `SELECT` | `RESULT_END` | `terminal_kind::end` | `terminal_end()` → `{final_seq, total_rows}` |
+| `INSERT` / `UPDATE` / `DELETE` | `EXEC_DONE` | `terminal_kind::exec_done` | `terminal_exec_done()` → `{op_type, rows_affected}` |
+| `CREATE` / `ALTER` / `DROP` / `TRUNCATE` | `EXEC_DONE` | `terminal_kind::exec_done` | `terminal_exec_done()` → `{op_type, rows_affected == 0}` |
+
+Concrete DDL / DML example:
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+/* CREATE TABLE. The cursor delivers no batches; only the terminal frame. */
+line_sender_utf8 ddl = QDB_UTF8_LITERAL(
+    "CREATE TABLE IF NOT EXISTS trades ("
+    " ts TIMESTAMP, symbol SYMBOL, side SYMBOL,"
+    " price DOUBLE, amount DOUBLE"
+    ") TIMESTAMP(ts) PARTITION BY DAY WAL");
+line_reader_cursor* cursor = line_reader_execute(reader, ddl, &err);
+if (!cursor) goto on_error;
+
+/* Drain (DDL streams zero batches; the loop body never runs). */
+int rc;
+while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) { /* unused */ }
+if (rc < 0) goto on_error;
+
+uint8_t op_type = 0;
+uint64_t rows_affected = 0;
+if (line_reader_cursor_terminal_exec_done(cursor, &op_type, &rows_affected))
+    printf("DDL ok: op_type=%u rows_affected=%llu\n",
+        (unsigned)op_type, (unsigned long long)rows_affected);
+
+line_reader_cursor_free(cursor);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto cur = reader.execute(
+    "CREATE TABLE IF NOT EXISTS trades ("
+    " ts TIMESTAMP, symbol SYMBOL, side SYMBOL,"
+    " price DOUBLE, amount DOUBLE"
+    ") TIMESTAMP(ts) PARTITION BY DAY WAL"_utf8);
+
+while (cur.next_batch()) { /* DDL streams zero batches */ }
+
+if (auto info = cur.terminal_exec_done()) {
+    std::cout << "DDL ok: op_type=" << int(info->op_type)
+              << " rows_affected=" << info->rows_affected << "\n";
+}
+```
+
+</TabItem>
+</Tabs>
+
+`rows_affected` is the count for `INSERT` / `UPDATE` / `DELETE`. Pure DDL
+reports `0`.
+
+`EXEC_DONE` confirms the statement has been applied to the local
+write-ahead log (WAL) and is visible to subsequent `SELECT`s on this
+reader. The `request_durable_ack` connect-string key is **sender-only**
+— it is not accepted on the reader, and reader-driven `INSERT`s
+acknowledge on local-WAL commit only. If you need durable upload to
+object storage for reader-side `INSERT`s, drive the inserts through the
+[ingestion sender](#data-ingestion) with `request_durable_ack=on`
+instead.
+
+Sequencing operations across one reader is safe because `execute()` is
+synchronous: the next statement does not start until the previous cursor
+terminates and is freed.
+
+### Parameterised queries
+
+Use `prepare()` for SQL with `$N` placeholders. Append binds in
+positional order, then call `execute()` to obtain a cursor.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_utf8 sql = QDB_UTF8_LITERAL(
+    "SELECT ts, symbol, price, amount FROM trades "
+    "WHERE symbol = $1 AND price >= $2 LIMIT 1000");
+
+line_reader_query* query = line_reader_prepare(reader, sql, &err);
+if (!query) goto on_error;
+
+line_reader_query_bind_varchar(query, QDB_UTF8_LITERAL("ETH-USD"));
+line_reader_query_bind_f64(query, 2500.0);
+
+line_reader_cursor* cursor = line_reader_query_execute(&query, &err);
+/* `query` is now NULL — line_reader_query_execute consumes it. */
+if (!cursor) goto on_error;
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto cur = reader
+    .prepare(
+        "SELECT ts, symbol, price, amount FROM trades "
+        "WHERE symbol = $1 AND price >= $2 LIMIT 1000"_utf8)
+    .bind_varchar("ETH-USD"_utf8)
+    .bind_f64(2500.0)
+    .execute();
+```
+
+</TabItem>
+</Tabs>
+
+Binds are positional: the first `bind_*` call fills `$1`, the second
+fills `$2`, and so on. The number of binds must match the number of
+placeholders; mismatches surface from `execute()` as
+`line_reader_error_invalid_bind`.
+
+Most binds are infallible at the call site — they only mutate the
+in-process query buffer. The single exception is `bind_varchar`, which
+re-validates UTF-8 and silently freezes the builder on invalid bytes; the
+deferred error surfaces from `execute()` as
+`line_reader_error_invalid_utf8`. To recover, drop the query and rebuild.
+
+#### Bind parameter types
+
+The C ABI exposes a separate function per QuestDB type; the C++ wrapper
+exposes the same surface as `query::bind_*` methods returning `query&`
+for chaining. Every QuestDB column type that can appear in a `$N`
+placeholder has a setter:
+
+| QuestDB type | C function | C++ method |
+|---|---|---|
+| `BOOLEAN` | `line_reader_query_bind_bool` | `query.bind_bool(value)` |
+| `BYTE` (i8) | `line_reader_query_bind_i8` | `query.bind_i8(value)` |
+| `SHORT` (i16) | `line_reader_query_bind_i16` | `query.bind_i16(value)` |
+| `INT` (i32) | `line_reader_query_bind_i32` | `query.bind_i32(value)` |
+| `LONG` (i64) | `line_reader_query_bind_i64` | `query.bind_i64(value)` |
+| `FLOAT` (f32) | `line_reader_query_bind_f32` | `query.bind_f32(value)` |
+| `DOUBLE` (f64) | `line_reader_query_bind_f64` | `query.bind_f64(value)` |
+| `CHAR` | `line_reader_query_bind_char` | `query.bind_char(code_unit)` |
+| `VARCHAR` | `line_reader_query_bind_varchar` | `query.bind_varchar(utf8_view)` |
+| `BINARY` | `line_reader_query_bind_binary` | `query.bind_binary(buf, len)` |
+| `UUID` | `line_reader_query_bind_uuid` | `query.bind_uuid(std::array<uint8_t, 16>)` |
+| `LONG256` | `line_reader_query_bind_long256` | `query.bind_long256(std::array<uint8_t, 32>)` |
+| `IPv4` | `line_reader_query_bind_ipv4` | `query.bind_ipv4(host_order_u32)` |
+| `TIMESTAMP` (μs) | `line_reader_query_bind_timestamp_micros` | `query.bind_timestamp_micros(micros)` |
+| `TIMESTAMP_NS` (ns) | `line_reader_query_bind_timestamp_nanos` | `query.bind_timestamp_nanos(nanos)` |
+| `DATE` (ms) | `line_reader_query_bind_date_millis` | `query.bind_date_millis(millis)` |
+| `DECIMAL64` | `line_reader_query_bind_decimal64` | `query.bind_decimal64(mantissa, scale)` |
+| `DECIMAL128` | `line_reader_query_bind_decimal128` | `query.bind_decimal128(lo, hi, scale)` |
+| `DECIMAL256` | `line_reader_query_bind_decimal256` | `query.bind_decimal256(std::array<uint8_t, 32>, scale)` |
+| `GEOHASH` | `line_reader_query_bind_geohash` | `query.bind_geohash(value, precision_bits)` |
+| `SYMBOL` | use `bind_varchar` (the server narrows VARCHAR → SYMBOL on schema match) | use `bind_varchar` |
+
+`SYMBOL` reuses `bind_varchar` because the QWP bind framing carries
+UTF-8 text; the server resolves to a symbol value on the receiving side.
+
+:::caution DECIMAL128 mantissa sign
+
+`bind_decimal128` splits the two's-complement i128 mantissa into a
+`uint64_t mantissa_lo` (low 64 bits) and an `int64_t mantissa_hi`
+(upper 64 bits). The high limb **must** be passed as `int64_t` so the
+sign extends correctly into the full i128 — passing `uint64_t` zero-
+extends and silently corrupts every negative value. For example,
+i128 `-1` is `(mantissa_lo = UINT64_MAX, mantissa_hi = -1)`. The C++
+overload takes `int64_t` directly, so calling it with a literal works
+without further care.
+
+:::
+
+The following column types have no `bind_*` variant — they can appear in
+result columns but not in `$N` placeholders:
+
+| Type | Why no bind | Workaround |
+|---|---|---|
+| `DOUBLE[]` / `LONG[]` (arrays) | The QWP `ARGS` frame carries scalar binds only; shape and stride metadata have no wire encoding. | Emit array literals directly in SQL, or filter by an extracted element (`bids[1][1] >= $1`). |
+| `INTERVAL` | Not yet exposed as a bind type. | Bind the boundary as a `TIMESTAMP` / `TIMESTAMP_NS` instead. |
+
+#### Binding NULL
+
+Bind a typed NULL with `bind_null` for the simple kinds, or with the
+dedicated `bind_null_*` variants for kinds that carry metadata (column
+scale on decimals, precision on geohash). Index drift is the failure
+mode to avoid: NULL still consumes one positional slot.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_reader_query_bind_null(query, line_reader_column_kind_long);     /* $1 = NULL LONG */
+line_reader_query_bind_null_varchar(query);                            /* $2 = NULL VARCHAR */
+line_reader_query_bind_null_decimal64(query, /*scale=*/4);             /* $3 = NULL DECIMAL64 */
+line_reader_query_bind_null_geohash(query, /*precision_bits=*/20);     /* $4 = NULL GEOHASH */
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+query
+    .bind_null(qdb::column_kind::long_)
+    .bind_null_varchar()
+    .bind_null_decimal64(/*scale=*/4)
+    .bind_null_geohash(/*precision_bits=*/20);
+```
+
+</TabItem>
+</Tabs>
+
+`bind_null_*` variants exist for `varchar`, `binary`, `decimal64`,
+`decimal128`, `decimal256`, and `geohash`. Every other kind goes through
+the generic `bind_null(kind)`.
+
+### Reading result batches
+
+`next_batch()` returns `true` / `1` when a batch is available, `false` /
+`0` when the stream has terminated, and the C function returns `-1` on
+error (with `*err_out` set). Inspect `row_count()`, `column_count()`,
+`column_kind(col_idx)`, and `column_name(col_idx)` to drive the typed
+getters.
+
+Pointers and views returned by the cursor (`column_name`, `get_varchar`,
+`get_symbol`, `get_binary`, array views, validity bitmaps) borrow from
+the currently-loaded batch and are invalidated by `next_batch()`,
+`cancel()`, `add_credit()`, or freeing the cursor. **Copy out any values
+you need beyond the current batch.**
+
+Batches are decoded column-major: each column's values live in one
+contiguous buffer. When porting from a PostgreSQL or ODBC row cursor,
+prefer iterating the outer loop over columns and the inner loop over
+rows — sequential access through each column buffer is cache-friendly,
+and you can pull `column_validity(col)` once and vectorise null
+handling instead of branching cell-by-cell. Row-major iteration (outer
+over rows) is correct but jumps between per-column buffers on every
+cell, so reach for it only when downstream shape (CSV, JSON) forces it.
+
+#### Column getters
+
+Every QuestDB column type has a dedicated getter:
+
+| QuestDB type | C function | C++ method | Return shape (C++) |
+|---|---|---|---|
+| `BOOLEAN` | `line_reader_cursor_get_bool` | `cursor.get_bool(col, row)` | `nullable<bool>` |
+| `BYTE` (i8) | `line_reader_cursor_get_i8` | `cursor.get_i8(col, row)` | `nullable<int8_t>` |
+| `SHORT` (i16) | `line_reader_cursor_get_i16` | `cursor.get_i16(col, row)` | `nullable<int16_t>` |
+| `INT` (i32) | `line_reader_cursor_get_i32` | `cursor.get_i32(col, row)` | `nullable<int32_t>` |
+| `LONG`, `TIMESTAMP` (μs), `TIMESTAMP_NS` (ns), `DATE` (ms) | `line_reader_cursor_get_i64` | `cursor.get_i64(col, row)` | `nullable<int64_t>` |
+| `FLOAT` (f32) | `line_reader_cursor_get_f32` | `cursor.get_f32(col, row)` | `nullable<float>` |
+| `DOUBLE` (f64) | `line_reader_cursor_get_f64` | `cursor.get_f64(col, row)` | `nullable<double>` |
+| `CHAR` (UTF-16 code unit) | `line_reader_cursor_get_char` | `cursor.get_char(col, row)` | `nullable<uint16_t>` |
+| `VARCHAR` | `line_reader_cursor_get_varchar` | `cursor.get_varchar(col, row)` | `nullable<std::string_view>` |
+| `SYMBOL` | `line_reader_cursor_get_symbol` | `cursor.get_symbol(col, row)` | `nullable<std::string_view>` |
+| `BINARY` | `line_reader_cursor_get_binary` | `cursor.get_binary(col, row)` | `nullable<binary_view>` |
+| `UUID` | `line_reader_cursor_get_uuid` | `cursor.get_uuid(col, row)` | `nullable<std::array<uint8_t, 16>>` |
+| `LONG256` | `line_reader_cursor_get_long256` | `cursor.get_long256(col, row)` | `nullable<std::array<uint8_t, 32>>` |
+| `IPv4` | `line_reader_cursor_get_ipv4` | `cursor.get_ipv4(col, row)` | `nullable<uint32_t>` |
+| `GEOHASH` | `line_reader_cursor_get_geohash` | `cursor.get_geohash(col, row)` | `nullable<geohash>` (value + `precision_bits`) |
+| `DECIMAL64` | `line_reader_cursor_get_decimal64` | `cursor.get_decimal64(col, row)` | `nullable<decimal64>` (mantissa + `scale`) |
+| `DECIMAL128` | `line_reader_cursor_get_decimal128` | `cursor.get_decimal128(col, row)` | `nullable<decimal128>` (`low`, `high`, `scale`) |
+| `DECIMAL256` | `line_reader_cursor_get_decimal256` | `cursor.get_decimal256(col, row)` | `nullable<decimal256>` (32 bytes + `scale`) |
+| `DOUBLE[]` row | `line_reader_cursor_get_double_array` | `cursor.get_double_array(col, row)` | `nullable<double_array_view>` |
+| `DOUBLE[]` element | `line_reader_cursor_get_double_array_element` | `cursor.get_double_array_element(col, row, flat_idx)` | `nullable<double>` |
+| `LONG[]` row | `line_reader_cursor_get_long_array` | `cursor.get_long_array(col, row)` | `nullable<long_array_view>` |
+| `LONG[]` element | `line_reader_cursor_get_long_array_element` | `cursor.get_long_array_element(col, row, flat_idx)` | `nullable<int64_t>` |
+| Null bitmap (all kinds) | `line_reader_cursor_column_validity` | `cursor.column_validity(col)` | `validity_view` (LSB-first; bit `1` = null) |
+
+`get_i64` is the single accessor for all 64-bit temporal kinds —
+disambiguate units by calling `column_kind(col)` and treating the value
+as μs / ns / ms accordingly.
+
+`get_i32` rejects `IPv4` columns (status `invalid_api_call`); use
+`get_ipv4` for those, otherwise an address ≥ `128.0.0.0` would silently
+flip sign through the signed 32-bit getter.
+
+`column_validity` exposes the raw LSB-first null bitmap when you want
+to vectorise null handling across a column instead of calling
+`get_*` cell-by-cell. The pointer is borrowed for the current batch.
+
+#### Reading NULLs
+
+C ABI: every `get_*` writes its `out_is_null` flag separately from the
+value pointer. Always branch on `out_is_null` before consuming
+`*out_value` — a default-zero `int64_t` or empty `string_view` is a
+valid value, not a NULL marker.
+
+```c
+int64_t price_micros = 0;
+bool is_null = false;
+if (!line_reader_cursor_get_i64(cursor, 0, r, &price_micros, &is_null, &err))
+    goto on_error;
+if (is_null) {
+    /* SQL NULL. Skip, sentinel, error — your call. */
+} else {
+    /* Real value. */
+}
+```
+
+C++ wrapper: every `get_*` returns `std::optional<T>` (`nullable<T>`),
+empty for NULL cells.
+
+```cpp
+if (auto price = cur.get_f64(col, r))
+    process(*price);
+else
+    handle_null();
+```
+
+#### Reading arrays
+
+`DOUBLE[]` and `LONG[]` rows return a borrowed view containing `shape`
+(row-major, innermost dimension last), `ndim`, `data` (concatenated
+little-endian element bytes), `data_len`, and `element_count`. Use the
+`_element` accessor when you want one cell at a flat row-major index;
+the wrapper does the little-endian decode for you.
+
+A NULL row sets `is_null` to true and zeroes the view. A non-null row
+whose shape produces zero elements (e.g. `[2, 0, 3]`) leaves
+`is_null = false` but writes `data == NULL`, `data_len == 0`. The C++
+wrapper's `view.element(flat_idx)` returns a NULL sentinel
+(`quiet_NaN()` for doubles, `INT64_MIN` for longs) in either case so a
+single branch handles both.
+
+Arrays require QuestDB 9.0.0 or later — older servers reject the QWP
+encoding outright with `unsupported_server`.
+
+### Flow control: credit
+
+By default the server streams as fast as the network allows. Set
+`initial_credit(bytes)` on the query to apply byte-credit flow control:
+the server pauses after the configured byte budget is exhausted and the
+client tops it up by calling `add_credit(more_bytes)` after each batch
+is processed. `0` is the sentinel for "unbounded".
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_reader_query* query = line_reader_prepare(reader, sql, &err);
+if (!query) goto on_error;
+line_reader_query_initial_credit(query, 256 * 1024);  /* 256 KiB */
+line_reader_cursor* cursor = line_reader_query_execute(&query, &err);
+
+while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) {
+    /* ... read the batch ... */
+    if (!line_reader_cursor_add_credit(cursor, 256 * 1024, &err))
+        goto on_error;
+}
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto cur = reader
+    .prepare(sql)
+    .initial_credit(256 * 1024)
+    .execute();
+
+while (cur.next_batch()) {
+    // ... read the batch ...
+    cur.add_credit(256 * 1024);
+}
+```
+
+</TabItem>
+</Tabs>
+
+Inspect `line_reader_credit_granted_total(reader)` (or
+`reader.credit_granted_total()`) from a monitoring thread to track
+cumulative credit issued on a connection.
+
+### Cancelling an in-flight query
+
+There are two ways to stop a stream early:
+
+- **`cancel()`** (C: `line_reader_cursor_cancel`) — sends `CANCEL`,
+  drains pending frames until the server's terminal reply, and **surfaces
+  any transport errors** through `err_out` / an exception. Use this when
+  you need to know whether the cancellation completed cleanly — for
+  example before reusing the reader from a critical path, or when the
+  cancel is itself observable to the application.
+- **Free the cursor** (C: `line_reader_cursor_free`; C++ destructor) —
+  best-effort: sends `CANCEL`, then tears down the WebSocket bounded by a
+  short internal timeout. Transport errors during teardown are
+  **swallowed**. Use this when you don't care about clean closure (e.g.
+  the process is shutting down anyway).
+
+Either way, after the cursor is gone the reader is ready for the next
+`execute()`.
+
+### Server info and connection state
+
+Once the reader (or cursor) is connected, `server_info()` exposes the
+last-seen QWP `SERVER_INFO` frame:
+
+```cpp
+if (auto info = reader.server_info()) {
+    std::cout << "role=" << int(info.role())
+              << " epoch=" << info.epoch()
+              << " cluster=" << info.cluster_id()
+              << " node=" << info.node_id() << "\n";
+}
+```
+
+`role` is one of `standalone`, `primary`, `replica`, `primary_catchup`,
+or `other` (use `role_byte()` for unknown values). `epoch` is monotonic
+across failover/role transitions. `current_host()` / `current_port()`
+return the endpoint currently in use.
+
+The reader's getters reject while a cursor is live — they read non-atomic
+state the cursor thread may mutate. Use the cursor-scoped equivalents
+(`cursor.server_info()`, `cursor.current_host()`, `cursor.current_port()`,
+`cursor.server_version()`) instead, or release the cursor first.
+
+### Failover and high availability
+
+:::note Enterprise
+
+Multi-host failover is most useful with QuestDB Enterprise primary-replica
+replication. A single-node deployment can configure the connect string
+the same way, but failover only kicks in when there is a second healthy
+endpoint to try.
+
+:::
+
+#### Multiple endpoints and routing
+
+Pass a comma-separated address list:
+
+```text
+wss::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+```
+
+`target` filters by `SERVER_INFO.role`:
+
+| Value | Endpoints accepted |
+|---|---|
+| `any` (default) | Any role. |
+| `primary` | `PRIMARY`, `PRIMARY_CATCHUP`, or `STANDALONE`. |
+| `replica` | `REPLICA` only. |
+
+`zone=<id>` biases endpoint selection toward same-zone hosts (Enterprise).
+
+#### Per-query failover loop
+
+When the connection breaks mid-stream, the cursor reconnects to another
+endpoint and replays the query from the start. The loop is bounded:
+
+| Key | Default | Description |
+|---|---|---|
+| `failover` | `on` | Master switch. `failover=off` disables per-query reconnect. |
+| `failover_max_attempts` | `8` | Cap on reconnect attempts per `execute()`. |
+| `failover_backoff_initial_ms` | `50` | First post-failure sleep. |
+| `failover_backoff_max_ms` | `1000` | Cap on per-attempt sleep. |
+| `failover_max_duration_ms` | `30000` | Total wall-clock budget per `execute()`. |
+| `auth_timeout_ms` | `15000` | Per-host HTTP upgrade timeout. |
+
+When the budget is exhausted, `next_batch()` (or `execute()`) surfaces a
+terminal error — typically `socket_error`, `handshake_error`, or
+`role_mismatch`. Free the cursor; the reader is then available for the
+next `execute()`. There is **no continuous reconnect** spanning idle
+periods between queries — each `execute()` starts its own failover budget.
+
+:::warning Failover requires multiple endpoints
+
+The failover loop rotates across the `addr=` list. With a single address
+there is no other host to try, and the budget collapses after one
+attempt regardless of `failover_max_attempts`. Provide at least two
+addresses for failover to be useful.
+
+:::
+
+#### Mid-stream failover hazard: duplicate rows
+
+**Read this before deploying a long-running cursor against a failover-
+enabled connect string.**
+
+When mid-stream failover fires, the server replays the query from the
+beginning. **Any rows the application has already consumed will be
+delivered again on the new connection.** Without explicit recovery, an
+aggregation, fan-out, or downstream writer sees duplicates.
+
+The library does **not** silently discard the replayed rows. Instead, it
+gives the application a choice via either the `on_failover_reset` or the
+`on_failover_progress` callback — installing either one clears the
+silent-duplicate guard:
+
+- **Wire a callback.** The trampoline fires on the cursor's thread,
+  before any replayed batch arrives. Discard the partial state you've
+  accumulated. Replay then proceeds transparently. Use
+  `on_failover_reset` for the reset-only signal, or
+  `on_failover_progress` (see [Failover progress
+  phases](#failover-progress-phases)) for the full lifecycle —
+  disconnect, per-retry, reset, gave-up.
+- **Don't wire a callback, and don't want replay.** The cursor surfaces
+  the next `next_batch()` (or `execute()`) call as
+  `line_reader_error_failover_would_duplicate` and terminates instead of
+  double-delivering. The application can then re-execute the query from
+  scratch.
+
+Initial-connect failover (before any batch has been yielded) is always
+transparent and ignores the callback — no rows are consumed yet, so
+there is nothing to duplicate.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+static void on_failover_reset(
+        const line_reader_failover_event* ev,
+        void* user_data)
+{
+    /* `user_data` is your accumulator; clear it before replay. */
+    struct row_buf* buf = (struct row_buf*)user_data;
+    row_buf_clear(buf);
+
+    /* Diagnostics only — must NOT call back into reader / query / cursor. */
+    const char* new_host = NULL;
+    size_t new_host_len = 0;
+    line_reader_failover_event_new_host(ev, &new_host, &new_host_len);
+    fprintf(stderr,
+        "failover -> %.*s:%u after %u attempts\n",
+        (int)new_host_len, new_host,
+        (unsigned)line_reader_failover_event_new_port(ev),
+        (unsigned)line_reader_failover_event_attempts(ev));
+}
+
+line_reader_query* query = line_reader_prepare(reader, sql, &err);
+line_reader_query_on_failover_reset(query, on_failover_reset, &my_buf);
+line_reader_cursor* cursor = line_reader_query_execute(&query, &err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+std::vector<row> accumulator;
+
+auto cur = reader
+    .prepare(sql)
+    .on_failover_reset([&](const qdb::failover_event_view& ev) {
+        accumulator.clear();  // discard partial result; replay incoming
+        std::cerr
+            << "failover -> " << ev.new_host() << ":" << ev.new_port()
+            << " after " << ev.attempts() << " attempts\n";
+    })
+    .execute();
+```
+
+</TabItem>
+</Tabs>
+
+The callback runs synchronously on the cursor's drive thread. It **must
+not** call back into the originating reader, query, or cursor (including
+read-only stat getters — they read state the trampoline is mid-mutation
+on); must not throw or `longjmp` across the C boundary (an escaping
+unwind aborts the C++ trampoline); and must not block, because while it
+runs no batch is being read and no credit is being granted to the
+server.
+
+#### Failover event fields
+
+The `failover_event` passed to the callback carries:
+
+| C++ accessor | C function | Meaning |
+|---|---|---|
+| `failed_host()` / `failed_port()` | `line_reader_failover_event_failed_host` / `_port` | The previously-connected endpoint that failed. |
+| `new_host()` / `new_port()` | `line_reader_failover_event_new_host` / `_port` | The endpoint the cursor is now connected to. |
+| `new_request_id()` | `line_reader_failover_event_new_request_id` | Server-assigned request ID on the new connection. |
+| `attempts()` | `line_reader_failover_event_attempts` | Number of reconnect attempts that preceded this success (1 = first retry). |
+| `elapsed_ns()` | `line_reader_failover_event_elapsed_ns` | Wall-clock nanoseconds spent reconnecting (sleep + dial + handshake + `SERVER_INFO`). |
+| `trigger_code()` | `line_reader_failover_event_trigger_code` | `line_reader_error_code` that triggered the failover. |
+| `trigger_msg()` | `line_reader_failover_event_trigger_msg` | Human-readable message for the trigger. |
+| `server_info()` | `line_reader_failover_event_server_info` | `SERVER_INFO` of the new endpoint (empty on v1 servers). |
+
+Outside the callback, `cursor.failover_resets()` reports the cumulative
+number of successful resets observed by this cursor since `execute()`.
+
+#### Failover progress phases
+
+`on_failover_reset` only fires on a successful reconnect. For full
+connection-lifecycle visibility — outage observed, per-retry telemetry,
+reset, retry budget exhausted — install an `on_failover_progress`
+callback instead (or in addition). The same callback fires for every
+phase; route on the phase discriminant:
+
+| Phase (C / C++) | When it fires | Fields populated beyond the always-set ones |
+|---|---|---|
+| `line_reader_failover_phase_disconnected` / `failover_phase::disconnected` | Once, immediately after the cursor's connection drops — **before** any retry. Lets observers alert on "QuestDB unreachable now" instead of retroactively when reconnect lands. | None. `attempt` is `0`. |
+| `line_reader_failover_phase_retrying` / `failover_phase::retrying` | Once per outer-loop iteration, **after** the inter-attempt backoff sleep and immediately before the dial. | `attempt` is `1`-based for the about-to-be-tried dial. `elapsed_ns` already includes backoff cost. |
+| `line_reader_failover_phase_reset` / `failover_phase::reset` | A reconnect succeeded; replayed batches will start arriving next. Fires immediately **before** the `on_failover_reset` callback (when both are installed) so a single sink sees the lifecycle in order. | `new_host` / `new_port`, `new_request_id`, `server_info` (empty on v1 servers). `attempt` is the dial that landed. |
+| `line_reader_failover_phase_gave_up` / `failover_phase::gave_up` | The retry budget is exhausted; the cursor is terminal. The same error will surface on the next `next_batch()` / `add_credit()` call. | `final_error_code` / `final_error_msg`. `attempt` is the total number of dials burned (may be `0` if the wall-clock deadline was already exhausted). |
+
+Always-set fields (every phase): `failed_host` / `failed_port` (the
+endpoint that died), `trigger_code` / `trigger_msg` (the original
+cause-of-death, preserved across phases), `elapsed_ns` (wall-clock since
+the disconnect was observed, monotonically non-decreasing across phases
+of the same lifecycle), and `attempt` (per-phase semantics above).
+
+Accessor surface:
+
+| C++ accessor | C function | Notes |
+|---|---|---|
+| `phase()` | `line_reader_failover_progress_event_phase` | Discriminant. |
+| `failed_host()` / `failed_port()` | `line_reader_failover_progress_event_failed_host` / `_failed_port` | Always set. |
+| `new_host()` / `new_port()` | `line_reader_failover_progress_event_new_host` / `_new_port` | Empty / `0` outside `Reset`. |
+| `new_request_id()` → `std::optional<int64_t>` | `line_reader_failover_progress_event_new_request_id` (returns `bool`) | `nullopt` / `false` outside `Reset`. |
+| `attempt()` | `line_reader_failover_progress_event_attempt` | Per-phase semantics, see table. |
+| `trigger_code()` / `trigger_msg()` | `line_reader_failover_progress_event_trigger_code` / `_trigger_msg` | Always set; preserved across phases. |
+| `elapsed_ns()` | `line_reader_failover_progress_event_elapsed_ns` | Wall-clock since disconnect. Saturating, monotonic. |
+| `server_info()` | `line_reader_failover_progress_event_server_info` | Non-NULL only on `Reset`, v2+ servers. |
+| `final_error_code()` → `std::optional<error_code>` | `line_reader_failover_progress_event_final_error_code` (returns `bool`) | Populated only on `GaveUp`. |
+| `final_error_msg()` | `line_reader_failover_progress_event_final_error_msg` (returns `bool`) | Populated only on `GaveUp`. |
+
+Installing `on_failover_progress` also clears the silent-duplicate
+guard documented under [Mid-stream failover
+hazard](#mid-stream-failover-hazard-duplicate-rows) — same as
+`on_failover_reset`. If you only want telemetry and not replay
+semantics, set `failover=off` in the connect string instead.
+
+The reentrancy contract is identical to `on_failover_reset`: the
+callback runs synchronously on the cursor's drive thread, **must not**
+call back into the originating reader / query / cursor (including
+read-only stat getters), **must not** throw or `longjmp` across the C
+boundary (an escaping unwind aborts the process), and **must not**
+block — while it runs, no batch is being read and the failover loop
+cannot make progress.
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+static void on_failover_progress(
+        const line_reader_failover_progress_event* ev,
+        void* user_data)
+{
+    const char* failed_host = NULL;
+    size_t failed_host_len = 0;
+    line_reader_failover_progress_event_failed_host(
+        ev, &failed_host, &failed_host_len);
+    const uint16_t failed_port =
+        line_reader_failover_progress_event_failed_port(ev);
+    const uint64_t elapsed_ns =
+        line_reader_failover_progress_event_elapsed_ns(ev);
+
+    switch (line_reader_failover_progress_event_phase(ev)) {
+    case line_reader_failover_phase_disconnected:
+        fprintf(stderr, "failover: disconnected from %.*s:%u\n",
+            (int)failed_host_len, failed_host, (unsigned)failed_port);
+        break;
+    case line_reader_failover_phase_retrying:
+        fprintf(stderr, "failover: retry #%u after %llu ns\n",
+            (unsigned)line_reader_failover_progress_event_attempt(ev),
+            (unsigned long long)elapsed_ns);
+        break;
+    case line_reader_failover_phase_reset: {
+        const char* new_host = NULL;
+        size_t new_host_len = 0;
+        line_reader_failover_progress_event_new_host(
+            ev, &new_host, &new_host_len);
+        fprintf(stderr,
+            "failover: reset -> %.*s:%u after %u attempts (%llu ns)\n",
+            (int)new_host_len, new_host,
+            (unsigned)line_reader_failover_progress_event_new_port(ev),
+            (unsigned)line_reader_failover_progress_event_attempt(ev),
+            (unsigned long long)elapsed_ns);
+        break;
+    }
+    case line_reader_failover_phase_gave_up: {
+        const char* msg = NULL;
+        size_t msg_len = 0;
+        line_reader_failover_progress_event_final_error_msg(
+            ev, &msg, &msg_len);
+        fprintf(stderr,
+            "failover: gave up after %u attempts: %.*s\n",
+            (unsigned)line_reader_failover_progress_event_attempt(ev),
+            (int)msg_len, msg);
+        break;
+    }
+    }
+}
+
+line_reader_query* query = line_reader_prepare(reader, sql, &err);
+line_reader_query_on_failover_progress(query, on_failover_progress, NULL);
+line_reader_cursor* cursor = line_reader_query_execute(&query, &err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+auto cur = reader
+    .prepare(sql)
+    .on_failover_progress([&](const qdb::failover_progress_event_view& ev) {
+        switch (ev.phase()) {
+        case qdb::failover_phase::disconnected:
+            std::cerr << "failover: disconnected from "
+                      << ev.failed_host() << ":" << ev.failed_port() << "\n";
+            break;
+        case qdb::failover_phase::retrying:
+            std::cerr << "failover: retry #" << ev.attempt()
+                      << " after " << ev.elapsed_ns() << " ns\n";
+            break;
+        case qdb::failover_phase::reset:
+            std::cerr << "failover: reset -> "
+                      << ev.new_host() << ":" << ev.new_port()
+                      << " after " << ev.attempt() << " attempts ("
+                      << ev.elapsed_ns() << " ns)\n";
+            break;
+        case qdb::failover_phase::gave_up:
+            std::cerr << "failover: gave up after " << ev.attempt()
+                      << " attempts: " << ev.final_error_msg() << "\n";
+            break;
+        }
+    })
+    .execute();
+```
+
+</TabItem>
+</Tabs>
+
+`on_failover_progress` and `on_failover_reset` coexist: when both are
+installed, the `Reset` phase fires immediately before the reset
+callback so a single observer sees the whole lifecycle in order. Pick
+whichever shape fits your sink — phased event stream vs. one-shot
+reset hook — or install both.
+
+#### Connection-state observability
+
+For mid-query connection lifecycle, install `on_failover_progress`
+(above): it surfaces `Disconnected` (on outage), `Retrying` (per dial
+attempt), `Reset` (reconnect succeeded), and `GaveUp` (budget
+exhausted) as structured events on the cursor's drive thread.
+
+What remains polling-based:
+
+- **Initial-connect failures** (before `execute()` returns): no
+  progress callback fires — `line_reader_from_conf` or
+  `line_reader_execute` itself fails. Inspect the host / port the
+  reader settled on with `current_host()` / `current_port()` once
+  `execute()` returns a cursor.
+- **Between queries**, while no cursor is live, the reader holds no
+  connection in the foreground, so there is nothing to observe. Poll
+  `reader.current_host()` / `reader.current_port()` (or
+  `reader.server_info().epoch()`) between successive `execute()` calls
+  for "endpoint changed" or "topology rotated" signals.
+
+### Error handling
+
+Every reader / query / cursor entry point that can fail returns a
+NULL/false / `-1` on error and writes an opaque `line_reader_error*`
+through its `err_out` parameter. The C++ wrapper throws
+`questdb::egress::line_reader_error` (derived from `std::runtime_error`)
+with the same code and message.
+
+`line_reader_error_get_code(err)` returns one of:
+
+| Code | Meaning | Typical recovery |
+|---|---|---|
+| `could_not_resolve_addr` | Bad URL, host, or interface in the connect string. | Fix the connect string. |
+| `config_error` | Connect-string syntax or unknown key. | Fix the connect string. |
+| `invalid_api_call` | Wrong-order or wrong-state call (e.g. `execute` while a cursor is live, type-mismatched `get_*`). | Bug in the application; fix the call site. |
+| `socket_error` | TCP / WS read / write / close failure. | Per-query failover handles it transparently if `failover=on` and multiple `addr=` entries are configured; otherwise rebuild the reader. |
+| `tls_error` | TLS handshake failure. | Inspect cert chain; verify `tls_roots` / `tls_ca`. |
+| `handshake_error` | HTTP upgrade or WebSocket handshake failed. | Often a version or compression mismatch; check the server release. |
+| `auth_error` | `401`/`403` from the upgrade response. | Re-mint the credential; auth failures are terminal across all endpoints — failover does not retry them. |
+| `unsupported_server` | Server advertises a QWP version, encoding, or capability the client cannot use. | Align client and server versions; disable optional encodings. |
+| `role_mismatch` | All endpoints connected but none matched `target=`. | Loosen `target` or fix the topology. |
+| `protocol_error` | Wire-format violation: bad magic, truncated frame, bad varint. | Rebuild the reader; report a bug if it recurs against an in-sync server. |
+| `invalid_utf8` | Connect string, SQL, or `bind_varchar` value contained invalid UTF-8. | Re-encode the input. |
+| `invalid_bind` | Bind count, index, or value rejected client-side (including timestamp / decimal / geohash range failures). | Fix the bind. |
+| `server_schema_mismatch` | Server-reported `SCHEMA_MISMATCH` (`0x03`). | Fix bind types or SQL. |
+| `server_parse_error` | Server-reported `PARSE_ERROR` (`0x05`). | Fix SQL. |
+| `server_internal_error` | Server-reported `INTERNAL_ERROR` (`0x06`). | Inspect server logs; retry with backoff. |
+| `server_security_error` | Server-reported `SECURITY_ERROR` (`0x08`). | Permission denied; check role / grants. |
+| `server_limit_exceeded` | Server-reported `LIMIT_EXCEEDED` (`0x0B`). | Reduce result size or raise the server limit. |
+| `limit_exceeded` | Client-side limit hit (e.g. array row exceeds per-row element cap). | Reduce row size. |
+| `cancelled` | Local `cancel()` or server `CANCELLED` (`0x0A`). | Expected after `cancel()`. |
+| `failover_would_duplicate` | Mid-query failover would replay rows the application has already consumed, and no `on_failover_reset` callback was installed. | See [Mid-stream failover hazard](#mid-stream-failover-hazard-duplicate-rows). Either wire a callback and discard partial state, or re-execute the query from scratch. |
+
+Once any of the `server_*` codes surface, the cursor is terminated; free
+it and (typically) reuse the reader for the next `execute()`. For
+`auth_error`, `unsupported_server`, `tls_error`, and `role_mismatch`,
+rebuild the reader from scratch — these are not transient.
+
+#### Error object fields
+
+A production error handler usually wants more than the code and the
+text. The following fields are everything you need to log a structured
+event, decide what to retry, and assemble a bug report:
+
+| Field | C++ accessor | C function | Notes — stability / PII / scope |
+|---|---|---|---|
+| Code | `e.code()` | `line_reader_error_get_code(err)` | `line_reader_error_code` discriminant. **Stable across releases** — the right field to dispatch on. For server-originated codes the discriminant embeds the QWP status byte (e.g. `server_parse_error = 0x05`). Safe to forward as-is. |
+| Message | `e.what()` | `line_reader_error_msg(err, &len)` | UTF-8 diagnostic. **Not null-terminated** in C — read exactly `len` bytes; pointer is owned by the error and stays valid until `line_reader_error_free`. Server messages mirror QuestDB's normal SQL error formatting (capped at the QWP error-message limit, currently 1 KiB); client-synthesised messages cover transport / handshake / bind validation. **Not stable across server versions** — never pattern-match. **May contain PII / secrets**: it can echo offending bind values or server-supplied close reasons — log at the input's trust level and sanitise before forwarding to external trackers. |
+| Cursor request ID | `cursor.request_id()` | `line_reader_cursor_request_id` | Server-assigned request ID for the current connection. Refreshes on failover. Safe to forward. |
+| Batch request ID | `cursor.batch_request_id()` | `line_reader_cursor_batch_request_id` | Request ID stamped on the most recently decoded batch (may differ from `request_id()` for already-buffered frames mid-failover). Safe to forward. |
+| Failover resets | `cursor.failover_resets()` | `line_reader_cursor_failover_resets` | Cumulative successful mid-stream resets since `execute()`. A non-zero value next to a duplicate-row complaint tells you replay happened. Safe to forward. |
+| Current endpoint | `cursor.current_host()` / `cursor.current_port()` | `line_reader_cursor_current_addr_host` / `_port` | Endpoint the cursor was attached to when the error fired. Safe to forward. |
+| Client identifier | (connect-string `client_id=` value) | (same) | Opaque label echoed by QuestDB as `X-QWP-Client-Id`. Set this in production so support can correlate sessions. Safe to forward. |
+
+The protocol does not currently surface a server-issued request or
+connection identifier in the WebSocket upgrade response. When opening a
+bug report, supply the connection start time (from your application
+logs), the `client_id=` value, and the cursor tuple
+`(request_id, batch_request_id, failover_resets, current_host, current_port)`
+— that is the closest you can get to a server-side correlation handle
+today.
+
+### Reader authentication and TLS
+
+The reader and the sender share the same authentication and TLS
+configuration grammar — see [Authentication and TLS](#authentication-and-tls)
+above for the full table of `tls_ca` / `tls_roots` / `tls_verify` values.
+In brief:
+
+- **HTTP basic auth**: `username=...;password=...;`.
+- **Bearer token (Enterprise)**: `token=...;`. Sent as
+  `Authorization: Bearer <token>` on the WebSocket upgrade.
+- **TLS**: switch to `wss::`. Select root certificates with `tls_ca`
+  (`webpki_roots`, `os_roots`, `webpki_and_os_roots`) or
+  `tls_roots=/path/to/ca.pem`. `tls_roots_password` unlocks JKS / PKCS#12
+  keystores.
+
+The reader applies the same restrictions as the sender:
+
+| Path | Status | Workaround |
+|---|---|---|
+| OIDC token acquisition or in-band refresh | Not supported by this client. There is no IdP integration and no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the reader when the token nears expiry. |
+| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates. | Use bearer-token auth over `wss://`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
+| Token rotation mid-session | Not supported. The token is presented once during the WebSocket upgrade and is not re-sent. | On token expiry, free the reader and build a fresh one with the new token. The cursor (and any open query) must be freed first. |
+
+### Enterprise example: TLS, token auth, multi-host failover
+
+A production read path typically combines all three. The reader uses the
+same connect-string grammar as the sender — drop `sf_*` keys (they are
+sender-only) and configure failover instead:
+
+```text
+wss::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+     token=eyJhbGciOi...;
+     target=primary;
+     failover_max_attempts=10;
+     failover_max_duration_ms=60000;
+     compression=auto;
+     tls_ca=os_roots;
+     client_id=quote-server;
+```
+
+<Tabs defaultValue="c" values={[
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+]}>
+<TabItem value="c">
+
+```c
+line_sender_utf8 conf = QDB_UTF8_LITERAL(
+    "wss::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;"
+    "token=eyJhbGciOi...;"
+    "target=primary;"
+    "failover_max_attempts=10;"
+    "failover_max_duration_ms=60000;"
+    "compression=auto;"
+    "tls_ca=os_roots;"
+    "client_id=quote-server;");
+line_reader_error* err = NULL;
+line_reader* reader = line_reader_from_conf(conf, &err);
+```
+
+</TabItem>
+<TabItem value="cpp">
+
+```cpp
+qdb::reader reader{
+    "wss::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;"
+    "token=eyJhbGciOi...;"
+    "target=primary;"
+    "failover_max_attempts=10;"
+    "failover_max_duration_ms=60000;"
+    "compression=auto;"
+    "tls_ca=os_roots;"
+    "client_id=quote-server;"_utf8};
+```
+
+</TabItem>
+</Tabs>
+
+`client_id` is opaque to the server but appears in QuestDB's connection
+logs as `X-QWP-Client-Id` — include it in bug reports to help support
+correlate sessions.
+
 ## Configuration reference
 
 For the full list of connect-string keys and their defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
 
-Common WebSocket-specific options:
+Common WebSocket-specific options accepted by the **ingestion sender**:
 
 | Key | Default | Description |
 |---|---|---|
@@ -1102,6 +2251,29 @@ Common WebSocket-specific options:
 | `qwp_ws_progress` | `background` | `background` or `manual`. |
 | `max_in_flight` | 128 | Max unacknowledged frames in flight on a connection. Acts as the backpressure window: publishers block locally once the window is full. |
 
+Common WebSocket-specific options accepted by the **query reader**:
+
+| Key | Default | Description |
+|---|---|---|
+| `addr` | required | One or more `host:port` entries, comma-separated or repeated. |
+| `username` / `password` | unset | HTTP basic auth. |
+| `token` | unset | Bearer token auth (Enterprise). |
+| `auth_timeout_ms` | 15000 | Per-host HTTP upgrade timeout (milliseconds). |
+| `tls_ca` / `tls_roots` / `tls_verify` / `tls_roots_password` | `webpki_roots` | TLS configuration (`wss` only). |
+| `target` | `any` | Endpoint role filter: `any`, `primary`, `replica`. |
+| `zone` | unset | Zone-aware routing hint (Enterprise). |
+| `failover` | `on` | Master switch for per-query reconnect. |
+| `failover_max_attempts` | `8` | Cap on reconnect attempts per `execute()`. |
+| `failover_backoff_initial_ms` | `50` | First post-failure sleep. |
+| `failover_backoff_max_ms` | `1000` | Cap on per-attempt sleep. |
+| `failover_max_duration_ms` | `30000` | Total wall-clock budget per `execute()`. |
+| `compression` | `raw` | `raw` / `zstd` / `auto`. `zstd` and `auto` require the `compression-zstd` build feature. |
+| `compression_level` | `1` | Advertised zstd level. Server clamps to `[1, 9]`. |
+| `max_batch_rows` | server default | Hint passed in `X-QWP-Max-Batch-Rows`. `0` (or unset) defers to the server. |
+| `client_id` | unset | Opaque identifier echoed in server logs as `X-QWP-Client-Id`. |
+| `path` | `/read/v1` | Endpoint path. Rarely changed. |
+| `max_version` | `2` | Highest QWP version the reader advertises. |
+
 ## Migration from ILP (HTTP/TCP)
 
 The buffer API is unchanged. To switch a sender to QWP/WebSocket:
@@ -1115,6 +2287,7 @@ The buffer API is unchanged. To switch a sender to QWP/WebSocket:
 | Store-and-forward | Not available | Available (`sf_dir`) |
 | Multi-endpoint failover | Not available | Built in (comma-separated `addr`) |
 | Shutdown | `line_sender_close` | `line_sender_qwpws_close_drain`, then `line_sender_close` |
+| Querying SQL from the same library | Not available | `line_reader_*` (C) / `questdb::egress::reader` (C++) — see [Querying and SQL execution](#querying-and-sql-execution) |
 
 To migrate, change the connect string from `http::` to `ws::` (or
 `https::` to `wss::`), drop any `auto_flush_*` keys, install a
@@ -1229,11 +2402,14 @@ on_error:;
 The header files are extensively commented and serve as the canonical API
 reference. Browse them on GitHub or in your local checkout:
 
-- C: [`include/questdb/ingress/line_sender.h`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.h)
-- C++: [`include/questdb/ingress/line_sender.hpp`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.hpp)
+- Ingestion C: [`include/questdb/ingress/line_sender.h`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.h)
+- Ingestion C++: [`include/questdb/ingress/line_sender.hpp`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/ingress/line_sender.hpp)
+- Query C: [`include/questdb/egress/line_reader.h`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/egress/line_reader.h)
+- Query C++: [`include/questdb/egress/line_reader.hpp`](https://github.com/questdb/c-questdb-client/blob/main/include/questdb/egress/line_reader.hpp)
 
-For querying QuestDB from C/C++, see the
-[PGWire C++ client](/docs/connect/compatibility/pgwire/c-and-cpp/) or the
+For SQL execution from C/C++, the [Querying and SQL execution](#querying-and-sql-execution)
+section covers the QWP reader. Alternatives outside this library are the
+[PGWire C++ client](/docs/connect/compatibility/pgwire/c-and-cpp/) and the
 [REST API](/docs/connect/compatibility/rest-api/).
 
 With data flowing into QuestDB, the next step is querying. See the
