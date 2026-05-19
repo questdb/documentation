@@ -481,7 +481,7 @@ unscaled little-endian integer).
 
 ### Designated timestamp
 
-The [designated timestamp](/docs/concept/designated-timestamp/) column
+The [designated timestamp](/docs/concepts/designated-timestamp/) column
 controls time-based partitioning and ordering. Two ways to set it:
 
 **User-assigned** (recommended for deduplication and exactly-once delivery):
@@ -505,7 +505,7 @@ if (!line_sender_buffer_at_now(buffer, &err))
 
 `at_now` removes the ability to deduplicate rows. Prefer explicit timestamps
 for production ingestion. See
-[Delivery semantics](/docs/concept/delivery-semantics/) for why
+[Delivery semantics](/docs/concepts/delivery-semantics/) for why
 server-assigned timestamps defeat exactly-once outcomes.
 
 :::note
@@ -665,7 +665,7 @@ configured.
 :::
 
 By default, the server confirms a batch once it is committed to the local
-[WAL](/docs/concept/write-ahead-log/). To wait for the batch to be durably
+[WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
 uploaded to object storage:
 
 ```text

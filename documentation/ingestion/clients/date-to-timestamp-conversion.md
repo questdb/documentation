@@ -210,7 +210,7 @@ int main() {
 }
 ```
 
-Learn more about the [QuestDB C Client](/docs/connect/clients/c-and-cpp/#c-1)
+Learn more about the [QuestDB C Client](/docs/connect/clients/c-and-cpp/)
 
 ## Date to Timestamp in C++
 
