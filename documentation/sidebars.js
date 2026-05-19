@@ -850,6 +850,7 @@ module.exports = {
                         "cookbook/sql/finance/volume-profile",
                         "cookbook/sql/finance/volume-spike",
                         "cookbook/sql/finance/aggressor-volume-imbalance",
+                        "cookbook/sql/finance/order-flow-imbalance",
                         "cookbook/sql/finance/vpin",
                       ],
                     },

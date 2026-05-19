@@ -35,4 +35,6 @@ The imbalance ranges from -100% (all sell) to +100% (all buy), with 0% indicatin
 :::info Related documentation
 - [CASE expressions](/docs/query/sql/case/)
 - [Aggregation functions](/docs/query/functions/aggregation/)
+- [Order Flow Imbalance (OFI) recipe](order-flow-imbalance.md)
+- [VPIN recipe](vpin.md)
 :::
