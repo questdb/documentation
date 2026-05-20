@@ -8,14 +8,14 @@ description:
 
 The QuestDB native client is configured with a single connect string. The
 same string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
-multi-host failover, and the store-and-forward substrate. Per-language
-clients accept the same options under the same names, so configuration is
-portable across implementations.
+multi-host failover, and the store-and-forward substrate. The native-client
+contract is a shared option vocabulary: the same connect string can configure
+both ingress and egress across language implementations. Implementation-specific
+exceptions are called out in the affected key section and client page.
 
 A `ws::` / `wss::` connect string is a single input shared by both the
-ingress sender and the egress query client. Each client reads the keys
-relevant to its direction and **silently ignores the rest** — a key meant
-for the other direction is accepted and skipped, never rejected — so one
+ingress sender and the egress query client. Each direction reads the keys
+relevant to it and ignores keys meant only for the other direction, so one
 connect string configures both without edits. The *Applies to:* tag on each
 section below marks which direction a key affects.
 
@@ -147,12 +147,11 @@ wss::addr=node-a:443,node-b:443;target=replica;zone=eu-west-1a;
 ### Tolerate a slow or restarting server at startup
 
 ```
-ws::addr=node-a:9000;reconnect_max_duration_millis=120000;
+ws::addr=node-a:9000;initial_connect_retry=on;reconnect_max_duration_millis=120000;
 ```
 
-The 2-minute reconnect budget covers both the *first* connect and any
-subsequent reconnect: setting any explicit `reconnect_*` key implicitly
-turns on `initial_connect_retry`. See
+The 2-minute reconnect budget covers the initial connect because the connect
+string explicitly sets `initial_connect_retry=on`. See
 [Ingress reconnect](#reconnect-keys).
 
 ## Recipes {#recipes}
@@ -171,15 +170,15 @@ caveats), follow the section links from the [Key index](#key-index).
 | Query only the primary (freshest data)            | egress    | `target=primary`                       | —                                                                                           |
 | Query only replicas (offload primary)             | egress    | `target=replica`                       | —                                                                                           |
 | Zone-aware routing with DR last-resort            | egress    | `zone=<id>`                            | `target`                                                                                    |
-| Tune ingest batching                              | ingress   | —                                      | `auto_flush_rows`, `auto_flush_interval`, `auto_flush_bytes`                                |
+| Tune ingest batching                              | ingress   | —                                      | Clients with auto-flush: `auto_flush_rows`, `auto_flush_interval`, `auto_flush_bytes`       |
 | Disable auto-flush (manual `flush()` only)        | ingress   | `auto_flush=off`                       | —                                                                                           |
 | Memory-buffered ingest (no disk durability)       | ingress   | (omit `sf_dir`)                        | `init_buf_size`, `max_buf_size`                                                             |
 | Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect budget                     | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
-| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
+| Tune ingress reconnect budget                     | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` |
+| Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | Default behaviour. Reconnect budget still applies after a successful first connect.         |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
 | Disable per-query egress failover                 | egress    | `failover=off`                         | —                                                                                           |
@@ -271,21 +270,22 @@ See also the [server-side TLS configuration](/docs/security/tls/).
 *Applies to: ingress.*
 
 The client buffers rows in memory and flushes them to the server in batches.
-Auto-flushing controls when the buffer is sent without an explicit
-`flush()` call. The three triggers below are OR'd — whichever threshold
-trips first sends the batch.
+For clients that implement auto-flushing, these keys control when the buffer
+is sent without an explicit `flush()` call. The three triggers below are OR'd:
+whichever threshold trips first sends the batch.
 
-- `auto_flush` — global enable. Options: `on`, `off`. Default: `on`.
+- `auto_flush` — global enable. Options: `on`, `off`. Default where supported:
+  `on`.
   When `off`, the application must call `flush()` explicitly to send
   buffered rows.
 - `auto_flush_rows` — flush when the buffered row count reaches this
-  threshold. Set to `off` to disable. Default: `1000`.
+  threshold. Set to `off` to disable. Default where supported: `1000`.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
   since the first buffered row. Evaluated on the next `at()` / `flush()`
   call (not driven by a wall-clock timer). Set to `off` to disable.
-  Default: `100` (100 ms).
+  Default where supported: `100` (100 ms).
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
-  size. Set to `off` to disable. Default: `8m` (8 MiB). Accepts
+  size. Set to `off` to disable. Default where supported: `8m` (8 MiB). Accepts
   [size suffixes](#size-suffixes). When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
   advertised `X-QWP-Max-Batch-Size` at handshake (one-way: a configured
@@ -296,6 +296,16 @@ trips first sends the batch.
   responsibility for not producing oversized batches. Older servers
   that do not advertise the header leave the configured value
   untouched.
+
+:::note Rust support
+
+The Rust client currently does not implement auto-flushing. It accepts
+`auto_flush=off` for compatibility and rejects `auto_flush=on`,
+`auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes`. Rust
+applications must call `flush()` explicitly; see the
+[Rust client page](/docs/connect/clients/rust/#flushing).
+
+:::
 
 ## Buffer sizing {#buffer}
 
@@ -521,15 +531,12 @@ SF mode and memory-only mode share the same loop.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
-  Default: `100`. Setting this enables `initial_connect_retry=on` implicitly;
-  see below.
+  Default: `100`.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
-  Default: `5000` (5 s). Setting this enables
-  `initial_connect_retry=on` implicitly; see below.
+  Default: `5000` (5 s).
 - `reconnect_max_duration_millis` — total time budget for a single outage.
   Once exceeded, the I/O loop gives up and surfaces a terminal error.
-  Default: `300000` (5 min). Setting this enables `initial_connect_retry=on`
-  implicitly; see below.
+  Default: `300000` (5 min).
 - `initial_connect_retry` — whether the initial connect attempt is retried
   on failure. The same loop drives the retry.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
@@ -538,13 +545,9 @@ SF mode and memory-only mode share the same loop.
   - `async` — return the `Sender` immediately; the I/O thread retries in
     the background, surfacing terminal failures via the error inbox.
 
-  **Implicit promotion.** Setting any explicit `reconnect_*` key without
-  also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the reconnect budget
-  also covers the *first* connect attempt — not only post-disconnect
-  ones. To keep the historical fail-fast behaviour on first connect while
-  still tuning the reconnect loop, set `initial_connect_retry=off`
-  explicitly; the override is preserved.
+  The reconnect budget does not make the first connect retryable by itself.
+  To tolerate a slow or restarting server at startup, set
+  `initial_connect_retry=on` or `initial_connect_retry=async` explicitly.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Default: `5000` (5 s).
   Set to `0` or `-1` for fast close (skip the drain).
@@ -677,10 +680,10 @@ description and behaviour notes.
 | --------------------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------------------- |
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
-| `auto_flush`                            | enum (`on` / `off`)           | `on`                          | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | `8m` (8 MiB)                  | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_interval`                   | int (ms) / `off`              | `100` (100 ms)                | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_rows`                       | int / `off`                   | `1000`                        | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_bytes`                      | size                          | `8m` (Rust: rejected)         | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
@@ -694,7 +697,7 @@ description and behaviour notes.
 | `failover_max_attempts`                 | int                           | `8`                           | [Egress failover](#reconnect-keys)                            |
 | `failover_max_duration_ms`              | int (ms)                      | `30000`                       | [Egress failover](#reconnect-keys)                            |
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
-| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
+| `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
 | `max_background_drainers`               | int                           | `4`                           | [Store-and-forward](#sf-keys)                                 |
 | `max_batch_rows`                        | int                           | server default                | [Query client keys](#egress-keys)                             |

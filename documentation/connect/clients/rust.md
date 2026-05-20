@@ -120,6 +120,14 @@ Supported values:
 WebSocket upgrade to complete. `auth_timeout` is also accepted for
 compatibility with the HTTP transport's spelling.
 
+### Unsupported authentication paths
+
+| Path | Status | Workaround |
+|---|---|---|
+| OIDC token acquisition or in-band refresh | Not supported by this client. It does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...` above, and build a fresh `Sender` when the token nears expiry. |
+| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss://`. See the [connect string reference](/docs/connect/clients/connect-string/#auth) for the canonical statement. |
+| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, call `sender.close_drain()`, drop the sender, and build a fresh one with the new token. |
+
 ## Creating the client
 
 ### From a connect string
@@ -244,6 +252,25 @@ needed.
 For exact signatures and accepted parameter conversions, see the
 [crate docs](https://docs.rs/questdb-rs/latest/questdb/ingress/struct.Buffer.html).
 
+### Null values and omitted columns
+
+Two idioms produce a NULL in the buffered row:
+
+1. **`column_*_opt(name, None)`** — the typed setter writes a wire-level
+   null for that column.
+2. **Omit the setter** — every column not set on a row is gap-filled
+   with NULL when the row is finished.
+
+Both produce the same on-the-wire output; the `_opt` variant just makes
+the optionality explicit at the call site.
+
+On a brand-new table, an omitted column is not inferred from that row.
+The server only adds the column when a later row supplies a non-null
+value for it, so first-row nulls leave the column absent until then.
+
+The designated timestamp **cannot** be null — every row requires `.at(...)?`
+or `.at_now()?` to finalize.
+
 ### Ingest arrays
 
 `Buffer::column_arr` accepts native Rust arrays/slices/vectors (up to 3D) and
@@ -257,7 +284,7 @@ fn main() -> Result<()> {
     let mut sender = Sender::from_conf("ws::addr=127.0.0.1:9000;")?;
     let mut buffer = sender.new_buffer();
     buffer
-        .table("fx_order_book")?
+        .table("book")?
         .symbol("symbol", "EURUSD")?
         .column_arr("bids", &vec![
             vec![1.0850, 600000.0],
@@ -343,7 +370,8 @@ you call `sender.flush(&mut buffer)`.
 
 The Rust client does not implement auto-flushing for QWP/WebSocket. You must
 call `flush()` explicitly. Connect-string keys `auto_flush_rows` and
-`auto_flush_bytes` are rejected; the only accepted value is `auto_flush=off`.
+`auto_flush_interval`, and `auto_flush_bytes` are rejected; the only accepted
+value is `auto_flush=off`.
 
 A common pattern is to flush periodically on a timer and/or when the buffer
 size (via `buffer.len()`) exceeds a threshold.
@@ -651,6 +679,13 @@ seconds, `sf_dir` is strongly recommended.
 | `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
 | `initial_connect_retry` | `off` | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). |
 
+When the reconnect budget elapses without recovery, the sender enters a
+terminal state: `Sender::must_close()` returns `true`, the next `flush()`
+returns an error, and a `Halt`-category entry surfaces through
+`poll_qwp_ws_error()` or the `qwp_ws_error_handler` callback. Recover by
+dropping the sender and constructing a new one (with `sf_dir` set, the
+on-disk slot is replayed once the new sender connects).
+
 By default the first connect fails fast; subsequent disconnects use the
 reconnect policy. Set `initial_connect_retry=on` to apply the same policy to
 the initial connect.
@@ -702,6 +737,8 @@ them.
 
 For the full list of connect-string keys and their defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
+The shared reference describes the native-client contract; the table below
+lists Rust-specific support.
 
 Common WebSocket-specific options:
 
@@ -712,7 +749,7 @@ Common WebSocket-specific options:
 | `token` | unset | Bearer token auth (Enterprise). |
 | `auth_timeout_ms` | 15000 | WebSocket upgrade timeout. |
 | `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss`/`qwpwss` only). |
-| `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
+| `auto_flush` | only `off` accepted if set | Auto-flush is not supported. `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |
 | `sf_durability` | `memory` | Only `memory` is currently accepted (see [SF tuning keys](#sf-tuning-keys)). |
@@ -779,10 +816,16 @@ fn main() -> questdb::Result<()> {
     // after sf_append_deadline_millis (default 30s). With sf_dir,
     // flush() writes to disk and returns quickly while the reconnect
     // loop replays to the new primary in the background.
+    //
+    // - wss + token:                    Enterprise TLS and bearer-token auth.
+    // - addr=h1,h2:                     comma-separated multi-host failover list.
+    // - sf_dir + sender_id:             disk-backed store-and-forward slot.
+    // - reconnect_max_duration_millis:  total outage budget; on expiry the
+    //                                   sender latches terminal (see
+    //                                   `must_close()` below).
     let mut sender = Sender::from_conf(
-        "wss::addr=db-primary:9000,db-replica:9000;\  // Enterprise: wss, multi-host
-         token=your_bearer_token;\                     // Enterprise: token auth
-         tls_verify=unsafe_off;\                       // test only!
+        "wss::addr=db-primary:9000,db-replica:9000;\
+         token=your_bearer_token;\
          sf_dir=/var/lib/myapp/qdb-sf;\
          sender_id=ingest-1;\
          reconnect_max_duration_millis=300000;"
