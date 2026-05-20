@@ -299,8 +299,7 @@ trips first sends the batch.
 
 ## Buffer sizing {#buffer}
 
-*Applies to: ingress (encode buffer). `max_schemas_per_connection` also
-applies to egress.*
+*Applies to: ingress (encode buffer).*
 
 These keys control the in-memory row buffer that the client uses before
 flushing.
@@ -311,9 +310,6 @@ flushing.
   Default: `104857600` (100 MiB). Accepts size suffixes.
 - `max_name_len` — maximum allowed length of a table or column name in
   bytes. Default: `127`.
-- `max_schemas_per_connection` — per-connection ceiling on the number of
-  distinct schema IDs the client can register. WebSocket / QWP only.
-  Default: `65535`.
 - `max_datagram_size` — UDP only. Maximum datagram size; defaults to a
   value below typical Ethernet MTU.
 
@@ -612,7 +608,12 @@ wire protocol for the underlying mechanism.
 *Applies to: egress (query client).*
 
 These keys are accepted by the QWP query client's connect string (the
-egress / `QwpQueryClient` path). They are not sender keys.
+egress / `QwpQueryClient` path). The Sender (ingress) silently consumes
+the same keys so that a single connect string can be shared between the
+Sender and the `QwpQueryClient` without an "unknown configuration key"
+error — the Sender does not interpret the values. Range, enum, and
+type checks happen on the egress side; a value the `QwpQueryClient`
+parser would reject is still silently accepted by the Sender.
 
 - `compression` — result-batch compression the client advertises. Options:
   `raw` (default — no compression, the accept-encoding header is omitted so
@@ -626,7 +627,15 @@ egress / `QwpQueryClient` path). They are not sender keys.
   unbounded: the server streams as fast as the network allows. Set a
   non-zero budget to bound server push on a memory-constrained client.
 - `max_batch_rows` — upper bound on rows per result batch.
-- `buffer_pool_size` — size of the client-side decode buffer pool.
+- `buffer_pool_size` — number of decoded result-batch buffers the I/O
+  thread keeps in rotation. Sets the in-flight window between the
+  receive/decode loop and the user's `onBatch` callback: at most this many
+  batches are decoded ahead of the consumer. Default: `4`. Minimum: `1`
+  (no read-ahead — the I/O thread waits for each `releaseBuffer()` call
+  before decoding the next batch). Each buffer reserves about 64 KiB of
+  native scratch, so raising the value grows pinned memory linearly. When
+  the pool drains, the I/O thread parks and the TCP receive window closes,
+  applying back-pressure to the server. Must be set before `connect()`.
 
 Equivalent options exist on the query client's builder API (for example,
 `WithQwpQueryCompression`, `WithQwpQueryCompressionLevel`,
@@ -672,7 +681,7 @@ description and behaviour notes.
 | `auto_flush_bytes`                      | size                          | `8m` (8 MiB)                  | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (100 ms)                | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000`                        | [Auto-flushing](#auto-flush)                                  |
-| `buffer_pool_size`                      | int                           | `4`                           | [Query client keys](#egress-keys)                             |
+| `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
 | `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
 | `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
@@ -692,7 +701,6 @@ description and behaviour notes.
 | `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
 | `max_name_len`                          | int                           | `127`                         | [Buffer sizing](#buffer)                                      |
-| `max_schemas_per_connection`            | int                           | `65535`                       | [Buffer sizing](#buffer)                                      |
 | `on_internal_error` *                   | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
 | `on_parse_error` *                      | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
 | `on_schema_error` *                     | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |

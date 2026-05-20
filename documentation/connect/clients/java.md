@@ -74,7 +74,10 @@ Add the dependency:
 ### Ingest data
 
 ```java
+import io.questdb.client.LineSenderServerException;
 import io.questdb.client.Sender;
+import io.questdb.client.SenderError;
+import io.questdb.client.cutlass.line.LineSenderException;
 
 try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
     sender.table("trades")
@@ -90,6 +93,17 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
           .doubleColumn("amount", 0.001)
           .atNow();
     sender.flush();
+} catch (LineSenderServerException e) {
+    // Server rejected a batch (schema mismatch, security, etc.) and the
+    // sender is now in a terminal HALT state. Inspect the structured payload,
+    // then create a new sender to continue.
+    SenderError err = e.getServerError();
+    System.err.printf("server rejected: status=0x%02X category=%s msg=%s%n",
+        err.getServerStatusByte(), err.getCategory(), err.getServerMessage());
+} catch (LineSenderException e) {
+    // Client-side failure: network, validation, terminal WebSocket failure,
+    // engine cap deadline, etc. Free-form message only.
+    System.err.println("ingest failed: " + e.getMessage());
 }
 ```
 
@@ -102,31 +116,37 @@ import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
 
 try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
     client.connect();
-    client.execute(
-        "SELECT ts, sym, price, amount FROM trades WHERE sym = 'ETH-USD' LIMIT 10",
-        new QwpColumnBatchHandler() {
-            @Override
-            public void onBatch(QwpColumnBatch batch) {
-                batch.forEachRow(row -> System.out.printf(
-                    "ts=%d sym=%s price=%.4f amount=%d%n",
-                    row.getLongValue(0),
-                    row.getSymbol(1),
-                    row.getDoubleValue(2),
-                    row.getLongValue(3)
-                ));
-            }
+    try {
+        client.execute(
+            "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10",
+            new QwpColumnBatchHandler() {
+                @Override
+                public void onBatch(QwpColumnBatch batch) {
+                    batch.forEachRow(row -> System.out.printf(
+                        "ts=%d symbol=%s price=%.4f amount=%.5f%n",
+                        row.getLongValue(0),
+                        row.getSymbol(1),
+                        row.getDoubleValue(2),
+                        row.getDoubleValue(3)
+                    ));
+                }
 
-            @Override
-            public void onEnd(long totalRows) {
-                System.out.println("done: " + totalRows + " rows");
-            }
+                @Override
+                public void onEnd(long totalRows) {
+                    System.out.println("done: " + totalRows + " rows");
+                }
 
-            @Override
-            public void onError(byte status, String message) {
-                System.err.println("query failed: " + message);
+                @Override
+                public void onError(long requestId, byte status, String message) {
+                    System.err.printf("query failed: req=%d %s%n", requestId, message);
+                }
             }
-        }
-    );
+        );
+    } catch (IllegalStateException e) {
+        // Client is in a terminal state (closed, not connected, or failover
+        // budget exhausted). Recover by closing and creating a new client.
+        System.err.println("query client unusable: " + e.getMessage());
+    }
 }
 ```
 
@@ -341,7 +361,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
           .symbol("symbol", "EURUSD")
           .symbol("side", "buy")
           .doubleColumn("price", 1.0842)
-          .longColumn("amount", 100_000)
+          .doubleColumn("amount", 100_000.0)
           .at(Instant.now());
 }
 ```
@@ -478,7 +498,7 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
         sender.table("trades")
               .symbol("symbol", trade.symbol())
               .doubleColumn("price", trade.price())
-              .longColumn("amount", trade.amount())
+              .doubleColumn("amount", trade.amount())
               .at(trade.timestamp());
     }
     sender.flush();  // send everything now, regardless of auto-flush thresholds
@@ -552,6 +572,43 @@ uploaded to object storage:
 ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 ```
 
+### Awaiting acknowledgements
+
+`flush()` returns once the batch is published into the cursor engine, not once
+the server has acknowledged it. ACKs arrive asynchronously on the I/O loop.
+To bridge between publish and acknowledgement, every published frame is
+assigned a frame sequence number (FSN). `flushAndGetSequence()` returns the
+highest FSN the call published, and `awaitAckedFsn(targetFsn, timeoutMillis)`
+blocks until the server has acknowledged up to that FSN:
+
+```java
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+    sender.table("trades").doubleColumn("price", 42.0).atNow();
+    long fsn = sender.flushAndGetSequence();
+    if (fsn >= 0 && !sender.awaitAckedFsn(fsn, 10_000)) {
+        // timed out waiting for the server ACK
+    }
+}
+```
+
+Related accessors:
+
+| Method | Returns |
+|--------|---------|
+| `flushAndGetSequence()` | Highest FSN published by this call. `-1` if nothing was published. |
+| `getAckedFsn()` | Highest FSN the server has acknowledged. `-1` if no batch has been published yet. |
+| `awaitAckedFsn(fsn, timeoutMillis)` | Block until `getAckedFsn()` reaches `fsn`, or the timeout elapses. |
+
+When `request_durable_ack=on` is set, `getAckedFsn()` advances after the
+durable upload to object storage, not on the ordinary commit ACK. The same
+FSN span is reported on `SenderError.getFromFsn()` / `getToFsn()` for
+rejected batches, so the value returned by `flushAndGetSequence()` is also
+the correlation key for async error reports.
+
+These methods are no-ops on transports that do not track frame sequence
+numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()` return
+`-1`, and `awaitAckedFsn()` returns immediately.
+
 ## Querying and SQL execution
 
 The `QwpQueryClient` sends SQL statements over the
@@ -578,13 +635,13 @@ client.execute("SELECT * FROM t", selectHandler);
 try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
     client.connect();
     client.execute(
-        "SELECT ts, sym, price FROM trades WHERE sym = 'EURUSD' LIMIT 100",
+        "SELECT ts, symbol, price FROM trades WHERE symbol = 'EURUSD' LIMIT 100",
         new QwpColumnBatchHandler() {
             @Override
             public void onBatch(QwpColumnBatch batch) {
                 for (int row = 0; row < batch.getRowCount(); row++) {
                     long ts = batch.getLongValue(0, row);
-                    String sym = batch.getSymbol(1, row);
+                    String symbol = batch.getSymbol(1, row);
                     double price = batch.getDoubleValue(2, row);
                     // process row...
                 }
@@ -622,7 +679,7 @@ values out if you need them after the callback returns.
 | `getShortValue(col, row)` | SHORT |
 | `getCharValue(col, row)` | CHAR |
 | `getIntValue(col, row)` | INT, IPv4 |
-| `getLongValue(col, row)` | LONG, TIMESTAMP, `timestamp_ns`, DATE |
+| `getLongValue(col, row)` | LONG, TIMESTAMP, `timestamp_ns`, DATE, DECIMAL64 (unscaled) |
 | `getFloatValue(col, row)` | FLOAT |
 | `getDoubleValue(col, row)` | DOUBLE |
 | `getSymbol(col, row)` | SYMBOL (returns cached `String`) |
@@ -633,12 +690,12 @@ values out if you need them after the callback returns.
 | `getBinary(col, row)` | BINARY (heap-allocating `byte[]`) |
 | `getUuid(col, row, Uuid)` | UUID (zero-allocation, into sink) |
 | `getUuidHi(col, row)` / `getUuidLo(col, row)` | UUID (individual 64-bit halves) |
-| `getLong256(col, row, Long256Sink)` | LONG256 (into sink) |
-| `getLong256Word(col, row, wordIndex)` | LONG256 (individual 64-bit word) |
+| `getLong256(col, row, Long256Sink)` | LONG256, DECIMAL256 (into sink) |
+| `getLong256Word(col, row, wordIndex)` | LONG256, DECIMAL256 (individual 64-bit word) |
 | `getGeohashValue(col, row)` | GEOHASH (raw long value) |
 | `getGeohashPrecisionBits(col)` | GEOHASH (precision metadata, per column) |
 | `getDecimal128High(col, row)` / `getDecimal128Low(col, row)` | DECIMAL128 (two longs) |
-| `getDecimalScale(col)` | DECIMAL (scale metadata, per column) |
+| `getDecimalScale(col)` | DECIMAL64 / DECIMAL128 / DECIMAL256 (scale metadata, per column) |
 | `getDoubleArrayElements(col, row)` | DOUBLE_ARRAY (flattened `double[]`, row-major) |
 | `getArrayNDims(col, row)` | DOUBLE_ARRAY (dimension count) |
 | `isNull(col, row)` | All types |
@@ -670,7 +727,7 @@ are executed through the same `execute()` method. The server responds with
 ```java
 client.execute(
     "CREATE TABLE trades ("
-    + "ts TIMESTAMP, sym SYMBOL, price DOUBLE, amount LONG"
+    + "ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE"
     + ") TIMESTAMP(ts) PARTITION BY DAY WAL",
     new QwpColumnBatchHandler() {
         @Override
@@ -701,8 +758,8 @@ Parameterized queries use typed bind values, avoiding SQL injection and
 enabling server-side factory cache reuse across repeated calls:
 
 ```java
-String sql = "SELECT ts, sym, price, amount FROM trades "
-    + "WHERE sym = $1 AND price >= $2 LIMIT 1000";
+String sql = "SELECT ts, symbol, price, amount FROM trades "
+    + "WHERE symbol = $1 AND price >= $2 LIMIT 1000";
 
 for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
     client.execute(
@@ -817,14 +874,21 @@ and create a new one.
 
 ### Query errors
 
-Query errors arrive via the `onError` callback:
+Query errors arrive via the `onError` callback. There are two overloads; the
+3-arg form carries the client-assigned request id so log entries can be joined
+back to the originating `execute()` call:
 
 ```java
 @Override
-public void onError(byte status, String message) {
-    System.err.printf("query failed: 0x%02X %s%n", status & 0xFF, message);
+public void onError(long requestId, byte status, String message) {
+    System.err.printf("query failed: req=%d 0x%02X %s%n",
+        requestId, status & 0xFF, message);
 }
 ```
+
+The 2-arg form `onError(byte status, String message)` still works -- the
+3-arg overload is a default method that delegates to it. Handlers that don't
+care about correlation can keep the simpler signature.
 
 Status codes:
 
@@ -840,6 +904,25 @@ Status codes:
 Errors can arrive before any data (parse failure) or mid-stream (storage
 failure, server shutdown). When `onError` is called, no further frames arrive
 for that query.
+
+`onEnd(long requestId, long totalRows)`,
+`onExecDone(long requestId, short opType, long rowsAffected)`, and
+`onFailoverReset(long requestId, QwpServerInfo newNode)` are the
+correlation-aware overloads of the corresponding completion callbacks; all
+four default to the original signatures, so existing handlers compile
+unchanged.
+
+#### Diagnostics surface
+
+What is and isn't carried on `onError`:
+
+| Diagnostic | Surfaced? |
+|------------|-----------|
+| Request id | Yes -- `requestId` argument on the 3-arg overload. Also available mid-stream on `QwpColumnBatch.requestId()`. `-1` when the failure is raised before a request was assigned (closed client, bind-encode failure, latched terminal failure from a prior generation). |
+| Failing SQL | Not surfaced. Stash the string at the `execute()` call site if you need it on `onError`. |
+| Bind index (for `SCHEMA_MISMATCH`) | Not structurally surfaced. May be embedded in the free-form `message`; format is not part of the protocol contract. |
+| Message stability | `message` is server-supplied free-form text, not localized. Wording is not guaranteed across server releases -- pattern-match on `status` instead. |
+| PII / secret safety | `message` may echo back SQL fragments, bind values, and table or column names. Treat it as untrusted user-derived text; redact before logging at INFO. |
 
 ### Connection-level errors
 
@@ -1119,6 +1202,17 @@ try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
               .at(Instant.now());
     }
     sender.flush();
+} catch (LineSenderServerException e) {
+    // Async batch rejection has already fired through errorHandler(...).
+    // This catch fires when the sender is in a terminal HALT state and the
+    // next producer-thread call rethrows the latched rejection.
+    SenderError err = e.getServerError();
+    System.err.printf("sender halted: status=0x%02X category=%s msg=%s%n",
+        err.getServerStatusByte(), err.getCategory(), err.getServerMessage());
+} catch (LineSenderException e) {
+    // Reconnect budget exhausted, terminal WebSocket failure, or other
+    // client-side error.
+    System.err.println("ingest failed: " + e.getMessage());
 }
 
 // Connection events you will see:
@@ -1156,7 +1250,8 @@ while (true) {
         try {
             client = QwpQueryClient.fromConfig(connString);
             client.connect();
-        } catch (Exception e) {
+        } catch (LineSenderException e) {
+            // Connect-time failure: network, TLS, auth, malformed config.
             System.err.println("connect failed: " + e.getMessage());
             client = null;
             Thread.sleep(2000);
@@ -1180,32 +1275,40 @@ while (true) {
                 }
 
                 @Override
-                public void onEnd(long totalRows) {
-                    System.out.println("(" + totalRows + " rows)");
+                public void onEnd(long requestId, long totalRows) {
+                    System.out.printf("req=%d (%d rows)%n", requestId, totalRows);
                 }
 
                 @Override
-                public void onError(byte status, String message) {
-                    System.err.printf("query error: 0x%02X %s%n",
-                        status & 0xFF, message);
+                public void onError(long requestId, byte status, String message) {
+                    System.err.printf("query error: req=%d 0x%02X %s%n",
+                        requestId, status & 0xFF, message);
                 }
 
                 @Override
-                public void onFailoverReset(QwpServerInfo newNode) {
+                public void onFailoverReset(long requestId, QwpServerInfo newNode) {
                     // Fires only when failover happens mid-query.
                     // Clear any accumulated partial results here.
-                    System.out.printf("failover to node=%s role=%s%n",
+                    System.out.printf("failover req=%d to node=%s role=%s%n",
+                        requestId,
                         newNode.getNodeId(),
                         QwpServerInfo.roleName(newNode.getRole()));
                 }
             }
         );
-    } catch (Exception e) {
-        // Failover budget exhausted or client dead — recreate
-        System.err.println("query failed: " + e.getMessage());
-        try { client.close(); } catch (Exception ignored) { }
+    } catch (IllegalStateException e) {
+        // Terminal state: client is closed, never connected, or failover
+        // budget exhausted. Recreate the client.
+        System.err.println("query client unusable: " + e.getMessage());
+        try { client.close(); } catch (RuntimeException ignored) { }
         client = null;
         System.out.println("(will reconnect on next query)");
+    } catch (LineSenderException e) {
+        // Other client-side failure (bind encoding, etc.). Client may still be
+        // usable; drop and recreate to be safe.
+        System.err.println("query failed: " + e.getMessage());
+        try { client.close(); } catch (RuntimeException ignored) { }
+        client = null;
     }
 
     Thread.sleep(2000);
