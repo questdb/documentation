@@ -370,7 +370,8 @@ you call `sender.flush(&mut buffer)`.
 
 The Rust client does not implement auto-flushing for QWP/WebSocket. You must
 call `flush()` explicitly. Connect-string keys `auto_flush_rows` and
-`auto_flush_bytes` are rejected; the only accepted value is `auto_flush=off`.
+`auto_flush_interval`, and `auto_flush_bytes` are rejected; the only accepted
+value is `auto_flush=off`.
 
 A common pattern is to flush periodically on a timer and/or when the buffer
 size (via `buffer.len()`) exceeds a threshold.
@@ -736,6 +737,8 @@ them.
 
 For the full list of connect-string keys and their defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
+The shared reference describes the native-client contract; the table below
+lists Rust-specific support.
 
 Common WebSocket-specific options:
 
@@ -746,7 +749,7 @@ Common WebSocket-specific options:
 | `token` | unset | Bearer token auth (Enterprise). |
 | `auth_timeout_ms` | 15000 | WebSocket upgrade timeout. |
 | `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss`/`qwpwss` only). |
-| `auto_flush` | required `off` if set | Auto-flush is not supported. `auto_flush_rows` and `auto_flush_bytes` are rejected. |
+| `auto_flush` | only `off` accepted if set | Auto-flush is not supported. `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |
 | `sf_durability` | `memory` | Only `memory` is currently accepted (see [SF tuning keys](#sf-tuning-keys)). |
