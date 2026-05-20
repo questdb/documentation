@@ -271,6 +271,20 @@ bitstream. The server picks Gorilla when the column has at least three
 non-null values and the delta-of-delta bitstream is smaller than
 `nonNullCount * 8` bytes; unordered or jumpy columns fall back to raw.
 
+:::warning DATE is timestamp-ish on egress only — opposite of ingress
+
+The encoding flag (plus optional Gorilla) applies to `DATE` (`0x0B`)
+**only on the egress wire**. On the **ingress** wire `DATE` is a plain
+`int64` column written exactly like `LONG`: no encoding flag, never
+Gorilla-encoded, even under `FLAG_GORILLA`. See the DATE asymmetry warning
+in the [QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/).
+
+A codec that reuses its egress DATE path for ingress (or vice-versa)
+shifts every DATE value by one byte (a clean ×256) and breaks Gorilla DATE
+entirely.
+
+:::
+
 ## Message kinds
 
 | Code   | Name          | Direction | Description                             |

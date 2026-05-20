@@ -8,7 +8,8 @@ description: "QuestDB Rust client for high-throughput data ingestion over the QW
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 The QuestDB Rust client connects to QuestDB over the
-[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
+columnar binary protocol carried over WebSocket.
 It supports high-throughput, column-oriented batched writes with automatic table
 creation, schema evolution, multi-host failover, and optional store-and-forward
 durability.
@@ -208,12 +209,9 @@ buffer.column_f64_opt("price", None)?;          // writes null
 buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
 ```
 
-`SYMBOL` has no `_opt` variant — omit the `symbol()` call to leave the
-symbol unset on a row.
-
 | QuestDB type | Setter | NULL variant |
 | --- | --- | --- |
-| `SYMBOL` | `symbol(name, &str)` | — (omit the call) |
+| `SYMBOL` | `symbol(name, &str)` | `symbol_opt(name, Option<&str>)` |
 | `BOOLEAN` | `column_bool(name, bool)` | `column_bool_opt(name, Option<bool>)` |
 | `BYTE` | `column_i8(name, i8)` | `column_i8_opt(name, Option<i8>)` |
 | `SHORT` | `column_i16(name, i16)` | `column_i16_opt(name, Option<i16>)` |
