@@ -1170,6 +1170,7 @@ same `execute()` entry point and differ only in their terminal frame.
 
 ```c
 #include <questdb/egress/line_reader.h>
+#include <questdb/egress/line_reader_helpers.h>
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -1188,33 +1189,35 @@ int main(void) {
     cursor = line_reader_execute(reader, sql, &err);
     if (!cursor) goto on_error;
 
-    int rc;
-    while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) {
-        const size_t rows = line_reader_cursor_row_count(cursor);
+    const line_reader_batch* batch;
+    while ((batch = line_reader_cursor_next_batch(cursor, &err)) != NULL) {
+        const size_t rows = line_reader_batch_row_count(batch);
+
+        /* Project each column once per batch, then index by row. */
+        line_reader_column_data d_ts, d_sym, d_price;
+        line_reader_symbol_dict sym_dict;
+        if (!line_reader_batch_column_data(batch, 0, &d_ts, &err))    goto on_error;
+        if (!line_reader_batch_column_data(batch, 1, &d_sym, &err))   goto on_error;
+        if (!line_reader_batch_column_data(batch, 2, &d_price, &err)) goto on_error;
+        if (!line_reader_batch_symbol_dict(batch, &sym_dict, &err))   goto on_error;
+
         for (size_t r = 0; r < rows; ++r) {
-            int64_t ts = 0;
-            bool ts_null = false;
-            if (!line_reader_cursor_get_i64(cursor, 0, r, &ts, &ts_null, &err))
-                goto on_error;
+            bool ts_null = false, sym_null = false, price_null = false;
+            int64_t ts = line_reader_column_data_get_i64(&d_ts, r, &ts_null);
 
             const char* symbol = NULL;
             size_t symbol_len = 0;
-            bool symbol_null = false;
-            if (!line_reader_cursor_get_symbol(
-                    cursor, 1, r, &symbol, &symbol_len, &symbol_null, &err))
+            if (!line_reader_column_data_get_symbol(
+                    &d_sym, &sym_dict, r, &symbol, &symbol_len, &sym_null))
                 goto on_error;
 
-            double price = 0.0;
-            bool price_null = false;
-            if (!line_reader_cursor_get_f64(
-                    cursor, 2, r, &price, &price_null, &err))
-                goto on_error;
+            double price = line_reader_column_data_get_f64(&d_price, r, &price_null);
 
             printf("ts=%lld symbol=%.*s price=%g\n",
-                (long long)ts, (int)symbol_len, symbol, price);
+                (long long)ts, (int)symbol_len, symbol ? symbol : "", price);
         }
     }
-    if (rc < 0) goto on_error;
+    if (err) goto on_error;
 
     line_reader_cursor_free(cursor);
     line_reader_close(reader);
@@ -1248,12 +1251,16 @@ int main() {
             "SELECT ts, symbol, price, amount FROM trades "
             "WHERE symbol = 'ETH-USD' LIMIT 100"_utf8);
 
-        while (cur.next_batch()) {
-            const size_t rows = cur.row_count();
+        while (auto bo = cur.next_batch()) {
+            auto& batch = *bo;
+            auto col_ts     = batch.column(0);
+            auto col_symbol = batch.column(1);
+            auto col_price  = batch.column(2);
+            const size_t rows = batch.row_count();
             for (size_t r = 0; r < rows; ++r) {
-                auto ts = cur.get_i64(0, r);
-                auto symbol = cur.get_symbol(1, r);
-                auto price = cur.get_f64(2, r);
+                auto ts     = col_ts.get<int64_t>(r);
+                auto symbol = col_symbol.symbol(r);
+                auto price  = col_price.get<double>(r);
                 std::cout
                     << "ts=" << (ts ? std::to_string(*ts) : "NULL")
                     << " symbol=" << (symbol ? *symbol : "NULL")
@@ -1277,8 +1284,12 @@ The four steps mirror the ingestion side:
 
 1. Build a `reader` from a connect string.
 2. Call `execute(sql)` (or `prepare(sql)` + binds + `.execute()`) to obtain a `cursor`.
-3. Loop `next_batch()` until it returns `false` / `0`.
-4. Read scalars and views with the typed getters during each batch.
+3. Loop `next_batch()` until it returns `nullopt` / `NULL` (terminal).
+4. For each batch, project columns once with `batch.column(c)` / C
+   `line_reader_batch_column_data(batch, c, &d, &err)`, then index by row
+   with `col.get<T>(r)` (C++) or the `line_reader_column_data_get_*`
+   inline helpers (C). The C ABI is **bulk-only at the symbol level** —
+   one FFI call per column, then pointer arithmetic per row.
 
 For the full list of connect-string keys accepted by the reader (including
 `target`, `zone`, `failover_*`, `compression`, and the shared TLS / auth
@@ -1385,9 +1396,11 @@ line_reader_cursor* cursor = line_reader_execute(reader, ddl, &err);
 if (!cursor) goto on_error;
 
 /* Drain (DDL streams zero batches; the loop body never runs). */
-int rc;
-while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) { /* unused */ }
-if (rc < 0) goto on_error;
+const line_reader_batch* batch;
+while ((batch = line_reader_cursor_next_batch(cursor, &err)) != NULL) {
+    (void)batch; /* unused for DDL */
+}
+if (err) goto on_error;
 
 uint8_t op_type = 0;
 uint64_t rows_affected = 0;
@@ -1584,81 +1597,251 @@ the generic `bind_null(kind)`.
 
 ### Reading result batches
 
-`next_batch()` returns `true` / `1` when a batch is available, `false` /
-`0` when the stream has terminated, and the C function returns `-1` on
-error (with `*err_out` set). Inspect `row_count()`, `column_count()`,
-`column_kind(col_idx)`, and `column_name(col_idx)` to drive the typed
-getters.
+`next_batch()` returns a borrowed `batch` handle when a batch is
+available, `nullopt` when the stream has terminated, and throws (C++) /
+returns `NULL` with `*err_out` set (C) on error. The batch handle is the
+entry point for all data access — there are no per-cell cursor getters.
 
-Pointers and views returned by the cursor (`column_name`, `get_varchar`,
-`get_symbol`, `get_binary`, array views, validity bitmaps) borrow from
-the currently-loaded batch and are invalidated by `next_batch()`,
-`cancel()`, `add_credit()`, or freeing the cursor. **Copy out any values
-you need beyond the current batch.**
+Pointers and views returned by the batch (column names, descriptor
+buffers, validity bitmaps, varlen / symbol strings, array shapes and
+elements) borrow from the currently-loaded batch and are invalidated by
+`next_batch()`, `cancel()`, `add_credit()`, or freeing the cursor.
+**Copy out any values you need beyond the current batch.**
 
 Batches are decoded column-major: each column's values live in one
-contiguous buffer. When porting from a PostgreSQL or ODBC row cursor,
-prefer iterating the outer loop over columns and the inner loop over
-rows — sequential access through each column buffer is cache-friendly,
-and you can pull `column_validity(col)` once and vectorise null
-handling instead of branching cell-by-cell. Row-major iteration (outer
-over rows) is correct but jumps between per-column buffers on every
-cell, so reach for it only when downstream shape (CSV, JSON) forces it.
+contiguous buffer. The C ABI exposes this as flat `line_reader_column_data`
+/ `line_reader_array_data` descriptors — fill one with
+`line_reader_batch_column_data(batch, col, &d, &err)` (or
+`_array_column_data` for `DOUBLE[]`), then index by row. This is the
+zero-copy path for Cython / numpy / pandas bindings. When iterating, run
+the outer loop over columns and the inner loop over rows; sequential
+access through each column buffer is cache-friendly. Row-major iteration
+(outer over rows) is correct but jumps between per-column buffers on
+every cell.
 
-#### Column getters
+#### Per-batch metadata
 
-Every QuestDB column type has a dedicated getter:
+| Accessor (C) | Accessor (C++) | Returns |
+|---|---|---|
+| `line_reader_batch_row_count(batch)` | `batch.row_count()` | `size_t` |
+| `line_reader_batch_column_count(batch)` | `batch.column_count()` | `size_t` |
+| `line_reader_batch_column_kind(batch, c, &k, &err)` | `batch.column_kind(c)` | `line_reader_column_kind` |
+| `line_reader_batch_column_name(batch, c, &buf, &len, &err)` | `batch.column_name(c)` | `std::string_view` |
+| `line_reader_batch_request_id(batch)` | `batch.request_id()` | `int64_t` |
+| `line_reader_batch_seq(batch)` | `batch.seq()` | `uint64_t` |
+| `line_reader_batch_flags(batch)` | `batch.flags()` | `uint8_t` |
 
-| QuestDB type | C function | C++ method | Return shape (C++) |
-|---|---|---|---|
-| `BOOLEAN` | `line_reader_cursor_get_bool` | `cursor.get_bool(col, row)` | `nullable<bool>` |
-| `BYTE` (i8) | `line_reader_cursor_get_i8` | `cursor.get_i8(col, row)` | `nullable<int8_t>` |
-| `SHORT` (i16) | `line_reader_cursor_get_i16` | `cursor.get_i16(col, row)` | `nullable<int16_t>` |
-| `INT` (i32) | `line_reader_cursor_get_i32` | `cursor.get_i32(col, row)` | `nullable<int32_t>` |
-| `LONG`, `TIMESTAMP` (μs), `TIMESTAMP_NS` (ns), `DATE` (ms) | `line_reader_cursor_get_i64` | `cursor.get_i64(col, row)` | `nullable<int64_t>` |
-| `FLOAT` (f32) | `line_reader_cursor_get_f32` | `cursor.get_f32(col, row)` | `nullable<float>` |
-| `DOUBLE` (f64) | `line_reader_cursor_get_f64` | `cursor.get_f64(col, row)` | `nullable<double>` |
-| `CHAR` (UTF-16 code unit) | `line_reader_cursor_get_char` | `cursor.get_char(col, row)` | `nullable<uint16_t>` |
-| `VARCHAR` | `line_reader_cursor_get_varchar` | `cursor.get_varchar(col, row)` | `nullable<std::string_view>` |
-| `SYMBOL` | `line_reader_cursor_get_symbol` | `cursor.get_symbol(col, row)` | `nullable<std::string_view>` |
-| `BINARY` | `line_reader_cursor_get_binary` | `cursor.get_binary(col, row)` | `nullable<binary_view>` |
-| `UUID` | `line_reader_cursor_get_uuid` | `cursor.get_uuid(col, row)` | `nullable<std::array<uint8_t, 16>>` |
-| `LONG256` | `line_reader_cursor_get_long256` | `cursor.get_long256(col, row)` | `nullable<std::array<uint8_t, 32>>` |
-| `IPv4` | `line_reader_cursor_get_ipv4` | `cursor.get_ipv4(col, row)` | `nullable<uint32_t>` |
-| `GEOHASH` | `line_reader_cursor_get_geohash` | `cursor.get_geohash(col, row)` | `nullable<geohash>` (value + `precision_bits`) |
-| `DECIMAL64` | `line_reader_cursor_get_decimal64` | `cursor.get_decimal64(col, row)` | `nullable<decimal64>` (mantissa + `scale`) |
-| `DECIMAL128` | `line_reader_cursor_get_decimal128` | `cursor.get_decimal128(col, row)` | `nullable<decimal128>` (`low`, `high`, `scale`) |
-| `DECIMAL256` | `line_reader_cursor_get_decimal256` | `cursor.get_decimal256(col, row)` | `nullable<decimal256>` (32 bytes + `scale`) |
-| `DOUBLE[]` row | `line_reader_cursor_get_double_array` | `cursor.get_double_array(col, row)` | `nullable<double_array_view>` |
-| `DOUBLE[]` element | `line_reader_cursor_get_double_array_element` | `cursor.get_double_array_element(col, row, flat_idx)` | `nullable<double>` |
-| `LONG[]` row | `line_reader_cursor_get_long_array` | `cursor.get_long_array(col, row)` | `nullable<long_array_view>` |
-| `LONG[]` element | `line_reader_cursor_get_long_array_element` | `cursor.get_long_array_element(col, row, flat_idx)` | `nullable<int64_t>` |
-| Null bitmap (all kinds) | `line_reader_cursor_column_validity` | `cursor.column_validity(col)` | `validity_view` (LSB-first; bit `1` = null) |
+#### Column descriptor (C)
 
-`get_i64` is the single accessor for all 64-bit temporal kinds —
-disambiguate units by calling `column_kind(col)` and treating the value
-as μs / ns / ms accordingly.
+`line_reader_batch_column_data` fills a `line_reader_column_data` struct
+with:
 
-`get_i32` rejects `IPv4` columns (status `invalid_api_call`); use
-`get_ipv4` for those, otherwise an address ≥ `128.0.0.0` would silently
-flip sign through the signed 32-bit getter.
+| Field | Use |
+|---|---|
+| `kind` | Column kind discriminant. Disambiguate units for 64-bit temporals (LONG / TIMESTAMP μs / TIMESTAMP_NS ns / DATE ms). |
+| `row_count` | Same as `line_reader_batch_row_count(batch)`. |
+| `validity` | LSB-first null bitmap, bit `1` = null. `NULL` when the column has no nulls. |
+| `values` / `value_stride` | Dense little-endian buffer for fixed-width kinds (`stride` = 1 / 2 / 4 / 8 / 16 / 32 bytes per row, kind-dependent). |
+| `var_offsets` / `var_data` / `var_data_len` | VARCHAR / BINARY ragged buffer: `var_offsets[r..r+1]` is a byte slice into `var_data`. |
+| `symbol_codes` | SYMBOL per-row dictionary codes (`uint32_t`). Resolve via `line_reader_batch_symbol_dict(batch, &dict, &err)` then `dict.heap` + `dict.entries[code]`. |
+| `decimal_scale` | DECIMAL64 / 128 / 256 column-wide scale. |
+| `geohash_precision_bits` | GEOHASH precision (1..60). |
 
-`column_validity` exposes the raw LSB-first null bitmap when you want
-to vectorise null handling across a column instead of calling
-`get_*` cell-by-cell. The pointer is borrowed for the current batch.
+For `DOUBLE[]` columns call `line_reader_batch_array_column_data` instead;
+that fills `line_reader_array_data` with `data` + `data_offsets` (byte
+offsets, row_count + 1) + `shapes` + `shape_offsets` (rank-prefixed).
+
+#### Casual single-cell reads (C)
+
+`<questdb/egress/line_reader_helpers.h>` ships header-only `static inline`
+helpers that package the row index + validity probe + typed little-endian
+load over a filled descriptor — no extra FFI crossing, no new exported
+symbols.
+
+| QuestDB type | Helper |
+|---|---|
+| `BOOLEAN` | `line_reader_column_data_get_bool` |
+| `BYTE` (i8) | `line_reader_column_data_get_i8` |
+| `SHORT` (i16) | `line_reader_column_data_get_i16` |
+| `INT` (i32) | `line_reader_column_data_get_i32` |
+| `IPv4` | `line_reader_column_data_get_ipv4` |
+| `LONG`, `TIMESTAMP` (μs / ns), `DATE` (ms) | `line_reader_column_data_get_i64` |
+| `FLOAT` (f32) | `line_reader_column_data_get_f32` |
+| `DOUBLE` (f64) | `line_reader_column_data_get_f64` |
+| `CHAR` (UTF-16 code unit) | `line_reader_column_data_get_char` |
+| `VARCHAR` / `BINARY` | `line_reader_column_data_get_varlen` |
+| `SYMBOL` | `line_reader_column_data_get_symbol` (takes a `line_reader_symbol_dict*` from `_batch_symbol_dict`) |
+| `UUID` / `LONG256` (raw bytes) | `line_reader_column_data_get_bytes` |
+| `DECIMAL64` (mantissa) | `line_reader_column_data_get_decimal64_mantissa` |
+| `DECIMAL128` (low / high limbs) | `line_reader_column_data_get_decimal128` |
+| `GEOHASH` | `line_reader_column_data_get_geohash` |
+
+For DECIMAL64 / 128 / 256 the column-wide scale is on `d->decimal_scale`;
+for GEOHASH the column-wide precision is on `d->geohash_precision_bits`.
+
+The helpers do **not** bounds-check `row` — caller's responsibility (use
+`d->row_count`). Tight loops should still inline-index the descriptor
+buffers directly; the helpers exist for ergonomics, not performance.
+
+#### Column accessors (C++)
+
+The C++ wrapper exposes `batch.column(c)` returning a polymorphic
+`egress::column` object covering every kind. Per-cell accessors are
+methods on the column, not on the cursor:
+
+| QuestDB type | C++ method | Return shape |
+|---|---|---|
+| `BOOLEAN`, `BYTE`, `SHORT`, `CHAR`, `INT`, `IPv4`, `LONG` / `TIMESTAMP` / `TIMESTAMP_NS` / `DATE`, `FLOAT`, `DOUBLE` | `col.get<T>(row)` | `nullable<T>` |
+| `VARCHAR` | `col.varchar(row)` | `nullable<std::string_view>` |
+| `BINARY` | `col.binary(row)` | `nullable<binary_view>` |
+| `SYMBOL` | `col.symbol(row)` | `nullable<std::string_view>` (resolved through the batch's symbol dict) |
+| `UUID` | `col.get_uuid(row)` | `nullable<std::array<uint8_t, 16>>` |
+| `LONG256` | `col.get_long256(row)` | `nullable<std::array<uint8_t, 32>>` |
+| `GEOHASH` | `col.get_geohash(row)` | `nullable<geohash>` (value + `precision_bits`) |
+| `DECIMAL64` / `DECIMAL128` / `DECIMAL256` | `col.get_decimal64(row)` / `_128` / `_256` | `nullable<decimal64>` / `_128` / `_256` (mantissa or limbs + `scale`) |
+| `DOUBLE[]` shape | `col.shape(row, &rank)` | `const uint32_t*` (dimension lengths) |
+| `DOUBLE[]` elements | `col.elements<double>(row, &count)` | `const double*` |
+| Validity bitmap | `col.validity()` / `col.validity_bytes()` / `col.has_nulls()` / `col.is_null(row)` | raw LSB-first bytes |
+
+`column::get<T>(row)` uses a kind whitelist (e.g. `int32_t` accepts only
+`INT`, not `IPv4`; `int64_t` accepts `LONG` / `TIMESTAMP` / `DATE` /
+`TIMESTAMP_NS` but not `DECIMAL64`). For deliberate reinterpretation use
+the strict overload `col.get<T>(row, kind)`.
+
+For column-oriented hot loops, get the dense pointer once and index it:
+
+```cpp
+auto col = batch.column(0);
+const int64_t* ts = col.values<int64_t>();   // throws on kind mismatch
+const uint8_t* validity = col.validity();    // null when no nulls
+for (size_t r = 0; r < col.row_count(); ++r) {
+    if (validity && ((validity[r >> 3] >> (r & 7)) & 1)) continue;
+    process(ts[r]);
+}
+```
+
+`LONG[]` columns are reserved on the wire but not supported in this
+revision — `batch.column(c)` throws `invalid_api_call` for them.
+
+#### Visitor dispatch (C++)
+
+When the schema is unknown at compile time — generic row formatters, CSV
+/ JSON converters, arrow-record builders — `col.visit(visitor)` is the
+ergonomic alternative to a hand-written `switch (col.kind())`. The
+column runs the kind discriminant once and hands the visitor a typed
+view; the visitor's overloads cover the kinds the caller cares about.
+
+The seven view types are:
+
+| View | Kinds | Key members |
+|---|---|---|
+| `fixed_view<T>` | `BOOLEAN`, `BYTE`, `SHORT`, `CHAR`, `INT`, `IPv4`, `LONG` / `TIMESTAMP` / `TIMESTAMP_NS` / `DATE`, `FLOAT`, `DOUBLE` | `kind`, `values` (typed pointer), `row_count`, `validity`, `value(row) → nullable<T>` |
+| `decimal_view` | `DECIMAL64`, `DECIMAL128`, `DECIMAL256` | `kind`, `values` (raw LE mantissa bytes), `value_stride` (8 / 16 / 32), `scale`, `row_count`, `validity` |
+| `bytes_view` | `UUID`, `LONG256` | `kind`, `values` (raw LE bytes), `value_stride` (16 / 32), `row_count`, `validity` |
+| `geohash_view` | `GEOHASH` | `values` (raw LE bytes), `value_stride` (1..8), `precision_bits`, `row_count`, `validity` |
+| `varlen_view` | `VARCHAR`, `BINARY` | `kind`, `offsets` (row_count + 1), `data`, `data_len`, `as_string_view(row)`, `as_binary(row)`, `validity` |
+| `symbol_view` | `SYMBOL` | `codes` (per-row dict codes), `dict` (snapshot), `resolve(row) → nullable<string_view>`, `validity` |
+| `array_view<T>` | `DOUBLE[]` (T = double) | `kind`, `data`, `data_offsets`, `shapes`, `shape_offsets`, `shape(row)`, `elements(row)`, `validity` |
+
+Every view also has `is_null(row) → bool`. `LONG[]` columns are not
+supported in this revision — `visit` throws `invalid_api_call` for them.
+
+Two contracts to know:
+
+- **All visitor overloads must return the same type.** `decltype(auto)`
+  deduction across the switch arms requires a common type. Return
+  `void` for side-effect-only visitors. Mismatches are caught at compile
+  time.
+- **Unhandled kinds throw `invalid_api_call`.** If the visitor has no
+  overload for the kind the column actually carries, `visit` throws
+  rather than calling an unrelated overload — there is no implicit
+  conversion between view types.
+
+The idiomatic visitor uses the C++17 `overload` helper (CTAD over a
+list of lambdas):
+
+```cpp
+namespace eg = questdb::egress;
+
+template <class... Fs> struct overload : Fs... { using Fs::operator()...; };
+template <class... Fs> overload(Fs...) -> overload<Fs...>;
+
+void print_cell(const eg::column& col, size_t row)
+{
+    col.visit(overload{
+        // Fixed-width primitives — one lambda per T.
+        [&](eg::fixed_view<int64_t> v) {
+            // Covers LONG / TIMESTAMP / DATE / TIMESTAMP_NS;
+            // disambiguate via v.kind if the unit matters.
+            if (auto x = v.value(row)) std::cout << *x;
+            else                       std::cout << "NULL";
+        },
+        [&](eg::fixed_view<double> v) {
+            if (auto x = v.value(row)) std::cout << *x;
+            else                       std::cout << "NULL";
+        },
+        // Variable-width.
+        [&](eg::varlen_view v) {
+            if (v.kind == eg::column_kind::binary) {
+                if (auto x = v.as_binary(row)) {
+                    /* x->data, x->size */
+                } else { std::cout << "NULL"; }
+            } else {
+                std::cout << v.as_string_view(row).value_or("NULL");
+            }
+        },
+        // SYMBOL — resolved through the batch's dict snapshot.
+        [&](eg::symbol_view v) {
+            std::cout << v.resolve(row).value_or("NULL");
+        },
+        // Arrays.
+        [&](eg::array_view<double> v) {
+            if (v.is_null(row)) { std::cout << "NULL"; return; }
+            auto el = v.elements(row);  // pair<const double*, size_t>
+            std::cout << "[";
+            for (size_t i = 0; i < el->second; ++i)
+                std::cout << (i ? " " : "") << el->first[i];
+            std::cout << "]";
+        },
+        // Catch-all for the kinds this caller doesn't need.
+        [&](auto v) { (void)v; std::cout << "(unhandled)"; },
+    });
+}
+```
+
+The `[](auto v){ ... }` generic lambda at the end is optional but lets
+you avoid listing every view type when the caller only needs a subset.
+Without it, the visitor must provide an overload for every kind the
+column might be — `visit` will throw if dispatch lands on an
+unmatched view.
+
+For a complete worked example covering all 7 view types — including
+hex / IPv4 / decimal scale / geohash precision rendering — see
+`examples/line_reader_cpp_example_columns.cpp` in the client repo.
+
+##### When to use which
+
+| Pattern | Use |
+|---|---|
+| Caller knows T at compile time (e.g. `LONG` accumulator). | `col.get<T>(row)` for one cell, `col.values<T>()` for a contiguous loop. |
+| Caller scans a known-mixed schema (a few kinds, fixed). | Inline `switch (col.kind())` with `col.varchar`/`col.symbol`/`col.get<T>` per arm. Smallest code. |
+| Caller scans an unknown / wide / kind-agnostic schema. | `col.visit(overload{...})`. Kind discriminant runs once per column; the compiler picks the right lambda. |
+| Caller needs the raw dense buffer (zero-copy interop). | `col.values<T>()` (scalar) or `col.elements<T>(row, &count)` / `col.shape(row, &rank)` (array). The view types' `values` / `data` fields work the same way inside a visitor. |
 
 #### Reading NULLs
 
-C ABI: every `get_*` writes its `out_is_null` flag separately from the
-value pointer. Always branch on `out_is_null` before consuming
-`*out_value` — a default-zero `int64_t` or empty `string_view` is a
-valid value, not a NULL marker.
+C ABI: the inline helpers write `*out_is_null` separately from the
+typed return value. Always branch on `*out_is_null` before consuming the
+value — a default-zero `int64_t` or empty `string_view` is a valid value,
+not a NULL marker. The underlying contract is that the column's
+`validity` bitmap (LSB-first; bit `1` = null) is `NULL` when the column
+has no nulls.
 
 ```c
-int64_t price_micros = 0;
+line_reader_column_data d;
+if (!line_reader_batch_column_data(batch, 0, &d, &err)) goto on_error;
 bool is_null = false;
-if (!line_reader_cursor_get_i64(cursor, 0, r, &price_micros, &is_null, &err))
-    goto on_error;
+int64_t price_micros = line_reader_column_data_get_i64(&d, r, &is_null);
 if (is_null) {
     /* SQL NULL. Skip, sentinel, error — your call. */
 } else {
@@ -1666,11 +1849,12 @@ if (is_null) {
 }
 ```
 
-C++ wrapper: every `get_*` returns `std::optional<T>` (`nullable<T>`),
-empty for NULL cells.
+C++ wrapper: every per-cell accessor returns `std::optional<T>`
+(`nullable<T>`), empty for NULL cells.
 
 ```cpp
-if (auto price = cur.get_f64(col, r))
+auto col = batch.column(col_idx);
+if (auto price = col.get<double>(r))
     process(*price);
 else
     handle_null();
@@ -1678,18 +1862,31 @@ else
 
 #### Reading arrays
 
-`DOUBLE[]` and `LONG[]` rows return a borrowed view containing `shape`
-(row-major, innermost dimension last), `ndim`, `data` (concatenated
-little-endian element bytes), `data_len`, and `element_count`. Use the
-`_element` accessor when you want one cell at a flat row-major index;
-the wrapper does the little-endian decode for you.
+`DOUBLE[]` columns use a separate descriptor —
+`line_reader_batch_array_column_data(batch, c, &d, &err)` fills a
+`line_reader_array_data` struct with four borrowed buffers:
 
-A NULL row sets `is_null` to true and zeroes the view. A non-null row
-whose shape produces zero elements (e.g. `[2, 0, 3]`) leaves
-`is_null = false` but writes `data == NULL`, `data_len == 0`. The C++
-wrapper's `view.element(flat_idx)` returns a NULL sentinel
-(`quiet_NaN()` for doubles, `INT64_MIN` for longs) in either case so a
-single branch handles both.
+| Field | Layout |
+|---|---|
+| `data` | Concatenated little-endian `double` bytes for every row, all rows back-to-back. |
+| `data_offsets` | `row_count + 1` entries; row `r`'s slice is `data[data_offsets[r] .. data_offsets[r+1]]` (byte offsets). |
+| `shapes` | Concatenated `uint32_t` dimension lengths (row-major; innermost dimension last). |
+| `shape_offsets` | `row_count + 1` entries indexing `shapes`; row `r`'s rank is `shape_offsets[r+1] - shape_offsets[r]`. |
+| `validity` | LSB-first null bitmap. `NULL` when the column has no nulls. |
+
+In C++, `batch.column(c).shape(row, &rank)` and
+`col.elements<double>(row, &count)` decode each row into typed pointers,
+or use `col.visit(...)` with an `array_view<double>` overload for full
+shape/element access (see [Visitor dispatch](#visitor-dispatch-c)).
+
+A NULL array row is flagged via the column's validity bitmap (or
+`col.is_null(row)`). A non-null row whose shape produces zero elements
+(e.g. `[2, 0, 3]`) has `shape != nullptr` but `count == 0` from
+`elements<double>`.
+
+`LONG[]` is reserved on the wire but not supported in this revision —
+`line_reader_batch_column_data` / `_array_column_data` reject it with
+`invalid_api_call`, and `batch.column(c)` throws in C++.
 
 Arrays require QuestDB 9.0.0 or later — older servers reject the QWP
 encoding outright with `unsupported_server`.
@@ -1714,11 +1911,13 @@ if (!query) goto on_error;
 line_reader_query_initial_credit(query, 256 * 1024);  /* 256 KiB */
 line_reader_cursor* cursor = line_reader_query_execute(&query, &err);
 
-while ((rc = line_reader_cursor_next_batch(cursor, &err)) == 1) {
-    /* ... read the batch ... */
+const line_reader_batch* batch;
+while ((batch = line_reader_cursor_next_batch(cursor, &err)) != NULL) {
+    /* ... read the batch (project columns, index by row) ... */
     if (!line_reader_cursor_add_credit(cursor, 256 * 1024, &err))
         goto on_error;
 }
+if (err) goto on_error;
 ```
 
 </TabItem>
@@ -2139,7 +2338,7 @@ with the same code and message.
 |---|---|---|
 | `could_not_resolve_addr` | Bad URL, host, or interface in the connect string. | Fix the connect string. |
 | `config_error` | Connect-string syntax or unknown key. | Fix the connect string. |
-| `invalid_api_call` | Wrong-order or wrong-state call (e.g. `execute` while a cursor is live, type-mismatched `get_*`). | Bug in the application; fix the call site. |
+| `invalid_api_call` | Wrong-order or wrong-state call (e.g. `execute` while a cursor is live, kind-mismatched `col.get<T>` / `_column_data_get_*`). | Bug in the application; fix the call site. |
 | `socket_error` | TCP / WS read / write / close failure. | Per-query failover handles it transparently if `failover=on` and multiple `addr=` entries are configured; otherwise rebuild the reader. |
 | `tls_error` | TLS handshake failure. | Inspect cert chain; verify `tls_roots` / `tls_ca`. |
 | `handshake_error` | HTTP upgrade or WebSocket handshake failed. | Often a version or compression mismatch; check the server release. |
@@ -2174,7 +2373,7 @@ event, decide what to retry, and assemble a bug report:
 | Code | `e.code()` | `line_reader_error_get_code(err)` | `line_reader_error_code` discriminant. **Stable across releases** — the right field to dispatch on. For server-originated codes the discriminant embeds the QWP status byte (e.g. `server_parse_error = 0x05`). Safe to forward as-is. |
 | Message | `e.what()` | `line_reader_error_msg(err, &len)` | UTF-8 diagnostic. **Not null-terminated** in C — read exactly `len` bytes; pointer is owned by the error and stays valid until `line_reader_error_free`. Server messages mirror QuestDB's normal SQL error formatting (capped at the QWP error-message limit, currently 1 KiB); client-synthesised messages cover transport / handshake / bind validation. **Not stable across server versions** — never pattern-match. **May contain PII / secrets**: it can echo offending bind values or server-supplied close reasons — log at the input's trust level and sanitise before forwarding to external trackers. |
 | Cursor request ID | `cursor.request_id()` | `line_reader_cursor_request_id` | Server-assigned request ID for the current connection. Refreshes on failover. Safe to forward. |
-| Batch request ID | `cursor.batch_request_id()` | `line_reader_cursor_batch_request_id` | Request ID stamped on the most recently decoded batch (may differ from `request_id()` for already-buffered frames mid-failover). Safe to forward. |
+| Batch request ID | `batch.request_id()` | `line_reader_batch_request_id(batch)` | Request ID stamped on the most recently decoded batch (may differ from `cursor.request_id()` for already-buffered frames mid-failover). Read from the borrowed batch handle returned by `next_batch()`. Safe to forward. |
 | Failover resets | `cursor.failover_resets()` | `line_reader_cursor_failover_resets` | Cumulative successful mid-stream resets since `execute()`. A non-zero value next to a duplicate-row complaint tells you replay happened. Safe to forward. |
 | Current endpoint | `cursor.current_host()` / `cursor.current_port()` | `line_reader_cursor_current_addr_host` / `_port` | Endpoint the cursor was attached to when the error fired. Safe to forward. |
 | Client identifier | (connect-string `client_id=` value) | (same) | Opaque label echoed by QuestDB as `X-QWP-Client-Id`. Set this in production so support can correlate sessions. Safe to forward. |
@@ -2183,7 +2382,7 @@ The protocol does not currently surface a server-issued request or
 connection identifier in the WebSocket upgrade response. When opening a
 bug report, supply the connection start time (from your application
 logs), the `client_id=` value, and the cursor tuple
-`(request_id, batch_request_id, failover_resets, current_host, current_port)`
+`(cursor.request_id, batch.request_id, failover_resets, current_host, current_port)`
 — that is the closest you can get to a server-side correlation handle
 today.
 
