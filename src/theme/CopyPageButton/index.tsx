@@ -6,6 +6,7 @@ import IconCopy from "@theme/Icon/Copy"
 import IconSuccess from "@theme/Icon/Success"
 import Chevron from "@theme/Chevron"
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/16/solid"
+import { getMarkdownUrl } from "../../utils/markdown-url"
 
 import styles from "./styles.module.css"
 
@@ -46,13 +47,10 @@ export default function CopyPageButton(): JSX.Element {
 
   const { siteConfig } = useDocusaurusContext()
 
-  const basePath = siteConfig.baseUrl.replace(/\/$/, "")
   const pathname = typeof window !== "undefined"
-    ? window.location.pathname.replace(/\/$/, "")
+    ? window.location.pathname
     : ""
-  const markdownUrl = pathname === basePath
-    ? basePath + "/index.md"
-    : pathname + ".md"
+  const markdownUrl = getMarkdownUrl(pathname, siteConfig.baseUrl)
 
   const pageUrl = siteConfig.url + markdownUrl
   const chatPrompt = `I'd like to ask some questions about ${pageUrl}.\n\n`
