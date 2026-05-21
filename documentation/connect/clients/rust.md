@@ -677,7 +677,7 @@ seconds, `sf_dir` is strongly recommended.
 | `reconnect_max_duration_millis` | 300000 | Total outage budget before giving up. |
 | `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
 | `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
-| `initial_connect_retry` | `off` | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). |
+| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). Explicit `off` preserves fail-fast startup. |
 
 When the reconnect budget elapses without recovery, the sender enters a
 terminal state: `Sender::must_close()` returns `true`, the next `flush()`
@@ -686,9 +686,10 @@ returns an error, and a `Halt`-category entry surfaces through
 dropping the sender and constructing a new one (with `sf_dir` set, the
 on-disk slot is replayed once the new sender connects).
 
-By default the first connect fails fast; subsequent disconnects use the
-reconnect policy. Set `initial_connect_retry=on` to apply the same policy to
-the initial connect.
+By default the first connect fails fast, but setting any explicit `reconnect_*`
+key promotes `initial_connect_retry` to `on` so the reconnect policy also
+covers the initial connect. Set `initial_connect_retry=off` explicitly to keep
+fail-fast startup while tuning the reconnect loop.
 
 The Rust client is zone-blind on ingress: the `zone=` key is accepted but
 ignored, so connect strings shared with future zone-aware egress clients work
@@ -755,7 +756,7 @@ Common WebSocket-specific options:
 | `sf_durability` | `memory` | Only `memory` is currently accepted (see [SF tuning keys](#sf-tuning-keys)). |
 | `request_durable_ack` | `off` | Wait for durable upload before ACK (Enterprise). |
 | `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
-| `initial_connect_retry` | `off` | Apply reconnect policy to the first connect. |
+| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Apply reconnect policy to the first connect; explicit `off` preserves fail-fast startup. |
 | `close_flush_timeout_millis` | 5000 | Bound on `close_drain` wait. |
 | `qwp_ws_progress` | `background` | `background` or `manual`. |
 | `max_in_flight` | 128 | Max unacknowledged frames in flight on a connection. Acts as the backpressure window: publishers block locally once the window is full. |

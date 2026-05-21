@@ -1054,11 +1054,12 @@ seconds, `sf_dir` is strongly recommended.
 | `reconnect_max_duration_millis` | 300000 | Total outage budget before giving up. |
 | `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
 | `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
-| `initial_connect_retry` | `off` | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). |
+| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). Explicit `off` preserves fail-fast startup. |
 
-By default the first connect fails fast; subsequent disconnects use the
-reconnect policy. Set `initial_connect_retry=on` to apply the same policy to
-the initial connect.
+By default the first connect fails fast, but setting any explicit `reconnect_*`
+key promotes `initial_connect_retry` to `on` so the reconnect policy also
+covers the initial connect. Set `initial_connect_retry=off` explicitly to keep
+fail-fast startup while tuning the reconnect loop.
 
 Once `reconnect_max_duration_millis` elapses without a successful
 reconnect, the sender latches terminal: `line_sender_must_close(sender)`
@@ -2455,7 +2456,7 @@ Common WebSocket-specific options accepted by the **ingestion sender**:
 | `sf_durability` | `memory` | Only `memory` is currently accepted. |
 | `request_durable_ack` | `off` | Wait for durable upload before ACK (Enterprise). |
 | `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
-| `initial_connect_retry` | `off` | Apply reconnect policy to the first connect. |
+| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Apply reconnect policy to the first connect; explicit `off` preserves fail-fast startup. |
 | `close_flush_timeout_millis` | 5000 | Bound on `close_drain` wait. |
 | `qwp_ws_progress` | `background` | `background` or `manual`. |
 | `max_in_flight` | 128 | Max unacknowledged frames in flight on a connection. Acts as the backpressure window: publishers block locally once the window is full. |
