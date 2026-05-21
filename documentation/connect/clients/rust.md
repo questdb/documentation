@@ -48,6 +48,8 @@ use questdb::{
 };
 
 fn main() -> Result<()> {
+    // `Sender` is single-owner (every publishing method takes `&mut self`).
+    // For multi-producer patterns, see the "Concurrency" section.
     let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
     let mut buffer = sender.new_buffer();
     buffer
@@ -138,8 +140,9 @@ The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
 let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
 ```
 
-Use `ws` (plain) or `wss` (TLS). `qwpws` / `qwpwss` are accepted as aliases.
-The default port is `9000`.
+Use `ws` (plain) or `wss` (TLS); the rest of this page uses these short
+forms. `qwpws::` / `qwpwss::` are accepted as long-form aliases if you
+prefer to spell out the wire protocol. The default port is `9000`.
 
 For the full list of connect-string keys, see the
 [connect string reference](/docs/connect/clients/connect-string/).
@@ -167,6 +170,8 @@ the [connect string reference](/docs/connect/clients/connect-string/).
 use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};
 use std::time::Duration;
 
+// `Sender` is single-owner (every publishing method takes `&mut self`).
+// For multi-producer patterns, see the "Concurrency" section.
 let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
     .qwp_ws_progress(QwpWsProgress::Background)?
     .reconnect_max_duration(Duration::from_secs(300))?
@@ -209,15 +214,18 @@ Tables and columns are created automatically if they do not exist.
 
 ### Column setters
 
-Every typed setter has an `_opt` variant taking `Option<T>` that writes
-a null when the value is `None`:
+Every typed setter has an `_opt` variant taking `Option<T>`. `Some(v)`
+forwards to the plain setter; `None` is a no-op — the column is left off
+the row, identical to omitting the setter. See
+[Null values and omitted columns](#null-values-and-omitted-columns) for
+how omission turns into a null on the wire at flush time.
 
 ```rust
-buffer.column_f64_opt("price", None)?;          // writes null
+buffer.column_f64_opt("price", None)?;          // no-op (column omitted)
 buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
 ```
 
-| QuestDB type | Setter | NULL variant |
+| QuestDB type | Setter | `_opt` (skip on `None`) variant |
 | --- | --- | --- |
 | `SYMBOL` | `symbol(name, &str)` | `symbol_opt(name, Option<&str>)` |
 | `BOOLEAN` | `column_bool(name, bool)` | `column_bool_opt(name, Option<bool>)` |
@@ -249,27 +257,41 @@ descriptive error. Application code written against these setters today
 will start working once the server adds support; no client change is
 needed.
 
+There is no separate `set_null`, `column_null`, or `column_*_null` method.
+The only way to leave a column null on a row is to omit the setter (or
+call `column_*_opt(name, None)`, which is equivalent). See
+[Null values and omitted columns](#null-values-and-omitted-columns).
+
 For exact signatures and accepted parameter conversions, see the
 [crate docs](https://docs.rs/questdb-rs/latest/questdb/ingress/struct.Buffer.html).
 
 ### Null values and omitted columns
 
-Two idioms produce a NULL in the buffered row:
+There is one way to leave a column null on a given row: don't set it.
+Two source-level spellings express this:
 
-1. **`column_*_opt(name, None)`** — the typed setter writes a wire-level
-   null for that column.
-2. **Omit the setter** — every column not set on a row is gap-filled
-   with NULL when the row is finished.
+1. **Omit the setter** — skip the column on rows that have no value.
+2. **`column_*_opt(name, None)`** — a no-op at the call site, identical
+   to omitting the setter. Useful when the source value is already an
+   `Option<T>` and the call site reads cleaner without an `if let`.
 
-Both produce the same on-the-wire output; the `_opt` variant just makes
-the optionality explicit at the call site.
+At flush time, the columnar encoder gap-fills a wire-level null for
+every row that omitted a column some *other* row in the same batch did
+set. If no row in the batch sets the column, the column does not appear
+in the batch at all.
 
-On a brand-new table, an omitted column is not inferred from that row.
-The server only adds the column when a later row supplies a non-null
-value for it, so first-row nulls leave the column absent until then.
+On a brand-new table, an omitted column is therefore not inferred from
+a single nulls-everywhere row. The server only adds the column when at
+least one row supplies a non-null value, so a first batch of all-`None`
+rows leaves the column absent until a later batch populates it.
 
 The designated timestamp **cannot** be null — every row requires `.at(...)?`
 or `.at_now()?` to finalize.
+
+There is no `set_null`, `column_null`, or `column_*_null` method on
+`Buffer`; calls like `buffer.set_null("price")` or
+`buffer.column_f64_null("price")` will fail to compile. Use one of the
+two idioms above.
 
 ### Ingest arrays
 
@@ -281,11 +303,13 @@ use questdb::{Result, ingress::{Sender, TimestampNanos}};
 use ndarray::arr2;
 
 fn main() -> Result<()> {
+    // `Sender` is single-owner (every publishing method takes `&mut self`).
+    // For multi-producer patterns, see the "Concurrency" section.
     let mut sender = Sender::from_conf("ws::addr=127.0.0.1:9000;")?;
     let mut buffer = sender.new_buffer();
     buffer
         .table("book")?
-        .symbol("symbol", "EURUSD")?
+        .symbol("ticker", "EURUSD")?
         .column_arr("bids", &vec![
             vec![1.0850, 600000.0],
             vec![1.0849, 300000.0],
@@ -514,6 +538,10 @@ There are two ways to observe them.
 ### Polling
 
 ```rust
+use questdb::ingress::Sender;
+
+let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
+
 while let Some(err) = sender.poll_qwp_ws_error()? {
     eprintln!(
         "category={:?} policy={:?} status={:?} fsn=[{}..={}] msg={:?}",
@@ -535,6 +563,8 @@ such as `flush()`. The handler must not call back into the same sender.
 ```rust
 use questdb::ingress::{Protocol, SenderBuilder};
 
+// `Sender` is single-owner (every publishing method takes `&mut self`).
+// For multi-producer patterns, see the "Concurrency" section.
 let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
     .qwp_ws_error_handler(|err| {
         eprintln!("QWP error: {err:?}");
@@ -548,9 +578,9 @@ let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
 |-------|---------|
 | `category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
 | `applied_policy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal). |
-| `status` | Raw QWP status byte. `None` for WebSocket protocol violations. |
-| `message` | Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. See [Message stability](#message-stability) and [PII safety](#message-pii) below. |
-| `message_sequence` | Server's per-frame QWP wire sequence for the error frame. Resets on reconnect — only meaningful within one connection. |
+| `status` | `Option<u8>`. Raw QWP status byte. `None` for WebSocket protocol violations, which do not carry a QWP status byte. |
+| `message` | `Option<String>`. Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. `None` when the server returned an empty message. See [Message stability](#message-stability) and [PII safety](#message-pii) below. |
+| `message_sequence` | `Option<u64>`. Server's per-frame QWP wire sequence for the error frame. `None` for WebSocket protocol violations, which do not carry a QWP message sequence. Resets on reconnect; only meaningful within one connection. |
 | `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s), client-side. |
 
 `Sender::qwp_ws_errors_dropped()` reports how many diagnostics were lost
@@ -569,8 +599,12 @@ text varies across server versions and across provenance:
   which historically reworded across releases.
 - The field may be empty.
 
-Use `category` and `status` for programmatic dispatch. Never pattern-match
-on `message`.
+Use `category` for programmatic dispatch (a typed enum derived from
+`status`, plus a `ProtocolViolation` variant for the case when `status`
+is `None`). Treat `status` as a wire-debug aid; the raw byte values are
+listed in the [QWP wire protocol status
+codes](/docs/connect/wire-protocols/qwp-ingress-websocket/#status-codes).
+Never pattern-match on `message`.
 
 #### PII / secret safety {#message-pii}
 
@@ -623,6 +657,8 @@ The client drives the WebSocket loop in one of two modes:
 ```rust
 use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};
 
+// `Sender` is single-owner (every publishing method takes `&mut self`).
+// For multi-producer patterns, see the "Concurrency" section.
 let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
     .qwp_ws_progress(QwpWsProgress::Manual)?
     .build()?;
@@ -824,6 +860,9 @@ fn main() -> questdb::Result<()> {
     // - reconnect_max_duration_millis:  total outage budget; on expiry the
     //                                   sender latches terminal (see
     //                                   `must_close()` below).
+    //
+    // `Sender` is single-owner (every publishing method takes `&mut self`).
+    // For multi-producer patterns, see the "Concurrency" section.
     let mut sender = Sender::from_conf(
         "wss::addr=db-primary:9000,db-replica:9000;\
          token=your_bearer_token;\
