@@ -60,18 +60,33 @@ fn main() -> Result<()> {
         .column_f64("amount", 0.00044)?
         .at(TimestampNanos::now())?;
     sender.flush(&mut buffer)?;
+    // close_drain() waits for already-published frames to be ACKed or
+    // rejected by the server.
     sender.close_drain()?;
+    // Server-side rejections arrive asynchronously and are not returned
+    // from flush() or close_drain(). Drain them after close_drain() so
+    // any ACK/REJECT processed during the drain wait is visible here.
+    // See "Asynchronous error handling" for the qwp_ws_error_handler
+    // callback alternative used by long-running senders.
+    while let Some(err) = sender.poll_qwp_ws_error()? {
+        eprintln!("QWP error: {err:?}");
+    }
     Ok(())
 }
 ```
 
-The four steps are:
+The five steps are:
 
 1. Get a `Sender` via `Sender::from_conf` or the builder.
 2. Populate a `Buffer` with one or more rows.
 3. Call `sender.flush(&mut buffer)` to publish.
 4. Call `sender.close_drain()` before the sender is dropped so already-published
    frames complete on the wire.
+5. Drain `sender.poll_qwp_ws_error()` after `close_drain()` to surface
+   server-side rejections, which arrive asynchronously and are not returned
+   from `flush()` or `close_drain()`. For long-running senders, register a
+   `qwp_ws_error_handler` on the builder instead. See
+   [Asynchronous error handling](#asynchronous-error-handling).
 
 ## Authentication and TLS
 
