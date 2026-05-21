@@ -872,13 +872,25 @@ fn main() -> questdb::Result<()> {
     )?;
 
     let mut buffer = sender.new_buffer();
+    let mut bids: Vec<Vec<f64>> = Vec::with_capacity(5);
+    let mut asks: Vec<Vec<f64>> = Vec::with_capacity(5);
 
     loop {
+        bids.clear();
+        asks.clear();
+        for lvl in 0..5 {
+            let step = 0.0001 * (lvl as f64 + 1.0);
+            // Each level is [price, size]; deterministic values keep the
+            // example dependency-free, replace with your live feed.
+            bids.push(vec![1.0842 - step, 100_000.0 + 10_000.0 * lvl as f64]);
+            asks.push(vec![1.0842 + step, 100_000.0 + 10_000.0 * lvl as f64]);
+        }
+
         buffer
             .table("book")?
             .symbol("ticker", "EURUSD")?
-            .column_f64("price", 1.0842)?
-            .column_f64("size", 100_000.0)?
+            .column_arr("bids", &bids)?
+            .column_arr("asks", &asks)?
             .at(TimestampNanos::now())?;
 
         // flush() can still return SubmitTimedOut if the SF queue
