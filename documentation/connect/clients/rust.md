@@ -262,15 +262,7 @@ buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
 | `DECIMAL64` | `column_dec64(name, …)` | `column_dec64_opt(name, …)` |
 | `DECIMAL128` | `column_dec128(name, …)` | `column_dec128_opt(name, …)` |
 | `DOUBLE[]` (arrays) | `column_arr(name, &view)` — slices, vecs up to 3D, [`ndarray`](https://docs.rs/ndarray) views | `column_arr_opt(name, Option<&view>)` |
-| `IPv4` † | `column_ipv4(name, std::net::Ipv4Addr)` | `column_ipv4_opt(name, Option<std::net::Ipv4Addr>)` |
-| `LONG[]` (i64 arrays) † | `column_arr` with `i64` element type | `column_arr_opt` with `i64` element type |
-
-† **Spec-only — currently rejected by the server.** QWP v1 defines these
-wire types and the client encodes them correctly, but server-side ingest
-does not yet accept them. Batches using them will be rejected with a
-descriptive error. Application code written against these setters today
-will start working once the server adds support; no client change is
-needed.
+| `IPv4` | `column_ipv4(name, std::net::Ipv4Addr)` | `column_ipv4_opt(name, Option<std::net::Ipv4Addr>)` |
 
 There is no separate `set_null`, `column_null`, or `column_*_null` method.
 The only way to leave a column null on a row is to omit the setter (or
