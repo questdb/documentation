@@ -1137,7 +1137,6 @@ same `execute()` entry point and differ only in their terminal frame.
 
 ```c
 #include <questdb/egress/line_reader.h>
-#include <questdb/egress/line_reader_helpers.h>
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -1620,10 +1619,13 @@ offsets, row_count + 1) + `shapes` + `shape_offsets` (rank-prefixed).
 
 #### Casual single-cell reads (C)
 
-`<questdb/egress/line_reader_helpers.h>` ships header-only `static inline`
-helpers that package the row index + validity probe + typed little-endian
-load over a filled descriptor — no extra FFI crossing, no new exported
-symbols.
+`<questdb/egress/line_reader.h>` ships header-only `static inline` helpers
+that package the row index + validity probe + typed little-endian load
+over a filled descriptor — no extra FFI crossing, no new exported symbols.
+Typed loads go through `memcpy` so they stay alignment-safe on every
+target (densified column slices may borrow from the wire payload at
+offsets that don't satisfy `alignof(T)`; the compiler lowers each call
+to a single unaligned MOV).
 
 | QuestDB type | Helper |
 |---|---|
