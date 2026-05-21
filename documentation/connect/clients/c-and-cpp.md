@@ -1726,18 +1726,16 @@ Two contracts to know:
   rather than calling an unrelated overload — there is no implicit
   conversion between view types.
 
-The idiomatic visitor uses the C++17 `overload` helper (CTAD over a
-list of lambdas):
+The idiomatic visitor uses the `eg::overload` helper that ships with the
+library — a C++17 CTAD wrapper that combines a list of lambdas into a
+single callable whose `operator()` resolves by argument type:
 
 ```cpp
 namespace eg = questdb::egress;
 
-template <class... Fs> struct overload : Fs... { using Fs::operator()...; };
-template <class... Fs> overload(Fs...) -> overload<Fs...>;
-
 void print_cell(const eg::column& col, size_t row)
 {
-    col.visit(overload{
+    col.visit(eg::overload{
         // Fixed-width primitives — one lambda per T.
         [&](eg::fixed_view<int64_t> v) {
             // Covers LONG / TIMESTAMP / DATE / TIMESTAMP_NS;
@@ -1794,7 +1792,7 @@ hex / IPv4 / decimal scale / geohash precision rendering — see
 |---|---|
 | Caller knows T at compile time (e.g. `LONG` accumulator). | `col.get<T>(row)` for one cell, `col.values<T>()` for a contiguous loop. |
 | Caller scans a known-mixed schema (a few kinds, fixed). | Inline `switch (col.kind())` with `col.varchar`/`col.symbol`/`col.get<T>` per arm. Smallest code. |
-| Caller scans an unknown / wide / kind-agnostic schema. | `col.visit(overload{...})`. Kind discriminant runs once per column; the compiler picks the right lambda. |
+| Caller scans an unknown / wide / kind-agnostic schema. | `col.visit(eg::overload{...})`. Kind discriminant runs once per column; the compiler picks the right lambda. |
 | Caller needs the raw dense buffer (zero-copy interop). | `col.values<T>()` (scalar) or `col.elements<T>(row, &count)` / `col.shape(row, &rank)` (array). The view types' `values` / `data` fields work the same way inside a visitor. |
 
 #### Reading NULLs
