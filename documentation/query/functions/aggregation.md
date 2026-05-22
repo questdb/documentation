@@ -1659,9 +1659,10 @@ Supports `SAMPLE BY` with `FILL` modes.
 #### Parameters
 
 - `price` is any numeric value.
-- `timestamp` is a `timestamp` value. This is typically the table's
-  [designated timestamp](/docs/concepts/designated-timestamp/) but can be any
-  timestamp column.
+- `timestamp` must be the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/). As a current
+  limitation, `twap()` rejects a query that passes any other timestamp column
+  or expression.
 
 #### Return value
 
