@@ -22,16 +22,26 @@ server. For embedded QuestDB, see the
 :::
 
 The QuestDB Java client connects to QuestDB over
-[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
-columnar binary protocol carried over WebSocket. It supports high-throughput
+[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) —
+a columnar binary protocol carried over WebSocket. It supports high-throughput
 data ingestion and streaming SQL queries on the same transport.
+
+The recommended entry point is the [`QuestDB`](#the-questdb-handle) handle: a
+shared, thread-safe facade that owns connection pools for both ingest and
+egress and exposes a fluent query API on top of them.
 
 Key capabilities:
 
+- **One handle, both directions**: `QuestDB.connect(...)` derives ingest and
+  egress endpoints from a single connect string; `db.borrowSender()` for
+  ingestion, `db.query()` / `db.executeSql(...)` for SQL.
+- **Pooled connections**: elastic sender and query pools with idle reaping,
+  thread-affine senders, and zero-allocation borrow/submit paths at steady
+  state.
 - **Ingestion**: column-oriented batched writes with automatic table creation,
   schema evolution, and optional store-and-forward durability.
 - **Querying**: streaming SQL result sets, DDL/DML execution, bind parameters,
-  and byte-credit flow control.
+  async [`Completion`](#completion) handles, and byte-credit flow control.
 - **Failover**: multi-endpoint connections with automatic reconnect across
   rolling upgrades and primary migrations.
 
@@ -39,7 +49,8 @@ Key capabilities:
 
 The client also supports ILP ingestion over HTTP and TCP for backward
 compatibility. This page documents the recommended WebSocket (QWP) path. For
-ILP transport details, see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
+ILP transport details, see the
+[ILP overview](/docs/connect/compatibility/ilp/overview/).
 
 :::
 
@@ -71,237 +82,344 @@ Add the dependency:
   </TabItem>
 </Tabs>
 
-### Ingest data
+Construct one `QuestDB` per deployment, share it across threads, close it at
+shutdown:
 
 ```java
-import io.questdb.client.LineSenderServerException;
+import io.questdb.client.Completion;
+import io.questdb.client.QuestDB;
+import io.questdb.client.QueryException;
 import io.questdb.client.Sender;
-import io.questdb.client.SenderError;
-import io.questdb.client.cutlass.line.LineSenderException;
-
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
-    sender.table("trades")
-          .symbol("symbol", "ETH-USD")
-          .symbol("side", "sell")
-          .doubleColumn("price", 2615.54)
-          .doubleColumn("amount", 0.00044)
-          .atNow();
-    sender.table("trades")
-          .symbol("symbol", "BTC-USD")
-          .symbol("side", "sell")
-          .doubleColumn("price", 39269.98)
-          .doubleColumn("amount", 0.001)
-          .atNow();
-    sender.flush();
-} catch (LineSenderServerException e) {
-    // Server rejected a batch (schema mismatch, security, etc.) and the
-    // sender is now in a terminal HALT state. Inspect the structured payload,
-    // then create a new sender to continue.
-    SenderError err = e.getServerError();
-    System.err.printf("server rejected: status=0x%02X category=%s msg=%s%n",
-        err.getServerStatusByte(), err.getCategory(), err.getServerMessage());
-} catch (LineSenderException e) {
-    // Client-side failure: network, validation, terminal WebSocket failure,
-    // engine cap deadline, etc. Free-form message only.
-    System.err.println("ingest failed: " + e.getMessage());
-}
-```
-
-### Query data
-
-```java
-import io.questdb.client.cutlass.qwp.client.QwpQueryClient;
-import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
 import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
 
-try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
-    client.connect();
-    try {
-        client.execute(
-            "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10",
-            new QwpColumnBatchHandler() {
-                @Override
-                public void onBatch(QwpColumnBatch batch) {
-                    batch.forEachRow(row -> System.out.printf(
-                        "ts=%d symbol=%s price=%.4f amount=%.5f%n",
-                        row.getLongValue(0),
-                        row.getSymbol(1),
-                        row.getDoubleValue(2),
-                        row.getDoubleValue(3)
-                    ));
-                }
+try (QuestDB db = QuestDB.connect("ws::addr=localhost:9000;")) {
 
-                @Override
-                public void onEnd(long totalRows) {
-                    System.out.println("done: " + totalRows + " rows");
-                }
+    // Ingest -- borrow a Sender, write rows, close() flushes and returns
+    // the Sender to the pool. Real disconnect only happens at db.close().
+    try (Sender sender = db.borrowSender()) {
+        sender.table("trades")
+              .symbol("symbol", "ETH-USD")
+              .symbol("side", "sell")
+              .doubleColumn("price", 2615.54)
+              .doubleColumn("amount", 0.00044)
+              .atNow();
+        sender.table("trades")
+              .symbol("symbol", "BTC-USD")
+              .symbol("side", "sell")
+              .doubleColumn("price", 39269.98)
+              .doubleColumn("amount", 0.001)
+              .atNow();
+    }
 
-                @Override
-                public void onError(long requestId, byte status, String message) {
-                    System.err.printf("query failed: req=%d %s%n", requestId, message);
-                }
+    // Query -- one-shot SELECT, blocking await on the Completion.
+    Completion c = db.executeSql(
+        "SELECT ts, symbol, price, amount FROM trades "
+        + "WHERE symbol = 'ETH-USD' LIMIT 10",
+        new QwpColumnBatchHandler() {
+            @Override
+            public void onBatch(QwpColumnBatch batch) {
+                batch.forEachRow(row -> System.out.printf(
+                    "ts=%d symbol=%s price=%.4f amount=%.5f%n",
+                    row.getLongValue(0),
+                    row.getSymbol(1),
+                    row.getDoubleValue(2),
+                    row.getDoubleValue(3)));
             }
-        );
-    } catch (IllegalStateException e) {
-        // Client is in a terminal state (closed, not connected, or failover
-        // budget exhausted). Recover by closing and creating a new client.
-        System.err.println("query client unusable: " + e.getMessage());
+
+            @Override
+            public void onEnd(long totalRows) {
+                System.out.println("done: " + totalRows + " rows");
+            }
+
+            @Override
+            public void onError(byte status, String message) {
+                System.err.printf("error: 0x%02X %s%n", status & 0xFF, message);
+            }
+        });
+    try {
+        c.await();
+    } catch (QueryException e) {
+        // Server reported an error (parse failure, schema mismatch, etc.).
+        System.err.printf("query failed: status=0x%02X %s%n",
+            e.getStatus() & 0xFF, e.getMessage());
     }
 }
 ```
 
+`QuestDB.connect(...)` accepts an `http`, `https`, `ws` or `wss` connect
+string and derives the other half by schema translation
+(`http`↔`ws`, `https`↔`wss`). Use
+[`QuestDB.connect(ingestCfg, queryCfg)`](#separate-ingest-and-egress-configs)
+or the [builder](#builder-api) when the two sides differ.
+
+## The QuestDB handle
+
+`QuestDB` is a `Closeable` deployment-level handle. It owns two pools — one
+for [`Sender`](#data-ingestion) instances and one for the underlying query
+clients — plus a daemon housekeeper that reaps idle and over-age pool slots.
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `connect(String)` | `QuestDB` | Static factory. Single connect string for both ingest and egress (schema must be `http`/`https`/`ws`/`wss`). |
+| `connect(String, String)` | `QuestDB` | Static factory. Explicit ingest + egress connect strings. |
+| `builder()` | `QuestDBBuilder` | Pool sizes, timeouts, separate configs. |
+| `borrowSender()` | `Sender` | Lease a sender from the pool; `close()` flushes and returns it. |
+| `sender()` | `Sender` | Thread-affine sender: pinned to the calling thread on first use, reused on subsequent calls. |
+| `releaseSender()` | `void` | Release the thread-affine sender for the calling thread. |
+| `query()` | `Query` | Per-thread cached fluent query builder (allocation-free). |
+| `newQuery()` | `Query` | Fresh `Query` instance — use when one thread holds multiple in-flight queries. |
+| `executeSql(sql, handler)` | `Completion` | One-shot shortcut, equivalent to `query().sql(sql).handler(handler).submit()`. |
+| `close()` | `void` | Shut down pools and disconnect every underlying client. Idempotent. |
+
+A `QuestDB` instance is safe to share across threads. Borrows, query
+submissions, and the per-thread caches all serialize through the pool
+internally.
+
+### Single connect string
+
+```java
+try (QuestDB db = QuestDB.connect("ws::addr=localhost:9000;")) {
+    // ...
+}
+```
+
+Allowed schemas: `http`, `https`, `ws`, `wss`. The other side is derived by
+schema translation:
+
+| Input schema | Ingest schema | Egress schema |
+|--------------|---------------|---------------|
+| `http`       | `http`        | `ws`          |
+| `https`      | `https`       | `wss`         |
+| `ws`         | `http`        | `ws`          |
+| `wss`        | `https`       | `wss`         |
+
+These keys are mirrored from the input config to the derived side: `addr`,
+`token`, `username`, `password`, `auth`, `tls_roots`, `tls_roots_password`,
+`tls_verify`. Other keys stay on the input side only.
+
+`token=...` is rewritten to `auth=Bearer ...` on the egress (WebSocket) side
+so the same Enterprise token works for both directions.
+
+:::note username/password and unified configs
+
+Single-string unified configuration does not auto-derive
+`username`/`password` for the WebSocket side. Either pass
+`auth=Basic <base64>` directly (which propagates as-is to both sides) or use
+the [builder](#builder-api) with explicit `ingestConfig()` and
+`queryConfig()` strings.
+
+:::
+
+### Separate ingest and egress configs
+
+When ingest and egress endpoints differ — typical when reads target a
+read-replica or when ingest goes through a different load balancer — pass
+explicit strings:
+
+```java
+try (QuestDB db = QuestDB.connect(
+        "ws::addr=ingest.cluster:9000;",
+        "wss::addr=read-replica.cluster:9000;auth=Bearer YOUR_TOKEN;")) {
+    // ...
+}
+```
+
+The first argument follows
+[`Sender.fromConfig`](#sender-low-level-primitive) format; the second follows
+[`QwpQueryClient.fromConfig`](#qwpqueryclient-low-level-primitive) format.
+
+### Builder API
+
+For pool tuning, separate configs, or any of the housekeeping knobs:
+
+```java
+try (QuestDB db = QuestDB.builder()
+        .ingestConfig("ws::addr=ingest.cluster:9000;")
+        .queryConfig("ws::addr=read-replica.cluster:9000;")
+        .senderPoolSize(8)                // fixed size, eager allocation
+        .queryPoolMin(2).queryPoolMax(16) // elastic
+        .acquireTimeoutMillis(10_000)
+        .idleTimeoutMillis(60_000)
+        .maxLifetimeMillis(30 * 60_000L)
+        .build()) {
+    // ...
+}
+```
+
+Builder methods:
+
+| Method | Default | Purpose |
+|--------|---------|---------|
+| `fromConfig(String)` | — | Unified config; also parses pool-tuning keys from the string. |
+| `ingestConfig(String)` | — | Sender-side config (required). |
+| `queryConfig(String)` | — | Query-side config (required). |
+| `senderPoolMin(int)` | `1` | Minimum senders kept warm. `0` allows drain. |
+| `senderPoolMax(int)` | `4` | Maximum senders. |
+| `senderPoolSize(int)` | — | Shortcut: fixed `min = max = size`, eager allocation. |
+| `queryPoolMin(int)` | `1` | Minimum query clients kept warm. |
+| `queryPoolMax(int)` | `4` | Maximum query clients. |
+| `queryPoolSize(int)` | — | Shortcut: fixed `min = max = size`. |
+| `acquireTimeoutMillis(long)` | `5000` | Borrow / submit blocks up to this long when the pool is exhausted, then throws. |
+| `idleTimeoutMillis(long)` | `60000` | Idle slot reap threshold. `min` is always respected. `0` ⇒ never reap. |
+| `maxLifetimeMillis(long)` | `1800000` | Recycle a slot after this age. `0` ⇒ never recycle. |
+| `housekeeperIntervalMillis(long)` | `5000` | Daemon sweep cadence. Minimum 100ms. |
+
+### Environment variable
+
+Set `QDB_CLIENT_CONF` and use `QuestDB.connect` with the same string read
+from the environment:
+
+```bash
+export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;token=YOUR_TOKEN;"
+```
+
+```java
+String cfg = System.getenv("QDB_CLIENT_CONF");
+try (QuestDB db = QuestDB.connect(cfg)) {
+    // ...
+}
+```
+
+### Connect-string pool keys
+
+The pool-tuning options above can also live in the connect string itself.
+The builder strips them out before passing the string to the underlying
+`Sender` and `QwpQueryClient` parsers (which don't recognise them):
+
+| Key                       | Builder equivalent         |
+|---------------------------|----------------------------|
+| `sender_pool_min`         | `senderPoolMin(int)`       |
+| `sender_pool_max`         | `senderPoolMax(int)`       |
+| `query_pool_min`          | `queryPoolMin(int)`        |
+| `query_pool_max`          | `queryPoolMax(int)`        |
+| `acquire_timeout_ms`      | `acquireTimeoutMillis(long)` |
+| `idle_timeout_ms`         | `idleTimeoutMillis(long)`  |
+| `max_lifetime_ms`         | `maxLifetimeMillis(long)`  |
+| `housekeeper_interval_ms` | `housekeeperIntervalMillis(long)` |
+
+Explicit builder calls **after** `fromConfig(...)` overwrite anything the
+string set; last write wins.
+
 ## Authentication and TLS
 
-Authentication happens at the HTTP level during the WebSocket upgrade, before
-any binary frames are exchanged. The same mechanisms work for both `Sender`
-(ingestion) and `QwpQueryClient` (querying).
+Authentication happens at the HTTP level during the WebSocket upgrade for
+egress and on each request for HTTP ingress, before any data is exchanged.
+The mirrored keys (`token`, `username`/`password`, `auth`, `tls_*`) work
+identically on `QuestDB.connect(...)`.
+
+### Token (Enterprise, recommended)
+
+```java
+try (QuestDB db = QuestDB.connect(
+        "wss::addr=db.example.com:9000;token=YOUR_BEARER_TOKEN;")) {
+    // ...
+}
+```
+
+The bearer token is sent verbatim to the ingest side and rewritten to
+`auth=Bearer YOUR_BEARER_TOKEN` on the egress side.
 
 ### HTTP basic auth
 
 ```java
-// Ingestion
-try (Sender sender = Sender.fromConfig(
+try (QuestDB db = QuestDB.connect(
         "wss::addr=db.example.com:9000;username=admin;password=quest;")) {
-    // ...
-}
-
-// Querying
-try (QwpQueryClient client = QwpQueryClient.fromConfig(
-        "wss::addr=db.example.com:9000;username=admin;password=quest;")) {
-    client.connect();
     // ...
 }
 ```
 
-### Token auth (Enterprise, recommended)
-
-Token authentication avoids the per-request overhead of basic auth and is
-the recommended path for Enterprise deployments.
-
-```java
-try (Sender sender = Sender.fromConfig(
-        "wss::addr=db.example.com:9000;token=your_bearer_token;")) {
-    // ...
-}
-```
+This works for ingest. For the egress side, use the builder with explicit
+`queryConfig("...auth=Basic <base64>...")` (see the note in
+[Single connect string](#single-connect-string)).
 
 ### TLS with custom trust store
 
 ```java
-try (Sender sender = Sender.fromConfig(
-        "wss::addr=db.example.com:9000;tls_roots=/path/to/truststore.jks;tls_roots_password=changeit;")) {
+try (QuestDB db = QuestDB.connect(
+        "wss::addr=db.example.com:9000;"
+        + "tls_roots=/path/to/truststore.jks;"
+        + "tls_roots_password=changeit;"
+        + "token=YOUR_BEARER_TOKEN;")) {
     // ...
 }
 ```
 
-## Creating the client
+For development, `tls_verify=unsafe_off` disables certificate validation.
+**Never use this in production.**
 
-### From a connect string
+## The connection pool
 
-The connect string format is `<schema>::<key>=<value>;<key>=<value>;...;`
+Both pools are *elastic*: they keep `min` slots warm, grow up to `max`
+on demand, and reap idle slots (anything above `min`) at the housekeeper
+interval.
 
-For ingestion, use `ws` (plain) or `wss` (TLS):
+### Borrowed vs thread-affine senders
 
 ```java
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
-    // ...
+// Borrowed: lease per use. close() flushes and returns to the pool.
+try (Sender sender = db.borrowSender()) {
+    sender.table("trades").doubleColumn("price", 42.0).atNow();
 }
-```
 
-For querying:
-
-```java
-try (QwpQueryClient client = QwpQueryClient.fromConfig("ws::addr=localhost:9000;")) {
-    client.connect();
-    // ...
+// Thread-affine: first call pins one Sender to this thread. Subsequent
+// calls on the same thread return the same instance with zero overhead.
+Sender sender = db.sender();
+for (int i = 0; i < 1_000_000; i++) {
+    sender.table("trades").doubleColumn("price", 42.0 + i).atNow();
 }
+sender.flush();
 ```
 
-For the full list of connect-string keys, see the
-[connect string reference](/docs/connect/clients/connect-string/).
+Pick `db.sender()` for long-lived dedicated producer threads where
+borrow/return overhead would dominate. Pick `db.borrowSender()` for
+short-lived or event-loop callers.
 
-### From an environment variable
+If your producer thread is borrowed from a foreign pool (Netty event loop,
+servlet container, etc.) and may be recycled to handle unrelated work,
+call `db.releaseSender()` before handing it back, otherwise it stays
+pinned for the rest of the thread's life.
 
-Set `QDB_CLIENT_CONF` to avoid hard-coding credentials:
+:::note Pooled Sender close semantics
 
-```bash
-export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
-```
+`Sender.close()` on a borrowed sender flushes pending rows and returns the
+decorator to the pool — it does **not** disconnect the underlying
+WebSocket. A real disconnect only happens at `QuestDB.close()` (or when the
+housekeeper reaps an idle slot).
 
-```java
-try (Sender sender = Sender.fromEnv()) {
-    // ...
-}
-```
-
-### Using the builder API
-
-The builder exposes the same options as the connect string. Method names
-follow camelCase convention (e.g., `sf_append_deadline_millis` becomes
-`sfAppendDeadlineMillis()`). For the full list of keys, see the
-[connect string reference](/docs/connect/clients/connect-string/).
-
-```java
-try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
-        .address("localhost:9000")
-        .autoFlushRows(500)
-        .autoFlushIntervalMillis(50)
-        .build()) {
-    // ...
-}
-```
-
-**Enterprise builder with TLS, token auth, and listeners:**
-
-```java
-try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
-        .address("db-primary:9000")
-        .address("db-replica:9000")
-        .enableTls()
-        .advancedTls().disableCertificateValidation()  // test only
-        .httpToken("your_bearer_token")                // works for WebSocket too
-        .reconnectMaxDurationMillis(300_000)
-        .reconnectInitialBackoffMillis(100)
-        .reconnectMaxBackoffMillis(5_000)
-        .errorHandler(error -> {
-            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
-                error.getCategory(), error.getTableName(),
-                error.getServerMessage());
-        })
-        .connectionListener(event -> {
-            System.out.printf("connection: %s host=%s:%d%n",
-                event.getKind(), event.getHost(), event.getPort());
-        })
-        .build()) {
-    // ...
-}
-```
-
-:::note
-The token method is named `httpToken()` for historical reasons but works
-on all transports including WebSocket. For production TLS, use
-`advancedTls().customTrustStore(path, password)` instead of
-`disableCertificateValidation()`.
 :::
 
-For `QwpQueryClient`, use the factory methods or configure post-construction:
+### Per-thread Query cache
 
-```java
-try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
-    client.withInitialCredit(256 * 1024);
-    client.connect();
-    // ...
-}
-```
+`db.query()` returns the same `Query` instance on every call from the same
+thread, reset to empty if it was in a terminal state. The associated
+`Completion` is a field on that instance, so the steady-state submit path
+is allocation-free.
+
+For multiple in-flight queries from one thread, call `db.newQuery()` —
+each call allocates a fresh `Query`. The query pool's `max` caps overall
+concurrency (one worker per in-flight query).
+
+### Acquire timeout
+
+`db.borrowSender()` and `Query.submit()` block when the pool is exhausted
+(every slot in use and `max` already reached). They unblock when a slot
+returns or when the timeout (default 5s) elapses; on timeout, they throw
+`LineSenderException`. Raise `acquireTimeoutMillis` for steady-state
+bursts you expect to absorb, or raise `max` to allow more concurrency.
 
 ## Data ingestion
 
+Once you have a `Sender` from the pool, the row-building API is identical
+across all transports.
+
 ### General usage pattern
 
-`Sender` is not thread-safe. For multi-threaded workloads, create one instance
-per thread or use an object pool.
+`Sender` is not thread-safe. The pool's contract is that a borrowed sender
+is owned by the borrower until it's returned (via `close()` or
+`releaseSender()`).
 
-1. Create a `Sender` via `Sender.fromConfig()` or the builder.
+1. Borrow a sender (`db.borrowSender()` or `db.sender()`).
 2. Call `table(name)` to select a table.
 3. Call column methods to add values:
    - `symbol(name, value)`
@@ -320,7 +438,8 @@ per thread or use an object pool.
      `geoHashColumn(name, CharSequence base32)`
    - `binaryColumn(name, byte[])`, `binaryColumn(name, long ptr, long len)`, or
      `binaryColumn(name, DirectByteSlice)`
-   - `doubleArray(name, ...)` and `longArray(name, ...)` (see [Ingest arrays](#ingest-arrays))
+   - `doubleArray(name, ...)` and `longArray(name, ...)` (see
+     [Ingest arrays](#ingest-arrays))
 
    DATE is accepted on ingress server-side but the Java client does not yet
    expose a `dateColumn()` setter. All types are readable on the
@@ -328,16 +447,15 @@ per thread or use an object pool.
 
    To store a null for a column, omit that column's setter before calling
    `at()` or `atNow()`. The column set for the batch is the union of all
-   columns seen across rows; a column first used on a later row is backfilled
-   with null for earlier rows.
+   columns seen across rows; a column first used on a later row is
+   backfilled with null for earlier rows.
 
    :::note IPv4 string input is strict
 
    `ipv4Column(name, CharSequence)` rejects the literal strings `"null"`
    (case-insensitive) and `"0.0.0.0"` with a `LineSenderException`. Passing
    a `null` reference is a no-op (the column is left unset, which surfaces
-   as SQL NULL on read). This avoids the previous silent round-trip where
-   `"0.0.0.0"` and `"null"` both stored as IPv4 NULL.
+   as SQL NULL on read).
 
    :::
 
@@ -346,17 +464,22 @@ per thread or use an object pool.
    The first call to `geoHashColumn` for a column fixes its precision
    (number of bits). Subsequent rows must use the same precision or the
    call throws `LineSenderException`. For the string overload, precision
-   is `value.length() * 5` bits; for the bits overload, it is the
-   explicit `precisionBits` argument (1..60).
+   is `value.length() * 5` bits; for the bits overload, it is the explicit
+   `precisionBits` argument (1..60).
 
    :::
 
-5. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the row.
-6. Repeat from step 2, or call `flush()` to send buffered data.
-7. Call `close()` when done (or use try-with-resources).
+4. Call `at(Instant)`, `at(long, ChronoUnit)`, or `atNow()` to finalize the
+   row.
+5. Repeat from step 2, or call `flush()` to send buffered data.
+6. Release the sender:
+   - For `db.borrowSender()`, close the sender (try-with-resources). The
+     pool flushes pending rows before reusing the slot.
+   - For `db.sender()`, leave it pinned across calls and `flush()` between
+     batches; release only on shutdown or thread recycling.
 
 ```java
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+try (Sender sender = db.borrowSender()) {
     sender.table("trades")
           .symbol("symbol", "EURUSD")
           .symbol("side", "buy")
@@ -384,7 +507,7 @@ overhead. Create the instance once and reuse it across rows by calling
 ```java
 import io.questdb.client.cutlass.line.array.DoubleArray;
 
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
+try (Sender sender = db.borrowSender();
      DoubleArray ary = new DoubleArray(3, 3, 3)) {
     for (int i = 0; i < ROW_COUNT; i++) {
         ary.clear();  // reset write position, reuse native memory
@@ -399,11 +522,11 @@ try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;");
 ```
 
 The constructor `new DoubleArray(d1, d2, ...)` defines the shape. Values are
-appended in row-major order: the last dimension varies fastest. For a 2D array
-with shape `(3, 2)`, `append()` fills positions `[0,0], [0,1], [1,0], [1,1],
-[2,0], [2,1]`. You can also use `set(value, i, j, ...)` to write at specific
-coordinates. Call `reshape(d1, d2, ...)` to change the shape without
-reallocating.
+appended in row-major order: the last dimension varies fastest. For a 2D
+array with shape `(3, 2)`, `append()` fills positions `[0,0], [0,1], [1,0],
+[1,1], [2,0], [2,1]`. You can also use `set(value, i, j, ...)` to write at
+specific coordinates. Call `reshape(d1, d2, ...)` to change the shape
+without reallocating.
 
 `LongArray` works the same way for 64-bit integer arrays — pass a Java
 `long[]`, `long[][]`, or `long[][][]` directly, or use the reusable
@@ -493,7 +616,7 @@ ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 immediately, even with auto-flush enabled:
 
 ```java
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+try (Sender sender = db.borrowSender()) {
     for (Trade trade : trades) {
         sender.table("trades")
               .symbol("symbol", trade.symbol())
@@ -511,9 +634,11 @@ WebSocket transport. Use the auto-flush row count and interval settings to
 control batch size instead.
 :::
 
-The client also flushes when closed, waiting up to `close_flush_timeout_millis`
-(default 5000) for acknowledgements. If the flush fails at close time, the
-client does not retry. Always flush explicitly before closing.
+`Sender.close()` (or pool return) flushes pending rows, waiting up to
+`close_flush_timeout_millis` (default 5000) for acknowledgements. If the
+flush fails at close time, the client does not retry. For at-least-once
+semantics, flush explicitly and check FSN progress
+([Awaiting acknowledgements](#awaiting-acknowledgements)) before closing.
 
 :::note Server-advertised batch cap
 
@@ -540,8 +665,13 @@ When multiple senders share the same `sf_dir`, each must have a distinct
 `sender_id`. Slots are exclusive: two senders with the same ID will collide.
 Allowed characters: `A-Za-z0-9_-`.
 
-Without `sf_dir`, unacknowledged data lives in process memory and is lost if
-the sender process dies. The reconnect loop still spans transient server
+If you use `db.sender()` (thread-affine) across multiple application
+threads, each pinned sender needs its own `sender_id`. Configure the pool
+with a unique `sender_id` per slot using the builder's `ingestConfig` (one
+`QuestDB` per slot ID), or stick to a single-slot pool when SF is enabled.
+
+Without `sf_dir`, unacknowledged data lives in process memory and is lost
+if the sender process dies. The reconnect loop still spans transient server
 outages (rolling upgrades), but the RAM buffer caps how much data can
 accumulate.
 
@@ -549,11 +679,11 @@ accumulate.
 
 With store-and-forward enabled, `flush()` can block when the buffer hits its
 cap. The producer blocks until the wire path drains enough capacity, up to
-`sf_append_deadline_millis` (default 30 seconds). If the deadline elapses, the
-call fails without dropping data. Terminal rejections (schema, parse, or
-security errors) latch a terminal error on the sender. The next API call
-throws `LineSenderServerException`; close the sender and create a new one to
-continue.
+`sf_append_deadline_millis` (default 30 seconds). If the deadline elapses,
+the call fails without dropping data. Terminal rejections (schema, parse,
+or security errors) latch a terminal error on the sender. The next API
+call throws `LineSenderServerException`; the pool detects the terminal
+state and replaces the slot.
 
 ### Durable acknowledgement
 
@@ -574,15 +704,15 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 
 ### Awaiting acknowledgements
 
-`flush()` returns once the batch is published into the cursor engine, not once
-the server has acknowledged it. ACKs arrive asynchronously on the I/O loop.
-To bridge between publish and acknowledgement, every published frame is
-assigned a frame sequence number (FSN). `flushAndGetSequence()` returns the
-highest FSN the call published, and `awaitAckedFsn(targetFsn, timeoutMillis)`
-blocks until the server has acknowledged up to that FSN:
+`flush()` returns once the batch is published into the cursor engine, not
+once the server has acknowledged it. ACKs arrive asynchronously on the I/O
+loop. To bridge between publish and acknowledgement, every published frame
+is assigned a frame sequence number (FSN). `flushAndGetSequence()` returns
+the highest FSN the call published, and `awaitAckedFsn(targetFsn,
+timeoutMillis)` blocks until the server has acknowledged up to that FSN:
 
 ```java
-try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+try (Sender sender = db.borrowSender()) {
     sender.table("trades").doubleColumn("price", 42.0).atNow();
     long fsn = sender.flushAndGetSequence();
     if (fsn >= 0 && !sender.awaitAckedFsn(fsn, 10_000)) {
@@ -606,67 +736,203 @@ rejected batches, so the value returned by `flushAndGetSequence()` is also
 the correlation key for async error reports.
 
 These methods are no-ops on transports that do not track frame sequence
-numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()` return
-`-1`, and `awaitAckedFsn()` returns immediately.
+numbers (HTTP, TCP, UDP): `flushAndGetSequence()` and `getAckedFsn()`
+return `-1`, and `awaitAckedFsn()` returns immediately.
 
-## Querying and SQL execution
+## Querying with `Query` and `Completion`
 
-The `QwpQueryClient` sends SQL statements over the
-[QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint (`/read/v1`).
-Results arrive as columnar batches via a callback handler.
-
-`execute()` is **blocking**: it sends the query, drives the WebSocket receive
-loop on the calling thread, invokes the handler callbacks (`onBatch`,
-`onEnd`, `onError`, or `onExecDone`), and returns only after the query
-completes. This means you can safely sequence operations:
+SQL queries are submitted through the fluent `Query` builder and observed
+through an async `Completion` handle:
 
 ```java
-client.execute("CREATE TABLE t (...) ...", ddlHandler);
-// Table exists by this point
-client.execute("INSERT INTO t VALUES ...", dmlHandler);
-// Data is committed by this point
-client.execute("SELECT * FROM t", selectHandler);
-// Results have been fully consumed by this point
-```
+import io.questdb.client.Completion;
+import io.questdb.client.QueryException;
+import io.questdb.client.Query;
 
-### Executing SELECT queries
+Query q = db.query()
+    .sql("SELECT ts, symbol, price FROM trades WHERE symbol = $1 LIMIT $2")
+    .binds(binds -> {
+        binds.setVarchar(0, "EURUSD");
+        binds.setLong(1, 100L);
+    })
+    .handler(handler);
 
-```java
-try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
-    client.connect();
-    client.execute(
-        "SELECT ts, symbol, price FROM trades WHERE symbol = 'EURUSD' LIMIT 100",
-        new QwpColumnBatchHandler() {
-            @Override
-            public void onBatch(QwpColumnBatch batch) {
-                for (int row = 0; row < batch.getRowCount(); row++) {
-                    long ts = batch.getLongValue(0, row);
-                    String symbol = batch.getSymbol(1, row);
-                    double price = batch.getDoubleValue(2, row);
-                    // process row...
-                }
-            }
-
-            @Override
-            public void onEnd(long totalRows) { }
-
-            @Override
-            public void onError(byte status, String message) {
-                System.err.printf("error: 0x%02X %s%n", status & 0xFF, message);
-            }
-        }
-    );
+Completion c = q.submit();
+try {
+    c.await();  // blocks until onEnd / onError / onExecDone resolves
+} catch (QueryException e) {
+    System.err.printf("query failed: status=0x%02X %s%n",
+        e.getStatus() & 0xFF, e.getMessage());
 }
 ```
 
-The `QwpColumnBatch` object is valid only during the `onBatch` callback. Copy
-values out if you need them after the callback returns.
+Or, for queries without bind parameters, the one-shot shortcut:
+
+```java
+Completion c = db.executeSql(
+    "SELECT count(*) FROM trades",
+    handler);
+c.await();
+```
+
+`db.executeSql(...)` is equivalent to
+`db.query().sql(sql).handler(handler).submit()` and uses the same per-thread
+cached `Query` and `Completion` — both forms are allocation-free at steady
+state.
+
+### The `Query` builder
+
+| Method | Required | Purpose |
+|--------|----------|---------|
+| `sql(CharSequence)` | yes | SQL text. Buffer is copied; not retained past `submit()`. |
+| `binds(QwpBindSetter)` | no | Bind-parameter populator. See [Bind parameters](#bind-parameters). |
+| `handler(QwpColumnBatchHandler)` | yes | Result handler — fires `onBatch` + `onEnd` (or `onError` / `onExecDone`). |
+| `submit()` | — | Acquire a worker, dispatch, return the cached `Completion`. Throws if SQL or handler is unset, or if a previous submit on this `Query` is still in flight. |
+| `abandon()` | — | Discard the current SQL/binds/handler without submitting. |
+
+`db.query()` returns the per-thread cached `Query`; one in-flight query
+per thread. For multiple concurrent in-flight queries from one thread, use
+`db.newQuery()` and submit each separately — the query pool serves up to
+`queryPoolMax` workers in parallel.
+
+### `Completion`
+
+| Method | Returns | Notes |
+|--------|---------|-------|
+| `await()` | `void` | Block until terminal; rethrow `QueryException` on server error or cancel. |
+| `await(long, TimeUnit)` | `boolean` | Like `await()` but returns `false` on timeout (the query stays in flight). |
+| `cancel()` | `void` | Request cancellation; idempotent. The handler observes `onError` with the cancel status; `await()` throws `QueryException`. |
+| `isDone()` | `boolean` | True once the query has reached a terminal state (success / error / cancel acknowledged). |
+
+`QueryException.getStatus()` returns the wire-level QWP status byte (see
+[Query error status codes](#query-errors)). `0` indicates a client-side
+failure — for example, a transport drop before any server response.
+
+The `Completion` is signaled from the query worker's I/O thread after the
+handler's terminal callback (`onEnd`, `onError`, or `onExecDone`) returns.
+
+### Bind parameters
+
+Parameterized queries use typed bind values, avoiding SQL injection and
+enabling server-side factory cache reuse across repeated calls:
+
+```java
+String sql = "SELECT ts, symbol, price, amount FROM trades "
+    + "WHERE symbol = $1 AND price >= $2 LIMIT 1000";
+
+for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
+    db.query()
+      .sql(sql)
+      .binds(binds -> binds
+          .setVarchar(0, symbol)
+          .setDouble(1, 1.0))
+      .handler(handler)
+      .submit()
+      .await();
+}
+```
+
+Bind indices are 0-based (`$1` maps to index 0). Setters must be called in
+ascending order with no gaps. Available setters:
+
+| Setter | Bind type |
+|--------|-----------|
+| `setBoolean(index, value)` | BOOLEAN |
+| `setByte(index, value)` | BYTE |
+| `setChar(index, value)` | CHAR |
+| `setShort(index, value)` | SHORT |
+| `setInt(index, value)` | INT |
+| `setLong(index, value)` | LONG |
+| `setFloat(index, value)` | FLOAT |
+| `setDouble(index, value)` | DOUBLE |
+| `setDate(index, millis)` | DATE |
+| `setTimestampMicros(index, micros)` | TIMESTAMP |
+| `setTimestampNanos(index, nanos)` | `timestamp_ns` |
+| `setVarchar(index, value)` | VARCHAR, STRING, and SYMBOL columns |
+| `setUuid(index, lo, hi)` or `setUuid(index, UUID)` | UUID |
+| `setLong256(index, l0, l1, l2, l3)` | LONG256 |
+| `setGeohash(index, precisionBits, value)` | GEOHASH |
+| `setDecimal64(index, scale, unscaled)` | DECIMAL64 |
+| `setDecimal128(index, scale, lo, hi)` | DECIMAL128 |
+| `setDecimal256(index, scale, ll, lh, hl, hh)` | DECIMAL256 |
+
+To pass a NULL bind value, either pass `null` to `setVarchar` or use the
+typed `setNull`:
+
+```java
+.binds(binds -> binds.setVarchar(0, null))           // null VARCHAR/SYMBOL
+.binds(binds -> binds.setNull(0, TYPE_LONG))         // typed null (requires QWP type code)
+.binds(binds -> binds.setNullGeohash(0, 20))         // null GEOHASH with precision
+.binds(binds -> binds.setNullDecimal64(0, 4))        // null DECIMAL64 with scale
+```
+
+To keep submission allocation-free, hoist your `QwpBindSetter` lambda to a
+field rather than capturing per-call locals — captured locals allocate a
+new closure object each submit.
+
+### Cancellation and timeouts
+
+```java
+Completion c = db.executeSql(
+    "SELECT * FROM big_table ORDER BY ts",
+    handler);
+
+if (!c.await(5, TimeUnit.SECONDS)) {
+    c.cancel();
+    try {
+        c.await();
+    } catch (QueryException cancelled) {
+        // status carries the cancel byte; handler also saw onError
+    }
+}
+```
+
+`cancel()` is a no-op if the query has already completed. If `cancel()`
+races to terminal, `await()` throws `QueryException` with the cancel
+status. If the query finished first, `await()` returns normally.
+
+### Result handler
+
+The handler interface is unchanged from the lower-level
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive):
+
+```java
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
+import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
+
+new QwpColumnBatchHandler() {
+    @Override
+    public void onBatch(QwpColumnBatch batch) {
+        for (int row = 0; row < batch.getRowCount(); row++) {
+            long ts = batch.getLongValue(0, row);
+            String symbol = batch.getSymbol(1, row);
+            double price = batch.getDoubleValue(2, row);
+            // process row...
+        }
+    }
+
+    @Override
+    public void onEnd(long totalRows) {}
+
+    @Override
+    public void onError(byte status, String message) {
+        System.err.printf("error: 0x%02X %s%n", status & 0xFF, message);
+    }
+};
+```
+
+The `QwpColumnBatch` object is valid only during the `onBatch` callback.
+Copy values out if you need them after the callback returns.
 
 **Convenience accessors**: `batch.forEachRow(row -> ...)` provides a
 `RowView` with single-argument accessors (`row.getLongValue(col)`,
 `row.getSymbol(col)`, etc.) for compact read paths.
 
 **Null checking**: call `batch.isNull(col, row)` before reading a value.
+
+When the handler is invoked through `Query`/`Completion`, the same instance
+can be reused across submissions — there is no per-call wrapping
+allocation.
 
 ### Reading result batches
 
@@ -705,9 +971,9 @@ Column metadata is available via `batch.getColumnName(col)`,
 
 **Reading array columns:**
 
-`getDoubleArrayElements(col, row)` returns a flattened `double[]` in row-major
-order. Use `getArrayNDims(col, row)` to discover the dimensionality. For
-example, reading a 2D `DOUBLE[][]` column:
+`getDoubleArrayElements(col, row)` returns a flattened `double[]` in
+row-major order. Use `getArrayNDims(col, row)` to discover the
+dimensionality:
 
 ```java
 int nDims = batch.getArrayNDims(colIndex, row);  // e.g. 2
@@ -715,26 +981,24 @@ double[] flat = batch.getDoubleArrayElements(colIndex, row);
 // flat contains all elements in row-major order
 ```
 
-Alternatively, you can extract individual elements in SQL (e.g.,
+Alternatively, extract individual elements in SQL (e.g.,
 `SELECT bids[1][1] FROM market_data`) and read them as scalar doubles.
 
 ### DDL and DML statements
 
 Non-SELECT statements (CREATE TABLE, INSERT, UPDATE, ALTER, DROP, TRUNCATE)
-are executed through the same `execute()` method. The server responds with
-`EXEC_DONE` instead of result batches:
+go through the same `submit()` / `executeSql(...)` path. The server replies
+with `EXEC_DONE` instead of result batches; override the
+`onExecDone(opType, rowsAffected)` callback:
 
 ```java
-client.execute(
+db.executeSql(
     "CREATE TABLE trades ("
     + "ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE"
     + ") TIMESTAMP(ts) PARTITION BY DAY WAL",
     new QwpColumnBatchHandler() {
-        @Override
-        public void onBatch(QwpColumnBatch batch) { }
-
-        @Override
-        public void onEnd(long totalRows) { }
+        @Override public void onBatch(QwpColumnBatch batch) {}
+        @Override public void onEnd(long totalRows) {}
 
         @Override
         public void onError(byte status, String message) {
@@ -746,113 +1010,65 @@ client.execute(
             System.out.printf("done: opType=%d rows=%d%n", opType, rowsAffected);
         }
     }
-);
+).await();
 ```
 
-`rowsAffected` reports the count for INSERT/UPDATE/DELETE. Pure DDL (CREATE,
-DROP, ALTER, TRUNCATE) reports 0.
+`rowsAffected` reports the count for INSERT/UPDATE/DELETE. Pure DDL
+(CREATE, DROP, ALTER, TRUNCATE) reports 0.
 
-### Bind parameters
-
-Parameterized queries use typed bind values, avoiding SQL injection and
-enabling server-side factory cache reuse across repeated calls:
+Because `await()` blocks until the terminal callback returns, you can
+safely sequence DDL → DML → SELECT:
 
 ```java
-String sql = "SELECT ts, symbol, price, amount FROM trades "
-    + "WHERE symbol = $1 AND price >= $2 LIMIT 1000";
-
-for (String symbol : List.of("EURUSD", "GBPUSD", "USDJPY")) {
-    client.execute(
-        sql,
-        binds -> binds
-            .setVarchar(0, symbol)
-            .setDouble(1, 1.0),
-        handler
-    );
-}
-```
-
-Bind indices are 0-based (`$1` maps to index 0). Available setters:
-
-| Setter | Bind type |
-|--------|-----------|
-| `setBoolean(index, value)` | BOOLEAN |
-| `setByte(index, value)` | BYTE |
-| `setChar(index, value)` | CHAR |
-| `setShort(index, value)` | SHORT |
-| `setInt(index, value)` | INT |
-| `setLong(index, value)` | LONG |
-| `setFloat(index, value)` | FLOAT |
-| `setDouble(index, value)` | DOUBLE |
-| `setDate(index, millis)` | DATE |
-| `setTimestampMicros(index, micros)` | TIMESTAMP |
-| `setTimestampNanos(index, nanos)` | `timestamp_ns` |
-| `setVarchar(index, value)` | VARCHAR, STRING, and SYMBOL columns |
-| `setUuid(index, lo, hi)` or `setUuid(index, UUID)` | UUID |
-| `setLong256(index, l0, l1, l2, l3)` | LONG256 |
-| `setGeohash(index, precisionBits, value)` | GEOHASH |
-| `setDecimal64(index, scale, unscaled)` | DECIMAL64 |
-| `setDecimal128(index, scale, lo, hi)` | DECIMAL128 |
-| `setDecimal256(index, scale, ll, lh, hl, hh)` | DECIMAL256 |
-
-To pass a NULL bind value, either pass `null` to `setVarchar` or use the
-typed `setNull`:
-
-```java
-binds -> binds.setVarchar(0, null)          // null VARCHAR/SYMBOL
-binds -> binds.setNull(0, TYPE_LONG)        // typed null (requires QWP type code)
-binds -> binds.setNullGeohash(0, 20)        // null GEOHASH with precision
-binds -> binds.setNullDecimal64(0, 4)       // null DECIMAL64 with scale
+db.executeSql("CREATE TABLE t (...) ...", ddlHandler).await();
+db.executeSql("INSERT INTO t VALUES ...", dmlHandler).await();
+db.executeSql("SELECT * FROM t", selectHandler).await();
 ```
 
 ### Flow control
 
 For large result sets, byte-credit flow control prevents the server from
-overwhelming the client:
+overwhelming the client. Set `initial_credit` on the query connect string
+(via the builder's `queryConfig`):
 
 ```java
-try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)
-        .withInitialCredit(256 * 1024)) {
-    client.connect();
-    // Server pauses after streaming ~256 KiB, auto-replenishes after each batch
+try (QuestDB db = QuestDB.builder()
+        .ingestConfig("ws::addr=localhost:9000;")
+        .queryConfig("ws::addr=localhost:9000;initial_credit=" + (256 * 1024) + ";")
+        .build()) {
+    // server pauses after streaming ~256 KiB, auto-replenishes per batch
 }
 ```
 
-A credit of `0` (the default) means unbounded: the server streams as fast as
-the network allows.
+A credit of `0` (the default) means unbounded: the server streams as fast
+as the network allows.
 
 ### Compression
 
-Negotiate zstd compression to reduce network bandwidth for large result sets:
+Negotiate zstd compression to reduce network bandwidth for large result
+sets:
 
 ```java
-try (QwpQueryClient client = QwpQueryClient.fromConfig(
+try (QuestDB db = QuestDB.connect(
         "ws::addr=localhost:9000;compression=zstd;compression_level=3;")) {
-    client.connect();
-    // Batches are automatically decompressed
+    // batches are automatically decompressed
 }
 ```
+
+`compression` and `compression_level` apply to the query side only and are
+ignored by the ingest side.
 
 ## Error handling
 
 ### Ingestion errors
 
 WebSocket ingestion uses an asynchronous error model. Batch rejections are
-delivered via the `SenderErrorHandler` callback, not thrown from `flush()`:
-
-```java
-try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
-        .address("localhost:9000")
-        .errorHandler(error -> {
-            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
-                error.getCategory(), error.getTableName(), error.getServerMessage());
-        })
-        .build()) {
-    // ...
-}
-```
-
-Each `SenderError` carries:
+delivered via the `SenderErrorHandler` callback, not thrown from `flush()`.
+The `QuestDB` connect-string path does not yet expose this callback — if
+your application needs structured `SenderError` reports, drop down to the
+[low-level `Sender.builder`](#sender-low-level-primitive) directly and
+skip the pool. The structured fields on `SenderError` are the same
+regardless of how the sender was created:
 
 | Field | Accessor | Description |
 |-------|----------|-------------|
@@ -864,31 +1080,34 @@ Each `SenderError` carries:
 | Message sequence | `getMessageSequence()` | Server's per-frame sequence number (`-1` if not available) |
 | Status byte | `getServerStatusByte()` | Raw QWP status code (`-1` if not available) |
 
-The error handler runs on a dedicated dispatcher thread, never on the I/O or
-producer thread.
+The error handler runs on a dedicated dispatcher thread, never on the I/O
+or producer thread.
 
-**Recovery after errors**: call `reset()` to clear buffers and continue with
-fresh data. On WebSocket, `reset()` does not recover from terminal failures
-(auth failure, reconnect budget exhaustion). In those cases, close the sender
-and create a new one.
+When a sender owned by `QuestDB` enters a terminal `HALT` state, the next
+producer-thread call throws `LineSenderServerException`. The pool detects
+the failure on close/return and replaces the slot with a fresh sender on
+the next borrow.
 
 ### Query errors
 
-Query errors arrive via the `onError` callback. There are two overloads; the
-3-arg form carries the client-assigned request id so log entries can be joined
-back to the originating `execute()` call:
+Query errors surface in two places:
+
+1. The handler's `onError(byte status, String message)` callback fires
+   exactly once with the QWP status and server text.
+2. `Completion.await()` rethrows them as `QueryException`:
 
 ```java
-@Override
-public void onError(long requestId, byte status, String message) {
-    System.err.printf("query failed: req=%d 0x%02X %s%n",
-        requestId, status & 0xFF, message);
+try {
+    db.executeSql(sql, handler).await();
+} catch (QueryException e) {
+    if (e.getStatus() == 0) {
+        // client-side failure: transport drop before any server response
+    } else {
+        System.err.printf("server reported 0x%02X: %s%n",
+            e.getStatus() & 0xFF, e.getMessage());
+    }
 }
 ```
-
-The 2-arg form `onError(byte status, String message)` still works -- the
-3-arg overload is a default method that delegates to it. Handlers that don't
-care about correlation can keep the simpler signature.
 
 Status codes:
 
@@ -898,18 +1117,21 @@ Status codes:
 | `0x05` | PARSE_ERROR     | SQL syntax error or malformed message             |
 | `0x06` | INTERNAL_ERROR  | Server-side execution failure                     |
 | `0x08` | SECURITY_ERROR  | Authorization failure                             |
-| `0x0A` | CANCELLED       | Query terminated by CANCEL                        |
+| `0x0A` | CANCELLED       | Query terminated by `Completion.cancel()`         |
 | `0x0B` | LIMIT_EXCEEDED  | Protocol limit hit                                |
 
 Errors can arrive before any data (parse failure) or mid-stream (storage
-failure, server shutdown). When `onError` is called, no further frames arrive
-for that query.
+failure, server shutdown). When `onError` is called, no further frames
+arrive for that query.
 
+`onError(long requestId, byte status, String message)` is a
+correlation-aware overload — the request id matches
+`QwpColumnBatch.requestId()` from any prior `onBatch`. Similarly,
 `onEnd(long requestId, long totalRows)`,
 `onExecDone(long requestId, short opType, long rowsAffected)`, and
-`onFailoverReset(long requestId, QwpServerInfo newNode)` are the
-correlation-aware overloads of the corresponding completion callbacks; all
-four default to the original signatures, so existing handlers compile
+`onFailoverReset(long requestId, QwpServerInfo newNode)` are
+default-method overloads of the corresponding completion callbacks; all
+default to the shorter signatures, so existing handlers compile
 unchanged.
 
 #### Diagnostics surface
@@ -918,16 +1140,17 @@ What is and isn't carried on `onError`:
 
 | Diagnostic | Surfaced? |
 |------------|-----------|
-| Request id | Yes -- `requestId` argument on the 3-arg overload. Also available mid-stream on `QwpColumnBatch.requestId()`. `-1` when the failure is raised before a request was assigned (closed client, bind-encode failure, latched terminal failure from a prior generation). |
-| Failing SQL | Not surfaced. Stash the string at the `execute()` call site if you need it on `onError`. |
+| Request id | Yes — `requestId` argument on the 3-arg overload. Also available mid-stream on `QwpColumnBatch.requestId()`. `-1` when the failure is raised before a request was assigned (closed client, bind-encode failure, latched terminal failure from a prior generation). |
+| Failing SQL | Not surfaced. Stash the string at the submit site if you need it on `onError`. |
 | Bind index (for `SCHEMA_MISMATCH`) | Not structurally surfaced. May be embedded in the free-form `message`; format is not part of the protocol contract. |
-| Message stability | `message` is server-supplied free-form text, not localized. Wording is not guaranteed across server releases -- pattern-match on `status` instead. |
+| Message stability | `message` is server-supplied free-form text, not localized. Wording is not guaranteed across server releases — pattern-match on `status` instead. |
 | PII / secret safety | `message` may echo back SQL fragments, bind values, and table or column names. Treat it as untrusted user-derived text; redact before logging at INFO. |
 
 ### Connection-level errors
 
 - **Authentication failure**: `401`/`403` HTTP response before the WebSocket
-  upgrade completes. Terminal across all endpoints.
+  upgrade completes. Terminal across all endpoints. The borrow that
+  triggered the connect rethrows `LineSenderException`.
 - **Malformed frames**: `QwpDecodeException` or WebSocket close with a
   terminal code.
 - **Role mismatch**: `QwpRoleMismatchException` when all endpoints report
@@ -950,7 +1173,8 @@ ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 ```
 
 The client tries endpoints in order. On connection loss, it walks the list
-to find the next healthy endpoint.
+to find the next healthy endpoint. Schema translation applies to the whole
+list — the egress side sees the same hosts on `ws`/`wss`.
 
 ### Ingestion failover
 
@@ -969,14 +1193,15 @@ Ingress is zone-blind: it pins QWP v1 and does not read `SERVER_INFO`. The
 clients works unchanged.
 
 With store-and-forward (`sf_dir` set), unacknowledged data survives sender
-restarts. Without it, unacknowledged data lives in process memory and is lost
-if the sender process dies.
+restarts. Without it, unacknowledged data lives in process memory and is
+lost if the sender process dies.
 
 ### Query failover
 
 The query client drives a per-query reconnect loop. When a transport error
-occurs mid-stream, the client reconnects to another endpoint and replays the
-query. `batch_seq` restarts at 0 on the new connection.
+occurs mid-stream, the client reconnects to another endpoint and replays
+the query. `batch_seq` restarts at 0 on the new connection, and the
+handler's `onFailoverReset(...)` fires before the replayed batches arrive.
 
 Key connect-string options:
 
@@ -1009,51 +1234,30 @@ public void onFailoverReset(QwpServerInfo newNode) {
 }
 ```
 
-If you do not clear state, you will see overlapping data (the server replays
-the full result set).
+If you do not clear state, you will see overlapping data (the server
+replays the full result set).
 
-`onFailoverReset` is a mid-stream event only. It does not fire during
-`connect()` or between queries. If the connection drops between queries,
-the next `execute()` call handles the reconnect internally.
+`onFailoverReset` is a mid-stream event only. It does not fire between
+queries — the pool transparently replaces unhealthy query clients on
+borrow.
 
 **Terminal failure**: when all endpoints are unreachable and the failover
-budget is exhausted, the error is delivered via `onError` and the
-`QwpQueryClient` enters a terminal state. Subsequent `execute()` calls
-throw `IllegalStateException`. Close the client and create a new one:
+budget is exhausted, the error is delivered via `onError` and
+`Completion.await()` rethrows `QueryException`. The pool detects the
+terminal state on slot return and provisions a fresh client on the next
+submit; no application-level recreate loop is required, in contrast to
+direct `QwpQueryClient` usage.
 
-```java
-try {
-    client.execute(sql, handler);
-} catch (IllegalStateException e) {
-    client.close();
-    client = QwpQueryClient.fromConfig("ws::addr=...");
-    client.connect();
-    client.execute(sql, handler);
-}
-```
+### Connection events (low-level)
 
-This differs from ingestion, where the `Sender` has a continuous reconnect
-loop (`reconnect_max_duration_millis`, default 5 minutes) that spans full
-outages transparently. The query client does not have an equivalent; it
-reconnects only within the scope of a single `execute()` call.
+`SenderConnectionListener`, `SenderErrorHandler`, and
+`SenderProgressHandler` are configured via the
+[`Sender.builder`](#sender-low-level-primitive) — they are not yet wired
+into the `QuestDB` connect-string path. Applications that need these
+callbacks should use the low-level `Sender` API directly. The available
+event kinds:
 
-### Connection events
-
-For ingestion, register a `SenderConnectionListener` to observe connection
-state transitions:
-
-```java
-Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
-    .address("db-primary:9000")
-    .address("db-replica:9000")
-    .connectionListener(event -> {
-        System.out.printf("%s host=%s:%d%n",
-            event.getKind(), event.getHost(), event.getPort());
-    })
-    .build();
-```
-
-Event kinds: `CONNECTED`, `DISCONNECTED`, `RECONNECTED`, `FAILED_OVER`,
+`CONNECTED`, `DISCONNECTED`, `RECONNECTED`, `FAILED_OVER`,
 `ENDPOINT_ATTEMPT_FAILED`, `ALL_ENDPOINTS_UNREACHABLE`, `AUTH_FAILED`
 (terminal), `RECONNECT_BUDGET_EXHAUSTED` (terminal).
 
@@ -1074,21 +1278,97 @@ and
 [multi-host failover](/docs/connect/clients/connect-string#failover-keys)
 sections of the connect string reference.
 
-## Parallel queries
+## Concurrency
+
+`QuestDB` is the only thread-safe handle in the library. `Sender` and
+`Query` (and the underlying `QwpQueryClient`) are single-threaded:
+
+- **Senders**: not thread-safe. Borrow one per concurrent producer, or pin
+  one per thread via `db.sender()`.
+- **Queries**: one in-flight query per `Query` instance.
+  `db.query()` returns the per-thread cached instance — fine for one
+  in-flight query per thread. For multiple concurrent in-flight queries
+  on one thread, call `db.newQuery()` per submit.
+- **Query pool**: caps total in-flight queries at `queryPoolMax`.
+
+To max out parallel query throughput, raise `queryPoolMax` and submit from
+as many threads as you have workers.
 
 :::note Phase 1 limitation
 
-The current implementation supports a single in-flight query per connection.
-The wire protocol allows multiple concurrent queries (demultiplexed by
-request ID); multi-query support is planned for a future release.
+A single underlying query client serves one in-flight query at a time. The
+pool runs N clients in parallel, so concurrency = `queryPoolMax`. The wire
+protocol allows demultiplexed concurrent queries on one client;
+multi-query support per client is planned for a future release.
 
 :::
 
-To run queries in parallel, create separate `QwpQueryClient` instances. Each
-instance manages its own WebSocket connection.
+## Low-level primitives
 
-Neither `Sender` nor `QwpQueryClient` is thread-safe. For multi-threaded
-workloads, use one instance per thread or use an object pool.
+`QuestDB` is built on the same `Sender` and `QwpQueryClient` types you can
+construct directly. Use them when you need:
+
+- A `SenderErrorHandler`, `SenderConnectionListener`, or
+  `SenderProgressHandler` registered on the sender (not yet exposed via
+  the pool).
+- The `Sender.builder` API for explicit advanced-TLS / endpoint
+  configuration that isn't expressible in a connect string.
+- A single-shot lifecycle without pooling overhead — for example, an ETL
+  job that opens, ingests, and exits.
+
+### `Sender` (low-level primitive)
+
+```java
+import io.questdb.client.Sender;
+
+try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
+    sender.table("trades")
+          .symbol("symbol", "ETH-USD")
+          .doubleColumn("price", 2615.54)
+          .atNow();
+}
+```
+
+Or with the builder, for callbacks the unified config can't express:
+
+```java
+try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
+        .address("db-primary:9000")
+        .address("db-replica:9000")
+        .enableTls()
+        .httpToken("YOUR_BEARER_TOKEN")
+        .errorHandler(error -> {
+            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
+                error.getCategory(), error.getTableName(),
+                error.getServerMessage());
+        })
+        .connectionListener(event -> {
+            System.out.printf("connection: %s host=%s:%d%n",
+                event.getKind(), event.getHost(), event.getPort());
+        })
+        .progressHandler(ackedFsn -> {
+            // settled watermark; see SenderProgressHandler javadoc for the
+            // distinction from durable
+        })
+        .build()) {
+    // ...
+}
+```
+
+### `QwpQueryClient` (low-level primitive)
+
+```java
+import io.questdb.client.cutlass.qwp.client.QwpQueryClient;
+
+try (QwpQueryClient client = QwpQueryClient.newPlainText("localhost", 9000)) {
+    client.connect();
+    client.execute(sql, handler);
+}
+```
+
+This is the path the `QuestDB` facade uses internally. Direct usage gives
+you explicit control over `connect()` timing, per-query `withInitialCredit`
+adjustment, and removal of the pool's `Completion` wrapper layer.
 
 ## Configuration reference
 
@@ -1109,10 +1389,23 @@ Common WebSocket-specific options:
 | `failover` | `on` | Egress per-query reconnect switch. |
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`). |
 
+Pool keys (parsed by the `QuestDB` facade, stripped before passing on):
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `sender_pool_min` | `1` | Minimum senders kept warm. |
+| `sender_pool_max` | `4` | Maximum senders. |
+| `query_pool_min` | `1` | Minimum query clients kept warm. |
+| `query_pool_max` | `4` | Maximum query clients. |
+| `acquire_timeout_ms` | `5000` | Borrow / submit timeout. |
+| `idle_timeout_ms` | `60000` | Reap idle slots after this duration. |
+| `max_lifetime_ms` | `1800000` | Recycle slots older than this. |
+| `housekeeper_interval_ms` | `5000` | Sweep cadence. |
+
 ## Compatible JDKs
 
-The client relies on some JDK internal libraries, which certain specialised JDK
-offerings may not support.
+The client relies on some JDK internal libraries, which certain specialised
+JDK offerings may not support.
 
 Known incompatible JDKs:
 
@@ -1132,185 +1425,149 @@ unchanged. The main differences:
 | Buffer capacity | Configurable | Not configurable (internal cursor) |
 | Store-and-forward | Not available | Available (`sf_dir`) |
 | Multi-endpoint failover | Limited | Full reconnect loop with backoff |
-| Querying | Not available | `QwpQueryClient` |
+| Querying | Not available | `QuestDB.executeSql` / `QwpQueryClient` |
+| Pooled facade | Not available | `QuestDB.connect(...)` |
 
-To migrate, change your connect string from `http::` to `ws::` (or `https::`
-to `wss::`), register a `SenderErrorHandler` for async error handling, and
-adjust auto-flush settings if needed.
+To migrate, either:
+
+1. Replace `Sender.fromConfig(...)` with `QuestDB.connect(...)` and use
+   `db.borrowSender()` — the row-building chain is unchanged.
+2. Or keep `Sender.fromConfig(...)` if you need the builder-only callbacks
+   (`SenderErrorHandler`, `SenderConnectionListener`,
+   `SenderProgressHandler`) and add a separate `QuestDB` or
+   `QwpQueryClient` for queries.
+
+Either way, change your connect string from `http::` to `ws::` (or
+`https::` to `wss::`) to opt into the QWP path, and adjust auto-flush
+settings if needed.
 
 ## Full example: ingestion and querying with failover
 
-This example combines ingestion with 2D arrays and connection events, then
-queries the data back with the recreate-on-failure pattern for egress. It
-uses the builder API with enterprise TLS and token auth.
-
 ```java
+import io.questdb.client.Completion;
+import io.questdb.client.QuestDB;
+import io.questdb.client.QueryException;
 import io.questdb.client.Sender;
 import io.questdb.client.cutlass.line.array.DoubleArray;
 import io.questdb.client.cutlass.qwp.client.QwpColumnBatch;
 import io.questdb.client.cutlass.qwp.client.QwpColumnBatchHandler;
-import io.questdb.client.cutlass.qwp.client.QwpQueryClient;
 import io.questdb.client.cutlass.qwp.client.QwpServerInfo;
 
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
-// ─── Ingestion (builder API with connection events) ─────────────────
+// One QuestDB per deployment. Holds elastic pools for both ingest and
+// egress. Use try-with-resources at the application boundary; everything
+// inside is allocation-free at steady state.
 
-// Multi-host with store-and-forward for failover durability.
-// Without sf_dir, data buffered during an outage lives in process memory
-// and is lost if the sender process dies. With sf_dir, unacknowledged
-// frames are persisted to disk and replayed after reconnection.
+try (QuestDB db = QuestDB.builder()
+        .fromConfig(
+            "wss::addr=db-primary:9000,db-replica:9000,db-replica2:9000;"
+            + "token=YOUR_BEARER_TOKEN;"
+            + "failover=on;"
+            + "failover_max_attempts=8;"
+            + "failover_max_duration_ms=30000;")
+        .senderPoolMin(2).senderPoolMax(16)
+        .queryPoolMin(2).queryPoolMax(8)
+        .acquireTimeoutMillis(10_000)
+        .build()) {
 
-try (Sender sender = Sender.builder(Sender.Transport.WEBSOCKET)
-        .address("db-primary:9000")       // Enterprise: multi-host
-        .address("db-replica:9000")       // Enterprise: multi-host
-        .enableTls()                      // Enterprise: wss (TLS)
-        .advancedTls().disableCertificateValidation()  // test only!
-        .httpToken("your_bearer_token")   // Enterprise: token auth (works for WS too)
-        .storeAndForwardDir("/var/lib/myapp/qdb-sf")   // durability across outages
-        .senderId("ingest-1")                          // unique per sender process
-        .reconnectMaxDurationMillis(300_000)
-        .reconnectInitialBackoffMillis(100)
-        .reconnectMaxBackoffMillis(5_000)
-        .errorHandler(error -> {
-            System.err.printf("batch rejected: category=%s table=%s msg=%s%n",
-                error.getCategory(), error.getTableName(),
-                error.getServerMessage());
-        })
-        .connectionListener(event -> {
-            System.out.printf("connection: %s host=%s:%d%n",
-                event.getKind(), event.getHost(), event.getPort());
-        })
-        .build();
-     DoubleArray bids = new DoubleArray(5, 2);
-     DoubleArray asks = new DoubleArray(5, 2)) {
+    // ─── Ingestion ─────────────────────────────────────────────────────
 
-    for (int i = 0; i < 100; i++) {
-        bids.clear();
-        asks.clear();
-        for (int lvl = 0; lvl < 5; lvl++) {
-            bids.append(1.0842 - 0.0001 * (lvl + 1));  // price
-            bids.append(100_000 + ThreadLocalRandom.current().nextInt(900_000)); // size
-            asks.append(1.0842 + 0.0001 * (lvl + 1));
-            asks.append(100_000 + ThreadLocalRandom.current().nextInt(900_000));
+    // Borrow a sender per producer task. close() flushes and returns it
+    // to the pool. The pool transparently handles reconnects; the
+    // failover loop drives the underlying Sender's reconnect budget.
+
+    try (Sender sender = db.borrowSender();
+         DoubleArray bids = new DoubleArray(5, 2);
+         DoubleArray asks = new DoubleArray(5, 2)) {
+
+        for (int i = 0; i < 100; i++) {
+            bids.clear();
+            asks.clear();
+            for (int lvl = 0; lvl < 5; lvl++) {
+                bids.append(1.0842 - 0.0001 * (lvl + 1));
+                bids.append(100_000 + ThreadLocalRandom.current().nextInt(900_000));
+                asks.append(1.0842 + 0.0001 * (lvl + 1));
+                asks.append(100_000 + ThreadLocalRandom.current().nextInt(900_000));
+            }
+            sender.table("book")
+                  .symbol("ticker", "EURUSD")
+                  .doubleArray("bids", bids)
+                  .doubleArray("asks", asks)
+                  .at(Instant.now());
         }
-        sender.table("book")
-              .symbol("ticker", "EURUSD")
-              .doubleArray("bids", bids)
-              .doubleArray("asks", asks)
-              .at(Instant.now());
+        // close() (via try-with-resources) flushes pending rows.
     }
-    sender.flush();
-} catch (LineSenderServerException e) {
-    // Async batch rejection has already fired through errorHandler(...).
-    // This catch fires when the sender is in a terminal HALT state and the
-    // next producer-thread call rethrows the latched rejection.
-    SenderError err = e.getServerError();
-    System.err.printf("sender halted: status=0x%02X category=%s msg=%s%n",
-        err.getServerStatusByte(), err.getCategory(), err.getServerMessage());
-} catch (LineSenderException e) {
-    // Reconnect budget exhausted, terminal WebSocket failure, or other
-    // client-side error.
-    System.err.println("ingest failed: " + e.getMessage());
-}
 
-// Connection events you will see:
-//   CONNECTED host=db-primary:9000        — initial connection
-//   DISCONNECTED host=db-primary:9000     — primary goes down
-//   ENDPOINT_ATTEMPT_FAILED host=...      — retry attempts during outage
-//   ALL_ENDPOINTS_UNREACHABLE host=...    — all hosts down (retries continue)
-//   FAILED_OVER host=db-replica:9000      — replica promoted, sender resumes
+    // ─── Querying ──────────────────────────────────────────────────────
 
-// With sf_dir set, unacknowledged frames are persisted to disk during
-// the outage and replayed when the new primary becomes reachable.
-// Without sf_dir, the Sender buffers in memory only — the reconnect
-// loop still works, but data is lost if the sender process dies.
+    // executeSql() is the one-shot shortcut. The pool serves the request
+    // from a query worker. Mid-query failover is transparent to the
+    // application; the handler's onFailoverReset() fires before replayed
+    // batches arrive.
 
+    Completion c = db.executeSql(
+        "SELECT ts, ticker, bids[1][1] AS best_bid, asks[1][1] AS best_ask "
+        + "FROM book ORDER BY ts DESC LIMIT 10",
+        new QwpColumnBatchHandler() {
+            @Override
+            public void onBatch(QwpColumnBatch batch) {
+                batch.forEachRow(row -> System.out.printf(
+                    "ts=%s ticker=%s bid=%.5f ask=%.5f%n",
+                    Instant.ofEpochMilli(row.getLongValue(0) / 1000),
+                    row.getSymbol(1),
+                    row.getDoubleValue(2),
+                    row.getDoubleValue(3)));
+            }
 
-// ─── Querying (connect string, with reconnect-on-failure) ───────────
+            @Override
+            public void onEnd(long requestId, long totalRows) {
+                System.out.printf("req=%d (%d rows)%n", requestId, totalRows);
+            }
 
-// The QwpQueryClient becomes permanently dead after a total outage
-// exhausts the failover budget. The application must close the dead
-// client and create a new one. This pattern handles that:
+            @Override
+            public void onError(long requestId, byte status, String message) {
+                System.err.printf("query error: req=%d 0x%02X %s%n",
+                    requestId, status & 0xFF, message);
+            }
 
-String connString =
-    "wss::addr=db-primary:9000,db-replica:9000,db-replica2:9000;"  // Enterprise: wss, multi-host
-    + "token=your_bearer_token;"                                    // Enterprise: token auth
-    + "tls_verify=unsafe_off;"                                      // test only!
-    + "failover=on;"                                                // Enterprise: failover
-    + "failover_max_attempts=8;"
-    + "failover_max_duration_ms=30000;";
-
-QwpQueryClient client = null;
-
-while (true) {
-    // Reconnect if the client is dead
-    if (client == null) {
-        try {
-            client = QwpQueryClient.fromConfig(connString);
-            client.connect();
-        } catch (LineSenderException e) {
-            // Connect-time failure: network, TLS, auth, malformed config.
-            System.err.println("connect failed: " + e.getMessage());
-            client = null;
-            Thread.sleep(2000);
-            continue;
-        }
-    }
+            @Override
+            public void onFailoverReset(long requestId, QwpServerInfo newNode) {
+                System.out.printf("failover req=%d to node=%s role=%s%n",
+                    requestId,
+                    newNode != null ? newNode.getNodeId() : "v1",
+                    newNode != null ? QwpServerInfo.roleName(newNode.getRole()) : "n/a");
+            }
+        });
 
     try {
-        client.execute(
-            "SELECT ts, ticker, bids[1][1] AS best_bid, asks[1][1] AS best_ask "
-                + "FROM book ORDER BY ts DESC LIMIT 10",
-            new QwpColumnBatchHandler() {
-                @Override
-                public void onBatch(QwpColumnBatch batch) {
-                    batch.forEachRow(row -> System.out.printf(
-                        "ts=%s ticker=%s bid=%.5f ask=%.5f%n",
-                        Instant.ofEpochMilli(row.getLongValue(0) / 1000),
-                        row.getSymbol(1),
-                        row.getDoubleValue(2),
-                        row.getDoubleValue(3)));
-                }
-
-                @Override
-                public void onEnd(long requestId, long totalRows) {
-                    System.out.printf("req=%d (%d rows)%n", requestId, totalRows);
-                }
-
-                @Override
-                public void onError(long requestId, byte status, String message) {
-                    System.err.printf("query error: req=%d 0x%02X %s%n",
-                        requestId, status & 0xFF, message);
-                }
-
-                @Override
-                public void onFailoverReset(long requestId, QwpServerInfo newNode) {
-                    // Fires only when failover happens mid-query.
-                    // Clear any accumulated partial results here.
-                    System.out.printf("failover req=%d to node=%s role=%s%n",
-                        requestId,
-                        newNode.getNodeId(),
-                        QwpServerInfo.roleName(newNode.getRole()));
-                }
-            }
-        );
-    } catch (IllegalStateException e) {
-        // Terminal state: client is closed, never connected, or failover
-        // budget exhausted. Recreate the client.
-        System.err.println("query client unusable: " + e.getMessage());
-        try { client.close(); } catch (RuntimeException ignored) { }
-        client = null;
-        System.out.println("(will reconnect on next query)");
-    } catch (LineSenderException e) {
-        // Other client-side failure (bind encoding, etc.). Client may still be
-        // usable; drop and recreate to be safe.
-        System.err.println("query failed: " + e.getMessage());
-        try { client.close(); } catch (RuntimeException ignored) { }
-        client = null;
+        if (!c.await(30, TimeUnit.SECONDS)) {
+            c.cancel();
+            c.await();
+        }
+    } catch (QueryException e) {
+        System.err.printf("query failed: status=0x%02X %s%n",
+            e.getStatus() & 0xFF, e.getMessage());
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
     }
 
-    Thread.sleep(2000);
+    // ─── Query with bind parameters ────────────────────────────────────
+
+    db.query()
+      .sql("SELECT ts, ticker FROM book WHERE ticker = $1 LIMIT $2")
+      .binds(binds -> {
+          binds.setVarchar(0, "EURUSD");
+          binds.setLong(1, 50L);
+      })
+      .handler(new QwpColumnBatchHandler() {
+          @Override public void onBatch(QwpColumnBatch batch) { /* ... */ }
+          @Override public void onEnd(long totalRows) { /* ... */ }
+          @Override public void onError(byte status, String message) { /* ... */ }
+      })
+      .submit()
+      .await();
 }
 ```
