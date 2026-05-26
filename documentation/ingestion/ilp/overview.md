@@ -443,6 +443,14 @@ CREATE TABLE IF NOT EXISTS 'trades' (
 You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
 created, but without raising an error if the table already exists.
 
+## Data ordering
+
+ILP performs best when rows arrive in chronological order by their designated
+timestamp. QuestDB also accepts rows in any order: late or out-of-order rows
+are merged into the correct position automatically. See
+[Partition splitting and squashing](/docs/concepts/partitions/#partition-splitting-and-squashing)
+for the engine mechanics.
+
 ## HTTP transaction semantics
 
 The TCP endpoint does not support transactions. The HTTP ILP endpoint treats

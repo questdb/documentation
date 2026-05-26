@@ -32,6 +32,7 @@ sequential reads, materialized views, and in-memory processing.
 - **Out-of-order data:**
   When data arrives out of order, QuestDB [rearranges it](/docs/concepts/partitions/#partition-splitting-and-squashing) to maintain timestamp order. The
   engine splits partitions to minimize [write amplification](/docs/getting-started/capacity-planning/#write-amplification) and compacts them in the background.
+  See [Out-of-order data](/docs/concepts/out-of-order-data/) for behavior per ingestion method and tuning guidance.
 
 
 ### Data partitioning and sequential reads
