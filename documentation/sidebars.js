@@ -519,6 +519,7 @@ module.exports = {
           collapsed: false,
           items: [
             "concepts/designated-timestamp",
+            "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
             "concepts/symbol",
