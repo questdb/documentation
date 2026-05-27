@@ -164,6 +164,7 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "query/overview",
+        "concepts/deep-dive/sql-extensions",
         {
           type: "category",
           label: "PostgreSQL Wire Protocol",
@@ -519,6 +520,7 @@ module.exports = {
           collapsed: false,
           items: [
             "concepts/designated-timestamp",
+            "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
             "concepts/symbol",
@@ -548,7 +550,6 @@ module.exports = {
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",
-            "concepts/deep-dive/sql-extensions",
             "concepts/deep-dive/sql-optimizer-hints",
             "concepts/deep-dive/root-directory-structure",
           ],
