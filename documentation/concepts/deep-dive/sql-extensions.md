@@ -64,14 +64,24 @@ QuestDB extends `WHERE` with a concise interval syntax for the designated
 timestamp. It compiles to optimized interval scans and is both shorter and
 faster than `dateadd()` / `now()` arithmetic.
 
-```questdb-sql demo title="Last hour, today, last seven days"
+```questdb-sql demo title="Last hour"
 SELECT * FROM trades WHERE timestamp IN '$now - 1h..$now';
-SELECT * FROM trades WHERE timestamp IN '$today';
-SELECT * FROM trades WHERE timestamp IN '$now - 7d..$now';
 ```
 
-`TICK` also supports calendar variables, business-day arithmetic, and complex
-intervals such as "NYSE trading hours on workdays for January." See
+```questdb-sql demo title="Today"
+SELECT * FROM trades WHERE timestamp IN '$today';
+```
+
+On QuestDB Enterprise, [exchange calendars](/docs/query/operators/exchange-calendars/)
+let TICK address venue schedules directly. `XNYS` is the ISO 10383 MIC code
+for the New York Stock Exchange; QuestDB knows the exchange's actual
+schedule, so holidays and early closes are excluded automatically.
+
+```questdb-sql title="NYSE trading hours for January 2025"
+SELECT * FROM trades WHERE timestamp IN '[2025-01]#XNYS';
+```
+
+Other supported calendars include `XLON`, `XHKG`, and more. See
 [TICK operator](/docs/query/operators/tick/) for the full grammar.
 
 ## Time-series joins
@@ -86,9 +96,10 @@ recent right row whose timestamp is less than or equal to the left timestamp.
 The textbook case is enriching trades with the prevailing quote.
 
 ```questdb-sql demo title="Attach prevailing quote to each trade"
-SELECT t.timestamp, t.symbol, t.price, q.bid, q.ask
-FROM trades t
-ASOF JOIN (SELECT * FROM trades) q ON (symbol);
+SELECT t.timestamp, t.symbol, t.price, p.bid_price, p.ask_price
+FROM fx_trades AS t
+ASOF JOIN core_price AS p ON (symbol)
+WHERE t.timestamp IN '$now-1h..$now';
 ```
 
 A `TOLERANCE` clause caps how far back the join will look.
@@ -118,18 +129,99 @@ Used for "all market data in the next 100 ms after a trade" style queries.
 a list or range of time offsets from each left row. Used for post-trade
 markout, implementation-shortfall, and other time-series cohort analyses.
 
-```questdb-sql title="Average mid at multiple horizons after each trade"
-SELECT t.symbol, h.offset / 1000000000 AS horizon_sec,
-    avg((m.best_bid + m.best_ask) / 2) AS avg_mid
-FROM trades t
-HORIZON JOIN market_data m ON (symbol)
-    LIST (0, 1s, 5s, 30s, 1m, 5m) AS h
-GROUP BY t.symbol, h.offset
+```questdb-sql demo title="Markout at non-uniform time horizons after each trade"
+SELECT
+    h.offset / 1_000_000_000 AS horizon_sec,
+    t.symbol,
+    avg((m.best_bid + m.best_ask) / 2 - t.price) AS avg_markout
+FROM fx_trades AS t
+HORIZON JOIN market_data AS m ON (symbol)
+LIST (0, 5s, 30s, 1m) AS h
+WHERE t.timestamp IN '$now-1h..$now'
 ORDER BY t.symbol, horizon_sec;
 ```
 
 For the full join inventory in one table, see
 [Supported joins](#supported-joins) below.
+
+## Query syntax conveniences
+
+These are differences from standard SQL that exist purely as ergonomics.
+They are optional shortcuts, not new semantics.
+
+### SELECT * FROM is optional
+
+`SELECT * FROM trades` and `trades` return the same result. The shorter form
+is often easier to read inside subqueries.
+
+```questdb-sql demo title="Implicit SELECT *"
+trades;
+-- equivalent to:
+SELECT * FROM trades;
+```
+
+### Implicit timestamp ordering and negative LIMIT
+
+Queries against a table with a
+[designated timestamp](/docs/concepts/designated-timestamp/) return rows in
+ascending timestamp order without an explicit `ORDER BY`. The data is
+already physically sorted on disk, so adding `ORDER BY timestamp` is
+redundant.
+
+QuestDB also extends [`LIMIT`](/docs/query/sql/limit/) with negative values,
+which take from the end of the result set. Combined with the implicit
+ordering, this gives "the latest N rows" with no sort:
+
+```questdb-sql demo title="Latest 10 trades"
+SELECT * FROM trades LIMIT -10;
+```
+
+`LIMIT` accepts a two-argument form with negative bounds for paginating from
+the end (`LIMIT -m, -n` takes the last m rows then drops the last n).
+
+### GROUP BY is optional
+
+QuestDB derives the `GROUP BY` set from the non-aggregate columns in
+`SELECT`. Enumerating them again in a `GROUP BY` clause is redundant.
+
+```questdb-sql demo title="Implicit GROUP BY"
+SELECT symbol, side, sum(price)
+FROM trades
+WHERE timestamp IN '$today';
+```
+
+The explicit `GROUP BY` form is still accepted.
+
+### Implicit HAVING
+
+Standard SQL `HAVING` is not supported. Filter on aggregates by wrapping
+them in a subquery and applying a regular `WHERE`:
+
+```questdb-sql demo title="HAVING equivalent via subquery"
+(
+    SELECT symbol, side, sum(price) AS total_price
+    FROM trades WHERE timestamp IN '$today'
+)
+WHERE total_price > 10_000_000;
+```
+
+This pattern is consistently faster than `HAVING` in dialects that have it,
+because no extra aggregation pass is required.
+
+### DECLARE variables
+
+[`DECLARE`](/docs/query/sql/declare/) introduces query-scoped variables for
+both stand-alone queries and view definitions. Variables make repeated
+expressions (date ranges, symbol filters, thresholds) reusable without
+losing readability.
+
+```questdb-sql demo title="DECLARE used in a query"
+DECLARE
+    @symbol := 'BTC-USDT',
+    @window := '$now - 1d..$now'
+SELECT timestamp, price FROM trades
+WHERE symbol = @symbol AND timestamp IN @window;
+```
 
 ## Storage and table extensions
 
@@ -196,66 +288,6 @@ CREATE TABLE trades (
 ) TIMESTAMP(ts) PARTITION BY DAY WAL;
 ```
 
-### DECLARE variables
-
-[`DECLARE`](/docs/query/sql/declare/) introduces query-scoped variables for
-both stand-alone queries and view definitions. Variables make repeated
-expressions (date ranges, symbol filters, thresholds) reusable without
-losing readability.
-
-```questdb-sql title="DECLARE used in a query"
-DECLARE
-    @symbol := 'BTC-USDT',
-    @window := '$now - 1d..$now'
-SELECT timestamp, price FROM trades
-WHERE symbol = @symbol AND timestamp IN @window;
-```
-
-## Query syntax conveniences
-
-These are differences from standard SQL that exist purely as ergonomics.
-They are optional shortcuts, not new semantics.
-
-### SELECT * FROM is optional
-
-`SELECT * FROM trades` and `trades` return the same result. The shorter form
-is often easier to read inside subqueries.
-
-```questdb-sql demo title="Implicit SELECT *"
-trades;
--- equivalent to:
-SELECT * FROM trades;
-```
-
-### GROUP BY is optional
-
-QuestDB derives the `GROUP BY` set from the non-aggregate columns in
-`SELECT`. Enumerating them again in a `GROUP BY` clause is redundant.
-
-```questdb-sql demo title="Implicit GROUP BY"
-SELECT symbol, side, sum(price)
-FROM trades
-WHERE timestamp IN '$today';
-```
-
-The explicit `GROUP BY` form is still accepted.
-
-### Implicit HAVING
-
-Standard SQL `HAVING` is not supported. Filter on aggregates by wrapping
-them in a subquery and applying a regular `WHERE`:
-
-```questdb-sql demo title="HAVING equivalent via subquery"
-(
-    SELECT symbol, side, sum(price) AS total_price
-    FROM trades WHERE timestamp IN '$today'
-)
-WHERE total_price > 10_000_000;
-```
-
-This pattern is consistently faster than `HAVING` in dialects that have it,
-because no extra aggregation pass is required.
-
 ## PIVOT
 
 QuestDB has native [`PIVOT`](/docs/query/sql/pivot/) following the
@@ -277,16 +309,30 @@ aggregates.
 ## JSON and UNNEST
 
 QuestDB supports JSON path expressions for reading inside `VARCHAR` columns
-that contain JSON, as well as JSON arrays via
-[`UNNEST`](/docs/query/sql/unnest/). The same `UNNEST` keyword expands
-native `DOUBLE[]` arrays into rows.
+that contain JSON. See [JSON functions](/docs/query/functions/json/) for the
+path-expression reference.
 
-```questdb-sql title="UNNEST a literal array"
+[`UNNEST`](/docs/query/sql/unnest/) expands both native arrays and JSON
+arrays into rows. Use it to flatten an `ARRAY` column for further filtering
+or aggregation:
+
+```questdb-sql demo title="UNNEST a literal array"
 SELECT value FROM UNNEST(ARRAY[1.0, 2.0, 3.0]);
 ```
 
-See [JSON functions](/docs/query/functions/json/) for the path-expression
-reference.
+For JSON arrays stored as `VARCHAR`, `UNNEST` accepts a `COLUMNS(...)`
+clause that types each extracted field. The example below ingests a slice of
+the [Coinbase trades API](https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=3)
+response and produces typed columns:
+
+```questdb-sql title="Expand a JSON array of trade objects"
+SELECT u.trade_id, u.price, u.size, u.side, u.time
+FROM UNNEST(
+    '[{"trade_id":994619709,"side":"sell","size":"0.00000100","price":"69839.36","time":"2026-04-06T10:32:55.517183Z"},
+      {"trade_id":994619708,"side":"buy","size":"0.00000006","price":"69839.35","time":"2026-04-06T10:32:55.418434Z"}]'::VARCHAR
+    COLUMNS(trade_id LONG, price DOUBLE, size DOUBLE, side VARCHAR, time TIMESTAMP)
+) u;
+```
 
 ## Lifecycle, security, and operations
 
@@ -315,11 +361,15 @@ QuestDB also adds groups not typically found in general-purpose databases:
 - **[Finance functions](/docs/query/functions/finance/)**. L2 price
   reconstruction, weighted statistics, and other primitives for market data.
 - **[Visualization functions](/docs/query/functions/visualization/)**.
-  Sparkline-style summaries for Grafana, the web console, and other
-  dashboard contexts.
+  Sparkline-style summaries for the web console and text-based interfaces
+  such as `psql`.
 - **[Meta functions](/docs/query/functions/meta/)**. `tables()`,
   `table_partitions()`, `table_storage()`, `materialized_views()`,
   `query_activity()`, and so on, for inspecting database state from SQL.
+  Only a small subset of PostgreSQL's `pg_catalog` is implemented (enough
+  for client tools to identify the server, for example
+  `pg_catalog.version()`); use the QuestDB meta functions for actual
+  introspection.
 - **[Array functions](/docs/query/functions/array/)** for n-dimensional
   numeric arrays.
 
@@ -333,6 +383,19 @@ Two good places to see this material applied:
 - **[Cookbook](/docs/cookbook/)**. Recipes for finance, time-series patterns,
   Grafana integration, and ingestion.
 
+To run SQL against a local QuestDB instance, use the built-in
+[web console](/docs/getting-started/web-console/overview/) at
+`http://localhost:9000`, or connect with `psql`:
+
+```shell
+psql -h localhost -p 8812 -U admin -d qdb
+# default password: quest
+```
+
+The web console works without any configuration. `psql` and other
+PostgreSQL clients connect over the
+[PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) on port 8812.
+
 ## Standard SQL features not supported
 
 When something a PostgreSQL or ANSI-SQL user expects does not work, the
@@ -344,13 +407,13 @@ table below points at the QuestDB equivalent.
 | `UPDATE` of the designated timestamp | Cannot be updated. Copy data through a temp table, modify, re-insert. See [Updating data](/docs/operations/updating-data/) and [Modifying data](/docs/operations/modifying-data/). |
 | `HAVING` | Wrap aggregate in subquery and filter (see [Implicit HAVING](#implicit-having)). |
 | `OFFSET n LIMIT m` | `LIMIT lo, hi` (e.g. `LIMIT 10, 30`). |
-| `DISTINCT ON (col)` | [`LATEST ON timestamp PARTITION BY col`](/docs/query/sql/latest-on/). |
+| `DISTINCT ON (col)` | For the "latest row per group by timestamp" form (`ORDER BY col, timestamp DESC`), use [`LATEST ON timestamp PARTITION BY col`](/docs/query/sql/latest-on/). For any other ordering, wrap in a CTE with `row_number() OVER (PARTITION BY col ORDER BY ...)` and filter where the row number equals 1. |
 | `INSERT ... ON CONFLICT (...) DO UPDATE` | [`DEDUP UPSERT KEYS(...)`](/docs/concepts/deduplication/) declared at table level. |
 | Correlated subqueries in `WHERE`, `EXISTS`, scalar position | [`LATERAL JOIN`](/docs/query/sql/lateral-join/) for the row-correlated cases. Some scalar correlation can be expressed via `ASOF` or window functions. |
 | `generate_series()` in `SELECT` projection | Use [`generate_series()`](/docs/query/functions/row-generator/) in the `FROM` clause. |
 | `FETCH BACKWARD`, scrollable cursors | Forward-only cursors. See [pgwire caveats](#pgwire-specific-caveats). |
 | Stored procedures, triggers, PL/pgSQL | Not supported. Application code or scheduled jobs replace these patterns. |
-| Foreign keys, CHECK constraints | Not supported. Time-series data is append-oriented; integrity is enforced at the ingestion layer. |
+| Foreign keys, CHECK constraints | Not supported. High-throughput ingestion paths (ILP, batch `INSERT`) avoid per-row constraint checks; integrity is typically enforced upstream in the ingestion pipeline. |
 
 ## Supported joins
 
