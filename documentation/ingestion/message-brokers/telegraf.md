@@ -95,8 +95,10 @@ load configuration files from and paste the following example:
 [[outputs.influxdb_v2]]
 # Use InfluxDB Line Protocol to write metrics to QuestDB
   urls = ["http://localhost:9000"]
-# Disable gzip compression
-  content_encoding = "identity"
+# QuestDB 9.1.0 and later accept gzip-compressed payloads, so Telegraf's
+# default gzip encoding works out of the box. Uncomment the line below to
+# disable gzip if you are on an older QuestDB version.
+#  content_encoding = "identity"
 
 # -- INPUT PLUGINS -- #
 [[inputs.cpu]]
