@@ -90,6 +90,18 @@ connection failures. However, while HTTP is recommended, TCP has slightly lower
 overhead than HTTP and may be useful in high-throughput scenarios in
 high-latency networks.
 
+### Request compression
+
+The HTTP transport accepts gzip-compressed payloads. Third-party tools that
+send ILP over HTTP, such as Telegraf, can set `Content-Encoding: gzip` to
+reduce bandwidth usage. This is most useful when sending text-heavy data
+(logs, documents) or when the client is bandwidth-constrained. The trade-off
+is some CPU overhead for compression on the client and decompression on the
+server.
+
+Compression is not currently exposed by the official QuestDB ILP clients,
+which send uncompressed payloads.
+
 ## Client-Side Configuration
 
 Clients connect to a QuestDB using ILP via a configuration string. Configuration
