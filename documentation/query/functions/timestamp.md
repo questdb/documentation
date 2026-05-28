@@ -41,13 +41,26 @@ CREATE TABLE tableName (...) timestamp(columnName);
 
 Creates a [designated timestamp](/docs/concepts/designated-timestamp/) column in
 the result of a query. Assigning a timestamp in a `SELECT` statement
-(`dynamic timestamp`) allows for time series operations such as `LATEST BY`,
-`SAMPLE BY` or `LATEST BY` on tables which do not have a `designated timestamp`
+(`dynamic timestamp`) allows for time series operations such as `LATEST ON`,
+`SAMPLE BY` or `ASOF JOIN` on tables which do not have a `designated timestamp`
 assigned.
 
 ```questdb-sql
 SELECT ... FROM tableName timestamp(columnName);
 ```
+
+:::warning Data must be sorted by the elected column
+
+`timestamp(columnName)` does not sort the data. QuestDB assumes the result is
+already ordered by `columnName` and uses that assumption for time-series
+operations such as `SAMPLE BY`, `LATEST ON` and `ASOF JOIN`. If the data is
+not actually in order, results will be silently incorrect and no error is
+raised.
+
+Always add `ORDER BY columnName` before applying `timestamp()` on data that
+is not guaranteed sorted (subqueries, `UNION`, `read_parquet()`, casts that
+round-trip the timestamp, and so on).
+:::
 
 ## Optimization with WHERE clauses
 
