@@ -582,6 +582,16 @@ totals over the collected prices in timestamp order.
 - NULL and empty input arrays are skipped during concatenation, but null
   elements within a non-null array are preserved.
 
+#### Maximum array size
+
+`array_agg` shares the global cap on `DOUBLE[]` element count: any group whose
+collected (or concatenated) array would exceed the limit causes the query to
+fail with an `array_agg: array size exceeds configured maximum` error. The cap
+is controlled by the `cairo.max.array.element.count` server property and
+defaults to `10,000,000` elements. See
+[Limitations for variable-sized types](/docs/query/datatypes/#limitations-for-variable-sized-types)
+for the broader array size limits.
+
 #### See also
 
 - [UNNEST](/docs/query/sql/unnest/#array-unnest) - Expand arrays back into rows (inverse of `array_agg`)
