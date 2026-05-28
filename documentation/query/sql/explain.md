@@ -78,6 +78,12 @@ The following list contains some plan node types:
   `INTERSECT`).
 - `Index forward/backward scan` - scans all row ids associated with a given
   `symbol` value from start to finish or vice versa.
+- `CoveringIndex` - reads data from a
+  [posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar
+  files instead of main column files. Appears when all selected columns are
+  covered by the `INCLUDE` clause.
+- `PostingIndex` - uses a posting index for accelerated operations such as
+  `DISTINCT` on a symbol column.
 - `Limit` - standalone node implementing the `LIMIT` keyword. Other nodes can
   implement `LIMIT` internally, e.g. the `Sort` node.
 - `Row forward/backward scan` - scans data frame (usually partitioned) records
