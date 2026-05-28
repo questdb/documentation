@@ -75,12 +75,6 @@ calculations. Functions are organized by category below.
 | [bit_or](#bit_or) | Bitwise OR of all non-NULL values |
 | [bit_xor](#bit_xor) | Bitwise XOR of all non-NULL values |
 
-### Array aggregates
-
-| Function | Description |
-| :------- | :---------- |
-| [array_agg](#array_agg) | Collect values or concatenate arrays into a DOUBLE[] |
-
 ### Specialized aggregates
 
 | Function | Description |
@@ -105,6 +99,7 @@ min/max position-by-position — see the
 
 | Function | Description |
 | :------- | :---------- |
+| [array_agg](#array_agg) | Collect values or concatenate arrays into a DOUBLE[] |
 | [array_elem_avg](/docs/query/functions/array/#array_elem_avg) | Element-wise average across arrays |
 | [array_elem_max](/docs/query/functions/array/#array_elem_max) | Element-wise maximum across arrays |
 | [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
