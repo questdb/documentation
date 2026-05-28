@@ -241,6 +241,12 @@ When explicit `min`/`max` are provided, out-of-range values are clamped:
   `FILL(NULL)`, `FILL(NONE)`, and `FILL(PREV)`. `FILL(LINEAR)` and
   `FILL(value)` are not supported.
 
+- **Ascending designated-timestamp scan required.** The base query must
+  deliver rows in ascending designated-timestamp order. As a current
+  limitation, `sparkline` rejects a base scan that compiles to a backward
+  scan (for example, an inner `ORDER BY ts DESC LIMIT N` on the
+  [designated timestamp](/docs/concepts/designated-timestamp/)).
+
 #### See also
 
 - [bar](#bar) - Scalar horizontal bar

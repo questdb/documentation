@@ -1660,9 +1660,11 @@ Supports `SAMPLE BY` with `FILL` modes.
 
 - `price` is any numeric value.
 - `timestamp` must be the table's
-  [designated timestamp](/docs/concepts/designated-timestamp/). As a current
-  limitation, `twap()` rejects a query that passes any other timestamp column
-  or expression.
+  [designated timestamp](/docs/concepts/designated-timestamp/), and the base
+  query must deliver rows in ascending designated-timestamp order. As a
+  current limitation, `twap()` rejects a query that passes any other
+  timestamp column or expression, or a base scan that compiles to a backward
+  scan (for example, an inner `ORDER BY ts DESC LIMIT N`).
 
 #### Return value
 
