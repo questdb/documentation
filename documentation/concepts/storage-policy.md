@@ -40,12 +40,12 @@ Storage policies require:
 A storage policy consists of up to four TTL settings. Each setting controls a
 stage in the partition lifecycle:
 
-| Setting | Description |
-|---------|-------------|
-| `TO PARQUET` | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file |
-| `TO REMOTE` | _Reserved._ Will upload the Parquet file to object storage when remote upload is supported |
-| `DROP LOCAL` | Remove all local data (native or Parquet) |
-| `DROP REMOTE` | _Reserved._ Will remove the Parquet file from object storage when remote upload is supported |
+| Setting       | Description                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `TO PARQUET`  | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file |
+| `TO REMOTE`   | _Reserved._ Will upload the Parquet file to object storage when remote upload is supported                                          |
+| `DROP LOCAL`  | Remove all local data (native or Parquet)                                                                                           |
+| `DROP REMOTE` | _Reserved._ Will remove the Parquet file from object storage when remote upload is supported                                        |
 
 All settings are optional. Use only the ones relevant to your use case. All TTL
 values must be **positive**; `0` is rejected.
@@ -95,12 +95,12 @@ processes eligible partitions automatically.
 Storage policies replace [TTL](/docs/concepts/ttl/) in QuestDB Enterprise. If
 you are already familiar with TTL, this comparison is the fastest way in:
 
-| | TTL | Storage Policy |
-|---|-----|----------------|
-| **Availability** | Open source | Enterprise only |
-| **Action** | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
-| **Parquet conversion** | No | Yes (automatic local conversion) |
-| **Granularity** | Single retention window | Up to four independent TTL stages |
+|                        | TTL                       | Storage Policy                           |
+| ---------------------- | ------------------------- | ---------------------------------------- |
+| **Availability**       | Open source               | Enterprise only                          |
+| **Action**             | Drops partitions entirely | Graduated lifecycle (convert, then drop) |
+| **Parquet conversion** | No                        | Yes (automatic local conversion)         |
+| **Granularity**        | Single retention window   | Up to four independent TTL stages        |
 
 In QuestDB Enterprise, `CREATE TABLE ... TTL` and `ALTER TABLE SET TTL` are
 deprecated. Use storage policies instead:
@@ -147,21 +147,6 @@ ALTER TABLE trades SET STORAGE POLICY(
 
 Only the specified settings are changed. Omitted settings remain unchanged.
 
-### On materialized views
-
-```questdb-sql
-CREATE MATERIALIZED VIEW hourly_trades AS (
-    SELECT ts, symbol, sum(price) total
-    FROM trades
-    SAMPLE BY 1h
-) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 7d, DROP LOCAL 1M);
-```
-
-```questdb-sql
-ALTER MATERIALIZED VIEW hourly_trades SET STORAGE POLICY(TO PARQUET 7d);
-```
-
 For full syntax details, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
@@ -170,13 +155,13 @@ For full syntax details, see
 Storage policy TTLs accept the same duration formats as
 [TTL](/docs/concepts/ttl/):
 
-| Unit | Long form | Short form |
-|------|-----------|------------|
-| Hours | `1 HOUR` / `2 HOURS` | `1h` |
-| Days | `1 DAY` / `3 DAYS` | `1d` / `3d` |
-| Weeks | `1 WEEK` / `2 WEEKS` | `1W` / `2W` |
+| Unit   | Long form              | Short form  |
+| ------ | ---------------------- | ----------- |
+| Hours  | `1 HOUR` / `2 HOURS`   | `1h`        |
+| Days   | `1 DAY` / `3 DAYS`     | `1d` / `3d` |
+| Weeks  | `1 WEEK` / `2 WEEKS`   | `1W` / `2W` |
 | Months | `1 MONTH` / `6 MONTHS` | `1M` / `6M` |
-| Years | `1 YEAR` / `2 YEARS` | `1Y` / `2Y` |
+| Years  | `1 YEAR` / `2 YEARS`   | `1Y` / `2Y` |
 
 ### Ordering constraint
 
@@ -227,9 +212,9 @@ Query the `storage_policies` system view to see all active policies:
 SELECT * FROM storage_policies;
 ```
 
-| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
-|----------------|-----------|-----------|------------|-------------|--------|--------------|
-| trades~12 | 72h | | 1m | | A | 2025-01-15T10:30:00.000000Z |
+| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated                |
+| -------------- | ---------- | --------- | ---------- | ----------- | ------ | --------------------------- |
+| trades~12      | 72h        |           | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
 
 - TTL values are rendered in just two units: `h` for hours and `m` for
   **months**. Hour-, day-, and week-based durations are normalized to hours
@@ -268,25 +253,25 @@ Storage policy behavior can be tuned in `server.conf`. Time-based properties
 accept values with unit suffixes (e.g., `15m`, `30s`, `1h`) or raw microsecond
 values:
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `storage.policy.check.interval` | `15m` (15 min) | How often QuestDB scans for partitions to process |
-| `storage.policy.retry.interval` | `1m` (1 min) | Retry interval for failed tasks |
-| `storage.policy.max.reschedule.count` | `20` | Maximum retries before abandoning a task |
-| `storage.policy.writer.wait.timeout` | `30s` (30 sec) | Timeout for acquiring the table writer |
-| `storage.policy.worker.count` | `2` | Number of storage policy worker threads (0 disables the feature) |
-| `storage.policy.worker.affinity` | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list) |
-| `storage.policy.worker.sleep.timeout` | `100ms` | Sleep duration when worker has no tasks |
+| Property                              | Default            | Description                                                      |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| `storage.policy.check.interval`       | `15m` (15 min)     | How often QuestDB scans for partitions to process                |
+| `storage.policy.retry.interval`       | `1m` (1 min)       | Retry interval for failed tasks                                  |
+| `storage.policy.max.reschedule.count` | `20`               | Maximum retries before abandoning a task                         |
+| `storage.policy.writer.wait.timeout`  | `30s` (30 sec)     | Timeout for acquiring the table writer                           |
+| `storage.policy.worker.count`         | `2`                | Number of storage policy worker threads (0 disables the feature) |
+| `storage.policy.worker.affinity`      | `-1` (no affinity) | CPU affinity for each worker thread (comma-separated list)       |
+| `storage.policy.worker.sleep.timeout` | `100ms`            | Sleep duration when worker has no tasks                          |
 
 ## Permissions
 
 Storage policy operations require specific permissions in QuestDB Enterprise:
 
-| Operation | Required permission |
-|-----------|-------------------|
-| `SET STORAGE POLICY` | `SET STORAGE POLICY` |
-| `DROP STORAGE POLICY` | `REMOVE STORAGE POLICY` |
-| `ENABLE STORAGE POLICY` | `ENABLE STORAGE POLICY` |
+| Operation                | Required permission      |
+| ------------------------ | ------------------------ |
+| `SET STORAGE POLICY`     | `SET STORAGE POLICY`     |
+| `DROP STORAGE POLICY`    | `REMOVE STORAGE POLICY`  |
+| `ENABLE STORAGE POLICY`  | `ENABLE STORAGE POLICY`  |
 | `DISABLE STORAGE POLICY` | `DISABLE STORAGE POLICY` |
 
 Grant permissions using standard RBAC syntax:
@@ -319,7 +304,7 @@ WHERE table_dir_name LIKE 'trades%';
 ```
 
 | table_dir_name | to_parquet | drop_local | status |
-|----------------|------------|------------|--------|
+| -------------- | ---------- | ---------- | ------ |
 | trades~12      | 72h        | 1m         | A      |
 
 ```questdb-sql title="3. Modify one stage (others remain unchanged)"
@@ -330,13 +315,13 @@ ALTER TABLE trades SET STORAGE POLICY(TO PARQUET 1d);
 SHOW CREATE TABLE trades;
 ```
 
-```text
+```questdb-sql
 CREATE TABLE 'trades' (
     ts TIMESTAMP,
     symbol SYMBOL CAPACITY 256 CACHE,
     price DOUBLE
 ) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 1 DAY, DROP LOCAL 1 MONTH) WAL;
+STORAGE POLICY(TO PARQUET 1 DAY) WAL;
 ```
 
 ```questdb-sql title="5. Temporarily suspend the policy (e.g. during a backfill)"
@@ -352,12 +337,12 @@ ALTER TABLE trades DROP STORAGE POLICY;
 
 ## Guidelines
 
-| Use case | Suggested policy | Rationale |
-|----------|-----------------|-----------|
-| Real-time metrics | `TO PARQUET 1d, DROP LOCAL 30d` | Keep recent data fast, drop old data automatically |
-| Trading data | `TO PARQUET 7d` | Keep Parquet locally for long-term queries |
-| IoT telemetry | `TO PARQUET 1d, DROP LOCAL 90d` | High volume, convert early to save disk before dropping the data |
-| Aggregated views | `TO PARQUET 30d` | Low volume, keep locally in Parquet |
+| Use case          | Suggested policy                | Rationale                                                        |
+| ----------------- | ------------------------------- | ---------------------------------------------------------------- |
+| Real-time metrics | `TO PARQUET 1d, DROP LOCAL 30d` | Keep recent data fast, drop old data automatically               |
+| Trading data      | `TO PARQUET 7d`                 | Keep Parquet locally for long-term queries                       |
+| IoT telemetry     | `TO PARQUET 1d, DROP LOCAL 90d` | High volume, convert early to save disk before dropping the data |
+| Aggregated views  | `TO PARQUET 30d`                | Low volume, keep locally in Parquet                              |
 
 **Tips:**
 

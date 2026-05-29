@@ -478,25 +478,26 @@ too — on a schedule you define. This supersedes plain TTL in Enterprise, where
 
 ### Migrating from TTL when upgrading from OSS
 
-Tables and materialized views that were created in OSS keep their existing
-`TTL` setting after you upgrade to Enterprise — no data is lost at upgrade
-time. However, Enterprise rejects any **new** `TTL` changes (both
-`CREATE ... TTL` and `ALTER ... SET TTL <non-zero>`) with:
+Tables that were created in OSS keep their existing `TTL` setting after you
+upgrade to Enterprise — no data is lost at upgrade time. However, Enterprise
+rejects any **new** `TTL` changes on tables (both `CREATE TABLE ... TTL` and
+`ALTER TABLE SET TTL <non-zero>`) with:
 
 ```
 TTL settings are deprecated, please, create a storage policy instead
 ```
 
-To move a legacy table or materialized view from `TTL` to a storage policy:
+Materialized views are not affected: they continue to use `TTL` for retention
+in Enterprise.
+
+To move a legacy table from `TTL` to a storage policy:
 
 1. **Clear the existing TTL** by setting it to `0`. This is the only `SET TTL`
-   value Enterprise accepts, and it is required before a storage policy can be
-   attached:
+   value Enterprise accepts on a table, and it is required before a storage
+   policy can be attached:
 
    ```questdb-sql title="Clear the legacy TTL"
    ALTER TABLE trades SET TTL 0;
-   -- or, for a materialized view:
-   ALTER MATERIALIZED VIEW trades_hourly SET TTL 0;
    ```
 
 2. **Attach a storage policy** that reproduces — and ideally extends — the
@@ -516,9 +517,9 @@ To move a legacy table or materialized view from `TTL` to a storage policy:
    use a single-stage policy — for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
    to match `TTL 1 MONTH`.
 
-Do this for every table and materialized view you want to keep managed
-automatically. Tables without a storage policy retain their data indefinitely
-once their legacy TTL has been cleared.
+Do this for every table you want to keep managed automatically. Tables without
+a storage policy retain their data indefinitely once their legacy TTL has been
+cleared.
 
 ### Creating new tables with a storage policy
 

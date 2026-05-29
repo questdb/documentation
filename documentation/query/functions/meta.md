@@ -295,8 +295,8 @@ Storage policies — and the `storage_policies` view — are available in
 :::
 
 `storage_policies` is a system view that lists every
-[storage policy](/docs/concepts/storage-policy/) currently attached to a table
-or materialized view. Query it like any other table:
+[storage policy](/docs/concepts/storage-policy/) currently attached to a table.
+Query it like any other table:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
@@ -306,7 +306,7 @@ SELECT * FROM storage_policies;
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
+| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
 | `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
 | `to_remote` | _STRING_ | Reserved — always blank in the current release. The `TO REMOTE` clause is rejected at SQL parse time with `'TO REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |

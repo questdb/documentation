@@ -4,9 +4,7 @@ sidebar_label: SET STORAGE POLICY
 description: ALTER TABLE SET STORAGE POLICY SQL keyword reference documentation.
 ---
 
-Sets, modifies, enables, disables, or removes a storage policy on a table. For
-the equivalent operations on materialized views, see
-[ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
+Sets, modifies, enables, disables, or removes a storage policy on a table.
 
 :::note
 
@@ -172,7 +170,6 @@ Stages that are not set are omitted from the output.
 ## See also
 
 - [Storage Policy concept](/docs/concepts/storage-policy/)
-- [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/)
 - [CREATE TABLE](/docs/query/sql/create-table/) — `STORAGE POLICY` clause at
   table creation
 - [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/) — the TTL
