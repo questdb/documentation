@@ -501,21 +501,20 @@ To move a legacy table or materialized view from `TTL` to a storage policy:
 
 2. **Attach a storage policy** that reproduces — and ideally extends — the
    retention the TTL used to provide. A policy lets you keep data in Parquet
-   after you would previously have dropped it, so `DROP LOCAL` (or
-   `DROP NATIVE` if you don't want Parquet at all) is the stage that replaces
-   the old TTL horizon:
+   after you would previously have dropped it, so `DROP LOCAL` is the stage
+   that replaces the old TTL horizon:
 
    ```questdb-sql title="Replace a 1-month TTL with an equivalent policy"
    ALTER TABLE trades SET STORAGE POLICY(
        TO PARQUET 3 DAYS,
-       DROP NATIVE 10 DAYS,
        DROP LOCAL 1 MONTH
    );
    ```
 
    If you want the policy to behave exactly like the old TTL (delete the
-   partition outright after the same interval), use a single-stage policy —
-   for example `STORAGE POLICY(DROP NATIVE 1 MONTH)` to match `TTL 1 MONTH`.
+   partition outright after the same interval, with no Parquet conversion),
+   use a single-stage policy — for example `STORAGE POLICY(DROP LOCAL 1 MONTH)`
+   to match `TTL 1 MONTH`.
 
 Do this for every table and materialized view you want to keep managed
 automatically. Tables without a storage policy retain their data indefinitely
@@ -531,7 +530,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
   WAL;
 ```
 
@@ -540,7 +539,6 @@ Or attach a policy to an existing table:
 ```questdb-sql title="Web Console - Set a storage policy on an existing table"
 ALTER TABLE trades SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
-    DROP NATIVE 10 DAYS,
     DROP LOCAL 1 MONTH
 );
 ```

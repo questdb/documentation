@@ -157,7 +157,7 @@ CREATE TABLE 'sensor_data' (
     ts TIMESTAMP,
     value DOUBLE
 ) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3 DAYS, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
 ```
 
 Stages that are not configured on the policy are omitted from the clause. A

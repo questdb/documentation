@@ -24,7 +24,7 @@ a full overview.
 ```questdb-sql
 ALTER MATERIALIZED VIEW view_name SET STORAGE POLICY(
     [TO PARQUET ttl,]
-    [DROP NATIVE ttl,]
+    [TO REMOTE ttl,]
     [DROP LOCAL ttl,]
     [DROP REMOTE ttl]
 );
@@ -57,18 +57,20 @@ transition from native format to Parquet and eventually get removed:
 
 | Setting | Effect |
 |---------|--------|
-| `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally |
-| `DROP NATIVE <ttl>` | Remove native binary files, keeping only the local Parquet copy |
+| `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file |
+| `TO REMOTE <ttl>` | _Reserved._ Will upload the partition to object storage when remote upload is supported |
 | `DROP LOCAL <ttl>` | Remove all local copies of the partition |
 | `DROP REMOTE <ttl>` | _Reserved._ Will remove the partition from object storage when remote upload is supported |
 
 :::info
 
-`DROP REMOTE` is reserved syntax. It is rejected at SQL parse time with
+`TO REMOTE` and `DROP REMOTE` are reserved syntax. They are rejected at SQL
+parse time with `'TO REMOTE' is not supported yet` and
 `'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
 object storage is not currently supported — storage policies operate locally
-only. Because the clause cannot take effect, the `drop_remote` column in the
-[`storage_policies`](/docs/query/functions/meta/#storage_policies) view is
+only. Because these clauses cannot take effect, the `to_remote` and
+`drop_remote` columns in the
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) view are
 always blank in the current release.
 
 :::
@@ -85,8 +87,10 @@ Both singular and plural forms are accepted.
 
 ### Constraints
 
-- TTL values must be in ascending order:
-  `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`
+- A drop stage may not fire before the write stage it depends on:
+  `TO PARQUET <= DROP LOCAL`, `TO REMOTE <= DROP LOCAL`, and
+  `DROP LOCAL <= DROP REMOTE`. `TO PARQUET` and `TO REMOTE` are independent of
+  each other
 - All TTL values must be positive — `0` is rejected
 - Each setting can only appear once per statement
 - The materialized view must have a designated timestamp and partitioning enabled
@@ -115,7 +119,6 @@ Set a storage policy with multiple stages:
 ```questdb-sql
 ALTER MATERIALIZED VIEW trades_hourly SET STORAGE POLICY(
     TO PARQUET 7 DAYS,
-    DROP NATIVE 14 DAYS,
     DROP LOCAL 1 MONTH
 );
 ```

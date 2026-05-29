@@ -29,8 +29,9 @@ AS [ ( ] query [ ) ]
 Where:
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `policyStage`: `TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration`
-  (Enterprise only; all stages optional; durations must be positive and in ascending order)
+- `policyStage`: `TO PARQUET duration | TO REMOTE duration | DROP LOCAL duration | DROP REMOTE duration`
+  (Enterprise only; all stages optional; durations must be positive; a drop
+  stage may not precede the write it depends on)
 - `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
 
 ## Parameters
@@ -301,21 +302,25 @@ Storage policies are available in **QuestDB Enterprise** only.
 :::
 
 A [storage policy](/docs/concepts/storage-policy/) automates the partition
-lifecycle by defining when partitions are converted to Parquet locally, when
-native data is removed, and when local copies are dropped. Place the
-`STORAGE POLICY(...)` clause after `PARTITION BY`:
+lifecycle by defining when partitions are converted to Parquet locally and
+when local copies are dropped. Place the `STORAGE POLICY(...)` clause after
+`PARTITION BY`:
 
 ```questdb-sql title="With storage policy (Enterprise)"
 CREATE MATERIALIZED VIEW trades_hourly AS (
   SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
 ) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 7d, DROP NATIVE 14d);
+  STORAGE POLICY(TO PARQUET 7d, DROP LOCAL 1M);
 ```
 
-A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
-`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
-positive, and they must be in ascending order. `DROP REMOTE` is reserved
-syntax and is currently rejected at SQL parse time with
+A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional and all TTL values must be
+positive. A drop stage may not precede the write it depends on (`TO PARQUET`
+and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
+`TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
+removes its native files and serves reads from the Parquet file. `TO REMOTE`
+and `DROP REMOTE` are reserved syntax and are currently rejected at SQL parse
+time with `'TO REMOTE' is not supported yet` and
 `'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after creation, see
