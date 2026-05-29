@@ -310,7 +310,6 @@ module.exports = {
                     "query/sql/alter-mat-view-resume-wal",
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
-                    "query/sql/alter-mat-view-set-storage-policy",
                     "query/sql/alter-mat-view-set-ttl",
                   ],
                 },

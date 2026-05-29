@@ -34,8 +34,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Storage policy](/docs/concepts/storage-policy/) - Removed the `DROP NATIVE` stage; `TO PARQUET` now removes native files and serves reads from the Parquet file
 - [SQL extensions and compatibility](/docs/concepts/deep-dive/sql-extensions/) - Rewritten as the canonical SQL dialect reference covering time-series clauses and joins, query syntax conveniences, storage extensions, PIVOT vs SQL Server/PostgreSQL, JSON and UNNEST, and a full inventory of standard SQL features not supported with QuestDB equivalents. Sidebar entry moved to the top of Query & SQL Reference
 - [systemd service example](/docs/deployment/systemd/) - Corrected JVM argument ordering, switched to `UseParallelGC`, set `-Dcontainerized=false`, and added required setup paths
+- [Materialized views](/docs/query/sql/create-mat-view/) - Removed storage policy support for materialized views; use `TTL` for retention instead
 - [Aggregation functions](/docs/query/functions/aggregation/) - Added demo tags and updated examples with runnable queries
 - [LATEST ON](/docs/query/sql/latest-on/) - Added demo tags to examples
 - [JOIN](/docs/query/sql/join/) - Updated examples to use demo data

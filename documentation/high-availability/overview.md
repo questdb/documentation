@@ -82,9 +82,9 @@ replicated automatically and should be populated separately on each instance.
 ## Storage policies in a replicated cluster
 
 [Storage policy](/docs/concepts/storage-policy/) definitions are stored in
-WAL-backed system tables, so the policy itself — the `TO PARQUET`,
-`DROP NATIVE`, and `DROP LOCAL` TTLs and the active/disabled status — is
-replicated to every instance through the same WAL pipeline as user data.
+WAL-backed system tables, so the policy itself — the `TO PARQUET` and
+`DROP LOCAL` TTLs and the active/disabled status — is replicated to every
+instance through the same WAL pipeline as user data.
 
 Enforcement, however, runs **independently on each instance**. Parquet files
 are produced locally and are not replicated; each node's storage policy job
