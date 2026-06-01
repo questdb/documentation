@@ -47,15 +47,13 @@ const config = {
       async: true,
       defer: true,
       "data-color-scheme": "dark",
+      "data-view-mode": "sidebar",
       "data-website-id": "752e7a80-c213-4acd-b6c3-c3747fbe4ba6",
       "data-project-name": "QuestDB",
       "data-project-logo": "/docs/images/favicon.webp",
       "data-bot-protection-mechanism": "hcaptcha",
-
-      "data-modal-border-radius": "8px",
-      "data-modal-overlay-bg-color": "rgba(33, 34, 44, 0.8)",
-      "data-modal-y-offset": "10vh",
       "data-modal-z-index": "9999",
+      "data-modal-size": "533px",
 
       "data-button-border": "1px solid #c94f74",
       "data-launcher-button-hover-background-color": "#282a36",
@@ -65,6 +63,7 @@ const config = {
       "data-submit-button-color": "#ffffff",
       "data-submit-button-background-color": "#c93261",
       "data-submit-button-hover-background-color": "#c94f74",
+      "data-hyperlink-color-dark": "#c94f74",
 
       "data-modal-example-questions":
         "How do I create a table?,What is designated timestamp?",
