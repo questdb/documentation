@@ -10,14 +10,22 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## May 2026
 
+### Releases
+
+- [9.4.0](https://questdb.com/release-notes/) - Released May 18, 2026
+
 ### New
 
+- [Out-of-order data](/docs/concepts/out-of-order-data/) - New concept page covering O3 behavior per ingestion method, engine mechanics, write amplification (with the `table_write_amp_*` columns), tuning, and common scenarios
+- [Posting index and covering index](/docs/concepts/deep-dive/posting-index/) - New deep-dive on posting indexes, plus covering index documentation across `CREATE TABLE`, `ALTER TABLE`, `SHOW`, `EXPLAIN`, and schema design
+- [Order Flow Imbalance (OFI)](/docs/cookbook/sql/finance/order-flow-imbalance/) - Cookbook recipe using the Cont-Kukanov-Stoikov definition computed from L1 quote changes, with per-ECN and consolidated variants
 - [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
 - [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
 - [DECLARE with Grafana time range](/docs/cookbook/integrations/grafana/declare-time-range/) - Pass Grafana dashboard time range into QuestDB `DECLARE` variables
 
 ### Reference
 
+- Documented [gzip request compression](/docs/ingestion/ilp/overview/) for ILP/HTTP and updated [Telegraf](/docs/ingestion/message-brokers/telegraf/) guidance for QuestDB 9.1.0+
 - Added [`ntile()`](/docs/query/functions/window-functions/reference/#ntile), [`cume_dist()`](/docs/query/functions/window-functions/reference/#cume_dist), and [`nth_value()`](/docs/query/functions/window-functions/reference/#nth_value) window functions
 - Fixed `timestamp_ns` valid range documentation
 - Added precise microsecond-grained timestamp examples for PHP clients
@@ -26,6 +34,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Storage policy](/docs/concepts/storage-policy/) - Removed the `DROP NATIVE` stage; `TO PARQUET` now removes native files and serves reads from the Parquet file
+- [SQL extensions and compatibility](/docs/concepts/deep-dive/sql-extensions/) - Rewritten as the canonical SQL dialect reference covering time-series clauses and joins, query syntax conveniences, storage extensions, PIVOT vs SQL Server/PostgreSQL, JSON and UNNEST, and a full inventory of standard SQL features not supported with QuestDB equivalents. Sidebar entry moved to the top of Query & SQL Reference
+- [systemd service example](/docs/deployment/systemd/) - Corrected JVM argument ordering, switched to `UseParallelGC`, set `-Dcontainerized=false`, and added required setup paths
+- [Materialized views](/docs/query/sql/create-mat-view/) - Removed storage policy support for materialized views; use `TTL` for retention instead
 - [Aggregation functions](/docs/query/functions/aggregation/) - Added demo tags and updated examples with runnable queries
 - [LATEST ON](/docs/query/sql/latest-on/) - Added demo tags to examples
 - [JOIN](/docs/query/sql/join/) - Updated examples to use demo data
