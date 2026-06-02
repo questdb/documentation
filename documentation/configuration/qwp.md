@@ -21,18 +21,6 @@ worker threads); see
 Maximum number of rows per table block in a single QWP message. The server
 rejects batches that exceed this limit with a parse error.
 
-### qwp.max.schemas.per.connection
-
-- **Default**: `65535`
-- **Reloadable**: no
-
-Maximum number of distinct schemas the server registers per connection. Each
-unique combination of column names and types consumes one schema slot. When
-the limit is reached, the server rejects further full-schema messages. For
-egress connections, a lower soft cap (4,096 by default) triggers a
-`CACHE_RESET` frame that clears and restarts the registry before hitting
-this hard limit.
-
 ### qwp.max.tables.per.connection
 
 - **Default**: `10000`

@@ -297,7 +297,7 @@ entirely.
 | `0x15` | CREDIT        | C -> S    | Extend the byte-credit window           |
 | `0x16` | EXEC_DONE     | S -> C    | Non-SELECT statement acknowledgement    |
 | `0x17` | CACHE_RESET   | S -> C    | Clear connection-scoped caches          |
-| `0x18` | SERVER_INFO   | S -> C    | Server role and identity (first frame)      |
+| `0x18` | SERVER_INFO   | S -> C    | Server role and identity (first frame)  |
 
 Codes `0x00` and `0x01` are the ingress DATA_BATCH and RESPONSE kinds
 (not used on the egress endpoint). Codes `0x19` through `0x1F` are reserved
