@@ -20,7 +20,7 @@ new QuestDB ingest client from scratch. End users should see the
 QuestDB Wire Protocol (QWP) is QuestDB's columnar binary protocol for
 high-throughput data ingestion over WebSocket. Each message carries one or more
 table blocks, where every column's values are stored contiguously. Batched
-messages, schema references, and Gorilla-compressed timestamps reduce wire
+messages, columnar layout, and Gorilla-compressed timestamps reduce wire
 overhead for sustained streaming workloads.
 
 This page covers WebSocket ingress only. For streaming query results back to
@@ -38,9 +38,9 @@ Compared with the line-oriented ILP protocols (`http`, `https`, `tcp`),
 QWP trades a denser binary encoding for higher throughput and lower CPU on
 both ends:
 
-- **One schema, many batches.** After the first message defines a table's
-  columns, subsequent messages reference the schema by an integer ID — no
-  per-row type tags, no per-batch column names.
+- **Schema per block, not per row.** A table block names its columns once in
+  its header, then packs every row column-by-column — no per-row type tags or
+  per-value field names.
 - **Columnar wire format.** Each column's values are contiguous in the
   message, so the server commits them column-at-a-time without row-by-row
   parsing. This is the same shape QuestDB uses on disk.
@@ -59,7 +59,7 @@ A minimum-viable client that supports BOOLEAN, LONG, DOUBLE, TIMESTAMP, and
 VARCHAR — the five types that cover most real workloads — is on the order of
 ~500 lines in a typed language, plus a WebSocket library. Adding the
 remaining ~20 types is mostly extending switch statements; the framing,
-schema registry, and ack loop stay the same.
+schema handling, and ack loop stay the same.
 
 The authoritative reference implementation is
 [`java-questdb-client`](https://github.com/questdb/java-questdb-client). It's
@@ -76,8 +76,6 @@ Design goals:
 
 - **Column-oriented**: values for each column are contiguous in the message.
 - **Batch-oriented**: a single message can carry rows for multiple tables.
-- **Schema-referencing**: after the first batch, subsequent batches reference a
-  previously sent schema by numeric ID, avoiding redundant column definitions.
 - **Timestamp compression**: designated timestamp columns can use
   Gorilla delta-of-delta encoding, reducing 8 bytes per timestamp to as
   little as 1 bit for steady-rate streams.
@@ -130,8 +128,9 @@ error.
 
 ### Current version
 
-Ingress is pinned to version 1. No v2 ingest semantics exist. Ingress
-clients advertise `X-QWP-Max-Version: 1`.
+There is a single protocol version (1). Ingress clients advertise
+`X-QWP-Max-Version: 1`; the negotiation mechanism stays in place for a future
+version bump.
 
 ## Authentication
 
@@ -177,9 +176,7 @@ The end-to-end shape of a QWP client session, before the encoding details:
      default such as 1.9 MiB to stay under the typical 2 MiB recv buffer.
 3. **Send binary frames.** Each frame is one QWP message:
    `12-byte header` + payload (`Delta Symbol Dictionary` if any, then one or
-   more `Table Block`s). The first frame for a given table carries a full
-   schema; subsequent frames for the same column set reference it by
-   schema ID.
+   more `Table Block`s). Each table block carries its column schema inline.
 4. **Drain server responses.** The server sends an OK (or error) binary frame
    per request, in send order. Match responses to requests by their position
    in your in-flight queue — the server-assigned `sequence` field in each
@@ -189,8 +186,8 @@ The end-to-end shape of a QWP client session, before the encoding details:
 5. **Close.** Send a WebSocket `Close` frame after the last expected OK has
    been drained.
 
-Every reconnect resets connection-scoped state on both sides: schema IDs,
-symbol dictionary, and sequence counter. Clients that want sender-restart
+Every reconnect resets connection-scoped state on both sides: the symbol
+dictionary and sequence counter. Clients that want sender-restart
 durability layer a store-and-forward buffer on top — see the
 [connect string reference](/docs/connect/clients/connect-string#sf-keys).
 
@@ -361,26 +358,11 @@ Each table block contains data for a single table.
 
 ## Schema definition
 
-The schema section immediately follows the table header and defines the columns
-in the block.
-
-### Schema mode byte
-
-| Value  | Mode      | Description                                    |
-|--------|-----------|------------------------------------------------|
-| `0x00` | Full      | Schema ID + complete column definitions inline |
-| `0x01` | Reference | Schema ID only (lookup from registry)          |
-
-### Full schema mode (0x00)
-
-Sent the first time a table's schema appears on a connection, or whenever the
-column set changes.
+The schema section immediately follows the table header and lists every column
+in the block, one definition per column in column order (`column_count`
+definitions total):
 
 ```text
-+----------------------------------+
-| mode_byte: 0x00                  |
-+----------------------------------+
-| schema_id: varint                |
 +----------------------------------+
 | Column Definition 0              |
 |   +- name_length: varint         |
@@ -391,39 +373,16 @@ column set changes.
 +----------------------------------+
 ```
 
-Schema IDs are non-negative integers assigned by the client and scoped to the
-lifetime of a single connection. They are global across all tables on the
-connection (not per-table). Clients typically assign them sequentially starting
-at 0, but the server does not require any particular ordering.
+The `type_code` byte holds the column type (`0x01` through `0x18`; see
+[Column types](#column-types)).
 
 A column with an **empty name** (length 0) and type TIMESTAMP denotes the
 [designated timestamp](/docs/concepts/designated-timestamp/) column, the
 per-table column that QuestDB uses for time-based partitioning and ordering.
 
-### Reference schema mode (0x01)
-
-Used for subsequent batches when the server has already registered the schema.
-
-```text
-+-------------------------+
-| mode_byte: 0x01         |
-+-------------------------+
-| schema_id: varint       |
-+-------------------------+
-```
-
-The server looks up the schema by its ID in the per-connection schema registry.
-
-### Schema registry lifecycle
-
-1. First batch for a table: full schema mode with a new schema ID.
-2. Subsequent batches with the same columns: reference mode with the same ID.
-3. When a table gains a column, the client assigns a new schema ID and sends
-   it in full mode.
-4. Full-mode schemas may re-register an existing ID; the server accepts any ID
-   within the per-connection schema-ID limit.
-5. On reconnect, both sides reset: the client reassigns IDs from 0 and the
-   server clears its registry.
+Every table block carries its columns inline. There is no cross-message schema
+registry and no schema-by-id reference: each block fully describes its own
+columns, which keeps every message self-contained for store-and-forward replay.
 
 ## Column types
 
@@ -1071,7 +1030,7 @@ section of the connect string reference:
 
 Key behaviors:
 
-- **Ingress is zone-blind.** It pins QWP v1 and never reads `SERVER_INFO`, so
+- **Ingress is zone-blind.** It never reads `SERVER_INFO`, so
   every host's zone tier is equivalent and selection is based on health state
   only. The `zone=` connect-string key is accepted but silently ignored, so a
   connect string shared with egress clients works unchanged on ingress.
@@ -1111,10 +1070,6 @@ XX XX XX XX              # Payload length
 73 65 6E 73 6F 72 73     # "sensors" UTF-8
 02                       # Row count: 2
 03                       # Column count: 3
-
-# Schema (full mode)
-00                       # Schema mode: full
-00                       # Schema ID: 0
 
 # Column 0: id (LONG)
 02                       # Name length: 2
@@ -1191,9 +1146,7 @@ XX XX XX XX              # Payload length
 02                       # row_count = 2
 03                       # column_count = 3
 
-# Schema (full mode)
-00                       # schema_mode = FULL
-00                       # schema_id = 0
+# Schema (inline)
 04 68 6F 73 74  09       # "host" : SYMBOL
 04 74 65 6D 70  07       # "temp" : DOUBLE
 00              0A       # "" : TIMESTAMP (designated)

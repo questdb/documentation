@@ -98,7 +98,6 @@ canonical entries.
 | `init_buf_size` | size | `64K` | Initial encode buffer capacity. |
 | `max_buf_size` | size | `100M` | Max encode buffer capacity. |
 | `max_name_len` | int | `127` | Local validation cap for table / column names. |
-| `max_schemas_per_connection` | int | `65535` | Per-connection schema-id ceiling. |
 
 ## Validation
 
