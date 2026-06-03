@@ -4,9 +4,7 @@ sidebar_label: SET STORAGE POLICY
 description: ALTER TABLE SET STORAGE POLICY SQL keyword reference documentation.
 ---
 
-Sets, modifies, enables, disables, or removes a storage policy on a table. For
-the equivalent operations on materialized views, see
-[ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/).
+Sets, modifies, enables, disables, or removes a storage policy on a table.
 
 :::note
 
@@ -24,7 +22,7 @@ a full overview.
 ```questdb-sql
 ALTER TABLE table_name SET STORAGE POLICY(
     [TO PARQUET ttl,]
-    [DROP NATIVE ttl,]
+    [TO REMOTE ttl,]
     [DROP LOCAL ttl,]
     [DROP REMOTE ttl]
 );
@@ -57,18 +55,20 @@ transition from native format to Parquet and eventually get removed:
 
 | Setting | Effect |
 |---------|--------|
-| `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally |
-| `DROP NATIVE <ttl>` | Remove native binary files, keeping only the local Parquet copy |
+| `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file |
+| `TO REMOTE <ttl>` | _Reserved._ Will upload the partition to object storage when remote upload is supported |
 | `DROP LOCAL <ttl>` | Remove all local copies of the partition |
 | `DROP REMOTE <ttl>` | _Reserved._ Will remove the partition from object storage when remote upload is supported |
 
 :::info
 
-`DROP REMOTE` is reserved syntax. It is rejected at SQL parse time with
+`TO REMOTE` and `DROP REMOTE` are reserved syntax. They are rejected at SQL
+parse time with `'TO REMOTE' is not supported yet` and
 `'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
 object storage is not currently supported — storage policies operate locally
-only. Because the clause cannot take effect, the `drop_remote` column in the
-[`storage_policies`](/docs/query/functions/meta/#storage_policies) view is
+only. Because these clauses cannot take effect, the `to_remote` and
+`drop_remote` columns in the
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) view are
 always blank in the current release.
 
 :::
@@ -85,8 +85,10 @@ Both singular and plural forms are accepted.
 
 ### Constraints
 
-- TTL values must be in ascending order:
-  `TO PARQUET <= DROP NATIVE <= DROP LOCAL <= DROP REMOTE`
+- A drop stage may not fire before the write stage it depends on:
+  `TO PARQUET <= DROP LOCAL`, `TO REMOTE <= DROP LOCAL`, and
+  `DROP LOCAL <= DROP REMOTE`. `TO PARQUET` and `TO REMOTE` are independent of
+  each other
 - All TTL values must be positive — `0` is rejected
 - Each setting can only appear once per statement
 - The table must have a designated timestamp and partitioning enabled
@@ -110,12 +112,11 @@ Each operation requires a specific permission:
 
 ## Examples
 
-Set a storage policy with all three currently-supported stages:
+Set a storage policy with both currently-supported stages:
 
 ```questdb-sql
 ALTER TABLE sensor_data SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
-    DROP NATIVE 10 DAYS,
     DROP LOCAL 1 MONTH
 );
 ```
@@ -161,7 +162,7 @@ CREATE TABLE 'sensor_data' (
     ts TIMESTAMP,
     value DOUBLE
 ) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3 DAYS, DROP NATIVE 10 DAYS, DROP LOCAL 1 MONTH) WAL;
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
 ```
 
 Stages that are not set are omitted from the output.
@@ -169,7 +170,6 @@ Stages that are not set are omitted from the output.
 ## See also
 
 - [Storage Policy concept](/docs/concepts/storage-policy/)
-- [ALTER MATERIALIZED VIEW SET STORAGE POLICY](/docs/query/sql/alter-mat-view-set-storage-policy/)
 - [CREATE TABLE](/docs/query/sql/create-table/) — `STORAGE POLICY` clause at
   table creation
 - [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/) — the TTL

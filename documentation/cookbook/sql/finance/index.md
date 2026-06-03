@@ -52,6 +52,7 @@ Analyze trading activity and order flow dynamics.
 | [Volume Profile](volume-profile.md) | Volume distribution by price level |
 | [Volume Spike](volume-spike.md) | Detect abnormal volume |
 | [Aggressor Imbalance](aggressor-volume-imbalance.md) | Buy vs sell pressure |
+| [Order Flow Imbalance](order-flow-imbalance.md) | Quote-based top-of-book buying/selling pressure |
 | [VPIN](vpin.md) | Volume-synchronized informed trading probability |
 
 ## Risk Metrics

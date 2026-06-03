@@ -295,8 +295,8 @@ Storage policies — and the `storage_policies` view — are available in
 :::
 
 `storage_policies` is a system view that lists every
-[storage policy](/docs/concepts/storage-policy/) currently attached to a table
-or materialized view. Query it like any other table:
+[storage policy](/docs/concepts/storage-policy/) currently attached to a table.
+Query it like any other table:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
@@ -306,9 +306,9 @@ SELECT * FROM storage_policies;
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
+| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
 | `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
-| `drop_native` | _STRING_ | TTL for the `DROP NATIVE` stage. Blank when the stage is not configured. |
+| `to_remote` | _STRING_ | Reserved — always blank in the current release. The `TO REMOTE` clause is rejected at SQL parse time with `'TO REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
 | `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
@@ -329,14 +329,15 @@ SELECT * FROM storage_policies;
 SELECT * FROM storage_policies;
 ```
 
-| table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
-|----------------|------------|-------------|------------|-------------|--------|--------------|
-| trades~12      | 72h        | 240h        | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
-| metrics~18     | 168h       |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
+| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
+|----------------|------------|-----------|------------|-------------|--------|--------------|
+| trades~12      | 72h        |           | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       |           |            |             | D      | 2025-01-14T09:15:42.000000Z |
 
-The first row is a policy with three active stages (3-day Parquet conversion,
-10-day native drop, 1-month local drop) and is currently enforced. The second
-row has only the `TO PARQUET` stage set and has been temporarily disabled.
+The first row is a policy with two active stages (3-day Parquet conversion and
+1-month local drop) and is currently enforced. The second row has only the
+`TO PARQUET` stage set and has been temporarily disabled. The `to_remote` and
+`drop_remote` columns are reserved and always blank in the current release.
 
 ## table_columns
 
@@ -355,14 +356,20 @@ Returns a `table` with the following columns:
 - `type` - type of the column
 - `indexed` - if indexing is applied to this column
 - `indexBlockCapacity` - how many row IDs to store in a single storage block on
-  disk
+  disk (bitmap indexes only)
 - `symbolCached` - whether this `symbol` column is cached
 - `symbolCapacity` - how many distinct values this column of `symbol` type is
   expected to have
+- `symbolTableSize` - current number of distinct values stored in this
+  `symbol` column's table
 - `designated` - if this is set as the designated timestamp column for this
   table
 - `upsertKey` - if this column is a part of UPSERT KEYS list for table
   [deduplication](/docs/concepts/deduplication)
+- `indexType` - the [index type](/docs/concepts/deep-dive/indexes/)
+  (`POSTING`, `POSTING DELTA`, `POSTING EF`, `BITMAP`, or empty)
+- `indexInclude` - comma-separated names of columns included in a
+  [posting index's](/docs/concepts/deep-dive/posting-index/) covering sidecar
 
 For more details on the meaning and use of these values, see the
 [CREATE TABLE](/docs/query/sql/create-table/) documentation.
@@ -373,12 +380,12 @@ For more details on the meaning and use of these values, see the
 table_columns('my_table');
 ```
 
-| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | designated | upsertKey |
-| ------ | --------- | ------- | ------------------ | ------------ | -------------- | ---------- | --------- |
-| symb   | SYMBOL    | true    | 1048576            | false        | 256            | false      | false     |
-| price  | DOUBLE    | false   | 0                  | false        | 0              | false      | false     |
-| ts     | TIMESTAMP | false   | 0                  | false        | 0              | true       | false     |
-| s      | VARCHAR   | false   | 0                  | false        | 0              | false      | false     |
+| column | type      | indexed | indexBlockCapacity | symbolCached | symbolCapacity | symbolTableSize | designated | upsertKey | indexType | indexInclude |
+| ------ | --------- | ------- | ------------------ | ------------ | -------------- | --------------- | ---------- | --------- | --------- | ------------ |
+| symb   | SYMBOL    | true    | 1048576            | false        | 256            | 0               | false      | false     | BITMAP    |              |
+| price  | DOUBLE    | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
+| ts     | TIMESTAMP | false   | 0                  | false        | 0              | 0               | true       | false     |           |              |
+| s      | VARCHAR   | false   | 0                  | false        | 0              | 0               | false      | false     |           |              |
 
 ```questdb-sql title="Get designated timestamp column"
 SELECT "column", type, designated FROM table_columns('my_table') WHERE designated = true;

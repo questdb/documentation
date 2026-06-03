@@ -164,6 +164,7 @@ module.exports = {
       label: "Query & SQL Reference",
       items: [
         "query/overview",
+        "concepts/deep-dive/sql-extensions",
         {
           type: "category",
           label: "PostgreSQL Wire Protocol",
@@ -309,7 +310,6 @@ module.exports = {
                     "query/sql/alter-mat-view-resume-wal",
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
-                    "query/sql/alter-mat-view-set-storage-policy",
                     "query/sql/alter-mat-view-set-ttl",
                   ],
                 },
@@ -519,6 +519,7 @@ module.exports = {
           collapsed: false,
           items: [
             "concepts/designated-timestamp",
+            "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
             "concepts/symbol",
@@ -544,10 +545,10 @@ module.exports = {
           collapsed: true,
           items: [
             "concepts/deep-dive/indexes",
+            "concepts/deep-dive/posting-index",
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",
-            "concepts/deep-dive/sql-extensions",
             "concepts/deep-dive/sql-optimizer-hints",
             "concepts/deep-dive/root-directory-structure",
           ],
@@ -849,6 +850,7 @@ module.exports = {
                         "cookbook/sql/finance/volume-profile",
                         "cookbook/sql/finance/volume-spike",
                         "cookbook/sql/finance/aggressor-volume-imbalance",
+                        "cookbook/sql/finance/order-flow-imbalance",
                         "cookbook/sql/finance/vpin",
                       ],
                     },
