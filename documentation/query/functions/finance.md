@@ -394,76 +394,56 @@ has little linear predictive power for y.
 
 ### Examples
 
-The following examples use the `trips` table of NYC taxi rides from the
-[QuestDB demo instance](https://demo.questdb.io/), where the fare of a ride is
-largely driven by the distance travelled.
+The following examples use the `market_data_ohlc_1d` table on the
+[QuestDB demo instance](https://demo.questdb.io/), which records the daily
+`open`, `high`, `low`, and `close` price of each FX pair.
 
-#### Measure how well one variable explains another
+#### Measure how well the open explains the close
 
-Treating `fare_amount` as the dependent variable y and `trip_distance` as the
-independent variable x measures how much of the fare is explained by distance:
+Treating the daily `close` as the dependent variable y and the `open` as the
+independent variable x shows how much of the closing price is explained by where
+the pair opened:
 
-```questdb-sql title="R-squared of fare against distance" demo
-SELECT regr_r2(fare_amount, trip_distance) AS r2 FROM trips;
+```questdb-sql title="R-squared of close against open for EURUSD" demo
+SELECT regr_r2(close, open) AS r2
+FROM market_data_ohlc_1d
+WHERE symbol = 'EURUSD';
 ```
 
 | r2     |
 | ------ |
-| 0.8562 |
+| 0.7973 |
 
-About 86% of the variation in fare is explained by a straight-line relationship
-with distance. Because `regr_r2(y, x)` is the square of `corr(y, x)`, the same
-value is returned by
-`corr(fare_amount, trip_distance) * corr(fare_amount, trip_distance)`.
+About 80% of the variation in the EURUSD daily close is explained by a
+straight-line relationship with the open. Because `regr_r2(y, x)` is the square
+of `corr(y, x)`, the same value is returned by
+`corr(close, open) * corr(close, open)`.
 
-#### Compare fit quality across groups
+#### Compare fit quality across instruments
 
-R-squared is a useful data-quality lens. Splitting the same regression by
-`payment_type` shows that ordinary metered trips paid by `Card` or `Cash` track
-distance closely, while voided, disputed, and no-charge trips fit far worse:
+Running the same regression per `symbol` turns R-squared into a
+trending-versus-ranging gauge. Freely floating majors drift from day to day, so
+the open explains most of the close, while the tightly managed USDHKD peg barely
+moves and its small daily fluctuations are mostly noise:
 
-```questdb-sql title="R-squared of fare against distance per payment type" demo
-SELECT payment_type, regr_r2(fare_amount, trip_distance) AS r2
-FROM trips
+```questdb-sql title="R-squared of close against open per pair" demo
+SELECT symbol, regr_r2(close, open) AS r2
+FROM market_data_ohlc_1d
+WHERE symbol IN ('USDCHF', 'EURUSD', 'GBPUSD', 'EURGBP', 'USDHKD')
+GROUP BY symbol
 ORDER BY r2 DESC;
 ```
 
-| payment_type | r2     |
-| ------------ | ------ |
-| Card         | 0.8604 |
-| Cash         | 0.8600 |
-| Unknown      | 0.6502 |
-| Dispute      | 0.4250 |
-| No Charge    | 0.3964 |
-| Voided       | 0.3156 |
+| symbol | r2     |
+| ------ | ------ |
+| USDCHF | 0.8895 |
+| EURUSD | 0.7973 |
+| GBPUSD | 0.6946 |
+| EURGBP | 0.1811 |
+| USDHKD | 0.0564 |
 
-The low R-squared values for the anomalous payment types highlight trips whose
-fare does not scale with distance.
-
-#### Handling null values
-
-`regr_r2` ignores any row where either argument is null. The query below
-supplies six rows, two of which contain a null, so only the four complete (y, x)
-pairs are used in the calculation:
-
-```questdb-sql title="Null pairs are ignored"
-SELECT regr_r2(y, x) AS r2
-FROM (
-    SELECT 1 AS x, 2 AS y
-    UNION ALL SELECT 2, 3
-    UNION ALL SELECT 3, null
-    UNION ALL SELECT null, 5
-    UNION ALL SELECT 4, 4
-    UNION ALL SELECT 5, 6
-);
-```
-
-| r2     |
-| ------ |
-| 0.9257 |
-
-The result matches running the query over only the four complete pairs; the two
-rows that contain a null are skipped.
+The pegged USDHKD scores far lower than the floating pairs, flagging an
+instrument whose daily close is largely disconnected from its open.
 
 ## regr_slope
 
