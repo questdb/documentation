@@ -354,7 +354,7 @@ linear fit).
 - The function returns 1 when y is constant and x varies (a horizontal line
   fits constant y perfectly). This follows the SQL:2003 specification and
   differs from `corr(y, x)`, which returns null in that case.
-- Supported data types for x and y include `double`, `float`, and `integer`
+- Supported data types for y and x include `double`, `float`, and `integer`
   types.
 - The order of arguments in `regr_r2(y, x)` matters.
   - Ensure that y is the dependent variable and x is the independent variable.
@@ -371,7 +371,7 @@ $$
 
 Where:
 
-- $\bar{x}$ and $\bar{y}$ are the means of x and y across the valid pairs.
+- $\bar{y}$ and $\bar{x}$ are the means of y and x across the valid pairs.
 - The numerator is the squared sum of cross-deviations $S_{xy}^2$.
 - The denominator is the product of the sums of squared deviations
   $S_{xx} \cdot S_{yy}$.
@@ -394,88 +394,76 @@ has little linear predictive power for y.
 
 ### Examples
 
-#### Detect a strong trend in fleet telemetry
+The following examples use the `trips` table of NYC taxi rides from the
+[QuestDB demo instance](https://demo.questdb.io/), where the fare of a ride is
+largely driven by the distance travelled.
 
-A common use case is filtering for series whose value is trending with
-statistical confidence, separating real drift from noise:
+#### Measure how well one variable explains another
 
-```questdb-sql
-SELECT robot_id,
-  regr_slope(motor_temp, elapsed_seconds) AS temp_trend,
-  regr_r2(motor_temp, elapsed_seconds) AS r_squared
-FROM telemetry
-WHERE ts > now() - 7d
-GROUP BY robot_id
-HAVING regr_r2(motor_temp, elapsed_seconds) > 0.7
-   AND regr_slope(motor_temp, elapsed_seconds) > 0
-ORDER BY temp_trend DESC;
+Treating `fare_amount` as the dependent variable y and `trip_distance` as the
+independent variable x measures how much of the fare is explained by distance:
+
+```questdb-sql title="R-squared of fare against distance" demo
+SELECT regr_r2(fare_amount, trip_distance) AS r2 FROM trips;
 ```
 
-Only robots whose temperature is rising and whose rise explains more than 70%
-of the variance over the past week are returned.
+| r2     |
+| ------ |
+| 0.8562 |
 
-#### Compute R-squared on a known dataset
+About 86% of the variation in fare is explained by a straight-line relationship
+with distance. Because `regr_r2(y, x)` is the square of `corr(y, x)`, the same
+value is returned by
+`corr(fare_amount, trip_distance) * corr(fare_amount, trip_distance)`.
 
-Using the same measurements table:
+#### Compare fit quality across groups
 
-| x   | y   |
-| --- | --- |
-| 1.0 | 2.0 |
-| 2.0 | 3.0 |
-| 3.0 | 5.0 |
-| 4.0 | 4.0 |
-| 5.0 | 6.0 |
+R-squared is a useful data-quality lens. Splitting the same regression by
+`payment_type` shows that ordinary metered trips paid by `Card` or `Cash` track
+distance closely, while voided, disputed, and no-charge trips fit far worse:
 
-```questdb-sql
-SELECT regr_r2(y, x) AS r_squared FROM measurements;
+```questdb-sql title="R-squared of fare against distance per payment type" demo
+SELECT payment_type, regr_r2(fare_amount, trip_distance) AS r2
+FROM trips
+ORDER BY r2 DESC;
 ```
 
-Result:
+| payment_type | r2     |
+| ------------ | ------ |
+| Card         | 0.8604 |
+| Cash         | 0.8600 |
+| Unknown      | 0.6502 |
+| Dispute      | 0.4250 |
+| No Charge    | 0.3964 |
+| Voided       | 0.3156 |
 
-| r_squared |
-| --------- |
-| 0.81      |
-
-About 81% of the variance in y is explained by a linear relationship with x.
-
-#### Compute R-squared grouped by category
-
-Using the same sales_data table:
-
-| category | advertising_spend | sales |
-| -------- | ---------------- | ----- |
-| A        | 1000             | 15000 |
-| A        | 2000             | 22000 |
-| A        | 3000             | 28000 |
-| B        | 1500             | 18000 |
-| B        | 2500             | 26000 |
-| B        | 3500             | 31000 |
-
-```questdb-sql
-SELECT category, regr_r2(sales, advertising_spend) AS fit_quality
-FROM sales_data
-GROUP BY category;
-```
-
-Both categories show a near-perfect linear relationship between advertising
-spend and sales, with R-squared values close to 1.
+The low R-squared values for the anomalous payment types highlight trips whose
+fare does not scale with distance.
 
 #### Handling null values
 
-The function ignores rows where either x or y is null:
+`regr_r2` ignores any row where either argument is null. The query below
+supplies six rows, two of which contain a null, so only the four complete (y, x)
+pairs are used in the calculation:
 
-```questdb-sql
-SELECT regr_r2(y, x) AS r_squared
+```questdb-sql title="Null pairs are ignored"
+SELECT regr_r2(y, x) AS r2
 FROM (
     SELECT 1 AS x, 2 AS y
-    UNION ALL SELECT 2, NULL
-    UNION ALL SELECT NULL, 4
-    UNION ALL SELECT 4, 5
+    UNION ALL SELECT 2, 3
+    UNION ALL SELECT 3, null
+    UNION ALL SELECT null, 5
+    UNION ALL SELECT 4, 4
+    UNION ALL SELECT 5, 6
 );
 ```
 
-Only the rows where both x and y are not null are considered in the
-calculation.
+| r2     |
+| ------ |
+| 0.9257 |
+
+The result matches running the query over only the four complete pairs; the two
+rows that contain a null are skipped.
 
 ## regr_slope
 
