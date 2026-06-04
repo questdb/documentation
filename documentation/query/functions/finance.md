@@ -430,7 +430,6 @@ moves and its small daily fluctuations are mostly noise:
 SELECT symbol, regr_r2(close, open) AS r2
 FROM market_data_ohlc_1d
 WHERE symbol IN ('USDCHF', 'EURUSD', 'GBPUSD', 'EURGBP', 'USDHKD')
-GROUP BY symbol
 ORDER BY r2 DESC;
 ```
 
