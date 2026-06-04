@@ -32,7 +32,7 @@ SELECT build();
 
 | build                                                                                              |
 | -------------------------------------------------------------------------------------------------- |
-| Build Information: QuestDB 7.3.5, JDK 17.0.7, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
+| Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
 ## current database, schema, or user
 
