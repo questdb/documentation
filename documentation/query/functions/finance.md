@@ -340,6 +340,110 @@ Result:
 
 Only the rows where both x and y are not null are considered in the calculation.
 
+## regr_r2
+
+`regr_r2(y, x)` - Calculates the coefficient of determination (R-squared) of
+the linear regression of y on x. R-squared measures how well the regression
+line fits the data, on a scale from 0 (no linear relationship) to 1 (perfect
+linear fit).
+
+- The function requires at least two valid (y, x) pairs to compute a value.
+  - If fewer than two pairs are available, the function returns null.
+- The function returns null when x is constant across all rows (zero variance
+  in the independent variable). This includes the single-row case.
+- The function returns 1 when y is constant and x varies (a horizontal line
+  fits constant y perfectly). This follows the SQL:2003 specification and
+  differs from `corr(y, x)`, which returns null in that case.
+- Supported data types for y and x include `double`, `float`, and `integer`
+  types.
+- The order of arguments in `regr_r2(y, x)` matters.
+  - Ensure that y is the dependent variable and x is the independent variable.
+- `regr_r2(y, x)` equals `corr(y, x) * corr(y, x)` everywhere except the
+  constant-y edge case noted above.
+
+### Calculation
+
+The coefficient of determination $r^2$ is the squared Pearson correlation:
+
+$$
+r^2 = \frac{\left(\sum (x_i - \bar{x})(y_i - \bar{y})\right)^2}{\sum (x_i - \bar{x})^2 \cdot \sum (y_i - \bar{y})^2}
+$$
+
+Where:
+
+- $\bar{y}$ and $\bar{x}$ are the means of y and x across the valid pairs.
+- The numerator is the squared sum of cross-deviations $S_{xy}^2$.
+- The denominator is the product of the sums of squared deviations
+  $S_{xx} \cdot S_{yy}$.
+
+When $S_{xx} = 0$ the function returns null; when $S_{xx} \neq 0$ and
+$S_{yy} = 0$ the function returns 1.
+
+### Arguments
+
+- y: A numeric column representing the dependent variable.
+- x: A numeric column representing the independent variable.
+
+### Return value
+
+Return value type is `double`.
+
+The function returns a value in the range $[0, 1]$. A value close to 1
+indicates a strong linear relationship; a value close to 0 indicates that x
+has little linear predictive power for y.
+
+### Examples
+
+The following examples use the `market_data_ohlc_1d` table on the
+[QuestDB demo instance](https://demo.questdb.io/), which records the daily
+`open`, `high`, `low`, and `close` price of each FX pair.
+
+#### Measure how well the open explains the close
+
+Treating the daily `close` as the dependent variable y and the `open` as the
+independent variable x shows how much of the closing price is explained by where
+the pair opened:
+
+```questdb-sql title="R-squared of close against open for EURUSD" demo
+SELECT regr_r2(close, open) AS r2
+FROM market_data_ohlc_1d
+WHERE symbol = 'EURUSD';
+```
+
+| r2     |
+| ------ |
+| 0.7973 |
+
+About 80% of the variation in the EURUSD daily close is explained by a
+straight-line relationship with the open. Because `regr_r2(y, x)` is the square
+of `corr(y, x)`, the same value is returned by
+`corr(close, open) * corr(close, open)`.
+
+#### Compare fit quality across instruments
+
+Running the same regression per `symbol` turns R-squared into a
+trending-versus-ranging gauge. Freely floating majors drift from day to day, so
+the open explains most of the close, while the tightly managed USDHKD peg barely
+moves and its small daily fluctuations are mostly noise:
+
+```questdb-sql title="R-squared of close against open per pair" demo
+SELECT symbol, regr_r2(close, open) AS r2
+FROM market_data_ohlc_1d
+WHERE symbol IN ('USDCHF', 'EURUSD', 'GBPUSD', 'EURGBP', 'USDHKD')
+ORDER BY r2 DESC;
+```
+
+| symbol | r2     |
+| ------ | ------ |
+| USDCHF | 0.8895 |
+| EURUSD | 0.7973 |
+| GBPUSD | 0.6946 |
+| EURGBP | 0.1811 |
+| USDHKD | 0.0564 |
+
+The pegged USDHKD scores far lower than the floating pairs, flagging an
+instrument whose daily close is largely disconnected from its open.
+
 ## regr_slope
 
 `regr_slope(y, x)` - Calculates the slope of the linear regression line for the
