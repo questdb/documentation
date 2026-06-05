@@ -844,6 +844,78 @@ every window function execution.
 Prevents stack overflow errors when evaluating complex nested SQL. The value
 is the approximate number of nested SELECT clauses allowed.
 
+## Memory limits
+
+These limits cap how much native memory a single workload may allocate, so a
+runaway query, materialized view refresh, or WAL apply batch is stopped at its
+source before it can drive the whole server toward out-of-memory. Each workload
+has its own independent limit: a runaway in one does not draw against another's
+budget, nor against the process-wide RSS limit (`ram.usage.limit.bytes` /
+`ram.usage.limit.percent`).
+
+All three default to `0`, which means unlimited, so behavior matches a server
+without limits until you opt in. Set each limit as a byte count or a size with a
+`K`, `M`, or `G` suffix, for example `512M` or `2G`. The limits are reloadable:
+edit `server.conf` and call
+[`reload_config()`](/docs/query/functions/meta/#reload_config), and the new value
+applies to every workload that starts afterward, with no restart. A workload
+already running keeps the limit it started with.
+
+When a workload exceeds its limit, QuestDB raises an out-of-memory error at the
+allocation that crossed the line and aborts that workload, while unrelated
+workloads keep running. A user query fails with the error, a materialized view
+refresh is invalidated, and a WAL apply suspends the affected table. The message
+names the workload so you can tell it apart from a process-wide breach:
+
+```
+query memory limit exceeded [workload=QUERY, queryId=..., limit=..., used=..., size=..., memoryTag=...]
+```
+
+:::note
+
+Coverage is best-effort. A limit constrains the allocation sites that grow with
+data volume: hash and GROUP BY tables, sorts, joins, window partition buffers,
+set operations, `LATEST BY`, SAMPLE BY fill, and Parquet decode buffers. Memory
+that is structurally bounded, or that lives for the life of a process or session
+(page-frame buffers, JIT buffers, table readers and writers, symbol tables,
+connection buffers, memory-mapped pages), is accounted only against the global
+RSS limit. Treat a workload limit as a guard against common runaway patterns,
+not a hard ceiling on every allocation.
+
+:::
+
+Live usage and the effective limit for each running query are exposed by the
+[`query_activity`](/docs/query/functions/meta/#query_activity) view through its
+`memory_used` and `memory_limit` columns. QuestDB Enterprise can additionally cap
+memory per user, group, or service account, tightening these workload limits for
+a principal's queries. See
+[role-based access control](/docs/security/rbac/#memory-limits).
+
+### cairo.mat.view.refresh.memory.limit.bytes
+
+- **Default**: `0`
+- **Reloadable**: yes
+
+Maximum native memory a single materialized view refresh may allocate. `0`
+disables the limit.
+
+### cairo.query.memory.limit.bytes
+
+- **Default**: `0`
+- **Reloadable**: yes
+
+Maximum native memory a single user SQL query may allocate. `0` disables the
+limit. Subqueries and other nested work share the top-level query's budget
+rather than each acquiring their own.
+
+### cairo.wal.apply.memory.limit.bytes
+
+- **Default**: `0`
+- **Reloadable**: yes
+
+Maximum native memory a single WAL apply batch may allocate. `0` disables the
+limit.
+
 ## Batch operations
 
 ### cairo.create.as.select.retry.count

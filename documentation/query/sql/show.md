@@ -284,10 +284,15 @@ SHOW USER john;
 SHOW USERS;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| name  | enabled | memory_limit |
+| ----- | ------- | ------------ |
+| admin | true    | null         |
+| john  | true    | 536870912    |
+
+The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
+`null` when no limit applies. For a user it is the effective limit after merging
+the limits of the user's groups. See
+[memory limits](/docs/security/rbac/#memory-limits).
 
 ### SHOW GROUPS
 
@@ -301,9 +306,9 @@ or
 SHOW GROUPS john;
 ```
 
-| name       |
-| ---------- |
-| management |
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management | null           | null         |
 
 ### SHOW SERVICE ACCOUNT
 
@@ -329,26 +334,26 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| management | true    | null         |
+| svc1_admin | true    | null         |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| svc1_admin | true    | null         |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| svc1_admin | true    | null         |
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 

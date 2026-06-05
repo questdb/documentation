@@ -224,6 +224,14 @@ Returns metadata on running SQL queries, including columns such as:
 - query_start - timestamp of when query started
 - state_change - timestamp of latest query state change, such as a cancellation
 - state - state of running query, can be `active` or `cancelled`
+- memory_used - native memory currently allocated by the query, in bytes. Only
+  the allocation sites covered by the
+  [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits) are
+  counted
+- memory_limit - effective native memory limit for the query, in bytes, or
+  `null` when the query runs unlimited. On QuestDB Enterprise this is the
+  smaller of the configured workload limit and the principal's
+  [memory limit](/docs/security/rbac/#memory-limits)
 - query - text of sql query
 
 **Examples:**
