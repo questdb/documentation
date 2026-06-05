@@ -300,15 +300,20 @@ the limits of the user's groups. See
 SHOW GROUPS;
 ```
 
-or
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management | null           | null         |
+
+Filtering by a user lists the groups that user belongs to, without the
+`memory_limit` column:
 
 ```questdb-sql
 SHOW GROUPS john;
 ```
 
-| name       | external_alias | memory_limit |
-| ---------- | -------------- | ------------ |
-| management | null           | null         |
+| name       | external_alias |
+| ---------- | -------------- |
+| management | null           |
 
 ### SHOW SERVICE ACCOUNT
 
@@ -339,21 +344,25 @@ SHOW SERVICE ACCOUNTS;
 | management | true    | null         |
 | svc1_admin | true    | null         |
 
+Filtering by a user or group instead lists the service accounts that principal
+can assume, with a `grant_option` column showing whether they may grant the
+assumption to others:
+
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       | enabled | memory_limit |
-| ---------- | ------- | ------------ |
-| svc1_admin | true    | null         |
+| name       | grant_option |
+| ---------- | ------------ |
+| svc1_admin | false        |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       | enabled | memory_limit |
-| ---------- | ------- | ------------ |
-| svc1_admin | true    | null         |
+| name       | grant_option |
+| ---------- | ------------ |
+| svc1_admin | false        |
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 

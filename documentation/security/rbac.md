@@ -695,8 +695,8 @@ SELECT * FROM all_permissions();
 
 - [ADD USER](/docs/query/sql/acl/add-user/)
 - [ALTER GROUP](/docs/query/sql/acl/alter-group/)
-- [ALTER USER](/docs/query/sql/acl/alter-user/)
 - [ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/)
+- [ALTER USER](/docs/query/sql/acl/alter-user/)
 - [ASSUME SERVICE ACCOUNT](/docs/query/sql/acl/assume-service-account/)
 - [CREATE GROUP](/docs/query/sql/acl/create-group/)
 - [CREATE SERVICE ACCOUNT](/docs/query/sql/acl/create-service-account/)

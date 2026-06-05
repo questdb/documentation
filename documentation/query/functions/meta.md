@@ -237,13 +237,14 @@ Returns metadata on running SQL queries, including columns such as:
 **Examples:**
 
 ```questdb-sql
-SELECT * FROM query_activity();
+SELECT query_id, username, state, memory_used, memory_limit, query
+FROM query_activity();
 ```
 
-| query_id | worker_id | worker_pool | username | query_start                 | state_change                | state  | query                                                     |
-| -------- | --------- | ----------- | -------- | --------------------------- | --------------------------- | ------ | --------------------------------------------------------- |
-| 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397  | active | select \* from query_activity()                           |
-| 57777    | 6         | shared      | bob      | 2024-01-09T08:58:55.988017Z | 2024-01-09T08:58:55.988017Z | active | SELECT symbol,approx_percentile(price, 50, 2) from trades |
+| query_id | username | state  | memory_used | memory_limit | query                                                      |
+| -------- | -------- | ------ | ----------- | ------------ | ---------------------------------------------------------- |
+| 62179    | bob      | active | 262144      | null         | SELECT \* FROM query_activity()                            |
+| 57777    | bob      | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades |
 
 ## reader_pool
 

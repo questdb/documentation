@@ -17,6 +17,8 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
+---
+
 ## Syntax
 
 ```questdb-sql title="Enable / disable"
