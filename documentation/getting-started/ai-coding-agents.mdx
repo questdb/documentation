@@ -50,7 +50,7 @@ Claude Code: I'll query the QuestDB REST API to list your tables.
 
 ## QuestDB agent skill
 
-The <a href="https://github.com/questdb/questdb-agent-skill" target="_blank">QuestDB agent skill</a> is an experimental skill for Claude Code and Codex. It embeds QuestDB-specific knowledge directly into the agent's context - SQL syntax, common mistakes, ingestion patterns, Grafana templates, and financial indicator recipes - so the agent can build complete data pipelines without searching the docs for every step. For topics not covered by the skill, the agent falls back to the online documentation automatically.
+The <a href="https://github.com/questdb/skills" target="_blank">QuestDB agent skill</a> is an experimental skill for Claude Code and Codex. It embeds QuestDB-specific knowledge directly into the agent's context - SQL syntax, common mistakes, ingestion patterns, Grafana templates, and financial indicator recipes - so the agent can build complete data pipelines without searching the docs for every step. For topics not covered by the skill, the agent falls back to the online documentation automatically.
 
 ### Installation
 
@@ -62,7 +62,7 @@ The <a href="https://github.com/questdb/questdb-agent-skill" target="_blank">Que
 <TabItem value="npx">
 
 ```shell
-npx skills add questdb/questdb-agent-skill
+npx skills add questdb/skills
 ```
 
 This installs the skill globally for Claude Code. To install it for a specific project only, run the command from the project directory with the `--local` flag.
@@ -71,7 +71,7 @@ This installs the skill globally for Claude Code. To install it for a specific p
 
 <TabItem value="manual">
 
-Copy the `questdb/` folder from the <a href="https://github.com/questdb/questdb-agent-skill" target="_blank">repository</a> into your skills directory:
+Copy the `questdb/` folder from the <a href="https://github.com/questdb/skills" target="_blank">repository</a> into your skills directory:
 
 **Claude Code:**
 - `~/.claude/skills/questdb/` - available in all projects
