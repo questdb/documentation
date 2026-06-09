@@ -14,6 +14,7 @@ systemd service.
 The prerequisites for deploying QuestDB with systemd are:
 
 - A Unix machine supporting systemd
+- Java 25 (OpenJDK 25 or compatible distribution)
 
 ## Initial system configuration
 
@@ -27,11 +28,9 @@ user with appropriately scoped permissions.
 ```bash
 #!/bin/bash
 
-# Download and install the JDK
-curl -s https://download.oracle.com/java/17/latest/jdk-17_linux-x64_bin.tar.gz -o jdk.tar.gz
-mkdir -p ~/jdk
-tar -xzf jdk.tar.gz -C ~/jdk --strip-components=1
-export JAVA_HOME=~/jdk
+# Install OpenJDK 25
+sudo apt-get update && sudo apt-get install -y openjdk-25-jdk
+export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
 
 # Download and set up QuestDB
@@ -76,7 +75,7 @@ Type=simple
 Restart=always
 RestartSec=2
 # Adjust java path to match requirements of a given distro
-ExecStart=/home/[USER_NAME]/jdk/bin/java \
+ExecStart=/usr/lib/jvm/java-25-openjdk-amd64/bin/java \
 -XX:+UnlockExperimentalVMOptions \
 -XX:+AlwaysPreTouch \
 -XX:+UseParallelGC \
