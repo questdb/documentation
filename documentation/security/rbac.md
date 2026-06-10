@@ -88,6 +88,18 @@ Restrict users to see only certain columns:
 GRANT SELECT ON trades(ts, price) TO analyst;
 ```
 
+To grant on every column except a few, use the `*` wildcard with an `EXCLUDE`
+list:
+
+```questdb-sql
+-- User can see all columns except trader_id
+GRANT SELECT ON trades(* EXCLUDE (trader_id)) TO analyst;
+```
+
+The wildcard covers the columns that exist when the statement runs, not columns
+added later. See
+[GRANT](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table) for details.
+
 ### Row-level access with views
 
 For row-level security, create a [view](/docs/concepts/views/) that filters rows,
