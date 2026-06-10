@@ -101,7 +101,11 @@ cat <key>.json | base64
 replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;credential=${BASE64_ENCODED_KEY};
 ```
 
-Alternatively, use `credential_path` to reference the key file directly.
+Alternatively, use `credential_path` to reference the key file directly, or
+supply a pre-obtained static OAuth `token` to skip the token exchange
+altogether. A static `token` is required when the store sits behind a private
+or intercepting CA; see
+[TLS with a private or self-signed CA](#tls-with-a-private-or-self-signed-ca).
 
 :::tip[Using Workload Identity]
 If your instance uses Workload Identity (GKE) or runs on a GCE VM with a service
@@ -130,7 +134,7 @@ replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/m
 
 ### TLS with a private or self-signed CA
 
-By default, QuestDB trusts only the built-in Mozilla (webpki) root certificates
+By default, QuestDB trusts only the built-in Mozilla root certificates
 when connecting to an object store over HTTPS. Public AWS S3, Azure Blob, and
 GCS endpoints work out of the box, but a private or on-prem
 S3/Azure/GCS-compatible store fronted by an internal CA, a self-signed
@@ -163,8 +167,7 @@ is read and parsed at startup, so a missing or malformed PEM fails fast with an
   then fails every request with a certificate-trust error.
 - **No `;` in the path.** The connection string is split on `;` with no escape,
   so a certificate path must not contain a `;`. A parameter with no `=` (for
-  example a path truncated at a `;`) is now rejected at startup rather than
-  silently dropped.
+  example, a path truncated at a `;`) is rejected at startup.
 - **Data requests only.** The custom CA applies to object store data requests
   (read, write, list, delete). Dynamic credential and token fetches (S3
   IMDS/STS/assume-role and the GCS OAuth token endpoint) go through a separate
