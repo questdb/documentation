@@ -17,6 +17,8 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- Documented the column wildcard with optional `EXCLUDE` list for column-level [`GRANT`](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table) and [`REVOKE`](/docs/query/sql/acl/revoke/#revoke-from-all-columns-of-a-table) — `GRANT SELECT ON trades(*) TO user` grants every current column, and `EXCLUDE` omits specific ones
+- Documented custom root CA support for the replication object store: the `ca_cert_file` and `ca_builtin_roots` [connection-string parameters](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca) trust a private, internal, or self-signed CA for S3, Azure Blob, and GCS stores
 - Added [`array_agg()`](/docs/query/functions/aggregation/#array_agg) aggregate function, covering scalar and array input forms, `SAMPLE BY` with FILL, and NULL handling
 - Documented the [`twap()`](/docs/query/functions/aggregation/#twap) designated-timestamp limitation: the timestamp argument must be the table's designated timestamp
 
