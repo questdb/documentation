@@ -33,6 +33,10 @@ For a tuning guide, see the
 A configuration string for connecting to an object store. The format is
 `scheme::key1=value;key2=value2;…`. Ignored if replication is disabled.
 
+For a store fronted by a private, internal, or self-signed CA, the string also
+accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See
+[TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
+
 ### replication.role
 
 - **Default**: `none`

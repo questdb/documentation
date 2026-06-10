@@ -52,7 +52,8 @@ Backup supports the following storage backends:
   sensitive to the underlying filesystem type.
 
 See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
-for connection string formats.
+for connection string formats. For a private, on-prem, or self-signed store,
+see [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
 #### Permissions
 
