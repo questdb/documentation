@@ -41,13 +41,15 @@ ALTER GROUP groupName { WITH | DROP } EXTERNAL ALIAS externalAlias;
 - `ALTER GROUP groupName DROP EXTERNAL ALIAS externalAlias` - removes an external
   group mapping.
 
-A member's queries run under the smallest positive memory limit among the user's
-own limit and the limits of every group they belong to, capped further at the
-configured
+A group limit applies to a member only when that member has no limit of its own;
+a user's own limit always takes priority. When several of a user's groups set a
+limit, the most restrictive (smallest positive) one applies. A set limit
+overrides the configured
 [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-workload limit. Setting a group limit requires the `SET MEMORY LIMIT` permission.
-See [memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
-workload limits combine.
+workload limit and binds even when larger. Setting a group limit requires the
+`SET MEMORY LIMIT` permission. See
+[memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
+workload limits resolve.
 
 For external group mapping with OIDC or LDAP, see the
 [OpenID Connect (OIDC) integration](/docs/security/oidc/) guide.

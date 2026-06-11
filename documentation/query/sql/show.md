@@ -290,8 +290,8 @@ SHOW USERS;
 | john  | true    | 536870912    |
 
 The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
-`null` when no limit applies. For a user it is the effective limit after merging
-the limits of the user's groups. See
+`null` when no limit applies. For a user it is the effective limit — its own
+limit, or, when it has none, the most restrictive of its groups'. See
 [memory limits](/docs/security/rbac/#memory-limits).
 
 ### SHOW GROUPS

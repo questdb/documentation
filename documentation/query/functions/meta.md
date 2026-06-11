@@ -229,9 +229,9 @@ Returns metadata on running SQL queries, including columns such as:
   [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits) are
   counted
 - memory_limit - effective native memory limit for the query, in bytes, or
-  `null` when the query runs unlimited. On QuestDB Enterprise this is the
-  smaller of the configured workload limit and the principal's
-  [memory limit](/docs/security/rbac/#memory-limits)
+  `null` when the query runs unlimited. On QuestDB Enterprise a set principal
+  [memory limit](/docs/security/rbac/#memory-limits) overrides the configured
+  workload limit; the workload limit applies only when the principal has none
 - query - text of sql query
 
 **Examples:**

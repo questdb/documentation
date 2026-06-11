@@ -66,12 +66,13 @@ ALTER USER userName SET MEMORY LIMIT { size | UNLIMITED };
 - `ALTER USER username SET MEMORY LIMIT UNLIMITED` - removes the limit. `SET
   MEMORY LIMIT 0` does the same.
 
-The limit applies to the user's queries on both the primary and replicas. The
-effective cap is the smaller of this value and the configured
+The limit applies to the user's queries on both the primary and replicas. A set
+limit takes priority over the user's groups and overrides the configured
 [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-workload limit. Setting it requires the `SET MEMORY LIMIT` permission. See
+workload limit, binding even when larger. Setting it requires the
+`SET MEMORY LIMIT` permission. See
 [memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
-workload limits combine.
+workload limits resolve.
 
 ## Examples
 

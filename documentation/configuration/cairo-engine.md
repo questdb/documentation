@@ -886,9 +886,9 @@ not a hard ceiling on every allocation.
 
 Live usage and the effective limit for each running query are exposed by the
 [`query_activity`](/docs/query/functions/meta/#query_activity) view through its
-`memory_used` and `memory_limit` columns. QuestDB Enterprise can additionally cap
-memory per user, group, or service account, tightening these workload limits for
-a principal's queries. See
+`memory_used` and `memory_limit` columns. QuestDB Enterprise can additionally set
+a memory limit per user, group, or service account, which overrides this workload
+limit for a principal's queries. See
 [role-based access control](/docs/security/rbac/#memory-limits).
 
 ### cairo.mat.view.refresh.memory.limit.bytes

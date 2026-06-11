@@ -546,10 +546,11 @@ information without these permissions.
 
 ## Memory limits {#memory-limits}
 
-QuestDB Enterprise can cap the native memory a single principal's queries may
-allocate, tightening the server-wide query memory limit for a specific user,
+QuestDB Enterprise can set the native memory a single principal's queries may
+allocate, overriding the server-wide query memory limit for a specific user,
 group, or service account. Use it to stop one tenant's runaway query from
-exhausting memory shared with everyone else.
+exhausting memory shared with everyone else, or to grant a trusted principal more
+headroom than the default.
 
 Set a limit with [`ALTER USER`](/docs/query/sql/acl/alter-user/),
 [`ALTER GROUP`](/docs/query/sql/acl/alter-group/), or
@@ -566,20 +567,28 @@ The value is a byte count or a size with a `K`, `M`, or `G` suffix. Setting a
 limit requires the `SET MEMORY LIMIT` permission, which is included in
 `GRANT ALL` and held implicitly by database admins.
 
-### How limits combine
+### How limits resolve
 
-A query runs under the smallest positive limit that applies to it:
+QuestDB resolves the limit for a query by strict precedence — it takes the first
+level that is set, rather than the smallest across levels:
 
-- the principal's own limit,
-- the limits of every group the principal belongs to, and
-- the server-wide
-  [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
-  workload limit.
+1. **The principal's own limit.** For a user this is the user's own limit; for a
+   query that assumes a service account it is the service account's limit.
+2. **A group limit** (users only). When a user has no own limit, it inherits the
+   most restrictive (smallest positive) limit among the groups it belongs to.
+   Service accounts never inherit group limits.
+3. **The workload limit.** Otherwise the server-wide
+   [`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+   applies.
 
-A value of `0` (or `UNLIMITED`) means no limit from that source, so a
-per-principal limit only ever tightens the effective cap, never loosens it. A
-user who assumes a service account takes on the service account's limit. The cap
-applies to the principal's queries on both the primary and replicas.
+A value of `0` (or `UNLIMITED`) means "not set" at that level, so resolution
+falls through to the next one. A more specific level, when set, fully overrides
+the broader one and binds even when it is larger — so a per-user or per-group
+override can raise a principal's ceiling above the workload limit, not only lower
+it. Use a smaller override to tighten the cap for a noisy tenant, or a larger one
+to lift it for a trusted principal. A user who assumes a service account takes on
+the service account's limit. The cap applies to the principal's queries on both
+the primary and replicas.
 
 Materialized view refresh and WAL apply run under internal contexts rather than a
 principal, so they stay bounded only by their own
@@ -597,8 +606,9 @@ cap guards against one runaway workload, not total concurrent usage.
 ### Inspecting limits
 
 - `SHOW USERS`, `SHOW GROUPS`, and `SHOW SERVICE ACCOUNTS` report the configured
-  limit in a `memory_limit` column. For a user this is the effective limit after
-  merging in the user's groups, and is `null` when no limit applies.
+  limit in a `memory_limit` column. For a user this is the effective limit — its
+  own limit, or, when it has none, the most restrictive of its groups' — and is
+  `null` when no limit applies.
 - [`query_activity`](/docs/query/functions/meta/#query_activity) exposes the
   effective limit and live usage of each running query through its `memory_limit`
   and `memory_used` columns.
