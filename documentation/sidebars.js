@@ -928,6 +928,7 @@ module.exports = {
                     "cookbook/sql/advanced/general-and-sampled-aggregates",
                     "cookbook/sql/advanced/consistent-histogram-buckets",
                     "cookbook/sql/advanced/array-from-string",
+                    "cookbook/sql/advanced/row-level-security",
                   ],
                 },
               ],
