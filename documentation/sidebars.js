@@ -311,6 +311,7 @@ module.exports = {
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
                     "query/sql/alter-mat-view-set-ttl",
+                    "query/sql/alter-mat-view-set-expire",
                   ],
                 },
                 {
@@ -546,6 +547,7 @@ module.exports = {
           items: [
             "concepts/deep-dive/indexes",
             "concepts/deep-dive/posting-index",
+            "concepts/deep-dive/expire-rows",
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",
