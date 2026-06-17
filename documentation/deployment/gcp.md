@@ -8,7 +8,6 @@ description:
 import Screenshot from "@theme/Screenshot"
 import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
 import CodeBlock from "@theme/CodeBlock"
-import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
 import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
 
 ## Quick reference
@@ -17,7 +16,7 @@ import MinimumHardware from "../../src/components/DRY/_questdb_production_hardwa
 |-----------|-------------|-------|
 | Instance | `c3-standard-4` or `c3-highmem-8` | 4-8 vCPUs, 16-64 GiB RAM |
 | Storage | Hyperdisk Balanced data disk, 300+ GiB | 5000 IOPS / 300 MBps for production |
-| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| File system | `ext4` | Or `zfs` with `lz4` for on-disk compression |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
 
 ---
@@ -77,7 +76,9 @@ cannot be used on `C3` machines smaller than `88 vCPUs`.
 
 **File system:**
 
-<FileSystemChoice />
+Format the data disk as `ext4`. If you need on-disk compression, use `zfs` with
+`lz4` instead, at a small performance cost. See
+[ZFS compression](/docs/deployment/compression-zfs/).
 
 **Unsupported storage:**
 
@@ -97,6 +98,10 @@ cannot be used on `C3` machines smaller than `88 vCPUs`.
 | 8812 | TCP | Your IP / VPC | PostgreSQL wire protocol |
 | 9009 | TCP | Application servers | InfluxDB line protocol |
 | 9003 | TCP | Monitoring servers | Health check & Prometheus |
+
+The firewall rule below opens only 9000 and 8812. Add 9009 only if you ingest
+over ILP, and reach 9003 from within the VPC or over SSH rather than exposing
+it publicly.
 
 :::warning
 Never expose ports 9000, 8812, or 9009 to `0.0.0.0/0`. Restrict access to known
@@ -202,13 +207,13 @@ gcloud compute instances create "$QDB_INSTANCE" \
   --machine-type "$QDB_MACHINE_TYPE" \
   --image-family "ubuntu-2404-lts-amd64" \
   --image-project "ubuntu-os-cloud" \
-  --boot-disk-size "30GB" \
+  --boot-disk-size "30GiB" \
   --boot-disk-type "hyperdisk-balanced" \
   --tags "$QDB_TAG"
 
 gcloud compute disks create "$QDB_DISK" \
   --zone "$QDB_ZONE" \
-  --size "300GB" \
+  --size "300GiB" \
   --type "hyperdisk-balanced" \
   --provisioned-iops "5000" \
   --provisioned-throughput "300" \
@@ -276,7 +281,9 @@ gcloud compute ssh questdb-europe-west3 --zone europe-west3-a
 ### Prepare the data disk
 
 Run these commands on the VM over SSH. They assume the attached data disk uses
-the custom device name `questdb-data`.
+the custom device name `questdb-data` and format it as `ext4`, which is the
+recommended default. If you need on-disk compression, format the data disk as
+`zfs` with `lz4` instead. See [ZFS compression](/docs/deployment/compression-zfs/).
 
 :::warning
 The `mkfs.ext4` command erases the target device. Run it only on a new blank
@@ -486,5 +493,3 @@ and NetApp Volumes requires enabling the `netapp.googleapis.com` API.
 For GCS replication, create a bucket for the database, then follow the
 [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) to
 create a connection string and configure QuestDB.
-
-See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
