@@ -32,7 +32,7 @@ SELECT build();
 
 | build                                                                                              |
 | -------------------------------------------------------------------------------------------------- |
-| Build Information: QuestDB 7.3.5, JDK 17.0.7, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
+| Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
 ## current database, schema, or user
 
@@ -295,8 +295,8 @@ Storage policies — and the `storage_policies` view — are available in
 :::
 
 `storage_policies` is a system view that lists every
-[storage policy](/docs/concepts/storage-policy/) currently attached to a table
-or materialized view. Query it like any other table:
+[storage policy](/docs/concepts/storage-policy/) currently attached to a table.
+Query it like any other table:
 
 ```questdb-sql
 SELECT * FROM storage_policies;
@@ -306,9 +306,9 @@ SELECT * FROM storage_policies;
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table or materialized view the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables) / [`materialized_views`](#materialized_views). |
+| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
 | `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
-| `drop_native` | _STRING_ | TTL for the `DROP NATIVE` stage. Blank when the stage is not configured. |
+| `to_remote` | _STRING_ | Reserved — always blank in the current release. The `TO REMOTE` clause is rejected at SQL parse time with `'TO REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
 | `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
 | `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
@@ -329,14 +329,15 @@ SELECT * FROM storage_policies;
 SELECT * FROM storage_policies;
 ```
 
-| table_dir_name | to_parquet | drop_native | drop_local | drop_remote | status | last_updated |
-|----------------|------------|-------------|------------|-------------|--------|--------------|
-| trades~12      | 72h        | 240h        | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
-| metrics~18     | 168h       |             |            |             | D      | 2025-01-14T09:15:42.000000Z |
+| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
+|----------------|------------|-----------|------------|-------------|--------|--------------|
+| trades~12      | 72h        |           | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       |           |            |             | D      | 2025-01-14T09:15:42.000000Z |
 
-The first row is a policy with three active stages (3-day Parquet conversion,
-10-day native drop, 1-month local drop) and is currently enforced. The second
-row has only the `TO PARQUET` stage set and has been temporarily disabled.
+The first row is a policy with two active stages (3-day Parquet conversion and
+1-month local drop) and is currently enforced. The second row has only the
+`TO PARQUET` stage set and has been temporarily disabled. The `to_remote` and
+`drop_remote` columns are reserved and always blank in the current release.
 
 ## table_columns
 

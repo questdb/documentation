@@ -75,6 +75,18 @@ TIMESTAMP(ts) PARTITION BY MONTH;
 
 See [Partitions](/docs/concepts/partitions/) for details.
 
+### Out-of-order writes
+
+QuestDB accepts data in any timestamp order. Rows that arrive behind already-
+committed data are merged into the correct position automatically. The cost
+is write amplification, which scales with partition size and how far behind
+the data arrives.
+
+If late or replayed data is part of your workload (exchange corrections,
+Kafka replay, sensor backfill), see
+[Out-of-order data](/docs/concepts/out-of-order-data/) for behavior per
+ingestion method and tuning guidance.
+
 ## Indexing
 
 Index your primary filter columns to speed up `WHERE` clause queries. QuestDB

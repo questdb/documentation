@@ -155,7 +155,9 @@ db/trades/
 
 When out-of-order data arrives for an existing partition, QuestDB may split that
 partition to avoid rewriting all its data. This is an optimization for write
-performance.
+performance. For the broader story on out-of-order ingestion, including
+write amplification and tuning, see
+[Out-of-order data](/docs/concepts/out-of-order-data/).
 
 A split occurs when:
 - The existing partition prefix is larger than the new data plus suffix

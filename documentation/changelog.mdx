@@ -8,17 +8,49 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## June 2026
+
+### Releases
+
+- [9.4.2](https://questdb.com/release-notes/) - Released June 9, 2026
+- [9.4.1](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
+- [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### Reference
+
+- Documented the column wildcard with optional `EXCLUDE` list for column-level [`GRANT`](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table) and [`REVOKE`](/docs/query/sql/acl/revoke/#revoke-from-all-columns-of-a-table) — `GRANT SELECT ON trades(*) TO user` grants every current column, and `EXCLUDE` omits specific ones
+- Documented custom root CA support for the replication object store: the `ca_cert_file` and `ca_builtin_roots` [connection-string parameters](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca) trust a private, internal, or self-signed CA for S3, Azure Blob, and GCS stores
+- Added [`array_agg()`](/docs/query/functions/aggregation/#array_agg) aggregate function, covering scalar and array input forms, `SAMPLE BY` with FILL, and NULL handling
+- Documented the [`twap()`](/docs/query/functions/aggregation/#twap) designated-timestamp limitation: the timestamp argument must be the table's designated timestamp
+
+### Updated
+
+- [systemd service example](/docs/deployment/systemd/) - Updated the Java requirement from 17 to 25 across deployment and quick-start prerequisites
+
 ## May 2026
+
+### Releases
+
+- [9.4.0](https://questdb.com/release-notes/) - Released May 18, 2026
 
 ### New
 
+- [Out-of-order data](/docs/concepts/out-of-order-data/) - New concept page covering O3 behavior per ingestion method, engine mechanics, write amplification (with the `table_write_amp_*` columns), tuning, and common scenarios
+- [Posting index and covering index](/docs/concepts/deep-dive/posting-index/) - New deep-dive on posting indexes, plus covering index documentation across `CREATE TABLE`, `ALTER TABLE`, `SHOW`, `EXPLAIN`, and schema design
+- [Order Flow Imbalance (OFI)](/docs/cookbook/sql/finance/order-flow-imbalance/) - Cookbook recipe using the Cont-Kukanov-Stoikov definition computed from L1 quote changes, with per-ECN and consolidated variants
 - [Upgrade QuestDB](/docs/operations/upgrade/) - Guide for upgrading QuestDB versions
 - [Table/column versioning](/docs/concepts/deep-dive/root-directory-structure/) - Added versioning info to root directory structure
 - [DECLARE with Grafana time range](/docs/cookbook/integrations/grafana/declare-time-range/) - Pass Grafana dashboard time range into QuestDB `DECLARE` variables
 
 ### Reference
 
+- Documented [gzip request compression](/docs/ingestion/ilp/overview/) for ILP/HTTP and updated [Telegraf](/docs/ingestion/message-brokers/telegraf/) guidance for QuestDB 9.1.0+
 - Added [`ntile()`](/docs/query/functions/window-functions/reference/#ntile), [`cume_dist()`](/docs/query/functions/window-functions/reference/#cume_dist), and [`nth_value()`](/docs/query/functions/window-functions/reference/#nth_value) window functions
+- Added [`regr_r2()`](/docs/query/functions/finance/#regr_r2) coefficient of determination aggregate
 - Fixed `timestamp_ns` valid range documentation
 - Added precise microsecond-grained timestamp examples for PHP clients
 - Fixed PIVOT syntax: removed redundant `FOR` from multiple pivot statements
@@ -27,6 +59,10 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Go client](/docs/connect/clients/go/) - Rewrote for the QWP binary protocol: ingestion, the QwpQueryClient query API, store-and-forward, and failover
+- [Storage policy](/docs/concepts/storage-policy/) - Removed the `DROP NATIVE` stage; `TO PARQUET` now removes native files and serves reads from the Parquet file
+- [SQL extensions and compatibility](/docs/concepts/deep-dive/sql-extensions/) - Rewritten as the canonical SQL dialect reference covering time-series clauses and joins, query syntax conveniences, storage extensions, PIVOT vs SQL Server/PostgreSQL, JSON and UNNEST, and a full inventory of standard SQL features not supported with QuestDB equivalents. Sidebar entry moved to the top of Query & SQL Reference
+- [systemd service example](/docs/deployment/systemd/) - Corrected JVM argument ordering, switched to `UseParallelGC`, set `-Dcontainerized=false`, and added required setup paths
+- [Materialized views](/docs/query/sql/create-mat-view/) - Removed storage policy support for materialized views; use `TTL` for retention instead
 - [Aggregation functions](/docs/query/functions/aggregation/) - Added demo tags and updated examples with runnable queries
 - [LATEST ON](/docs/query/sql/latest-on/) - Added demo tags to examples
 - [JOIN](/docs/query/sql/join/) - Updated examples to use demo data
@@ -45,6 +81,10 @@ This page tracks significant updates to the QuestDB documentation.
 ### Releases
 
 - [9.3.5](https://questdb.com/release-notes/) - Released April 13, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.5](https://questdb.com/release-notes/) - Released April 13, 2026
 
 ### New
 
@@ -80,6 +120,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.3.4](https://questdb.com/release-notes/) - Released March 26, 2026
 
+### QuestDB Enterprise Releases
+
+- [3.2.4](https://questdb.com/release-notes/) - Released March 26, 2026
+- [3.2.3](https://questdb.com/release-notes/) - Released March 3, 2026
+
 ### New
 
 - [Log returns](/docs/cookbook/sql/finance/log-returns/) and [gamma scalping signal](/docs/cookbook/sql/finance/gamma-scalping-signal/) cookbook recipes
@@ -105,6 +150,10 @@ This page tracks significant updates to the QuestDB documentation.
 ### Releases
 
 - [9.3.3](https://questdb.com/release-notes/) - Released February 25, 2026
+
+### QuestDB Enterprise Releases
+
+- [3.2.2](https://questdb.com/release-notes/) - Released February 4, 2026
 
 ### New
 
@@ -140,6 +189,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.3.1](https://questdb.com/release-notes/) - Released January 14, 2026
 - [9.3.0](https://questdb.com/release-notes/) - Released January 9, 2026
 
+### QuestDB Enterprise Releases
+
+- [3.2.1](https://questdb.com/release-notes/) - Released January 29, 2026
+- [3.2.0](https://questdb.com/release-notes/) - Released January 19, 2026
+
 ### New
 
 - [Cookbook](/docs/cookbook/) - Collection of 40+ recipes for common SQL patterns, integrations, and operations
@@ -171,6 +225,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.2.3](https://questdb.com/release-notes/) - Released December 18, 2025
 - [9.2.2](https://questdb.com/release-notes/) - Released December 1, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.1.2](https://questdb.com/release-notes/) - Released December 18, 2025
+- [3.1.1](https://questdb.com/release-notes/) - Released December 1, 2025
+
 ### New
 
 - [Builtin profiler](/docs/troubleshooting/profiling/) - Documentation for QuestDB's built-in query profiler
@@ -193,6 +252,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [9.2.1](https://questdb.com/release-notes/) - Released November 25, 2025
 - [9.2.0](https://questdb.com/release-notes/) - Released November 13, 2025
 - [9.1.1](https://questdb.com/release-notes/) - Released November 3, 2025
+
+### QuestDB Enterprise Releases
+
+- [3.1.0](https://questdb.com/release-notes/) - Released November 25, 2025
+- [3.0.5](https://questdb.com/release-notes/) - Released November 7, 2025
 
 ### New
 
@@ -217,6 +281,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.1.0](https://questdb.com/release-notes/) - Released October 3, 2025
 
+### QuestDB Enterprise Releases
+
+- [3.0.4](https://questdb.com/release-notes/) - Released October 27, 2025
+
 ### New
 
 - [PGWire for C/C++](/docs/connect/compatibility/pgwire/c-and-cpp/) - Guide for C/C++ applications using PostgreSQL wire protocol
@@ -234,6 +302,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ## September 2025
 
+### QuestDB Enterprise Releases
+
+- [3.0.3](https://questdb.com/release-notes/) - Released September 15, 2025
+
 ### Updated
 
 - [Partitioning](/docs/concepts/partitions/) - Improved formatting and explanations
@@ -245,6 +317,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.0.3](https://questdb.com/release-notes/) - Released August 29, 2025
 - [9.0.2](https://questdb.com/release-notes/) - Released August 15, 2025
+
+### QuestDB Enterprise Releases
+
+- [3.0.2](https://questdb.com/release-notes/) - Released August 29, 2025
+- [3.0.1](https://questdb.com/release-notes/) - Released August 15, 2025
 
 ### New
 
@@ -261,6 +338,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [9.0.1](https://questdb.com/release-notes/) - Released July 23, 2025
 - [9.0.0](https://questdb.com/release-notes/) - Released July 11, 2025
+
+### QuestDB Enterprise Releases
+
+- [3.0.0](https://questdb.com/release-notes/) - Released July 23, 2025
 
 ### New
 

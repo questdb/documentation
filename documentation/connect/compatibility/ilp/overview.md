@@ -106,6 +106,18 @@ connection failures. However, while HTTP is recommended, TCP has slightly lower
 overhead than HTTP and may be useful in high-throughput scenarios in
 high-latency networks.
 
+### Request compression
+
+The HTTP transport accepts gzip-compressed payloads. Third-party tools that
+send ILP over HTTP, such as Telegraf, can set `Content-Encoding: gzip` to
+reduce bandwidth usage. This is most useful when sending text-heavy data
+(logs, documents) or when the client is bandwidth-constrained. The trade-off
+is some CPU overhead for compression on the client and decompression on the
+server.
+
+Compression is not currently exposed by the official QuestDB ILP clients,
+which send uncompressed payloads.
+
 ## Client-Side Configuration
 
 Clients connect to a QuestDB using ILP via a configuration string. Configuration
@@ -458,6 +470,14 @@ CREATE TABLE IF NOT EXISTS 'trades' (
 
 You can use the `CREATE TABLE IF NOT EXISTS` construct to make sure the table is
 created, but without raising an error if the table already exists.
+
+## Data ordering
+
+ILP performs best when rows arrive in chronological order by their designated
+timestamp. QuestDB also accepts rows in any order: late or out-of-order rows
+are merged into the correct position automatically. See
+[Partition splitting and squashing](/docs/concepts/partitions/#partition-splitting-and-squashing)
+for the engine mechanics.
 
 ## HTTP transaction semantics
 

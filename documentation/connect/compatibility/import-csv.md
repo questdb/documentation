@@ -117,8 +117,10 @@ csvstack *.csv > singleFile.csv
 
 - `COPY` is parallel when target table is partitioned.
 
-- `COPY` is _serial_ when target table is non-partitioned. Out-of-order
-  timestamps are rejected.
+- `COPY` is _serial_ when target table is non-partitioned, and out-of-order
+  timestamps are rejected. Partitioned target tables accept out-of-order rows
+  and sort them during import. See
+  [Out-of-order data](/docs/concepts/out-of-order-data/) for details.
 
 - `COPY` cannot import data into non-empty table.
 

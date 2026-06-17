@@ -52,7 +52,8 @@ Backup supports the following storage backends:
   sensitive to the underlying filesystem type.
 
 See [Configure object storage](/docs/high-availability/setup/#1-configure-object-storage)
-for connection string formats.
+for connection string formats. For a private, on-prem, or self-signed store,
+see [TLS with a private or self-signed CA](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca).
 
 #### Permissions
 
@@ -335,13 +336,13 @@ To find your instance name, see [Backup instance name](#backup-instance-name).
 ### Interaction with storage policies
 
 [Storage policies](/docs/concepts/storage-policy/) operate locally — they
-convert partitions to Parquet in place and then drop native (and eventually
-local Parquet) files on a schedule. Backups capture whatever is on local disk
-at the time the backup runs:
+convert partitions to Parquet in place (removing the native files) and
+eventually drop the local Parquet files on a schedule. Backups capture
+whatever is on local disk at the time the backup runs:
 
 - Partitions still in native format are backed up as native files.
-- Partitions that have been converted to Parquet (via the `TO PARQUET` stage,
-  after `DROP NATIVE` has fired) are backed up as Parquet files.
+- Partitions that have been converted to Parquet (via the `TO PARQUET` stage)
+  are backed up as Parquet files.
 - Once `DROP LOCAL` fires and removes a partition from local disk, subsequent
   backups will no longer contain that partition — restoring an earlier backup
   is the only way to recover it.

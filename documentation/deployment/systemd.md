@@ -1,12 +1,12 @@
 ---
 title: Launch QuestDB with systemd
 sidebar_label: systemd
-description: This document describes how to launch QuestBD using systemd.
+description: This document describes how to launch QuestDB using systemd.
 ---
 
 Use systemd to run QuestDB as a system or user service. This guide will
 demonstrate an initial configuration which you can use as the basis for your
-installation scripts. It will also demonstrate how to setup and start a QuestDB
+installation scripts. It will also demonstrate how to set up and start a QuestDB
 systemd service.
 
 ## Prerequisites
@@ -14,6 +14,7 @@ systemd service.
 The prerequisites for deploying QuestDB with systemd are:
 
 - A Unix machine supporting systemd
+- Java 25 (OpenJDK 25 or compatible distribution)
 
 ## Initial system configuration
 
@@ -27,16 +28,15 @@ user with appropriately scoped permissions.
 ```bash
 #!/bin/bash
 
-# Download and install the JDK
-curl -s https://download.oracle.com/java/17/latest/jdk-17_linux-x64_bin.tar.gz -o jdk.tar.gz
-mkdir -p ~/jdk
-tar -xzf jdk.tar.gz -C ~/jdk --strip-components=1
-export JAVA_HOME=~/jdk
+# Install OpenJDK 25
+sudo apt-get update && sudo apt-get install -y openjdk-25-jdk
+export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
 
 # Download and set up QuestDB
 curl -s https://dl.questdb.io/snapshots/questdb-latest-no-jre-bin.tar.gz -o questdb.tar.gz
 mkdir -p ~/questdb/binary
+mkdir -p ~/bin ~/var/lib/questdb
 tar -xzf questdb.tar.gz -C ~/questdb/binary --strip-components 1
 mv ~/questdb/binary/questdb.jar ~/bin/
 ```
@@ -45,7 +45,7 @@ mv ~/questdb/binary/questdb.jar ~/bin/
 
 Your QuestDB configuration is done in a `server.conf` file. The `server.conf`
 file is populated with safe defaults on first startup if it does not exist. It
-is common for user's of QuestDB to stick with the default configuration.
+is common for users of QuestDB to stick with the default configuration.
 However, should you choose to update your own and serve it via a scripted method
 or similar, you may do so.
 
@@ -75,15 +75,16 @@ Type=simple
 Restart=always
 RestartSec=2
 # Adjust java path to match requirements of a given distro
-ExecStart=/home/[USER_NAME]/jdk/bin/java \
+ExecStart=/usr/lib/jvm/java-25-openjdk-amd64/bin/java \
+-XX:+UnlockExperimentalVMOptions \
+-XX:+AlwaysPreTouch \
+-XX:+UseParallelGC \
+-DQuestDB-Runtime-66535 \
+-Dcontainerized=false \
+-ea -Dnoebug \
 --add-exports java.base/jdk.internal.math=io.questdb \
 -p /home/[USER_NAME]/bin/questdb.jar \
 -m io.questdb/io.questdb.ServerMain \
--DQuestDB-Runtime-66535 \
--ea -Dnoebug \
--XX:+UnlockExperimentalVMOptions \
--XX:+AlwaysPreTouch \
--XX:+UseParallelOldGC \
 -d /home/[USER_NAME]/var/lib/questdb
 
 ExecReload=/bin/kill -s HUP $MAINPID

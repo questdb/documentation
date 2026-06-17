@@ -51,6 +51,20 @@ reference for Python, Go, Java, JavaScript, C/C++, Rust, and C#/.NET.
 
 ---
 
+:::tip Looking for `timestamp()` to elect a designated timestamp?
+
+The `timestamp(column)` clause assigns a
+[designated timestamp](/docs/concepts/designated-timestamp/) to a query result
+or to a new table. It is a structural clause rather than a value
+transformation, so it is documented on its own page:
+[Timestamp function](/docs/query/functions/timestamp/#during-a-select-operation).
+
+Use it when a table or CTE does not have a designated timestamp, or to change
+the designated timestamp for the scope of a query.
+:::
+
+---
+
 ## Function categories
 
 ### Current time

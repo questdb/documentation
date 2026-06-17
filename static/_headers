@@ -12,6 +12,7 @@
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, OPTIONS
   Cache-Control: public, max-age=60
+  X-Robots-Tag: noindex
 
 /*/web-console/*.json
   Access-Control-Allow-Origin: *

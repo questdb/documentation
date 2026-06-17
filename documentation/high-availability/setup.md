@@ -101,7 +101,11 @@ cat <key>.json | base64
 replication.object.store=gcs::bucket=${BUCKET_NAME};root=/;credential=${BASE64_ENCODED_KEY};
 ```
 
-Alternatively, use `credential_path` to reference the key file directly.
+Alternatively, use `credential_path` to reference the key file directly, or
+supply a pre-obtained static OAuth `token` to skip the token exchange
+altogether. A static `token` is required when the store sits behind a private
+or intercepting CA; see
+[TLS with a private or self-signed CA](#tls-with-a-private-or-self-signed-ca).
 
 :::tip[Using Workload Identity]
 If your instance uses Workload Identity (GKE) or runs on a GCE VM with a service
@@ -127,6 +131,54 @@ mount to prevent write corruption.
 ```ini
 replication.object.store=fs::root=/mnt/nfs_replication/final;atomic_write_dir=/mnt/nfs_replication/scratch;
 ```
+
+### TLS with a private or self-signed CA
+
+By default, QuestDB trusts only the built-in Mozilla root certificates
+when connecting to an object store over HTTPS. Public AWS S3, Azure Blob, and
+GCS endpoints work out of the box, but a private or on-prem
+S3/Azure/GCS-compatible store fronted by an internal CA, a self-signed
+certificate, or a TLS-intercepting proxy fails the TLS handshake. Two optional
+connection-string parameters add the trusted CA:
+
+- `ca_cert_file`: path to a PEM file holding one or more CA root certificates to
+  trust, in addition to the built-in roots. The file may hold a single
+  certificate or a bundle.
+- `ca_builtin_roots` (optional): `true` (default) or `false`. Set to `false` to
+  trust only the certificates from `ca_cert_file` and drop the built-in roots.
+  Valid only together with `ca_cert_file`.
+
+```ini
+replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};region=${AWS_REGION};endpoint=https://minio.internal;ca_cert_file=/etc/ssl/private-ca.pem;
+```
+
+Both parameters are valid only for the HTTP-based backends (`s3`, `azblob`,
+`gcs`) and are rejected for `fs` (NFS). They belong to the object store
+connection string, so they work the same way in `backup.object.store`. The file
+is read and parsed at startup, so a missing or malformed PEM fails fast with an
+`InvalidObjectStoreConfigurationException`.
+
+:::caution
+
+- **Point it at the CA, not the server certificate.** `ca_cert_file` must hold
+  the CA certificate(s) that issued the store's certificate (the root plus any
+  intermediates), not the store's own server certificate. Startup validation
+  only checks that the PEM parses, so a server certificate passes validation but
+  then fails every request with a certificate-trust error.
+- **No `;` in the path.** The connection string is split on `;` with no escape,
+  so a certificate path must not contain a `;`. A parameter with no `=` (for
+  example, a path truncated at a `;`) is rejected at startup.
+- **Data requests only.** The custom CA applies to object store data requests
+  (read, write, list, delete). Dynamic credential and token fetches (S3
+  IMDS/STS/assume-role and the GCS OAuth token endpoint) go through a separate
+  client that always trusts the built-in roots. Stores that authenticate with
+  static credentials (S3 `access_key_id` and `secret_access_key`, or Azure
+  `account_key`) make no such fetch and are unaffected. A `gcs` store reached
+  through a private or intercepting CA must therefore also be given a static
+  OAuth `token`, otherwise its token fetch fails the handshake at runtime even
+  though the configuration validates.
+
+:::
 
 ## 2. Configure the primary node
 

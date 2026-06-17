@@ -87,13 +87,15 @@ consistent handling of timestamps.
 
 ### SQL dialect differences
 
-While QuestDB supports the PGWire protocol for communication, its SQL dialect
-and feature set are not identical to PostgreSQL. QuestDB is a specialized
-time-series database and does not support all SQL features, functions, or data
-types that a standard PostgreSQL server does.
+QuestDB's SQL dialect adds time-series clauses (SAMPLE BY, LATEST ON,
+ASOF/LT/SPLICE/WINDOW/HORIZON joins, TICK intervals) and omits a small
+number of standard features that do not fit a column-oriented, time-ordered
+storage model (`DELETE`, `HAVING`, `OFFSET`, `DISTINCT ON`, `ON CONFLICT`,
+correlated subqueries in `WHERE`).
 
-Always refer to the [QuestDB SQL documentation](/docs/query/overview/)
-for supported operations.
+For the full picture, including the QuestDB equivalent of each unsupported
+feature, see
+[SQL extensions and compatibility](/docs/concepts/deep-dive/sql-extensions/).
 
 ### Forward-only cursors
 

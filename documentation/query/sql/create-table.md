@@ -70,12 +70,13 @@ TABLE [IF NOT EXISTS] tableName
 Where `policyStage` is one of:
 
 ```
-TO PARQUET duration | DROP NATIVE duration | DROP LOCAL duration | DROP REMOTE duration
+TO PARQUET duration | TO REMOTE duration | DROP LOCAL duration | DROP REMOTE duration
 ```
 
-Stages are Enterprise-only, all optional, and their durations must be positive
-and in ascending order. `TTL` and `STORAGE POLICY` are mutually exclusive — see
-[Storage Policy](#storage-policy).
+Stages are Enterprise-only, all optional, and their durations must be positive.
+A drop stage may not precede the write it depends on (`TO PARQUET` and
+`TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`). `TTL` and
+`STORAGE POLICY` are mutually exclusive — see [Storage Policy](#storage-policy).
 
 ```questdb-sql title="Create from another table's structure (CREATE TABLE LIKE)"
 CREATE TABLE tableName (LIKE sourceTableName);
@@ -277,9 +278,9 @@ Storage policies are available in **QuestDB Enterprise** only.
 :::
 
 A [storage policy](/docs/concepts/storage-policy/) automates the partition
-lifecycle by defining when partitions are converted to Parquet locally, when
-native data is removed, and when local copies are dropped. Place the
-`STORAGE POLICY(...)` clause after `PARTITION BY`:
+lifecycle by defining when partitions are converted to Parquet locally and
+when local copies are dropped. Place the `STORAGE POLICY(...)` clause after
+`PARTITION BY`:
 
 ```questdb-sql title="With storage policy (Enterprise)"
 CREATE TABLE trades (
@@ -289,14 +290,18 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3d, DROP NATIVE 10d, DROP LOCAL 1M)
+STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
 WAL;
 ```
 
-A storage policy supports up to four settings: `TO PARQUET`, `DROP NATIVE`,
-`DROP LOCAL`, and `DROP REMOTE`. All are optional, all TTL values must be
-positive, and they must be in ascending order. `DROP REMOTE` is reserved
-syntax and is currently rejected at SQL parse time with
+A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
+`DROP LOCAL`, and `DROP REMOTE`. All are optional and all TTL values must be
+positive. A drop stage may not precede the write it depends on (`TO PARQUET`
+and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
+`TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
+removes its native files and serves reads from the Parquet file. `TO REMOTE`
+and `DROP REMOTE` are reserved syntax and are currently rejected at SQL parse
+time with `'TO REMOTE' is not supported yet` and
 `'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after table creation, see

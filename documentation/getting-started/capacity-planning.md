@@ -101,9 +101,16 @@ For instructions on how to do so, see the
 
 ### Write amplification
 
-Write amplification measures how many times data is rewritten during ingestion.
-A value of 1.0 means each row is written once (ideal). Higher values indicate
-rewrites due to out-of-order data merging into existing partitions.
+Write amplification measures how many physical rows are written to disk per
+logical row committed. A value of 1.0 means each row is written once (ideal).
+Higher values come from any operation that rewrites existing data: out-of-order
+ingestion merging into existing partitions, incremental
+[materialized view](/docs/concepts/materialized-views/) refreshes replacing
+already-refreshed time buckets, and `UPDATE` statements rewriting column files.
+
+For the full picture on the out-of-order side (per-ingestion-method behavior,
+tuning, and common scenarios), see
+[Out-of-order data](/docs/concepts/out-of-order-data/).
 
 Calculate it using [Prometheus metrics](/docs/integrations/other/prometheus/#scraping-prometheus-metrics-from-questdb):
 

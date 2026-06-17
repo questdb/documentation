@@ -99,6 +99,7 @@ min/max position-by-position — see the
 
 | Function | Description |
 | :------- | :---------- |
+| [array_agg](#array_agg) | Collect values or concatenate arrays into a DOUBLE[] |
 | [array_elem_avg](/docs/query/functions/array/#array_elem_avg) | Element-wise average across arrays |
 | [array_elem_max](/docs/query/functions/array/#array_elem_max) | Element-wise maximum across arrays |
 | [array_elem_min](/docs/query/functions/array/#array_elem_min) | Element-wise minimum across arrays |
@@ -455,6 +456,142 @@ LIMIT 5;
 - [arg_max](#arg_max) - Value at the row where another column is maximum
 - [min](#min) - Returns the minimum value itself
 - [first](#first) - Returns the first value by timestamp order
+
+## array_agg
+
+**Syntax:**
+
+```questdb-sql
+array_agg(value) -> DOUBLE[]
+array_agg(array) -> DOUBLE[]
+```
+
+Collects row values into a single `DOUBLE[]` array per group. This is the
+inverse of [UNNEST](/docs/query/sql/unnest/#array-unnest), which expands arrays
+back into rows. Use `array_agg` to build per-group vectors for downstream array
+operations such as [array_avg](/docs/query/functions/array/#array_avg),
+[dot_product](/docs/query/functions/array/#dot_product), or time-bucketed
+snapshots via `SAMPLE BY`.
+
+When called with a scalar argument, each row's value becomes one element of the
+output array. When called with a `DOUBLE[]` argument, non-null input arrays are
+concatenated into a single flat `DOUBLE[]`.
+
+`array_agg` always executes in parallel across threads while preserving input
+order.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `value` | `DOUBLE` (or castable) | Scalar to collect. Each row's value becomes one element. NULL values are preserved. |
+| `array` | `DOUBLE[]` | One-dimensional array to concatenate. Non-null arrays are appended into a flat `DOUBLE[]`. NULL and empty arrays are skipped. Multi-dimensional arrays (e.g. `DOUBLE[][]`) are rejected. |
+
+Only one of `value` or `array` is used per call.
+
+#### Return value
+
+- **Scalar form** - `DOUBLE[]`. Always produces an array when at least one row
+  exists, even if every value is NULL. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
+- **Array form** - `DOUBLE[]`. Returns NULL (not an empty array) when every
+  input array is NULL or empty. Empty `SAMPLE BY` buckets produce NULL via
+  `FILL(NULL)`.
+
+#### SAMPLE BY support
+
+`array_agg` works with `SAMPLE BY` and the following FILL options:
+
+- `FILL(NULL)` - empty buckets produce NULL
+- `FILL(PREV)` - empty buckets repeat the previous bucket's array
+- `FILL(NONE)` - empty buckets are omitted from the result
+
+Not supported:
+
+- `FILL(LINEAR)` - interpolation is meaningless for arrays
+- `FILL(constant)` - a scalar cannot fill an array column; use `FILL(NULL)` instead
+
+#### Examples
+
+**Collect prices per symbol:**
+
+```questdb-sql demo title="array_agg - collect prices per symbol"
+SELECT symbol, array_agg(price) AS prices
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 3s..$now'
+GROUP BY symbol;
+```
+
+| symbol | prices |
+| :----- | :----- |
+| EURUSD | [1.1922, 1.1928, 1.1925, 1.1927, 1.1927, 1.1926, 1.1924, 1.1926, 1.1932, 1.1934, 1.1933, 1.1928, 1.1929, 1.1934, 1.1935, 1.1934, 1.1935, 1.1929, 1.193, ...] |
+
+Each row's `price` value is collected into a single `DOUBLE[]` per symbol.
+
+**Time-bucketed arrays with SAMPLE BY:**
+
+```questdb-sql demo title="array_agg - time-bucketed price arrays"
+SELECT timestamp, array_agg(price) AS prices
+FROM trades
+WHERE symbol = 'BTC-USDT'
+  AND timestamp IN '$now - 5s..$now'
+SAMPLE BY 1s;
+```
+
+Produces one array per 1-second bucket containing all trade prices in that
+interval.
+
+**Concatenate arrays within a time bucket:**
+
+```questdb-sql demo title="array_agg - concatenate bid price arrays"
+SELECT timestamp, array_agg(bids[1]) AS all_bids
+FROM market_data
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 1s..$now'
+SAMPLE BY 100ms;
+```
+
+Here `bids[1]` is a `DOUBLE[]` column (bid prices at each depth level). The
+function concatenates all non-null bid-price arrays in each 100 ms bucket into a
+single flat array.
+
+**Compose with array functions:**
+
+```questdb-sql demo title="array_agg - cumulative price sums per symbol"
+SELECT symbol,
+  array_agg(price) AS prices,
+  array_cum_sum(array_agg(price)) AS cumulative_prices
+FROM fx_trades
+WHERE symbol = 'EURUSD'
+  AND timestamp IN '$now - 3s..$now'
+GROUP BY symbol;
+```
+
+[array_cum_sum](/docs/query/functions/array/#array_cum_sum) computes running
+totals over the collected prices in timestamp order.
+
+#### NULL handling
+
+- NULL scalar inputs appear as null elements in the output array.
+- NULL and empty input arrays are skipped during concatenation, but null
+  elements within a non-null array are preserved.
+
+#### Maximum array size
+
+`array_agg` shares the global cap on `DOUBLE[]` element count: any group whose
+collected (or concatenated) array would exceed the limit causes the query to
+fail with an `array_agg: array size exceeds configured maximum` error. The cap
+is controlled by the `cairo.max.array.element.count` server property and
+defaults to `10,000,000` elements. See
+[Limitations for variable-sized types](/docs/query/datatypes/overview/#limitations-for-variable-sized-types)
+for the broader array size limits.
+
+#### See also
+
+- [UNNEST](/docs/query/sql/unnest/#array-unnest) - Expand arrays back into rows (inverse of `array_agg`)
+- [Array functions](/docs/query/functions/array/) - Functions that operate on arrays
+- [SAMPLE BY](/docs/query/sql/sample-by/) - Time-series aggregation
 
 ## avg
 
@@ -1659,9 +1796,14 @@ Supports `SAMPLE BY` with `FILL` modes.
 #### Parameters
 
 - `price` is any numeric value.
-- `timestamp` is a `timestamp` value. This is typically the table's
-  [designated timestamp](/docs/concepts/designated-timestamp/) but can be any
-  timestamp column.
+- `timestamp` must be the table's
+  [designated timestamp](/docs/concepts/designated-timestamp/), and the base
+  query must deliver rows in ascending designated-timestamp order. `twap()`
+  rejects a query that passes any other timestamp column or expression, or a
+  base scan that compiles to a backward scan (for example, an inner
+  `ORDER BY ts DESC LIMIT N`). To use a non-designated timestamp column, first
+  promote it to designated timestamp using the
+  [timestamp function](/docs/query/functions/timestamp/).
 
 #### Return value
 
