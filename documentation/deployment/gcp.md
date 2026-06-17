@@ -1,60 +1,376 @@
 ---
-title: Deploying to Google Cloud Platform  (GCP)
+title: Deploying QuestDB on GCP
 sidebar_label: GCP
 description:
-  This document explains what to hardware to use, and how to provision QuestDB on Google Cloud Platform (GCP).
+  Deploy QuestDB on Google Cloud Platform using Compute Engine, with instance sizing, storage, and networking recommendations.
 ---
 
-
+import Screenshot from "@theme/Screenshot"
+import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
+import CodeBlock from "@theme/CodeBlock"
 import FileSystemChoice from "../../src/components/DRY/_questdb_file_system_choice.mdx"
 import MinimumHardware from "../../src/components/DRY/_questdb_production_hardware-minimums.mdx"
 
-## Hardware recommendations
+## Quick reference
+
+| Component | Recommended | Notes |
+|-----------|-------------|-------|
+| Instance | `c3-standard-4` or `c3-highmem-8` | 4-8 vCPUs, 16-64 GiB RAM |
+| Storage | Hyperdisk Balanced, 100+ GiB | 5000 IOPS / 300 MBps |
+| File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
+| Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
+
+---
+
+## Infrastructure
+
+Plan your infrastructure before launching. This section covers instance types,
+storage, and networking requirements.
 
 <MinimumHardware />
 
-### Google Compute Engine with Google Cloud Hyperdisk
+### Instance sizing
 
-Google Compute Engine offers a variety of VM instances tuned for different workloads.
+| Workload | Instance | vCPUs | RAM | Use case |
+|----------|----------|-------|-----|----------|
+| Development | `c3-standard-4` | 4 | 16 GiB | Testing, small datasets |
+| Production (starter) | `c3-highmem-4` | 4 | 32 GiB | Light ingestion, moderate queries |
+| Production (standard) | `c3-highmem-8` | 8 | 64 GiB | High ingestion, complex queries |
+| Production (heavy) | `c3-highmem-22` | 22 | 176 GiB | Heavy workloads, large datasets |
 
+**Choosing an instance family:**
 
-Do **not** use instances containing the letter `A`, such as `C4A`. These are `ARM` architecture instances, 
-using Axion processors. 
+Start with `C3` (Intel Xeon) or `C3D` (AMD EPYC) instances. Both perform
+similarly for QuestDB. Choose based on availability and pricing in your region.
 
-Either `AMD EPYC` CPUs (`D` letter) or `Intel Xeon` (no letter) are appropriate for `x86_64` deployments.
+You can use the `highcpu`, `standard`, and `highmem` variants to adjust the
+RAM-to-vCPU ratio between `2:1`, `4:1`, and `8:1`. Higher RAM can improve query
+performance dramatically when it lets your working set fit entirely in memory.
 
-We recommend starting with `C-Series` instances, and reviewing other instance types if your workload demands it.
+:::warning
+Do **not** use instances containing the letter `A`, such as `C4A`. These are
+ARM architecture instances using Axion processors. QuestDB's JIT compilation and
+SIMD optimizations are limited on ARM. Deploy on `x86_64` instances and an
+`x86_64` Linux distribution such as Ubuntu.
+:::
 
-You should deploy using an  `x86_64` Linux distribution, such as Ubuntu.
+### Storage
 
-For storage, we recommend using [Hyperdisk Balanced](https://cloud.google.com/compute/docs/disks/hyperdisks) disks,
-and provisioning them at `5000 IOPS/300 MBps` until you have tested your workload.
+Use [Hyperdisk Balanced](https://cloud.google.com/compute/docs/disks/hyperdisks)
+volumes, provisioned at `5000 IOPS / 300 MBps` until you have tested your
+workload. Separate your OS disk (30 GiB) from your data disk.
+
+| Workload | Disk | Size | IOPS | Throughput |
+|----------|------|------|------|------------|
+| Development | Hyperdisk Balanced | 100 GiB | 3000 | 140 MBps |
+| Production | Hyperdisk Balanced | 300+ GiB | 5000 | 300 MBps |
+| High I/O | Hyperdisk Balanced | 500+ GiB | 5000+ | 300+ MBps |
 
 :::warning
 Hyperdisk Balanced is not supported on all machine types. N2 instances do not
 support Hyperdisk. Use N4, C3, or C4 series instances with Hyperdisk Balanced.
 :::
 
-`Hyperdisk Extreme` generally requires much higher `vCPU` counts - for example, it cannot be used on `C3` machines
-smaller than `88 vCPUs`.
+`Hyperdisk Extreme` generally requires much higher vCPU counts. For example, it
+cannot be used on `C3` machines smaller than `88 vCPUs`.
+
+**File system:**
 
 <FileSystemChoice />
 
+Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
+compression, `ext4` or `xfs` offer slightly better performance.
 
-### Google Filestore
+**Unsupported storage:**
 
-Google Filestore is a managed NFS service that can be used as a replication
-transport layer in QuestDB Enterprise.
+- **Filestore** - Not supported as primary storage (NFS latency too high). Use
+  for Enterprise replication only (see [Enterprise on GCP](#enterprise-on-gcp)).
+- **Google Cloud Storage** - Not supported as primary storage. Use for
+  Enterprise replication only.
 
-Filestore should **not** be used as primary storage for QuestDB. However, it
-is well-suited for replication when low latency is required. The `fs::`
-transport over NFS provides sub-200ms replication lag with
-[aggressive tuning](/docs/high-availability/tuning/), compared to ~1s+ with
-object store transport (GCS).
+### Networking
 
-To use Filestore for replication:
+**Firewall rules:**
 
-1. Create a Filestore instance in the same region as your QuestDB VMs
+| Port | Protocol | Source | Purpose |
+|------|----------|--------|---------|
+| 22 | TCP | Your IP | SSH access |
+| 9000 | TCP | Your IP / VPC | Web Console & REST API |
+| 8812 | TCP | Your IP / VPC | PostgreSQL wire protocol |
+| 9009 | TCP | Application servers | InfluxDB line protocol |
+| 9003 | TCP | Monitoring servers | Health check & Prometheus |
+
+:::warning
+Never expose ports 9000, 8812, or 9009 to `0.0.0.0/0`. Restrict access to known
+IP ranges or use an Identity-Aware Proxy (IAP) bastion.
+:::
+
+**VPC recommendations:**
+
+- Deploy QuestDB in a private subnet
+- Use Cloud NAT for outbound access (package updates, etc.)
+- Use a network tag (this guide uses `questdb`) so one firewall rule applies to
+  every QuestDB instance you create
+- Use Private Google Access for GCS if using Enterprise replication
+
+---
+
+## Deployment
+
+Deploy QuestDB on a Google Compute Engine virtual machine.
+
+:::note
+Deploying QuestDB as a container at VM creation (the **Deploy Container** option
+on Compute Engine) is no longer supported. Create a standard Linux VM and
+install QuestDB over SSH as described below.
+:::
+
+### Prerequisites
+
+- A [Google Cloud Platform](https://console.cloud.google.com/getting-started)
+  account and a GCP project
+- The
+  [Compute Engine API](https://console.cloud.google.com/apis/api/compute.googleapis.com)
+  enabled for that project
+- An SSH key registered with your project or account
+
+### Create the VM
+
+1. In the Google Cloud Console, navigate to
+   [Compute Engine](https://console.cloud.google.com/compute/instances) and
+   click **Create Instance**
+
+<Screenshot
+  alt="The Create Instance wizard on Google Cloud Platform"
+  src="images/guides/google-cloud-platform/create-instance.webp"
+  width={650}
+  title="Compute Engine instance creation"
+/>
+
+2. Give the instance a name. This example uses `questdb-europe-west3`
+3. Choose a **Region** and **Zone**. This example uses
+   `europe-west3 (Frankfurt)` and the default zone
+4. Select a machine configuration (see [Instance sizing](#instance-sizing))
+5. Under **Boot disk**, click **Change** and choose **Ubuntu 24.04 LTS
+   (x86/64)** as the image
+6. Set the boot disk type to **Hyperdisk Balanced** and the size to at least
+   `100 GiB` (see [Storage](#storage))
+
+<Screenshot
+  alt="Configuring a QuestDB VM on Google Cloud Platform Compute Engine"
+  src="images/guides/google-cloud-platform/create-vm.webp"
+  width={650}
+  title="Machine configuration"
+/>
+
+Before creating the instance, assign it a **Network tag** so a firewall rule can
+expose the QuestDB ports:
+
+1. Expand the **Advanced options** menu, then expand the **Networking** panel
+2. Add a **Network tag** to identify the instance. This example uses `questdb`
+
+<Screenshot
+  alt="Applying a network tag to a Compute Engine VM on Google Cloud Platform"
+  src="images/guides/google-cloud-platform/add-network-tag.webp"
+  width={650}
+  title="Network tag"
+/>
+
+Click **Create** at the bottom of the dialog to launch the instance.
+
+### Create a firewall rule
+
+The network tag lets a single firewall rule apply to this instance and any
+future QuestDB instances you create with the same tag.
+
+1. Navigate to the
+   [Firewall configuration](https://console.cloud.google.com/net-security/firewall-manager/firewall-policies)
+   page under **Network Security** → **Firewall policies**
+2. Click **Create firewall rule**
+3. Enter `questdb` in the **Name** field
+4. Under **Targets**, select **Specified target tags** and enter `questdb` in
+   **Target tags**
+5. Under **Source filter**, enter the IP range this rule applies to. Restrict
+   this to your own IP range rather than `0.0.0.0/0` (see
+   [Networking](#networking))
+6. Under **Protocols and ports**, select **Specified protocols and ports**,
+   check **TCP**, and enter `8812,9000`
+7. Click **Create**
+
+<Screenshot
+  alt="Creating a firewall rule for VPC networking on Google Cloud Platform"
+  src="images/guides/google-cloud-platform/firewall-rules.webp"
+  width={650}
+  title="Firewall rule for the questdb tag"
+/>
+
+:::warning
+Only add port 9009 if you need ILP ingestion, and restrict the source to your
+application servers.
+:::
+
+### Install QuestDB
+
+1. Connect to the instance over SSH. You can use the **SSH** button on the
+   [VM Instances](https://console.cloud.google.com/compute/instances) page, or
+   connect with `gcloud`:
+
+```bash
+gcloud compute ssh questdb-europe-west3 --zone europe-west3-a
+```
+
+2. Download and start QuestDB:
+
+<InterpolateReleaseData
+renderText={(release) => (
+<CodeBlock className="language-bash">
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz
+cd questdb-${release.name}-rt-linux-x86-64/bin
+./questdb.sh start`}
+</CodeBlock>
+)}
+/>
+
+3. Access the Web Console at `http://<external-ip>:9000`, using the instance's
+   **External IP** from the VM Instances page
+
+<Screenshot
+  alt="The QuestDB Web Console running on a VM instance on Google Cloud Platform"
+  src="images/guides/google-cloud-platform/gcp-portal.webp"
+  width={650}
+  title="Web Console ready"
+/>
+
+You can also send a request to the REST API on port 9000:
+
+```bash
+curl -G \
+  --data-urlencode "query=SELECT * FROM telemetry_config" \
+  <external-ip>:9000/exec
+```
+
+For production deployments, use [systemd](/docs/deployment/systemd/) to manage
+the QuestDB service.
+
+---
+
+## Security
+
+### Change default credentials
+
+Update credentials immediately after deployment.
+
+**Web Console and REST API** - edit `conf/server.conf`:
+
+```ini
+http.user=your_username
+http.password=your_secure_password
+```
+
+**PostgreSQL** - edit `conf/server.conf`:
+
+```ini
+pg.user=your_username
+pg.password=your_secure_password
+```
+
+**InfluxDB line protocol** - edit `conf/auth.json`. See
+[ILP authentication](/docs/ingestion/ilp/overview/#authentication).
+
+Restart after changes:
+
+```bash
+./questdb.sh stop
+./questdb.sh start
+```
+
+### Disable unused interfaces
+
+Reduce attack surface by disabling protocols you don't use:
+
+```ini title="conf/server.conf"
+pg.enabled=false           # Disable PostgreSQL
+line.tcp.enabled=false     # Disable ILP
+http.enabled=false         # Disable Web Console & REST API
+http.security.readonly=true  # Or make HTTP read-only
+```
+
+---
+
+## Operations
+
+### Upgrading
+
+1. Stop QuestDB:
+   ```bash
+   ./questdb.sh stop
+   ```
+
+2. Back up your data directory
+
+3. Download and extract the new version:
+
+<InterpolateReleaseData
+renderText={(release) => (
+<CodeBlock className="language-bash">
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz`}
+</CodeBlock>
+)}
+/>
+
+4. Start the new version:
+   ```bash
+   cd questdb-*/bin
+   ./questdb.sh start
+   ```
+
+### Monitoring
+
+**Health check:**
+
+```bash
+curl http://localhost:9003/status
+```
+
+**Prometheus metrics:**
+
+```bash
+curl http://localhost:9003/metrics
+```
+
+**Cloud Monitoring integration:**
+
+Use the Ops Agent to collect:
+- VM metrics (CPU, memory, disk I/O)
+- QuestDB logs from the `log/` directory
+- Custom metrics from the Prometheus endpoint
+
+---
+
+## Enterprise on GCP
+
+QuestDB Enterprise adds production features for GCP:
+
+- **GCS replication** - Continuous backup for durability
+- **Cold storage** - Move old partitions to GCS, query on-demand
+- **High availability** - Automatic failover across instances
+
+GCP offers two low-latency NFS services that can act as a replication transport
+via the `fs::` prefix, as an alternative to GCS:
+
+- **Google Filestore** - a managed NFS service. The `fs::` transport over NFS
+  provides sub-200ms replication lag with
+  [aggressive tuning](/docs/high-availability/tuning/), compared to ~1s+ with
+  the GCS object store transport.
+- **[NetApp Volumes](https://cloud.google.com/netapp/volumes/docs/discover/overview)** -
+  a managed NFS service backed by NetApp ONTAP. The QuestDB configuration is
+  identical to Filestore.
+
+To use Filestore or NetApp Volumes for replication:
+
+1. Create the instance in the same region as your QuestDB VMs
 2. Mount the NFS share on both primary and replica nodes
 3. Configure the `fs::` transport in `server.conf`:
 
@@ -63,279 +379,19 @@ replication.object.store=fs::root=/mnt/questdb-repl/final;atomic_write_dir=/mnt/
 ```
 
 Use the [backup](/docs/operations/backup/) feature to manage WAL file retention
-on the NFS mount.
-
-On GKE, expose the Filestore share as a `PersistentVolume` with
+on the NFS mount. On GKE, expose the share as a `PersistentVolume` with
 `ReadWriteMany` access mode using the
-[Filestore CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver),
+[Filestore CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver)
 so both primary and replica pods can mount it simultaneously.
 
 :::note
 Filestore Zonal and Basic SSD tiers may require a
-[quota increase](https://cloud.google.com/docs/quotas/view-manage) before use.
-Basic HDD is typically available by default.
+[quota increase](https://cloud.google.com/docs/quotas/view-manage) before use,
+and NetApp Volumes requires enabling the `netapp.googleapis.com` API.
 :::
 
-### Google Cloud Storage
+For GCS replication, create a bucket for the database, then follow the
+[Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) to
+create a connection string and configure QuestDB.
 
-QuestDB supports Google Cloud Storage as its replication object store in the
-Enterprise edition. GCS is the simplest and cheapest replication transport, but
-has higher latency (~1s+) due to object store API overhead.
-
-To get started, create a bucket for the database to use. Then follow the
-[Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) steps to create a connection string and
-configure QuestDB.
-
-### NetApp Volumes
-
-[NetApp Volumes](https://cloud.google.com/netapp/volumes/docs/discover/overview)
-is a managed NFS service on GCP backed by NetApp ONTAP. Like Filestore, it can
-be used as a low-latency replication transport via the `fs::` prefix. The
-QuestDB configuration is identical to Filestore.
-
-:::note
-NetApp Volumes requires enabling the `netapp.googleapis.com` API and may
-require separate quota allocation.
-:::
-
-### Minimum specification
-
-- **Instance**: `c3-standard-4` or `c3d-standard-4` `(4 vCPUs, 16 GB RAM)`
-- **Storage**
-    - **OS disk**: `Hyperdisk Balanced (30 GiB)` volume provisioned with `3000 IOPS/140 MBps`.
-    - **Data disk**: `Hyperdisk Balanced (100 GiB)` volume provisioned with `3000 IOPS/140 MBps`.
-- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
-- **File System**: `ext4`
-
-
-### Better specification
-
-- **Instance**: `c3-highmem-8` or `c3d-highmem-8` `(8 vCPUs, 64 GB RAM)`
-- **Storage**
-    - **OS disk**: `Hyperdisk Balanced (30 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
-    - **Data disk**: `Hyperdisk Balanced (300 GiB)` volume provisioned with `5000 IOPS/300 MBps`.
-- **Operating System**: `Linux Ubuntu 24.04 LTS x86_64`.
-- **File System**: `zfs`
-
-:::note
-
-You can use the `highcpu` and `highmem` variants to adjust the `standard` `4:1` RAM/vCPU
-ratio to `2:1` or `8:1` respectively. Higher RAM can improve performance dramatically
-if it means your working set data will fit entirely into memory.
-
-:::
-
-
-## Launching QuestDB on Google Compute Engine
-
-This guide describes how to run QuestDB on a new Google Cloud Platform (GCP)
-Compute Engine instance. After completing this guide, you will have an instance
-with QuestDB running in a container using the official QuestDB Docker image, as
-well as a network rule that enables communication over HTTP and PostgreSQL wire
-protocol.
-
-### Prerequisites
-
-- A [Google Cloud Platform](https://console.cloud.google.com/getting-started)
-  (GCP) account and a GCP Project
-- The
-  [Compute Engine API](https://console.cloud.google.com/apis/api/compute.googleapis.com)
-  must be enabled for the corresponding Google Cloud Platform project
-
-### Create a Compute Engine VM
-
-1. In the Google Cloud Console, navigate to
-   [Compute Engine](https://console.cloud.google.com/compute/instances) and
-   click **Create Instance**
-
-import Screenshot from "@theme/Screenshot"
-
-<Screenshot
-alt="The Create Instance wizard on Google Cloud platform"
-height={598}
-src="images/guides/google-cloud-platform/create-instance.webp"
-width={650}
-/>
-
-2. Give the instance a name - this example uses `questdb-europe-west3`
-3. Choose a **Region** and **Zone** where you want to deploy the instance - this
-   example uses `europe-west3 (Frankfurt)` and the default zone
-4. Choose a machine configuration. The default choice, `ec2-medium`, is a
-   general-purpose instance with 4GB memory and should be enough to run this
-   example.
-
-   {" "} <Screenshot
-   alt="Deploying a QuestDB instance on Google Cloud Platform Compute Engine"
-   height={695}
-   src="images/guides/google-cloud-platform/create-vm.webp"
-   width={650}
-   />
-
-5. To add a running QuestDB container on instance startup, scroll down and click
-   the **Deploy Container** button. Then, provide the `latest` QuestDB Docker
-   image in the **Container image** textbox.
-
-   ```text
-   questdb/questdb:latest
-   ```
-
-   Click the **Select** button at the bottom of the dropdown to complete the
-   container configuration.
-
-   Your docker configuration should look like this:
-
-   {" "} <Screenshot
-   alt="Configuring a Docker container to launch in a new QuestDB instance on Google Cloud Platform Compute Engine"
-   height={695}
-   src="images/guides/google-cloud-platform/create-vm-docker.webp"
-   width={650}
-   />
-
-Before creating the instance, we need to assign it a **Network tag** so that we
-can add a firewall rule that exposes QuestDB-related ports to the internet. This
-is required for you to access the database from outside your VPC. To create a
-**Network tag**:
-
-1. Expand the **Advanced options** menu below the **firewall** section, and then
-   expand the **Networking** panel
-2. In the **Networking** panel add a **Network tag** to identify the instance.
-   This example uses `questdb`
-
-<Screenshot
-alt="Applying a Network tag to a Compute Engine VM Instance on Google Cloud Platform"
-height={610}
-src="images/guides/google-cloud-platform/add-network-tag.webp"
-width={650}
-/>
-
-You can now launch the instance by clicking **Create** at the bottom of the
-dialog.
-
-### Create a firewall rule
-
-Now that we've created our instance with a `questdb` network tag, we need to
-create a corresponding firewall rule to associate with that tag. This rule will
-expose the required ports for accessing QuestDB. With a network tag, we can
-easily apply the new firewall rule to our newly created instance as well as any
-other QuestDB instances that we create in the future.
-
-1. Navigate to the
-   [Firewall configuration](https://console.cloud.google.com/net-security/firewall-manager/firewall-policies)
-   page under **Network Security** -> **Firewall policies**
-2. Click the **Create firewall rule** button at the top of the page
-3. Enter `questdb` in the **Name** field
-4. Scroll down to the **Targets** dropdown and select "Specified target tags"
-5. Enter `questdb` in the **Target tags** textbox. This will apply the firewall
-   rule to the new instance that was created above
-6. Under **Source filter**, enter an IP range that this rule applies to. This
-   example uses `0.0.0.0/0`, which allows ingress from any IP address. We
-   recommend that you make this rule more restrictive, and naturally that you
-   include your current IP address within the chosen range.
-7. In the **Protocols and ports** section, select **Specified protocols and
-   ports**, check the **TCP** option, and type `8812,9000` in the textbox.
-8. Scroll down and click the **Create** button
-
-<Screenshot
-alt="Creating a firewall rule in for VPC networking on Google Cloud Platform"
-height={654}
-src="images/guides/google-cloud-platform/firewall-rules.webp"
-width={650}
-/>
-
-All VM instances on Compute Engine in this account which have the **Network
-tag** `questdb` will now have this firewall rule applied.
-
-The ports we have opened are:
-
-- `9000` for the REST API and [Web Console](/docs/getting-started/web-console/overview/)
-- `8812` for the PostgreSQL wire protocol
-
-## Verify the deployment
-
-To verify that the instance is running, navigate to **Compute Engine** ->
-[VM Instances](https://console.cloud.google.com/compute/instances). A status
-indicator should show the instance as **running**:
-
-<Screenshot
-alt="A QuestDB instance running on Google Cloud Platform showing a success status indicator"
-height={186}
-src="images/guides/google-cloud-platform/instance-available.webp"
-width={650}
-/>
-
-To verify that the QuestDB deployment is operating as expected:
-
-1. Copy the **External IP** of the instance
-2. Navigate to `http://<external_ip>:9000` in a browser
-
-The [Web Console](/docs/getting-started/web-console/overview/) should now be visible:
-
-<Screenshot
-alt="The QuestDB Web Console running on a VM instance on Google Cloud Platform"
-height={405}
-src="images/guides/google-cloud-platform/gcp-portal.webp"
-width={650}
-/>
-
-Alternatively, a request may be sent to the REST API exposed on port 9000:
-
-```bash
-curl -G \
-  --data-urlencode "query=SELECT * FROM telemetry_config" \
-  <external_ip>:9000/exec
-```
-
-### Set up GCP with Pulumi
-
-If you're using [Pulumi](https://www.pulumi.com/gcp/) to manage your
-infrastructure, you can create a QuestDB instance with the following:
-
-```python
-import pulumi
-import pulumi_gcp as gcp
-
-# Create a Google Cloud Network
-firewall = gcp.compute.Firewall(
-    "questdb-firewall",
-    network="default",
-    allows=[
-        gcp.compute.FirewallAllowArgs(
-            protocol="tcp",
-            ports=["9000", "8812"],
-        ),
-    ],
-    target_tags=["questdb"],
-    source_ranges=["0.0.0.0/0"],
-)
-
-# Create a Compute Engine Instance
-instance = gcp.compute.Instance(
-    "questdb-instance",
-    machine_type="e2-medium",
-    zone="us-central1-a",
-    boot_disk={
-        "initialize_params": {
-            "image": "ubuntu-os-cloud/ubuntu-2004-lts",
-        },
-    },
-    network_interfaces=[
-        gcp.compute.InstanceNetworkInterfaceArgs(
-            network="default",
-            access_configs=[{}],  # Ephemeral public IP
-        )
-    ],
-    metadata_startup_script="""#!/bin/bash
-        sudo apt-get update
-        sudo apt-get install -y docker.io
-        sudo docker run -d -p 9000:9000 -p 8812:8812 \
-        --env QDB_HTTP_USER="admin" \
-        --env QDB_HTTP_PASSWORD="quest" \
-        questdb/questdb
-        """,
-    tags=["questdb"],
-)
-
-# Export the instance's name and public IP
-pulumi.export("instanceName", instance.name)
-pulumi.export("instance_ip", instance.network_interfaces[0].access_configs[0].nat_ip)
-```
+See [Enterprise Quick Start](/docs/getting-started/enterprise-quick-start/) for setup.
