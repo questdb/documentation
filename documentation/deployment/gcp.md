@@ -19,10 +19,6 @@ import MinimumHardware from "../../src/components/DRY/_questdb_production_hardwa
 | Storage | Hyperdisk Balanced data disk, 300+ GiB | 5000 IOPS / 300 MBps for production |
 | File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
-| QuestDB root | `/var/lib/questdb` | Mount the data disk here |
-
-The screenshots in this guide are visual confirmation only. The numbered steps
-and command blocks contain the complete deployment instructions.
 
 ---
 
@@ -139,22 +135,6 @@ install QuestDB over SSH as described below.
   to use the `gcloud` commands instead of the console
 - A client source CIDR for firewall rules, such as your workstation IP address
   with `/32`. Do not use `0.0.0.0/0` for QuestDB ports.
-
-This guide uses the following example values. Replace them consistently if you
-choose different names, regions, zones, or CIDR ranges.
-
-| Setting | Example value | Used for |
-|---------|---------------|----------|
-| Instance name | `questdb-europe-west3` | VM name |
-| Region | `europe-west3` | GCP region |
-| Zone | `europe-west3-a` | VM and disk zone |
-| Machine type | `c3-standard-4` | Development or small workloads |
-| Network tag | `questdb` | Firewall rule target |
-| Data disk name | `questdb-data` | Hyperdisk Balanced data disk |
-| Data disk device | `/dev/disk/by-id/google-questdb-data` | Stable Linux device path |
-| QuestDB install directory | `/opt/questdb` | Extracted QuestDB release |
-| QuestDB root directory | `/var/lib/questdb` | Configuration, logs, and table data |
-| Client source range | `YOUR_CLIENT_IP/32` | Firewall source range |
 
 ### Create the VM
 
@@ -324,23 +304,17 @@ After this step, QuestDB configuration, logs, and table data will live under
 
 ### Install QuestDB
 
-Download QuestDB, extract it to a stable install directory, and start it with
-`/var/lib/questdb` as the QuestDB root directory:
+Download QuestDB and start it with `/var/lib/questdb` as the QuestDB root
+directory:
 
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`export QDB_INSTALL_DIR="/opt/questdb"
-export QDB_RELEASE_DIR="/opt/questdb-${release.name}"
-export QDB_ROOT="/var/lib/questdb"
-
-wget "https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz"
-sudo mkdir -p "$QDB_RELEASE_DIR"
-sudo chown "$USER:$USER" "$QDB_RELEASE_DIR"
-tar xzf "questdb-${release.name}-rt-linux-x86-64.tar.gz" -C "$QDB_RELEASE_DIR" --strip-components=1
-sudo ln -sfn "$QDB_RELEASE_DIR" "$QDB_INSTALL_DIR"
-"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
-"$QDB_INSTALL_DIR/bin/questdb.sh" status -d "$QDB_ROOT"`}
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz
+cd questdb-${release.name}-rt-linux-x86-64/bin
+./questdb.sh start -d /var/lib/questdb
+./questdb.sh status -d /var/lib/questdb`}
 </CodeBlock>
 )}
 />
@@ -380,38 +354,35 @@ the QuestDB service.
 
 Update credentials immediately after deployment.
 
-**Web Console and REST API** - edit `/var/lib/questdb/conf/server.conf`:
+**Web Console and REST API** - edit `conf/server.conf`:
 
 ```ini
 http.user=your_username
 http.password=your_secure_password
 ```
 
-**PostgreSQL** - edit `/var/lib/questdb/conf/server.conf`:
+**PostgreSQL** - edit `conf/server.conf`:
 
 ```ini
 pg.user=your_username
 pg.password=your_secure_password
 ```
 
-**InfluxDB line protocol** - edit `/var/lib/questdb/conf/auth.json`. See
+**InfluxDB line protocol** - edit `conf/auth.json`. See
 [ILP authentication](/docs/ingestion/ilp/overview/#authentication).
 
 Restart after changes:
 
 ```bash
-export QDB_INSTALL_DIR="/opt/questdb"
-export QDB_ROOT="/var/lib/questdb"
-
-"$QDB_INSTALL_DIR/bin/questdb.sh" stop -d "$QDB_ROOT"
-"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
+./questdb.sh stop -d /var/lib/questdb
+./questdb.sh start -d /var/lib/questdb
 ```
 
 ### Disable unused interfaces
 
 Reduce attack surface by disabling protocols you don't use:
 
-```ini title="/var/lib/questdb/conf/server.conf"
+```ini title="conf/server.conf"
 pg.enabled=false           # Disable PostgreSQL
 line.tcp.enabled=false     # Disable ILP
 http.enabled=false         # Disable Web Console & REST API
@@ -424,50 +395,29 @@ http.security.readonly=true  # Or make HTTP read-only
 
 ### Upgrading
 
-1. On the VM, stop QuestDB:
+1. Stop QuestDB:
+   ```bash
+   ./questdb.sh stop -d /var/lib/questdb
+   ```
 
-```bash
-export QDB_INSTALL_DIR="/opt/questdb"
-export QDB_ROOT="/var/lib/questdb"
+2. Back up your data directory
 
-"$QDB_INSTALL_DIR/bin/questdb.sh" stop -d "$QDB_ROOT"
-```
-
-2. From Cloud Shell or another shell with `gcloud` configured, create a disk
-   snapshot before changing binaries:
-
-```bash
-gcloud compute disks snapshot "questdb-data" \
-  --zone "europe-west3-a" \
-  --snapshot-names "questdb-data-pre-upgrade-$(date +%Y%m%d%H%M%S)"
-```
-
-3. On the VM, download and extract the new version:
+3. Download and extract the new version:
 
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`export QDB_INSTALL_DIR="/opt/questdb"
-export QDB_RELEASE_DIR="/opt/questdb-${release.name}"
-
-wget "https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz"
-sudo mkdir -p "$QDB_RELEASE_DIR"
-sudo chown "$USER:$USER" "$QDB_RELEASE_DIR"
-tar xzf "questdb-${release.name}-rt-linux-x86-64.tar.gz" -C "$QDB_RELEASE_DIR" --strip-components=1
-sudo ln -sfn "$QDB_RELEASE_DIR" "$QDB_INSTALL_DIR"`}
+{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
+tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz`}
 </CodeBlock>
 )}
 />
 
-4. Start QuestDB with the same root directory and check status:
-
-```bash
-export QDB_INSTALL_DIR="/opt/questdb"
-export QDB_ROOT="/var/lib/questdb"
-
-"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
-"$QDB_INSTALL_DIR/bin/questdb.sh" status -d "$QDB_ROOT"
-```
+4. Start the new version:
+   ```bash
+   cd questdb-*/bin
+   ./questdb.sh start -d /var/lib/questdb
+   ```
 
 ### Monitoring
 
@@ -487,7 +437,7 @@ curl http://localhost:9003/metrics
 
 Use the Ops Agent to collect:
 - VM metrics (CPU, memory, disk I/O)
-- QuestDB logs from `/var/lib/questdb/log/`
+- QuestDB logs from the `log/` directory
 - Custom metrics from the Prometheus endpoint
 
 ---
