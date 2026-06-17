@@ -394,7 +394,7 @@ psql -h localhost -p 8812 -U admin -d qdb
 
 The web console works without any configuration. `psql` and other
 PostgreSQL clients connect over the
-[PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) on port 8812.
+[PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/) on port 8812.
 
 ## Standard SQL features not supported
 
@@ -435,7 +435,7 @@ For the full inventory in one place:
 
 ## Pgwire-specific caveats
 
-When connecting via the [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/),
+When connecting via the [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/),
 a few client-visible behaviors differ from a real PostgreSQL server:
 
 - **Forward-only cursors.** `FETCH BACKWARD` and other backward operations are
@@ -444,19 +444,19 @@ a few client-visible behaviors differ from a real PostgreSQL server:
 - **Timestamp time zones.** QuestDB stores all timestamps in UTC and emits
   them over the wire as `TIMESTAMP WITHOUT TIMEZONE`. Configure your client
   to interpret these as UTC; do not rely on driver-default local-time
-  conversion. See [Timestamp handling](/docs/query/pgwire/overview/#timestamp-handling).
+  conversion. See [Timestamp handling](/docs/connect/compatibility/pgwire/overview/#timestamp-handling).
 - **Large result sets.** Most drivers buffer entire result sets in memory by
   default, which can OOM the client on large queries. Use cursor-based
-  fetching. See [Large result sets](/docs/query/pgwire/large-result-sets/).
+  fetching. See [Large result sets](/docs/connect/compatibility/pgwire/large-result-sets/).
 - **Protocol coverage.** SSL, BLOB transfer, and remote file upload
   (`COPY ... FROM stdin`) are not supported over pgwire. See
-  [pgwire compatibility](/docs/query/pgwire/overview/#compatibility) for the
+  [pgwire compatibility](/docs/connect/compatibility/pgwire/overview/#compatibility) for the
   full list.
 
 ## See also
 
 - [Query and SQL overview](/docs/query/overview/)
-- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/)
+- [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/)
 - [Designated timestamp](/docs/concepts/designated-timestamp/)
 - [Out-of-order data](/docs/concepts/out-of-order-data/)
 - [Materialized views](/docs/concepts/materialized-views/)
