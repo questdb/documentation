@@ -1,9 +1,8 @@
 ---
 name: review-pr
 description: Review QuestDB documentation pull requests for placement, discoverability, dual-audience (human + LLM) quality, example coverage, and SQL syntax diagrams. Use when reviewing a docs PR, a new or changed page, or assessing whether documentation is findable, correct, and usable by both engineers and LLMs that build systems against QuestDB.
-allowed-tools: bash read subagent
-metadata:
-  argument-hint: "[PR number, URL, or branch] [--level=0..2]"
+argument-hint: "[PR number, URL, or branch] [--level=0..2]"
+allowed-tools: Bash, Read, Grep, Glob, Agent
 ---
 
 # QuestDB documentation PR reviewer
@@ -296,31 +295,26 @@ produce this inventory, don't guess it:
 This map is required input for Agent 4 and sharpens agents 1-3. Skip it only at
 level 0.
 
-### Spawning review agents in pi
+### Spawning review agents in Claude Code
 
-> Harness note: this skill runs inside **pi**. Launch parallel agents with the
-> `subagent(...)` tool using fresh-context `reviewer` agents — there is no
-> Claude `Agent` tool. Search the repo with `bash` (`rg`, `grep`, `find`) plus
-> `read`; pi has no separate `Grep`/`Glob` tools.
+> Harness note: this skill runs inside **Claude Code**. Launch parallel agents
+> with the `Agent` tool — one agent per role, dispatched in a single message so
+> they run concurrently. Search the repo with `Grep`/`Glob` and read files with
+> `Read`.
 
 Each agent task must be self-contained — the child does not inherit this
-conversation. Give every task: the diff (or have the child re-run the `git
+conversation. Give every agent: the diff (or have the child re-run the `git
 diff` from step 1), the change surface map (for the structured agents), the
 list of new/changed pages with their `sidebars.js` context, its role
 instructions below, and an explicit "review only — do not edit any files"
-constraint.
+constraint. Dispatch them like:
 
-```typescript
-subagent({
-  tasks: [
-    { agent: "reviewer", task: "Agent 1 — Technical correctness. <diff + changed pages + Agent 1 instructions>. Review only; do not edit." },
-    { agent: "reviewer", task: "Agent 2 — Placement & retrieval. <...>. Review only; do not edit." },
-    { agent: "reviewer", task: "Agent 3 — Information flow, examples & syntax. <...>. Review only; do not edit." },
-    { agent: "reviewer", task: "Agent 4 — Cross-page navigation & coherence. <change surface map + reading paths + linked pages>. Review only; do not edit." },
-    { agent: "reviewer", task: "Agent 5 — Fresh-context adversarial. <ONLY the changed page text + file paths; NO pillars>. Review only; do not edit." }
-  ],
-  context: "fresh"
-})
+```
+Agent("Agent 1 — Technical correctness. <diff + changed pages + Agent 1 instructions>. Review only; do not edit.")
+Agent("Agent 2 — Placement & retrieval. <...>. Review only; do not edit.")
+Agent("Agent 3 — Information flow, examples & syntax. <...>. Review only; do not edit.")
+Agent("Agent 4 — Cross-page navigation & coherence. <change surface map + reading paths + linked pages>. Review only; do not edit.")
+Agent("Agent 5 — Fresh-context adversarial. <ONLY the changed page text + file paths; NO pillars>. Review only; do not edit.")
 ```
 
 The adversarial agents (5 and 6) must NOT receive the pillars, the severity
@@ -386,8 +380,8 @@ severity levels, or any checklist. Its sole instruction:
 > something that is wrong or unverifiable, buries the answer, or wastes your
 > time. Quote the exact passage for each problem.
 
-It may use `read` and `bash` (`rg`/`grep`/`find`) to explore the repo and the
-product to confirm a claim is wrong. Findings are not pre-classified — each
+It may use `Read`, `Grep`, and `Glob` to explore the repo and the product to
+confirm a claim is wrong. Findings are not pre-classified — each
 states what's wrong, where, and why. A finding here that none of agents 1-4
 produced is high signal: the structured review's frame missed it.
 
