@@ -78,9 +78,6 @@ cannot be used on `C3` machines smaller than `88 vCPUs`.
 
 <FileSystemChoice />
 
-Use `zfs` with `lz4` compression to reduce storage costs. If you don't need
-compression, `ext4` or `xfs` offer slightly better performance.
-
 **Unsupported storage:**
 
 - **Filestore** - Not supported as primary storage (NFS latency too high). Use
