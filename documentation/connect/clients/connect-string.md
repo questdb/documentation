@@ -665,19 +665,40 @@ consumed by the application.
   Must be ≥ `16`. Overflow drops the oldest entry and bumps a
   `droppedErrorNotifications` counter. Default: `256`.
 
-The following per-category override keys are **reserved by the spec but
-not yet recognised by the Java connect-string parser** — today they are
-wired only via the fluent builder API. New client implementations should
-accept them in the connect string per the spec; precedence rules are
-documented in the [QWP store-and-forward spec](https://github.com/questdb/questdb-enterprise/blob/main/questdb/docs/qwp/sf-client.md)
-§14.
+The following per-category keys select the **error policy** — whether the
+I/O loop halts the sender (`halt`) or drops the rejected batch and continues
+(`drop`) — for each class of error. They are **defined by the spec but not yet
+implemented in the Java client**: the connect-string parser does not recognise
+them and there is no builder equivalent. The only error-handling surface wired
+today is the async `errorHandler(...)` callback and `error_inbox_capacity`
+(both WebSocket/QWP only — see [Error handling](#error-handling)). New client
+implementations should accept the keys below in the connect string per the spec.
 
-- `on_server_error` — handler for server-reject status frames.
-- `on_schema_error` — handler for schema-validation errors.
-- `on_parse_error` — handler for client-side parse errors.
-- `on_internal_error` — handler for unexpected client-side errors.
-- `on_security_error` — handler for auth / TLS errors.
-- `on_write_error` — handler for transport write failures.
+- `on_server_error` — global default for server-reject status frames.
+  Accepts `auto` \| `halt` \| `drop`. Default: `auto` (applies the built-in
+  per-category defaults listed below).
+- `on_schema_error` — schema-validation errors. `halt` \| `drop`. Default: `drop`.
+- `on_parse_error` — client-side parse errors. `halt` \| `drop`. Default: `halt`.
+- `on_internal_error` — unexpected server-side faults. `halt` \| `drop`. Default: `halt`.
+- `on_security_error` — auth / TLS errors. `halt` \| `drop`. Default: `halt`.
+- `on_write_error` — transport / table write failures. `halt` \| `drop`. Default: `drop`.
+
+**Specified resolution precedence**, from highest to lowest (as documented on
+`SenderError.Policy`):
+
+1. Builder `errorPolicyResolver(...)` — full programmatic control. _(not yet
+   implemented in the Java client)_
+2. Builder per-category `errorPolicy(category, policy)`. _(not yet implemented
+   in the Java client)_
+3. The connect-string per-category key (e.g. `on_schema_error`) — overrides
+   the global default when set.
+4. `on_server_error` — the global default; when left at `auto` the built-in
+   per-category defaults above apply.
+
+`PROTOCOL_VIOLATION` and `UNKNOWN` errors are always fatal (forced `halt`)
+and cannot be overridden. For the full model see the public
+[QWP error-handling spec](https://github.com/questdb/java-questdb-client/blob/main/design/qwp-cursor-error-api.md)
+and the `SenderError.Policy` Javadoc in the client source.
 
 ## Key index {#key-index}
 
