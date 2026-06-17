@@ -198,8 +198,6 @@ The schema prefix selects the QWP transport.
 | `wss`  | WebSocket + TLS | `9000`       | QWP over TLS-secured WebSocket. Recommended for production.                                                          |
 | `udp`  | UDP             | `9007`       | Fire-and-forget metrics ingest, single table per datagram. |
 
-`qwpws` / `qwpwss` are accepted as long-form aliases for `ws` / `wss`.
-
 The default port is applied when `addr` omits `:port`. Note that `wss` does
 **not** default to `443`: both `ws` and `wss` use `9000` unless overridden.
 
@@ -397,9 +395,9 @@ keys are silently accepted on ingress but have no effect.
   collapses: the writer is followed regardless of zone.
 
 The full behavioural model — host picker policy, host-health states, error
-classification, and backoff schedule — is documented under the Connect
-section (Client failover, coming with Bundle C). Server-side HA is covered
-separately under the
+classification, and backoff schedule — is documented under
+[Client failover](/docs/high-availability/client-failover/concepts/).
+Server-side HA is covered separately under the
 [High Availability section](/docs/high-availability/overview/).
 
 Related: [Reconnect and failover](#reconnect-keys),
@@ -513,8 +511,8 @@ released — **multiple orphans drain in parallel**, up to
 - `max_background_drainers` — maximum concurrent drainers. Default: `4`.
 
 For delivery semantics, architecture, and tradeoffs (at-least-once
-guarantees, DEDUP requirements, segment-granular trim), see the
-Store-and-forward concepts page under Connect (coming with Bundle C).
+guarantees, DEDUP requirements, segment-granular trim), see
+[Store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/).
 
 ## Reconnect and failover {#reconnect-keys}
 

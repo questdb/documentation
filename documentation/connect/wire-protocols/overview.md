@@ -5,13 +5,6 @@ description:
   QuestDB's wire-protocol specifications for client implementers.
 ---
 
-:::note Page in draft
-
-This is the day-one skeleton for the Protocols section. Content is being
-filled in.
-
-:::
-
 :::info Audience
 
 This section documents QuestDB's wire protocols at the byte-on-the-wire
@@ -35,17 +28,19 @@ a spec, the spec wins.
 
 ## Versioning
 
-<!-- TODO: how versions are advertised on the wire, version negotiation,
-     compatibility guarantees. -->
+Each connection negotiates a protocol version during the WebSocket upgrade.
+The client advertises the highest version it supports via the
+`X-QWP-Max-Version` header; the server replies with `X-QWP-Version` set to
+`min(clientMax, serverMax)`. Every message on the connection then carries the
+negotiated version in its header. See each protocol page for the exact headers
+and the per-version message layout.
 
 ## Reference implementation
 
 The reference client implementation is the Java client
 ([`java-questdb-client`](https://github.com/questdb/java-questdb-client)).
-Each protocol page below pins the reference-implementation commit that
-matches the documented version.
-
-<!-- TODO: pinned commit hashes per protocol. -->
+Each protocol page below pins the reference-implementation commit that matches
+its documented version.
 
 ## Source specifications
 

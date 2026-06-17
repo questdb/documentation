@@ -156,8 +156,7 @@ let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
 ```
 
 Use `ws` (plain) or `wss` (TLS); the rest of this page uses these short
-forms. `qwpws::` / `qwpwss::` are accepted as long-form aliases if you
-prefer to spell out the wire protocol. The default port is `9000`.
+forms. The default port is `9000`.
 
 For the full list of connect-string keys, see the
 [connect string reference](/docs/connect/clients/connect-string/).
@@ -792,7 +791,7 @@ Common WebSocket-specific options:
 | `username` / `password` | unset | HTTP basic auth. |
 | `token` | unset | Bearer token auth (Enterprise). |
 | `auth_timeout_ms` | 15000 | WebSocket upgrade timeout. |
-| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss`/`qwpwss` only). |
+| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss` only). |
 | `auto_flush` | only `off` accepted if set | Auto-flush is not supported. `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes` are rejected. |
 | `sf_dir` | unset | Enable disk-backed store-and-forward. |
 | `sender_id` | `default` | SF slot identity. |

@@ -302,8 +302,7 @@ The C/C++ client supports only HTTP basic auth and static bearer-token auth
 
 The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
 
-Use `ws` (plain) or `wss` (TLS). `qwpws` / `qwpwss` are accepted as
-aliases. The default port is `9000`.
+Use `ws` (plain) or `wss` (TLS). The default port is `9000`.
 
 <Tabs defaultValue="c">
 <TabItem value="c" label="C">
@@ -2490,7 +2489,7 @@ The buffer API is unchanged. To switch a sender to QWP/WebSocket:
 
 | Aspect | HTTP (ILP) | WebSocket (QWP) |
 |---|---|---|
-| Connect string schema | `http::` / `https::` | `ws::` / `wss::` (`qwpws::` / `qwpwss::` aliases) |
+| Connect string schema | `http::` / `https::` | `ws::` / `wss::` |
 | Batch trigger | Row/time-based auto-flush (defaults: 75000 rows, 1000 ms) | Explicit `flush()` only |
 | Error model | Synchronous on `flush()` | Async via `line_sender_qwpws_poll_error` / handler |
 | Completion tracking | Implicit per request | Explicit FSN watermarks |
