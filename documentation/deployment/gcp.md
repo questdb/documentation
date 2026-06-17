@@ -16,9 +16,13 @@ import MinimumHardware from "../../src/components/DRY/_questdb_production_hardwa
 | Component | Recommended | Notes |
 |-----------|-------------|-------|
 | Instance | `c3-standard-4` or `c3-highmem-8` | 4-8 vCPUs, 16-64 GiB RAM |
-| Storage | Hyperdisk Balanced, 100+ GiB | 5000 IOPS / 300 MBps |
+| Storage | Hyperdisk Balanced data disk, 300+ GiB | 5000 IOPS / 300 MBps for production |
 | File system | `zfs` with `lz4` | Or `ext4` if compression not needed |
 | Ports | 9000, 8812, 9009, 9003 | Restrict to known IPs only |
+| QuestDB root | `/var/lib/questdb` | Mount the data disk here |
+
+The screenshots in this guide are visual confirmation only. The numbered steps
+and command blocks contain the complete deployment instructions.
 
 ---
 
@@ -57,8 +61,9 @@ SIMD optimizations are limited on ARM. Deploy on `x86_64` instances and an
 ### Storage
 
 Use [Hyperdisk Balanced](https://cloud.google.com/compute/docs/disks/hyperdisks)
-volumes, provisioned at `5000 IOPS / 300 MBps` until you have tested your
-workload. Separate your OS disk (30 GiB) from your data disk.
+volumes for QuestDB data, provisioned at `5000 IOPS / 300 MBps` until you have
+tested your workload. Keep the OS disk separate from the QuestDB data disk, and
+mount the data disk at `/var/lib/questdb`.
 
 | Workload | Disk | Size | IOPS | Throughput |
 |----------|------|------|------|------------|
@@ -130,6 +135,26 @@ install QuestDB over SSH as described below.
   [Compute Engine API](https://console.cloud.google.com/apis/api/compute.googleapis.com)
   enabled for that project
 - An SSH key registered with your project or account
+- The [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) if you want
+  to use the `gcloud` commands instead of the console
+- A client source CIDR for firewall rules, such as your workstation IP address
+  with `/32`. Do not use `0.0.0.0/0` for QuestDB ports.
+
+This guide uses the following example values. Replace them consistently if you
+choose different names, regions, zones, or CIDR ranges.
+
+| Setting | Example value | Used for |
+|---------|---------------|----------|
+| Instance name | `questdb-europe-west3` | VM name |
+| Region | `europe-west3` | GCP region |
+| Zone | `europe-west3-a` | VM and disk zone |
+| Machine type | `c3-standard-4` | Development or small workloads |
+| Network tag | `questdb` | Firewall rule target |
+| Data disk name | `questdb-data` | Hyperdisk Balanced data disk |
+| Data disk device | `/dev/disk/by-id/google-questdb-data` | Stable Linux device path |
+| QuestDB install directory | `/opt/questdb` | Extracted QuestDB release |
+| QuestDB root directory | `/var/lib/questdb` | Configuration, logs, and table data |
+| Client source range | `YOUR_CLIENT_IP/32` | Firewall source range |
 
 ### Create the VM
 
@@ -150,8 +175,15 @@ install QuestDB over SSH as described below.
 4. Select a machine configuration (see [Instance sizing](#instance-sizing))
 5. Under **Boot disk**, click **Change** and choose **Ubuntu 24.04 LTS
    (x86/64)** as the image
-6. Set the boot disk type to **Hyperdisk Balanced** and the size to at least
-   `100 GiB` (see [Storage](#storage))
+6. Set the boot disk type to **Hyperdisk Balanced** and the size to `30 GiB`
+7. Add a separate blank **Hyperdisk Balanced** data disk:
+   - Set **Name** to `questdb-data`
+   - Set **Size** to `300 GiB` for production, or `100 GiB` for development
+   - Set **Provisioned IOPS** to `5000`
+   - Set **Provisioned throughput** to `300 MBps`
+   - Set **Deletion rule** to **Keep disk** if you want the data disk to survive
+     instance deletion
+   - Set the device name to `questdb-data`
 
 <Screenshot
   alt="Configuring a QuestDB VM on Google Cloud Platform Compute Engine"
@@ -174,6 +206,39 @@ expose the QuestDB ports:
 />
 
 Click **Create** at the bottom of the dialog to launch the instance.
+
+If you prefer Cloud Shell or another shell with `gcloud` configured, this is the
+equivalent VM and disk setup:
+
+```bash
+export QDB_INSTANCE="questdb-europe-west3"
+export QDB_ZONE="europe-west3-a"
+export QDB_MACHINE_TYPE="c3-standard-4"
+export QDB_TAG="questdb"
+export QDB_DISK="questdb-data"
+
+gcloud compute instances create "$QDB_INSTANCE" \
+  --zone "$QDB_ZONE" \
+  --machine-type "$QDB_MACHINE_TYPE" \
+  --image-family "ubuntu-2404-lts-amd64" \
+  --image-project "ubuntu-os-cloud" \
+  --boot-disk-size "30GB" \
+  --boot-disk-type "hyperdisk-balanced" \
+  --tags "$QDB_TAG"
+
+gcloud compute disks create "$QDB_DISK" \
+  --zone "$QDB_ZONE" \
+  --size "300GB" \
+  --type "hyperdisk-balanced" \
+  --provisioned-iops "5000" \
+  --provisioned-throughput "300" \
+  --access-mode "READ_WRITE_SINGLE"
+
+gcloud compute instances attach-disk "$QDB_INSTANCE" \
+  --zone "$QDB_ZONE" \
+  --disk "$QDB_DISK" \
+  --device-name "$QDB_DISK"
+```
 
 ### Create a firewall rule
 
@@ -206,31 +271,82 @@ Only add port 9009 if you need ILP ingestion, and restrict the source to your
 application servers.
 :::
 
-### Install QuestDB
+The equivalent `gcloud` command is:
 
-1. Connect to the instance over SSH. You can use the **SSH** button on the
-   [VM Instances](https://console.cloud.google.com/compute/instances) page, or
-   connect with `gcloud`:
+```bash
+export QDB_ALLOWED_SOURCE="YOUR_CLIENT_IP/32"
+
+gcloud compute firewall-rules create "questdb-client-access" \
+  --network "default" \
+  --target-tags "questdb" \
+  --source-ranges "$QDB_ALLOWED_SOURCE" \
+  --allow "tcp:9000,tcp:8812"
+```
+
+### Connect to the VM
+
+Connect to the instance over SSH. You can use the **SSH** button on the
+[VM Instances](https://console.cloud.google.com/compute/instances) page, or
+connect with `gcloud`:
 
 ```bash
 gcloud compute ssh questdb-europe-west3 --zone europe-west3-a
 ```
 
-2. Download and start QuestDB:
+### Prepare the data disk
+
+Run these commands on the VM over SSH. They assume the attached data disk uses
+the custom device name `questdb-data`.
+
+:::warning
+The `mkfs.ext4` command erases the target device. Run it only on a new blank
+data disk, and verify that the device path points to the data disk before
+formatting.
+:::
+
+```bash
+export QDB_ROOT="/var/lib/questdb"
+export QDB_DATA_DEVICE="/dev/disk/by-id/google-questdb-data"
+
+ls -l "$QDB_DATA_DEVICE"
+
+sudo mkfs.ext4 -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard "$QDB_DATA_DEVICE"
+sudo mkdir -p "$QDB_ROOT"
+sudo mount -o discard,defaults "$QDB_DATA_DEVICE" "$QDB_ROOT"
+QDB_DATA_UUID="$(sudo blkid -s UUID -o value "$QDB_DATA_DEVICE")"
+echo "UUID=$QDB_DATA_UUID $QDB_ROOT ext4 discard,defaults,nofail 0 2" | sudo tee -a /etc/fstab
+sudo chown "$USER:$USER" "$QDB_ROOT"
+findmnt "$QDB_ROOT"
+```
+
+After this step, QuestDB configuration, logs, and table data will live under
+`/var/lib/questdb`.
+
+### Install QuestDB
+
+Download QuestDB, extract it to a stable install directory, and start it with
+`/var/lib/questdb` as the QuestDB root directory:
 
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
-tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz
-cd questdb-${release.name}-rt-linux-x86-64/bin
-./questdb.sh start`}
+{`export QDB_INSTALL_DIR="/opt/questdb"
+export QDB_RELEASE_DIR="/opt/questdb-${release.name}"
+export QDB_ROOT="/var/lib/questdb"
+
+wget "https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz"
+sudo mkdir -p "$QDB_RELEASE_DIR"
+sudo chown "$USER:$USER" "$QDB_RELEASE_DIR"
+tar xzf "questdb-${release.name}-rt-linux-x86-64.tar.gz" -C "$QDB_RELEASE_DIR" --strip-components=1
+sudo ln -sfn "$QDB_RELEASE_DIR" "$QDB_INSTALL_DIR"
+"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
+"$QDB_INSTALL_DIR/bin/questdb.sh" status -d "$QDB_ROOT"`}
 </CodeBlock>
 )}
 />
 
-3. Access the Web Console at `http://<external-ip>:9000`, using the instance's
-   **External IP** from the VM Instances page
+Access the Web Console at `http://<external-ip>:9000`, using the instance's
+**External IP** from the VM Instances page.
 
 <Screenshot
   alt="The QuestDB Web Console running on a VM instance on Google Cloud Platform"
@@ -244,8 +360,14 @@ You can also send a request to the REST API on port 9000:
 ```bash
 curl -G \
   --data-urlencode "query=SELECT * FROM telemetry_config" \
-  <external-ip>:9000/exec
+  "http://<external-ip>:9000/exec"
 ```
+
+The deployment is working when:
+
+- `questdb.sh status -d /var/lib/questdb` reports the service as running
+- `curl http://localhost:9003/status` returns `Status: Healthy` from the VM
+- `http://<external-ip>:9000` loads the Web Console from an allowed source IP
 
 For production deployments, use [systemd](/docs/deployment/systemd/) to manage
 the QuestDB service.
@@ -258,35 +380,38 @@ the QuestDB service.
 
 Update credentials immediately after deployment.
 
-**Web Console and REST API** - edit `conf/server.conf`:
+**Web Console and REST API** - edit `/var/lib/questdb/conf/server.conf`:
 
 ```ini
 http.user=your_username
 http.password=your_secure_password
 ```
 
-**PostgreSQL** - edit `conf/server.conf`:
+**PostgreSQL** - edit `/var/lib/questdb/conf/server.conf`:
 
 ```ini
 pg.user=your_username
 pg.password=your_secure_password
 ```
 
-**InfluxDB line protocol** - edit `conf/auth.json`. See
+**InfluxDB line protocol** - edit `/var/lib/questdb/conf/auth.json`. See
 [ILP authentication](/docs/ingestion/ilp/overview/#authentication).
 
 Restart after changes:
 
 ```bash
-./questdb.sh stop
-./questdb.sh start
+export QDB_INSTALL_DIR="/opt/questdb"
+export QDB_ROOT="/var/lib/questdb"
+
+"$QDB_INSTALL_DIR/bin/questdb.sh" stop -d "$QDB_ROOT"
+"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
 ```
 
 ### Disable unused interfaces
 
 Reduce attack surface by disabling protocols you don't use:
 
-```ini title="conf/server.conf"
+```ini title="/var/lib/questdb/conf/server.conf"
 pg.enabled=false           # Disable PostgreSQL
 line.tcp.enabled=false     # Disable ILP
 http.enabled=false         # Disable Web Console & REST API
@@ -299,29 +424,50 @@ http.security.readonly=true  # Or make HTTP read-only
 
 ### Upgrading
 
-1. Stop QuestDB:
-   ```bash
-   ./questdb.sh stop
-   ```
+1. On the VM, stop QuestDB:
 
-2. Back up your data directory
+```bash
+export QDB_INSTALL_DIR="/opt/questdb"
+export QDB_ROOT="/var/lib/questdb"
 
-3. Download and extract the new version:
+"$QDB_INSTALL_DIR/bin/questdb.sh" stop -d "$QDB_ROOT"
+```
+
+2. From Cloud Shell or another shell with `gcloud` configured, create a disk
+   snapshot before changing binaries:
+
+```bash
+gcloud compute disks snapshot "questdb-data" \
+  --zone "europe-west3-a" \
+  --snapshot-names "questdb-data-pre-upgrade-$(date +%Y%m%d%H%M%S)"
+```
+
+3. On the VM, download and extract the new version:
 
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`wget https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz
-tar xzf questdb-${release.name}-rt-linux-x86-64.tar.gz`}
+{`export QDB_INSTALL_DIR="/opt/questdb"
+export QDB_RELEASE_DIR="/opt/questdb-${release.name}"
+
+wget "https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz"
+sudo mkdir -p "$QDB_RELEASE_DIR"
+sudo chown "$USER:$USER" "$QDB_RELEASE_DIR"
+tar xzf "questdb-${release.name}-rt-linux-x86-64.tar.gz" -C "$QDB_RELEASE_DIR" --strip-components=1
+sudo ln -sfn "$QDB_RELEASE_DIR" "$QDB_INSTALL_DIR"`}
 </CodeBlock>
 )}
 />
 
-4. Start the new version:
-   ```bash
-   cd questdb-*/bin
-   ./questdb.sh start
-   ```
+4. Start QuestDB with the same root directory and check status:
+
+```bash
+export QDB_INSTALL_DIR="/opt/questdb"
+export QDB_ROOT="/var/lib/questdb"
+
+"$QDB_INSTALL_DIR/bin/questdb.sh" start -d "$QDB_ROOT" -n
+"$QDB_INSTALL_DIR/bin/questdb.sh" status -d "$QDB_ROOT"
+```
 
 ### Monitoring
 
@@ -341,7 +487,7 @@ curl http://localhost:9003/metrics
 
 Use the Ops Agent to collect:
 - VM metrics (CPU, memory, disk I/O)
-- QuestDB logs from the `log/` directory
+- QuestDB logs from `/var/lib/questdb/log/`
 - Custom metrics from the Prometheus endpoint
 
 ---
