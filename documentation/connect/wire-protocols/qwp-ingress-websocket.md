@@ -771,6 +771,24 @@ N-dimensional arrays, row-major order:
 +------------------------------------------------------+
 ```
 
+**NULL and empty arrays are distinct values.** Both follow the column's
+standard null handling, but they are not the same thing:
+
+- A **NULL** array is carried in the null bitmap (bitmap mode), exactly like
+  any other nullable type: the row's bit is set and no inline array bytes are
+  written for it. `n_dims == 0` is never written and must be rejected on
+  decode — a NULL array is always signalled by the bitmap, never inline.
+- A non-null **empty** array (cardinality 0) is written inline like a regular
+  row, with `n_dims >= 1` and at least one `dim_length` equal to 0, so
+  `product(dims) == 0` and no value bytes follow. It is a distinct value from
+  NULL. QuestDB stores empty arrays of different shapes as distinct values
+  (for example `[0]`, `[2, 0]`, and `[0, 5]` are all different), and a
+  `DOUBLE[]` column distinguishes `NULL` from `ARRAY[]` (a 1-D array of
+  length 0).
+
+Decoders must accept a `dim_length` of 0 and surface such a row as a non-null,
+zero-element array. Only a negative `dim_length` or `n_dims == 0` is malformed.
+
 ### Decimal types (DECIMAL64, DECIMAL128, DECIMAL256)
 
 Decimal values are stored as two's complement integers. A 1-byte scale prefix

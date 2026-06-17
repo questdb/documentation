@@ -650,8 +650,22 @@ Element-level NULL uses the element type's row-level sentinel:
 - `DOUBLE_ARRAY` element: `NaN` (a non-null `NaN` is indistinguishable from NULL)
 - `LONG_ARRAY` element: `Long.MIN_VALUE` (cannot be represented as non-null)
 
-The row-level null bitmap bit signals "the array itself is NULL", distinct
-from "an array of zero or more elements where some may be element-NULL."
+The row-level null bitmap bit signals "the array itself is NULL", which is
+distinct from a non-null array that happens to have zero elements:
+
+- A **NULL** array is carried only in the column's null bitmap; no inline
+  array bytes are emitted for that row.
+- A non-null **empty** array (cardinality 0) is emitted inline with
+  `n_dims >= 1` and a `dim_length` of 0 in at least one dimension
+  (`product(dims) == 0`, so no element bytes follow). Empty arrays of
+  different shapes (e.g. `[0]`, `[2, 0]`) are distinct values, and an empty
+  array is never equal to NULL.
+
+Decoders must accept a 0-length dimension and surface such a row as non-null
+with zero elements; only `n_dims == 0` or a negative dimension length is
+malformed. See the array encoding in the
+[QWP ingress spec](/docs/connect/wire-protocols/qwp-ingress-websocket/) for
+the byte layout.
 
 ## Schema and symbol dictionary scope
 
