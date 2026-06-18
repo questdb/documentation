@@ -1140,7 +1140,7 @@ keys it honours:
 |---|---|
 | Addressing | `addr` (one or comma-separated `host:port` entries), `path` (defaults to `/read/v1`), `protocol` (auto-derived from the `ws::` / `wss::` scheme) |
 | TLS | `tls_verify`, `tls_roots`, `tls_roots_password` |
-| Auth | `username` / `password` (HTTP Basic), `token` (Bearer), `auth` (pre-built `Authorization` header), `auth_timeout_ms` |
+| Auth | `username` / `password` (HTTP Basic), `token` (Bearer), `auth_timeout_ms` |
 | Routing | `target`, `zone`, `client_id` |
 | Failover | `failover`, `failover_max_attempts`, `failover_backoff_initial_ms`, `failover_backoff_max_ms`, `failover_max_duration_ms` |
 | Streaming | `compression`, `compression_level`, `max_batch_rows`, `initial_credit` |
@@ -1150,8 +1150,8 @@ emit before pausing for a `CREDIT` frame from the client — useful when a
 single result is much larger than the consumer's working set. The client
 auto-replenishes credit per consumed batch.
 
-`auth`, `username`/`password`, and `token` are mutually exclusive; setting
-two raises `IngressError`. Control characters are rejected in all string
+`username`/`password` and `token` are mutually exclusive; setting both
+raises `IngressError`. Control characters are rejected in all string
 values (connect-string parsing is strict).
 
 ## Misc
