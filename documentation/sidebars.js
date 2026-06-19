@@ -1006,6 +1006,11 @@ module.exports = {
           type: "doc",
         },
         {
+          id: "tutorials/questdb-to-iceberg",
+          label: "QuestDB to Iceberg",
+          type: "doc",
+        },
+        {
           label: "Ingest L2 order book data",
           type: "link",
           href: "https://questdb.com/blog/level-2-order-book-data-into-questdb-arrays/",
