@@ -27,6 +27,14 @@ query_validation_report.txt
 # PDF generator output
 scripts/pdf-generator/output/
 
+# Whitepaper generator: local test PDFs (baselines live in output/)
+scripts/whitepaper-generator/test-output/
+
+# Whitepaper generator: commercial brand fonts are licensed and must not be
+# redistributed publicly — contributors drop their own files in per fonts/README.md
+scripts/whitepaper-generator/fonts/*
+!scripts/whitepaper-generator/fonts/README.md
+
 # Misc
 .DS_Store
 .env.local

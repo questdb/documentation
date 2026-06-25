@@ -16,19 +16,20 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_DIR="$SCRIPT_DIR/output"
+SOURCE_DIR="$SCRIPT_DIR/output"
+PDF_OUTPUT_DIR="$SCRIPT_DIR/test-output"
 TEMPLATE="$SCRIPT_DIR/template.tex"
 
 # Input markdown (default: executive whitepaper)
-INPUT="${1:-$OUTPUT_DIR/executive-whitepaper.md}"
+INPUT="${1:-$SOURCE_DIR/executive-whitepaper.md}"
 INPUT_BASENAME="$(basename "$INPUT" .md)"
 
 # Logo (default: QuestDB full logo converted to PDF for XeLaTeX)
 DEFAULT_LOGO="$SCRIPT_DIR/questdb-logo.pdf"
 LOGO="${2:-$DEFAULT_LOGO}"
 
-# Output PDF
-OUTPUT_PDF="$OUTPUT_DIR/${INPUT_BASENAME}.pdf"
+# Output PDF (test builds only; baseline PDFs live in output/)
+OUTPUT_PDF="$PDF_OUTPUT_DIR/${INPUT_BASENAME}.pdf"
 
 echo "=== QuestDB Whitepaper PDF Generator ==="
 echo "Input:    $INPUT"
@@ -72,7 +73,7 @@ else
 fi
 
 # Create output directory
-mkdir -p "$OUTPUT_DIR"
+mkdir -p "$PDF_OUTPUT_DIR"
 
 # Generate PDF
 echo "Generating PDF..."
@@ -80,12 +81,20 @@ pandoc "$INPUT" \
     -o "$OUTPUT_PDF" \
     --pdf-engine=xelatex \
     --template="$TEMPLATE" \
-    --resource-path="$SCRIPT_DIR:$OUTPUT_DIR" \
+    --resource-path="$SCRIPT_DIR:$SOURCE_DIR" \
+    --lua-filter="$SCRIPT_DIR/style-tables.lua" \
+    --lua-filter="$SCRIPT_DIR/keep-headings-with-tables.lua" \
+    --lua-filter="$SCRIPT_DIR/autolink-bare-urls.lua" \
+    --syntax-definition="$SCRIPT_DIR/questdb-sql.xml" \
+    --top-level-division=chapter \
     --toc \
     --toc-depth=3 \
     --highlight-style=tango \
     $LOGO_ARG \
     $QRCODE_ARG \
+    --variable=fontdir:"$SCRIPT_DIR/fonts" \
+    --variable=coverbg:"$SCRIPT_DIR/cover-background.png" \
+    --variable=coverlogo:"$SCRIPT_DIR/quest-db-logo-light.png" \
     --variable=colorlinks:true
 
 echo ""

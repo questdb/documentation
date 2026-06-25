@@ -1,6 +1,7 @@
 ---
 title: "QuestDB: The Fastest Time-Series Database"
 subtitle: "Executive Overview"
+abstract: "A decision-maker's overview of QuestDB, the fastest open source time-series database: where it excels, who runs it in production, and how teams deploy it across open source, self-managed Enterprise, and Bring Your Own Cloud."
 date: 2026-05-13
 version: "1.0"
 ---
