@@ -1154,8 +1154,11 @@ try (QuestDB db = QuestDB.connect(
 }
 ```
 
-`compression` and `compression_level` apply to the query side only and are
-ignored by the ingest side.
+`compression` selects the codec the client requests: `raw` (the default, no
+compression), `zstd` (always compress), or `auto` (compress only when the
+server offers zstd). `compression_level` is the zstd level, default `1`,
+accepted in the range `1`–`22` and clamped server-side to `1`–`9`. Both keys
+apply to the query side only and are ignored by the ingest side.
 
 ## Error handling
 
@@ -1481,7 +1484,9 @@ Common WebSocket-specific options:
 | `request_durable_ack` | `off` | Request durable upload ACK (Enterprise). |
 | `reconnect_max_duration_millis` | `300000` | Ingress reconnect budget. |
 | `failover` | `on` | Egress per-query reconnect switch. |
-| `compression` | `raw` | Egress batch compression (`raw`, `zstd`). |
+| `compression` | `raw` | Egress batch compression (`raw`, `zstd`, `auto`). |
+| `compression_level` | `1` | Egress zstd level (`1`–`22`, clamped server-side to `1`–`9`). |
+| `client_id` | unset | Egress client label, sent as the `X-QWP-Client-Id` header; set in production so support can correlate sessions. |
 
 Pool keys (read by the `QuestDB` facade; the two clients accept and ignore them):
 
