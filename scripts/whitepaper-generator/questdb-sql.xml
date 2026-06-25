@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<!--
+  QuestDB SQL syntax for skylighting (pandoc). Named "SQL" so it overrides the
+  built-in SQL highlighter for ```sql blocks. Covers QuestDB dialect keywords
+  (SAMPLE BY, LATEST ON, ASOF/LT/SPLICE JOIN, HORIZON, DECLARE, ...), built-in
+  functions (dateadd, now, array_sum, ...), data types, and @variables.
+  Token classes map to the colored *Tok commands in template.tex.
+-->
+<language name="SQL" section="Database" version="1" kateversion="5.0"
+         extensions="*.sql" mimetype="text/x-sql" casesensitive="0">
+  <highlighting>
+    <list name="keywords">
+      <item>select</item><item>from</item><item>where</item><item>group</item>
+      <item>by</item><item>order</item><item>asc</item><item>desc</item>
+      <item>limit</item><item>offset</item><item>distinct</item><item>as</item>
+      <item>join</item><item>inner</item><item>left</item><item>right</item>
+      <item>outer</item><item>cross</item><item>asof</item><item>lt</item>
+      <item>splice</item><item>on</item><item>union</item><item>all</item>
+      <item>except</item><item>intersect</item><item>and</item><item>or</item>
+      <item>not</item><item>in</item><item>between</item><item>like</item>
+      <item>ilike</item><item>is</item><item>null</item><item>case</item>
+      <item>when</item><item>then</item><item>else</item><item>end</item>
+      <item>with</item><item>over</item><item>partition</item><item>range</item>
+      <item>rows</item><item>preceding</item><item>following</item>
+      <item>unbounded</item><item>current</item><item>row</item>
+      <item>sample</item><item>fill</item><item>align</item><item>to</item>
+      <item>calendar</item><item>latest</item><item>horizon</item>
+      <item>declare</item><item>create</item><item>table</item>
+      <item>materialized</item><item>view</item><item>insert</item>
+      <item>into</item><item>values</item><item>update</item><item>set</item>
+      <item>delete</item><item>drop</item><item>alter</item><item>add</item>
+      <item>column</item><item>rename</item><item>truncate</item><item>copy</item>
+      <item>index</item><item>capacity</item><item>wal</item><item>bypass</item>
+      <item>dedup</item><item>upsert</item><item>keys</item><item>refresh</item>
+      <item>every</item><item>start</item><item>exists</item><item>if</item>
+      <item>cast</item><item>interval</item><item>none</item><item>desc</item>
+    </list>
+    <list name="functions">
+      <item>avg</item><item>sum</item><item>min</item><item>max</item>
+      <item>count</item><item>first</item><item>last</item><item>ksum</item>
+      <item>nsum</item><item>stddev</item><item>stddev_samp</item>
+      <item>variance</item><item>dateadd</item><item>datediff</item>
+      <item>now</item><item>systimestamp</item><item>sysdate</item>
+      <item>to_timestamp</item><item>to_str</item><item>to_date</item>
+      <item>date_trunc</item><item>timestamp_floor</item><item>timestamp_ceil</item>
+      <item>timestamp_shuffle</item><item>extract</item><item>hour</item>
+      <item>day</item><item>month</item><item>year</item><item>minute</item>
+      <item>second</item><item>week</item><item>dow</item><item>doy</item>
+      <item>array_sum</item><item>array_avg</item><item>array_count</item>
+      <item>insertion_point</item><item>approx_count_distinct</item>
+      <item>approx_percentile</item><item>coalesce</item><item>nullif</item>
+      <item>abs</item><item>round</item><item>round_half_even</item>
+      <item>ceiling</item><item>ceil</item><item>floor</item><item>sqrt</item>
+      <item>exp</item><item>ln</item><item>log</item><item>power</item>
+      <item>concat</item><item>length</item><item>substring</item>
+      <item>replace</item><item>lpad</item><item>rpad</item><item>trim</item>
+      <item>ltrim</item><item>rtrim</item><item>upper</item><item>lower</item>
+      <item>regexp_replace</item><item>rank</item><item>dense_rank</item>
+      <item>row_number</item><item>vwap</item><item>haversine_dist_deg</item>
+      <item>first_value</item><item>last_value</item><item>lag</item>
+      <item>lead</item><item>coalesce</item><item>greatest</item><item>least</item>
+    </list>
+    <list name="types">
+      <item>boolean</item><item>byte</item><item>short</item><item>char</item>
+      <item>int</item><item>long</item><item>long256</item><item>float</item>
+      <item>double</item><item>string</item><item>symbol</item>
+      <item>timestamp</item><item>date</item><item>binary</item>
+      <item>geohash</item><item>uuid</item><item>ipv4</item><item>varchar</item>
+      <item>decimal</item><item>true</item><item>false</item>
+    </list>
+    <contexts>
+      <context attribute="Normal Text" lineEndContext="#stay" name="Normal">
+        <RegExpr attribute="Variable" String="@[A-Za-z_]\w*" context="#stay"/>
+        <keyword attribute="Keyword" String="keywords" context="#stay"/>
+        <keyword attribute="Data Type" String="types" context="#stay"/>
+        <keyword attribute="Function" String="functions" context="#stay"/>
+        <Float attribute="Float" context="#stay"/>
+        <Int attribute="Decimal" context="#stay"/>
+        <DetectChar attribute="String" context="String" char="'"/>
+        <Detect2Chars attribute="Comment" context="LineComment" char="-" char1="-"/>
+        <Detect2Chars attribute="Comment" context="BlockComment" char="/" char1="*"/>
+        <AnyChar attribute="Operator" String="+-*/%=&lt;&gt;!|&amp;:" context="#stay"/>
+      </context>
+      <context attribute="String" lineEndContext="#pop" name="String">
+        <DetectChar attribute="String" context="#pop" char="'"/>
+      </context>
+      <context attribute="Comment" lineEndContext="#pop" name="LineComment"/>
+      <context attribute="Comment" lineEndContext="#stay" name="BlockComment">
+        <Detect2Chars attribute="Comment" context="#pop" char="*" char1="/"/>
+      </context>
+    </contexts>
+    <itemDatas>
+      <itemData name="Normal Text" defStyleNum="dsNormal"/>
+      <itemData name="Keyword"     defStyleNum="dsKeyword"/>
+      <itemData name="Function"    defStyleNum="dsFunction"/>
+      <itemData name="Data Type"   defStyleNum="dsDataType"/>
+      <itemData name="String"      defStyleNum="dsString"/>
+      <itemData name="Decimal"     defStyleNum="dsDecVal"/>
+      <itemData name="Float"       defStyleNum="dsFloat"/>
+      <itemData name="Comment"     defStyleNum="dsComment"/>
+      <itemData name="Variable"    defStyleNum="dsVariable"/>
+      <itemData name="Operator"    defStyleNum="dsOperator"/>
+    </itemDatas>
+  </highlighting>
+  <general>
+    <comments>
+      <comment name="singleLine" start="--"/>
+      <comment name="multiLine" start="/*" end="*/"/>
+    </comments>
+    <keywords casesensitive="0"/>
+  </general>
+</language>

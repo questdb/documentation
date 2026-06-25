@@ -1,6 +1,7 @@
 ---
 title: "QuestDB: Architecture and Core Concepts"
 subtitle: "Technical Deep Dive"
+abstract: "An inside look at QuestDB's three-tier storage model, columnar engine, time-series SQL extensions, and the enterprise capabilities that make it production-ready for regulated, low-latency workloads."
 date: 2026-05-13
 ---
 

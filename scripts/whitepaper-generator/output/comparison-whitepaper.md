@@ -1,6 +1,7 @@
 ---
 title: "QuestDB: Competitive Comparison"
 subtitle: "vs. kdb+, InfluxDB, TimescaleDB, and ClickHouse"
+abstract: "A factual, benchmark-backed comparison of QuestDB against kdb+, InfluxDB, TimescaleDB, and ClickHouse, covering performance, architecture, query language, open formats, and total cost of ownership for time-series workloads."
 date: 2026-05-13
 ---
 
@@ -529,8 +530,6 @@ GROUP BY t.symbol, h.offset;
 QuestDB writes cold data to Apache Parquet on S3, Azure Blob, or GCS. Any tool that reads Parquet (DuckDB, Spark, Trino, pandas) can query it directly, with no QuestDB instance required. QuestDB exports metadata to Iceberg, Delta Lake, and Hive.
 
 ClickHouse stores all data in its proprietary MergeTree format, including cold storage on S3. When ClickHouse tiers data to object storage, it remains in MergeTree format. To export it, you need a running ClickHouse instance. ClickHouse's cloud-native engine (SharedMergeTree) is closed-source and only available on ClickHouse Cloud.
-
-\newpage
 
 ## Further reading
 

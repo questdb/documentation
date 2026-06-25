@@ -6,10 +6,31 @@
 % Page geometry
 \usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=3cm]{geometry}
 
-% Font setup (XeLaTeX)
+% Font setup (XeLaTeX) — QuestDB brand fonts from the repo's fonts/ dir.
+% $fontdir$ is supplied by generate-pdf.sh as an absolute path so the fonts
+% resolve regardless of pandoc's temporary working directory.
 \usepackage{fontspec}
-\setmainfont{Helvetica Neue}
-\setmonofont{Menlo}[Scale=0.85]
+% Body: PP Neue Montreal Regular. Inline bold/italic use PP Neue Montreal too.
+\setmainfont{PPNeueMontreal-Regular.ttf}[
+  Path = $fontdir$/Neue Montreal/ ,
+  BoldFont       = PPNeueMontreal-Bold.ttf ,
+  ItalicFont     = PPNeueMontreal-Italic.ttf ,
+  BoldItalicFont = PPNeueMontreal-BoldItalic.ttf ]
+% Headings: PP Neue Montreal Medium (applied via \headingfont in titlesec).
+% No Medium-italic in the repo, so headings fall back to Regular italic if italicised.
+\newfontfamily\headingfont{PPNeueMontreal-Medium.ttf}[
+  Path = $fontdir$/Neue Montreal/ ,
+  ItalicFont = PPNeueMontreal-Italic.ttf ,
+  LetterSpace = -1.4 ]  % -1.4% tracking to match brand collateral headings
+% Cover title: PP Neue Montreal Medium with tighter -3% tracking (per Figma cover)
+\newfontfamily\covertitlefont{PPNeueMontreal-Medium.ttf}[
+  Path = $fontdir$/Neue Montreal/ ,
+  LetterSpace = -3.0 ]
+% Mono: GT Standard Mono.
+\setmonofont{GT-Standard-Mono-Standard-Regular.otf}[
+  Path = $fontdir$/GT Standard Mono/ ,
+  BoldFont = GT-Standard-Mono-Standard-Bold.otf ,
+  Scale = 0.85 ]
 
 % Colors - QuestDB brand
 \usepackage{xcolor}
@@ -17,9 +38,35 @@
 \definecolor{questdb-dark}{RGB}{38,40,51}
 \definecolor{questdb-gray}{RGB}{100,100,110}
 \definecolor{quote-border}{RGB}{209,70,113}
+% Brand collateral tokens
+\definecolor{questdb-heading}{HTML}{9C274B}  % primary/darkest — headings on white
+\definecolor{questdb-charade}{HTML}{21222C}  % near-black — table headers, emphasis
+\definecolor{questdb-bodygray}{HTML}{32343E} % base/grey — body text
+\definecolor{questdb-rowfill}{HTML}{F7F4F4}  % table zebra fill
+\definecolor{questdb-rule}{HTML}{A9A29D}     % table rules
+% Code block: border + SQL syntax palette (tuned for the light F7F4F4 background)
+\definecolor{code-border}{HTML}{BE2F5B}
+\definecolor{code-keyword}{HTML}{BE2F5B}     % SELECT, FROM, WHERE, DECLARE, AND
+\definecolor{code-func}{HTML}{0E7C7B}        % functions / built-ins / types
+\definecolor{code-var}{HTML}{6E56CF}         % @variables
+\definecolor{code-string}{HTML}{2E7D32}      % 'strings'
+\definecolor{code-num}{HTML}{C2410C}         % numbers
+\definecolor{code-comment}{HTML}{6B7280}     % comments
+\definecolor{code-text}{HTML}{21222C}        % default code text
+% Cover
+\definecolor{cover-title}{HTML}{F8F8F2}      % off-white cover title/subtitle
+\definecolor{cover-bg}{HTML}{1D070E}         % dark banner base (fallback)
+% Default body text color (brand base/grey). Headings, links, headers/footers,
+% and the cover title all set their own colors, so this only affects body copy.
+\AtBeginDocument{\color{questdb-bodygray}}
 
 % Paragraph spacing (no indent, space between paragraphs)
 \usepackage{parskip}
+
+% Body leading: 150% line-height. LaTeX's 11pt body leading is ~13.6pt (124%);
+% \linespread{1.21} brings it to ~16.4pt = 150% of the 10.95pt body size.
+% (The title page resets this locally so the cover title stays tight.)
+\linespread{1.21}
 
 % Headers and footers
 \usepackage{fancyhdr}
@@ -39,12 +86,18 @@
 \usepackage{hyperref}
 \hypersetup{
   colorlinks=true,
-  linkcolor=questdb-pink,
-  urlcolor=questdb-pink,
-  citecolor=questdb-pink,
+  linkcolor=questdb-heading,
+  urlcolor=questdb-heading,
+  citecolor=questdb-heading,
   pdftitle={$title$},
   pdfauthor={QuestDB},
 }
+
+% Inline links: brand maroon (#9C274B, set above) + medium weight + underline.
+% hyperref handles the color; we wrap the link text for weight and underline.
+\usepackage[normalem]{ulem}  % \uline breaks across lines; normalem keeps \emph italic
+\let\qdbhref\href
+\renewcommand{\href}[2]{\qdbhref{#1}{{\headingfont\uline{#2}}}}
 
 % Tables
 \usepackage{booktabs}
@@ -66,8 +119,13 @@
   \small%
   \setlength{\tabcolsep}{3pt}%
   \renewcommand{\arraystretch}{1.35}%
-  \rowcolors{2}{gray!8}{white}%
+  \arrayrulecolor{questdb-rule}%    % rules A9A29D (booktabs width unchanged)
+  \rowcolors{2}{questdb-rowfill}{white}%  % zebra F7F4F4 / white
 }
+% Table text color (#21222C) + bold headers are applied per-cell by the
+% style-tables.lua filter (inline \textcolor/\textbf). We deliberately do NOT set
+% \color anywhere near the longtable: a bare \color in vertical mode at/around a
+% longtable start emits a whatsit that makes longtable output a phantom header.
 
 % Graphics
 \usepackage{graphicx}
@@ -96,72 +154,101 @@
     innertopmargin=8pt,
     innerbottommargin=8pt,
     backgroundcolor=white,
-    skipabove=12pt,
-    skipbelow=12pt
-  ]
-  \itshape
+    skipabove=16pt,
+    skipbelow=0pt
+  ]%
+  % 13pt, PP Neue Montreal Medium, -1.4% tracking (\headingfont), 130% leading, upright
+  \linespread{1}\headingfont\fontsize{13}{16.9}\selectfont
 }{%
-  \end{mdframed}
+  \end{mdframed}%
+  % mdframed silently drops skipbelow when parskip is active, so add the space
+  % below explicitly. ~2x the space above so the quote groups with the text it
+  % follows and is clearly separated from the next paragraph.
+  \vspace{20pt}
 }
 
 % Pandoc requirements
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 
+% Pandoc 3.x wraps caption-less tables in {\def\LTcaptype{none} ...} so the
+% table number is not incremented. Stock longtable then calls
+% \refstepcounter{none}; define a throwaway 'none' counter so that is a no-op
+% (otherwise: "LaTeX Error: No counter 'none' defined").
+\newcounter{none}
+
 % Code blocks
 \usepackage{fancyvrb}
+\usepackage{tcolorbox}
+\usepackage{tikz}  % full-bleed cover layout (remember picture / overlay)
 \newenvironment{Shaded}{%
-  \begin{mdframed}[
-    backgroundcolor=questdb-dark!5,
-    linewidth=0pt,
-    innerleftmargin=10pt,
-    innerrightmargin=10pt,
-    innertopmargin=8pt,
-    innerbottommargin=8pt,
-    skipabove=8pt,
-    skipbelow=8pt
-  ]
-}{\end{mdframed}}
+  \begin{tcolorbox}[
+    colback=questdb-rowfill,            % F7F4F4 background
+    colframe=code-border,               % BE2F5B stroke
+    leftrule=2pt, rightrule=1pt, toprule=1pt, bottomrule=1pt,
+    arc=3pt,                            % 3pt rounded corners
+    boxsep=0pt, left=20pt, right=20pt, top=16pt, bottom=16pt,  % 2x padding (was 10/8)
+    before skip=16pt, after skip=20pt,  % spacing like blockquotes
+    coltext=code-text
+  ]%
+}{\end{tcolorbox}}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},fontsize=\small}
-\newcommand{\KeywordTok}[1]{\textbf{#1}}
-\newcommand{\NormalTok}[1]{#1}
-\newcommand{\StringTok}[1]{#1}
-\newcommand{\CommentTok}[1]{\textit{#1}}
-\newcommand{\OtherTok}[1]{#1}
-\newcommand{\FunctionTok}[1]{#1}
-\newcommand{\VariableTok}[1]{#1}
-\newcommand{\ControlFlowTok}[1]{\textbf{#1}}
-\newcommand{\OperatorTok}[1]{#1}
-\newcommand{\BuiltInTok}[1]{#1}
-\newcommand{\ExtensionTok}[1]{#1}
-\newcommand{\SpecialCharTok}[1]{#1}
-\newcommand{\DataTypeTok}[1]{#1}
-\newcommand{\DecValTok}[1]{#1}
-\newcommand{\BaseNTok}[1]{#1}
-\newcommand{\FloatTok}[1]{#1}
-\newcommand{\ConstantTok}[1]{#1}
-\newcommand{\CharTok}[1]{#1}
-\newcommand{\SpecialStringTok}[1]{#1}
-\newcommand{\VerbatimStringTok}[1]{#1}
-\newcommand{\ImportTok}[1]{#1}
-\newcommand{\DocumentationTok}[1]{\textit{#1}}
-\newcommand{\AnnotationTok}[1]{#1}
-\newcommand{\CommentVarTok}[1]{\textit{#1}}
-\newcommand{\PreprocessorTok}[1]{#1}
-\newcommand{\AttributeTok}[1]{#1}
-\newcommand{\RegionMarkerTok}[1]{#1}
-\newcommand{\InformationTok}[1]{#1}
-\newcommand{\WarningTok}[1]{#1}
-\newcommand{\AlertTok}[1]{#1}
-\newcommand{\ErrorTok}[1]{#1}
+% SQL syntax coloring (skylighting token classes)
+\newcommand{\KeywordTok}[1]{\textbf{\textcolor{code-keyword}{#1}}}
+\newcommand{\ControlFlowTok}[1]{\textbf{\textcolor{code-keyword}{#1}}}
+\newcommand{\NormalTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\OperatorTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor{code-func}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor{code-func}{#1}}
+\newcommand{\DataTypeTok}[1]{\textcolor{code-func}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor{code-func}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor{code-var}{#1}}
+\newcommand{\StringTok}[1]{\textcolor{code-string}{#1}}
+\newcommand{\CharTok}[1]{\textcolor{code-string}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor{code-string}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor{code-string}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor{code-num}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor{code-num}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor{code-num}{#1}}
+\newcommand{\ConstantTok}[1]{\textcolor{code-num}{#1}}
+\newcommand{\CommentTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\CommentVarTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\DocumentationTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\AnnotationTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\ExtensionTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor{code-comment}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor{code-func}{#1}}
+\newcommand{\RegionMarkerTok}[1]{\textcolor{code-text}{#1}}
+\newcommand{\InformationTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\WarningTok}[1]{\textit{\textcolor{code-comment}{#1}}}
+\newcommand{\AlertTok}[1]{\textbf{\textcolor{code-keyword}{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor{code-keyword}{#1}}
 
-% Prevent orphaned headings at bottom of page (heading with no content)
-\widowpenalty=10000
-\clubpenalty=10000
+% Discourage (but don't forbid) widows/orphans. =10000 is infinite and forces
+% LaTeX to eject whole paragraphs to the next page, leaving large mid-document
+% gaps; a high *finite* penalty keeps pages filled while still avoiding most
+% stray lines. Heading->table reserves use \Needspace* (see keep-headings filter).
+\widowpenalty=9999
+\clubpenalty=9999
+\displaywidowpenalty=9999
+\brokenpenalty=9999
+% Let pages end at their natural height instead of stretching content to fill;
+% leftover space collects at the bottom rather than as gaps between blocks.
+\raggedbottom
 
 % Section styling - larger, colored
 \usepackage{titlesec}
+% Never break a page right after a heading. \@secpenalty (-300) makes a break
+% *before* a heading attractive, which strands a heading that's immediately
+% followed by another heading (or a table/figure block that won't fit). Prepending
+% \nobreak to \@afterheading forbids the break, so the heading travels with its
+% following content (sub-heading, paragraph, table, or figure).
+\makeatletter
+\preto\@afterheading{\nobreak}
+\makeatother
 \titleformat{\chapter}[display]
-  {\normalfont\huge\bfseries\color{questdb-dark}}
+  {\normalfont\headingfont\fontsize{22}{26}\selectfont\color{questdb-heading}}
   {}
   {0pt}
   {}
@@ -169,21 +256,21 @@
 
 \usepackage{needspace}
 \titleformat{\section}
-  {\normalfont\Large\bfseries\color{questdb-dark}\needspace{6\baselineskip}}
+  {\normalfont\headingfont\fontsize{18}{22}\selectfont\color{questdb-heading}}
   {}
   {0pt}
   {}
 \titlespacing*{\section}{0pt}{24pt}{12pt}
 
 \titleformat{\subsubsection}
-  {\normalfont\normalsize\bfseries\color{questdb-dark}\needspace{4\baselineskip}}
+  {\normalfont\headingfont\fontsize{12}{15}\selectfont\color{questdb-heading}}
   {}
   {0pt}
   {}
 \titlespacing*{\subsubsection}{0pt}{14pt}{6pt}
 
 \titleformat{\subsection}
-  {\normalfont\large\bfseries\color{questdb-dark}\needspace{5\baselineskip}}
+  {\normalfont\headingfont\fontsize{14}{18}\selectfont\color{questdb-charade}}
   {}
   {0pt}
   {}
@@ -203,45 +290,38 @@ $endif$
 % Title page
 % ============================================================
 \begin{titlepage}
-\centering
-
-\vspace*{3cm}
-
-% Logo
-$if(logo)$
-\includegraphics[width=6cm]{$logo$}
-$else$
-{\fontsize{48}{52}\selectfont\textcolor{questdb-pink}{\textbf{QuestDB}}}
-$endif$
-
-\vspace{2cm}
-
-% Title
-{\fontsize{28}{34}\selectfont\textbf{$title$}\par}
-
-\vspace{0.8cm}
-
-% Subtitle
-$if(subtitle)$
-{\fontsize{16}{20}\selectfont\textcolor{questdb-gray}{$subtitle$}\par}
-$endif$
-
-\vspace{1.5cm}
-
-% Horizontal rule
-{\color{questdb-pink}\rule{8cm}{1.5pt}}
-
-\vfill
-
-% QR code on title page
-$if(qrcode)$
-\begin{center}
-\includegraphics[width=2.5cm]{$qrcode$}
-\end{center}
-$endif$
-
-\vspace{1cm}
-
+\thispagestyle{empty}
+\linespread{1}\selectfont  % cover uses tight leading; 150% body leading resumes after
+\begin{tikzpicture}[remember picture, overlay]
+  % Full-bleed dark banner across the top 70% of the page (bleeds horizontally)
+  \node[anchor=north, inner sep=0] at (current page.north)
+    {\includegraphics[height=0.70\paperheight]{$coverbg$}};
+  % Light QuestDB logo, centered near the top
+  \node[anchor=north, inner sep=0] at ([yshift=-56pt]current page.north)
+    {\includegraphics[height=32pt]{$coverlogo$}};
+  % Title (+ subtitle), centered, off-white
+  \node[anchor=north, text width=523.3pt, align=center, inner sep=0]
+    at ([yshift=-144pt]current page.north) {%
+      {\covertitlefont\fontsize{72}{70}\selectfont\hyphenpenalty=10000\textcolor{cover-title}{$title$}\par}%
+      $if(subtitle)$\par\vspace{18pt}{\headingfont\fontsize{22}{26}\selectfont\textcolor{cover-title}{$subtitle$}\par}$endif$%
+    };
+  % Abstract in the white lower area
+  $if(abstract)$
+  \node[anchor=north west, text width=523pt, align=left, inner sep=0,
+        text=questdb-bodygray, font=\fontsize{13}{18}\selectfont]
+    at ([xshift=36pt, yshift=-637pt]current page.north west) {$abstract$};  % 48pt below the 70% banner
+  $endif$
+  % Footer (bottom-left)
+  \node[anchor=south west, inner sep=0, text=questdb-bodygray, font=\fontsize{10}{13}\selectfont]
+    at ([xshift=36pt, yshift=36pt]current page.south west)
+    {Learn more about our company, products and services at \textbf{\textcolor{questdb-heading}{\uline{www.questdb.com}}}};
+  % QR (bottom-right)
+  $if(qrcode)$
+  \node[anchor=south east, inner sep=0]
+    at ([xshift=-36pt, yshift=36pt]current page.south east)
+    {\includegraphics[width=2.5cm]{$qrcode$}};
+  $endif$
+\end{tikzpicture}
 \end{titlepage}
 
 % ============================================================

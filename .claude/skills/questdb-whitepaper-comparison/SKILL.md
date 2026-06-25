@@ -37,9 +37,10 @@ Each comparison section should be 4-6 pages, not 1-2.
 
 ## Page breaks and layout
 
-Insert `\newpage` before every top-level `##` section (kdb+, InfluxDB,
-TimescaleDB, ClickHouse, Further reading). This ensures each comparison
-starts on a fresh page.
+Insert `\newpage` before each comparison top-level `##` section (kdb+,
+InfluxDB, TimescaleDB, ClickHouse). Do **not** insert `\newpage` before
+`## Further reading` — it is short closing content and a forced break
+leaves a near-empty page when the preceding paragraph splits across pages.
 
 ### Summary table placement
 
@@ -142,6 +143,7 @@ interactive charts).
 ---
 title: "QuestDB: Competitive Comparison"
 subtitle: "vs. kdb+, InfluxDB, TimescaleDB, and ClickHouse"
+abstract: "A 2-3 sentence summary of the whitepaper for the cover page. Describe what the reader will get from this document."
 date: YYYY-MM-DD
 ---
 ```

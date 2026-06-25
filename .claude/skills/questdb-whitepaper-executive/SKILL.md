@@ -59,6 +59,7 @@ concise. Target 8-12 pages when rendered as PDF.
 ---
 title: "QuestDB: The Fastest Time-Series Database"
 subtitle: "Executive Overview"
+abstract: "A 2-3 sentence summary of the whitepaper for the cover page. Describe what the reader will get from this document."
 date: YYYY-MM-DD
 ---
 

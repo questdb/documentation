@@ -242,6 +242,7 @@ When suggesting updates, verify:
 
 - [ ] Only changed source pages were read (not full regeneration)
 - [ ] Proposed changes preserve the existing structure and tone
+- [ ] Frontmatter includes an `abstract:` (2-3 sentence cover-page summary); add one if missing
 - [ ] SQL queries match source verbatim (with line-break adjustments only)
 - [ ] No Docusaurus syntax introduced (admonitions, links, components)
 - [ ] No internal doc links (e.g., `/docs/concepts/...`)
