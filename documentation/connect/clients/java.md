@@ -27,15 +27,15 @@ a columnar binary protocol carried over WebSocket. It supports high-throughput
 data ingestion and streaming SQL queries on the same transport.
 
 The recommended entry point is the [`QuestDB`](#the-questdb-handle) handle: a
-shared, thread-safe facade that owns connection pools for both ingest and
+shared, thread-safe facade that owns connection pools for both ingress and
 egress and exposes a fluent query API on top of them.
 
 Key capabilities:
 
-- **One handle, both directions**: `QuestDB.connect(...)` derives ingest and
-  egress endpoints from a single connect string; `db.borrowSender()` for
+- **One handle, both directions**: `QuestDB.connect(...)` configures ingress and
+  egress from a single `ws`/`wss` connect string; `db.borrowSender()` for
   ingestion, `db.query()` / `db.executeSql(...)` for SQL.
-- **Pooled connections**: elastic sender and query pools with idle reaping,
+- **Pooled connections**: elastic sender and query pools that close idle connections,
   thread-affine senders, and zero-allocation borrow/submit paths at steady
   state.
 - **Ingestion**: column-oriented batched writes with automatic table creation,
@@ -147,22 +147,29 @@ try (QuestDB db = QuestDB.connect("ws::addr=localhost:9000;")) {
 }
 ```
 
-`QuestDB.connect(...)` accepts an `http`, `https`, `ws` or `wss` connect
-string and derives the other half by schema translation
-(`http`↔`ws`, `https`↔`wss`). Use
-[`QuestDB.connect(ingestCfg, queryCfg)`](#separate-ingest-and-egress-configs)
-or the [builder](#builder-api) when the two sides differ.
+The `QuestDB` handle is a facade over two distinct kinds of client: a
+[`Sender`](#data-ingestion) for ingestion (`db.borrowSender()` /
+`db.sender()`) and a [query client](#querying-with-query-and-completion) for
+SQL (`db.query()` / `db.executeSql(...)`). You acquire both from the same
+handle, and both speak QWP, so a single `ws` or `wss` connect string passed to
+`QuestDB.connect(...)` configures both. Each client reads the connect-string
+keys it owns and ignores the rest. Use
+[`QuestDB.connect(ingestCfg, queryCfg)`](#separate-ingress-and-egress-configs)
+or the [builder](#builder-api) when ingestion and queries need different
+addresses or settings.
 
 ## The QuestDB handle
 
-`QuestDB` is a `Closeable` deployment-level handle. It owns two pools — one
-for [`Sender`](#data-ingestion) instances and one for the underlying query
-clients — plus a daemon housekeeper that reaps idle and over-age pool slots.
+`QuestDB` is a `Closeable` handle for a QuestDB deployment: you create one,
+share it across your application's threads, and close it at shutdown. It owns
+a pool of each client type — [`Sender`](#data-ingestion)s for ingestion and
+query clients for SQL — plus a background housekeeper thread that closes idle
+and over-age connections.
 
 | Method | Returns | Purpose |
 |--------|---------|---------|
-| `connect(String)` | `QuestDB` | Static factory. Single connect string for both ingest and egress (schema must be `http`/`https`/`ws`/`wss`). |
-| `connect(String, String)` | `QuestDB` | Static factory. Explicit ingest + egress connect strings. |
+| `connect(String)` | `QuestDB` | Static factory. Single connect string for both ingress and egress (schema must be `ws`/`wss`). |
+| `connect(String, String)` | `QuestDB` | Static factory. Explicit ingress + egress connect strings. |
 | `builder()` | `QuestDBBuilder` | Pool sizes, timeouts, separate configs. |
 | `borrowSender()` | `Sender` | Lease a sender from the pool; `close()` flushes and returns it. |
 | `sender()` | `Sender` | Thread-affine sender: pinned to the calling thread on first use, reused on subsequent calls. |
@@ -184,50 +191,57 @@ try (QuestDB db = QuestDB.connect("ws::addr=localhost:9000;")) {
 }
 ```
 
-Allowed schemas: `http`, `https`, `ws`, `wss`. The other side is derived by
-schema translation:
+The schema must be `ws` or `wss`. QuestDB ingests and queries over QWP, so the
+pooled facade is WebSocket-only and rejects `http`/`https`/`tcp` and the other
+legacy ILP schemas. (The low-level [`Sender`](#sender-low-level-primitive)
+speaks those transports; only the `QuestDB` facade is QWP-only.)
 
-| Input schema | Ingest schema | Egress schema |
-|--------------|---------------|---------------|
-| `http`       | `http`        | `ws`          |
-| `https`      | `https`       | `wss`         |
-| `ws`         | `http`        | `ws`          |
-| `wss`        | `https`       | `wss`         |
+The string is handed to both the ingress sender and the egress query client
+verbatim.
+Each direction reads the keys it owns and ignores keys meant only for the
+other, so ingress-only and egress-only options coexist in one string:
 
-These keys are mirrored from the input config to the derived side: `addr`,
-`token`, `username`, `password`, `auth`, `tls_roots`, `tls_roots_password`,
-`tls_verify`. Other keys stay on the input side only.
+```java
+try (QuestDB db = QuestDB.connect(
+        "wss::addr=db.example.com:9000;"
+        + "token=YOUR_TOKEN;"        // common: authenticates both directions
+        + "auto_flush_rows=5000;"    // ingress-only: the query client ignores it
+        + "compression=zstd;")) {    // egress-only: the sender ignores it
+    // ...
+}
+```
 
-`token=...` is rewritten to `auth=Bearer ...` on the egress (WebSocket) side
-so the same Enterprise token works for both directions.
+`addr`, the credentials (`username`/`password` or `token`), and the `tls_*`
+keys are **common** — they apply to both directions. `token` is sent as an
+`Authorization: Bearer` header on both the ingress and egress WebSocket
+upgrades, and `username`/`password` configure HTTP basic auth on both.
 
-:::note username/password and unified configs
+An unrecognized key fails fast at `connect()` with
+`unknown configuration key: <key>`; a legacy ILP key (such as `init_buf_size`
+or `retry_timeout`) is rejected with a hint pointing to the right place. For
+the full key list, see the
+[connect string reference](/docs/connect/clients/connect-string/).
 
-Single-string unified configuration does not auto-derive
-`username`/`password` for the WebSocket side. Either pass
-`auth=Basic <base64>` directly (which propagates as-is to both sides) or use
-the [builder](#builder-api) with explicit `ingestConfig()` and
-`queryConfig()` strings.
+### Separate ingress and egress configs
 
-:::
-
-### Separate ingest and egress configs
-
-When ingest and egress endpoints differ — typical when reads target a
+When ingress and egress endpoints differ — typical when reads target a
 read-replica or when ingest goes through a different load balancer — pass
 explicit strings:
 
 ```java
 try (QuestDB db = QuestDB.connect(
         "ws::addr=ingest.cluster:9000;",
-        "wss::addr=read-replica.cluster:9000;auth=Bearer YOUR_TOKEN;")) {
+        "wss::addr=read-replica.cluster:9000;token=YOUR_TOKEN;")) {
     // ...
 }
 ```
 
-The first argument follows
+Both strings must use the `ws`/`wss` schema. The first follows
 [`Sender.fromConfig`](#sender-low-level-primitive) format; the second follows
 [`QwpQueryClient.fromConfig`](#qwpqueryclient-low-level-primitive) format.
+Because the two sides share one key vocabulary, each string also accepts keys
+owned by the other direction; the split just lets ingress and egress point at
+different hosts or carry different tuning.
 
 ### Builder API
 
@@ -237,7 +251,7 @@ For pool tuning, separate configs, or any of the housekeeping knobs:
 try (QuestDB db = QuestDB.builder()
         .ingestConfig("ws::addr=ingest.cluster:9000;")
         .queryConfig("ws::addr=read-replica.cluster:9000;")
-        .senderPoolSize(8)                // fixed size, eager allocation
+        .senderPoolSize(8)                // fixed size, opened up front
         .queryPoolMin(2).queryPoolMax(16) // elastic
         .acquireTimeoutMillis(10_000)
         .idleTimeoutMillis(60_000)
@@ -251,19 +265,24 @@ Builder methods:
 
 | Method | Default | Purpose |
 |--------|---------|---------|
-| `fromConfig(String)` | — | Unified config; also parses pool-tuning keys from the string. |
-| `ingestConfig(String)` | — | Sender-side config (required). |
-| `queryConfig(String)` | — | Query-side config (required). |
-| `senderPoolMin(int)` | `1` | Minimum senders kept warm. `0` allows drain. |
-| `senderPoolMax(int)` | `4` | Maximum senders. |
-| `senderPoolSize(int)` | — | Shortcut: fixed `min = max = size`, eager allocation. |
-| `queryPoolMin(int)` | `1` | Minimum query clients kept warm. |
-| `queryPoolMax(int)` | `4` | Maximum query clients. |
+| `fromConfig(String)` | — | One `ws`/`wss` string for both sides; honors pool keys in the string. |
+| `ingestConfig(String)` | — | Ingress-side `ws`/`wss` config. |
+| `queryConfig(String)` | — | Egress-side `ws`/`wss` config. |
+| `senderPoolMin(int)` | `1` | Senders kept open even when idle. `0` lets the pool close them all. |
+| `senderPoolMax(int)` | `4` | Maximum senders the pool opens. |
+| `senderPoolSize(int)` | — | Shortcut: fixed `min = max = size`, all opened up front. |
+| `queryPoolMin(int)` | `1` | Query clients kept open even when idle. `0` lets the pool close them all. |
+| `queryPoolMax(int)` | `4` | Maximum query clients the pool opens. |
 | `queryPoolSize(int)` | — | Shortcut: fixed `min = max = size`. |
-| `acquireTimeoutMillis(long)` | `5000` | Borrow / submit blocks up to this long when the pool is exhausted, then throws. |
-| `idleTimeoutMillis(long)` | `60000` | Idle slot reap threshold. `min` is always respected. `0` ⇒ never reap. |
-| `maxLifetimeMillis(long)` | `1800000` | Recycle a slot after this age. `0` ⇒ never recycle. |
-| `housekeeperIntervalMillis(long)` | `5000` | Daemon sweep cadence. Minimum 100ms. |
+| `acquireTimeoutMillis(long)` | `5000` | How long `borrowSender()` / `Query.submit()` wait for a free connection when the pool is at `max`, before throwing. |
+| `idleTimeoutMillis(long)` | `60000` | How long an unused connection stays open before the housekeeper closes it (never below `min`). `0` ⇒ keep idle connections forever. |
+| `maxLifetimeMillis(long)` | `1800000` | Maximum age of a connection; the housekeeper closes and reopens older ones once idle. `0` ⇒ no age limit. |
+| `housekeeperIntervalMillis(long)` | `5000` | How often the housekeeper checks for idle and over-age connections. Minimum 100ms. |
+
+Supply the connection config with either `fromConfig(...)` or with both
+`ingestConfig(...)` and `queryConfig(...)`; `build()` throws if either side is
+left unset. The config strings combine last-write-wins, so an `ingestConfig(...)`
+or `queryConfig(...)` call after `fromConfig(...)` overrides that one side.
 
 ### Environment variable
 
@@ -283,9 +302,9 @@ try (QuestDB db = QuestDB.connect(cfg)) {
 
 ### Connect-string pool keys
 
-The pool-tuning options above can also live in the connect string itself.
-The builder strips them out before passing the string to the underlying
-`Sender` and `QwpQueryClient` parsers (which don't recognise them):
+The pool-tuning options above can also live in the connect string itself. They
+belong to the facade: the `Sender` and `QwpQueryClient` parsers accept and
+ignore them, while the facade reads them off the string.
 
 | Key                       | Builder equivalent         |
 |---------------------------|----------------------------|
@@ -298,15 +317,19 @@ The builder strips them out before passing the string to the underlying
 | `max_lifetime_ms`         | `maxLifetimeMillis(long)`  |
 | `housekeeper_interval_ms` | `housekeeperIntervalMillis(long)` |
 
-Explicit builder calls **after** `fromConfig(...)` overwrite anything the
-string set; last write wins.
+An explicit builder setter always wins over the same key in the string,
+regardless of call order. When you pass [separate ingress and egress
+strings](#separate-ingress-and-egress-configs) that both carry the same pool key
+with **different** values, `build()` fails — set it on one side only, or use
+the builder setter.
 
 ## Authentication and TLS
 
-Authentication happens at the HTTP level during the WebSocket upgrade for
-egress and on each request for HTTP ingress, before any data is exchanged.
-The mirrored keys (`token`, `username`/`password`, `auth`, `tls_*`) work
-identically on `QuestDB.connect(...)`.
+QWP runs over WebSocket, so authentication uses HTTP-style credentials sent on
+the WebSocket upgrade request — for both ingress and egress, before any data is
+exchanged. The credential and TLS keys (`token`, `username`/`password`,
+`tls_*`) are common to both directions, so a single `QuestDB.connect(...)`
+string authenticates both.
 
 ### Token (Enterprise, recommended)
 
@@ -317,8 +340,9 @@ try (QuestDB db = QuestDB.connect(
 }
 ```
 
-The bearer token is sent verbatim to the ingest side and rewritten to
-`auth=Bearer YOUR_BEARER_TOKEN` on the egress side.
+The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on
+both the ingress and egress WebSocket upgrades. It is mutually exclusive with
+`username`/`password`.
 
 ### HTTP basic auth
 
@@ -329,9 +353,9 @@ try (QuestDB db = QuestDB.connect(
 }
 ```
 
-This works for ingest. For the egress side, use the builder with explicit
-`queryConfig("...auth=Basic <base64>...")` (see the note in
-[Single connect string](#single-connect-string)).
+`username`/`password` are common keys, so this authenticates both the ingress
+and egress upgrades. Both halves must be present together, and they are
+mutually exclusive with `token`.
 
 ### TLS with custom trust store
 
@@ -350,9 +374,10 @@ For development, `tls_verify=unsafe_off` disables certificate validation.
 
 ## The connection pool
 
-Both pools are *elastic*: they keep `min` slots warm, grow up to `max`
-on demand, and reap idle slots (anything above `min`) at the housekeeper
-interval.
+Both pools are *elastic*. Each holds live connections — pooled senders in one,
+query clients in the other. A pool keeps at least `min` connections open and
+ready, opens more on demand up to `max`, and a background **housekeeper** thread
+closes connections left idle too long, down to `min`.
 
 ### Borrowed vs thread-affine senders
 
@@ -382,10 +407,10 @@ pinned for the rest of the thread's life.
 
 :::note Pooled Sender close semantics
 
-`Sender.close()` on a borrowed sender flushes pending rows and returns the
-decorator to the pool — it does **not** disconnect the underlying
+`Sender.close()` on a borrowed sender flushes pending rows and returns it to
+the pool for reuse — it does **not** disconnect the underlying
 WebSocket. A real disconnect only happens at `QuestDB.close()` (or when the
-housekeeper reaps an idle slot).
+housekeeper closes an idle connection).
 
 :::
 
@@ -398,15 +423,18 @@ is allocation-free.
 
 For multiple in-flight queries from one thread, call `db.newQuery()` —
 each call allocates a fresh `Query`. The query pool's `max` caps overall
-concurrency (one worker per in-flight query).
+concurrency (one query client per in-flight query).
 
 ### Acquire timeout
 
-`db.borrowSender()` and `Query.submit()` block when the pool is exhausted
-(every slot in use and `max` already reached). They unblock when a slot
-returns or when the timeout (default 5s) elapses; on timeout, they throw
-`LineSenderException`. Raise `acquireTimeoutMillis` for steady-state
-bursts you expect to absorb, or raise `max` to allow more concurrency.
+Both `db.borrowSender()` and `Query.submit()` take a connection from a pool — a
+sender from the sender pool, a query client from the query pool. When every
+connection is in use and the pool has already grown to `max`, the call blocks,
+waiting for another caller to return one. It proceeds the moment a connection
+frees up, or, if the timeout (default 5s) elapses first, gives up and throws:
+`LineSenderException` from `borrowSender()`, `QueryException` from
+`Query.submit()`. Raise `acquireTimeoutMillis` to ride out longer bursts, or
+raise `max` to allow more concurrency.
 
 ## Data ingestion
 
@@ -474,7 +502,7 @@ is owned by the borrower until it's returned (via `close()` or
 5. Repeat from step 2, or call `flush()` to send buffered data.
 6. Release the sender:
    - For `db.borrowSender()`, close the sender (try-with-resources). The
-     pool flushes pending rows before reusing the slot.
+     pool flushes pending rows before the sender returns for reuse.
    - For `db.sender()`, leave it pinned across calls and `flush()` between
      batches; release only on shutdown or thread recycling.
 
@@ -597,23 +625,39 @@ page for details.
 
 ### Flushing
 
-The client accumulates rows in an internal buffer and sends them in batches.
+Rows you build accumulate in a buffer. `flush()` hands the batch to a background
+**send engine**: a buffer of unacknowledged rows plus a thread that delivers
+them to the server, waits for acknowledgements, and reconnects on failure. The
+engine holds every unacknowledged row until the server acks it, and replays the
+held rows after a reconnect.
 
-**Auto-flush** (default): the client flushes when either threshold is reached:
+`flush()` returns once the rows are handed to the engine. The server's
+acknowledgement arrives later, asynchronously;
+[Awaiting acknowledgements](#awaiting-acknowledgements) shows how to wait for a
+specific batch to be acked. Where the engine holds unacknowledged rows depends
+on the mode (see [Store-and-forward](#store-and-forward)): in RAM by default, or
+in memory-mapped files on disk when `sf_dir` is set.
 
-| Trigger    | WebSocket default | HTTP default |
-|------------|-------------------|--------------|
-| Row count  | 1,000 rows        | 75,000 rows  |
-| Time       | 100 ms            | 1,000 ms     |
+**Auto-flush** (on by default) calls `flush()` for you when the buffer first
+crosses one of these thresholds:
 
-Customize via connect string:
+| Trigger      | Default  | Connect-string key    |
+|--------------|----------|-----------------------|
+| Row count    | 1,000    | `auto_flush_rows`     |
+| Time         | 100 ms   | `auto_flush_interval` |
+| Buffer bytes | disabled | `auto_flush_bytes`    |
+
+Smaller thresholds lower latency at the cost of more, smaller batches:
 
 ```text
 ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 ```
 
-**Explicit flush**: you can call `flush()` at any time to send buffered data
-immediately, even with auto-flush enabled:
+The WebSocket transport always auto-flushes; control batch size through these
+thresholds.
+
+**Explicit flush.** Call `flush()` at any point to hand the buffered rows to the
+engine immediately, regardless of the auto-flush thresholds:
 
 ```java
 try (Sender sender = db.borrowSender()) {
@@ -624,66 +668,109 @@ try (Sender sender = db.borrowSender()) {
               .doubleColumn("amount", trade.amount())
               .at(trade.timestamp());
     }
-    sender.flush();  // send everything now, regardless of auto-flush thresholds
+    sender.flush();  // hand everything to the engine now
 }
 ```
 
-:::note
-Disabling auto-flush entirely (`auto_flush=off`) is not supported on the
-WebSocket transport. Use the auto-flush row count and interval settings to
-control batch size instead.
-:::
+**Backpressure.** The engine's buffer is bounded by `sf_max_total_bytes`
+(default 128 MiB in memory mode, 10 GiB in store-and-forward mode). If a slow or
+unreachable server lets it fill, `flush()` blocks until the server acks rows and
+the engine frees space, up to `sf_append_deadline_millis` (default 30 s), then
+throws, keeping the buffered rows.
 
-`Sender.close()` (or pool return) flushes pending rows, waiting up to
-`close_flush_timeout_millis` (default 5000) for acknowledgements. If the
-flush fails at close time, the client does not retry. For at-least-once
-semantics, flush explicitly and check FSN progress
-([Awaiting acknowledgements](#awaiting-acknowledgements)) before closing.
+**Closing.** On a sender you own, `close()` flushes buffered rows and then
+*drains*: it waits for the server to acknowledge everything published, up to
+`close_flush_timeout_millis` (default 60 s), before disconnecting. If the drain
+times out, `close()` throws `LineSenderException` with rows still unacknowledged
+— recoverable by reopening on the same `sf_dir` in store-and-forward mode, lost
+in memory mode. A **pooled** sender (from `db.borrowSender()`) behaves
+differently: its `close()` flushes and returns it to the pool without
+disconnecting or draining, and the drain runs only when `QuestDB.close()` closes
+the underlying connection. To
+confirm a batch is durable before moving on, wait for its ack with
+[`awaitAckedFsn`](#awaiting-acknowledgements) rather than relying on `close()`.
 
 :::note Server-advertised batch cap
 
-The server advertises its maximum accepted batch size on the WebSocket
-upgrade response (`X-QWP-Max-Batch-Size`). The client parses this header
-on connect and clamps subsequent batches to the advertised cap. A single
-row larger than the cap, or a batch that would exceed the cap at flush
-time, surfaces synchronously as a `LineSenderException` from the
-offending column call or from `flush()` — earlier client versions only
-saw this as a `1009` WebSocket close on the next operation.
+The server advertises its maximum accepted batch size on the WebSocket upgrade
+(`X-QWP-Max-Batch-Size`), and the client clamps batches to it. A single row
+larger than the cap, or a batch that would exceed it at flush time, surfaces as
+a `LineSenderException` from the offending column call or from `flush()`.
 
 :::
 
 ### Store-and-forward
 
-With store-and-forward enabled, unacknowledged data is persisted to disk and
-replayed after reconnection, surviving sender process restarts.
+Ingestion is asynchronous in every mode: `flush()` hands rows to the background
+send engine, which delivers them and tracks the server's acknowledgements on
+its own (see [Flushing](#flushing)). The `sf_dir` key changes one thing —
+**where the engine keeps unacknowledged rows** — and with it, what a crash can
+lose.
+
+**Memory mode** is the default (no `sf_dir`). Unacknowledged rows live in RAM.
+The engine still reconnects across transient server outages — rolling upgrades,
+brief network loss — for up to `reconnect_max_duration_millis` (default 5
+minutes) and replays the unacknowledged tail, so a server blip loses nothing.
+But if the **sender process** dies, the RAM buffer dies with it. The buffer is
+capped at 128 MiB (`sf_max_total_bytes`).
+
+**Store-and-forward mode** turns on when you set `sf_dir`. The engine backs its
+buffer with memory-mapped files under `sf_dir`, so unacknowledged rows survive a
+sender **process restart**: on the next startup the engine
+recovers the unacknowledged tail from disk and replays it once the server is
+reachable. The on-disk buffer defaults to a 10 GiB cap.
 
 ```text
-ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
+ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;
 ```
 
-When multiple senders share the same `sf_dir`, each must have a distinct
-`sender_id`. Slots are exclusive: two senders with the same ID will collide.
-Allowed characters: `A-Za-z0-9_-`.
+**Choosing an `sf_dir` layout.** An `sf_dir` is a recovery identity — a restart
+recovers a run's unacknowledged rows by re-opening the same path — so keep it
+stable for a given producer. Pick one of two layouts:
 
-If you use `db.sender()` (thread-affine) across multiple application
-threads, each pinned sender needs its own `sender_id`. Configure the pool
-with a unique `sender_id` per slot using the builder's `ingestConfig` (one
-`QuestDB` per slot ID), or stick to a single-slot pool when SF is enabled.
+- **One `sf_dir` per instance** is the simplest and the common case. The default
+  `sender_id` is fine. When the process restarts against the same directory, the
+  pool recovers its own unacknowledged rows and delivers them once the server is
+  reachable. Use this whenever a producer restarts in place — a fixed host, a pod
+  with a stable volume.
+- **One shared `sf_dir` across instances** suits ephemeral producers — autoscaled
+  workers or rolling pods on a shared volume — where a crashed producer may never
+  come back to flush its own rows. Give each instance a distinct `sender_id` so
+  their directories don't collide, and set `drain_orphans=on` so a surviving
+  instance picks up a crashed peer's leftover rows instead of leaving them
+  stranded.
 
-Without `sf_dir`, unacknowledged data lives in process memory and is lost
-if the sender process dies. The reconnect loop still spans transient server
-outages (rolling upgrades), but the RAM buffer caps how much data can
-accumulate.
+```text
+# shared root: a distinct sender_id per instance, peers recover each other
+ws::addr=db:9000;sf_dir=/shared/qdb-sf;sender_id=ingest-a;drain_orphans=on;
+ws::addr=db:9000;sf_dir=/shared/qdb-sf;sender_id=ingest-b;drain_orphans=on;
+```
+
+**Directories and recovery.** Within an `sf_dir`, each pooled sender owns
+`<sender_id>-<index>` (`ingest-a-0`, `ingest-a-1`, …), held by an exclusive OS
+lock for its lifetime — two running senders never share a directory, and one
+becomes adoptable only after its owner releases the lock by exiting or crashing,
+so a live sender's rows are never drained from under it. On restart a pool
+recovers its own directories automatically; `drain_orphans=on` extends that to
+abandoned siblings under the same root, replaying their rows over fresh
+connections (up to `max_background_drainers` at a time, default 4) and skipping
+any directory an earlier drain flagged `.failed`. Two instances that share an
+`sf_dir` with the same `sender_id` collide, and the second to start fails fast
+with `sf slot already in use`. Allowed `sender_id` characters: letters, digits,
+`_`, `-`.
+
+**Durability.** Store-and-forward runs with `sf_durability=memory`, the only
+supported mode. The engine relies on the OS page cache and the memory-mapped
+files rather than an explicit `fsync`, so the on-disk buffer survives a JVM crash
+and a process restart; rows still in the page cache at an OS crash or power loss
+can be lost.
 
 <SfDedupWarning />
 
-With store-and-forward enabled, `flush()` can block when the buffer hits its
-cap. The producer blocks until the wire path drains enough capacity, up to
-`sf_append_deadline_millis` (default 30 seconds). If the deadline elapses,
-the call fails without dropping data. Terminal rejections (schema, parse,
-or security errors) latch a terminal error on the sender. The next API
-call throws `LineSenderServerException`; the pool detects the terminal
-state and replaces the slot.
+A batch the server rejects outright — a schema, parse, or security error — is
+terminal. It latches an error on the sender: the next call throws
+`LineSenderServerException`, and the pool replaces the failed sender on the next
+borrow (see [Ingestion errors](#ingestion-errors)).
 
 ### Durable acknowledgement
 
@@ -704,10 +791,10 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
 
 ### Awaiting acknowledgements
 
-`flush()` returns once the batch is published into the cursor engine, not
-once the server has acknowledged it. ACKs arrive asynchronously on the I/O
-loop. To bridge between publish and acknowledgement, every published frame
-is assigned a frame sequence number (FSN). `flushAndGetSequence()` returns
+`flush()` returns once the batch is handed to the send engine, not once the
+server has acknowledged it. ACKs arrive asynchronously on the I/O loop. To
+bridge between publish and acknowledgement, every published frame is assigned a
+frame sequence number (FSN). `flushAndGetSequence()` returns
 the highest FSN the call published, and `awaitAckedFsn(targetFsn,
 timeoutMillis)` blocks until the server has acknowledged up to that FSN:
 
@@ -782,34 +869,46 @@ state.
 
 ### The `Query` builder
 
-| Method | Required | Purpose |
-|--------|----------|---------|
-| `sql(CharSequence)` | yes | SQL text. Buffer is copied; not retained past `submit()`. |
-| `binds(QwpBindSetter)` | no | Bind-parameter populator. See [Bind parameters](#bind-parameters). |
-| `handler(QwpColumnBatchHandler)` | yes | Result handler — fires `onBatch` + `onEnd` (or `onError` / `onExecDone`). |
-| `submit()` | — | Acquire a worker, dispatch, return the cached `Completion`. Throws if SQL or handler is unset, or if a previous submit on this `Query` is still in flight. |
-| `abandon()` | — | Discard the current SQL/binds/handler without submitting. |
+Build a query by setting its SQL and a result handler — plus bind parameters if
+the SQL has any — then call `submit()` to run it:
 
-`db.query()` returns the per-thread cached `Query`; one in-flight query
-per thread. For multiple concurrent in-flight queries from one thread, use
-`db.newQuery()` and submit each separately — the query pool serves up to
-`queryPoolMax` workers in parallel.
+| Method | Required | Sets |
+|--------|----------|------|
+| `sql(CharSequence)` | yes | The SQL text. Copied internally, so you can reuse or change your source string after `submit()`. |
+| `binds(QwpBindSetter)` | no | A callback that fills in the query's `$1`, `$2`, … parameters (see [Bind parameters](#bind-parameters)). |
+| `handler(QwpColumnBatchHandler)` | yes | A callback that receives the query's row batches and its outcome (see [Result handler](#result-handler)). |
+
+- **`submit()`** sends the query and returns a [`Completion`](#completion) you
+  use to wait for it. It throws if the SQL or handler is missing, or if this
+  `Query`'s previous query is still running.
+- **`abandon()`** clears the SQL, binds, and handler without sending anything —
+  use it to back out of a query you started building.
+
+`db.query()` returns a reusable `Query` bound to the calling thread, which runs
+one query at a time. To run several at once from a single thread, call
+`db.newQuery()` for each; the [query pool](#the-connection-pool) runs up to
+`queryPoolMax` queries in parallel.
 
 ### `Completion`
 
+A `Completion` tracks one submitted query until it **finishes** — succeeds (all
+rows delivered, or a DDL/DML statement done), fails with a server error, or is
+cancelled.
+
 | Method | Returns | Notes |
 |--------|---------|-------|
-| `await()` | `void` | Block until terminal; rethrow `QueryException` on server error or cancel. |
-| `await(long, TimeUnit)` | `boolean` | Like `await()` but returns `false` on timeout (the query stays in flight). |
-| `cancel()` | `void` | Request cancellation; idempotent. The handler observes `onError` with the cancel status; `await()` throws `QueryException`. |
-| `isDone()` | `boolean` | True once the query has reached a terminal state (success / error / cancel acknowledged). |
+| `await()` | `void` | Blocks until the query finishes. Returns normally on success; throws `QueryException` if the server reported an error or the query was cancelled. |
+| `await(long, TimeUnit)` | `boolean` | Like `await()`, but gives up after the timeout and returns `false` — the query keeps running. |
+| `cancel()` | `void` | Asks the server to stop the query; safe to call more than once. The handler then sees `onError` with a cancel status, and `await()` throws `QueryException`. |
+| `isDone()` | `boolean` | `true` once the query has finished — succeeded, failed, or been cancelled. |
 
-`QueryException.getStatus()` returns the wire-level QWP status byte (see
-[Query error status codes](#query-errors)). `0` indicates a client-side
-failure — for example, a transport drop before any server response.
+`QueryException.getStatus()` returns the QWP status code the server sent (see
+[Query error status codes](#query-errors)). `0` means the failure was
+client-side — for example, the connection dropped before the server replied.
 
-The `Completion` is signaled from the query worker's I/O thread after the
-handler's terminal callback (`onEnd`, `onError`, or `onExecDone`) returns.
+`await()` returns (or throws) only after the handler's final callback —
+`onEnd`, `onError`, or `onExecDone` — has run, so whatever state that callback
+set is visible by the time `await()` returns.
 
 ### Bind parameters
 
@@ -1085,7 +1184,7 @@ or producer thread.
 
 When a sender owned by `QuestDB` enters a terminal `HALT` state, the next
 producer-thread call throws `LineSenderServerException`. The pool detects
-the failure on close/return and replaces the slot with a fresh sender on
+the failure on close/return and replaces the failed sender with a fresh one on
 the next borrow.
 
 ### Query errors
@@ -1160,121 +1259,116 @@ What is and isn't carried on `onError`:
 
 :::note Enterprise
 
-Multi-host failover with automatic reconnect requires QuestDB Enterprise.
+Failing over across multiple QuestDB hosts requires QuestDB Enterprise — the
+replicas you fail over to come from Enterprise replication.
 
 :::
 
+A `QuestDB` handle keeps working across server restarts and network blips: the
+ingestion sender and the query client each reconnect on their own. The two sides
+recover a little differently, so they are covered separately below.
+
 ### Multiple endpoints
 
-Specify comma-separated addresses in the connect string:
+List several hosts in `addr`, comma-separated:
 
 ```text
 ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 ```
 
-The client tries endpoints in order. On connection loss, it walks the list
-to find the next healthy endpoint. Schema translation applies to the whole
-list — the egress side sees the same hosts on `ws`/`wss`.
+The client tries them in order and, when a connection drops, moves on to the
+next reachable one. `addr` is shared by both sides, so ingestion and queries use
+the same host list.
 
 ### Ingestion failover
 
-The ingestion sender uses a reconnect loop with exponential backoff. Key
-connect-string options:
+Ingestion always writes to the **primary** — replicas are read-only and reject a
+write connection. When you list several hosts, the sender tries them in order and
+settles on whichever one is the current primary, while the replicas turn it away.
+So failing over to a *different* host only helps once that host becomes the
+primary — for example, after the old primary goes down and a replica is promoted
+in its place. (The query-side keys `target` and `zone` don't apply to ingestion;
+the sender always needs the primary.)
 
-| Key                              | Default   | Description                               |
-|----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Total outage budget before giving up.     |
-| `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
-| `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
-| `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |
+If the connection to the primary drops, the sender reconnects on its own, using
+exponential backoff between attempts, and resumes where it left off once a
+primary is reachable again. Whether unacknowledged rows survive a *sender*
+failure depends on the [store-and-forward](#store-and-forward) mode: with `sf_dir`
+set they are on disk and survive even a restart; without it they live in RAM and
+are lost only if the sender process itself dies.
 
-Ingress is zone-blind: it pins QWP v1 and does not read `SERVER_INFO`. The
-`zone=` key is accepted but ignored, so a connect string shared with egress
-clients works unchanged.
+Tune the reconnect loop from the connect string:
 
-With store-and-forward (`sf_dir` set), unacknowledged data survives sender
-restarts. Without it, unacknowledged data lives in process memory and is
-lost if the sender process dies.
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `reconnect_max_duration_millis` | `300000` (5 min) | How long to keep retrying one outage before giving up. |
+| `reconnect_initial_backoff_millis` | `100` | Wait before the first retry. |
+| `reconnect_max_backoff_millis` | `5000` | Longest wait between retries. |
+| `initial_connect_retry` | `off` | Whether to retry the *first* connect too (`on`, `sync`, `async`). |
 
 ### Query failover
 
-The query client drives a per-query reconnect loop. When a transport error
-occurs mid-stream, the client reconnects to another endpoint and replays
-the query. `batch_seq` restarts at 0 on the new connection, and the
-handler's `onFailoverReset(...)` fires before the replayed batches arrive.
-
-Key connect-string options:
-
-| Key                           | Default | Description                               |
-|-------------------------------|---------|-------------------------------------------|
-| `failover`                    | `on`    | Master switch for per-query reconnect.    |
-| `failover_max_attempts`       | `8`     | Max reconnect attempts per query.         |
-| `failover_backoff_initial_ms` | `50`    | First post-failure sleep.                 |
-| `failover_backoff_max_ms`     | `1000`  | Cap on per-attempt sleep.                 |
-| `failover_max_duration_ms`    | `30000` | Total wall-clock budget per query.        |
-
-:::warning Failover requires multiple endpoints
-
-Failover rotates across endpoints. With a single `addr`, there is no other
-host to try, and the loop exhausts after one attempt regardless of
-`failover_max_attempts`. For failover to be useful, provide at least two
-addresses.
-
-:::
-
-**Handling partial results**: when failover occurs mid-stream, the
-`onFailoverReset` callback fires before replayed batches arrive. Use it to
-clear any accumulated state:
+If a query's connection fails partway through, the query client reconnects to
+another host (with exponential backoff between attempts) and re-runs the query
+from the start. Because the server resends the
+whole result, your handler's `onFailoverReset(...)` fires first, so you can throw
+away the partial results you had collected:
 
 ```java
 @Override
 public void onFailoverReset(QwpServerInfo newNode) {
-    // Clear partial results; the server will re-send from the beginning
-    results.clear();
+    results.clear();  // the server will resend from the beginning
 }
 ```
 
-If you do not clear state, you will see overlapping data (the server
-replays the full result set).
+If you don't clear, you'll see the first part of the result twice. Failover is a
+mid-query event; between queries the pool simply hands you a healthy client, so
+`onFailoverReset` doesn't fire there.
 
-`onFailoverReset` is a mid-stream event only. It does not fire between
-queries — the pool transparently replaces unhealthy query clients on
-borrow.
+Tune query failover from the connect string:
 
-**Terminal failure**: when all endpoints are unreachable and the failover
-budget is exhausted, the error is delivered via `onError` and
-`Completion.await()` rethrows `QueryException`. The pool detects the
-terminal state on slot return and provisions a fresh client on the next
-submit; no application-level recreate loop is required, in contrast to
-direct `QwpQueryClient` usage.
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `failover` | `on` | Turn per-query failover on or off. |
+| `failover_max_attempts` | `8` | Most reconnect attempts for one query. |
+| `failover_backoff_initial_ms` | `50` | Wait before the first retry. |
+| `failover_backoff_max_ms` | `1000` | Longest wait between retries. |
+| `failover_max_duration_ms` | `30000` (30 s) | Total time budget for one query's retries. |
 
-### Connection events (low-level)
+:::warning Failover needs at least two hosts
 
-`SenderConnectionListener`, `SenderErrorHandler`, and
-`SenderProgressHandler` are configured via the
-[`Sender.builder`](#sender-low-level-primitive) — they are not yet wired
-into the `QuestDB` connect-string path. Applications that need these
-callbacks should use the low-level `Sender` API directly. The available
-event kinds:
+Failover works by trying a *different* host. With a single `addr` there is
+nowhere else to go, so the query fails after one attempt no matter how high
+`failover_max_attempts` is. List two or more hosts for failover to do anything.
 
-`CONNECTED`, `DISCONNECTED`, `RECONNECTED`, `FAILED_OVER`,
-`ENDPOINT_ATTEMPT_FAILED`, `ALL_ENDPOINTS_UNREACHABLE`, `AUTH_FAILED`
-(terminal), `RECONNECT_BUDGET_EXHAUSTED` (terminal).
+:::
 
-### Error classification
+When every host is unreachable and the time or attempt budget runs out, the
+query fails: your handler gets `onError` and `Completion.await()` throws
+`QueryException`. You don't need to rebuild anything — the pool drops the broken
+client and gives you a fresh one on your next query.
 
-- **Authentication errors** (`401`/`403`): terminal at any host. The
-  reconnect loop stops immediately.
-- **Role reject** (`421 + X-QuestDB-Role`): transient if the role is
-  `PRIMARY_CATCHUP`, topology-level otherwise.
-- **Version mismatch** at upgrade: per-endpoint, not terminal. The client
-  tries the next endpoint.
-- **All other errors** (TCP/TLS failures, `404`, `503`, mid-stream errors):
-  transient, fed into the reconnect loop.
+### Which failures are retried
+
+- **Authentication failures** (a bad token or wrong credentials) stop
+  immediately on every host — retrying cannot help.
+- **Network and availability failures** (connection refused, TLS errors, a
+  `5xx` from the server, a mid-query drop) are treated as temporary and fed into
+  the reconnect and failover loops.
+- **A host that turns you away because of its role** (for example, you asked for
+  the primary but reached a replica) is skipped, and the client tries the next
+  host.
+
+### Connection events
+
+The `QuestDB` facade does not expose connection callbacks. To watch connect,
+disconnect, reconnect, and failover events — `CONNECTED`, `DISCONNECTED`,
+`RECONNECTED`, `FAILED_OVER`, `AUTH_FAILED`, and the rest — use the low-level
+[`Sender.builder`](#sender-low-level-primitive) and register a
+`SenderConnectionListener`.
 
 For the full list of connect-string keys, see the
-[reconnect and failover](/docs/connect/clients/connect-string#reconnect-keys)
-and
+[reconnect](/docs/connect/clients/connect-string#reconnect-keys) and
 [multi-host failover](/docs/connect/clients/connect-string#failover-keys)
 sections of the connect string reference.
 
@@ -1389,18 +1483,18 @@ Common WebSocket-specific options:
 | `failover` | `on` | Egress per-query reconnect switch. |
 | `compression` | `raw` | Egress batch compression (`raw`, `zstd`). |
 
-Pool keys (parsed by the `QuestDB` facade, stripped before passing on):
+Pool keys (read by the `QuestDB` facade; the two clients accept and ignore them):
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `sender_pool_min` | `1` | Minimum senders kept warm. |
-| `sender_pool_max` | `4` | Maximum senders. |
-| `query_pool_min` | `1` | Minimum query clients kept warm. |
-| `query_pool_max` | `4` | Maximum query clients. |
-| `acquire_timeout_ms` | `5000` | Borrow / submit timeout. |
-| `idle_timeout_ms` | `60000` | Reap idle slots after this duration. |
-| `max_lifetime_ms` | `1800000` | Recycle slots older than this. |
-| `housekeeper_interval_ms` | `5000` | Sweep cadence. |
+| `sender_pool_min` | `1` | Senders kept open even when idle. |
+| `sender_pool_max` | `4` | Maximum senders the pool opens. |
+| `query_pool_min` | `1` | Query clients kept open even when idle. |
+| `query_pool_max` | `4` | Maximum query clients the pool opens. |
+| `acquire_timeout_ms` | `5000` | Wait this long for a free connection before throwing. |
+| `idle_timeout_ms` | `60000` | Close a connection after it is idle this long. |
+| `max_lifetime_ms` | `1800000` | Replace a connection once it reaches this age. |
+| `housekeeper_interval_ms` | `5000` | How often the housekeeper checks for idle and over-age connections. |
 
 ## Compatible JDKs
 
@@ -1457,7 +1551,7 @@ import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
-// One QuestDB per deployment. Holds elastic pools for both ingest and
+// One QuestDB per deployment. Holds elastic pools for both ingress and
 // egress. Use try-with-resources at the application boundary; everything
 // inside is allocation-free at steady state.
 
@@ -1504,7 +1598,7 @@ try (QuestDB db = QuestDB.builder()
     // ─── Querying ──────────────────────────────────────────────────────
 
     // executeSql() is the one-shot shortcut. The pool serves the request
-    // from a query worker. Mid-query failover is transparent to the
+    // from a query client. Mid-query failover is transparent to the
     // application; the handler's onFailoverReset() fires before replayed
     // batches arrive.
 
@@ -1536,9 +1630,8 @@ try (QuestDB db = QuestDB.builder()
             @Override
             public void onFailoverReset(long requestId, QwpServerInfo newNode) {
                 System.out.printf("failover req=%d to node=%s role=%s%n",
-                    requestId,
-                    newNode != null ? newNode.getNodeId() : "v1",
-                    newNode != null ? QwpServerInfo.roleName(newNode.getRole()) : "n/a");
+                    requestId, newNode.getNodeId(),
+                    QwpServerInfo.roleName(newNode.getRole()));
             }
         });
 
