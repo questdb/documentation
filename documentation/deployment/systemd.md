@@ -89,6 +89,9 @@ ExecStart=/usr/lib/jvm/java-25-openjdk-amd64/bin/java \
 
 ExecReload=/bin/kill -s HUP $MAINPID
 
+# Raise the open-files limit
+LimitNOFILE=1048576
+
 # Prevent writes to /usr, /boot, and /etc
 ProtectSystem=full
 StandardError=syslog
@@ -97,6 +100,12 @@ SyslogIdentifier=questdb
 [Install]
 WantedBy=multi-user.target
 ```
+
+`LimitNOFILE=1048576` raises the open-files limit above systemd's default of
+`524288`, which is below what QuestDB recommends. The kernel `vm.max_map_count`
+limit cannot be set from a unit file; configure it separately. See
+[OS configuration](/docs/getting-started/capacity-planning/#os-configuration) for
+both.
 
 Next, move your `questdb.service` file into your user's `systemd` config:
 
