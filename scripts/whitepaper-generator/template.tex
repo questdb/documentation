@@ -180,6 +180,14 @@
 \usepackage{fancyvrb}
 \usepackage{tcolorbox}
 \usepackage{tikz}  % full-bleed cover layout (remember picture / overlay)
+% Compatibility shim: newer tcolorbox (TeX Live) calls the LaTeX PDF-tagging
+% socket \UseTaggingSocket{...} unconditionally, but older kernels/formats do
+% not define it, breaking every code block with "Undefined control sequence".
+% Tagging is accessibility metadata only, so a no-op is safe; \providecommand
+% defers to the real command once the kernel provides it.
+\providecommand{\UseTaggingSocket}[1]{}
+\providecommand{\SuspendTagging}[1]{}
+\providecommand{\ResumeTagging}[1]{}
 \newenvironment{Shaded}{%
   \begin{tcolorbox}[
     colback=questdb-rowfill,            % F7F4F4 background
@@ -276,6 +284,32 @@
   {}
 \titlespacing*{\subsection}{0pt}{18pt}{8pt}
 
+% Compact mode (per-document via `compact: true` frontmatter): tighter body
+% leading and section spacing so short documents fit on fewer pages. Other
+% whitepapers leave `compact` unset and keep the default spacing.
+$if(compact)$
+\linespread{1.0}
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titleformat{\section}
+  {\normalfont\headingfont\fontsize{16}{20}\selectfont\color{questdb-heading}}
+  {}
+  {0pt}
+  {}
+$endif$
+
+% Keep a *section* heading from stranding in the last lines of a page: reserve
+% room for the heading plus a couple of following lines, else start a new page.
+% Only sections get this. Subsections deliberately do NOT, so they flow and fill
+% the page; \nobreak (above) already keeps any heading with its first line, which
+% is enough to stop sub-headings dangling without forcing large bottom gaps.
+\preto\section{\Needspace*{4\baselineskip}}
+
+% Keep a code block with the lead-in paragraph that introduces it (e.g.
+% "Example from XRP Ledger:"). Forbid a page break between the paragraph and the
+% following code block so a lead-in never strands at the bottom of a page; if
+% they do not fit together, both move to the next page.
+\BeforeBeginEnvironment{Shaded}{\par\nobreak}
+
 % Title variables from pandoc metadata
 $if(title)$
 \title{$title$}
@@ -302,7 +336,7 @@ $endif$
   % Title (+ subtitle), centered, off-white
   \node[anchor=north, text width=523.3pt, align=center, inner sep=0]
     at ([yshift=-144pt]current page.north) {%
-      {\covertitlefont\fontsize{72}{70}\selectfont\hyphenpenalty=10000\textcolor{cover-title}{$title$}\par}%
+      {\covertitlefont\fontsize{72}{80}\selectfont\hyphenpenalty=10000\textcolor{cover-title}{$if(covertitle)$$covertitle$$else$$title$$endif$}\par}%
       $if(subtitle)$\par\vspace{18pt}{\headingfont\fontsize{22}{26}\selectfont\textcolor{cover-title}{$subtitle$}\par}$endif$%
     };
   % Abstract in the white lower area
@@ -327,8 +361,11 @@ $endif$
 % ============================================================
 % Table of contents
 % ============================================================
+$if(notoc)$$else$
+$if(toclevel)$\setcounter{tocdepth}{$toclevel$}$endif$  % per-doc TOC depth (1 = sections only)
 \tableofcontents
 \newpage
+$endif$
 
 % ============================================================
 % Body
