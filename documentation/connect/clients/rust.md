@@ -127,14 +127,22 @@ are the only supported schemes. For the full connect-string grammar, see the
 TLS, store-and-forward, failover, compression — is a connect-string key, so one
 string fully configures the client. There is no separate builder API.
 
+`connect` is **lazy**: it validates the connect string and starts the pool but
+opens no connection. The **first borrow** (`borrow_column_sender` /
+`borrow_row_sender` / `borrow_reader`, or a `db.flush_*` DataFrame call) opens the
+connection, so an unreachable server, TLS, or auth failure surfaces there — not
+at `connect`. By default that first attempt fails fast; set
+`initial_connect_retry=on` to retry it within the reconnect budget instead.
+
 ### Pool keys
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `pool_size` | 1 | Warm/minimum connections, opened eagerly at `connect()`. |
+| `pool_size` | 1 | Warm minimum the reaper keeps once connections exist. Opened lazily on first borrow, **not** at `connect()`. |
 | `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
 | `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
 | `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires calling `reap_idle()`. |
+| `initial_connect_retry` | `off` | How the first borrow's connect handles failure: `off` fails fast; `on` retries within the reconnect budget; `async` retries in the background. |
 
 ### Authentication and TLS
 
@@ -729,8 +737,8 @@ and the next borrow opens a fresh connection).
 **Borrowing is fail-fast at the cap.** The column, row, and reader pools are each
 capped independently by `pool_max`; when every slot is in use the next borrow
 returns `ErrorCode::InvalidApiCall` rather than blocking. Size `pool_max` to your
-peak concurrency, and set `pool_size` to your steady worker count to pre-warm
-connections.
+peak concurrency, and set `pool_size` to your steady worker count so the reaper
+keeps that many connections warm once they have opened.
 
 ## Closing
 
