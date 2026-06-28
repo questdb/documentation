@@ -302,7 +302,7 @@ The Rust client currently does not implement auto-flushing. It accepts
 `auto_flush=off` for compatibility and rejects `auto_flush=on`,
 `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes`. Rust
 applications must call `flush()` explicitly; see the
-[Rust client page](/docs/connect/clients/rust/#flushing).
+[Rust client page](/docs/connect/clients/rust/#sending-data-column-major).
 
 :::
 

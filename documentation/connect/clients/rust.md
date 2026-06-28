@@ -2,946 +2,790 @@
 slug: /connect/clients/rust
 title: Rust client for QuestDB
 sidebar_label: Rust
-description: "QuestDB Rust client for high-throughput data ingestion over the QWP binary protocol (WebSocket)."
+description: "QuestDB Rust client: the QuestDb connection pool for column-major and row-major ingestion and SQL queries over QWP/WebSocket. Complete signatures and examples."
 ---
 
-import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
+The QuestDB Rust client ingests and queries data over
+[QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), a columnar binary
+protocol carried over WebSocket. The single entry point is a connection pool,
+`QuestDb`. Open it once, then borrow:
 
-The QuestDB Rust client connects to QuestDB over the
-[QWP — QuestDB Wire Protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) — a
-columnar binary protocol carried over WebSocket.
-It supports high-throughput, column-oriented batched writes with automatic table
-creation, schema evolution, multi-host failover, and optional store-and-forward
-durability.
+- a **column-major writer** for bulk/columnar ingestion (`borrow_column_sender`),
+- a **row-major writer** for event-at-a-time ingestion (`borrow_row_sender`),
+- a **reader** for SQL queries (`borrow_reader`).
 
-:::tip Legacy transports
+`QuestDb` and the three `Borrowed*` handles are re-exported at the crate root:
+`use questdb::QuestDb;`.
 
-The client also supports ILP ingestion over HTTP and TCP for backward
-compatibility. This page documents the recommended WebSocket (QWP) path. For
-ILP transport details, see the
-[ILP overview](/docs/connect/compatibility/ilp/overview/).
-
-:::
-
-:::info
-
-This page focuses on ingestion. For querying QuestDB from Rust, see the
-[PGWire Rust client](/docs/connect/compatibility/pgwire/rust/) or the
-[REST API](/docs/connect/compatibility/rest-api/).
-
-:::
-
-## Quick start
-
-Add the dependency:
+## Cargo setup
 
 ```bash
 cargo add questdb-rs
 ```
 
-Then ingest data:
+```toml
+[dependencies]
+# Writing works with default features. Querying needs `sync-reader-qwp-ws`.
+questdb-rs = { version = "7", features = ["sync-reader-qwp-ws"] }
+```
+
+| Feature | Default | Enables |
+| --- | --- | --- |
+| `sync-sender` | ✅ | The ILP/TCP, ILP/HTTP and QWP/WebSocket senders — including the pool's column-major and row-major writers. (QWP/UDP is best-effort and opt-in via `sync-sender-qwp-udp`; the pool does not use it.) |
+| `sync-reader-qwp-ws` | ❌ | The query **reader** (`QuestDb::borrow_reader`, `Reader`, `Cursor`). Required for reads. |
+| `sync-reader-zstd` | ❌ | Decompress `zstd`-compressed result batches on the read path. |
+| `ndarray` | ❌ | `Buffer::column_arr` from [`ndarray`](https://docs.rs/ndarray) views (row-major arrays). |
+| `rust_decimal` / `bigdecimal` | ❌ | `Buffer::column_dec*` from those decimal types (string decimals work without). |
+| `chrono-timestamp` | ❌ | Build timestamps from `chrono::DateTime`. |
+| `arrow` (`arrow-ingress` / `arrow-egress`) | ❌ | Apache Arrow: `db.flush_arrow_batch` (ingest) and `Cursor::*_arrow` (read). The umbrella `arrow` enables both directions; pick one direction to stay lean. |
+| `polars` (`polars-ingress` / `polars-egress`) | ❌ | polars: `db.flush_polars_dataframe` (ingest) and `Cursor::*_polars` (read). Umbrella enables both; directional features available. |
+| `tls-native-certs` | ❌ | Validate TLS against the OS certificate store. |
+
+**Direction tip:** ingest methods (`flush_*`) need the `*-ingress` feature; query
+methods (`Cursor::*`) need the `*-egress` feature. The `arrow` / `polars` umbrellas
+enable both directions — enable a single directional feature (e.g. `arrow-egress`)
+to keep a read-only or write-only build lean.
+
+The pre-rename names `sync-reader-ws`, `compression-zstd`, and `chrono_timestamp`
+still work as deprecated aliases but will be removed in the next major — prefer
+the names above.
+
+:::tip For an AI building a read+write app
+
+Add `features = ["sync-reader-qwp-ws"]`. Without it, `QuestDb::borrow_reader` and
+the `egress` module do not exist and reads will not compile.
+
+:::
+
+## Quick start
 
 ```rust
-use questdb::{
-    Result,
-    ingress::{Sender, TimestampNanos},
-};
+use questdb::{QuestDb, ingress::column_sender::{Chunk, AckLevel}};
+use std::time::Duration;
 
-fn main() -> Result<()> {
-    // `Sender` is single-owner (every publishing method takes `&mut self`).
-    // For multi-producer patterns, see the "Concurrency" section.
-    let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
-    let mut buffer = sender.new_buffer();
-    buffer
-        .table("trades")?
-        .symbol("symbol", "ETH-USD")?
-        .symbol("side", "sell")?
-        .column_f64("price", 2615.54)?
-        .column_f64("amount", 0.00044)?
-        .at(TimestampNanos::now())?;
-    sender.flush(&mut buffer)?;
-    // close_drain() waits for already-published frames to be ACKed or
-    // rejected by the server.
-    sender.close_drain()?;
-    // Server-side rejections arrive asynchronously and are not returned
-    // from flush() or close_drain(). Drain them after close_drain() so
-    // any ACK/REJECT processed during the drain wait is visible here.
-    // See "Asynchronous error handling" for the qwp_ws_error_handler
-    // callback alternative used by long-running senders.
-    while let Some(err) = sender.poll_qwp_ws_error()? {
-        eprintln!("QWP error: {err:?}");
-    }
+fn main() -> questdb::Result<()> {
+    let db = QuestDb::connect("ws::addr=localhost:9000;")?;
+
+    // write a batch of trades (column-major)
+    let mut sender = db.borrow_column_sender()?;
+    let mut chunk = Chunk::new("trades");
+    chunk.column_f64("price", &[2615.54, 2616.00], None)?;
+    chunk.designated_timestamp_nanos(&[1_700_000_000_000_000_000, 1_700_000_000_001_000_000])?;
+    sender.flush(&mut chunk)?;                   // queued for delivery (a background thread sends it)
+    sender.wait(AckLevel::Ok, Duration::ZERO)?;  // optional: block until the server has it
     Ok(())
 }
 ```
 
-The five steps are:
+That is the whole write path: open the pool, borrow a sender, flush a chunk. To
+read the data back, add `features = ["sync-reader-qwp-ws"]` and use a reader —
+see [Querying data](#querying-data).
 
-1. Get a `Sender` via `Sender::from_conf` or the builder.
-2. Populate a `Buffer` with one or more rows.
-3. Call `sender.flush(&mut buffer)` to publish.
-4. Call `sender.close_drain()` before the sender is dropped so already-published
-   frames complete on the wire.
-5. Drain `sender.poll_qwp_ws_error()` after `close_drain()` to surface
-   server-side rejections, which arrive asynchronously and are not returned
-   from `flush()` or `close_drain()`. For long-running senders, register a
-   `qwp_ws_error_handler` on the builder instead. See
-   [Asynchronous error handling](#asynchronous-error-handling).
+## API overview
 
-## Authentication and TLS
+| Concern | Type | Obtained via |
+| --- | --- | --- |
+| Connection pool | `QuestDb` | `QuestDb::connect(conf)` |
+| Column-major writer | `SfColumnSender` (store-and-forward) | `db.borrow_column_sender()` |
+| Row-major writer | `BorrowedRowSender` (derefs to `Sender`) | `db.borrow_row_sender()` |
+| Query reader | `BorrowedReader` (derefs to `Reader`) | `db.borrow_reader()` |
+| Column batch | `Chunk` | `Chunk::new(table)` |
+| Row buffer | `Buffer` | `sender.new_buffer()` |
+| Query builder | `ReaderQuery` | `reader.prepare(sql)` |
+| Streaming result | `Cursor` → `BatchView` → `ColumnView` | `reader.prepare(sql).execute()` |
 
-Authentication happens at the HTTP level during the WebSocket upgrade, before
-any binary frames are exchanged.
+Each kind of borrow draws from its own pool within the same `QuestDb`, capped
+independently by `pool_max`, so heavy ingest can't starve queries. All borrows recycle on `Drop` and are `!Send` — each belongs to the
+thread that took it. The pool handle is `Send`/`Sync`.
 
-### HTTP basic auth
-
-```rust
-let mut sender = Sender::from_conf(
-    "wss::addr=db.example.com:9000;username=admin;password=quest;"
-)?;
-```
-
-### Token auth (Enterprise, recommended)
-
-Token authentication avoids the per-request overhead of basic auth and is
-the recommended path for Enterprise deployments.
+`QuestDb` methods:
 
 ```rust
-let mut sender = Sender::from_conf(
-    "wss::addr=db.example.com:9000;token=your_bearer_token;"
-)?;
+fn connect(conf: &str) -> questdb::Result<QuestDb>
+fn borrow_column_sender(&self) -> questdb::Result<SfColumnSender<'_>>
+fn borrow_row_sender(&self) -> questdb::Result<BorrowedRowSender<'_>>
+fn borrow_reader(&self) -> questdb::egress::error::Result<BorrowedReader<'_>>  // needs `sync-reader-qwp-ws`
+fn flush_arrow_batch<T>(&self, table: T, batch: &RecordBatch, ts_col: Option<ColumnName>, overrides: &[ArrowColumnOverride], ack: Option<AckLevel>) -> Result<()>  // feature `arrow-ingress`
+fn flush_polars_dataframe<T>(&self, table: T, df: &DataFrame, opts: &PolarsIngestOptions) -> Result<()>  // feature `polars-ingress`
+fn reap_idle(&self) -> usize
+fn close(self)
 ```
 
-### TLS
-
-Use the `wss` schema for TLS. Select where root certificates come from with
-`tls_ca`:
-
-```text
-wss::addr=db.example.com:9000;tls_ca=webpki_roots;
-```
-
-Supported values:
-
-| Key | Description |
-|-----|-------------|
-| `tls_ca=webpki_roots` | Use the [`webpki-roots`](https://crates.io/crates/webpki-roots) crate. |
-| `tls_ca=os_roots` | Use the OS certificate store. |
-| `tls_ca=webpki_and_os_roots` | Combine both. |
-| `tls_roots=/path/to/root-ca.pem` | Load roots from a PEM file. Useful for self-signed certs during testing. |
-| `tls_verify=unsafe_off` | Disable verification. Never use in production. |
-
-### Authentication timeout
-
-`auth_timeout_ms` (default 15000) controls how long the client waits for the
-WebSocket upgrade to complete. `auth_timeout` is also accepted for
-compatibility with the HTTP transport's spelling.
-
-### Unsupported authentication paths
-
-| Path | Status | Workaround |
-|---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported by this client. It does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...` above, and build a fresh `Sender` when the token nears expiry. |
-| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss://`. See the [connect string reference](/docs/connect/clients/connect-string/#auth) for the canonical statement. |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, call `sender.close_drain()`, drop the sender, and build a fresh one with the new token. |
-
-## Creating the client
-
-### From a connect string
-
-The connect string format is `<schema>::<key>=<value>;<key>=<value>;...`
+## Connecting
 
 ```rust
-let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
+use questdb::QuestDb;
+
+let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-Use `ws` (plain) or `wss` (TLS); the rest of this page uses these short
-forms. The default port is `9000`.
-
-For the full list of connect-string keys, see the
+Use `ws` (plain) or `wss` (TLS); `qwpws` / `qwpwss` are accepted aliases. These
+are the only supported schemes. For the full connect-string grammar, see the
 [connect string reference](/docs/connect/clients/connect-string/).
 
-### From an environment variable
+`QuestDb::connect` is the only constructor: every option — pool sizing, auth,
+TLS, store-and-forward, failover, compression — is a connect-string key, so one
+string fully configures the client. There is no separate builder API.
 
-Set `QDB_CLIENT_CONF` to keep credentials out of source code:
+### Pool keys
 
-```bash
-export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
-```
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `pool_size` | 1 | Warm/minimum connections, opened eagerly at `connect()`. |
+| `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
+| `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
+| `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires calling `reap_idle()`. |
 
-```rust
-let mut sender = Sender::from_env()?;
-```
+### Authentication and TLS
 
-### Using the builder API
-
-The builder exposes the same options as the connect string, with Rust-typed
-signatures (e.g., `sf_append_deadline_millis` becomes
-`sf_append_deadline(Duration::from_secs(30))`). For the full list of keys, see
-the [connect string reference](/docs/connect/clients/connect-string/).
+Pass auth/TLS in the connect string:
 
 ```rust
-use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};
+// Basic auth over TLS
+let db = QuestDb::connect("wss::addr=db:9000;username=admin;password=quest;")?;
+// Bearer token (Enterprise)
+let db = QuestDb::connect("wss::addr=db:9000;token=your_bearer_token;")?;
+```
+
+`tls_ca` selects the root store: `webpki_roots` (default), `os_roots`,
+`webpki_and_os_roots`; `tls_roots=/path/ca.pem` loads a PEM; `tls_verify=unsafe_off`
+disables verification (testing only).
+
+:::note Store-and-forward is always on
+
+**Both** the column-major and row-major senders are always store-and-forward:
+`flush()` lands in a local durable queue instead of blocking on the server, and a
+background thread delivers it for you — reconnecting, rotating endpoints, and
+replaying as needed. By default the queue is in-memory; set `sf_dir` to make it
+**disk-backed**, so it survives a client restart. In disk-backed mode the column
+pool is single-borrower — an explicit `pool_size > 1` or `pool_max > 1` is
+rejected, and an omitted `pool_max` is treated as `1`. `sender_id` and the other
+`sf_*` keys require an explicit `sf_dir`.
+
+:::
+
+## Sending data: column-major
+
+Borrow a column sender, build a `Chunk` of columns (each a slice), set the
+designated timestamp, then `flush`. Each `flush` lands in a durable
+store-and-forward queue and returns immediately — there is no server round-trip
+on the hot path. A background thread delivers the queue for you, so you normally
+never call `wait`; reach for it only when your own code must block until the data
+has reached the server.
+
+```rust
+use questdb::{QuestDb, ingress::column_sender::{Chunk, AckLevel}};
 use std::time::Duration;
 
-// `Sender` is single-owner (every publishing method takes `&mut self`).
-// For multi-producer patterns, see the "Concurrency" section.
-let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
-    .qwp_ws_progress(QwpWsProgress::Background)?
-    .reconnect_max_duration(Duration::from_secs(300))?
-    .qwp_ws_error_handler(|err| {
-        eprintln!("QWP error: {err:?}");
-    })?
-    .build()?;
-```
+fn main() -> questdb::Result<()> {
+    let db = QuestDb::connect("ws::addr=localhost:9000;")?;
+    let mut sender = db.borrow_column_sender()?;
 
-Most QWP/WebSocket settings are configured through the connect string. The
-builder exposes typed setters for the most common runtime knobs: error handler,
-progress mode, reconnect timing, and `initial_connect_retry`.
+    let price  = [2615.54_f64, 2616.00, 2617.25];
+    let amount = [0.00044_f64, 0.00050, 0.00021];
+    let ts_ns  = [1_700_000_000_000_000_000_i64, 1_700_000_000_001_000_000, 1_700_000_000_002_000_000];
 
-## Data ingestion
+    let mut chunk = Chunk::new("trades");
+    chunk.column_f64("price", &price, None)?;     // (name, &[T], validity)
+    chunk.column_f64("amount", &amount, None)?;
+    chunk.designated_timestamp_nanos(&ts_ns)?;
 
-### Concurrency
-
-`Sender` is single-owner: every publishing method takes `&mut self`, so
-only one caller can use it at a time. For concurrent producers, create
-one `Sender` per thread, or hand rows to a single owner over a channel.
-
-`Buffer` is decoupled from `Sender`. Build buffers on any thread, then
-call `sender.flush(&mut buffer)` once you have the sender in scope. This
-lets worker threads encode rows in parallel and serialises only the
-publish step.
-
-When several `Sender` instances share an `sf_dir`, give each a distinct
-`sender_id` — slots are exclusive (see
-[Store-and-forward](#store-and-forward)).
-
-### General usage pattern
-
-1. Call `buffer.table(name)?` to select a table.
-2. Call typed column setters to add values (see
-   [Column setters](#column-setters) below).
-3. Call `at(timestamp)?` or `at_now()?` to finalize the row.
-4. Repeat from step 1, or call `sender.flush(&mut buffer)?` to send.
-
-Tables and columns are created automatically if they do not exist.
-
-### Column setters
-
-Every typed setter has an `_opt` variant taking `Option<T>`. `Some(v)`
-forwards to the plain setter; `None` is a no-op — the column is left off
-the row, identical to omitting the setter. See
-[Null values and omitted columns](#null-values-and-omitted-columns) for
-how omission turns into a null on the wire at flush time.
-
-```rust
-buffer.column_f64_opt("price", None)?;          // no-op (column omitted)
-buffer.column_f64_opt("price", Some(2615.54))?; // equivalent to column_f64
-```
-
-| QuestDB type | Setter | `_opt` (skip on `None`) variant |
-| --- | --- | --- |
-| `SYMBOL` | `symbol(name, &str)` | `symbol_opt(name, Option<&str>)` |
-| `BOOLEAN` | `column_bool(name, bool)` | `column_bool_opt(name, Option<bool>)` |
-| `BYTE` | `column_i8(name, i8)` | `column_i8_opt(name, Option<i8>)` |
-| `SHORT` | `column_i16(name, i16)` | `column_i16_opt(name, Option<i16>)` |
-| `INT` | `column_i32(name, i32)` | `column_i32_opt(name, Option<i32>)` |
-| `LONG` | `column_i64(name, i64)` | `column_i64_opt(name, Option<i64>)` |
-| `FLOAT` | `column_f32(name, f32)` | `column_f32_opt(name, Option<f32>)` |
-| `DOUBLE` | `column_f64(name, f64)` | `column_f64_opt(name, Option<f64>)` |
-| `CHAR` | `column_char(name, u16)` (UTF-16 code unit) | `column_char_opt(name, Option<u16>)` |
-| `VARCHAR` | `column_str(name, &str)` | `column_str_opt(name, Option<&str>)` |
-| `BINARY` | `column_binary(name, &[u8])` | `column_binary_opt(name, Option<&[u8]>)` |
-| `UUID` | `column_uuid(name, lo: u64, hi: u64)` | `column_uuid_opt(name, Option<(u64, u64)>)` |
-| `LONG256` | `column_long256(name, &[u8; 32])` (4 LE limbs) | `column_long256_opt(name, Option<&[u8; 32]>)` |
-| `DATE` | `column_date(name, millis: i64)` | `column_date_opt(name, Option<i64>)` |
-| `TIMESTAMP` / `timestamp_ns` (non-designated) | `column_ts(name, TimestampMicros / TimestampNanos)` | `column_ts_opt(name, Option<…>)` |
-| `GEOHASH` | `column_geohash(name, bits: u64, precision_bits: u8)` (1–60 bits) | `column_geohash_opt(name, Option<(u64, u8)>)` |
-| `DECIMAL` (up to 256-bit) | `column_dec(name, &str / rust_decimal / bigdecimal)` | `column_dec_opt(name, …)` |
-| `DECIMAL64` | `column_dec64(name, …)` | `column_dec64_opt(name, …)` |
-| `DECIMAL128` | `column_dec128(name, …)` | `column_dec128_opt(name, …)` |
-| `DOUBLE[]` (arrays) | `column_arr(name, &view)` — slices, vecs up to 3D, [`ndarray`](https://docs.rs/ndarray) views | `column_arr_opt(name, Option<&view>)` |
-| `IPv4` | `column_ipv4(name, std::net::Ipv4Addr)` | `column_ipv4_opt(name, Option<std::net::Ipv4Addr>)` |
-
-There is no separate `set_null`, `column_null`, or `column_*_null` method.
-The only way to leave a column null on a row is to omit the setter (or
-call `column_*_opt(name, None)`, which is equivalent). See
-[Null values and omitted columns](#null-values-and-omitted-columns).
-
-For exact signatures and accepted parameter conversions, see the
-[crate docs](https://docs.rs/questdb-rs/latest/questdb/ingress/struct.Buffer.html).
-
-### Null values and omitted columns
-
-There is one way to leave a column null on a given row: don't set it.
-Two source-level spellings express this:
-
-1. **Omit the setter** — skip the column on rows that have no value.
-2. **`column_*_opt(name, None)`** — a no-op at the call site, identical
-   to omitting the setter. Useful when the source value is already an
-   `Option<T>` and the call site reads cleaner without an `if let`.
-
-At flush time, the columnar encoder gap-fills a wire-level null for
-every row that omitted a column some *other* row in the same batch did
-set. If no row in the batch sets the column, the column does not appear
-in the batch at all.
-
-On a brand-new table, an omitted column is therefore not inferred from
-a single nulls-everywhere row. The server only adds the column when at
-least one row supplies a non-null value, so a first batch of all-`None`
-rows leaves the column absent until a later batch populates it.
-
-The designated timestamp **cannot** be null — every row requires `.at(...)?`
-or `.at_now()?` to finalize.
-
-There is no `set_null`, `column_null`, or `column_*_null` method on
-`Buffer`; calls like `buffer.set_null("price")` or
-`buffer.column_f64_null("price")` will fail to compile. Use one of the
-two idioms above.
-
-### Ingest arrays
-
-`Buffer::column_arr` accepts native Rust arrays/slices/vectors (up to 3D) and
-[`ndarray`](https://docs.rs/ndarray) arrays for higher dimensions:
-
-```rust
-use questdb::{Result, ingress::{Sender, TimestampNanos}};
-use ndarray::arr2;
-
-fn main() -> Result<()> {
-    // `Sender` is single-owner (every publishing method takes `&mut self`).
-    // For multi-producer patterns, see the "Concurrency" section.
-    let mut sender = Sender::from_conf("ws::addr=127.0.0.1:9000;")?;
-    let mut buffer = sender.new_buffer();
-    buffer
-        .table("book")?
-        .symbol("ticker", "EURUSD")?
-        .column_arr("bids", &vec![
-            vec![1.0850, 600000.0],
-            vec![1.0849, 300000.0],
-            vec![1.0848, 150000.0]])?
-        .column_arr("asks", &arr2(&[
-            [1.0853, 500000.0],
-            [1.0854, 250000.0],
-            [1.0855, 125000.0]]).view())?
-        .at(TimestampNanos::now())?;
-    sender.flush(&mut buffer)?;
-    sender.close_drain()?;
+    sender.flush(&mut chunk)?;     // publish to the durable queue; chunk cleared on success
+    sender.wait(AckLevel::Ok, Duration::ZERO)?;   // optional: block until the server has received it (ZERO = wait forever)
     Ok(())
 }
 ```
 
-Array ingestion requires QuestDB 9.0.0 or later. The QWP/WebSocket transport
-negotiates protocol support automatically.
-
-### Decimal columns
-
-:::caution
-
-Decimal ingestion requires QuestDB 9.2.0 or later. Pre-create decimal columns
-with `DECIMAL(precision, scale)` so the server enforces the expected precision.
-See the
-[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
-page.
-
-:::
-
-`Buffer::column_dec` accepts string slices,
-[`rust_decimal`](https://docs.rs/rust_decimal), and
-[`bigdecimal`](https://docs.rs/bigdecimal) values.
-
-### Designated timestamp
-
-The [designated timestamp](/docs/concepts/designated-timestamp/) column
-controls time-based partitioning and ordering. Two ways to set it:
-
-**User-assigned** (recommended for deduplication and exactly-once delivery):
+`borrow_column_sender()` returns an `SfColumnSender` — a **store-and-forward**
+handle with a deliberately small surface:
 
 ```rust
-use questdb::ingress::{TimestampMicros, TimestampNanos};
-
-// Microsecond precision creates a standard TIMESTAMP column.
-buffer
-    .table("trades")?
-    .column_f64("price", 1.0842)?
-    .at(TimestampMicros::now())?;
-
-// Nanosecond precision creates a timestamp_ns column.
-buffer
-    .table("ticks")?
-    .column_f64("price", 1.0842)?
-    .at(TimestampNanos::now())?;
+fn flush(&mut self, chunk: &mut Chunk) -> Result<()>            // publish to the durable queue; auto-clears the chunk; no round-trip
+fn wait(&mut self, ack_level: AckLevel, timeout: Duration) -> Result<()>   // block until `ack_level` (or `timeout` of no ack progress)
+fn must_close(&self) -> bool
+fn mark_must_close(&mut self)
 ```
 
-**Server-assigned** (server uses its wall-clock time):
+`AckLevel::Ok` waits for the server to **accept** every published frame;
+`AckLevel::Durable` waits for **durable** storage and requires the pool to have
+been opened with `request_durable_ack=on` (Enterprise). For whole-`RecordBatch`
+Arrow or polars `DataFrame` ingestion, prefer the pool-level `db.flush_arrow_batch`
+/ `db.flush_polars_dataframe` (see *DataFrame and Arrow ingestion* below).
+
+:::important Delivery is automatic; `wait()` is rarely needed
+
+`flush()` does not round-trip — it appends the batch to a client-side
+store-and-forward queue and returns. A **background thread** delivers the queue
+for you: it reconnects, rotates across endpoints, and **replays across client
+restarts** when the pool is disk-backed (`sf_dir`). A successful `flush()`
+already means "safely queued for delivery" — you do **not** call `wait()` to make
+delivery happen.
+
+Reach for `wait()` only when your own application logic cannot proceed until the
+data has reached the server:
+
+- **`wait(AckLevel::Ok, timeout)`** blocks until the server has accepted every
+  frame published so far.
+- **`wait(AckLevel::Durable, timeout)`** blocks until those frames are durably
+  stored (Enterprise, needs `request_durable_ack=on`).
+
+`timeout` is a **no-progress deadline** — it fires only if the ack watermark
+stops advancing for that long (`Duration::ZERO` waits indefinitely); on expiry
+`wait()` returns `ErrorCode::FailoverRetry` and the queued frames are kept for
+replay.
+
+**`wait()` does not yet guarantee query visibility.** It confirms the server has
+*received* the data, not that it is queryable. A read-your-write guarantee is
+planned but not implemented — do not rely on `wait()` to make rows immediately
+selectable.
+
+:::
+
+**Throughput.** `flush()` never round-trips, so a few rows per flush is fine —
+but each flush is still a wire frame and a queue append. If your source trickles
+tiny batches, accumulate rows into larger chunks and flush less often to amortise
+the per-frame overhead, then `wait()` once per batch if you need confirmation.
+The only calls that ever block are `wait()` and backpressure when you sustainably
+outrun the server.
+
+### Reuse the chunk across flushes
+
+**Reuse one `Chunk` — do not allocate per batch.** On a successful `flush` it is
+cleared but keeps its capacity; on failure it is left untouched. The chunk
+**borrows** your slices, so they only need to outlive each `flush`.
 
 ```rust
-buffer.table("trades")?.column_f64("price", 1.0842)?.at_now()?;
+let mut chunk = Chunk::new("trades");
+for batch in incoming_batches() {
+    chunk.column_f64("price", &batch.price, None)?;
+    chunk.column_f64("amount", &batch.amount, None)?;
+    chunk.designated_timestamp_nanos(&batch.ts_ns)?;
+    sender.flush(&mut chunk)?;        // clears the chunk
+}
+sender.wait(AckLevel::Ok, Duration::ZERO)?;   // confirm the whole run (optional)
 ```
 
-`at_now()` removes the ability to deduplicate rows. Prefer explicit timestamps
-for production ingestion. See
-[Delivery semantics](/docs/concepts/delivery-semantics/) for why
-server-assigned timestamps defeat exactly-once outcomes.
+### Chunk column setters
 
-:::note
+Every setter is `fn(&mut self, name: &str, data: &[T], validity: Option<&Validity>) -> Result<&mut Self>`
+unless noted, and all columns plus the timestamp must share the same row count.
+`validity = None` means no nulls.
 
-QuestDB works best when data arrives in chronological order (sorted by
-timestamp).
+| QuestDB type | `Chunk` method | `data` slice |
+| --- | --- | --- |
+| `BYTE`/`SHORT`/`INT`/`LONG` | `column_i8` / `column_i16` / `column_i32` / `column_i64` | `&[i8/i16/i32/i64]` |
+| `FLOAT` / `DOUBLE` | `column_f32` / `column_f64` | `&[f32]` / `&[f64]` |
+| `BOOLEAN` | `column_bool(name, data, row_count, validity)` | bit-packed `&[u8]` (LSB-first) + explicit `row_count` |
+| `TIMESTAMP` (micros) / `timestamp_ns` | `column_ts_micros` / `column_ts_nanos` | `&[i64]` |
+| `DATE` | `column_date_millis` | `&[i64]` |
+| `UUID` | `column_uuid` | `&[[u8; 16]]` |
+| `LONG256` | `column_long256` | `&[[u8; 32]]` |
+| `IPV4` | `column_ipv4` | `&[u32]` |
+| `VARCHAR` | `column_varchar(name, offsets: &[i32], bytes: &[u8], validity)` | Arrow Utf8: `row_count+1` offsets + UTF-8 bytes (`column_varchar_large` for `&[i64]` offsets) |
+| `BINARY` | `column_binary(name, offsets: &[i32], bytes: &[u8], validity)` | same offset+byte layout |
+| `SYMBOL` | `symbol_dict_i32` (or `_i8`/`_i16`, `_large_*`) | `codes: &[i32]` + `dict_offsets: &[i32]` + `dict_bytes: &[u8]` |
+| designated timestamp | `designated_timestamp_nanos` / `_micros` / `_millis` / `_seconds` | `&[i64]` (no validity) |
 
-:::
+Other `Chunk` methods: `new(table)`, `table()`, `row_count()`, `is_empty()`,
+`clear()`.
 
-## Flushing
+## Sending data: row-major
 
-The sender and buffer are decoupled. Buffered rows are not on the wire until
-you call `sender.flush(&mut buffer)`.
-
-:::caution No auto-flush
-
-The Rust client does not implement auto-flushing for QWP/WebSocket. You must
-call `flush()` explicitly. Connect-string keys `auto_flush_rows` and
-`auto_flush_interval`, and `auto_flush_bytes` are rejected; the only accepted
-value is `auto_flush=off`.
-
-A common pattern is to flush periodically on a timer and/or when the buffer
-size (via `buffer.len()`) exceeds a threshold.
-
-:::
-
-`flush()` clears the buffer after publishing. Use `flush_and_keep()` to retain
-contents (for example, to fan the same buffer out to multiple senders).
-
-On QWP/WebSocket, `flush()` returns once the buffer is accepted by the local
-replay queue, before the server acknowledges it. The call can block if the
-queue is full — see [Backpressure on `flush()`](#backpressure-on-flush). Server
-errors observed later are reported asynchronously (see
-[Asynchronous error handling](#asynchronous-error-handling)).
-
-### Backpressure on `flush()`
-
-`flush()` is not unconditionally non-blocking. The publisher feeds a bounded
-queue with two stacked caps:
-
-1. **In-flight window** — `max_in_flight` (default `128`) unacknowledged
-   frames on the connection. Reached first under steady-state load when the
-   server keeps up but you have many small flushes in flight.
-2. **Queue cap** — `sf_max_total_bytes` (default `128 MiB` in memory mode,
-   `10 GiB` in disk mode). Reached when the server is unreachable long
-   enough that the in-flight count stops being the active limit.
-
-When either cap is hit, `flush()` blocks the caller and retries as the I/O
-loop releases capacity (ACK-driven trim). The wait is bounded by
-`sf_append_deadline_millis` (default `30000`). If the deadline elapses,
-`flush()` returns a `SubmitTimedOut` error — the application can retry, fail
-closed, or shed load. **No data is ever dropped or overwritten** while the
-publisher is parked.
-
-Memory-only and disk-backed modes have identical backpressure semantics: the
-same SFA queue handles both; only the cap default and whether the buffered
-data survives a sender restart differ.
-
-`buffer.column_*` setters and `buffer.table(...)` never block — they only
-mutate the in-process `Buffer`. Backpressure surfaces only at `flush()`.
-
-:::caution Oversized payloads are rejected, not parked
-
-A single flushed payload larger than `sf_max_bytes` (default `4 MiB`) returns
-a `PayloadExceedsByteCapacity` error from `flush()` immediately — it does
-*not* enter the backpressure wait. The error carries the payload length and
-the segment capacity. Fixes: reduce the number of rows you accumulate per
-buffer before flushing, or raise `sf_max_bytes` to fit your largest single
-flushed payload.
-
-:::
-
-### FSN-based completion
-
-Every published frame is assigned a frame sequence number (FSN). To wait until
-the server has acknowledged a specific frame:
+For event-at-a-time ingestion, borrow a row sender. `BorrowedRowSender` derefs to
+`Sender`, so the classic `Buffer` API works unchanged.
 
 ```rust
+use questdb::{QuestDb, ingress::timestamp::TimestampNanos};
+
+fn main() -> questdb::Result<()> {
+    let db = QuestDb::connect("ws::addr=localhost:9000;")?;
+    let mut sender = db.borrow_row_sender()?;
+    let mut buffer = sender.new_buffer();
+
+    for (sym, price, amount) in [("ETH-USD", 2615.54, 0.00044), ("BTC-USD", 65432.10, 0.00120)] {
+        buffer
+            .table("trades")?
+            .symbol("symbol", sym)?
+            .column_f64("price", price)?
+            .column_f64("amount", amount)?
+            .at(TimestampNanos::now())?;          // .at_now() = server-assigned timestamp
+    }
+
+    sender.flush(&mut buffer)?;                    // sends + clears the buffer
+    Ok(())
+}
+```
+
+Tables/columns are auto-created. A row is committed to the buffer only on
+`at`/`at_now`. `flush` publishes every completed row to the durable queue and
+clears the buffer (`flush_and_keep` retains it). Reuse the `Buffer` across
+flushes — it keeps its capacity.
+
+:::important Confirming delivery
+
+The row sender is store-and-forward too: `flush()` publishes to the local queue
+and a background thread delivers it — you do not call `wait()` for delivery to
+happen. Use the **same `wait()`** the column sender uses only when your code must
+block until the data has reached the server:
+
+```rust
+use questdb::ingress::AckLevel;
 use std::time::Duration;
 
-let fsn = sender.flush_and_get_fsn(&mut buffer)?;
-if let Some(fsn) = fsn {
-    let acked = sender.await_acked_fsn(fsn, Duration::from_secs(10))?;
-    if !acked {
-        eprintln!("timed out waiting for server ACK");
+sender.flush(&mut buffer)?;                  // publish to the durable queue
+sender.wait(AckLevel::Ok, Duration::ZERO)?;  // optional: block until the server has received it
+```
+
+`wait()` blocks until every frame published so far reaches `ack_level`
+(`Ok` = accepted by the server, `Durable` = durably stored); `timeout` is a
+no-progress deadline (`Duration::ZERO` waits indefinitely). As on the column
+sender, `wait()` confirms receipt, **not** query visibility (a future guarantee).
+
+For non-blocking progress instead of a barrier, use `flush_and_get_fsn()`
+(publish + return this frame's FSN), then compare `published_fsn()` (highest
+sent) against `acked_fsn()` (highest server-confirmed).
+
+:::
+
+### Buffer column setters
+
+Each takes the column name first and returns `Result<&mut Buffer>` so calls chain.
+Every setter has an `_opt` variant taking `Option<T>` that is a no-op on `None`
+(how you leave a value null on a row).
+
+| QuestDB type | `Buffer` setter |
+| --- | --- |
+| `SYMBOL` | `symbol(name, &str)` |
+| `BOOLEAN` | `column_bool(name, bool)` |
+| `BYTE`/`SHORT`/`INT`/`LONG` | `column_i8` / `column_i16` / `column_i32` / `column_i64` |
+| `FLOAT` / `DOUBLE` | `column_f32(name, f32)` / `column_f64(name, f64)` |
+| `VARCHAR` | `column_str(name, &str)` |
+| `DECIMAL` (≤256-bit) | `column_dec` / `column_dec64` / `column_dec128` (`&str`, or `rust_decimal`/`bigdecimal` with those features) |
+| `CHAR` | `column_char(name, u16)` (UTF-16 code unit) |
+| `UUID` | `column_uuid(name, lo: u64, hi: u64)` |
+| `LONG256` | `column_long256(name, &[u8; 32])` |
+| `IPV4` | `column_ipv4(name, Ipv4Addr)` |
+| `DATE` | `column_date(name, millis: i64)` |
+| `BINARY` | `column_binary(name, &[u8])` |
+| `GEOHASH` | `column_geohash(name, bits: u64, precision_bits: u8)` |
+| `DOUBLE[]` (arrays) | `column_arr(name, &view)` — slices/vecs (≤3D) and `ndarray` views (needs `ndarray`) |
+| `TIMESTAMP` (non-designated) | `column_ts(name, TimestampMicros / TimestampNanos)` |
+| designated timestamp | `at(TimestampMicros / TimestampNanos)` or `at_now()` |
+
+Useful `Sender` methods (via deref): `new_buffer()`, `flush(&mut Buffer)`,
+`flush_and_keep(&Buffer)`, `wait(ack_level, timeout)`, `flush_and_get_fsn`,
+`published_fsn`/`acked_fsn`, `poll_qwp_ws_error()`, `must_close()`.
+
+## DataFrame and Arrow ingestion
+
+With the `arrow` or `polars` feature, ingest a whole Arrow `RecordBatch` or
+polars `DataFrame` in **one call on the pool** — no sender, no chunk, no buffer.
+These helpers borrow a connection internally, drive the frame, and return it.
+`table` accepts anything convertible into a `TableName` (a bare `&str` works).
+
+Unlike the store-and-forward row- and column-major senders, these two calls are
+**synchronous and blocking** and do **not** use the on-client queue: they drive
+a direct connection and return only once the data has been delivered to the
+server.
+
+```rust
+use questdb::ingress::AckLevel;
+
+// feature = "arrow-ingress" (or the `arrow` umbrella).
+// ts_col: Some(col) sources the designated timestamp from that column; None lets
+//   the server stamp each row. overrides: &[ArrowColumnOverride] (&[] = none).
+// ack: None uses the pool default (Durable if request_durable_ack=on, else Ok).
+db.flush_arrow_batch("trades", &record_batch, None, &[], None)?;
+
+// feature = "polars-ingress" (or the `polars` umbrella)
+use questdb::ingress::polars::PolarsIngestOptions;
+db.flush_polars_dataframe("trades", &df, &PolarsIngestOptions::new().max_rows(10_000))?;
+```
+
+`PolarsIngestOptions` is a builder (all default off): `.max_rows(n)` slices the
+frame into batches, `.timestamp_column(name)` picks the designated timestamp,
+`.overrides(&[…])` remaps column interpretation (e.g. treat a Utf8 column as
+`SYMBOL`).
+
+Because they block until delivery, each owns its failover handling inline:
+`flush_polars_dataframe` re-drives the uncommitted tail onto a live endpoint
+across a transient failure, while `flush_arrow_batch` surfaces the error for you
+to re-call (the batch is yours to resend). Delivery is at-least-once — a replayed
+tail can duplicate rows, so cover the table with
+[deduplication](/docs/concepts/deduplication/) upsert keys.
+
+## Querying data
+
+Get a reader, `prepare` SQL (optionally binding parameters), `execute` to a
+`Cursor`, then pull `BatchView`s and read typed columns.
+
+```rust
+use questdb::QuestDb;
+use questdb::egress::column::ColumnView;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let db = QuestDb::connect("ws::addr=localhost:9000;")?;
+    let mut reader = db.borrow_reader()?;   // BorrowedReader, derefs to Reader
+
+    let mut cursor = reader
+        .prepare("SELECT ts, price, symbol FROM trades WHERE price > $1")
+        .bind_f64(2615.0)
+        .execute()?;
+
+    while let Some(batch) = cursor.next_batch()? {
+        let ColumnView::Timestamp(ts) = batch.column(0)? else { unreachable!() };
+        let ColumnView::Double(price) = batch.column(1)? else { unreachable!() };
+        let ColumnView::Symbol(symbol) = batch.column(2)? else { unreachable!() };
+
+        for r in 0..batch.row_count() {
+            if price.is_null(r) { continue; }
+            println!("{} {} {:?}", ts.value(r), price.value(r), symbol.resolve(r));
+        }
+    }
+    Ok(())
+}
+```
+
+### Reader → Cursor methods
+
+```rust
+// Reader (and BorrowedReader via deref)
+fn prepare(&mut self, sql: impl AsRef<str>) -> ReaderQuery<'_>   // build a parametrised query
+fn execute(&mut self, sql: impl AsRef<str>) -> Result<Cursor<'_>> // shortcut, no binds
+fn server_info(&self) -> Option<&ServerInfo>
+fn server_version(&self) -> Result<u8>
+
+// Cursor
+fn next_batch(&mut self) -> Result<Option<BatchView<'_>>>        // None = end of stream
+fn terminal(&self) -> Option<&Terminal>                         // Some after RESULT_END/EXEC_DONE
+fn cancel(&mut self) -> Result<()>
+fn request_id(&self) -> i64
+// with feature = "polars-egress" (or the `polars` umbrella):
+fn next_polars(&mut self) -> Result<Option<DataFrame>>             // one batch as a DataFrame
+fn iter_polars(&mut self) -> Result<CursorPolarsIter<'_, '_>>      // drift-checked iterator of per-batch DataFrames
+fn fetch_all_polars(&mut self) -> Result<DataFrame>               // whole result as one DataFrame
+// with feature = "arrow-egress" (or the `arrow` umbrella):
+fn next_arrow_batch(&mut self) -> Result<Option<RecordBatch>>
+fn fetch_all_arrow(&mut self) -> Result<(SchemaRef, Vec<RecordBatch>)>
+```
+
+### Parameter binds
+
+`reader.prepare(sql)` returns a `ReaderQuery`; chain `bind_*` (positional, in
+order, matching `$1`, `$2`, …) then `.execute()`:
+
+```rust
+let mut cursor = reader
+    .prepare("SELECT * FROM trades WHERE symbol = $1 AND ts >= $2")
+    .bind_varchar("ETH-USD")
+    .bind_timestamp_micros(1_700_000_000_000_000)
+    .execute()?;
+```
+
+Available binds: `bind_bool`, `bind_i8/i16/i32/i64`, `bind_f32/f64`,
+`bind_varchar(&str)`, `bind_binary(&[u8])`, `bind_timestamp_micros/nanos(i64)`,
+`bind_date_millis(i64)`, `bind_uuid([u8;16])`, `bind_long256([u8;32])`,
+`bind_char(u16)`, `bind_ipv4(Ipv4Addr)`, `bind_decimal64(i64, scale)`,
+`bind_decimal128(i128, scale)`, `bind_decimal256([u8;32], scale)`,
+`bind_geohash(u64, precision_bits)`, and `bind_null_*` variants. `initial_credit(u64)`,
+`on_failover_reset`/`on_failover_progress` configure streaming/failover.
+
+### Reading columns
+
+`batch.column(idx)` returns a typed `ColumnView`. Match it to the concrete column,
+then index per row. Every column type exposes `len()`, `is_null(row)`, and
+`validity()`; `ColumnView` itself also has `kind()`, `len()`, and `is_null(row)`.
+
+| `ColumnView` variant | Inner type | Read a value |
+| --- | --- | --- |
+| `Boolean`/`Byte`/`Short`/`Int`/`Long`/`Float`/`Double` | `FixedColumn<T>` (`u8/i8/i16/i32/i64/f32/f64`) | `col.value(row) -> T` |
+| `Timestamp`/`TimestampNanos`/`Date` | `FixedColumn<i64>` | `col.value(row) -> i64` |
+| `Char` | `FixedColumn<u16>` | `col.value(row) -> u16` |
+| `Ipv4` | `FixedColumn<u32>` | `col.value(row) -> u32` (host-order) |
+| `Symbol` | `SymbolColumn` | `col.resolve(row) -> Option<&str>` |
+| `Varchar` | `VarcharColumn` | `col.value(row) -> Option<&str>` |
+| `Binary` | `BinaryColumn` | `col.value(row) -> Option<&[u8]>` |
+| `Uuid` | `UuidColumn` | `col.value(row) -> &[u8; 16]` |
+| `Long256` | `Long256Column` | `col.value(row) -> &[u8; 32]` |
+| `Decimal64`/`Decimal128`/`Decimal256` | `Decimal*Column` | see column docs (value + scale) |
+| `Geohash` | `GeohashColumn` | bits + precision |
+| `DoubleArray`/`LongArray` | `DoubleArrayColumn`/`LongArrayColumn` | per-row array slices |
+
+`FixedColumn<T>::value(row)` returns the raw `T` even on null rows — always check
+`is_null(row)` first (or use `col.iter()`). `SymbolColumn::resolve`,
+`VarcharColumn::value`, and `BinaryColumn::value` return `Option`, which is `None`
+on a null row.
+
+With the `polars` (or `polars-egress`) feature you can pull a SQL result straight
+into a polars `DataFrame`, skipping per-column handling:
+
+```rust
+// whole result in one DataFrame
+let df = reader.prepare(sql).execute()?.fetch_all_polars()?;
+
+// or stream it batch-by-batch (schema-drift-checked)
+let mut cursor = reader.prepare(sql).execute()?;
+for frame in cursor.iter_polars()? {
+    let df = frame?;
+    // ... process each DataFrame ...
+}
+```
+
+`fetch_all_polars()` materialises the entire result (and replays transparently
+through a mid-query failover); `iter_polars()` yields one `DataFrame` per batch
+with schema-drift detection; `next_polars()` is the low-level per-batch form.
+These live on the `Cursor` — there is no pool-level shortcut on the read side.
+
+### Running DDL and DML
+
+`execute` / `prepare` also run non-`SELECT` statements (CREATE, INSERT, UPDATE,
+ALTER, DROP, TRUNCATE). They return no rows: `next_batch()` yields `None`
+immediately and the outcome lands in the cursor's `terminal()` as
+`Terminal::ExecDone { rows_affected, .. }`.
+
+```rust
+use questdb::egress::Terminal;
+
+let mut cursor =
+    reader.execute("UPDATE trades SET price = price * 1.01 WHERE symbol = 'ETH-USD'")?;
+while cursor.next_batch()?.is_some() {}          // drain (a DDL/DML statement yields no rows)
+if let Some(Terminal::ExecDone { rows_affected, .. }) = cursor.terminal() {
+    println!("updated {rows_affected} rows");
+}
+```
+
+The `Cursor` is `#[must_use]`: always drain it with `next_batch()` (or
+`cancel()`), even when the statement returns nothing.
+
+### Cancellation, flow control, and compression
+
+Cancel a running query at any time with `cursor.cancel()` — it sends a `CANCEL`
+frame and drains to the server's terminal.
+
+For large results, bound how far the server streams ahead with **byte credits**.
+`initial_credit(n)` caps the in-flight bytes (`0` = unbounded); grant more as you
+consume with `Cursor::add_credit(bytes)`, and read the running total with
+`credit_granted_total()`:
+
+```rust
+let mut cursor = reader
+    .prepare("SELECT * FROM trades")
+    .initial_credit(1 << 20)          // cap at 1 MiB in flight
+    .execute()?;
+while let Some(batch) = cursor.next_batch()? {
+    // ... process `batch` ...
+    cursor.add_credit(1 << 20)?;      // top up as you drain
+}
+```
+
+Enable **zstd** compression on the read path with the `sync-reader-zstd` feature
+plus a connect-string key: `compression=zstd` (or `compression=auto` to let the
+server choose), optionally tuned with `compression_level=N` (`1`–22, default `1`).
+
+## Error handling
+
+Every write call returns `questdb::Result<T>` (alias for
+`Result<T, questdb::Error>`); `questdb::Error` carries an
+`ErrorCode` (`err.code()`) and a message (`err.msg()`). The reader uses a parallel
+`questdb::egress::error::{Error, ErrorCode, Result}`. To mix both in one function,
+return `Result<(), Box<dyn std::error::Error>>` (both `?` cleanly).
+
+```rust
+match sender.flush(&mut chunk) {
+    Ok(()) => {}
+    Err(e) => {
+        eprintln!("flush failed [{:?}]: {}", e.code(), e.msg());
+        if sender.must_close() { /* drop the borrow; the pool opens a fresh conn next time */ }
     }
 }
 ```
 
-Related accessors:
-
-| Method | Returns |
-|--------|---------|
-| `flush_and_get_fsn(&mut buf)` | Highest FSN published by this call. `None` if the buffer was empty. |
-| `flush_and_keep_and_get_fsn(&buf)` | Same, but keeps the buffer. |
-| `published_fsn()` | Highest FSN published locally. |
-| `acked_fsn()` | Highest FSN completed (server ACK or reject-and-continue). |
-| `await_acked_fsn(fsn, timeout)` | Block until `acked_fsn()` reaches `fsn`, or the timeout elapses. |
-
-In durable ACK mode, `acked_fsn` advances after durable upload, not on the
-ordinary OK frame.
-
-## Store-and-forward
-
-With store-and-forward (SF) enabled, unacknowledged frames are persisted to
-disk and replayed after reconnection, surviving sender process restarts:
-
-```text
-ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
-```
-
-Without `sf_dir`, unacknowledged data lives in process memory and is lost if
-the sender process exits. The reconnect loop still spans transient server
-outages, but a RAM cap bounds how much data can accumulate.
-
-<SfDedupWarning />
-
-### SF tuning keys
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `sf_dir` | unset | Enables disk-backed SF when set. |
-| `sender_id` | `default` | Slot identity. Allowed chars: `A-Za-z0-9_-`. Use distinct ids per sender process. |
-| `sf_max_bytes` | 4 MiB | Per-segment size cap. |
-| `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
-| `sf_durability` | `memory` | `memory` is the only shipping value. `flush` and `append` are reserved for future per-write fsync modes; setting them today fails sender construction. |
-| `sf_append_deadline_millis` | 30000 | Maximum time `flush()` blocks waiting for queue capacity to free up. Applies in both memory and disk modes (the SFA queue is shared). On timeout, `flush()` surfaces a `SubmitTimedOut` error; no data is dropped. See [Backpressure on `flush()`](#backpressure-on-flush). |
-| `drain_orphans` | `off` | If `on`, take over stale slots owned by a previous sender. |
-| `max_background_drainers` | 4 | Concurrency cap when draining orphans. |
-
-## Durable acknowledgement
-
-:::note Enterprise
-
-Durable acknowledgement requires QuestDB Enterprise with primary replication
-configured.
-
-:::
-
-By default, the server confirms a batch once it is committed to the local
-[WAL](/docs/concepts/write-ahead-log/). To wait for the batch to be durably
-uploaded to object storage:
-
-```text
-ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
-```
-
-`durable_ack_keepalive_interval_millis` (default 200) controls how often the
-client probes the server for durable ACK progress when no other traffic is in
-flight.
-
-## Asynchronous error handling
-
-QWP/WebSocket ingestion is asynchronous: `flush()` returns as soon as the
-frame is accepted locally. Server-side rejections and protocol violations are
-reported separately.
-
-There are two ways to observe them.
-
-### Polling
-
-```rust
-use questdb::ingress::Sender;
-
-let mut sender = Sender::from_conf("ws::addr=localhost:9000;")?;
-
-while let Some(err) = sender.poll_qwp_ws_error()? {
-    eprintln!(
-        "category={:?} policy={:?} status={:?} fsn=[{}..={}] msg={:?}",
-        err.category,
-        err.applied_policy,
-        err.status,
-        err.from_fsn,
-        err.to_fsn,
-        err.message,
-    );
-}
-```
-
-### Handler callback
-
-Install a handler on the builder. It runs synchronously from sender API calls
-such as `flush()`. The handler must not call back into the same sender.
-
-```rust
-use questdb::ingress::{Protocol, SenderBuilder};
-
-// `Sender` is single-owner (every publishing method takes `&mut self`).
-// For multi-producer patterns, see the "Concurrency" section.
-let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
-    .qwp_ws_error_handler(|err| {
-        eprintln!("QWP error: {err:?}");
-    })?
-    .build()?;
-```
-
-### `QwpWsSenderError` fields
-
-| Field | Meaning |
-|-------|---------|
-| `category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
-| `applied_policy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal). |
-| `status` | `Option<u8>`. Raw QWP status byte. `None` for WebSocket protocol violations, which do not carry a QWP status byte. |
-| `message` | `Option<String>`. Human-readable error text from the server, or a client-synthesized close reason for WebSocket protocol violations. `None` when the server returned an empty message. See [Message stability](#message-stability) and [PII safety](#message-pii) below. |
-| `message_sequence` | `Option<u64>`. Server's per-frame QWP wire sequence for the error frame. `None` for WebSocket protocol violations, which do not carry a QWP message sequence. Resets on reconnect; only meaningful within one connection. |
-| `from_fsn` / `to_fsn` | Inclusive FSN span of the affected frame(s), client-side. |
-
-`Sender::qwp_ws_errors_dropped()` reports how many diagnostics were lost
-because the bounded log overflowed (typically due to a lagging poll cursor).
-
-#### Message stability {#message-stability}
-
-`message` is a human-readable diagnostic — **not a stable contract.** Its
-text varies across server versions and across provenance:
-
-- **QWP error frames** carry a server-supplied UTF-8 string capped at
-  1024 bytes by the wire spec.
-- **WebSocket protocol violations** are client-synthesized as
-  `"ws-close[<code>]: <reason>"`.
-- The server-supplied text mirrors QuestDB's normal SQL error formatting,
-  which historically reworded across releases.
-- The field may be empty.
-
-Use `category` for programmatic dispatch (a typed enum derived from
-`status`, plus a `ProtocolViolation` variant for the case when `status`
-is `None`). Treat `status` as a wire-debug aid; the raw byte values are
-listed in the [QWP wire protocol status
-codes](/docs/connect/wire-protocols/qwp-ingress-websocket/#status-codes).
-Never pattern-match on `message`.
-
-#### PII / secret safety {#message-pii}
-
-`message` may include fragments of the client's own payload — for
-example, an offending column value quoted back by a schema or parse
-rejection — or a server-supplied WebSocket close reason that the
-operator did not control. **Treat `message` as potentially containing
-PII or secrets.**
-
-Log it at the same trust level as the data being sent, and sanitize
-before forwarding to external error trackers (Sentry, Datadog, end-user
-UIs). The other fields on `QwpWsSenderError` are safe to forward as-is —
-they carry only structural metadata.
-
-#### Correlating with server-side logs
-
-The protocol does not currently surface a server-issued request or
-connection identifier in the WebSocket upgrade response. The closest
-correlation tuple is `(message_sequence, from_fsn, to_fsn)`:
-
-- `message_sequence` — per-connection QWP wire sequence the server
-  attached to the error frame. Resets on reconnect.
-- `from_fsn` / `to_fsn` — client-side FSN span of the affected frames.
-  Not generally indexed by server-side logs.
-
-When opening a bug report, supply:
-
-1. The connection start time (from your application logs).
-2. The client's `X-QWP-Client-Id` header value, if your application sets one.
-3. The `(message_sequence, from_fsn, to_fsn)` triple.
-
-There is no globally unique handle.
-
-After a `Halt` policy fires, the sender is terminal. Drop it and create a new
-one. `Sender::must_close()` reports whether the sender has entered a terminal
-state.
-
-`DropAndContinue` errors do not halt the sender. The affected batch is
-discarded; subsequent frames are unaffected and the I/O loop keeps running.
-
-## Progress modes
-
-The client drives the WebSocket loop in one of two modes:
-
-| Mode | Behaviour |
-|------|-----------|
-| `QwpWsProgress::Background` (default) | A sender-owned thread sends frames, receives ACKs, reconnects, and replays. Right choice for most callers. |
-| `QwpWsProgress::Manual` | No background thread. The caller drives progress with `Sender::drive_once()` or `Sender::await_acked_fsn()`. |
-
-```rust
-use questdb::ingress::{Protocol, SenderBuilder, QwpWsProgress};
-
-// `Sender` is single-owner (every publishing method takes `&mut self`).
-// For multi-producer patterns, see the "Concurrency" section.
-let mut sender = SenderBuilder::new(Protocol::QwpWs, "localhost", 9000)
-    .qwp_ws_progress(QwpWsProgress::Manual)?
-    .build()?;
-
-loop {
-    // ... publish frames ...
-    sender.flush(&mut buffer)?;
-    // Drive until idle so the I/O loop catches up.
-    while sender.drive_once()? {}
-}
-```
-
-`drive_once()` performs at most one unit of work per call (send one frame,
-drain ready responses, do one storage-maintenance step). Call it in a loop
-until it returns `false` before parking.
+A borrow that has latched terminal (`must_close()` is `true`) is dropped — not
+recycled — when it returns to the pool. Call `mark_must_close()` to force this
+after an error you suspect damaged the connection.
 
 ## Failover and high availability
 
-:::note Enterprise
+Point the pool at several QuestDB nodes and it rotates to a live one on every
+reconnect. List the endpoints in the connect string — comma-separated in one
+`addr=`, or as repeated `addr=` params:
 
-Multi-host failover with automatic reconnect is most useful with QuestDB
-Enterprise primary-replica replication.
+```rust
+// rotate across three nodes; pin to the primary (Enterprise primary/replica)
+let db = QuestDb::connect("ws::addr=node-a:9000,node-b:9000,node-c:9000;target=primary;")?;
+```
+
+`target=primary` / `target=replica` / `target=any` and `zone=` select which node
+role the pool connects to; see the
+[connect string reference](/docs/connect/clients/connect-string/) for the full
+grammar. If every endpoint completes its handshake but none matches `target=`,
+the borrow fails with a role-reject error (distinct from "all endpoints
+unreachable").
+
+### Reconnect budget
+
+When a connection drops, the pool dials the endpoint set with centered-jittered
+backoff until one answers or the budget expires. Three QWP/WebSocket-only keys
+tune it:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `reconnect_max_duration_millis` | 300000 (5 min) | Total failover budget before the borrow gives up. |
+| `reconnect_initial_backoff_millis` | 100 | First backoff between dials; grows toward the max. |
+| `reconnect_max_backoff_millis` | 5000 | Backoff ceiling between dials. |
+
+Auth failures and protocol-version mismatches are **terminal** — they are never
+retried, whatever the budget.
+
+### Ingestion failover
+
+Ingestion failover is **automatic** — you do not write a retry loop. The column
+sender publishes every `flush()` into its store-and-forward queue, and a
+background runner forwards that queue to the server, reconnecting and rotating
+across the endpoints above on its own. When the pool is disk-backed (`sf_dir`)
+the queue is durable, so unacknowledged batches **replay after a client restart
+or a server failover** — a batch that `flush()` accepted is not lost to a dropped
+connection.
+
+The only thing you react to is a **terminal** condition — an auth or
+protocol-version rejection the runner cannot retry. The handle reports it via
+`must_close()`; drop the borrow and the next one opens a fresh connection.
+
+:::note Replays can duplicate
+
+Because the durable queue replays unacknowledged batches, a delivery that was in
+doubt when a connection dropped may be re-sent. Enable table-level
+[deduplication](/docs/concepts/deduplication/) or upsert keys so replays are
+idempotent.
 
 :::
 
-### Multiple endpoints
+The **row sender** shares this model: its background runner absorbs reconnects
+across the endpoint set automatically. Surface any async transport error with
+`poll_qwp_ws_error()`, confirm the tail with `wait()`, and check `must_close()`
+after a terminal error.
 
-Specify a comma-separated address list (or repeat `addr=`):
+### Query failover
 
-```text
-ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
-```
-
-The client picks an endpoint, connects, and walks the list to find the next
-healthy peer when the current connection breaks.
-
-:::tip Strongly recommend sf_dir for multi-host deployments
-
-Without `sf_dir`, `flush()` blocks when the connection is down and the
-in-memory queue fills up. After `sf_append_deadline_millis` (default 30s),
-it returns `SubmitTimedOut`. With `sf_dir`, `flush()` writes to disk and
-returns quickly while the reconnect loop replays to the new primary in the
-background. For any deployment where failover may take more than a few
-seconds, `sf_dir` is strongly recommended.
-
-:::
-
-### Reconnect knobs
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `reconnect_max_duration_millis` | 300000 | Total outage budget before giving up. |
-| `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
-| `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
-| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Retry on first connect. Values: `off`, `on` / `true` / `sync` (synchronous retry), `async` (background retry), `false` (alias for `off`). Explicit `off` preserves fail-fast startup. |
-
-When the reconnect budget elapses without recovery, the sender enters a
-terminal state: `Sender::must_close()` returns `true`, the next `flush()`
-returns an error, and a `Halt`-category entry surfaces through
-`poll_qwp_ws_error()` or the `qwp_ws_error_handler` callback. Recover by
-dropping the sender and constructing a new one (with `sf_dir` set, the
-on-disk slot is replayed once the new sender connects).
-
-By default the first connect fails fast, but setting any explicit `reconnect_*`
-key promotes `initial_connect_retry` to `on` so the reconnect policy also
-covers the initial connect. Set `initial_connect_retry=off` explicitly to keep
-fail-fast startup while tuning the reconnect loop.
-
-The Rust client is zone-blind on ingress: the `zone=` key is accepted but
-ignored, so connect strings shared with future zone-aware egress clients work
-unchanged.
-
-The Rust client does not currently expose connection-state event callbacks
-(the equivalent of Java's `SenderConnectionListener`). Connection lifecycle is
-observable through `log` crate output and through error notifications
-delivered to the polling API or the `qwp_ws_error_handler` callback. To see
-reconnect events, enable logging for the `questdb` target:
+A transport error mid-query fails the cursor over to another endpoint and
+**replays the query from the start** there (a fresh `request_id`, batches from
+zero). Because already-consumed rows arrive again, you must opt in and discard
+them — install `on_failover_reset`:
 
 ```rust
-// e.g., with the env_logger crate
-env_logger::Builder::from_env(
-    env_logger::Env::default().default_filter_or("questdb=info")
-).init();
+let mut cursor = reader
+    .prepare("SELECT ts, price FROM trades WHERE price > $1")
+    .bind_f64(2615.0)
+    .on_failover_reset(|ev| {
+        // query restarts on ev.new_addr — drop rows kept from the dead node
+        eprintln!("failover {}:{} -> {}:{} ({} attempts)",
+            ev.failed_addr.host, ev.failed_addr.port,
+            ev.new_addr.host, ev.new_addr.port, ev.attempts);
+    })
+    .execute()?;
 ```
 
-### Error classification
+Without `on_failover_reset` (or `on_failover_progress`), a mid-stream failover
+surfaces as an error instead of silently replaying. `on_failover_progress`
+reports each phase — `Disconnected`, `Retrying`, `Reset`, `GaveUp` (budget
+exhausted; the cursor is terminal and the error is in `final_error`). Both
+callbacks run synchronously on the cursor's drive thread: do not call back into
+the reader/cursor, block, or panic inside them.
 
-- **Authentication errors** (`401`/`403`): terminal across all endpoints. The
-  reconnect loop stops immediately.
-- **Role reject** (`421 + X-QuestDB-Role`): transient if the role is
-  `PRIMARY_CATCHUP`, topology-level otherwise.
-- **Version mismatch at upgrade**: per-endpoint, not terminal. The client
-  tries the next endpoint.
-- **All other errors** (TCP/TLS failures, `404`, `503`, mid-stream errors):
-  transient, fed into the reconnect loop.
+## Concurrency
 
-## Closing the sender
+`QuestDb` **is the pool**, and it is the only thread-safe handle in the client.
+It is `Send + Sync`: create **one** per process and share it across every worker
+thread — behind an `Arc`, since the pool itself is not `Clone`. The pool guards
+its connections internally.
 
-Call `Sender::close_drain()` before dropping the sender:
+The borrowed handles are the opposite. `SfColumnSender`, `BorrowedRowSender`, and
+`BorrowedReader` — and the `Chunk` / `Buffer` you build — are **not** thread-safe
+(`!Send + !Sync`). A borrow belongs to the thread that took it; the compiler
+stops you moving one to another thread. The model is always **one pool, many
+short-lived borrows**: each thread borrows what it needs, uses it, and drops it.
 
 ```rust
-sender.close_drain()?;
-drop(sender);
+use std::sync::Arc;
+
+let db = Arc::new(QuestDb::connect("ws::addr=localhost:9000;pool_size=4;")?);
+
+let workers: Vec<_> = (0..4).map(|_| {
+    let db = Arc::clone(&db);
+    std::thread::spawn(move || -> questdb::Result<()> {
+        let mut sender = db.borrow_column_sender()?;   // this thread's own sender
+        // ... build and flush chunks ...
+        Ok(())
+    }) // `sender` drops here → its connection returns to the pool
+}).collect();
 ```
 
-`close_drain()` stops accepting new publications and waits up to
-`close_flush_timeout_millis` (default 5000) for already-published frames to
-ACK. Dropping the sender without `close_drain` may discard unacknowledged
-in-memory frames; SF mode persists them to disk so a later sender can replay
-them.
+**Borrows return to the pool on `Drop`** — you never return one by hand. A handle
+holds a pool slot for as long as it is alive, so keep borrows short: borrow, use,
+drop, rather than parking one open across idle periods. A returned connection is
+recycled for the next borrow (one that latched `must_close` is discarded instead,
+and the next borrow opens a fresh connection).
 
-## Configuration reference
+**Borrowing is fail-fast at the cap.** The column, row, and reader pools are each
+capped independently by `pool_max`; when every slot is in use the next borrow
+returns `ErrorCode::InvalidApiCall` rather than blocking. Size `pool_max` to your
+peak concurrency, and set `pool_size` to your steady worker count to pre-warm
+connections.
 
-For the full list of connect-string keys and their defaults, see the
-[connect string reference](/docs/connect/clients/connect-string/).
-The shared reference describes the native-client contract; the table below
-lists Rust-specific support.
+## Closing
 
-Common WebSocket-specific options:
+Dropping `QuestDb` closes the pool (stops the reaper, drops idle connections).
+Call `db.close()` for an explicit shutdown, or `db.reap_idle()` under
+`pool_reap=manual` to trim idle connections yourself.
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `addr` | required | One or more `host:port` entries. |
-| `username` / `password` | unset | HTTP basic auth. |
-| `token` | unset | Bearer token auth (Enterprise). |
-| `auth_timeout_ms` | 15000 | WebSocket upgrade timeout. |
-| `tls_ca` / `tls_roots` / `tls_verify` | webpki | TLS configuration (`wss` only). |
-| `auto_flush` | only `off` accepted if set | Auto-flush is not supported. `auto_flush_rows`, `auto_flush_interval`, and `auto_flush_bytes` are rejected. |
-| `sf_dir` | unset | Enable disk-backed store-and-forward. |
-| `sender_id` | `default` | SF slot identity. |
-| `sf_durability` | `memory` | Only `memory` is currently accepted (see [SF tuning keys](#sf-tuning-keys)). |
-| `request_durable_ack` | `off` | Wait for durable upload before ACK (Enterprise). |
-| `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
-| `initial_connect_retry` | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | Apply reconnect policy to the first connect; explicit `off` preserves fail-fast startup. |
-| `close_flush_timeout_millis` | 5000 | Bound on `close_drain` wait. |
-| `qwp_ws_progress` | `background` | `background` or `manual`. |
-| `max_in_flight` | 128 | Max unacknowledged frames in flight on a connection. Acts as the backpressure window: publishers block locally once the window is full. |
-
-## Crate features
-
-The QuestDB Rust client uses Cargo features to gate optional dependencies and
-transports.
-
-### Default-enabled features
-
-- `sync-sender`: enables all sync sender transports (TCP, HTTP, QWP/UDP,
-  QWP/WebSocket).
-- `tls-webpki-certs`: TLS verification using `webpki-roots`.
-- `ring-crypto`: TLS crypto via the `ring` crate.
-
-### Optional features
-
-- `sync-sender-qwp-ws`: QWP/WebSocket transport only (subset of `sync-sender`).
-- `chrono_timestamp`: build timestamps from `chrono::DateTime`.
-- `ndarray`: ingest arrays from the [ndarray](https://docs.rs/ndarray) crate.
-- `rust_decimal` / `bigdecimal`: ingest decimals from those crates.
-- `tls-native-certs`: validate TLS against the OS certificate store.
-- `insecure-skip-verify`: disable TLS verification (testing only).
-
-## Migration from ILP (HTTP/TCP)
-
-The buffer API is unchanged. To switch a sender to QWP/WebSocket:
-
-| Aspect | HTTP (ILP) | WebSocket (QWP) |
-|--------|-----------|-----------------|
-| Connect string schema | `http::` / `https::` | `ws::` / `wss::` |
-| Batch trigger | Row/time-based auto-flush (defaults: 75000 rows, 1000 ms) | Explicit `flush()` only |
-| Error model | Synchronous on `flush()` | Async via `poll_qwp_ws_error` / handler |
-| Completion tracking | Implicit per request | Explicit FSN watermarks |
-| Store-and-forward | Not available | Available (`sf_dir`) |
-| Multi-endpoint failover | Not available | Built in (comma-separated `addr`) |
-| Shutdown | `drop` | `close_drain()` then `drop` |
-
-To migrate an existing sender, change the connect string from `http::` to
-`ws::` (or `https::` to `wss::`), drop any `auto_flush_*` keys, install a
-`qwp_ws_error_handler` or poll `poll_qwp_ws_error()`, and call `close_drain()`
-before dropping the sender.
-
-## Full example: multi-host ingestion with failover
-
-This example shows a production ingestion loop with store-and-forward,
-multi-host failover, and proper error handling including the retry pattern
-around `flush()`.
+## Complete example: write then read
 
 ```rust
-use questdb::ingress::{Sender, TimestampNanos};
-use std::{thread, time::Duration};
+use questdb::QuestDb;
+use questdb::ingress::column_sender::{Chunk, AckLevel};
+use questdb::egress::column::ColumnView;
+use std::time::Duration;
 
-fn main() -> questdb::Result<()> {
-    // Multi-host with store-and-forward for failover durability.
-    // Without sf_dir, flush() blocks during an outage and times out
-    // after sf_append_deadline_millis (default 30s). With sf_dir,
-    // flush() writes to disk and returns quickly while the reconnect
-    // loop replays to the new primary in the background.
-    //
-    // - wss + token:                    Enterprise TLS and bearer-token auth.
-    // - addr=h1,h2:                     comma-separated multi-host failover list.
-    // - sf_dir + sender_id:             disk-backed store-and-forward slot.
-    // - reconnect_max_duration_millis:  total outage budget; on expiry the
-    //                                   sender latches terminal (see
-    //                                   `must_close()` below).
-    //
-    // `Sender` is single-owner (every publishing method takes `&mut self`).
-    // For multi-producer patterns, see the "Concurrency" section.
-    let mut sender = Sender::from_conf(
-        "wss::addr=db-primary:9000,db-replica:9000;\
-         token=your_bearer_token;\
-         sf_dir=/var/lib/myapp/qdb-sf;\
-         sender_id=ingest-1;\
-         reconnect_max_duration_millis=300000;"
-    )?;
+// Cargo.toml: questdb-rs = { version = "7", features = ["sync-reader-qwp-ws"] }
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 
-    let mut buffer = sender.new_buffer();
-    let mut bids: Vec<Vec<f64>> = Vec::with_capacity(5);
-    let mut asks: Vec<Vec<f64>> = Vec::with_capacity(5);
+    // --- write (column-major) ---
+    {
+        let mut sender = db.borrow_column_sender()?;
+        let price = [2615.54_f64, 2616.00, 2617.25];
+        let ts_ns = [1_700_000_000_000_000_000_i64, 1_700_000_000_001_000_000, 1_700_000_000_002_000_000];
+        let mut chunk = Chunk::new("trades");
+        chunk.column_f64("price", &price, None)?;
+        chunk.designated_timestamp_nanos(&ts_ns)?;
+        sender.flush(&mut chunk)?;
+        sender.wait(AckLevel::Ok, Duration::ZERO)?;
+    } // sender returns to the pool here
 
-    loop {
-        bids.clear();
-        asks.clear();
-        for lvl in 0..5 {
-            let step = 0.0001 * (lvl as f64 + 1.0);
-            // Each level is [price, size]; deterministic values keep the
-            // example dependency-free, replace with your live feed.
-            bids.push(vec![1.0842 - step, 100_000.0 + 10_000.0 * lvl as f64]);
-            asks.push(vec![1.0842 + step, 100_000.0 + 10_000.0 * lvl as f64]);
-        }
-
-        buffer
-            .table("book")?
-            .symbol("ticker", "EURUSD")?
-            .column_arr("bids", &bids)?
-            .column_arr("asks", &asks)?
-            .at(TimestampNanos::now())?;
-
-        // flush() can still return SubmitTimedOut if the SF queue
-        // fills to sf_max_total_bytes during a prolonged outage.
-        // The buffer is retained on error; retry on the next pass.
-        match sender.flush(&mut buffer) {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("flush error: {e}");
-                // Check if the sender is terminal (auth failure,
-                // reconnect budget exhausted). If so, recreate it.
-                if sender.must_close() {
-                    eprintln!("sender is terminal, exiting");
-                    break;
-                }
-                // Otherwise the buffer still holds the rows;
-                // the next flush() retries them.
+    // --- read ---
+    // NOTE: wait() confirms receipt, not query visibility. In a real
+    // write-then-read flow a freshly written row may not be selectable
+    // immediately — see the visibility note above.
+    {
+        let mut reader = db.borrow_reader()?;
+        let mut cursor = reader.prepare("SELECT ts, price FROM trades ORDER BY ts").execute()?;
+        while let Some(batch) = cursor.next_batch()? {
+            let ColumnView::Timestamp(ts) = batch.column(0)? else { unreachable!() };
+            let ColumnView::Double(price) = batch.column(1)? else { unreachable!() };
+            for r in 0..batch.row_count() {
+                println!("{} -> {}", ts.value(r), price.value(r));
             }
         }
-
-        thread::sleep(Duration::from_millis(500));
     }
 
-    sender.close_drain()?;
+    db.close();
     Ok(())
 }
-
-// Without store-and-forward (sf_dir not set), the same code works for
-// short outages but flush() will return SubmitTimedOut if the in-memory
-// queue fills before the reconnect loop succeeds. For any multi-host
-// deployment where failover may take more than a few seconds, sf_dir
-// is strongly recommended.
 ```
 
 ## Next steps
 
-Explore the full API on the
-[crate docs](https://docs.rs/questdb-rs/latest/questdb/ingress/).
-
-For querying QuestDB from Rust, see the
-[PGWire Rust client](/docs/connect/compatibility/pgwire/rust/) or the
-[REST API](/docs/connect/compatibility/rest-api/).
-
-With data flowing into QuestDB, the next step is querying. See the
-[Query overview](/docs/query/overview/) to learn QuestDB SQL.
-
-Need help? Visit the
-[Community Forum](https://community.questdb.com/).
+- [Connect string reference](/docs/connect/clients/connect-string/)
+- [QWP protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/)
+- [C/C++ pooled API](/docs/connect/clients/c-api-reference/) (the same pool, in C/C++)
+- [Query overview](/docs/query/overview/)
