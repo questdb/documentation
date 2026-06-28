@@ -253,6 +253,11 @@ module.exports = {
               type: "doc",
               label: "QWP Egress (WebSocket)",
             },
+            {
+              id: "connect/wire-protocols/qwp-client-behavior",
+              type: "doc",
+              label: "QWP Client Behaviour",
+            },
           ],
         },
       ],
