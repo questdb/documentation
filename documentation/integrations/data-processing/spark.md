@@ -14,7 +14,7 @@ High-level instructions for loading data from QuestDB to Spark and back.
 ## What is Spark?
 
 [Apache Spark](https://spark.apache.org/) is an analytics engine for large-scale
-data engineering and [stream processing](/glossary/stream-processing),
+data engineering and [stream processing](/glossary/stream-processing/),
 well-known in the big data landscape. It is suitable for executing data
 engineering, data science, and machine learning on single-node machines or
 clusters.
