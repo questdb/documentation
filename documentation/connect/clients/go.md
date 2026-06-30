@@ -16,8 +16,17 @@ The QuestDB Go client connects to QuestDB over
 columnar binary protocol carried over WebSocket. It supports high-throughput
 data ingestion and streaming SQL queries on the same transport.
 
+The recommended entry point is the [`QuestDB`](#the-questdb-handle) handle: a
+shared, goroutine-safe facade that owns connection pools for both ingress and
+egress.
+
 Key capabilities:
 
+- **One handle, both directions**: `qdb.Connect(...)` configures ingress and
+  egress from a single `ws`/`wss` connect string; `db.BorrowSender(...)` for
+  ingestion, `db.BorrowQuery(...)` for SQL.
+- **Pooled connections**: elastic sender and query pools that close idle
+  connections, shared safely across goroutines.
 - **Ingestion**: column-oriented batched writes with automatic table creation,
   schema evolution, and optional store-and-forward durability.
 - **Querying**: streaming SQL result sets, DDL and DML execution, bind
@@ -42,43 +51,8 @@ The client requires Go 1.23 or later. Add it to your module:
 go get github.com/questdb/go-questdb-client/v4
 ```
 
-### Ingest data
-
-```go
-package main
-
-import (
-	"context"
-
-	qdb "github.com/questdb/go-questdb-client/v4"
-)
-
-func main() {
-	ctx := context.TODO()
-
-	sender, err := qdb.LineSenderFromConf(ctx, "ws::addr=localhost:9000;")
-	if err != nil {
-		panic(err)
-	}
-	defer sender.Close(ctx)
-
-	err = sender.Table("trades").
-		Symbol("symbol", "ETH-USD").
-		Symbol("side", "sell").
-		Float64Column("price", 2615.54).
-		Float64Column("amount", 0.00044).
-		AtNow(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := sender.Flush(ctx); err != nil {
-		panic(err)
-	}
-}
-```
-
-### Query data
+Construct one `QuestDB` handle per deployment, share it across goroutines, and
+close it at shutdown. Borrow a sender to ingest and a query session to read:
 
 ```go
 package main
@@ -93,18 +67,45 @@ import (
 func main() {
 	ctx := context.TODO()
 
-	client, err := qdb.NewQwpQueryClient(ctx,
-		qdb.WithQwpQueryAddress("localhost:9000"))
+	// One ws/wss config drives both the ingest and the query pool.
+	db, err := qdb.Connect(ctx, "ws::addr=localhost:9000;")
 	if err != nil {
 		panic(err)
 	}
-	defer client.Close(ctx)
+	defer db.Close(ctx)
 
-	q := client.Query(ctx,
+	// Ingest: borrow a sender, write rows, Close returns it to the pool.
+	sender, err := db.BorrowSender(ctx)
+	if err != nil {
+		panic(err)
+	}
+	err = sender.Table("trades").
+		Symbol("symbol", "ETH-USD").
+		Symbol("side", "sell").
+		Float64Column("price", 2615.54).
+		Float64Column("amount", 0.00044).
+		AtNow(ctx)
+	if err != nil {
+		panic(err)
+	}
+	if err := sender.Flush(ctx); err != nil {
+		panic(err)
+	}
+	if err := sender.Close(ctx); err != nil { // flush + return to pool
+		panic(err)
+	}
+
+	// Query: borrow a session, run a SELECT, iterate its result batches.
+	query, err := db.BorrowQuery(ctx)
+	if err != nil {
+		panic(err)
+	}
+	defer query.Close()
+
+	cursor := query.Query(ctx,
 		"SELECT symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 10")
-	defer q.Close()
-
-	for batch, err := range q.Batches() {
+	defer cursor.Close()
+	for batch, err := range cursor.Batches() {
 		if err != nil {
 			panic(err)
 		}
@@ -115,17 +116,25 @@ func main() {
 }
 ```
 
+<RemoteRepoExample name="qwp-pool" lang="go" header={false} />
+
+The `QuestDB` handle is a facade over two pools: a sender pool for ingestion
+(`db.BorrowSender`) and a query pool for SQL (`db.BorrowQuery`). Both speak QWP,
+so a single `ws` or `wss` connect string passed to `qdb.Connect(...)` configures
+both. Each side reads the connect-string keys it owns and ignores the rest.
+
 :::caution Read before building on these snippets
 
-The two snippets above are deliberately minimal. Three behaviors will cause
-data loss, corruption, or panics if you carry the minimal form into real code:
+The snippet above is deliberately minimal. Three behaviors will cause data
+loss, corruption, or panics if you carry the minimal form into real code:
 
 - **Ingestion errors are asynchronous.** `Flush` returning `nil` does **not**
   mean the server accepted the rows. Schema, parse, and write rejections are
-  delivered out of band. Register an error handler. See
-  [Ingestion errors](#ingestion-errors).
-- **A sender or query client is not safe for concurrent use.** Use one per
-  goroutine. See [Concurrency](#concurrency).
+  delivered out of band. Register an error handler with
+  `qdb.WithQuestDBErrorHandler`. See [Ingestion errors](#ingestion-errors).
+- **A borrowed sender or query session is not safe for concurrent use.** The
+  `QuestDB` handle is; an individual borrow is not. Borrow one per goroutine.
+  See [Concurrency](#concurrency).
 - **A query batch is valid only inside its loop iteration.** Some accessors
   alias the network buffer. Copy out anything you keep. See
   [Reading result batches](#reading-result-batches).
@@ -137,156 +146,250 @@ applications can ignore them.
 
 :::
 
+## The QuestDB handle
+
+`QuestDB` is a handle for a QuestDB deployment: you create one, share it across
+your application's goroutines, and close it at shutdown. It owns an elastic pool
+of each client type — senders for ingestion and query sessions for SQL — plus a
+background housekeeper goroutine that closes idle and over-age connections.
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `qdb.Connect(ctx, conf)` | `*QuestDB` | Open a handle with default pool sizing. One `ws`/`wss` string for both directions. |
+| `qdb.NewQuestDB(ctx, conf, opts...)` | `*QuestDB` | Same, with pool-tuning [options](#options-api). |
+| `db.BorrowSender(ctx)` | `LineSender` | Lease a sender from the pool; `Close` flushes and returns it. |
+| `db.BorrowQuery(ctx)` | `*Query` | Lease a query session; `Close` returns it. |
+| `db.Close(ctx)` | `error` | Shut down both pools and disconnect every underlying client. Idempotent. |
+
+A `*QuestDB` is safe to share across goroutines: `BorrowSender`, `BorrowQuery`,
+and `Close` may be called concurrently. The leases they hand back are **not** —
+use one per goroutine (see [Concurrency](#concurrency)).
+
+### Single connect string
+
+```go
+db, err := qdb.Connect(ctx, "ws::addr=localhost:9000;")
+```
+
+The schema must be `ws` or `wss`. QuestDB ingests and queries over QWP, so the
+pooled facade is WebSocket-only and rejects `http`/`https`/`tcp` and the other
+legacy ILP schemas. (The low-level [`LineSender`](#low-level-primitives) speaks
+those transports; only the `QuestDB` facade is QWP-only.)
+
+The string is handed to both the ingress sender and the egress query client
+verbatim. Each direction reads the keys it owns and ignores keys meant only for
+the other, so ingress-only and egress-only options coexist in one string:
+
+```go
+db, err := qdb.Connect(ctx,
+	"wss::addr=db.example.com:9000;"+
+		"token=YOUR_TOKEN;"+     // common: authenticates both directions
+		"auto_flush_rows=5000;"+ // ingress-only: the query side ignores it
+		"compression=zstd;")     // egress-only: the sender ignores it
+```
+
+`addr`, the credentials (`username`/`password` or `token`), the `tls_*` keys,
+and `connect_timeout` are **common** — they apply to both directions. The Go
+facade takes a single config string for the whole cluster; list every node in
+one `addr` server list.
+
+### Options API
+
+`qdb.NewQuestDB(ctx, conf, opts...)` accepts the same config string plus
+type-safe pool-tuning options. An explicit option always wins over the matching
+connect-string key.
+
+```go
+db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
+	qdb.WithSenderPoolMin(2),
+	qdb.WithSenderPoolMax(8),
+	qdb.WithQueryPoolMax(16),
+	qdb.WithAcquireTimeout(10*time.Second),
+	qdb.WithIdleTimeout(60*time.Second),
+	qdb.WithMaxLifetime(30*time.Minute),
+	qdb.WithQuestDBErrorHandler(func(e *qdb.SenderError) { /* see Error handling */ }),
+	qdb.WithQuestDBConnectionListener(func(e qdb.SenderConnectionEvent) { /* see Connection events */ }))
+```
+
+| Option | Default | Purpose |
+|--------|---------|---------|
+| `WithSenderPoolMin(int)` | `1` | Senders kept open even when idle. `0` lets the pool close them all. |
+| `WithSenderPoolMax(int)` | `4` | Maximum senders the pool opens. |
+| `WithQueryPoolMin(int)` | `1` | Query sessions kept open even when idle (`0` with `lazy_connect`). |
+| `WithQueryPoolMax(int)` | `4` | Maximum query sessions the pool opens. |
+| `WithAcquireTimeout(d)` | `5s` | How long `BorrowSender`/`BorrowQuery` wait for a free connection when the pool is at `max`. |
+| `WithIdleTimeout(d)` | `60s` | How long an above-`min` connection stays idle before the housekeeper closes it. `0` keeps idle connections forever. |
+| `WithMaxLifetime(d)` | `30m` | Maximum age of a connection before recycling. `0` disables age recycling. |
+| `WithHousekeeperInterval(d)` | `5s` | How often the housekeeper checks for idle and over-age connections. |
+| `WithQuestDBErrorHandler(h)` | — | Ingest [`SenderErrorHandler`](#ingestion-errors) applied to every pooled sender. |
+| `WithQuestDBConnectionListener(l)` | — | [`SenderConnectionListener`](#connection-events) applied to every pooled sender. |
+
+Unlike the Java facade, the Go `QuestDB` handle accepts the ingest error handler
+and connection listener directly, so you do not need to drop down to the
+low-level sender to observe rejections or connection-state transitions.
+
+### From an environment variable
+
+Set `QDB_CLIENT_CONF` to avoid hard-coding credentials, then read it and pass it
+to `qdb.Connect`:
+
+```bash
+export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;token=YOUR_TOKEN;"
+```
+
+```go
+db, err := qdb.Connect(ctx, os.Getenv("QDB_CLIENT_CONF"))
+```
+
+### Connect-string pool keys
+
+The pool-tuning options can also live in the connect string itself. They belong
+to the facade: the sender and query parsers accept and ignore them, while the
+facade reads them off the string.
+
+| Key                       | Option equivalent             |
+|---------------------------|-------------------------------|
+| `sender_pool_min`         | `WithSenderPoolMin(int)`      |
+| `sender_pool_max`         | `WithSenderPoolMax(int)`      |
+| `query_pool_min`          | `WithQueryPoolMin(int)`       |
+| `query_pool_max`          | `WithQueryPoolMax(int)`       |
+| `acquire_timeout_ms`      | `WithAcquireTimeout(d)`       |
+| `idle_timeout_ms`         | `WithIdleTimeout(d)`          |
+| `max_lifetime_ms`         | `WithMaxLifetime(d)`          |
+| `housekeeper_interval_ms` | `WithHousekeeperInterval(d)`  |
+| `lazy_connect`            | — (facade-only, see [below](#tolerating-a-down-server-at-startup)) |
+
+An explicit option setter always wins over the same key in the string.
+
 ## Authentication and TLS
 
-Authentication happens at the HTTP level during the WebSocket upgrade, before
-any binary frames are exchanged. The same mechanisms work for both the
-`LineSender` (ingestion) and the `QwpQueryClient` (querying).
+QWP runs over WebSocket, so authentication uses HTTP-style credentials sent on
+the WebSocket upgrade request — for both ingress and egress, before any data is
+exchanged. The credential and TLS keys (`token`, `username`/`password`, `tls_*`)
+are common to both directions, so a single `qdb.Connect(...)` string
+authenticates both pools.
+
+### Token auth (Enterprise, recommended)
+
+Token authentication avoids the per-request overhead of basic auth and is the
+recommended path for Enterprise deployments.
+
+```go
+db, err := qdb.Connect(ctx,
+	"wss::addr=db.example.com:9000;token=YOUR_BEARER_TOKEN;")
+```
+
+The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on both
+the ingress and egress WebSocket upgrades. It is a **static credential**: the
+client sends exactly the string you pass and never refreshes or renews it.
+Acquire it out of band — QuestDB Enterprise issues bearer tokens through its
+[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime yourself.
+When the token expires or is rotated, construct a new handle with the new token.
+An expired or rejected token surfaces as an authentication failure (see
+[Connection-level errors](#connection-level-errors)). It is mutually exclusive
+with `username`/`password`.
 
 ### HTTP basic auth
 
 ```go
-// Ingestion
-sender, err := qdb.LineSenderFromConf(ctx,
-	"wss::addr=db.example.com:9000;username=admin;password=quest;")
-
-// Querying
-client, err := qdb.QwpQueryClientFromConf(ctx,
+db, err := qdb.Connect(ctx,
 	"wss::addr=db.example.com:9000;username=admin;password=quest;")
 ```
 
-The options API exposes the same settings:
-
-```go
-sender, err := qdb.NewLineSender(ctx,
-	qdb.WithQwp(),
-	qdb.WithAddress("db.example.com:9000"),
-	qdb.WithTls(),
-	qdb.WithBasicAuth("admin", "quest"))
-```
-
-### Token auth (Enterprise, recommended)
-
-Token authentication avoids the per-request overhead of basic auth and is
-the recommended path for Enterprise deployments.
-
-```go
-sender, err := qdb.LineSenderFromConf(ctx,
-	"wss::addr=db.example.com:9000;token=your_bearer_token;")
-
-client, err := qdb.NewQwpQueryClient(ctx,
-	qdb.WithQwpQueryAddress("db.example.com:9000"),
-	qdb.WithQwpQueryTls(),
-	qdb.WithQwpQueryBearerToken("your_bearer_token"))
-```
-
-The token is a **static credential**: the client sends exactly the string
-you pass and never refreshes or renews it. Acquire it out of band — QuestDB
-Enterprise issues bearer tokens through its
-[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime
-yourself. There is no token-refresh callback: when the token expires or is
-rotated, construct a new sender or query client with the new token. An
-expired or rejected token surfaces as an authentication failure (see
-[Connection-level errors](#connection-level-errors)).
-
-### Production example (TLS + token + multi-host)
-
-A realistic Enterprise deployment combines `wss`, token auth, and a
-multi-host `addr` list. The `target` key controls which server roles the
-client will connect to: `primary` for the authoritative write node,
-`replica` for read-only replicas, or `any` (default) for either.
-
-```go
-// Ingestion: connect to any writeable node
-sender, err := qdb.LineSenderFromConf(ctx,
-	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
-		"token=your_bearer_token;")
-
-// Querying: prefer a replica to offload the primary
-client, err := qdb.QwpQueryClientFromConf(ctx,
-	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
-		"token=your_bearer_token;target=replica;")
-```
+`username`/`password` are common keys, so this authenticates both the ingress
+and egress upgrades. Both halves must be present together, and they are mutually
+exclusive with `token`.
 
 ### TLS trust store
 
-TLS is enabled by the `wss` schema (or `qdb.WithTls()`). The Go client
-verifies the server certificate against the **operating-system trust
-store**. It does **not** support a custom trust store: the `tls_roots` /
-`tls_roots_password` connect-string keys (a Java-keystore feature) are
-rejected by the Go connect-string parser. To trust a private CA, install it
-in the host trust store. For test-only certificate-verification bypass, see
-`tls_verify` in the
-[TLS section](/docs/connect/clients/connect-string#tls) of the connect
-string reference.
+TLS is enabled by the `wss` schema. The Go client verifies the server
+certificate against the **operating-system trust store**. It does **not**
+support a custom trust store: the `tls_roots` / `tls_roots_password`
+connect-string keys (a Java-keystore feature) are rejected by the Go
+connect-string parser. To trust a private CA, install it in the host trust
+store. For test-only certificate-verification bypass, use `tls_verify=unsafe_off`
+(**never in production**); see the
+[TLS section](/docs/connect/clients/connect-string#tls) of the connect string
+reference.
 
-## Creating the client
+### Production example (TLS + token + multi-host)
 
-### From a connect string
-
-The connect string format is `<schema>::<key>=<value>;<key>=<value>;...;`. Use
-`ws` for plain WebSocket or `wss` for TLS:
-
-```go
-sender, err := qdb.LineSenderFromConf(ctx, "ws::addr=localhost:9000;")
-
-client, err := qdb.QwpQueryClientFromConf(ctx, "ws::addr=localhost:9000;")
-```
-
-For the full list of connect-string keys, see the
-[connect string reference](/docs/connect/clients/connect-string/).
-
-### From an environment variable
-
-Set `QDB_CLIENT_CONF` to avoid hard-coding credentials:
-
-```bash
-export QDB_CLIENT_CONF="wss::addr=db.example.com:9000;username=admin;password=quest;"
-```
+A realistic Enterprise deployment combines `wss`, token auth, and a multi-host
+`addr` list. The `target` key controls which server roles the query pool
+connects to: `primary` for the authoritative write node, `replica` for
+read-only replicas, or `any` (default) for either. (Ingest always lands on the
+primary — replicas reject write connections — so it accepts but ignores
+`target`.)
 
 ```go
-sender, err := qdb.LineSenderFromEnv(ctx)
+db, err := qdb.Connect(ctx,
+	"wss::addr=db-1.example.com:9000,db-2.example.com:9000;"+
+		"token=YOUR_BEARER_TOKEN;target=replica;")
 ```
 
-### Using the options API
+## The connection pool
 
-The options API exposes the same options as the connect string, with type-safe
-Go signatures (e.g., `sf_append_deadline_millis` becomes
-`qdb.WithSfAppendDeadline(30*time.Second)`). For the full list of keys, see
-the [connect string reference](/docs/connect/clients/connect-string/).
+Both pools are *elastic*. Each holds live connections — pooled senders in one,
+query sessions in the other. A pool keeps at least `min` connections open and
+ready, opens more on demand up to `max`, and a background **housekeeper**
+goroutine closes connections left idle too long, down to `min`.
 
-`NewLineSender` requires exactly one transport option (`qdb.WithQwp()` here);
-`LineSenderFromConf` infers the transport from the `ws`/`wss` schema instead.
-An error handler can only be set through the options API:
+### Borrowing and returning
 
 ```go
-sender, err := qdb.NewLineSender(ctx,
-	qdb.WithQwp(),
-	qdb.WithAddress("localhost:9000"),
-	qdb.WithAutoFlushRows(500),
-	qdb.WithAutoFlushInterval(50*time.Millisecond),
-	qdb.WithErrorHandler(func(e *qdb.SenderError) { /* see Error handling */ }))
-
-client, err := qdb.NewQwpQueryClient(ctx,
-	qdb.WithQwpQueryAddress("localhost:9000"),
-	qdb.WithQwpQueryInitialCredit(256*1024))
+sender, err := db.BorrowSender(ctx)
+if err != nil {
+	return err
+}
+sender.Table("trades").Float64Column("price", 42.0).AtNow(ctx)
+if err := sender.Close(ctx); err != nil { // flush + return to the pool
+	return err
+}
 ```
+
+`Close` on a borrowed sender flushes pending rows and returns it to the pool for
+reuse — it does **not** disconnect the underlying WebSocket. A real disconnect
+only happens at `db.Close(ctx)` (or when the housekeeper closes an idle
+connection). Leases are generation-stamped: a handle kept after `Close` cannot
+corrupt the borrow that next reuses its slot.
+
+The same lifecycle applies to a borrowed query session: `db.BorrowQuery(ctx)`
+hands back a `*Query`, and its `Close` returns it to the query pool.
+
+### Acquire timeout
+
+Both `BorrowSender` and `BorrowQuery` take a connection from a pool. When every
+connection is in use and the pool has already grown to `max`, the call blocks,
+waiting for another caller to return one. It proceeds the moment a connection
+frees up, or, if the acquire timeout (default 5s) elapses first, returns an
+error. Raise `WithAcquireTimeout` to ride out longer bursts, or raise `max` to
+allow more concurrency.
+
+### Tolerating a down server at startup
+
+By default the pool prewarms `min` connections eagerly, so `Connect` fails fast
+if the server is unreachable. Set `lazy_connect=true` to tolerate a down server
+at startup:
+
+```go
+db, err := qdb.Connect(ctx, "ws::addr=localhost:9000;lazy_connect=true;")
+```
+
+With `lazy_connect`, the ingest pool connects asynchronously (writes buffer
+until the wire comes up) and the query pool defaults to `query_pool_min=0`,
+connecting on the first `BorrowQuery`. The handle builds successfully even while
+the server is down. `lazy_connect` is a facade-only key; standalone clients
+accept but ignore it.
 
 ## Data ingestion
 
-### Concurrency
-
-A `LineSender` owns a single connection and is **not safe for concurrent
-use**. Sharing one across goroutines corrupts the buffer and interleaves
-rows. Create one sender per goroutine, or hand rows to a single dedicated
-writer goroutine through a channel.
-
-Connection pooling (`LineSenderPool`) targets the stateless HTTP transport and
-is not available for QWP, so it is not the answer to QWP concurrency.
+Once you have a sender from the pool (or a standalone
+[`LineSender`](#low-level-primitives)), the row-building API is identical across
+all transports.
 
 ### General usage pattern
 
-1. Create a sender via `qdb.LineSenderFromConf()` or `qdb.NewLineSender()`.
+1. Borrow a sender via `db.BorrowSender(ctx)`.
 2. Call `Table(name)` to select a table.
 3. Call column methods to add values:
    - `Symbol(name, value)`
@@ -300,7 +403,7 @@ is not available for QWP, so it is not the answer to QWP concurrency.
      [Decimal columns](#decimal-columns))
 4. Call `At(ctx, time.Time)` or `AtNow(ctx)` to finalize the row.
 5. Repeat from step 2, or call `Flush(ctx)` to send buffered data.
-6. Call `Close(ctx)` when done.
+6. Call `Close(ctx)` to flush and return the sender to the pool.
 
 The call order is fixed: `Table`, then `Symbol`s, then column setters, then
 `At`/`AtNow`. The fluent methods do not return errors; the first error is
@@ -310,10 +413,10 @@ return value.
 :::caution The error from `At`/`AtNow`/`Flush` is only the local error
 
 It reports a client-side problem: a bad value, wrong call order, or
-store-and-forward backpressure. Server-side rejections (schema mismatch,
-parse error, write error) are **asynchronous** and are delivered to the
-error handler, never returned here. A `nil` return does not mean the server
-accepted the data. See [Ingestion errors](#ingestion-errors).
+store-and-forward backpressure. Server-side rejections (schema mismatch, parse
+error, write error) are **asynchronous** and are delivered to the error handler,
+never returned here. A `nil` return does not mean the server accepted the data.
+See [Ingestion errors](#ingestion-errors).
 
 :::
 
@@ -323,19 +426,28 @@ QWP producer:
 
 <RemoteRepoExample name="qwp-ingest" lang="go" header={false} />
 
-The QWP transport exposes column types that are not part of ILP. Type-assert
-the sender to `qdb.QwpSender` with the comma-ok form (only `ws`/`wss` senders
-implement it; an HTTP or TCP sender does not):
+### QWP-only column types
+
+`BorrowSender` returns a `LineSender`. The QWP transport exposes column types
+that are not part of ILP; type-assert the sender to `qdb.QwpSender` with the
+comma-ok form (every pooled sender is a QWP sender, so the assertion always
+succeeds — but check it, as a standalone HTTP or TCP sender would not):
 
 ```go
-sender, err := qdb.LineSenderFromConf(ctx, "ws::addr=localhost:9000;")
+sender, err := db.BorrowSender(ctx)
+if err != nil {
+	panic(err)
+}
 qs, ok := sender.(qdb.QwpSender)
 if !ok {
 	panic("not a QWP sender")
 }
 
-err = qs.Table("trades").
-	Symbol("symbol", "ETH-USD").
+// Table and Symbol return LineSender, so call them first; then chain the
+// QWP-only setters (which return QwpSender) into AtNano.
+qs.Table("trades")
+qs.Symbol("symbol", "ETH-USD")
+err = qs.
 	Int32Column("venue_id", 7).
 	CharColumn("side", 'S').
 	UuidColumn("order_id", hi, lo).
@@ -345,18 +457,19 @@ err = qs.Table("trades").
 `QwpSender` adds `ByteColumn`, `ShortColumn`, `Int32Column`, `Float32Column`,
 `CharColumn`, `DateColumn`, `TimestampNanosColumn`, `UuidColumn`,
 `GeohashColumn`, `Int64Array1DColumn` / `2D` / `3D`, the decimal columns, and
-`AtNano` for nanosecond designated timestamps.
+`AtNano` for nanosecond designated timestamps. It also exposes the
+acknowledgement and observability accessors (`AwaitAckedFsn`,
+`FlushAndGetSequence`, `TotalReconnectAttempts`, `LastTerminalError`, …).
 
 ### Null values
 
-The client has no null setter. To store a null for a column in a given row,
-omit that column's setter before `At`/`AtNow`/`AtNano`. On row commit, every
-column not set in the row is gap-filled with a null, so omitting a column and
-writing an "explicit null" are the same operation.
+The client has no null setter. To store a null for a column in a given row, omit
+that column's setter before `At`/`AtNow`/`AtNano`. On row commit, every column
+not set in the row is gap-filled with a null, so omitting a column and writing an
+"explicit null" are the same operation.
 
-The buffered column set is the union across the batch: a column first used on
-a later row is backfilled with null for every earlier row still in the send
-buffer.
+The buffered column set is the union across the batch: a column first used on a
+later row is backfilled with null for every earlier row still in the send buffer.
 
 ### Ingest arrays
 
@@ -379,14 +492,14 @@ err = sender.Table("book").Float64ArrayNDColumn("cube", arr).AtNow(ctx)
 ```
 
 Values are stored in row-major order: the last dimension varies fastest. Use
-`Set(value, positions...)` to write at specific coordinates, `Append(value)`
-for sequential fills, and `Reshape(shape...)` to change the shape without
+`Set(value, positions...)` to write at specific coordinates, `Append(value)` for
+sequential fills, and `Reshape(shape...)` to change the shape without
 reallocating.
 
 ### Designated timestamp
 
-The [designated timestamp](/docs/concepts/designated-timestamp/) column
-controls time-based partitioning and ordering:
+The [designated timestamp](/docs/concepts/designated-timestamp/) column controls
+time-based partitioning and ordering:
 
 ```go
 // User-assigned (recommended for deduplication and exactly-once delivery)
@@ -395,11 +508,13 @@ err = sender.Table("trades").
 	Float64Column("price", 1.0842).
 	At(ctx, time.Now())
 
-// Nanosecond precision (creates a timestamp_ns column); QwpSender only
-err = qs.Table("ticks").
+// Nanosecond precision (creates a timestamp_ns column); QwpSender only.
+// AtNano is a QwpSender method, so call it on qs directly (Table/Symbol/
+// Float64Column return LineSender).
+qs.Table("ticks").
 	Symbol("symbol", "EURUSD").
-	Float64Column("price", 1.0842).
-	AtNano(ctx, time.Now())
+	Float64Column("price", 1.0842)
+err = qs.AtNano(ctx, time.Now())
 
 // Server-assigned (server uses its wall-clock time)
 err = sender.Table("trades").
@@ -409,23 +524,21 @@ err = sender.Table("trades").
 ```
 
 :::caution
-A table's designated timestamp resolution is fixed by its first row. Mixing
-`At` (microseconds) and `AtNano` (nanoseconds) on rows of the same table
-within one flush returns a type-conflict error. Pick one resolution per
-table.
+A table's designated timestamp resolution is fixed by its first row. Mixing `At`
+(microseconds) and `AtNano` (nanoseconds) on rows of the same table within one
+flush returns a type-conflict error. Pick one resolution per table.
 :::
 
 :::note
-QuestDB works best when data arrives in chronological order, sorted by
-timestamp.
+QuestDB works best when data arrives in chronological order, sorted by timestamp.
 :::
 
 ### Decimal columns
 
 :::caution
 Decimal values require QuestDB 9.2.0 or later. Create decimal columns ahead of
-time with `DECIMAL(precision, scale)` so QuestDB ingests values with the
-expected precision. See the
+time with `DECIMAL(precision, scale)` so QuestDB ingests values with the expected
+precision. See the
 [decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
 page for details.
 :::
@@ -440,8 +553,9 @@ if err != nil {
 	panic(err)
 }
 
-err = qs.Table("trade_fees").
-	Symbol("symbol", "ETH-USD").
+qs.Table("trade_fees")
+qs.Symbol("symbol", "ETH-USD")
+err = qs.
 	Decimal128Column("settled_price", price).
 	Decimal128Column("commission", commission).
 	AtNow(ctx)
@@ -461,8 +575,9 @@ Auto-flush (default) flushes when either threshold is reached:
 
 | Trigger   | WebSocket default | HTTP default |
 | --------- | ----------------- | ------------ |
-| Row count | 1,000 rows        | 75,000 rows  |
-| Time      | 100 ms            | 1,000 ms     |
+| Row count (`auto_flush_rows`)    | 1,000 rows | 75,000 rows |
+| Interval (`auto_flush_interval`) | 100 ms     | 1,000 ms    |
+| Byte size (`auto_flush_bytes`)   | 8 MiB      | disabled    |
 
 Customize via the connect string or the options API:
 
@@ -471,26 +586,26 @@ ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 ```
 
 `Flush(ctx)` sends buffered data immediately. It returns once the rows are
-published into the cursor engine (in memory, or on disk when `sf_dir` is
-set) — it does **not** wait for the server to acknowledge them. Delivery and
-acknowledgement happen asynchronously on the send loop; a server-side
-rejection surfaces on the error handler, never as a `Flush` error (see
-[Ingestion errors](#ingestion-errors)). For explicit server-ack
-confirmation, pair `FlushAndGetSequence` with `AwaitAckedFsn` (below). Write
-many rows per `Flush`; calling it after every row collapses throughput.
+published into the cursor engine (in memory, or on disk when `sf_dir` is set) —
+it does **not** wait for the server to acknowledge them. Delivery and
+acknowledgement happen asynchronously on the send loop; a server-side rejection
+surfaces on the error handler, never as a `Flush` error (see
+[Ingestion errors](#ingestion-errors)). For explicit server-ack confirmation,
+pair `FlushAndGetSequence` with `AwaitAckedFsn` (below). Write many rows per
+`Flush`; calling it after every row collapses throughput.
 
 :::caution
 If you disable auto-flush (`auto_flush=off` or `qdb.WithAutoFlushDisabled()`),
-nothing is sent until you call `Flush` yourself. `Close` does a final flush,
-but it is best-effort, bounded by `close_flush_timeout_millis`, and not
-retried on failure. An app that disables auto-flush and never calls `Flush`
-loses everything it buffered.
+nothing is sent until you call `Flush` yourself. `Close` does a final flush, but
+it is best-effort, bounded by `close_flush_timeout_millis`, and not retried on
+failure. An app that disables auto-flush and never calls `Flush` loses everything
+it buffered.
 :::
 
-`QwpSender.FlushAndGetSequence(ctx)` returns the published frame sequence
-number (FSN), and `AwaitAckedFsn(ctx, target)` blocks until the server has
-acknowledged up to a given FSN. Use the FSN to correlate a publish with any
-later `SenderError`.
+`QwpSender.FlushAndGetSequence(ctx)` returns the published frame sequence number
+(FSN), and `AwaitAckedFsn(ctx, target)` blocks until the server has acknowledged
+up to a given FSN. Use the FSN to correlate a publish with any later
+`SenderError`.
 
 ### Store-and-forward
 
@@ -503,23 +618,26 @@ ws::addr=localhost:9000;sf_dir=/var/lib/questdb/sf;sender_id=ingest-1;
 
 When multiple senders share the same `sf_dir`, each must have a distinct
 `sender_id`. Slots are exclusive: two senders with the same ID will collide.
-Allowed characters: `A-Za-z0-9_-`.
+Allowed characters: `A-Za-z0-9_-`. When the `QuestDB` pool runs in
+store-and-forward mode, it assigns each pooled sender its own slot under the
+base `sender_id`, so slots never collide and crash-stranded slots are recovered
+automatically.
 
-Without `sf_dir`, unacknowledged data lives in process memory and is lost if
-the sender process dies. The reconnect loop still spans transient server
-outages, but the RAM buffer caps how much data can accumulate.
+Without `sf_dir`, unacknowledged data lives in process memory and is lost if the
+sender process dies. The reconnect loop still spans transient server outages, but
+the RAM buffer caps how much data can accumulate.
 
 <SfDedupWarning />
 
-With store-and-forward enabled, `At`/`AtNow`/`Flush` can block when the
-buffer hits its cap. The producer blocks until the wire path drains enough
-capacity, then returns a deadline error (`sf_append_deadline_millis`) if it
-does not drain in time. Treat a blocking call as a signal that the server is
-unreachable or slow, not as a reason to retry in a tight loop.
+With store-and-forward enabled, `At`/`AtNow`/`Flush` can block when the buffer
+hits its cap. The producer blocks until the wire path drains enough capacity,
+then returns a deadline error (`sf_append_deadline_millis`) if it does not drain
+in time. Treat a blocking call as a signal that the server is unreachable or
+slow, not as a reason to retry in a tight loop.
 
-Terminal rejections (schema, parse, or security errors) latch a terminal
-error. The next producer call returns it as a typed `*SenderError`; the
-sender will not drain further. Close it and create a new sender to continue.
+Terminal rejections (schema, parse, or security errors) latch a terminal error.
+The next producer call returns it as a typed `*SenderError`; the sender will not
+drain further. Close it and borrow a new one to continue.
 
 For concepts, sizing, and recovery, see
 [store-and-forward](/docs/high-availability/store-and-forward/concepts/) and the
@@ -542,38 +660,38 @@ until the batch has been durably uploaded to object storage. See the
 
 Durable-ack mode is a deferred follow-up in this client. Passing
 `request_durable_ack=on;` (or `=true`) in the connect string is **rejected at
-construction** with an `InvalidConfigStr` error; the only accepted value
-today is `request_durable_ack=off` (the default). Until the feature ships,
-the sender confirms on the transport-level OK ACK and ignores
-`STATUS_DURABLE_ACK` frames.
+construction** with an `InvalidConfigStr` error; the only accepted value today is
+`request_durable_ack=off` (the default). Until the feature ships, the sender
+confirms on the transport-level OK ACK and ignores `STATUS_DURABLE_ACK` frames.
 
 :::
 
 ## Querying and SQL execution
 
-The `QwpQueryClient` sends SQL statements over the
-[QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint.
-`Query` returns a streaming cursor for SELECT statements; `Exec` runs DDL and
-DML and returns an `ExecResult`. Both block until the statement completes, so
-you can sequence operations safely:
+Borrow a query session with `db.BorrowQuery(ctx)`. The returned `*Query`
+delegates to the QWP [egress](/docs/connect/wire-protocols/qwp-egress-websocket/)
+endpoint: `Query` returns a streaming cursor for SELECT statements; `Exec` runs
+DDL and DML and returns an `ExecResult`. Both block until the statement
+completes, so you can sequence operations safely. `Close` returns the session to
+the pool:
 
 <RemoteRepoExample name="qwp-query" lang="go" header={false} />
 
-A `QwpQueryClient` is **not safe for concurrent `Query` or `Exec` calls**, and
-it runs **one query at a time** (the protocol is single-in-flight in this
-release). Use one client per query-issuing goroutine. `Cancel` (on a
-`*QwpQuery`) and `Close` are safe to call from other goroutines. A `*QwpQuery`
-is single-use: once its `Batches()` range ends, do not iterate it again.
+A borrowed query session runs **one query at a time** (the protocol is
+single-in-flight in this release) and is **not safe for concurrent `Query` or
+`Exec` calls**. To run queries in parallel, borrow one session per goroutine —
+the query pool's `max` caps overall concurrency. `Cancel` (on the cursor) and
+`Close` are safe to call from other goroutines. A cursor is single-use: once its
+`Batches()` range ends, do not iterate it again.
 
-Results stream as a sequence of batches. Process each batch as it arrives
-rather than collecting an entire large result set in memory. For big result
-sets, bound how fast the server pushes with
-[flow control](#flow-control).
+Results stream as a sequence of batches. Process each batch as it arrives rather
+than collecting an entire large result set in memory. For big result sets, bound
+how fast the server pushes with [flow control](#flow-control).
 
 ### Executing SELECT queries
 
-The simple, single-host idiom is to treat any non-`nil` error from the
-iteration as terminal. This is always safe, including under failover:
+The simple, single-host idiom is to treat any non-`nil` error from the iteration
+as terminal. This is always safe, including under failover:
 
 ```go
 type Trade struct {
@@ -582,11 +700,17 @@ type Trade struct {
 	Price    float64
 }
 
-var trades []Trade
-q := client.Query(ctx, "SELECT ts, symbol, price FROM trades LIMIT 1000")
-defer q.Close()
+query, err := db.BorrowQuery(ctx)
+if err != nil {
+	return err
+}
+defer query.Close()
 
-for batch, err := range q.Batches() {
+var trades []Trade
+cursor := query.Query(ctx, "SELECT ts, symbol, price FROM trades LIMIT 1000")
+defer cursor.Close()
+
+for batch, err := range cursor.Batches() {
 	if err != nil {
 		return err // simple apps: any error is terminal
 	}
@@ -602,18 +726,18 @@ for batch, err := range q.Batches() {
 
 :::caution Copy aliasing values out before the iteration ends
 
-A `*QwpColumnBatch` is valid only during its iteration of the loop. Never
-store the batch itself; use `batch.CopyAll()` for a retainable snapshot.
-Which accessors alias the receive buffer and which return caller-owned data:
+A `*QwpColumnBatch` is valid only during its iteration of the loop. Never store
+the batch itself; use `batch.CopyAll()` for a retainable snapshot. Which
+accessors alias the receive buffer and which return caller-owned data:
 
-- **Alias the buffer** (copy with `bytes.Clone` before the loop advances if
-  you keep them): `Str(col, row)` and `Binary(col, row)`.
-- **Safe to retain:** `String(col, row)` returns a freshly allocated Go
-  string. `Float64Array`, `Int64Array`, the `*Into` accessors, and the
-  `QwpColumn` `*Range` accessors return caller-owned slices (freshly
-  allocated, or appended into a buffer you supply).
-- The fixed-width scalar accessors (`Int64`, `Float64`, …) return values,
-  not views.
+- **Alias the buffer** (copy with `bytes.Clone` before the loop advances if you
+  keep them): `Str(col, row)` and `Binary(col, row)`.
+- **Safe to retain:** `String(col, row)` returns a freshly allocated Go string.
+  `Float64Array`, `Int64Array`, the `*Into` accessors, and the `QwpColumn`
+  `*Range` accessors return caller-owned slices (freshly allocated, or appended
+  into a buffer you supply).
+- The fixed-width scalar accessors (`Int64`, `Float64`, …) return values, not
+  views.
 
 :::
 
@@ -623,7 +747,7 @@ row range into a caller-owned slice in one shot:
 
 ```go
 buf := make([]int64, 0, 4096)
-for batch, err := range q.Batches() {
+for batch, err := range cursor.Batches() {
 	if err != nil {
 		return err
 	}
@@ -634,14 +758,14 @@ for batch, err := range q.Batches() {
 }
 ```
 
-`q.Cancel()` aborts the query and is safe to call from another goroutine.
-`q.TotalRows()` reports the row count once the cursor completes.
+`cursor.Cancel()` aborts the query and is safe to call from another goroutine.
+`cursor.TotalRows()` reports the row count once the cursor completes.
 
 ### Reading result batches
 
 `QwpColumnBatch` and `QwpColumn` provide typed accessors for every QuestDB
-column type. `QwpColumnBatch` accessors take `(col, row)`; the cached
-`QwpColumn` accessors take `(row)`.
+column type. `QwpColumnBatch` accessors take `(col, row)`; the cached `QwpColumn`
+accessors take `(row)`.
 
 | Accessor                            | Column types                              |
 | ----------------------------------- | ----------------------------------------- |
@@ -672,11 +796,11 @@ Representations to be aware of:
 - `UUID` is two `int64` halves (`UuidHi` / `UuidLo`); reassemble client-side.
 - Decimals come back as the unscaled integer plus the per-column
   `DecimalScale(col)`: read `DECIMAL64` with `Int64`, `DECIMAL128` with
-  `Decimal128Hi`/`Decimal128Lo`, and `DECIMAL256` with `Long256Word`
-  (words 0–3); apply the scale yourself.
+  `Decimal128Hi`/`Decimal128Lo`, and `DECIMAL256` with `Long256Word` (words
+  0–3); apply the scale yourself.
 - `GEOHASH` result columns expose only metadata in this release
-  (`GeohashPrecisionBits(col)`); there is no public value accessor for a
-  GEOHASH cell. Cast it to a string or long in SQL if you need the value.
+  (`GeohashPrecisionBits(col)`); there is no public value accessor for a GEOHASH
+  cell. Cast it to a string or long in SQL if you need the value.
 - A typed accessor on a NULL cell returns the zero value (`0`, `false`, `""`,
   `nil`), which is indistinguishable from a real zero. Call `IsNull(col, row)`
   first whenever NULL is meaningful.
@@ -689,7 +813,7 @@ Column metadata is available via `ColumnName(col)`, `ColumnType(col)`, and
 Non-SELECT statements run through `Exec`, which returns an `ExecResult`:
 
 ```go
-res, err := client.Exec(ctx,
+res, err := query.Exec(ctx,
 	"CREATE TABLE trades (ts TIMESTAMP, symbol SYMBOL, side SYMBOL, "+
 		"price DOUBLE, amount DOUBLE) TIMESTAMP(ts) PARTITION BY DAY WAL")
 if err != nil {
@@ -698,80 +822,83 @@ if err != nil {
 fmt.Println(res.OpType, res.RowsAffected)
 ```
 
-`RowsAffected` reports the count for INSERT, UPDATE, and DELETE. Pure DDL
-reports 0. `OpType` is the server's statement discriminator, useful for
-distinguishing INSERT from UPDATE from pure DDL.
+`RowsAffected` reports the count for INSERT, UPDATE, and DELETE. Pure DDL reports
+0. `OpType` is the server's statement discriminator, useful for distinguishing
+INSERT from UPDATE from pure DDL.
 
 :::caution `Exec` is not retried across a reconnect by default
 
-If the connection drops mid-statement, `Exec` returns a `*QwpFailoverReset`.
-This means the statement was **interrupted and not confirmed**, not that it
-succeeded. For a non-idempotent `INSERT`, re-issuing it may double-apply, so
-decide per statement whether replay is safe. To make `Exec` retry
-transparently (only for idempotent statements), construct the client with
-`qdb.WithQwpQueryReplayExec(true)`.
+If the connection drops mid-statement, `Exec` returns a `*QwpFailoverReset`. This
+means the statement was **interrupted and not confirmed**, not that it succeeded.
+For a non-idempotent `INSERT`, re-issuing it may double-apply, so decide per
+statement whether replay is safe. To make `Exec` retry transparently (only for
+idempotent statements), set `replay_exec=on` in the connect string (or
+`qdb.WithQwpQueryReplayExec(true)` on a standalone
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive)).
 
 :::
 
 ### Bind parameters
 
-Parameterized queries use typed bind values, avoiding SQL injection and
-enabling server-side factory cache reuse. Pass a `QwpBindFunc` via
-`qdb.WithQueryBinds`:
+Parameterized queries use typed bind values, avoiding SQL injection and enabling
+server-side factory cache reuse. Pass a `QwpBindFunc` via `qdb.WithQwpQueryBinds`:
 
 ```go
 sql := "SELECT ts, symbol, price FROM trades " +
 	"WHERE symbol = $1 AND price >= $2 LIMIT 1000"
 
 for _, symbol := range []string{"EURUSD", "GBPUSD", "USDJPY"} {
-	q := client.Query(ctx, sql, qdb.WithQueryBinds(func(b *qdb.QwpBinds) {
+	cursor := query.Query(ctx, sql, qdb.WithQwpQueryBinds(func(b *qdb.QwpBinds) {
 		b.VarcharBind(0, symbol).DoubleBind(1, 1.0)
 	}))
-	for batch, err := range q.Batches() {
+	for batch, err := range cursor.Batches() {
 		if err != nil {
 			break
 		}
 		// ...
 	}
-	q.Close()
+	cursor.Close()
 }
 ```
 
 Bind indices are 0-based and must be set in strictly ascending order; index `0`
-maps to `$1`. Setters include `BooleanBind`, `ByteBind`, `ShortBind`,
-`IntBind`, `LongBind`, `FloatBind`, `DoubleBind`, `CharBind`, `DateBind`,
+maps to `$1`. Setters include `BooleanBind`, `ByteBind`, `ShortBind`, `IntBind`,
+`LongBind`, `FloatBind`, `DoubleBind`, `CharBind`, `DateBind`,
 `TimestampMicrosBind`, `TimestampNanosBind`, `VarcharBind`, `UuidBind`,
-`Long256Bind`, `GeohashBind`, `DecimalBind` (and `Decimal64/128/256Bind`),
-plus a `Null...Bind` variant for each type. There is no symbol bind: use
-`VarcharBind` for symbol parameters. **Not bindable:** `BINARY` (no setter);
-`ARRAY` / `DOUBLE[]` / `LONG[]` (bind frames carry no array shape — pass a
-SQL array literal in the statement instead); `IPv4` (bind it as `INT` with
-`IntBind`). A gap, a duplicate index, or any out-of-order call latches an
-error that surfaces from `Query` or `Exec`.
+`Long256Bind`, `GeohashBind`, `DecimalBind` (and `Decimal64/128/256Bind`), plus a
+`Null...Bind` variant for each type. There is no symbol bind: use `VarcharBind`
+for symbol parameters. **Not bindable:** `BINARY` (no setter); `ARRAY` /
+`DOUBLE[]` / `LONG[]` (bind frames carry no array shape — pass a SQL array
+literal in the statement instead); `IPv4` (bind it as `INT` with `IntBind`). A
+gap, a duplicate index, or any out-of-order call latches an error that surfaces
+from `Query` or `Exec`.
 
 ### Flow control
 
 For large result sets, byte-credit flow control prevents the server from
-overwhelming the client:
+overwhelming the client. Set the initial credit (bytes) via the connect string,
+which the facade applies to every pooled query session:
 
-```go
-client, err := qdb.NewQwpQueryClient(ctx,
-	qdb.WithQwpQueryAddress("localhost:9000"),
-	qdb.WithQwpQueryInitialCredit(256*1024))
+```text
+ws::addr=localhost:9000;initial_credit=262144;
 ```
 
-The server pauses after streaming the granted budget and replenishes after
-each batch. A credit of `0` (the default) means unbounded: the server streams
-as fast as the network allows, so set a credit when consuming a large result
-set on a memory-constrained client.
+The server pauses after streaming the granted budget and replenishes after each
+batch. A credit of `0` (the default) means unbounded: the server streams as fast
+as the network allows, so set a credit when consuming a large result set on a
+memory-constrained client. On a standalone
+[`QwpQueryClient`](#qwpqueryclient-low-level-primitive) the equivalent option is
+`qdb.WithQwpQueryInitialCredit(256*1024)`.
 
 ### Compression
 
-Negotiate zstd compression to reduce bandwidth for large result sets:
+Negotiate compression to reduce bandwidth for large result sets, via the
+connect string. `compression` is one of `raw` (default, no compression), `zstd`,
+or `auto` (advertise both and let the server choose). `compression_level` is the
+zstd level hint — default `1`, accepted range `1`–`22`:
 
-```go
-client, err := qdb.QwpQueryClientFromConf(ctx,
-	"ws::addr=localhost:9000;compression=zstd;compression_level=3;")
+```text
+ws::addr=localhost:9000;compression=zstd;compression_level=3;
 ```
 
 Batches are decompressed automatically.
@@ -782,22 +909,20 @@ Batches are decompressed automatically.
 
 WebSocket ingestion uses an asynchronous error model. Batch rejections are
 **not** returned from `Flush`. They are delivered to a `SenderErrorHandler`
-callback. If you do not register one, a built-in handler logs them, but your
-application is not notified and cannot dead-letter or alert, so register one
-in any non-trivial producer:
+callback. Register one on the `QuestDB` handle (it is applied to every pooled
+sender) with `qdb.WithQuestDBErrorHandler`. If you do not register one, a
+built-in handler logs them, but your application is not notified and cannot
+dead-letter or alert, so register one in any non-trivial producer:
 
 ```go
-sender, err := qdb.NewLineSender(ctx,
-	qdb.WithQwp(),
-	qdb.WithAddress("localhost:9000"),
-	qdb.WithErrorHandler(func(e *qdb.SenderError) {
+db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
+	qdb.WithQuestDBErrorHandler(func(e *qdb.SenderError) {
 		log.Printf("rejected: category=%s table=%s msg=%s fsn=[%d,%d]",
 			e.Category, e.TableName, e.ServerMessage, e.FromFsn, e.ToFsn)
 	}))
 ```
 
-Full `SenderError` field set, for logging, alerting, and support
-correlation:
+Full `SenderError` field set, for logging, alerting, and support correlation:
 
 | Field              | Type        | Use                                                                                                                                                                                   |
 | ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -810,19 +935,21 @@ correlation:
 | `MessageSequence`  | `int64`     | Server's per-frame wire sequence for the rejection frame. **Resets on reconnect** — only meaningful within one connection; round-trips verbatim against that connection's server-side logs. Not a standalone correlation key (see below). `NoMessageSequence` (`-1`) for protocol violations.                                       |
 | `DetectedAt`       | `time.Time` | Client-side receipt time, for ops timelines (not for correlation).                                                                                                                     |
 
-The protocol does not surface a server-issued request or connection
-identifier. The closest correlation handle is the `(MessageSequence,
-FromFsn, ToFsn)` tuple plus the connection start time from your
-application logs — `MessageSequence` resets on reconnect, so it only
-disambiguates frames within a single connection. The client sends an
-`X-QWP-Client-Id` header (default `go/<version>`) on the upgrade. When
-filing a support ticket, include the connection start time and the
+The protocol does not surface a server-issued request or connection identifier.
+The closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
+plus the connection start time from your application logs — `MessageSequence`
+resets on reconnect, so it only disambiguates frames within a single connection.
+The client sends an `X-QWP-Client-Id` header (default `go/<version>`) on the
+upgrade. When filing a support ticket, include the connection start time and the
 `(MessageSequence, FromFsn, ToFsn)` triple.
 
 The per-category policy is configurable. Resolution precedence is the policy
 resolver, then the per-category policy, then the connect-string `on_*_error`
-keys, then the spec defaults. `CategoryProtocolViolation` and
-`CategoryUnknown` are always `PolicyHalt`:
+keys, then the spec defaults. `CategoryProtocolViolation` and `CategoryUnknown`
+are always `PolicyHalt`. These policies are set on the standalone sender options
+(`qdb.WithErrorPolicy`, `qdb.WithErrorPolicyResolver`, `qdb.WithErrorInboxCapacity`)
+or via the connect-string `on_*_error` keys that the facade forwards to every
+pooled sender:
 
 ```go
 qdb.WithErrorPolicy(qdb.CategorySchemaMismatch, qdb.PolicyDropAndContinue)
@@ -830,9 +957,10 @@ qdb.WithErrorPolicyResolver(func(c qdb.Category) qdb.Policy { ... })
 qdb.WithErrorInboxCapacity(512)
 ```
 
-After a `PolicyHalt` rejection, the sender stops draining and the next
-producer call returns the same payload as a typed error. Unwrap it with
-`errors.As`, then `Close` and rebuild the sender to continue:
+After a `PolicyHalt` rejection, the sender stops draining and the next producer
+call returns the same payload as a typed error. Unwrap it with `errors.As`, then
+`Close` (which returns the broken sender to the pool to be discarded) and borrow
+a new one to continue:
 
 ```go
 if err := sender.Flush(ctx); err != nil {
@@ -853,7 +981,7 @@ Server-side query failures surface as a `*QwpQueryError` from the `Batches()`
 iteration or the `Exec` return value:
 
 ```go
-for batch, err := range q.Batches() {
+for batch, err := range cursor.Batches() {
 	if err != nil {
 		var qe *qdb.QwpQueryError
 		if errors.As(err, &qe) {
@@ -879,17 +1007,16 @@ for batch, err := range q.Batches() {
 `QwpQueryError` also carries `RequestId` (the client-assigned query id — the
 correlation key for support tickets and server-log matching) and `Message`
 (server-supplied UTF-8, English, may be empty; safe to log, but switch on
-`Status`, not on message text). Errors can arrive before any data or
-mid-stream. Once an error is yielded, no further batches arrive for that
-query.
+`Status`, not on message text). Errors can arrive before any data or mid-stream.
+Once an error is yielded, no further batches arrive for that query.
 
 ### Connection-level errors
 
 - **Authentication failure**: a `401` or `403` response before the WebSocket
   upgrade completes. Terminal across all endpoints.
-- **Role mismatch**: `*QwpRoleMismatchError` from `NewQwpQueryClient` when no
-  configured endpoint satisfies the `target=` filter. It reports the endpoints
-  tried, the last observed server role, and the last transport error.
+- **Role mismatch**: a `*QwpRoleMismatchError` from a borrowed query session when
+  no configured endpoint satisfies the `target=` filter. It reports the
+  endpoints tried, the last observed server role, and the last transport error.
 
 ## Failover and high availability
 
@@ -897,53 +1024,45 @@ query.
 Multi-host failover with automatic reconnect requires QuestDB Enterprise.
 :::
 
-Single-host applications need nothing from this section. The simple loops
-shown earlier are already correct: treating any iteration error as terminal is
-always safe, including when a reconnect happens.
+Single-host applications need nothing from this section. The simple loops shown
+earlier are already correct: treating any iteration error as terminal is always
+safe, including when a reconnect happens.
 
 If you connect to multiple hosts for failover, a correct application must do
 exactly three things beyond the single-host code. This is the whole list:
 
-1. **Ingestion: no loop changes.** Configure multiple endpoints and a
-   reconnect policy; reconnection is transparent to the producer. You still
-   need the universal asynchronous error handling from
+1. **Ingestion: no loop changes.** Configure multiple endpoints and a reconnect
+   policy; reconnection is transparent to the producer. You still need the
+   universal asynchronous error handling from
    [Ingestion errors](#ingestion-errors). Details:
    [Ingestion failover](#ingestion-failover).
-2. **Querying: handle `*QwpFailoverReset`, but only if you accumulate rows.**
-   If you build up rows across batches, discard them on a reset and continue
+2. **Querying: handle `*QwpFailoverReset`, but only if you accumulate rows.** If
+   you build up rows across batches, discard them on a reset and continue
    iterating. If you process each batch and keep nothing, the simple
    terminal-on-error loop is already correct. Pattern:
    [Query failover](#query-failover).
 3. **DDL/DML: `Exec` is not retried by default.** A `*QwpFailoverReset` from
-   `Exec` means the statement was not confirmed, not that it succeeded.
-   Re-issue it only if it is idempotent, or opt into
-   `qdb.WithQwpQueryReplayExec(true)`. Details:
+   `Exec` means the statement was not confirmed, not that it succeeded. Re-issue
+   it only if it is idempotent, or opt into `replay_exec=on`. Details:
    [the Exec caution](#ddl-and-dml-statements).
 
 Everything below is the detail behind these three points.
 
 ### Multiple endpoints
 
-Specify comma-separated addresses in the connect string, or pass them to the
-options API:
+Specify comma-separated addresses in the connect string:
 
 ```text
 ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 ```
 
-```go
-client, err := qdb.NewQwpQueryClient(ctx,
-	qdb.WithQwpQueryEndpoints("db-primary:9000", "db-replica-1:9000"))
-```
-
-The client tries endpoints in order and walks the list to find the next
-healthy one on connection loss.
+The pool tries endpoints in order and walks the list to find the next healthy one
+on connection loss.
 
 ### Ingestion failover
 
-The ingestion sender uses a reconnect loop with exponential backoff. Configure
-it via the connect string or `qdb.WithReconnectPolicy(maxDuration,
-initialBackoff, maxBackoff)`:
+The ingestion sender uses a reconnect loop with exponential backoff. Configure it
+via the connect string:
 
 | Key                                | Default  | Description                          |
 | ---------------------------------- | -------- | ------------------------------------ |
@@ -952,17 +1071,14 @@ initialBackoff, maxBackoff)`:
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
 | `initial_connect_retry`            | `off`    | Retry on first connect               |
 
-`qdb.WithInitialConnectMode` selects `InitialConnectOff` (default),
-`InitialConnectSync` (block the constructor while retrying), or
-`InitialConnectAsync` (return immediately and buffer rows until connected).
 Ingress is zone-blind: it pins QWP v1 and ignores the `zone=` key, so a connect
-string shared with query clients works unchanged. Reconnect is transparent to
+string shared with the query pool works unchanged. Reconnect is transparent to
 the producer; you do not change the ingestion loop for it.
 
 ### Query failover
 
-The query client drives a per-query reconnect loop. On a mid-stream transport
-error it reconnects and replays the query.
+The query pool drives a per-query reconnect loop. On a mid-stream transport error
+it reconnects and replays the query.
 
 | Key                           | Default | Description                       |
 | ----------------------------- | ------- | --------------------------------- |
@@ -973,19 +1089,15 @@ error it reconnects and replays the query.
 | `failover_max_duration_ms`    | `30000` | Total wall-clock failover budget per query (`0` = unbounded) |
 | `target`                      | `any`   | Role filter: `any`, `primary`, `replica` |
 
-The matching options are `qdb.WithQwpQueryFailover`,
-`qdb.WithQwpQueryFailoverMaxAttempts`, `qdb.WithQwpQueryFailoverBackoff`,
-`qdb.WithQwpQueryFailoverMaxDuration`, and `qdb.WithQwpQueryTarget`.
-
-You only need the pattern below if you **accumulate rows across batches and
-want the query to continue transparently across a reconnect**. When failover
-occurs mid-stream, `Batches()` yields a non-fatal `*QwpFailoverReset` before
-the replayed batches arrive. Detect it with `errors.As`, discard the rows you
-accumulated from the prior connection (the server replays from the
-beginning), and continue iterating:
+You only need the pattern below if you **accumulate rows across batches and want
+the query to continue transparently across a reconnect**. When failover occurs
+mid-stream, `Batches()` yields a non-fatal `*QwpFailoverReset` before the replayed
+batches arrive. Detect it with `errors.As`, discard the rows you accumulated from
+the prior connection (the server replays from the beginning), and continue
+iterating:
 
 ```go
-for batch, err := range q.Batches() {
+for batch, err := range cursor.Batches() {
 	if err != nil {
 		var reset *qdb.QwpFailoverReset
 		if errors.As(err, &reset) {
@@ -1000,70 +1112,71 @@ for batch, err := range q.Batches() {
 
 :::warning Without the reset branch, accumulated rows are duplicated
 
-If you accumulate rows across batches and do **not** handle
-`*QwpFailoverReset`, the rows you kept from the prior connection stay in your
-buffer while the server replays the **entire** result set from the beginning
-after the reconnect. The replayed rows are appended to the ones you already
-have, so every pre-failover row ends up in your result set twice. Either
-clear the accumulator on the reset (as shown above), or use the simple
-terminal-on-error loop, which discards everything on any error and so cannot
-duplicate.
+If you accumulate rows across batches and do **not** handle `*QwpFailoverReset`,
+the rows you kept from the prior connection stay in your buffer while the server
+replays the **entire** result set from the beginning after the reconnect. The
+replayed rows are appended to the ones you already have, so every pre-failover row
+ends up in your result set twice. Either clear the accumulator on the reset (as
+shown above), or use the simple terminal-on-error loop, which discards everything
+on any error and so cannot duplicate.
 
 :::
 
-If you do not need transparent continuation, the simple loop is correct:
-returning on any error treats a reset as terminal, which the client supports
-explicitly. When the failover budget is consumed, `Batches()` (and `Exec`)
-return `*QwpFailoverExhaustedError`.
-
-After failover exhaustion or a total outage (all endpoints down), the query
-client enters a terminal state and returns errors on every subsequent call.
-Close it and create a new one. This differs from ingestion, where the
-`LineSender` has a continuous reconnect loop (`reconnect_max_duration_millis`,
-default 5 minutes) that spans full outages transparently. The query client
-reconnects only within the scope of a single query.
+If you do not need transparent continuation, the simple loop is correct: returning
+on any error treats a reset as terminal, which the client supports explicitly.
+When the failover budget is consumed, `Batches()` (and `Exec`) return
+`*QwpFailoverExhaustedError`. The pool discards the exhausted query session when
+you `Close` it, so the next `BorrowQuery` hands back a healthy one. This differs
+from ingestion, where the sender has a continuous reconnect loop
+(`reconnect_max_duration_millis`, default 5 minutes) that spans full outages
+transparently. The query side reconnects only within the scope of a single query.
 
 :::warning Failover requires multiple endpoints
 
-Failover rotates across endpoints. With a single `addr`, there is no other
-host to try, and the loop exhausts after one attempt regardless of
-`failover_max_attempts`. For failover to be useful, provide at least two
-addresses.
+Failover rotates across endpoints. With a single `addr`, there is no other host to
+try, and the loop exhausts after one attempt regardless of `failover_max_attempts`.
+For failover to be useful, provide at least two addresses.
 
 :::
 
-### Observability
+### Connection events
 
-`QwpSender` exposes counters for dashboards: `TotalReconnectAttempts`,
-`TotalReconnectsSucceeded`, `TotalFramesReplayed`, `TotalBackpressureStalls`,
-`TotalServerErrors`, and `LastTerminalError`. With `drain_orphans=on`,
-`BackgroundDrainers()` snapshots the goroutines adopting unacked data from
-crashed sibling senders. The query client exposes `ServerInfo()` and
-`CurrentEndpoint()`; `QwpServerInfo.RoleName()` returns the bound node's role.
-
-There is no per-transition connection callback: connect, disconnect,
-reconnect, and failover are not delivered as events. Observe reconnect and
-failover through these counters, and terminal failures through the
-[ingestion error handler](#ingestion-errors). Poll the counters from a
-background goroutine:
+Register a `SenderConnectionListener` on the `QuestDB` handle with
+`qdb.WithQuestDBConnectionListener` to watch connect, disconnect, reconnect, and
+failover transitions across every pooled sender:
 
 ```go
-go func() {
-	t := time.NewTicker(10 * time.Second)
-	defer t.Stop()
-	for range t.C {
-		log.Printf("qwp: reconnects=%d/%d replayed=%d stalls=%d",
-			qs.TotalReconnectsSucceeded(), qs.TotalReconnectAttempts(),
-			qs.TotalFramesReplayed(), qs.TotalBackpressureStalls())
-		if e := qs.LastTerminalError(); e != nil {
-			// Page on-call: the sender has stopped draining.
-			log.Printf("qwp TERMINAL: %s", e)
+db, err := qdb.NewQuestDB(ctx, "ws::addr=db-1:9000,db-2:9000;",
+	qdb.WithQuestDBConnectionListener(func(e qdb.SenderConnectionEvent) {
+		switch e.Kind {
+		case qdb.SenderConnected, qdb.SenderReconnected, qdb.SenderFailedOver:
+			log.Printf("qwp up: %s endpoint=%s:%d", e.Kind, e.Host, e.Port)
+		case qdb.SenderAuthFailed, qdb.SenderReconnectBudgetExhausted:
+			// Terminal: the sender has stopped draining. Page on-call.
+			log.Printf("qwp TERMINAL: %s cause=%v", e.Kind, e.Cause)
 		}
-	}
-}()
+	}))
 ```
 
-where `qs` is the `qdb.QwpSender` from the type assertion shown earlier.
+`SenderConnectionEvent.Kind` is one of `SenderConnected`, `SenderDisconnected`,
+`SenderReconnected`, `SenderFailedOver`, `SenderEndpointAttemptFailed`,
+`SenderAllEndpointsUnreachable`, `SenderAuthFailed`, or
+`SenderReconnectBudgetExhausted`. The event also carries `Host`/`Port` (and
+`PreviousHost`/`PreviousPort` for a failover), `AttemptNumber`, `RoundNumber`,
+`Cause` (for failure/terminal kinds), and `TimestampMillis`.
+
+The listener runs on a dedicated dispatcher goroutine, never on the I/O or
+producer goroutine. Success events (`SenderConnected`, `SenderReconnected`,
+`SenderFailedOver`) fire on each transition; failure events may be coalesced under
+inbox pressure; terminal events fire before the producer-side typed error becomes
+observable. Dropped events are counted by
+`QwpSender.DroppedConnectionNotifications()`.
+
+A borrowed sender also exposes polling counters once type-asserted to
+`qdb.QwpSender`: `TotalReconnectAttempts`, `TotalReconnectsSucceeded`,
+`TotalFramesReplayed`, `TotalBackpressureStalls`, `TotalServerErrors`, and
+`LastTerminalError`. With `drain_orphans=on`, `BackgroundDrainers()` snapshots the
+goroutines adopting unacked data from crashed sibling senders.
 
 For background and worked configurations, see
 [client failover concepts](/docs/high-availability/client-failover/concepts/),
@@ -1073,36 +1186,122 @@ and the
 [reconnect](/docs/connect/clients/connect-string#reconnect-keys) keys of the
 connect string reference.
 
-## Concurrency and parallel queries
+## Concurrency
+
+The `QuestDB` handle is the **only** thread-safe object in the client. Borrow a
+sender or query session per goroutine; the leases themselves are single-threaded:
+
+- **Senders**: not safe for concurrent use. Borrow one per concurrent producer.
+  Sharing a borrowed sender across goroutines corrupts the buffer and interleaves
+  rows.
+- **Queries**: one in-flight query per borrowed session. `Cancel` (on the cursor)
+  and `Close` are safe to call from other goroutines, which is how you cancel an
+  in-flight query or shut down cleanly.
+- **Pool sizing**: the sender and query pools cap total in-flight ingest and
+  query concurrency at their respective `max`. Raise `WithQueryPoolMax` and submit
+  from as many goroutines as you have workers to scale parallel query throughput.
 
 :::note Phase 1 limitation
-The current implementation supports a single in-flight query per connection.
-Multi-query support is planned for a future release.
+A single underlying query client serves one in-flight query at a time. The pool
+runs N clients in parallel, so concurrency equals the query pool's `max`. The wire
+protocol allows demultiplexed concurrent queries on one client; multi-query
+support per client is planned for a future release.
 :::
 
-Neither the `LineSender` nor the `QwpQueryClient` is safe for concurrent use.
-For multi-threaded workloads, use one instance per goroutine. To run queries
-in parallel, create separate `QwpQueryClient` instances, one per goroutine.
-`Cancel` (on a `*QwpQuery`) and `Close` are safe to call from other
-goroutines, which is how you cancel an in-flight query or shut down cleanly.
+## Low-level primitives
+
+The `QuestDB` facade is built on the same `LineSender` and `QwpQueryClient` types
+you can construct directly. Use them when you need a single-shot lifecycle without
+pooling overhead — for example, an ETL job that opens, ingests, and exits — or the
+ILP (HTTP/TCP) transports, which the QWP-only facade does not expose.
+
+### `LineSender` (low-level primitive)
+
+Construct a standalone sender from a connect string or the options API. The
+options API is the only way to register an error handler or connection listener on
+a standalone sender; `NewLineSender` requires exactly one transport option
+(`qdb.WithQwp()` here), while `LineSenderFromConf` infers the transport from the
+`ws`/`wss` schema:
+
+```go
+// From a connect string.
+sender, err := qdb.LineSenderFromConf(ctx, "ws::addr=localhost:9000;")
+
+// From an environment variable (QDB_CLIENT_CONF).
+sender, err := qdb.LineSenderFromEnv(ctx)
+
+// From the options API, for callbacks the connect string can't express.
+sender, err := qdb.NewLineSender(ctx,
+	qdb.WithQwp(),
+	qdb.WithAddress("db-primary:9000"),
+	qdb.WithAddress("db-replica:9000"),
+	qdb.WithTls(),
+	qdb.WithBearerToken("YOUR_BEARER_TOKEN"),
+	qdb.WithAutoFlushRows(500),
+	qdb.WithErrorHandler(func(e *qdb.SenderError) { /* ... */ }),
+	qdb.WithConnectionListener(func(e qdb.SenderConnectionEvent) { /* ... */ }))
+```
+
+A standalone `LineSender` owns a single connection and is closed (and
+disconnected) by its own `Close`. The same row-building API, `QwpSender`
+type-assertion, and store-and-forward behavior described above all apply.
+
+`qdb.WithInitialConnectMode` selects `InitialConnectOff` (default),
+`InitialConnectSync` (block the constructor while retrying), or
+`InitialConnectAsync` (return immediately and buffer rows until connected).
+
+### `QwpQueryClient` (low-level primitive)
+
+Construct a standalone query client from a connect string or the options API:
+
+```go
+client, err := qdb.QwpQueryClientFromConf(ctx, "ws::addr=localhost:9000;")
+
+client, err := qdb.NewQwpQueryClient(ctx,
+	qdb.WithQwpQueryAddress("localhost:9000"),
+	qdb.WithQwpQueryInitialCredit(256*1024))
+defer client.Close(ctx)
+
+cursor := client.Query(ctx, "SELECT * FROM trades LIMIT 10")
+defer cursor.Close()
+for batch, err := range cursor.Batches() {
+	// ...
+}
+```
+
+This is the path the `QuestDB` facade uses internally. The `Query`, `Exec`, and
+`Batches` APIs are identical to a borrowed query session; the difference is that
+you manage `connect`/`Close` and the client's lifecycle yourself instead of
+leasing from the pool.
 
 ## Configuration reference
 
 For the full list of connect-string keys and their defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
 
-Common WebSocket-specific keys:
+Common keys for the pooled facade:
 
 | Key                             | Default  | Description                          |
 | ------------------------------- | -------- | ------------------------------------ |
+| `sender_pool_min` / `_max`      | `1` / `4`| Ingest pool size bounds              |
+| `query_pool_min` / `_max`       | `1` / `4`| Query pool size bounds               |
+| `acquire_timeout_ms`            | `5000`   | Borrow wait when the pool is at `max`|
+| `idle_timeout_ms`               | `60000`  | Idle connection reap (0 = never)     |
+| `max_lifetime_ms`               | `1800000`| Max connection age (0 = no limit)    |
+| `housekeeper_interval_ms`       | `5000`   | Reaper sweep interval                |
+| `lazy_connect`                  | `false`  | Tolerate a down server at startup    |
+| `connect_timeout`              | unset    | TCP-connect budget (milliseconds)    |
 | `auto_flush_rows`               | `1000`   | Rows before auto-flush               |
 | `auto_flush_interval`           | `100`    | Milliseconds before auto-flush       |
+| `auto_flush_bytes`              | `8388608`| Bytes before auto-flush (QWP 8 MiB; HTTP disabled) |
 | `sf_dir`                        | unset    | Store-and-forward directory          |
 | `sender_id`                     | `default`| Sender slot identity for SF          |
-| `request_durable_ack`           | `off`    | Request durable upload ACK (Enterprise) |
+| `request_durable_ack`           | `off`    | Durable upload ACK (Enterprise) — only `off` accepted today; `on` is rejected at construction |
 | `reconnect_max_duration_millis` | `300000` | Ingress reconnect budget             |
 | `failover`                      | `on`     | Query per-query reconnect switch     |
-| `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`) |
+| `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
+| `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
+| `client_id`                     | `go/<ver>` | Client identifier sent as `X-QWP-Client-Id` |
 
 ## Migration from ILP (HTTP/TCP)
 
@@ -1116,20 +1315,23 @@ The row-building API is unchanged across transports. The main differences:
 | Auto-flush interval   | 1,000 ms          | 100 ms                  |
 | Error model           | Synchronous       | Async `SenderErrorHandler` |
 | Store-and-forward     | Not available     | Available (`sf_dir`)    |
+| Connection pooling    | `LineSenderPool` (HTTP-only) | `QuestDB` facade |
 | Multi-endpoint failover | Limited         | Full reconnect loop     |
-| Querying              | Not available     | `QwpQueryClient`        |
+| Querying              | Not available     | `BorrowQuery` / `QwpQueryClient` |
 
 The biggest behavioral change is the error model: on HTTP, `Flush` returns the
-rejection synchronously; on QWP it does not. To migrate, change the connect
-string from `http::` to `ws::` (or `https::` to `wss::`), register a
-`SenderErrorHandler`, and adjust auto-flush settings if needed. `QwpSender` is
-a superset of `LineSender`, so existing ingestion code keeps working.
+rejection synchronously; on QWP it does not. To migrate, change the connect string
+from `http::` to `ws::` (or `https::` to `wss::`), register a
+`SenderErrorHandler`, and adjust auto-flush settings if needed. `QwpSender` is a
+superset of `LineSender`, so existing ingestion code keeps working. Note that the
+legacy `LineSenderPool` is HTTP-only; the QWP path uses the
+[`QuestDB` handle](#the-questdb-handle) for pooling instead.
 
-## Full example: ingestion and querying with failover
+## Full example: pooled ingestion and querying with failover
 
-This example combines ingestion with store-and-forward and connection
-observability, then queries the data back with the recreate-on-failure
-pattern for egress.
+This example uses the `QuestDB` handle with store-and-forward durability and a
+connection listener, borrowing a sender to ingest and a query session to read the
+data back.
 
 ```go
 package main
@@ -1138,140 +1340,85 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"time"
 
 	qdb "github.com/questdb/go-questdb-client/v4"
 )
 
-// ─── Ingestion (options API with store-and-forward) ─────────────────
-
-// Multi-host with store-and-forward for failover durability.
-// Without sf_dir, data buffered during an outage lives in process memory
-// and is lost if the sender process dies. With sf_dir, unacknowledged
-// frames are persisted to disk and replayed after reconnection.
-
-func ingestExample() {
+func main() {
 	ctx := context.Background()
 
-	sender, err := qdb.NewLineSender(ctx,
-		qdb.WithQwp(),
-		qdb.WithAddress("db-primary:9000"),          // Enterprise: multi-host
-		qdb.WithAddress("db-replica:9000"),           // Enterprise: multi-host
-		qdb.WithTls(),                                // Enterprise: wss (TLS)
-		qdb.WithBearerToken("your_bearer_token"),     // Enterprise: token auth
-		qdb.WithSfDir("/var/lib/myapp/qdb-sf"),       // durability across outages
-		qdb.WithSenderId("ingest-1"),                 // unique per sender process
-		qdb.WithReconnectPolicy(
-			5*time.Minute,                        // max outage budget
-			100*time.Millisecond,                 // initial backoff
-			5*time.Second),                       // max backoff
-		qdb.WithErrorHandler(func(e *qdb.SenderError) {
+	// One handle for the whole deployment. Multi-host + wss + token are
+	// Enterprise; sf_dir adds durability across outages.
+	db, err := qdb.NewQuestDB(ctx,
+		"wss::addr=db-primary:9000,db-replica:9000;"+ // Enterprise: multi-host
+			"token=YOUR_BEARER_TOKEN;"+               // Enterprise: token auth
+			"sf_dir=/var/lib/myapp/qdb-sf;"+          // durability across outages
+			"sender_id=ingest;"+                      // SF slot base
+			"target=replica;",                        // queries prefer a replica
+		qdb.WithSenderPoolMax(8),
+		qdb.WithQueryPoolMax(8),
+		qdb.WithQuestDBErrorHandler(func(e *qdb.SenderError) {
 			fmt.Printf("batch rejected: category=%s table=%s msg=%s\n",
 				e.Category, e.TableName, e.ServerMessage)
+		}),
+		qdb.WithQuestDBConnectionListener(func(e qdb.SenderConnectionEvent) {
+			log.Printf("connection: %s endpoint=%s:%d", e.Kind, e.Host, e.Port)
 		}))
 	if err != nil {
 		panic(err)
 	}
-	defer sender.Close(ctx)
+	defer db.Close(ctx)
 
+	// ─── Ingest ──────────────────────────────────────────────────────
+	sender, err := db.BorrowSender(ctx)
+	if err != nil {
+		panic(err)
+	}
 	for i := 0; i < 100; i++ {
 		price := 1.0842 + (rand.Float64()-0.5)*0.002
-		err = sender.Table("book").
+		if err := sender.Table("book").
 			Symbol("ticker", "EURUSD").
 			Float64Column("price", price).
 			Float64Column("size", 100000+rand.Float64()*900000).
-			At(ctx, time.Now())
-		if err != nil {
+			At(ctx, time.Now()); err != nil {
 			fmt.Printf("row error: %s\n", err)
 		}
 	}
-	if err := sender.Flush(ctx); err != nil {
-		fmt.Printf("flush error: %s\n", err)
+	if err := sender.Close(ctx); err != nil { // flush + return to pool
+		fmt.Printf("sender close error: %s\n", err)
 	}
-}
 
-// With sf_dir set, unacknowledged frames are persisted to disk during
-// the outage and replayed when the new primary becomes reachable.
-// Without sf_dir, the reconnect loop still works but data is lost if
-// the sender process dies.
-//
-// Observability (no per-event callback in Go):
-//   qs := sender.(qdb.QwpSender)
-//   qs.TotalReconnectAttempts()
-//   qs.TotalReconnectsSucceeded()
-//   qs.TotalFramesReplayed()
-//   qs.LastTerminalError()
+	// ─── Query ───────────────────────────────────────────────────────
+	query, err := db.BorrowQuery(ctx)
+	if err != nil {
+		panic(err)
+	}
+	defer query.Close()
 
+	cursor := query.Query(ctx,
+		"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
+	defer cursor.Close()
 
-// ─── Querying (connect string, with reconnect-on-failure) ───────────
-
-// The QwpQueryClient becomes permanently dead after a total outage
-// exhausts the failover budget. The application must close the dead
-// client and create a new one. This pattern handles that:
-
-func queryExample() {
-	ctx := context.Background()
-
-	connString :=
-		"wss::addr=db-primary:9000,db-replica:9000,db-replica2:9000;" + // Enterprise: wss, multi-host
-			"token=your_bearer_token;" +                              // Enterprise: token auth
-			"tls_verify=unsafe_off;" +                                // test only!
-			"failover=on;" +                                          // Enterprise: failover
-			"failover_max_attempts=8;" +
-			"failover_max_duration_ms=30000;"
-
-	var client *qdb.QwpQueryClient
-
-	for {
-		// Reconnect if the client is dead
-		if client == nil {
-			var err error
-			client, err = qdb.QwpQueryClientFromConf(ctx, connString)
-			if err != nil {
-				fmt.Printf("connect failed: %s\n", err)
-				time.Sleep(2 * time.Second)
+	for batch, err := range cursor.Batches() {
+		if err != nil {
+			var reset *qdb.QwpFailoverReset
+			if errors.As(err, &reset) {
+				// Fires only on a mid-query failover. Clear partial results.
+				fmt.Println("failover, clearing partial results")
 				continue
 			}
+			fmt.Printf("query failed: %s\n", err)
+			break
 		}
-
-		q := client.Query(ctx,
-			"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
-
-		rowCount := 0
-		for batch, err := range q.Batches() {
-			if err != nil {
-				var reset *qdb.QwpFailoverReset
-				if errors.As(err, &reset) {
-					// Fires only when failover happens mid-query.
-					// Clear any accumulated partial results here.
-					fmt.Println("failover, clearing partial results")
-					rowCount = 0
-					continue
-				}
-				// Any other error is terminal for this client
-				fmt.Printf("query failed: %s\n", err)
-				q.Close()
-				client.Close(ctx)
-				client = nil
-				fmt.Println("(will reconnect on next query)")
-				break
-			}
-			for row := 0; row < batch.RowCount(); row++ {
-				ts := time.UnixMicro(batch.Int64(0, row))
-				ticker := batch.String(1, row)
-				price := batch.Float64(2, row)
-				fmt.Printf("%s  %s  price=%.5f\n",
-					ts.Format("2006-01-02T15:04:05.000Z"), ticker, price)
-				rowCount++
-			}
+		for row := 0; row < batch.RowCount(); row++ {
+			ts := time.UnixMicro(batch.Int64(0, row))
+			fmt.Printf("%s  %s  price=%.5f\n",
+				ts.Format("2006-01-02T15:04:05.000Z"),
+				batch.String(1, row), batch.Float64(2, row))
 		}
-		if client != nil {
-			q.Close()
-			fmt.Printf("(%d rows)\n", rowCount)
-		}
-
-		time.Sleep(2 * time.Second)
 	}
 }
 ```
