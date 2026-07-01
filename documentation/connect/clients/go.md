@@ -221,6 +221,7 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
 | `WithIdleTimeout(d)` | `60s` | How long an above-`min` connection stays idle before the housekeeper closes it. `0` keeps idle connections forever. |
 | `WithMaxLifetime(d)` | `30m` | Maximum age of a connection before recycling. `0` disables age recycling. |
 | `WithHousekeeperInterval(d)` | `5s` | How often the housekeeper checks for idle and over-age connections. |
+| `WithLazyConnect(bool)` | `false` | Tolerate a down server at startup (see [below](#tolerating-a-down-server-at-startup)). |
 | `WithQuestDBErrorHandler(h)` | — | Ingest [`SenderErrorHandler`](#ingestion-errors) applied to every pooled sender. |
 | `WithQuestDBConnectionListener(l)` | — | [`SenderConnectionListener`](#connection-events) applied to every pooled sender. |
 
@@ -257,7 +258,7 @@ facade reads them off the string.
 | `idle_timeout_ms`         | `WithIdleTimeout(d)`          |
 | `max_lifetime_ms`         | `WithMaxLifetime(d)`          |
 | `housekeeper_interval_ms` | `WithHousekeeperInterval(d)`  |
-| `lazy_connect`            | — (facade-only, see [below](#tolerating-a-down-server-at-startup)) |
+| `lazy_connect`            | `WithLazyConnect(bool)`       |
 
 An explicit option setter always wins over the same key in the string.
 
@@ -368,18 +369,20 @@ allow more concurrency.
 ### Tolerating a down server at startup
 
 By default the pool prewarms `min` connections eagerly, so `Connect` fails fast
-if the server is unreachable. Set `lazy_connect=true` to tolerate a down server
-at startup:
+if the server is unreachable. Set `lazy_connect=true` (or the `WithLazyConnect`
+option) to tolerate a down server at startup:
 
 ```go
 db, err := qdb.Connect(ctx, "ws::addr=localhost:9000;lazy_connect=true;")
+// or:
+db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;", qdb.WithLazyConnect(true))
 ```
 
 With `lazy_connect`, the ingest pool connects asynchronously (writes buffer
 until the wire comes up) and the query pool defaults to `query_pool_min=0`,
 connecting on the first `BorrowQuery`. The handle builds successfully even while
-the server is down. `lazy_connect` is a facade-only key; standalone clients
-accept but ignore it.
+the server is down. `lazy_connect` is facade-only; standalone clients accept but
+ignore the key.
 
 ## Data ingestion
 
@@ -652,19 +655,30 @@ configured.
 :::
 
 By default, the server confirms a batch when it is committed to the local
-[WAL](/docs/concepts/write-ahead-log/). Durable acknowledgement instead waits
-until the batch has been durably uploaded to object storage. See the
+[WAL](/docs/concepts/write-ahead-log/). Set `request_durable_ack=on` (or
+`qdb.WithRequestDurableAck(true)`) to instead wait until the batch has been
+durably uploaded to object storage:
+
+```text
+ws::addr=db-primary:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+```
+
+With durable-ack on, the sender trims store-and-forward data, replays, and
+advances its acknowledged watermark on the server's `STATUS_DURABLE_ACK`
+(object-storage upload) instead of the ordinary OK ACK (WAL commit) — so
+`FlushAndGetSequence` / `AwaitAckedFsn` confirm *durable* upload, not just commit.
+
+Durable-ack is **QWP-only** and requires a **replication primary** that advertises
+support. If the bound endpoint does not (e.g. a replica), the connect fails
+terminally with a `*SenderError` of category `PROTOCOL_VIOLATION` — the client
+never falls back to commit-only trimming, which would drop data you believe is
+durable.
+
+`durable_ack_keepalive_interval_millis` (or `qdb.WithDurableAckKeepaliveInterval`,
+default 200 ms; `0` disables) paces a keepalive ping that prods an idle server
+into flushing pending durable-ack frames. `QwpSender.TotalDurableAcks()` and
+`TotalDurableTrimAdvances()` expose durable-ack progress. See the
 [durable ACK keys](/docs/connect/clients/connect-string#durable-ack).
-
-:::caution Not yet implemented in the Go client
-
-Durable-ack mode is a deferred follow-up in this client. Passing
-`request_durable_ack=on;` (or `=true`) in the connect string is **rejected at
-construction** with an `InvalidConfigStr` error; the only accepted value today is
-`request_durable_ack=off` (the default). Until the feature ships, the sender
-confirms on the transport-level OK ACK and ignores `STATUS_DURABLE_ACK` frames.
-
-:::
 
 ## Querying and SQL execution
 
@@ -1296,7 +1310,8 @@ Common keys for the pooled facade:
 | `auto_flush_bytes`              | `8388608`| Bytes before auto-flush (QWP 8 MiB; HTTP disabled) |
 | `sf_dir`                        | unset    | Store-and-forward directory          |
 | `sender_id`                     | `default`| Sender slot identity for SF          |
-| `request_durable_ack`           | `off`    | Durable upload ACK (Enterprise) — only `off` accepted today; `on` is rejected at construction |
+| `request_durable_ack`           | `off`    | Wait for durable object-storage upload ACK (Enterprise, QWP, replication primary) |
+| `durable_ack_keepalive_interval_millis` | `200` | Durable-ack keepalive ping pacing (`0` disables) |
 | `reconnect_max_duration_millis` | `300000` | Ingress reconnect budget             |
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
