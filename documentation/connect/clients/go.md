@@ -655,29 +655,38 @@ configured.
 :::
 
 By default, the server confirms a batch when it is committed to the local
-[WAL](/docs/concepts/write-ahead-log/). Set `request_durable_ack=on` (or
-`qdb.WithRequestDurableAck(true)`) to instead wait until the batch has been
-durably uploaded to object storage:
+[WAL](/docs/concepts/write-ahead-log/). Set `request_durable_ack=on` in the
+connect string to instead wait until the batch has been durably uploaded to
+object storage:
 
 ```text
-ws::addr=db-primary:9000;sf_dir=/var/lib/questdb/sf;request_durable_ack=on;
+ws::addr=db-primary:9000;request_durable_ack=on;
 ```
 
-With durable-ack on, the sender trims store-and-forward data, replays, and
-advances its acknowledged watermark on the server's `STATUS_DURABLE_ACK`
-(object-storage upload) instead of the ordinary OK ACK (WAL commit) — so
-`FlushAndGetSequence` / `AwaitAckedFsn` confirm *durable* upload, not just commit.
+On the pooled facade, durable-ack is configured through the connect string. The
+equivalent option form, `qdb.WithRequestDurableAck(true)`, applies to a standalone
+[`LineSender`](#low-level-primitives) — it is not a `NewQuestDB` option.
+
+With durable-ack on, the sender advances its acknowledged watermark on the
+server's `STATUS_DURABLE_ACK` (object-storage upload) instead of the ordinary OK
+ACK (WAL commit) — so `FlushAndGetSequence` / `AwaitAckedFsn` confirm *durable*
+upload, not just commit. This is independent of store-and-forward: it works in
+memory mode, and combined with `sf_dir` it keeps unacknowledged data on disk until
+the upload is confirmed, surviving a sender restart. `QwpSender.TotalDurableAcks()`
+and `TotalDurableTrimAdvances()` expose durable-ack progress; on a standalone
+sender, `qdb.WithProgressHandler` reports each watermark advance.
 
 Durable-ack is **QWP-only** and requires a **replication primary** that advertises
-support. If the bound endpoint does not (e.g. a replica), the connect fails
-terminally with a `*SenderError` of category `PROTOCOL_VIOLATION` — the client
-never falls back to commit-only trimming, which would drop data you believe is
-durable.
+support. Against a single endpoint that does not advertise it (e.g. a replica),
+the connect fails terminally with a `*SenderError` of category
+`PROTOCOL_VIOLATION` — the client never falls back to commit-only trimming, which
+would drop data you believe is durable. With a multi-host `addr`, the connect
+walks the full endpoint list and binds a durable-advertising primary if one is
+reachable, failing terminally only when none do.
 
-`durable_ack_keepalive_interval_millis` (or `qdb.WithDurableAckKeepaliveInterval`,
-default 200 ms; `0` disables) paces a keepalive ping that prods an idle server
-into flushing pending durable-ack frames. `QwpSender.TotalDurableAcks()` and
-`TotalDurableTrimAdvances()` expose durable-ack progress. See the
+`durable_ack_keepalive_interval_millis` (default 200 ms; `0` disables) paces a
+keepalive ping that prods an idle server into flushing pending durable-ack frames;
+the standalone option form is `qdb.WithDurableAckKeepaliveInterval`. See the
 [durable ACK keys](/docs/connect/clients/connect-string#durable-ack).
 
 ## Querying and SQL execution
@@ -1188,9 +1197,11 @@ observable. Dropped events are counted by
 
 A borrowed sender also exposes polling counters once type-asserted to
 `qdb.QwpSender`: `TotalReconnectAttempts`, `TotalReconnectsSucceeded`,
-`TotalFramesReplayed`, `TotalBackpressureStalls`, `TotalServerErrors`, and
-`LastTerminalError`. With `drain_orphans=on`, `BackgroundDrainers()` snapshots the
-goroutines adopting unacked data from crashed sibling senders.
+`TotalFramesReplayed`, `TotalBackpressureStalls`, `TotalServerErrors`,
+`TotalDurableAcks`, `TotalDurableTrimAdvances`, and `LastTerminalError`. With
+`drain_orphans=on`, `BackgroundDrainers()` snapshots the goroutines adopting
+unacked data from crashed sibling senders; on a standalone sender,
+`qdb.WithBackgroundDrainerListener` surfaces their durable-ack drain outcomes.
 
 For background and worked configurations, see
 [client failover concepts](/docs/high-availability/client-failover/concepts/),
