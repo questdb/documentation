@@ -27,6 +27,12 @@ Two complementary clients live in the same NuGet package:
   execution, per-query failover, and credit-based flow control. See
   [Querying and SQL execution](#querying-and-sql-execution).
 
+For applications that ingest or query from **multiple threads**, wrap both in a
+shared, thread-safe [`QuestDBClient`](#connection-pooling-with-questdbclient)
+handle. It owns elastic pools of senders and query clients, hands out a sender
+or runs a query on demand, and is the recommended entry point for long-running
+services. Construct one, share it across threads, dispose it at shutdown.
+
 :::tip Legacy transports
 
 The same `Sender` also speaks ILP over HTTP and TCP. This page documents the
@@ -184,7 +190,9 @@ using var sender = Sender.New("wss::addr=localhost:9000;tls_verify=unsafe_off;")
 ```
 
 `auth_timeout_ms` (default 15000) bounds how long the client waits for the
-WebSocket upgrade response.
+WebSocket upgrade response. `connect_timeout`, when set, bounds the whole
+per-endpoint connect (TCP + TLS + upgrade) and overrides `auth_timeout_ms` for
+that purpose; left unset, it inherits `auth_timeout_ms`.
 
 ### Unsupported authentication paths
 
@@ -277,6 +285,163 @@ directly, so you skip the `is IQwpWebSocketSender` cast.
 
 For the full list of connect-string keys and defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
+
+## Connection pooling with `QuestDBClient`
+
+A `Sender` owns one connection and is **not thread-safe**; the same is true of a
+`QueryClient`. For a service that ingests or queries from many threads, create
+one shared **`QuestDBClient`** — a thread-safe handle that owns an elastic pool
+of senders and (on .NET 7+) a pool of query clients, plus a background
+housekeeper that closes idle and over-age connections. Build it once, share it
+across threads, dispose it at shutdown. It is the .NET counterpart of the Java
+[`QuestDB`](/docs/connect/clients/java/#the-questdb-handle) handle.
+
+```csharp
+using QuestDB;
+using QuestDB.Qwp.Query;
+
+await using var client = QuestDBClient.Connect("ws::addr=localhost:9000;");
+
+// Ingest: borrow a sender, write rows, dispose to flush + return it to the pool.
+using (var sender = client.BorrowSender())
+{
+    await sender.Table("trades")
+        .Symbol("symbol", "ETH-USD")
+        .Column("price", 2615.54)
+        .AtAsync(DateTime.UtcNow);
+}
+
+// Query: run SQL on a pooled query client (.NET 7+).
+await client.ExecuteSqlAsync("SELECT count(*) FROM trades", new PrintHandler());
+```
+
+### Creating the handle
+
+| Factory | Purpose |
+|---|---|
+| `QuestDBClient.Connect(connStr)` | One connect string drives both pools. A `ws` / `wss` string configures ingest **and** query; an `http` / `tcp` string configures ingest only (no query pool). |
+| `QuestDBClient.Connect(ingestConnStr, queryConnStr)` | Separate ingress and egress endpoints. The query string must be `ws` / `wss`. |
+| `QuestDBClient.Builder()` … `.Build()` | Programmatic pool tuning — sizes, timeouts, separate configs. |
+
+```csharp
+await using var client = QuestDBClient.Builder()
+    .FromConfig("ws::addr=localhost:9000;")
+    .SenderPoolMin(2).SenderPoolMax(8)
+    .QueryPoolMin(1).QueryPoolMax(4)
+    .AcquireTimeout(TimeSpan.FromSeconds(5))
+    .Build();
+```
+
+A pool knob set on the builder always wins over the same key in the connect
+string.
+
+### Borrowing a sender
+
+`BorrowSender()` (or `BorrowSenderAsync(ct)`) leases a sender from the pool.
+**Dispose it to flush its rows and return it to the pool** — disposing a pooled
+sender does *not* close the underlying connection; the real disconnect happens
+only when the handle itself is disposed (or the housekeeper reaps an idle one).
+Use a `using` block:
+
+```csharp
+await Parallel.ForEachAsync(batches, async (batch, ct) =>
+{
+    using var sender = client.BorrowSender();   // one per unit of work
+    foreach (var row in batch)
+        await sender.Table("trades")
+            .Symbol("symbol", row.Symbol)
+            .Column("price", row.Price)
+            .AtAsync(row.Timestamp, ct);
+    await sender.SendAsync(ct);
+}); // dispose returns each sender to the pool
+```
+
+- A borrowed sender is single-threaded — borrow one per thread / unit of work
+  and never share it across threads.
+- When every sender is in use and the pool is at `sender_pool_max`,
+  `BorrowSender()` blocks up to `acquire_timeout_ms`, then throws `IngressError`
+  with `ErrorCode.PoolExhausted`.
+- For the QWP-only operations (ping, `seqTxn` watermarks, FSN tracking,
+  decimal / extended columns), cast the borrowed `ISender` to
+  `IQwpWebSocketSender` — pooled `ws` / `wss` senders implement it.
+- If the handle's ingest config sets `sf_dir`, each pooled sender owns a
+  distinct on-disk slot `<sender_id>-<index>`, so
+  [store-and-forward](#store-and-forward) works across the whole pool without
+  extra configuration.
+
+### Querying from the pool
+
+_Requires .NET 7+ and a `ws` / `wss` query configuration._ Each execution
+borrows a query client for the duration of one query and returns it
+automatically — there is no explicit borrow/release for queries:
+
+```csharp
+// One-shot, bind-less:
+await client.ExecuteSqlAsync("SELECT * FROM trades LIMIT 10", handler);
+
+// Fluent, with bind parameters:
+await client.NewQuery()
+    .Sql("SELECT ts, price FROM trades WHERE symbol = $1 LIMIT $2")
+    .Binds(b => { b.SetVarchar(0, "ETH-USD"); b.SetLong(1, 100); })
+    .Handler(handler)
+    .ExecuteAsync();
+```
+
+- `NewQuery()` returns a fresh `Query`; one in-flight execution per `Query`, so
+  allocate a new one per concurrent query. The query pool caps concurrency at
+  `query_pool_max`.
+- The handler is the same
+  [`QwpColumnBatchHandler`](#querying-and-sql-execution) used by `QueryClient`;
+  bind parameters, DDL/DML, compression, and per-query failover all behave
+  identically.
+- Cancellation: `query.Cancel()` is cooperative (the client is re-pooled);
+  cancelling the `CancellationToken` passed to `ExecuteAsync` is a hard cancel
+  that tears the connection down and discards that client.
+- Calling `NewQuery()` / `ExecuteSqlAsync(...)` on a handle built from an
+  `http` / `tcp` ingest string with no query config throws `IngressError` —
+  supply a `ws` / `wss` query config via the builder's `QueryConfig(...)` or
+  `QuestDBClient.Connect(ingest, query)`.
+
+### Separate ingress and egress endpoints
+
+When reads target a replica or go through a different load balancer, give each
+side its own connect string:
+
+```csharp
+await using var client = QuestDBClient.Connect(
+    "wss::addr=ingest.cluster:9000;token=YOUR_TOKEN;",   // ingest → primary
+    "wss::addr=read-replica.cluster:9000;token=YOUR_TOKEN;target=replica;");
+```
+
+The same split is available on the builder via `IngestConfig(...)` /
+`QueryConfig(...)`.
+
+### Pool configuration
+
+Set these on the builder, or as connect-string keys (the builder setter wins):
+
+| Builder method | Connect-string key | Default | Description |
+|---|---|---|---|
+| `SenderPoolMin(int)` | `sender_pool_min` | `1` | Senders kept open when idle (`0` lets the pool close them all). |
+| `SenderPoolMax(int)` | `sender_pool_max` | `4` | Maximum senders the pool opens. |
+| `QueryPoolMin(int)` | `query_pool_min` | `1` | Query clients kept open when idle. |
+| `QueryPoolMax(int)` | `query_pool_max` | `4` | Maximum query clients the pool opens. |
+| `AcquireTimeout(TimeSpan)` | `acquire_timeout_ms` | `5000` | How long a borrow blocks when the pool is at max before throwing. |
+| `IdleTimeout(TimeSpan)` | `idle_timeout_ms` | `60000` | Idle time before the housekeeper closes a connection (never below `min`). |
+| `MaxLifetime(TimeSpan)` | `max_lifetime_ms` | `1800000` | Maximum connection age before the housekeeper recycles it. |
+| `HousekeeperInterval(TimeSpan)` | `housekeeper_interval_ms` | `5000` | How often the housekeeper sweeps (minimum 100 ms). |
+
+`SenderPoolSize(n)` / `QueryPoolSize(n)` are shortcuts for `min == max == n`.
+Observe pool state via `client.AvailableSenderCount` / `client.TotalSenderCount`
+(and `AvailableQueryClientCount` / `TotalQueryClientCount` on .NET 7+).
+
+### Closing
+
+`QuestDBClient` is `IDisposable` and `IAsyncDisposable`. Prefer `await using`
+(or `DisposeAsync`) so the drain is non-blocking. Closing stops the
+housekeeper, closes the query pool, then flushes and disconnects every sender;
+it is idempotent, and threads blocked in `BorrowSender()` are released with an
+error.
 
 ## Data ingestion
 
@@ -458,7 +623,7 @@ asynchronously; see [Delivery tracking](#delivery-tracking).
 Awaiting ACKs is **optional**: an app that never calls `PingAsync` or
 `AwaitAckedFsnAsync` and just `await using`-disposes the sender is safe —
 `DisposeAsync` drains in-flight ACKs, bounded by `close_flush_timeout_millis`
-(default 5000 ms). Reach for the APIs below when the app needs to (a) know a
+(default 60000 ms). Reach for the APIs below when the app needs to (a) know a
 specific write made it before continuing, (b) cooperate with QuestDB
 Enterprise durable-replication watermarks, or (c) co-ordinate a graceful
 shutdown that must not exit until the queue has drained.
@@ -1125,7 +1290,9 @@ await using var client = await QueryClient.NewAsync(
 | `zstd` | Demand zstd; the server falls back to raw per-batch when raw is smaller. |
 | `auto` | Advertise both; the server picks zstd if it supports it, else raw. |
 
-`compression_level` is in `[1, 9]` (zstd levels). Inspect
+`compression_level` accepts the full zstd range `[1, 22]`; the server clamps it
+to its maximum of `9`, so levels above 9 are accepted for connect-string parity
+with the other clients but yield no extra compression. Inspect
 `client.NegotiatedCompression` after connect to see what the server actually
 chose. Batches decompress transparently — your `OnBatch` code is unchanged.
 
@@ -1179,7 +1346,7 @@ errors:
 ```csharp
 await using var sender = Sender.New("ws::addr=localhost:9000;");
 // ... ingest ...
-// DisposeAsync drains in-flight ACKs, bounded by close_flush_timeout_millis (default 5000).
+// DisposeAsync drains in-flight ACKs, bounded by close_flush_timeout_millis (default 60000).
 ```
 
 With `sf_dir` set, anything still un-acked at close is persisted to disk so a
@@ -1196,13 +1363,30 @@ WebSocket options:
 | `addr` | required | One or more `host:port` entries, comma-separated or repeated. Default port `9000`. |
 | `username` / `password` | unset | HTTP basic auth. |
 | `token` | unset | Bearer token auth (Enterprise). |
-| `auth_timeout_ms` | 15000 | WebSocket upgrade timeout. |
-| `tls_verify` / `tls_roots` / `tls_roots_password` | — | TLS configuration (`wss` only). |
+| `auth_timeout_ms` | 15000 | Per-endpoint WebSocket-upgrade timeout. |
+| `connect_timeout` | = `auth_timeout_ms` | Per-endpoint connect budget (TCP + TLS + upgrade); overrides `auth_timeout_ms` when set. |
+| `tls_verify` / `tls_roots` / `tls_roots_password` | `on` / — / — | TLS configuration (`wss` only). |
 | `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
-| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward. |
-| `request_durable_ack` | `off` | Wait for durable upload (Enterprise). |
-| `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
-| `close_flush_timeout_millis` | 5000 | Bound on the drain at dispose. |
+| `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
+| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and slot identity. |
+| `sf_max_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
+| `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
+| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
+| `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |
+| `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Per-outage reconnect budget and backoff. |
+| `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |
+| `ping_timeout` | 5000 | Bound on `PingAsync` waiting for the ACK window to drain. |
+| `error_inbox_capacity` / `connection_listener_inbox_capacity` | 256 / 256 | Async error and connection-event inbox capacities. |
+| `close_flush_timeout_millis` | 60000 | Bound on the drain at dispose. |
+
+Pool keys (`sender_pool_min` / `sender_pool_max`, `query_pool_min` /
+`query_pool_max`, `acquire_timeout_ms`, `idle_timeout_ms`, `max_lifetime_ms`,
+`housekeeper_interval_ms`) are read by the
+[`QuestDBClient`](#connection-pooling-with-questdbclient) handle — see
+[Pool configuration](#pool-configuration). The egress-only keys (`compression`,
+`compression_level`, `target`, `zone`, `failover_*`, `initial_credit`,
+`max_batch_rows`, `client_id`) are covered under
+[Querying and SQL execution](#querying-and-sql-execution).
 
 ## Migration from ILP (HTTP/TCP)
 
@@ -1219,6 +1403,7 @@ sender to QWP/WebSocket:
 | Store-and-forward | Not available | Available (`sf_dir`) |
 | Multi-endpoint failover | HTTP only | Built in (comma-separated `addr`) |
 | Querying | Not available | [`QueryClient`](#querying-and-sql-execution) on the same NuGet package |
+| Connection pooling | `QuestDBClient` (sender pool) | `QuestDBClient` (sender + query pools) |
 | Minimum runtime | .NET 6.0 | .NET 7.0 |
 
 The minimal swap is "change the connect string from `http::` to `ws::` (or
