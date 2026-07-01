@@ -127,7 +127,7 @@ in this documentation often omit `GROUP BY` for brevity.
 
 `approx_count_distinct(column_name, precision)` - estimates the number of
 distinct non-`NULL` values in `IPv4`, `int`, or `long` columns using the
-[HyperLogLog](/glossary/HyperLogLog/) data structure, which provides an
+[HyperLogLog](/glossary/hyperloglog/) data structure, which provides an
 approximation rather than an exact count.
 
 The precision of HyperLogLog can be controlled via the optional `precision`

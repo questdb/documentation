@@ -1,5 +1,5 @@
 ---
-title: Date to Timestamp Conversion in Different Programming Languages
+title: Date-to-timestamp conversion by language
 sidebar_label: Date to Timestamp
 description: Python, Go, JAVA, JavaScript, C/C++, Rust, .Net, PHP, or Ruby.
 ---
