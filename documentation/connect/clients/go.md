@@ -686,7 +686,11 @@ reachable, failing terminally only when none do.
 
 `durable_ack_keepalive_interval_millis` (default 200 ms; `0` disables) paces a
 keepalive ping that prods an idle server into flushing pending durable-ack frames;
-the standalone option form is `qdb.WithDurableAckKeepaliveInterval`. See the
+the standalone option form is `qdb.WithDurableAckKeepaliveInterval`. Leave it
+enabled under `request_durable_ack`: with the keepalive off, a quiescent final
+batch has nothing to elicit its `STATUS_DURABLE_ACK`, so `AwaitAckedFsn` can block
+on that batch and `Close` may report a drain-timeout even after the data reached
+the server. See the
 [durable ACK keys](/docs/connect/clients/connect-string#durable-ack).
 
 ## Querying and SQL execution
