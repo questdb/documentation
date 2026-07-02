@@ -47,21 +47,29 @@ ILP transport details, see the
 
 The pooled `QuestDB` facade (`qdb.Connect`, `BorrowSender`, `BorrowQuery`) and the
 QWP query API on this page are **pre-release**: they are not yet part of a tagged
-`v4` release of `go-questdb-client`, so
-`go get github.com/questdb/go-questdb-client/v4` alone will not resolve the types
-shown below. Build against the pre-release QWP client, pin the exact version, and
-expect the API to change before it ships. Track the
+`v4` release of `go-questdb-client`, so a plain
+`go get github.com/questdb/go-questdb-client/v4` will not resolve the types shown
+below. Until the first release that includes them, pin the API to the `qwip_go`
+branch:
+
+```bash
+go get github.com/questdb/go-questdb-client/v4@qwip_go
+```
+
+This writes a pseudo-version of the branch tip into your `go.mod`. Expect the API
+to change before it ships; track the
 [client releases](https://github.com/questdb/go-questdb-client/releases) for the
-first version that includes it.
+first tagged version, then move off the branch pin.
 
 :::
 
 ## Quick start
 
-The client requires Go 1.23 or later. Add it to your module:
+The client requires Go 1.23 or later. Until the pre-release API ships in a tagged
+release, pull it from the `qwip_go` branch (see the note above):
 
 ```bash
-go get github.com/questdb/go-questdb-client/v4
+go get github.com/questdb/go-questdb-client/v4@qwip_go
 ```
 
 Construct one `QuestDB` handle per deployment, share it across goroutines, and
@@ -73,6 +81,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	qdb "github.com/questdb/go-questdb-client/v4"
 )
@@ -80,8 +89,14 @@ import (
 func main() {
 	ctx := context.TODO()
 
-	// One ws/wss config drives both the ingest and the query pool.
-	db, err := qdb.Connect(ctx, "ws::addr=localhost:9000;")
+	// One ws/wss config drives both the ingest and the query pool. Register an
+	// error handler: QWP delivers batch rejections asynchronously, so a nil
+	// Flush is not acceptance (see Ingestion errors).
+	db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
+		qdb.WithQuestDBErrorHandler(func(e *qdb.SenderError) {
+			log.Printf("ingest rejected: category=%s table=%s msg=%s",
+				e.Category, e.TableName, e.ServerMessage)
+		}))
 	if err != nil {
 		panic(err)
 	}
@@ -102,7 +117,7 @@ func main() {
 		panic(err)
 	}
 
-	// Ingest: borrow a sender, write rows, Close returns it to the pool.
+	// Ingest: borrow a sender and write a row.
 	sender, err := db.BorrowSender(ctx)
 	if err != nil {
 		panic(err)
@@ -116,7 +131,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := sender.Close(ctx); err != nil { // flush + return to pool
+	// Flush and wait for the server to acknowledge the row before reading it
+	// back. Flush and Close publish asynchronously (see Flushing), so without
+	// this the SELECT below could race the commit and return no rows.
+	qs := sender.(qdb.QwpSender)
+	fsn, err := qs.FlushAndGetSequence(ctx)
+	if err != nil {
+		panic(err)
+	}
+	if err := qs.AwaitAckedFsn(ctx, fsn); err != nil {
+		panic(err)
+	}
+	if err := sender.Close(ctx); err != nil { // return to pool
 		panic(err)
 	}
 
@@ -142,13 +168,18 @@ both. Each side reads the connect-string keys it owns and ignores the rest.
 
 :::caution Read before building on these snippets
 
-The snippet above is deliberately minimal. Three behaviors will cause data
-loss, corruption, or panics if you carry the minimal form into real code:
+The snippet above shows the correct minimal shape. Four behaviors will cause
+data loss, corruption, or panics if you overlook them in real code:
 
 - **Ingestion errors are asynchronous.** `Flush` returning `nil` does **not**
   mean the server accepted the rows. Schema, parse, and write rejections are
   delivered out of band. Register an error handler with
   `qdb.WithQuestDBErrorHandler`. See [Ingestion errors](#ingestion-errors).
+- **A publish is not committed when `Flush` or `Close` returns.** Both hand the
+  rows to the send loop and return before the server commits them, so reading a
+  table back immediately after `Close` can race the commit and return zero rows.
+  Confirm durability with `FlushAndGetSequence` + `AwaitAckedFsn`, as the quick
+  start does. See [Flushing](#flushing).
 - **A borrowed sender or query session is not safe for concurrent use.** The
   `QuestDB` handle is; an individual borrow is not. Borrow one per goroutine.
   See [Concurrency](#concurrency).
@@ -479,7 +510,9 @@ hi := binary.BigEndian.Uint64(id[0:8])
 lo := binary.BigEndian.Uint64(id[8:16])
 
 // Table and Symbol return LineSender, so call them first; then chain the
-// QWP-only setters (which return QwpSender) into AtNano.
+// QWP-only setters (which return QwpSender) into the row finalizer. trades is a
+// microsecond table, so finalize with AtNow; AtNano would conflict with its
+// resolution (see Designated timestamp).
 qs.Table("trades")
 qs.Symbol("symbol", "ETH-USD")
 qs.Symbol("side", "sell") // side is a SYMBOL, matching the rest of the page
@@ -487,7 +520,7 @@ err = qs.
 	Int32Column("venue_id", 7).
 	CharColumn("cond", 'R'). // trade-condition code — a single CHAR
 	UuidColumn("order_id", hi, lo).
-	AtNano(ctx, time.Now())
+	AtNow(ctx)
 ```
 
 `QwpSender` adds `ByteColumn`, `ShortColumn`, `Int32Column`, `Float32Column`,
@@ -1175,6 +1208,12 @@ and ignores the `zone=` key, so a connect string shared with the query pool
 works unchanged. Reconnect is transparent to the producer; you do not change the
 ingestion loop for it.
 
+Reconnect and multi-host failover replay unacknowledged frames — whether or not
+`sf_dir` is set — so the at-least-once rule applies to every failover connection,
+not just store-and-forward ones:
+
+<SfDedupWarning />
+
 ### Query failover
 
 The query pool drives a per-query reconnect loop. On a mid-stream transport error
@@ -1491,10 +1530,14 @@ func main() {
 	}
 	defer query.Close()
 
+	// trades uses DEDUP because this deployment reconnects (multi-host + sf_dir):
+	// failover replays unacknowledged frames, and DEDUP stops that from
+	// duplicating rows (see the failover DEDUP caution).
 	if _, err := query.Exec(ctx,
-		"CREATE TABLE IF NOT EXISTS book "+
-			"(ts TIMESTAMP, ticker SYMBOL, price DOUBLE, size DOUBLE) "+
-			"TIMESTAMP(ts) PARTITION BY DAY WAL"); err != nil {
+		"CREATE TABLE IF NOT EXISTS trades "+
+			"(ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE) "+
+			"TIMESTAMP(ts) PARTITION BY DAY WAL "+
+			"DEDUP UPSERT KEYS(ts, symbol, side)"); err != nil {
 		panic(err)
 	}
 
@@ -1505,10 +1548,15 @@ func main() {
 	}
 	for i := 0; i < 100; i++ {
 		price := 1.0842 + (rand.Float64()-0.5)*0.002
-		if err := sender.Table("book").
-			Symbol("ticker", "EURUSD").
+		side := "buy"
+		if i%2 == 0 {
+			side = "sell"
+		}
+		if err := sender.Table("trades").
+			Symbol("symbol", "EURUSD").
+			Symbol("side", side).
 			Float64Column("price", price).
-			Float64Column("size", 100000+rand.Float64()*900000).
+			Float64Column("amount", 100000+rand.Float64()*900000).
 			At(ctx, time.Now()); err != nil {
 			fmt.Printf("row error: %s\n", err)
 		}
@@ -1530,7 +1578,7 @@ func main() {
 
 	// ─── Query ───────────────────────────────────────────────────────
 	cursor := query.Query(ctx,
-		"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
+		"SELECT ts, symbol, price FROM trades ORDER BY ts DESC LIMIT 10")
 	defer cursor.Close()
 
 	// Accumulate across batches, so a mid-query failover must clear the
