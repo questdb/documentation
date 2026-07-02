@@ -511,9 +511,8 @@ err = sender.Table("trades").
 	Float64Column("price", 1.0842).
 	At(ctx, time.Now())
 
-// Nanosecond precision (creates a timestamp_ns column); QwpSender only.
-// AtNano is a QwpSender method, so call it on qs directly (Table/Symbol/
-// Float64Column return LineSender).
+// Nanosecond precision (creates a timestamp_ns column); AtNano lives on
+// QwpSender, so call it on qs — the base setters return LineSender.
 qs.Table("ticks").
 	Symbol("symbol", "EURUSD").
 	Float64Column("price", 1.0842)
@@ -574,7 +573,7 @@ literal, and `DecimalColumnShopspring` accepts
 
 The client accumulates rows in an internal buffer and sends them in batches.
 
-Auto-flush (default) flushes when either threshold is reached:
+Auto-flush (default) flushes when any of these thresholds is reached:
 
 | Trigger   | WebSocket default | HTTP default |
 | --------- | ----------------- | ------------ |
@@ -966,8 +965,8 @@ The protocol does not surface a server-issued request or connection identifier.
 The closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
 plus the connection start time from your application logs — `MessageSequence`
 resets on reconnect, so it only disambiguates frames within a single connection.
-The client sends an `X-QWP-Client-Id` header (default `go/<version>`) on the
-upgrade. When filing a support ticket, include the connection start time and the
+The ingest client identifies itself with an `X-QWP-Client-Id: go/<version>`
+header on the upgrade. When filing a support ticket, include the connection start time and the
 `(MessageSequence, FromFsn, ToFsn)` triple.
 
 The per-category policy is configurable. Resolution precedence is the policy
@@ -1096,7 +1095,7 @@ via the connect string:
 | `reconnect_max_duration_millis`    | `300000` | Total outage budget before giving up |
 | `reconnect_initial_backoff_millis` | `100`    | First post-failure sleep             |
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
-| `initial_connect_retry`            | `off`    | Retry on first connect               |
+| `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor; `async` returns immediately and buffers |
 
 Ingress is zone-blind: it pins QWP v1 and ignores the `zone=` key, so a connect
 string shared with the query pool works unchanged. Reconnect is transparent to
@@ -1331,7 +1330,7 @@ Common keys for the pooled facade:
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
-| `client_id`                     | `go/<ver>` | Client identifier sent as `X-QWP-Client-Id` |
+| `client_id`                     | `go/<ver>` | `X-QWP-Client-Id` on the query-side upgrade (ingest always sends the default) |
 
 ## Migration from ILP (HTTP/TCP)
 
