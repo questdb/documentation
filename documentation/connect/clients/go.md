@@ -4,7 +4,7 @@ title: Go client for QuestDB
 sidebar_label: Go
 description:
   "QuestDB Go client for high-throughput data ingestion and streaming SQL
-  queries over the QWP binary protocol."
+  queries over the QWP binary WebSocket protocol."
 ---
 
 import { RemoteRepoExample } from "@theme/RemoteRepoExample"
@@ -405,6 +405,12 @@ corrupt the borrow that next reuses its slot.
 The same lifecycle applies to a borrowed query session: `db.BorrowQuery(ctx)`
 hands back a `*Query`, and its `Close` returns it to the query pool.
 
+The `Close` signatures differ by object. `db.Close(ctx)` and a sender's
+`Close(ctx)` take a context — the sender does a final flush on close, which can
+block, so it wants a deadline. A query session's `Close()` and a cursor's
+`Close()` take **no** context: closing either just returns it to the pool (or
+ends the stream) and has nothing to wait on.
+
 ### Acquire timeout
 
 Both `BorrowSender` and `BorrowQuery` take a connection from a pool. When every
@@ -663,8 +669,10 @@ ws::addr=localhost:9000;auto_flush_rows=500;auto_flush_interval=50;
 published into the cursor engine (in memory, or on disk when `sf_dir` is set) —
 it does **not** wait for the server to acknowledge them. Delivery and
 acknowledgement happen asynchronously on the send loop; a server-side rejection
-surfaces on the error handler, never as a `Flush` error (see
-[Ingestion errors](#ingestion-errors)). For explicit server-ack confirmation,
+surfaces on the error handler, not as the error return of the `Flush` that sent
+those rows. The one exception is a `PolicyHalt` rejection that has already
+latched: it resurfaces as a typed `*SenderError` on the next producer call,
+including a later `Flush` (see [Ingestion errors](#ingestion-errors)). For explicit server-ack confirmation,
 pair `FlushAndGetSequence` with `AwaitAckedFsn` (below). Write many rows per
 `Flush`; calling it after every row collapses throughput.
 
@@ -748,6 +756,13 @@ memory mode, and combined with `sf_dir` it keeps unacknowledged data on disk unt
 the upload is confirmed, surviving a sender restart. `QwpSender.TotalDurableAcks()`
 and `TotalDurableTrimAdvances()` expose durable-ack progress; on a standalone
 sender, `qdb.WithProgressHandler` reports each watermark advance.
+
+An ACK — WAL commit or durable upload — confirms the write on the **primary**;
+it does not mean a replica has applied it. If your query pool targets `replica`
+or `any`, a read issued immediately after the ACK can miss just-acked rows until
+replication catches up. Query with `target=primary` when you need
+read-your-writes; see [high availability](/docs/high-availability/overview/) for
+replica lag.
 
 Durable-ack is **QWP-only** and requires a **replication primary** that advertises
 support. Against a single endpoint that does not advertise it (e.g. a replica),
@@ -997,7 +1012,8 @@ for symbol parameters. **Not bindable:** `BINARY` (no setter); `ARRAY` /
 `DOUBLE[]` / `LONG[]` (bind frames carry no array shape — pass a SQL array
 literal in the statement instead); `IPv4` (bind it as `INT` with `IntBind`). A
 gap, a duplicate index, or any out-of-order call latches an error that surfaces
-from `Query` or `Exec`.
+from the first `Batches()` yield (for `Query`, which itself returns only a
+cursor) or from the `Exec` return.
 
 ### Flow control
 
@@ -1074,8 +1090,9 @@ resolver, then the per-category policy, then the connect-string `on_*_error`
 keys, then the spec defaults. `CategoryProtocolViolation` and `CategoryUnknown`
 are always `PolicyHalt`. These policies are set on the standalone sender options
 (`qdb.WithErrorPolicy`, `qdb.WithErrorPolicyResolver`, `qdb.WithErrorInboxCapacity`)
-or via the connect-string `on_*_error` keys that the facade forwards to every
-pooled sender:
+or via the per-category connect-string keys — `on_schema_error`, `on_parse_error`,
+`on_internal_error`, `on_security_error`, `on_write_error`, and `on_server_error`
+— that the facade forwards to every pooled sender:
 
 ```go
 qdb.WithErrorPolicy(qdb.CategorySchemaMismatch, qdb.PolicyDropAndContinue)
@@ -1366,7 +1383,9 @@ Construct a standalone sender from a connect string or the options API. The
 options API is the only way to register an error handler or connection listener on
 a standalone sender; `NewLineSender` requires exactly one transport option
 (`qdb.WithQwp()` here), while `LineSenderFromConf` infers the transport from the
-`ws`/`wss` schema:
+`ws`/`wss` schema. The three constructors below are **alternatives** — pick one;
+they share the `sender, err :=` binding and are shown together only to compare,
+so the block does not compile if pasted whole:
 
 ```go
 // From a connect string.
@@ -1424,7 +1443,13 @@ leasing from the pool.
 For the full list of connect-string keys and their defaults, see the
 [connect string reference](/docs/connect/clients/connect-string/).
 
-Common keys for the pooled facade:
+Common keys for the pooled facade. This is a curated subset — some keys that
+affect data-loss timing are documented in their sections rather than here:
+`close_flush_timeout_millis` (the [`Close` final-flush](#flushing) bound),
+`sf_append_deadline_millis` (the [store-and-forward](#store-and-forward) buffer
+deadline), and the `auto_flush=off` switch that disables every flush trigger. See
+the [connect string reference](/docs/connect/clients/connect-string/) for the
+full list.
 
 | Key                             | Default  | Description                          |
 | ------------------------------- | -------- | ------------------------------------ |

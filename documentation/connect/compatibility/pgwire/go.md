@@ -30,7 +30,8 @@ for performance. For best performance when querying data from QuestDB with Go, w
 
 For data ingestion, we recommend using QuestDB's first-party clients with the [InfluxDB Line Protocol (ILP)](/docs/connect/overview/)
 instead of PGWire. PGWire should primarily be used for querying data in QuestDB. QuestDB provides an
-official [Go client](/docs/connect/clients/go/) for data ingestion using ILP.
+official [Go client](/docs/connect/clients/go/) for high-throughput ingestion and
+streaming SQL over QWP.
 
 :::
 
