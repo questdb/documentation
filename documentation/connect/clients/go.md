@@ -453,6 +453,11 @@ if !ok {
 	panic("not a QWP sender")
 }
 
+// UuidColumn takes the UUID as two big-endian int64 halves:
+id := uuid.New() // github.com/google/uuid — a [16]byte value
+hi := int64(binary.BigEndian.Uint64(id[0:8]))
+lo := int64(binary.BigEndian.Uint64(id[8:16]))
+
 // Table and Symbol return LineSender, so call them first; then chain the
 // QWP-only setters (which return QwpSender) into AtNano.
 qs.Table("trades")
@@ -520,7 +525,9 @@ err = sender.Table("trades").
 	At(ctx, time.Now())
 
 // Nanosecond precision (creates a timestamp_ns column); AtNano lives on
-// QwpSender, so call it on qs — the base setters return LineSender.
+// QwpSender, so obtain qs first (comma-ok form shown under "QWP-only column
+// types"), then call the base setters — they return LineSender.
+qs := sender.(qdb.QwpSender)
 qs.Table("ticks").
 	Symbol("symbol", "EURUSD").
 	Float64Column("price", 1.0842)
@@ -535,8 +542,10 @@ err = sender.Table("trades").
 
 :::caution
 A table's designated timestamp resolution is fixed by its first row. Mixing `At`
-(microseconds) and `AtNano` (nanoseconds) on rows of the same table returns a
-type-conflict error. Pick one resolution per table.
+(microseconds) and `AtNano` (nanoseconds) on rows of the same table **within a
+single flush** returns a local type-conflict error; across flushes the mismatch
+is caught server-side and surfaces as an asynchronous rejection instead. Pick one
+resolution per table.
 :::
 
 :::note
@@ -563,6 +572,7 @@ if err != nil {
 	panic(err)
 }
 
+qs := sender.(qdb.QwpSender) // see "QWP-only column types" for the comma-ok form
 qs.Table("trade_fees")
 qs.Symbol("symbol", "ETH-USD")
 err = qs.
@@ -605,11 +615,13 @@ pair `FlushAndGetSequence` with `AwaitAckedFsn` (below). Write many rows per
 `Flush`; calling it after every row collapses throughput.
 
 :::caution
-If you disable auto-flush (`auto_flush=off` or `qdb.WithAutoFlushDisabled()`),
-nothing is sent until you call `Flush` yourself. `Close` does a final flush, but
-it is best-effort, bounded by `close_flush_timeout_millis`, and not retried on
-failure. An app that disables auto-flush and never calls `Flush` loses everything
-it buffered.
+If you disable auto-flush, nothing is sent until you call `Flush` yourself. On
+QWP, use the connect-string `auto_flush=off` to disable every trigger;
+`qdb.WithAutoFlushDisabled()` clears only the row-count and interval triggers and
+leaves the 8 MiB byte-size trigger active. `Close` does a final flush, but it is
+best-effort, bounded by `close_flush_timeout_millis`, and not retried on failure.
+An app that disables auto-flush and never calls `Flush` loses everything it
+buffered.
 :::
 
 `QwpSender.FlushAndGetSequence(ctx)` returns the published frame sequence number
@@ -842,6 +854,24 @@ Representations to be aware of:
   `nil`), which is indistinguishable from a real zero. Call `IsNull(col, row)`
   first whenever NULL is meaningful.
 
+Reassembling a UUID and scaling a decimal from a batch (`col`/`row` from the
+iteration loop above):
+
+```go
+// UUID: recombine the two int64 halves into the 16-byte big-endian form.
+var u [16]byte
+binary.BigEndian.PutUint64(u[0:8], uint64(batch.UuidHi(col, row)))
+binary.BigEndian.PutUint64(u[8:16], uint64(batch.UuidLo(col, row)))
+id := uuid.UUID(u) // github.com/google/uuid; id.String() -> canonical text
+
+// DECIMAL64: combine the unscaled integer with the per-column scale.
+unscaled := batch.Int64(col, row)
+scale := batch.DecimalScale(col)                  // fractional-digit count
+value := decimal.New(unscaled, -int32(scale))     // github.com/shopspring/decimal
+// DECIMAL128 uses Decimal128Hi/Decimal128Lo, DECIMAL256 uses Long256Word(0..3);
+// apply the same DecimalScale(col) to the reassembled unscaled integer.
+```
+
 Column metadata is available via `ColumnName(col)`, `ColumnType(col)`, and
 `ColumnCount()`.
 
@@ -1011,7 +1041,10 @@ if err := sender.Flush(ctx); err != nil {
 
 The handler runs on a dedicated dispatcher goroutine, never on the producer
 goroutine. If the bounded inbox fills, surplus notifications are dropped and
-counted by `QwpSender.DroppedErrorNotifications()`.
+counted by `QwpSender.DroppedErrorNotifications()`. The inbox holds 256
+notifications by default; raise it with the `error_inbox_capacity` connect-string
+key — forwarded to every pooled sender — or, on a standalone sender, the
+`qdb.WithErrorInboxCapacity` option (range 16–1,048,576).
 
 ### Query errors
 
@@ -1052,9 +1085,12 @@ Once an error is yielded, no further batches arrive for that query.
 
 - **Authentication failure**: a `401` or `403` response before the WebSocket
   upgrade completes. Terminal across all endpoints.
-- **Role mismatch**: a `*QwpRoleMismatchError` from a borrowed query session when
-  no configured endpoint satisfies the `target=` filter. It reports the
-  endpoints tried, the last observed server role, and the last transport error.
+- **Role mismatch**: a `*QwpRoleMismatchError` when no configured endpoint
+  satisfies the `target=` filter. Because the query pool prewarms
+  `query_pool_min` sessions at construction, it surfaces from `Connect` (or from
+  the first `BorrowQuery` under `lazy_connect`, where `query_pool_min` is `0`).
+  It reports the endpoints tried, the last observed server role, and the last
+  transport error.
 
 ## Failover and high availability
 
@@ -1206,11 +1242,14 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=db-1:9000,db-2:9000;",
 `Cause` (for failure/terminal kinds), and `TimestampMillis`.
 
 The listener runs on a dedicated dispatcher goroutine, never on the I/O or
-producer goroutine. Success events (`SenderConnected`, `SenderReconnected`,
-`SenderFailedOver`) fire on each transition; failure events may be coalesced under
-inbox pressure; terminal events fire before the producer-side typed error becomes
-observable. Dropped events are counted by
-`QwpSender.DroppedConnectionNotifications()`.
+producer goroutine. The dispatch inbox is bounded and drop-oldest, so under inbox
+pressure any event — success, failure, or terminal — can be dropped; dropped
+events are counted by `QwpSender.DroppedConnectionNotifications()`. The inbox
+holds 256 events by default; raise it with the `connection_listener_inbox_capacity`
+connect-string key — forwarded to every pooled sender — or, on a standalone
+sender, the `qdb.WithConnectionListenerInboxCapacity` option (range
+16–1,048,576). Terminal state does not depend on catching the event: it is also
+reported on demand by `LastTerminalError()` and by the next typed producer error.
 
 A borrowed sender also exposes polling counters once type-asserted to
 `qdb.QwpSender`: `TotalReconnectAttempts`, `TotalReconnectsSucceeded`,
@@ -1344,6 +1383,8 @@ Common keys for the pooled facade:
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
+| `error_inbox_capacity`          | `256`    | Error-notification inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
+| `connection_listener_inbox_capacity` | `256` | Connection-event inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `client_id`                     | `go/<ver>` | `X-QWP-Client-Id` on the query-side upgrade (ingest always sends the default) |
 
 ## Migration from ILP (HTTP/TCP)
