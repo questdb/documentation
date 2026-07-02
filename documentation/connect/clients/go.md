@@ -43,6 +43,19 @@ ILP transport details, see the
 
 :::
 
+:::caution Pre-release
+
+The pooled `QuestDB` facade (`qdb.Connect`, `BorrowSender`, `BorrowQuery`) and the
+QWP query API on this page are **pre-release**: they are not yet part of a tagged
+`v4` release of `go-questdb-client`, so
+`go get github.com/questdb/go-questdb-client/v4` alone will not resolve the types
+shown below. Build against the pre-release QWP client, pin the exact version, and
+expect the API to change before it ships. Track the
+[client releases](https://github.com/questdb/go-questdb-client/releases) for the
+first version that includes it.
+
+:::
+
 ## Quick start
 
 The client requires Go 1.23 or later. Add it to your module:
@@ -74,6 +87,21 @@ func main() {
 	}
 	defer db.Close(ctx)
 
+	// Borrow a query session and create the table up front so its designated
+	// timestamp column is named `ts`. An auto-created table would name that
+	// column `timestamp` (see the note under Data ingestion).
+	query, err := db.BorrowQuery(ctx)
+	if err != nil {
+		panic(err)
+	}
+	defer query.Close()
+	if _, err := query.Exec(ctx,
+		"CREATE TABLE IF NOT EXISTS trades "+
+			"(ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE) "+
+			"TIMESTAMP(ts) PARTITION BY DAY WAL"); err != nil {
+		panic(err)
+	}
+
 	// Ingest: borrow a sender, write rows, Close returns it to the pool.
 	sender, err := db.BorrowSender(ctx)
 	if err != nil {
@@ -88,20 +116,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := sender.Flush(ctx); err != nil {
-		panic(err)
-	}
 	if err := sender.Close(ctx); err != nil { // flush + return to pool
 		panic(err)
 	}
 
-	// Query: borrow a session, run a SELECT, iterate its result batches.
-	query, err := db.BorrowQuery(ctx)
-	if err != nil {
-		panic(err)
-	}
-	defer query.Close()
-
+	// Query: run a SELECT and iterate its result batches.
 	cursor := query.Query(ctx,
 		"SELECT symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 10")
 	defer cursor.Close()
@@ -115,8 +134,6 @@ func main() {
 	}
 }
 ```
-
-<RemoteRepoExample name="qwp-pool" lang="go" header={false} />
 
 The `QuestDB` handle is a facade over two pools: a sender pool for ingestion
 (`db.BorrowSender`) and a query pool for SQL (`db.BorrowQuery`). Both speak QWP,
@@ -427,12 +444,15 @@ on the next producer call. Always `errors.As(err, &se)` to tell them apart. See
 
 Tables and columns are created automatically if they do not exist. Auto-created
 tables name the designated-timestamp column `timestamp`. To use a different name
-(the examples below use `ts`), pre-create the table with
-`CREATE TABLE … TIMESTAMP(<name>)`. See
-[ILP overview](/docs/connect/compatibility/ilp/overview#timestamp-column-name).
+(the examples on this page use `ts`), pre-create the table with
+`CREATE TABLE … TIMESTAMP(<name>)`, as the [quick start](#quick-start) does. See
+[designated timestamp](/docs/concepts/designated-timestamp/).
 
-The full runnable example registers an error handler, the minimum correct shape
-for a QWP producer:
+The full runnable program below is a **standalone `LineSender`** that registers an
+error handler — the minimum correct shape for a QWP producer. For shared,
+multi-goroutine use, prefer the pooled facade (`db.BorrowSender` with
+`qdb.WithQuestDBErrorHandler`, shown under
+[The QuestDB handle](#the-questdb-handle)):
 
 <RemoteRepoExample name="qwp-ingest" lang="go" header={false} />
 
@@ -453,18 +473,19 @@ if !ok {
 	panic("not a QWP sender")
 }
 
-// UuidColumn takes the UUID as two big-endian int64 halves:
+// UuidColumn takes the UUID as two big-endian uint64 halves:
 id := uuid.New() // github.com/google/uuid — a [16]byte value
-hi := int64(binary.BigEndian.Uint64(id[0:8]))
-lo := int64(binary.BigEndian.Uint64(id[8:16]))
+hi := binary.BigEndian.Uint64(id[0:8])
+lo := binary.BigEndian.Uint64(id[8:16])
 
 // Table and Symbol return LineSender, so call them first; then chain the
 // QWP-only setters (which return QwpSender) into AtNano.
 qs.Table("trades")
 qs.Symbol("symbol", "ETH-USD")
+qs.Symbol("side", "sell") // side is a SYMBOL, matching the rest of the page
 err = qs.
 	Int32Column("venue_id", 7).
-	CharColumn("side", 'S').
+	CharColumn("cond", 'R'). // trade-condition code — a single CHAR
 	UuidColumn("order_id", hi, lo).
 	AtNano(ctx, time.Now())
 ```
@@ -720,7 +741,11 @@ endpoint: `Query` returns a streaming cursor for SELECT statements; `Exec` runs
 DDL and DML and returns an `ExecResult`. `Exec` blocks until the statement
 completes, so you can sequence DDL and DML safely; `Query` submits the statement
 and returns at once — batches stream as you iterate the cursor. `Close` returns
-the session to the pool:
+the session to the pool.
+
+The self-contained program below walks the full query lifecycle using a
+standalone `QwpQueryClient` over a minimal table. The pooled `BorrowQuery` idiom
+on the `trades` model is used throughout the sections that follow:
 
 <RemoteRepoExample name="qwp-query" lang="go" header={false} />
 
@@ -1488,7 +1513,18 @@ func main() {
 			fmt.Printf("row error: %s\n", err)
 		}
 	}
-	if err := sender.Close(ctx); err != nil { // flush + return to pool
+	// Flush and wait for the server to acknowledge every buffered row before
+	// reading it back. Flush and Close publish asynchronously and do not wait
+	// for the ack, so an immediate read could race the commit (see Flushing).
+	qs := sender.(qdb.QwpSender)
+	fsn, err := qs.FlushAndGetSequence(ctx)
+	if err != nil {
+		panic(err)
+	}
+	if err := qs.AwaitAckedFsn(ctx, fsn); err != nil {
+		panic(err)
+	}
+	if err := sender.Close(ctx); err != nil { // return to pool
 		fmt.Printf("sender close error: %s\n", err)
 	}
 
