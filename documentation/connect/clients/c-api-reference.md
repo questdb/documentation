@@ -26,11 +26,11 @@ Arrow batches), a row-major sender, or a query reader.
 | Concern | C | C++ |
 | --- | --- | --- |
 | Connection pool | `questdb_db*` | `questdb::pool` |
-| Borrow a **column-major** writer | `questdb_db_borrow_sf_column_sender` → `sf_column_sender*` | `pool::borrow_sf_column_sender()` → `borrowed_sf_column_sender` |
+| Borrow a **column-major** writer | `questdb_db_borrow_column_sender` → `column_sender*` | `pool::borrow_column_sender()` → `borrowed_column_sender` |
 | Borrow a **row-major** writer | `questdb_db_borrow_row_sender` → `row_sender*` | `pool::borrow_row_sender()` → `borrowed_row_sender` |
 | Borrow a **reader** | `questdb_db_borrow_reader` → `reader*` | `pool::borrow_reader()` → `reader` |
 | Column batch | `column_sender_chunk*` | `questdb::ingress::column_chunk` |
-| Arrow batch flush | `sf_column_sender_flush_arrow_batch_at_column` | `borrowed_sf_column_sender::flush_arrow_batch()` |
+| Arrow batch flush | `column_sender_flush_arrow_batch_at_column` | `borrowed_column_sender::flush_arrow_batch()` |
 | Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
 | Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
 
@@ -44,7 +44,7 @@ report errors as exceptions.
 
 | You have | Borrow | Why |
 | --- | --- | --- |
-| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_sf_column_sender`) | Whole columns are encoded in one pass — no per-row assembly. Store-and-forward queue owns delivery. |
+| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_column_sender`) | Whole columns are encoded in one pass — no per-row assembly. Store-and-forward queue owns delivery. |
 | Events arriving one at a time (tickers, order flow, telemetry) | **Row-major** (`borrow_row_sender`) | Build rows field-by-field into a buffer, flush batches on your cadence. |
 | SQL to run — verification read-backs, dashboards, downsampling | **Reader** (`borrow_reader`) | Streams typed columnar batches with flow control. |
 
@@ -169,13 +169,13 @@ int main(void)
 {
     line_sender_error* err = NULL;
     questdb_db* db = NULL;
-    sf_column_sender* conn = NULL;
+    column_sender* conn = NULL;
     column_sender_chunk* chunk = NULL;
 
     db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
     if (!db) goto on_error;
 
-    conn = questdb_db_borrow_sf_column_sender(db, &err);
+    conn = questdb_db_borrow_column_sender(db, &err);
     if (!conn) goto on_error;
 
     double price[]  = {2615.54, 2616.00, 2617.25};
@@ -190,11 +190,11 @@ int main(void)
     if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
     if (!column_sender_chunk_designated_timestamp_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
-    if (!sf_column_sender_flush(conn, chunk, &err)) goto on_error;                 // publish
-    if (!sf_column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK
+    if (!column_sender_flush(conn, chunk, &err)) goto on_error;                 // publish
+    if (!column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK
 
     column_sender_chunk_free(chunk);
-    questdb_db_return_sf_column_sender(db, conn);   // return the borrow to the pool
+    questdb_db_return_column_sender(db, conn);   // return the borrow to the pool
     questdb_db_close(db);
     return 0;
 
@@ -204,7 +204,7 @@ on_error:;
     fprintf(stderr, "error: %.*s\n", (int)len, msg);
     line_sender_error_free(err);
     column_sender_chunk_free(chunk);
-    if (conn) questdb_db_drop_sf_column_sender(db, conn);  // drop a possibly-in-doubt conn
+    if (conn) questdb_db_drop_column_sender(db, conn);  // drop a possibly-in-doubt conn
     questdb_db_close(db);
     return 1;
 }
@@ -221,7 +221,7 @@ int main()
     try
     {
         questdb::pool pool{"ws::addr=localhost:9000;"};
-        auto conn = pool.borrow_sf_column_sender();   // RAII: returns to pool on scope exit
+        auto conn = pool.borrow_column_sender();   // RAII: returns to pool on scope exit
 
         double price[]  = {2615.54, 2616.00, 2617.25};
         double amount[] = {0.00044, 0.00050, 0.00021};
@@ -251,15 +251,15 @@ int main()
   keeps its capacity; on failure it is left untouched.
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays — they must outlive the flush.
-- **`flush` is not durability.** A successful `sf_column_sender_flush` means the
+- **`flush` is not durability.** A successful `column_sender_flush` means the
   frame was accepted by the local store-and-forward queue, which owns delivery —
-  not that the server has ACKed it. `sf_column_sender_wait` (C++ `conn.wait()`)
+  not that the server has ACKed it. `column_sender_wait` (C++ `conn.wait()`)
   only *observes* the ACK; it is a barrier, not a commit step. Publish many
   chunks, then `wait` once (`qwpws_ack_level_durable` waits for durable upload,
   Enterprise). See [Durability and backpressure](#durability-and-backpressure).
-- **Return the borrow.** C: `questdb_db_return_sf_column_sender` (recycle) or
-  `questdb_db_drop_sf_column_sender` (retire a possibly in-doubt conn); C++ does
-  it in the `borrowed_sf_column_sender` destructor, and `drop_on_return()` forces
+- **Return the borrow.** C: `questdb_db_return_column_sender` (recycle) or
+  `questdb_db_drop_column_sender` (retire a possibly in-doubt conn); C++ does
+  it in the `borrowed_column_sender` destructor, and `drop_on_return()` forces
   a drop. The return path already retires conns that have latched a terminal
   error or whose pool has been closed, so plain return/destruction is correct for
   healthy conns — reach for drop only after an error that may have left in-doubt
@@ -340,7 +340,7 @@ using namespace questdb::ingress::literals;
 // arrow::ExportRecordBatch(*batch, &array, &schema) in Arrow C++.
 void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
 {
-    auto conn = pool.borrow_sf_column_sender();       // one per thread
+    auto conn = pool.borrow_column_sender();       // one per thread
     conn.flush_arrow_batch("trades"_tn, array, schema, "ts"_cn);
     conn.wait();                                      // ack barrier
 }
@@ -351,15 +351,15 @@ void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
 bool ingest(questdb_db* db, struct ArrowArray* array,
             const struct ArrowSchema* schema, line_sender_error** err)
 {
-    sf_column_sender* conn = questdb_db_borrow_sf_column_sender(db, err);
+    column_sender* conn = questdb_db_borrow_column_sender(db, err);
     if (!conn)
         return false;
-    bool ok = sf_column_sender_flush_arrow_batch_at_column(
+    bool ok = column_sender_flush_arrow_batch_at_column(
         conn, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
         QDB_COLUMN_NAME_LITERAL("ts"), NULL, 0, err);
     if (ok)
-        ok = sf_column_sender_wait(conn, qwpws_ack_level_ok, 0, err);
-    questdb_db_return_sf_column_sender(db, conn);
+        ok = column_sender_wait(conn, qwpws_ack_level_ok, 0, err);
+    questdb_db_return_column_sender(db, conn);
     return ok;
 }
 ```
@@ -678,9 +678,9 @@ The pool owns reconnection and connection health so borrowers don't have to:
 - **Multiple endpoints.** Comma-separate hosts in one `addr=` (or repeat the
   key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The pool rotates away
   from unhealthy endpoints on borrow.
-- **Retrying borrow.** `questdb_db_borrow_sf_column_sender_with_retry(db,
+- **Retrying borrow.** `questdb_db_borrow_column_sender_with_retry(db,
   budget_ms, &err)` and `questdb_db_borrow_row_sender_with_retry(...)` (C++
-  `pool::borrow_sf_column_sender_with_retry(budget_ms)` /
+  `pool::borrow_column_sender_with_retry(budget_ms)` /
   `borrow_row_sender_with_retry(budget_ms)`) retry the connect within `budget_ms`
   using the pool's reconnect backoff. Authentication and protocol-version errors
   are terminal; `budget_ms == 0` makes a single attempt.
@@ -727,7 +727,7 @@ durability story in one place:
 1. **`flush` = local acceptance.** Success means the frame is queued locally,
    nothing more. The background runner delivers, receives ACKs, reconnects,
    and replays as needed — even while the conn is parked in the pool.
-2. **`wait` = observation.** `sf_column_sender_wait` / `row_sender_wait`
+2. **`wait` = observation.** `column_sender_wait` / `row_sender_wait`
    (C++ `wait()`) block until everything published so far reaches an ack
    level: `qwpws_ack_level_ok` (server accepted) or `qwpws_ack_level_durable`
    (Enterprise: uploaded to object storage — distinguish "in the server's WAL"
@@ -755,11 +755,11 @@ returns before the server ACKs. Beyond the blocking `wait` barrier, both senders
 expose **frame sequence numbers (FSNs)** for non-blocking progress tracking while
 the same borrow is still held:
 
-- Publish with an FSN-returning flush — C `sf_column_sender_flush_and_get_fsn` /
+- Publish with an FSN-returning flush — C `column_sender_flush_and_get_fsn` /
   `row_sender_flush_and_get_fsn`; C++ `flush_and_get_fsn()` (returns
   `std::optional<uint64_t>`).
 - Keep doing work, then compare the saved FSN against the completion watermark —
-  C `sf_column_sender_acked_fsn` / `row_sender_acked_fsn`; C++ `acked_fsn()`. The
+  C `column_sender_acked_fsn` / `row_sender_acked_fsn`; C++ `acked_fsn()`. The
   publication boundary has completed once `acked_fsn` returns a value `>=` your
   saved FSN.
 
@@ -908,7 +908,7 @@ int main()
   / `questdb_db_borrow_*` and released with `*_close` / `*_free` /
   `questdb_db_return_*` / `questdb_db_drop_*`. Return and drop are **mutually
   exclusive** on the same handle: call exactly one, exactly once. The C++
-  wrappers (`pool`, `borrowed_sf_column_sender`, `borrowed_row_sender`,
+  wrappers (`pool`, `borrowed_column_sender`, `borrowed_row_sender`,
   `column_chunk`, `reader`, `cursor`) are RAII and move-only.
 - **Concurrency.** The pool is shared across threads; a borrowed handle belongs
   to one thread at a time. See
