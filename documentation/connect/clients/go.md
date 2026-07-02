@@ -413,19 +413,26 @@ The call order is fixed: `Table`, then `Symbol`s, then column setters, then
 latched and surfaces from `At`, `AtNow`, or `Flush`, so always check that
 return value.
 
-:::caution The error from `At`/`AtNow`/`Flush` is only the local error
+:::caution The error from `At`/`AtNow`/`Flush` is not the server's verdict on your rows
 
-It reports a client-side problem: a bad value, wrong call order, or
-store-and-forward backpressure. Server-side rejections (schema mismatch, parse
-error, write error) are **asynchronous** and are delivered to the error handler,
-never returned here. A `nil` return does not mean the server accepted the data.
-See [Ingestion errors](#ingestion-errors).
+A `nil` return does not mean the server accepted the data: batch rejections are
+delivered asynchronously to the error handler, never returned from the call that
+sent the rows. A non-`nil` return is one of two things — a client-side problem (a
+bad value, wrong call order, or store-and-forward backpressure), or, once a
+`PolicyHalt` rejection has latched, the terminal `*SenderError` itself, surfaced
+on the next producer call. Always `errors.As(err, &se)` to tell them apart. See
+[Ingestion errors](#ingestion-errors).
 
 :::
 
-Tables and columns are created automatically if they do not exist. The full
-runnable example registers an error handler, the minimum correct shape for a
-QWP producer:
+Tables and columns are created automatically if they do not exist. Auto-created
+tables name the designated-timestamp column `timestamp`. To use a different name
+(the examples below use `ts`), pre-create the table with
+`CREATE TABLE … TIMESTAMP(<name>)`. See
+[ILP overview](/docs/connect/compatibility/ilp/overview#timestamp-column-name).
+
+The full runnable example registers an error handler, the minimum correct shape
+for a QWP producer:
 
 <RemoteRepoExample name="qwp-ingest" lang="go" header={false} />
 
@@ -1408,6 +1415,23 @@ func main() {
 	}
 	defer db.Close(ctx)
 
+	// ─── Schema ──────────────────────────────────────────────────────
+	// Borrow one query session for both the DDL and the read-back. An
+	// auto-created table would name the designated timestamp `timestamp`;
+	// create it explicitly so the column is named `ts`.
+	query, err := db.BorrowQuery(ctx)
+	if err != nil {
+		panic(err)
+	}
+	defer query.Close()
+
+	if _, err := query.Exec(ctx,
+		"CREATE TABLE IF NOT EXISTS book "+
+			"(ts TIMESTAMP, ticker SYMBOL, price DOUBLE, size DOUBLE) "+
+			"TIMESTAMP(ts) PARTITION BY DAY WAL"); err != nil {
+		panic(err)
+	}
+
 	// ─── Ingest ──────────────────────────────────────────────────────
 	sender, err := db.BorrowSender(ctx)
 	if err != nil {
@@ -1428,12 +1452,6 @@ func main() {
 	}
 
 	// ─── Query ───────────────────────────────────────────────────────
-	query, err := db.BorrowQuery(ctx)
-	if err != nil {
-		panic(err)
-	}
-	defer query.Close()
-
 	cursor := query.Query(ctx,
 		"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
 	defer cursor.Close()
