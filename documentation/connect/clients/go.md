@@ -272,6 +272,7 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=localhost:9000;",
 | `WithLazyConnect(bool)` | `false` | Tolerate a down server at startup (see [below](#tolerating-a-down-server-at-startup)). |
 | `WithQuestDBErrorHandler(h)` | — | Ingest [`SenderErrorHandler`](#ingestion-errors) applied to every pooled sender. |
 | `WithQuestDBConnectionListener(l)` | — | [`SenderConnectionListener`](#connection-events) applied to every pooled sender. |
+| `WithQuestDBDrainerListener(l)` | — | `QwpBackgroundDrainerListener` applied to every pooled sender's orphan drainers (see [Connection events](#connection-events)). |
 
 Unlike the Java facade, the Go `QuestDB` handle accepts the ingest error handler
 and connection listener directly, so you do not need to drop down to the
@@ -1210,15 +1211,17 @@ on connection loss.
 
 ### Ingestion failover
 
-The ingestion sender uses a reconnect loop with exponential backoff. Configure it
-via the connect string:
+The ingestion sender uses a reconnect loop with capped exponential backoff and
+**no time limit**: a running sender retries a transport outage indefinitely
+(buffering via the cursor engine, or on disk with `sf_dir`) and never gives up
+on a wall clock. Configure the backoff via the connect string:
 
 | Key                                | Default  | Description                          |
 | ---------------------------------- | -------- | ------------------------------------ |
-| `reconnect_max_duration_millis`    | `300000` | Total outage budget before giving up |
+| `reconnect_max_duration_millis`    | `300000` | Budget for the **blocking sync initial connect** only (`initial_connect_retry=sync`); the running loop never consults it |
 | `reconnect_initial_backoff_millis` | `100`    | First post-failure sleep             |
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
-| `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor; `async` returns immediately and buffers |
+| `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor up to `reconnect_max_duration_millis`; `async` returns immediately, buffers, and retries indefinitely |
 
 Ingress is zone-blind — it never sees the server's role or zone information —
 and ignores the `zone=` key, so a connect string shared with the query pool
@@ -1283,9 +1286,9 @@ on any error treats a reset as terminal, which the client supports explicitly.
 When the failover budget is consumed, `Batches()` (and `Exec`) return
 `*QwpFailoverExhaustedError`. The pool discards the exhausted query session when
 you `Close` it, so the next `BorrowQuery` hands back a healthy one. This differs
-from ingestion, where the sender has a continuous reconnect loop
-(`reconnect_max_duration_millis`, default 5 minutes) that spans full outages
-transparently. The query side reconnects only within the scope of a single query.
+from ingestion, where the sender's continuous reconnect loop has no time limit
+and spans arbitrarily long outages transparently. The query side reconnects only
+within the scope of a single query.
 
 :::note Failover with a single endpoint
 
@@ -1308,7 +1311,7 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=db-1:9000,db-2:9000;",
 		switch e.Kind {
 		case qdb.SenderConnected, qdb.SenderReconnected, qdb.SenderFailedOver:
 			log.Printf("qwp up: %s endpoint=%s:%d", e.Kind, e.Host, e.Port)
-		case qdb.SenderAuthFailed, qdb.SenderReconnectBudgetExhausted:
+		case qdb.SenderAuthFailed:
 			// Terminal: the sender has stopped draining. Page on-call.
 			log.Printf("qwp TERMINAL: %s cause=%v", e.Kind, e.Cause)
 		}
@@ -1317,8 +1320,10 @@ db, err := qdb.NewQuestDB(ctx, "ws::addr=db-1:9000,db-2:9000;",
 
 `SenderConnectionEvent.Kind` is one of `SenderConnected`, `SenderDisconnected`,
 `SenderReconnected`, `SenderFailedOver`, `SenderEndpointAttemptFailed`,
-`SenderAllEndpointsUnreachable`, `SenderAuthFailed`, or
-`SenderReconnectBudgetExhausted`. The event also carries `Host`/`Port` (and
+`SenderAllEndpointsUnreachable`, or `SenderAuthFailed`. There is deliberately no
+budget-exhausted kind: a running sender retries transport outages indefinitely
+and only genuine terminals (an auth reject, a durable-ack capability mismatch)
+stop it. The event also carries `Host`/`Port` (and
 `PreviousHost`/`PreviousPort` for a failover), `AttemptNumber`, `RoundNumber`,
 `Cause` (for failure/terminal kinds), and `TimestampMillis`.
 
@@ -1337,8 +1342,10 @@ A borrowed sender also exposes polling counters once type-asserted to
 `TotalFramesReplayed`, `TotalBackpressureStalls`, `TotalServerErrors`,
 `TotalDurableAcks`, `TotalDurableTrimAdvances`, and `LastTerminalError`. With
 `drain_orphans=on`, `BackgroundDrainers()` snapshots the goroutines adopting
-unacked data from crashed sibling senders; on a standalone sender,
-`qdb.WithBackgroundDrainerListener` surfaces their durable-ack drain outcomes.
+unacked data from crashed sibling senders. `qdb.WithBackgroundDrainerListener`
+(standalone) and `qdb.WithQuestDBDrainerListener` (facade, applied to every
+pooled sender) surface drainer outcomes: durable-ack unavailability, persistent
+durable failure, and all-replica primary-unavailable windows.
 
 For background and worked configurations, see
 [client failover concepts](/docs/high-availability/client-failover/concepts/),
@@ -1468,10 +1475,11 @@ full list.
 | `sender_id`                     | `default`| Sender slot identity for SF          |
 | `request_durable_ack`           | `off`    | Wait for durable object-storage upload ACK (Enterprise, QWP, replication primary) |
 | `durable_ack_keepalive_interval_millis` | `200` | Durable-ack keepalive ping pacing (`0` disables) |
-| `reconnect_max_duration_millis` | `300000` | Ingress reconnect budget             |
+| `reconnect_max_duration_millis` | `300000` | Sync initial-connect budget (running loop retries unbounded) |
 | `failover`                      | `on`     | Query per-query reconnect switch     |
 | `compression`                   | `raw`    | Query batch compression (`raw`, `zstd`, `auto`) |
 | `compression_level`             | `1`      | zstd level hint (`1`–`22`)           |
+| `query_close_timeout_ms`        | `5000`   | Close-path cleanup drain bound on a query session |
 | `error_inbox_capacity`          | `256`    | Error-notification inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `connection_listener_inbox_capacity` | `256` | Connection-event inbox size (`0` = default; 16–1,048,576); forwarded to each pooled sender |
 | `client_id`                     | `go/<ver>` | `X-QWP-Client-Id` on the query-side upgrade (ingest always sends the default) |

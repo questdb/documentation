@@ -178,7 +178,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
-| Tune ingress reconnect budget                     | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
+| Tune ingress reconnect backoff                    | ingress   | —                                      | `reconnect_initial_backoff_millis`, `reconnect_max_backoff_millis`, `reconnect_max_duration_millis` (any of these also implies `initial_connect_retry=on`) |
 | Force fail-fast on initial connect                | ingress   | `initial_connect_retry=off`            | overrides the implicit promotion from any explicit `reconnect_*` key                        |
 | Retry initial connect in background               | ingress   | `initial_connect_retry=async`          | `reconnect_*`                                                                               |
 | Fast `close()` without drain                      | ingress   | `close_flush_timeout_millis=0`         | —                                                                                           |
@@ -526,7 +526,10 @@ runs once per query.
 ### Ingress reconnect
 
 These keys control the cursor-engine reconnect loop used by QWP ingest.
-SF mode and memory-only mode share the same loop.
+SF mode and memory-only mode share the same loop. A **running** sender
+retries a transport outage indefinitely with capped exponential backoff —
+there is no wall-clock give-up: the whole point of the buffering
+architecture is that a producer survives an arbitrarily long outage.
 
 - `reconnect_initial_backoff_millis` — initial wait between reconnect
   attempts. Backoff grows exponentially up to `reconnect_max_backoff_millis`.
@@ -535,25 +538,27 @@ SF mode and memory-only mode share the same loop.
 - `reconnect_max_backoff_millis` — cap on per-attempt backoff.
   Default: `5000` (5 s). Setting this enables
   `initial_connect_retry=on` implicitly; see below.
-- `reconnect_max_duration_millis` — total time budget for a single outage.
-  Once exceeded, the I/O loop gives up and surfaces a terminal error.
-  Default: `300000` (5 min). Setting this enables `initial_connect_retry=on`
-  implicitly; see below.
+- `reconnect_max_duration_millis` — time budget for the **blocking sync
+  initial connect** (`initial_connect_retry=on`): once exceeded, the
+  constructor gives up and returns the error. The running loop and the
+  `async` initial connect never consult it. Default: `300000` (5 min).
+  Setting this enables `initial_connect_retry=on` implicitly; see below.
 - `initial_connect_retry` — whether the initial connect attempt is retried
-  on failure. The same loop drives the retry.
+  on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
   - `on` (aliases `sync`, `true`) — retry synchronously on the user
-    thread.
+    thread, up to `reconnect_max_duration_millis`.
   - `async` — return the `Sender` immediately; the I/O thread retries in
-    the background, surfacing terminal failures via the error inbox.
+    the background indefinitely, surfacing only genuine terminal failures
+    (auth reject, durable-ack mismatch) via the error inbox.
 
   **Implicit promotion.** Setting any explicit `reconnect_*` key without
   also choosing an `initial_connect_retry` mode promotes
-  `initial_connect_retry` to `on` automatically, so the reconnect budget
-  also covers the *first* connect attempt — not only post-disconnect
-  ones. To keep the historical fail-fast behaviour on first connect while
-  still tuning the reconnect loop, set `initial_connect_retry=off`
-  explicitly; the override is preserved.
+  `initial_connect_retry` to `on` automatically, so the budget also covers
+  the *first* connect attempt — without the promotion,
+  `reconnect_max_duration_millis` would be inert. To keep the historical
+  fail-fast behaviour on first connect while still tuning the backoff, set
+  `initial_connect_retry=off` explicitly; the override is preserved.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Default: `5000` (5 s).
   Set to `0` or `-1` for fast close (skip the drain).
@@ -636,6 +641,10 @@ parser would reject is still silently accepted by the Sender.
   unbounded: the server streams as fast as the network allows. Set a
   non-zero budget to bound server push on a memory-constrained client.
 - `max_batch_rows` — upper bound on rows per result batch.
+- `query_close_timeout_ms` — bounds the close-path cleanup drain (closing a
+  cursor mid-result-set, breaking out of iteration) before the connection
+  is declared desynced and discarded. Positive integer milliseconds;
+  default `5000` (5 s).
 - `buffer_pool_size` — number of decoded result-batch buffers the I/O
   thread keeps in rotation. Sets the in-flight window between the
   receive/decode loop and the user's `onBatch` callback: at most this many
@@ -738,6 +747,7 @@ description and behaviour notes.
 | `on_server_error` *                     | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
 | `on_write_error` *                      | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
 | `password`                              | string                        | unset                         | [Authentication](#auth)                                       |
+| `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
