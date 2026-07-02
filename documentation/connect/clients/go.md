@@ -459,7 +459,8 @@ err = qs.
 
 `QwpSender` adds `ByteColumn`, `ShortColumn`, `Int32Column`, `Float32Column`,
 `CharColumn`, `DateColumn`, `TimestampNanosColumn`, `UuidColumn`,
-`GeohashColumn`, `Int64Array1DColumn` / `2D` / `3D`, the decimal columns, and
+`GeohashColumn`, `Int64Array1DColumn` / `2D` / `3D`, the fixed-width decimal
+columns (`Decimal64Column` / `Decimal128Column` / `Decimal256Column`), and
 `AtNano` for nanosecond designated timestamps. It also exposes the
 acknowledgement and observability accessors (`AwaitAckedFsn`,
 `FlushAndGetSequence`, `TotalReconnectAttempts`, `LastTerminalError`, …).
@@ -496,8 +497,8 @@ err = sender.Table("book").Float64ArrayNDColumn("cube", arr).AtNow(ctx)
 
 Values are stored in row-major order: the last dimension varies fastest. Use
 `Set(value, positions...)` to write at specific coordinates, `Append(value)` for
-sequential fills, and `Reshape(shape...)` to change the shape without
-reallocating.
+sequential fills, and `Reshape(shape...)` for a new view with a different shape
+over the same backing data.
 
 ### Designated timestamp
 
@@ -527,8 +528,8 @@ err = sender.Table("trades").
 
 :::caution
 A table's designated timestamp resolution is fixed by its first row. Mixing `At`
-(microseconds) and `AtNano` (nanoseconds) on rows of the same table within one
-flush returns a type-conflict error. Pick one resolution per table.
+(microseconds) and `AtNano` (nanoseconds) on rows of the same table returns a
+type-conflict error. Pick one resolution per table.
 :::
 
 :::note
@@ -631,11 +632,11 @@ the RAM buffer caps how much data can accumulate.
 
 <SfDedupWarning />
 
-With store-and-forward enabled, `At`/`AtNow`/`Flush` can block when the buffer
-hits its cap. The producer blocks until the wire path drains enough capacity,
-then returns a deadline error (`sf_append_deadline_millis`) if it does not drain
-in time. Treat a blocking call as a signal that the server is unreachable or
-slow, not as a reason to retry in a tight loop.
+In both modes, `At`/`AtNow`/`Flush` can block when the buffer hits its cap: the
+producer waits for the wire path to free enough capacity, and returns a deadline
+error if it does not within `sf_append_deadline_millis` (default 30 seconds).
+Treat a blocking call as a signal that the server is unreachable or slow, not as
+a reason to retry in a tight loop.
 
 Terminal rejections (schema, parse, or security errors) latch a terminal error.
 The next producer call returns it as a typed `*SenderError`; the sender will not
@@ -697,9 +698,10 @@ the server. See the
 Borrow a query session with `db.BorrowQuery(ctx)`. The returned `*Query`
 delegates to the QWP [egress](/docs/connect/wire-protocols/qwp-egress-websocket/)
 endpoint: `Query` returns a streaming cursor for SELECT statements; `Exec` runs
-DDL and DML and returns an `ExecResult`. Both block until the statement
-completes, so you can sequence operations safely. `Close` returns the session to
-the pool:
+DDL and DML and returns an `ExecResult`. `Exec` blocks until the statement
+completes, so you can sequence DDL and DML safely; `Query` submits the statement
+and returns at once — batches stream as you iterate the cursor. `Close` returns
+the session to the pool:
 
 <RemoteRepoExample name="qwp-query" lang="go" header={false} />
 
@@ -810,6 +812,7 @@ accessors take `(row)`.
 | `Long256Word`                       | LONG256 (per 64-bit word)                  |
 | `Float64Array` / `Int64Array`       | DOUBLE_ARRAY, LONG_ARRAY (flattened)       |
 | `ArrayNDims` / `ArrayDim`           | array dimensionality and shape             |
+| `Geohash`                           | GEOHASH (bits right-aligned in a `uint64`) |
 | `DecimalScale`                      | DECIMAL scale metadata (per column)        |
 | `GeohashPrecisionBits`              | GEOHASH precision metadata (per column)    |
 | `IsNull`                            | all types                                  |
@@ -824,9 +827,10 @@ Representations to be aware of:
   `DecimalScale(col)`: read `DECIMAL64` with `Int64`, `DECIMAL128` with
   `Decimal128Hi`/`Decimal128Lo`, and `DECIMAL256` with `Long256Word` (words
   0–3); apply the scale yourself.
-- `GEOHASH` result columns expose only metadata in this release
-  (`GeohashPrecisionBits(col)`); there is no public value accessor for a GEOHASH
-  cell. Cast it to a string or long in SQL if you need the value.
+- `GEOHASH` comes back as the packed bits right-aligned in a `uint64`
+  (`Geohash(col, row)`), with the per-column precision from
+  `GeohashPrecisionBits(col)`; decode to the text form client-side if you need
+  it.
 - A typed accessor on a NULL cell returns the zero value (`0`, `false`, `""`,
   `nil`), which is indistinguishable from a real zero. Call `IsNull(col, row)`
   first whenever NULL is meaningful.
@@ -854,7 +858,8 @@ INSERT from UPDATE from pure DDL.
 
 :::caution `Exec` is not retried across a reconnect by default
 
-If the connection drops mid-statement, `Exec` returns a `*QwpFailoverReset`. This
+If the connection drops mid-statement, `Exec` returns an error — the transport
+error, or `*QwpFailoverExhaustedError` once the failover budget is spent. This
 means the statement was **interrupted and not confirmed**, not that it succeeded.
 For a non-idempotent `INSERT`, re-issuing it may double-apply, so decide per
 statement whether replay is safe. To make `Exec` retry transparently (only for
@@ -1067,10 +1072,10 @@ exactly three things beyond the single-host code. This is the whole list:
    iterating. If you process each batch and keep nothing, the simple
    terminal-on-error loop is already correct. Pattern:
    [Query failover](#query-failover).
-3. **DDL/DML: `Exec` is not retried by default.** A `*QwpFailoverReset` from
-   `Exec` means the statement was not confirmed, not that it succeeded. Re-issue
-   it only if it is idempotent, or opt into `replay_exec=on`. Details:
-   [the Exec caution](#ddl-and-dml-statements).
+3. **DDL/DML: `Exec` is not retried by default.** An error from `Exec` after a
+   mid-statement disconnect means the statement was not confirmed, not that it
+   succeeded. Re-issue it only if it is idempotent, or opt into `replay_exec=on`.
+   Details: [the Exec caution](#ddl-and-dml-statements).
 
 Everything below is the detail behind these three points.
 
@@ -1097,9 +1102,10 @@ via the connect string:
 | `reconnect_max_backoff_millis`     | `5000`   | Cap on per-attempt sleep             |
 | `initial_connect_retry`            | `off`    | First-connect retry: `off` fails fast; `on`/`sync` retries blocking the constructor; `async` returns immediately and buffers |
 
-Ingress is zone-blind: it pins QWP v1 and ignores the `zone=` key, so a connect
-string shared with the query pool works unchanged. Reconnect is transparent to
-the producer; you do not change the ingestion loop for it.
+Ingress is zone-blind — it never sees the server's role or zone information —
+and ignores the `zone=` key, so a connect string shared with the query pool
+works unchanged. Reconnect is transparent to the producer; you do not change the
+ingestion loop for it.
 
 ### Query failover
 
@@ -1157,11 +1163,12 @@ from ingestion, where the sender has a continuous reconnect loop
 (`reconnect_max_duration_millis`, default 5 minutes) that spans full outages
 transparently. The query side reconnects only within the scope of a single query.
 
-:::warning Failover requires multiple endpoints
+:::note Failover with a single endpoint
 
-Failover rotates across endpoints. With a single `addr`, there is no other host to
-try, and the loop exhausts after one attempt regardless of `failover_max_attempts`.
-For failover to be useful, provide at least two addresses.
+With a single `addr`, the failover loop retries the same host with backoff — up
+to `failover_max_attempts` / `failover_max_duration_ms` — which rides out a
+server restart. Multiple addresses additionally let a query move to another
+healthy node.
 
 :::
 
@@ -1259,10 +1266,10 @@ sender, err := qdb.LineSenderFromConf(ctx, "ws::addr=localhost:9000;")
 sender, err := qdb.LineSenderFromEnv(ctx)
 
 // From the options API, for callbacks the connect string can't express.
+// Multiple endpoints go in one comma-separated address string.
 sender, err := qdb.NewLineSender(ctx,
 	qdb.WithQwp(),
-	qdb.WithAddress("db-primary:9000"),
-	qdb.WithAddress("db-replica:9000"),
+	qdb.WithAddress("db-primary:9000,db-replica:9000"),
 	qdb.WithTls(),
 	qdb.WithBearerToken("YOUR_BEARER_TOKEN"),
 	qdb.WithAutoFlushRows(500),
@@ -1431,23 +1438,28 @@ func main() {
 		"SELECT ts, ticker, price FROM book ORDER BY ts DESC LIMIT 10")
 	defer cursor.Close()
 
+	// Accumulate across batches, so a mid-query failover must clear the
+	// partial results: the server replays the result set from the beginning.
+	var lines []string
 	for batch, err := range cursor.Batches() {
 		if err != nil {
 			var reset *qdb.QwpFailoverReset
 			if errors.As(err, &reset) {
-				// Fires only on a mid-query failover. Clear partial results.
-				fmt.Println("failover, clearing partial results")
+				lines = lines[:0]
 				continue
 			}
 			fmt.Printf("query failed: %s\n", err)
-			break
+			return
 		}
 		for row := 0; row < batch.RowCount(); row++ {
 			ts := time.UnixMicro(batch.Int64(0, row))
-			fmt.Printf("%s  %s  price=%.5f\n",
+			lines = append(lines, fmt.Sprintf("%s  %s  price=%.5f",
 				ts.Format("2006-01-02T15:04:05.000Z"),
-				batch.String(1, row), batch.Float64(2, row))
+				batch.String(1, row), batch.Float64(2, row)))
 		}
+	}
+	for _, line := range lines {
+		fmt.Println(line)
 	}
 }
 ```
