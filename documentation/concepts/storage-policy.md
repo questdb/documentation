@@ -212,7 +212,7 @@ ALTER TABLE trades DROP STORAGE POLICY;
 
 ## Checking storage policies
 
-Query the `storage_policies` system view to see all active policies:
+Query the `storage_policies` system view to see all policies and their status:
 
 ```questdb-sql
 SELECT * FROM storage_policies;

@@ -9,9 +9,10 @@ Storage policy is [Enterprise](/enterprise/) only.
 
 :::
 
-Storage policies automate partition lifecycle management, including local
-deletion and cold storage offloading. These settings control the scan interval,
-retry behavior, and worker threads for the storage policy engine.
+Storage policies automate partition lifecycle management: they convert older
+partitions to Parquet locally and drop local copies on a schedule. These
+settings control the scan interval, retry behavior, and worker threads for the
+storage policy engine.
 
 For details, see the
 [storage policy concept](/docs/concepts/storage-policy/) page.
