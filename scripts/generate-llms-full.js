@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const yaml = require('js-yaml')
+const matter = require('gray-matter')
 const {
   convertAllComponents,
   bumpHeadings,
@@ -8,13 +8,14 @@ const {
   removeImports,
   processPartialImports,
 } = require('../plugins/raw-markdown/convert-components')
+const remoteRepoExamplePlugin = require('../plugins/remote-repo-example/index')
 
 const sidebarConfig = require('../documentation/sidebars.js')
+const { BASE_URL, generateUrl } = require('./lib/docs-urls')
 
 const ROOT_DIR = path.resolve(__dirname, '..')
 const DOCS_DIR = path.join(ROOT_DIR, 'documentation')
 const OUTPUT_DIR = path.join(ROOT_DIR, 'static')
-const BASE_URL = 'https://questdb.com/docs/'
 
 function readDocFile(docId) {
   const mdPath = path.join(DOCS_DIR, docId + '.md')
@@ -43,9 +44,7 @@ function loadPartial(partialPath, currentFileDir) {
 
   if (fs.existsSync(absolutePath)) {
     const partialRaw = fs.readFileSync(absolutePath, 'utf8')
-    const frontmatterRegex = /^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/
-    const match = partialRaw.match(frontmatterRegex)
-    const content = match ? match[1] : partialRaw
+    const { content } = matter(partialRaw)
     partialCache.set(absolutePath, content)
     return content
   }
@@ -54,64 +53,23 @@ function loadPartial(partialPath, currentFileDir) {
   return `<!-- Partial not found: ${partialPath} -->`
 }
 
-function normalizeUrl(url) {
-  const clean = url.endsWith('/') ? url.slice(0, -1) : url
-  return clean + '.md'
-}
-
-function generateUrl(docId, slug) {
-  if (slug) {
-    let urlPath = slug
-
-    // Absolute slug (starts with /)
-    if (urlPath.startsWith('/')) {
-      urlPath = urlPath.substring(1)
-      if (urlPath === '') {
-        return BASE_URL + 'index.md'
-      }
-      return normalizeUrl(BASE_URL + urlPath)
-    }
-
-    // Relative slug - resolve it relative to the document's directory
-    const docDir = path.dirname(docId)
-    if (docDir && docDir !== '.') {
-      urlPath = path.join(docDir, urlPath)
-    }
-
-    return normalizeUrl(BASE_URL + urlPath)
-  }
-
-  if (docId === 'introduction') {
-    return BASE_URL + 'index.md'
-  }
-  // Strip /index suffix to match raw-markdown plugin output (e.g. cookbook/index -> cookbook.md)
-  const urlDocId = docId.endsWith('/index') ? docId.slice(0, -'/index'.length) : docId
-  return normalizeUrl(BASE_URL + urlDocId)
-}
-
-async function renderDoc(docId) {
+async function renderDoc(docId, repoExamples) {
   const doc = readDocFile(docId)
   if (!doc) return ''
 
-  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/
-  const match = doc.raw.match(frontmatterRegex)
-
-  let frontmatter = {}
-  let mainContent = doc.raw
-
-  if (match) {
-    try {
-      frontmatter = yaml.load(match[1]) || {}
-    } catch (_) {}
-    mainContent = match[2]
-  }
+  const { data: frontmatter, content: mainContent } = matter(doc.raw)
 
   // Process partial component imports
   const relativeDir = path.relative(DOCS_DIR, path.dirname(doc.filePath))
   let processedContent = processPartialImports(mainContent, loadPartial, relativeDir)
 
   // Convert MDX components to markdown
-  processedContent = await convertAllComponents(processedContent, path.dirname(doc.filePath), DOCS_DIR)
+  processedContent = await convertAllComponents(
+    processedContent,
+    path.dirname(doc.filePath),
+    DOCS_DIR,
+    repoExamples,
+  )
 
   processedContent = removeImports(processedContent)
   processedContent = normalizeNewLines(processedContent)
@@ -133,6 +91,7 @@ async function renderDoc(docId) {
 
 // Walk the sidebar in order, collecting doc ids grouped by top-level category.
 // Loose top-level docs fall under "Getting Started", matching llms.txt.
+// A category's own `link: {type: 'doc'}` page is included before its items.
 function collectSections(items) {
   const sections = []
   let current = { label: 'Getting Started', docIds: [] }
@@ -143,8 +102,13 @@ function collectSections(items) {
         into.push(item)
       } else if (item.type === 'doc') {
         into.push(item.id)
-      } else if (item.type === 'category' && item.items) {
-        collectDocIds(item.items, into)
+      } else if (item.type === 'category') {
+        if (item.link && item.link.type === 'doc' && item.link.id) {
+          into.push(item.link.id)
+        }
+        if (item.items) {
+          collectDocIds(item.items, into)
+        }
       }
       // item.type === 'link' is external; skip
     }
@@ -160,6 +124,9 @@ function collectSections(items) {
         sections.push(current)
       }
       current = { label: item.label, docIds: [] }
+      if (item.link && item.link.type === 'doc' && item.link.id) {
+        current.docIds.push(item.link.id)
+      }
       if (item.items) {
         collectDocIds(item.items, current.docIds)
       }
@@ -176,6 +143,10 @@ function collectSections(items) {
 async function generateLlmsFull() {
   console.log('Generating llms-full.txt from QuestDB documentation...')
 
+  // Same remote example data the raw-markdown plugin receives at build time,
+  // so <RemoteRepoExample /> renders real code instead of its fallback
+  const repoExamples = await remoteRepoExamplePlugin().loadContent()
+
   const sections = collectSections(sidebarConfig.docs)
 
   let output = `# QuestDB Documentation — Full Content
@@ -186,12 +157,24 @@ markdown source.
 
 `
 
+  // Docs can appear in several sidebar positions; render each only once
+  const renderedDocIds = new Set()
   let docCount = 0
+  let duplicateCount = 0
+
   for (const section of sections) {
     output += `# ${section.label}\n\n`
     for (const docId of section.docIds) {
-      output += await renderDoc(docId)
-      docCount++
+      if (renderedDocIds.has(docId)) {
+        duplicateCount++
+        continue
+      }
+      renderedDocIds.add(docId)
+      const rendered = await renderDoc(docId, repoExamples)
+      if (rendered) {
+        output += rendered
+        docCount++
+      }
     }
   }
 
@@ -205,7 +188,7 @@ markdown source.
   const sizeMB = (Buffer.byteLength(output, 'utf8') / 1024 / 1024).toFixed(2)
   console.log('✅ llms-full.txt generated successfully!')
   console.log(`   - Path: ${targetPath}`)
-  console.log(`   - Docs: ${docCount}`)
+  console.log(`   - Docs: ${docCount} (${duplicateCount} duplicate sidebar entries skipped)`)
   console.log(`   - Size: ${sizeMB} MB`)
 }
 
