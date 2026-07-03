@@ -37,9 +37,9 @@ TABLE [IF NOT EXISTS] tableName
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -58,9 +58,9 @@ TABLE [IF NOT EXISTS] tableName
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
         [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']

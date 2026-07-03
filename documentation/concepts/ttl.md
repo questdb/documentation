@@ -16,9 +16,12 @@ non-zero `SET TTL` with
 `TTL is not supported on Enterprise tables; use a storage policy instead`.
 Storage policies extend TTL with graduated lifecycle management (convert to
 Parquet, then drop) and are the recommended retention primitive for Enterprise
-users. The rest of this page describes TTL behavior on QuestDB Open Source
-(and the `SET TTL 0` case on Enterprise, used to clear an older TTL before
-attaching a storage policy).
+users. Materialized views are the exception: they continue to use `TTL` for
+retention on Enterprise (set via
+[`ALTER MATERIALIZED VIEW SET TTL`](/docs/query/sql/alter-mat-view-set-ttl/)).
+The rest of this page describes TTL behavior on QuestDB Open Source (and the
+`SET TTL 0` case on Enterprise, used to clear an older TTL before attaching a
+storage policy).
 
 :::
 

@@ -306,7 +306,7 @@ SELECT * FROM storage_policies;
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
+| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `directoryName` column in [`tables()`](#tables). |
 | `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). `0h` when the stage is not configured. |
 | `to_remote` | _STRING_ | TTL for the `TO REMOTE` stage. Accepted and stored but not yet enforced, so setting it has no effect for now. `0h` when not configured. |
 | `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. `0h` when the stage is not configured. |
