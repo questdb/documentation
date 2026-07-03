@@ -76,9 +76,9 @@ eligible when: partition_end_time < reference_time - TTL
 
 **This rule is applied independently for each stage's TTL.** A partition can
 be eligible for `TO PARQUET` long before it is eligible for `DROP LOCAL` (or,
-one day, the reserved `TO REMOTE` and `DROP REMOTE` stages). Each stage uses
-its own `TTL` in the formula above; the stages share only the reference time
-and the [ordering constraints](#ordering-constraint).
+once remote upload is enforced, the `TO REMOTE` and `DROP REMOTE` stages).
+Each stage uses its own `TTL` in the formula above; the stages share only the
+reference time and the [ordering constraints](#ordering-constraint).
 
 The reference time is `min(wall_clock_time, latest_timestamp)` by default —
 the same formula used by TTL. The

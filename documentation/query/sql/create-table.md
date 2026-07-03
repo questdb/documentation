@@ -36,7 +36,7 @@ TABLE [IF NOT EXISTS] tableName
     (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
             [BYPASS WAL | WAL]]]
@@ -57,7 +57,7 @@ TABLE [IF NOT EXISTS] tableName
     [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
             [BYPASS WAL | WAL]]]
