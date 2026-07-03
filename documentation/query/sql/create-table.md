@@ -262,10 +262,13 @@ information on the behavior of this feature.
 
 :::note
 
-In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
-rejected with `TTL settings are deprecated, please, create a storage policy
-instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
-it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+In QuestDB Enterprise, use `STORAGE POLICY` instead of `TTL`.
+`CREATE TABLE ... TTL` is still accepted for backward compatibility and is
+translated into a `STORAGE POLICY(DROP LOCAL ...)`. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is rejected with `TTL is not
+supported on Enterprise tables; use a storage policy instead`. If a legacy
+table has a TTL set, clear it with `ALTER TABLE SET TTL 0` before setting a
+storage policy.
 
 :::
 
@@ -299,9 +302,9 @@ A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
 positive. A drop stage may not precede the write it depends on (`TO PARQUET`
 and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
 `TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
-removes its native files and serves reads from the Parquet file. `TO REMOTE`
-and `DROP REMOTE` are reserved syntax and are currently rejected at SQL parse
-time with `'TO REMOTE' is not supported yet` and
+removes its native files and serves reads from the Parquet file. Storage
+policies currently operate locally only: `TO REMOTE` is accepted and stored but
+not yet enforced, and `DROP REMOTE` is rejected at SQL parse time with
 `'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after table creation, see

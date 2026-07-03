@@ -28,8 +28,8 @@ ALTER TABLE table_name SET STORAGE POLICY(
 );
 ```
 
-Only the specified settings are changed. Omitted settings retain their current
-values.
+`SET STORAGE POLICY` replaces the policy as a whole. Any stage you do not list
+is cleared, not preserved, so restate every stage you want to keep.
 
 ### Enable or disable a storage policy
 
@@ -56,20 +56,19 @@ transition from native format to Parquet and eventually get removed:
 | Setting | Effect |
 |---------|--------|
 | `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file |
-| `TO REMOTE <ttl>` | _Reserved._ Will upload the partition to object storage when remote upload is supported |
+| `TO REMOTE <ttl>` | Accepted and stored but not yet enforced; no upload happens yet. Reserved for future object storage upload |
 | `DROP LOCAL <ttl>` | Remove all local copies of the partition |
-| `DROP REMOTE <ttl>` | _Reserved._ Will remove the partition from object storage when remote upload is supported |
+| `DROP REMOTE <ttl>` | _Not yet supported._ Rejected at parse time with `'DROP REMOTE' is not supported yet`. Reserved for future object storage removal |
 
 :::info
 
-`TO REMOTE` and `DROP REMOTE` are reserved syntax. They are rejected at SQL
-parse time with `'TO REMOTE' is not supported yet` and
-`'DROP REMOTE' is not supported yet`. Automatic upload of Parquet files to
-object storage is not currently supported — storage policies operate locally
-only. Because these clauses cannot take effect, the `to_remote` and
-`drop_remote` columns in the
-[`storage_policies`](/docs/query/functions/meta/#storage_policies) view are
-always blank in the current release.
+Storage policies operate locally only for now. `TO REMOTE` is accepted and
+stored but not yet enforced: no upload to object storage happens yet.
+`DROP REMOTE` is not yet supported and is rejected at parse time with
+`'DROP REMOTE' is not supported yet`. In the
+[`storage_policies`](/docs/query/functions/meta/#storage_policies) view,
+`drop_remote` is therefore always `0h`, and `to_remote` reads `0h` unless a
+`TO REMOTE` value is set (stored, but not yet enforced).
 
 :::
 
@@ -89,13 +88,17 @@ Both singular and plural forms are accepted.
   `TO PARQUET <= DROP LOCAL`, `TO REMOTE <= DROP LOCAL`, and
   `DROP LOCAL <= DROP REMOTE`. `TO PARQUET` and `TO REMOTE` are independent of
   each other
-- All TTL values must be positive — `0` is rejected
+- All TTL values must be positive; `0` is rejected
+- Each TTL must be an integer multiple of the partition size. For example, a
+  `MONTH`-partitioned table accepts only month- or year-based values, not
+  `HOUR`, `DAY`, or `WEEK`
 - Each setting can only appear once per statement
 - The table must have a designated timestamp and partitioning enabled
-- If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0` before
-  setting a storage policy. Any non-zero `SET TTL` value is rejected in
-  Enterprise with `TTL settings are deprecated, please, create a storage policy
-  instead`
+- If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0` first;
+  otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage policy,
+  please, remove TTL settings`. On Enterprise tables, any non-zero `SET TTL`
+  value is itself rejected with `TTL is not supported on Enterprise tables; use
+  a storage policy instead`
 - `ENABLE` and `DISABLE` require a policy to exist on the table; both return an
   error otherwise
 
@@ -121,7 +124,8 @@ ALTER TABLE sensor_data SET STORAGE POLICY(
 );
 ```
 
-Update only the Parquet conversion threshold:
+Replace the policy with a single Parquet-conversion stage (any previously set
+stages are cleared):
 
 ```questdb-sql
 ALTER TABLE sensor_data SET STORAGE POLICY(TO PARQUET 7d);

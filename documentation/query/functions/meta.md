@@ -307,21 +307,22 @@ SELECT * FROM storage_policies;
 | Column | Type | Description |
 |--------|------|-------------|
 | `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
-| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
-| `to_remote` | _STRING_ | Reserved — always blank in the current release. The `TO REMOTE` clause is rejected at SQL parse time with `'TO REMOTE' is not supported yet`. The column is kept for forward compatibility. |
-| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
-| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
+| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). `0h` when the stage is not configured. |
+| `to_remote` | _STRING_ | TTL for the `TO REMOTE` stage. Accepted and stored but not yet enforced, so setting it has no effect for now. `0h` when not configured. |
+| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. `0h` when the stage is not configured. |
+| `drop_remote` | _STRING_ | Reserved for future object storage removal. `DROP REMOTE` is rejected at parse time with `'DROP REMOTE' is not supported yet`, so this column is always `0h`. |
 | `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
 | `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
 
 **Notes on TTL formatting:**
 
-- TTL values are rendered in just two units: `h` for hours and `m` for
-  **months**. Durations written in the DDL as days, weeks, or years are
-  normalized to hours when stored (e.g., `3 DAYS` → `72h`, `1 WEEK` →
-  `168h`). Month-based durations are stored and rendered with the lowercase
-  `m` suffix — despite the visual collision with "minute", `m` in this view
-  is **months**, and QuestDB's duration shorthand has no unit for minutes.
+- TTL values are rendered in two units: `h` for hours and `m` for **months**.
+  Hour-, day-, and week-based durations are stored as hours (e.g. `3 DAYS` →
+  `72h`, `1 WEEK` → `168h`). Month- and year-based durations are stored as
+  months (e.g. `1 MONTH` → `1m`, `1 YEAR` → `12m`). Despite the visual
+  collision with "minute", `m` in this view is **months**; QuestDB's duration
+  shorthand has no unit for minutes.
+- An unset stage renders as `0h`, not blank.
 
 **Example:**
 
@@ -331,13 +332,13 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
 |----------------|------------|-----------|------------|-------------|--------|--------------|
-| trades~12      | 72h        |           | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
-| metrics~18     | 168h       |           |            |             | D      | 2025-01-14T09:15:42.000000Z |
+| trades~12      | 72h        | 0h        | 1m         | 0h          | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       | 0h        | 0h         | 0h          | D      | 2025-01-14T09:15:42.000000Z |
 
 The first row is a policy with two active stages (3-day Parquet conversion and
 1-month local drop) and is currently enforced. The second row has only the
-`TO PARQUET` stage set and has been temporarily disabled. The `to_remote` and
-`drop_remote` columns are reserved and always blank in the current release.
+`TO PARQUET` stage set and has been temporarily disabled. Unset stages, and the
+not-yet-enforced `to_remote` and `drop_remote` columns, all render as `0h`.
 
 ## table_columns
 
