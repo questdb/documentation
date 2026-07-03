@@ -12,6 +12,7 @@ const remoteRepoExamplePlugin = require('../plugins/remote-repo-example/index')
 
 const sidebarConfig = require('../documentation/sidebars.js')
 const { BASE_URL, generateUrl } = require('./lib/docs-urls')
+const { subtreeContainsDoc } = require('./lib/sidebar-utils')
 
 const ROOT_DIR = path.resolve(__dirname, '..')
 const DOCS_DIR = path.join(ROOT_DIR, 'documentation')
@@ -74,8 +75,10 @@ async function renderDoc(docId, repoExamples) {
   processedContent = removeImports(processedContent)
   processedContent = normalizeNewLines(processedContent)
 
-  // Body headings H2 -> H3 etc. so the manually emitted H2 title stays the top of each doc
-  processedContent = bumpHeadings(processedContent, 1)
+  // Bump body headings by 2 (H1 -> H3, H2 -> H4, …) so nothing in a doc body
+  // can collide with the H1 section headers or the H2 per-doc title below —
+  // some docs (introduction, changelog) legitimately contain body H1s
+  processedContent = bumpHeadings(processedContent, 2)
 
   const title = frontmatter.title || docId
   const url = generateUrl(docId, frontmatter.slug || null)
@@ -89,12 +92,32 @@ async function renderDoc(docId, repoExamples) {
   return out
 }
 
-// Walk the sidebar in order, collecting doc ids grouped by top-level category.
-// Loose top-level docs fall under "Getting Started", matching llms.txt.
-// A category's own `link: {type: 'doc'}` page is included before its items.
+function docTitle(docId) {
+  const doc = readDocFile(docId)
+  if (!doc) return docId
+  const { data } = matter(doc.raw)
+  return data.title || docId
+}
+
+// Walk the sidebar in order, collecting doc ids grouped into sections.
+// Top-level categories become sections labeled by the category. Loose
+// top-level docs before the first category form an "Overview" section;
+// loose docs appearing after a category (e.g. changelog) each get their own
+// section labeled by the doc's title, so no doc is misattributed to a
+// neighboring category. A category's own `link: {type: 'doc'}` page is
+// included before its items unless the items already list it — the same
+// rule (and therefore the same order) as the llms.txt generator.
 function collectSections(items) {
   const sections = []
-  let current = { label: 'Getting Started', docIds: [] }
+  const leading = { label: 'Overview', docIds: [] }
+  let seenCategory = false
+
+  function categoryLinkDocIds(item) {
+    return item.link && item.link.type === 'doc' && item.link.id &&
+      !subtreeContainsDoc(item.items, item.link.id)
+      ? [item.link.id]
+      : []
+  }
 
   function collectDocIds(subItems, into) {
     for (const item of subItems) {
@@ -103,9 +126,7 @@ function collectSections(items) {
       } else if (item.type === 'doc') {
         into.push(item.id)
       } else if (item.type === 'category') {
-        if (item.link && item.link.type === 'doc' && item.link.id) {
-          into.push(item.link.id)
-        }
+        into.push(...categoryLinkDocIds(item))
         if (item.items) {
           collectDocIds(item.items, into)
         }
@@ -115,37 +136,55 @@ function collectSections(items) {
   }
 
   for (const item of items) {
-    if (typeof item === 'string') {
-      current.docIds.push(item)
-    } else if (item.type === 'doc') {
-      current.docIds.push(item.id)
+    if (typeof item === 'string' || item.type === 'doc') {
+      const docId = typeof item === 'string' ? item : item.id
+      if (seenCategory) {
+        sections.push({ label: docTitle(docId), docIds: [docId] })
+      } else {
+        leading.docIds.push(docId)
+      }
     } else if (item.type === 'category') {
-      if (current.docIds.length > 0) {
-        sections.push(current)
+      if (!seenCategory && leading.docIds.length > 0) {
+        sections.push(leading)
       }
-      current = { label: item.label, docIds: [] }
-      if (item.link && item.link.type === 'doc' && item.link.id) {
-        current.docIds.push(item.link.id)
-      }
+      seenCategory = true
+      const section = { label: item.label, docIds: [] }
+      section.docIds.push(...categoryLinkDocIds(item))
       if (item.items) {
-        collectDocIds(item.items, current.docIds)
+        collectDocIds(item.items, section.docIds)
       }
+      sections.push(section)
     }
   }
 
-  if (current.docIds.length > 0) {
-    sections.push(current)
+  if (!seenCategory && leading.docIds.length > 0) {
+    sections.push(leading)
   }
 
   return sections
 }
 
+// Same remote example data the raw-markdown plugin receives at build time,
+// so <RemoteRepoExample /> renders real code instead of its fallback.
+// Never fails the build: this data is only used for llms-full.txt, so on
+// persistent fetch errors we degrade to placeholder examples for one build
+// rather than blocking the whole docs deploy on a GitHub flake.
+async function loadRepoExamples() {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await remoteRepoExamplePlugin().loadContent()
+    } catch (error) {
+      console.warn(`[generate-llms-full] Warning: could not load remote repo examples (attempt ${attempt}/2): ${error.message}`)
+    }
+  }
+  console.warn('[generate-llms-full] Proceeding without remote examples; <RemoteRepoExample /> blocks will render placeholders until the next successful build.')
+  return {}
+}
+
 async function generateLlmsFull() {
   console.log('Generating llms-full.txt from QuestDB documentation...')
 
-  // Same remote example data the raw-markdown plugin receives at build time,
-  // so <RemoteRepoExample /> renders real code instead of its fallback
-  const repoExamples = await remoteRepoExamplePlugin().loadContent()
+  const repoExamples = await loadRepoExamples()
 
   const sections = collectSections(sidebarConfig.docs)
 
@@ -163,7 +202,7 @@ markdown source.
   let duplicateCount = 0
 
   for (const section of sections) {
-    output += `# ${section.label}\n\n`
+    let body = ''
     for (const docId of section.docIds) {
       if (renderedDocIds.has(docId)) {
         duplicateCount++
@@ -172,9 +211,13 @@ markdown source.
       renderedDocIds.add(docId)
       const rendered = await renderDoc(docId, repoExamples)
       if (rendered) {
-        output += rendered
+        body += rendered
         docCount++
       }
+    }
+    // Skip the header if every doc in this section was a duplicate or missing
+    if (body) {
+      output += `# ${section.label}\n\n` + body
     }
   }
 

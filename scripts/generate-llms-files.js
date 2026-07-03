@@ -4,6 +4,7 @@ const yaml = require('js-yaml')
 
 const sidebarConfig = require('../documentation/sidebars.js')
 const { generateUrl: buildDocUrl } = require('./lib/docs-urls')
+const { subtreeContainsDoc } = require('./lib/sidebar-utils')
 
 const processedFiles = new Map()
 
@@ -57,17 +58,6 @@ function generateUrl(docId, docPath) {
   // Extract frontmatter to check for custom slug
   const { slug } = extractFrontmatter(docPath)
   return buildDocUrl(docId, slug)
-}
-
-function subtreeContainsDoc(items, docId) {
-  if (!items) return false
-  return items.some(item =>
-    (typeof item === 'string' && item === docId) ||
-    (item.type === 'doc' && item.id === docId) ||
-    (item.type === 'category' &&
-      ((item.link && item.link.type === 'doc' && item.link.id === docId) ||
-        subtreeContainsDoc(item.items, docId)))
-  )
 }
 
 function processForLlmsTxt(items, indent = 0, isTopLevel = false) {

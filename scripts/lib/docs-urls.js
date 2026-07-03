@@ -21,11 +21,20 @@ function generateUrl(docId, slug) {
       urlPath = path.join(fileDir, urlPath)
     }
   } else {
+    // Safety net: introduction carries `slug: /`; if slug extraction ever
+    // fails (parse error, unreadable file) fall back to the URL the plugin
+    // publishes for it rather than emitting a dead introduction.md link.
+    if (docId === 'introduction') {
+      return BASE_URL + 'index.md'
+    }
     urlPath = docId
     if (urlPath.endsWith('/index')) {
       urlPath = urlPath.replace(/\/index$/, '')
     }
   }
+  // Note: a trailing '/' in a slug is deliberately NOT stripped — the
+  // raw-markdown plugin writes `<slug>.md` verbatim, so stripping here
+  // would link a path the plugin never publishes.
 
   if (urlPath === '' || urlPath === '.') {
     return BASE_URL + 'index.md'
