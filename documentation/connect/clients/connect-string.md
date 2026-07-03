@@ -672,40 +672,50 @@ consumed by the application.
   Must be ≥ `16`. Overflow drops the oldest entry and bumps a
   `droppedErrorNotifications` counter. Default: `256`.
 
-The following per-category keys select the **error policy** — whether the
-I/O loop halts the sender (`halt`) or drops the rejected batch and continues
-(`drop`) — for each class of error. They are **defined by the spec but not yet
-implemented in the Java client**: the connect-string parser does not recognise
-them and there is no builder equivalent. The only error-handling surface wired
-today is the async `errorHandler(...)` callback and `error_inbox_capacity`
-(both WebSocket/QWP only — see [Error handling](#error-handling)). New client
-implementations should accept the keys below in the connect string per the spec.
+The following per-category keys select the **error policy** for each class
+of server rejection. There is **no drop policy**: the client never silently
+discards data. A rejected batch is either replayed — `retriable` recycles the
+connection and replays from the acknowledged watermark; `retriable_other`
+does the same but rotates to the next endpoint (the node cannot serve writes
+at all) — or halts the sender loudly with the bytes preserved in the
+store-and-forward log (`terminal`). A frame that keeps being rejected with no
+ack progress escalates to a terminal via the poison-frame detector
+(`max_frame_rejections`, default `4`).
 
 - `on_server_error` — global default for server-reject status frames.
-  Accepts `auto` \| `halt` \| `drop`. Default: `auto` (applies the built-in
-  per-category defaults listed below).
-- `on_schema_error` — schema-validation errors. `halt` \| `drop`. Default: `drop`.
-- `on_parse_error` — client-side parse errors. `halt` \| `drop`. Default: `halt`.
-- `on_internal_error` — unexpected server-side faults. `halt` \| `drop`. Default: `halt`.
-- `on_security_error` — auth / TLS errors. `halt` \| `drop`. Default: `halt`.
-- `on_write_error` — transport / table write failures. `halt` \| `drop`. Default: `drop`.
+  Accepts `auto` \| `terminal` \| `retriable` \| `retriable_other`.
+  Default: `auto` (applies the built-in per-category defaults listed below).
+- `on_schema_error` — schema-validation errors. Default: `terminal`
+  (deterministic under byte-identical replay).
+- `on_parse_error` — malformed-payload errors. Default: `terminal`.
+- `on_internal_error` — unexpected server-side faults. Default: `retriable`.
+- `on_security_error` — ACL denial on a writable node. Default: `terminal`.
+- `on_write_error` — transient write failures (disk pressure, suspended
+  table). Default: `retriable`.
+- `max_frame_rejections` — poison-frame detector threshold: consecutive
+  server rejections (retriable NACK, or non-orderly close after a send) of
+  the same head-of-line frame, with no ack progress in between, before the
+  sender latches a terminal instead of replaying forever. Integer ≥ 1;
+  default `4`.
 
-**Specified resolution precedence**, from highest to lowest (as documented on
+**Resolution precedence**, from highest to lowest (as documented on
 `SenderError.Policy`):
 
-1. Builder `errorPolicyResolver(...)` — full programmatic control. _(not yet
-   implemented in the Java client)_
-2. Builder per-category `errorPolicy(category, policy)`. _(not yet implemented
-   in the Java client)_
+1. Builder error-policy resolver — full programmatic control.
+2. Builder per-category policy override.
 3. The connect-string per-category key (e.g. `on_schema_error`) — overrides
    the global default when set.
 4. `on_server_error` — the global default; when left at `auto` the built-in
    per-category defaults above apply.
 
-`PROTOCOL_VIOLATION` and `UNKNOWN` errors are always fatal (forced `halt`)
-and cannot be overridden. For the full model see the public
-[QWP error-handling spec](https://github.com/questdb/java-questdb-client/blob/main/design/qwp-cursor-error-api.md)
-and the `SenderError.Policy` Javadoc in the client source.
+`PROTOCOL_VIOLATION` is always terminal and `UNKNOWN` always retriable (fail
+open: a status byte from a newer server degrades to retry, not to a dead
+sender); neither can be overridden. Per-client wiring of the override surface
+may lag the spec — check your client's documentation for which of the
+resolver / per-category / connect-string layers it exposes. For the full
+model see the
+[NACK policy design](https://github.com/questdb/java-questdb-client/blob/main/design/qwp-nack-policy-v2.md)
+and the `SenderError.Policy` docs in the client source.
 
 ## Key index {#key-index}
 
@@ -740,12 +750,13 @@ description and behaviour notes.
 | `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
 | `max_name_len`                          | int                           | `127`                         | [Buffer sizing](#buffer)                                      |
-| `on_internal_error` *                   | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
-| `on_parse_error` *                      | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
-| `on_schema_error` *                     | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
-| `on_security_error` *                   | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
-| `on_server_error` *                     | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
-| `on_write_error` *                      | enum                          | — (reserved)                  | [Error handling](#error-handling)                             |
+| `max_frame_rejections`                  | int (≥ 1)                     | `4`                           | [Error handling](#error-handling)                             |
+| `on_internal_error`                     | enum                          | `retriable`                   | [Error handling](#error-handling)                             |
+| `on_parse_error`                        | enum                          | `terminal`                    | [Error handling](#error-handling)                             |
+| `on_schema_error`                       | enum                          | `terminal`                    | [Error handling](#error-handling)                             |
+| `on_security_error`                     | enum                          | `terminal`                    | [Error handling](#error-handling)                             |
+| `on_server_error`                       | enum                          | `auto`                        | [Error handling](#error-handling)                             |
+| `on_write_error`                        | enum                          | `retriable`                   | [Error handling](#error-handling)                             |
 | `password`                              | string                        | unset                         | [Authentication](#auth)                                       |
 | `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
@@ -766,7 +777,3 @@ description and behaviour notes.
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |
 | `zone`                                  | string                        | unset                         | [Multi-host failover](#failover-keys)                         |
 
-\* Reserved by the spec; the Java connect-string parser does not yet
-recognise these — they are currently wired only via the fluent builder
-API. New client implementations should accept them. See
-[Error handling](#error-handling).
