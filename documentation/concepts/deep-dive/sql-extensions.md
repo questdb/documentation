@@ -340,8 +340,9 @@ QuestDB exposes a few SQL-level features for operating tables at scale:
 
 - **[TTL](/docs/concepts/ttl/)**. Per-table retention that drops whole
   partitions older than the configured horizon.
-- **[Storage policy](/docs/concepts/storage-policy/)** (Enterprise). Moves
-  old partitions to Parquet on object storage while keeping them queryable.
+- **[Storage policy](/docs/concepts/storage-policy/)** (Enterprise). Converts
+  old partitions to Parquet locally, keeping them queryable, and can drop local
+  copies on a schedule.
 - **[RBAC](/docs/security/rbac/)** (Enterprise). Users, groups, and service
   accounts with granular permissions over tables and operations.
 - **[Backup / CHECKPOINT](/docs/query/sql/checkpoint/)**. Filesystem-level

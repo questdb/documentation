@@ -144,9 +144,9 @@ CREATE TABLE sensors (
 
 #### Storage policy clause
 
-When a [storage policy](/docs/concepts/storage-policy/) is attached to a table
-(Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in the
-`SHOW CREATE TABLE` output:
+When an active [storage policy](/docs/concepts/storage-policy/) is attached to a
+table (Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in
+the `SHOW CREATE TABLE` output:
 
 ```questdb-sql
 SHOW CREATE TABLE sensor_data;

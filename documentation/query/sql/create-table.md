@@ -266,8 +266,9 @@ In QuestDB Enterprise, use `STORAGE POLICY` instead of `TTL`.
 `CREATE TABLE ... TTL` is still accepted for backward compatibility and is
 translated into a `STORAGE POLICY(DROP LOCAL ...)`. On an existing table,
 `ALTER TABLE SET TTL` with a non-zero value is rejected with `TTL is not
-supported on Enterprise tables; use a storage policy instead`. If a legacy
-table has a TTL set, clear it with `ALTER TABLE SET TTL 0` before setting a
+supported on Enterprise tables; use a storage policy instead`. A table can still
+carry a TTL if it was created in QuestDB Open Source and later upgraded to
+Enterprise; clear that legacy TTL with `ALTER TABLE SET TTL 0` before setting a
 storage policy.
 
 :::

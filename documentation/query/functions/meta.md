@@ -337,8 +337,10 @@ SELECT * FROM storage_policies;
 
 The first row is a policy with two active stages (3-day Parquet conversion and
 1-month local drop) and is currently enforced. The second row has only the
-`TO PARQUET` stage set and has been temporarily disabled. Unset stages, and the
-not-yet-enforced `to_remote` and `drop_remote` columns, all render as `0h`.
+`TO PARQUET` stage set and has been temporarily disabled. Every unset stage
+renders as `0h`: here neither policy sets `TO REMOTE`, so `to_remote` is `0h`,
+and `drop_remote` is always `0h` because `DROP REMOTE` is rejected at parse
+time.
 
 ## table_columns
 

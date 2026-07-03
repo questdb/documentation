@@ -89,9 +89,10 @@ Both singular and plural forms are accepted.
   `DROP LOCAL <= DROP REMOTE`. `TO PARQUET` and `TO REMOTE` are independent of
   each other
 - All TTL values must be positive; `0` is rejected
-- Each TTL must be an integer multiple of the partition size. For example, a
+- The TTL unit cannot be finer than the table's partition size. For example, a
   `MONTH`-partitioned table accepts only month- or year-based values, not
-  `HOUR`, `DAY`, or `WEEK`
+  `HOUR`, `DAY`, or `WEEK`; a `DAY`-partitioned table also accepts coarser
+  units such as `DROP LOCAL 1 MONTH`
 - Each setting can only appear once per statement
 - The table must have a designated timestamp and partitioning enabled
 - If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0` first;

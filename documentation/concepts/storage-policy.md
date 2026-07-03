@@ -118,8 +118,9 @@ ALTER TABLE trades SET STORAGE POLICY(DROP LOCAL 30d);
 
 :::note
 
-If a table already has a TTL set, clear it with `ALTER TABLE SET TTL 0` before
-setting a storage policy; otherwise `SET STORAGE POLICY` is rejected with
+A table can carry a TTL only if it was created in QuestDB Open Source and later
+upgraded to Enterprise. Clear that legacy TTL with `ALTER TABLE SET TTL 0`
+before setting a storage policy; otherwise `SET STORAGE POLICY` is rejected with
 `Cannot set storage policy, please, remove TTL settings`. On Enterprise tables
 `SET TTL 0` is the only accepted `SET TTL` value; any non-zero value is rejected
 with `TTL is not supported on Enterprise tables; use a storage policy instead`.
@@ -253,7 +254,7 @@ for details.
 ## Configuration
 
 Storage policy behavior can be tuned in `server.conf`. Time-based properties
-accept values with unit suffixes (e.g., `15m`, `30s`, `1h`) or raw microsecond
+accept values with unit suffixes (e.g., `5m`, `1h`, `100ms`) or raw microsecond
 values:
 
 | Property                              | Default            | Description                                                      |
@@ -267,9 +268,7 @@ values:
 
 See
 [Storage policy configuration](/docs/configuration/storage-policy/) for the
-complete list, including additional worker-pool tuning properties
-(`worker.haltOnError`, `worker.nap.threshold`, `worker.sleep.threshold`, and
-`worker.yield.threshold`).
+complete list, including the remaining worker-pool tuning properties.
 
 ## Permissions
 
