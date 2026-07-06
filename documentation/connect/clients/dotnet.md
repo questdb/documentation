@@ -112,34 +112,32 @@ using QuestDB.Qwp.Query;
 
 await using var client = await QueryClient.NewAsync("ws::addr=localhost:9000;");
 
-await client.ExecuteAsync(
-    "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10",
-    new PrintHandler());
+await using var reader = await client.ExecuteReaderAsync(
+    "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10");
 
-internal sealed class PrintHandler : QwpColumnBatchHandler
+while (await reader.ReadBatchAsync())
 {
-    public override void OnBatch(QwpColumnBatch batch)
+    var batch = reader.Current;
+    for (var row = 0; row < batch.RowCount; row++)
     {
-        for (var row = 0; row < batch.RowCount; row++)
-        {
-            Console.WriteLine(
-                $"ts={batch.GetLongValue(0, row)} "
-                + $"symbol={batch.GetString(1, row)} "
-                + $"price={batch.GetDoubleValue(2, row)} "
-                + $"amount={batch.GetDoubleValue(3, row)}");
-        }
+        Console.WriteLine(
+            $"ts={batch.GetLongValue(0, row)} "
+            + $"symbol={batch.GetString(1, row)} "
+            + $"price={batch.GetDoubleValue(2, row)} "
+            + $"amount={batch.GetDoubleValue(3, row)}");
     }
-
-    public override void OnEnd(long totalRows) =>
-        Console.WriteLine($"done: {totalRows} rows");
-
-    public override void OnError(byte status, string message) =>
-        Console.Error.WriteLine($"query failed: 0x{status:X2} {message}");
 }
+
+Console.WriteLine($"done: {reader.TotalRows} rows");
 ```
 
-See [Querying and SQL execution](#querying-and-sql-execution) for the full
-egress surface (bind parameters, DDL/DML, failover, compression).
+`ExecuteReaderAsync` submits the query and returns an `IQwpQueryReader` — a
+`DbDataReader`-style **pull cursor**. Iterate it with `ReadBatchAsync()`; each
+call advances to the next columnar batch in `reader.Current`. Dispose the
+reader (`await using`) to end the query. A server-side query failure throws
+`QwpQueryException`. See
+[Querying and SQL execution](#querying-and-sql-execution) for the full egress
+surface (bind parameters, DDL/DML, failover, compression).
 
 :::note
 
@@ -312,7 +310,9 @@ using (var sender = client.BorrowSender())
 }
 
 // Query: run SQL on a pooled query client (.NET 7+).
-await client.ExecuteSqlAsync("SELECT count(*) FROM trades", new PrintHandler());
+await using var reader = await client.ExecuteReaderAsync("SELECT count(*) FROM trades");
+while (await reader.ReadBatchAsync())
+    Console.WriteLine(reader.Current.GetLongValue(0, 0));
 ```
 
 ### Creating the handle
@@ -372,32 +372,41 @@ await Parallel.ForEachAsync(batches, async (batch, ct) =>
 ### Querying from the pool
 
 _Requires .NET 7+ and a `ws` / `wss` query configuration._ Each execution
-borrows a query client for the duration of one query and returns it
-automatically — there is no explicit borrow/release for queries:
+borrows a query client for the lifetime of the returned reader and returns it
+automatically when the reader is disposed — there is no explicit borrow/release
+for queries:
 
 ```csharp
 // One-shot, bind-less:
-await client.ExecuteSqlAsync("SELECT * FROM trades LIMIT 10", handler);
+await using (var reader = await client.ExecuteReaderAsync("SELECT * FROM trades LIMIT 10"))
+{
+    while (await reader.ReadBatchAsync())
+        Console.WriteLine($"batch rows={reader.Current.RowCount}");
+}
 
 // Fluent, with bind parameters:
-await client.NewQuery()
+await using var r = await client.NewQuery()
     .Sql("SELECT ts, price FROM trades WHERE symbol = $1 LIMIT $2")
     .Binds(b => { b.SetVarchar(0, "ETH-USD"); b.SetLong(1, 100); })
-    .Handler(handler)
-    .ExecuteAsync();
+    .ExecuteReaderAsync();
+while (await r.ReadBatchAsync())
+    Console.WriteLine($"batch rows={r.Current.RowCount}");
 ```
 
 - `NewQuery()` returns a fresh `Query`; one in-flight execution per `Query`, so
   allocate a new one per concurrent query. The query pool caps concurrency at
-  `query_pool_max`.
-- The handler is the same
-  [`QwpColumnBatchHandler`](#querying-and-sql-execution) used by `QueryClient`;
+  `query_pool_max`. **Dispose the reader** (`await using`) to end the query and
+  return its client to the pool — an open reader holds one of the
+  `query_pool_max` permits, so leaving readers open exhausts the pool.
+- The reader is the same
+  [`IQwpQueryReader`](#querying-and-sql-execution) returned by `QueryClient`;
   bind parameters, DDL/DML, compression, and per-query failover all behave
   identically.
-- Cancellation: `query.Cancel()` is cooperative (the client is re-pooled);
-  cancelling the `CancellationToken` passed to `ExecuteAsync` is a hard cancel
-  that tears the connection down and discards that client.
-- Calling `NewQuery()` / `ExecuteSqlAsync(...)` on a handle built from an
+- Cancellation: `query.Cancel()` (or `reader.Cancel()`) is cooperative (the
+  client is re-pooled); cancelling the `CancellationToken` passed to
+  `ReadBatchAsync` is a hard cancel that tears the connection down and discards
+  that client.
+- Calling `NewQuery()` / `ExecuteReaderAsync(...)` on a handle built from an
   `http` / `tcp` ingest string with no query config throws `IngressError` —
   supply a `ws` / `wss` query config via the builder's `QueryConfig(...)` or
   `QuestDBClient.Connect(ingest, query)`.
@@ -430,10 +439,54 @@ Set these on the builder, or as connect-string keys (the builder setter wins):
 | `IdleTimeout(TimeSpan)` | `idle_timeout_ms` | `60000` | Idle time before the housekeeper closes a connection (never below `min`). |
 | `MaxLifetime(TimeSpan)` | `max_lifetime_ms` | `1800000` | Maximum connection age before the housekeeper recycles it. |
 | `HousekeeperInterval(TimeSpan)` | `housekeeper_interval_ms` | `5000` | How often the housekeeper sweeps (minimum 100 ms). |
+| `LazyConnect(bool)` | `lazy_connect` | `off` | Tolerant startup — build the handle while the server is down (see [Tolerant startup](#tolerant-startup-lazy_connect)). |
 
 `SenderPoolSize(n)` / `QueryPoolSize(n)` are shortcuts for `min == max == n`.
 Observe pool state via `client.AvailableSenderCount` / `client.TotalSenderCount`
 (and `AvailableQueryClientCount` / `TotalQueryClientCount` on .NET 7+).
+
+### Tolerant startup (`lazy_connect`) {#tolerant-startup-lazy_connect}
+
+_Requires the `QuestDBClient` handle._ By default `Connect(...)` / `Build()`
+opens the pool eagerly and fails if the server is unreachable. With
+`lazy_connect` the handle builds even while the server is down, so a service
+can start before QuestDB is up, buffer writes, and read once it comes online:
+
+```csharp
+// Connect-string key (default off):
+await using var client = QuestDBClient.Connect("ws::addr=localhost:9000;lazy_connect=on;");
+
+// Or on the builder — an explicit call wins over the connect-string key:
+await using var client2 = QuestDBClient.Builder()
+    .FromConfig("ws::addr=localhost:9000;")
+    .LazyConnect()
+    .Build();
+```
+
+When enabled:
+
+- **Ingest connects asynchronously.** For a `ws` / `wss` ingest config,
+  `Build()` injects `initial_connect_retry=async` (when you have not set it
+  yourself), so construction never blocks on a down server. Rows buffer in
+  memory — or in [store-and-forward](#store-and-forward) when `sf_dir` is set —
+  and drain once a server becomes reachable.
+- **Reads connect on first use.** The query pool defaults `query_pool_min=0`
+  (when you leave it unset) so nothing connects eagerly; the pool stays enabled
+  and the first `NewQuery()` / `ExecuteReaderAsync()` opens a connection lazily
+  once the server is up.
+
+`Build()` **rejects a conflicting blocking-startup knob** up front with
+`IngressError`:
+
+- an explicit `initial_connect_retry` set to a blocking mode (anything other
+  than `async`), or
+- an explicit `query_pool_min > 0`, which would pre-warm the read pool eagerly.
+
+Drop the conflicting key — or set `initial_connect_retry=async` /
+`query_pool_min=0` — to combine it with `lazy_connect`. The key lives in the
+shared connect-string vocabulary, so a plain
+[`Sender`](#ways-to-create-the-client) parses and ignores it; only the
+`QuestDBClient` pool acts on it.
 
 ### Closing
 
@@ -797,7 +850,8 @@ For programmatic control, set `SenderOptions.error_policy_resolver` to a
 
 These are not delivered through the `error_handler` because they happen
 before the I/O loop is operating against a healthy connection — they surface
-synchronously from the factory, from `ExecuteAsync`, or as listener events:
+synchronously from the factory, from `ExecuteReaderAsync` / `ReadBatchAsync`,
+or as listener events:
 
 - **Authentication failure** (`401` / `403` during the WebSocket upgrade) —
   terminal across all endpoints. The reconnect / failover loop stops
@@ -807,7 +861,7 @@ synchronously from the factory, from `ExecuteAsync`, or as listener events:
   with a terminal code. The sender / query client transitions to a
   non-recoverable state.
 - **Role mismatch** — `QwpRoleMismatchException` from `QueryClient.NewAsync`
-  or the next `ExecuteAsync` when no endpoint matches the configured
+  or the next `ExecuteReaderAsync` when no endpoint matches the configured
   `target=any|primary|replica` filter. `LastObserved` carries the most
   recent `QwpServerInfo` to distinguish "no primary available" from
   "all endpoints unreachable".
@@ -977,24 +1031,33 @@ For transactional ILP over HTTP, see the
 
 `QueryClient` sends SQL statements over the
 [QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint
-(`/read/v1`). Results arrive as columnar batches via a callback handler.
+(`/read/v1`). `ExecuteReaderAsync` submits the query and returns an
+[`IQwpQueryReader`](#reading-result-batches) — a `DbDataReader`-style **pull
+cursor** you drive yourself: each `ReadBatchAsync()` advances to the next
+columnar batch in `reader.Current`, and disposing the reader ends the query.
 
-`ExecuteAsync` is **blocking on completion**: it sends the query, drives the
-WebSocket receive loop, invokes the handler callbacks (`OnBatch`, `OnEnd`,
-`OnExecDone`, or `OnError`), and returns only after the query terminates.
-That makes operations easy to sequence:
+Because you consume the stream by awaiting `ReadBatchAsync()` to completion,
+operations are easy to sequence:
 
 ```csharp
-await client.ExecuteAsync("CREATE TABLE trades (...) ...", ddlHandler);
+// DDL/DML return no batches — drive the reader to completion to sequence.
+await using (var r = await client.ExecuteReaderAsync("CREATE TABLE trades (...) ..."))
+    while (await r.ReadBatchAsync()) { }
 // Table exists by this point
-await client.ExecuteAsync("INSERT INTO trades VALUES (...) ...", dmlHandler);
+
+await using (var r = await client.ExecuteReaderAsync("INSERT INTO trades VALUES (...) ..."))
+    while (await r.ReadBatchAsync()) { }
 // Data is committed by this point
-await client.ExecuteAsync("SELECT * FROM trades", selectHandler);
+
+await using (var reader = await client.ExecuteReaderAsync("SELECT * FROM trades"))
+    while (await reader.ReadBatchAsync()) { /* consume reader.Current */ }
 // Results have been fully consumed by this point
 ```
 
-One `QueryClient` owns one WebSocket and runs **one query at a time**. To run
-queries in parallel, create one client per concurrent caller — the same
+One `QueryClient` owns one WebSocket and runs **one query at a time** — the
+reader holds that single-flight slot until it is disposed. To run queries in
+parallel, create one client per concurrent caller (or use the
+[`QuestDBClient` query pool](#querying-from-the-pool)) — the same
 multi-publisher pattern as for `Sender`.
 
 ### Building a query client
@@ -1023,35 +1086,29 @@ and `client.NegotiatedCompression`.
 ### Executing SELECT queries
 
 ```csharp
-await client.ExecuteAsync(
-    "SELECT ts, symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 100",
-    new PrintHandler());
+await using var reader = await client.ExecuteReaderAsync(
+    "SELECT ts, symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 100");
 
-internal sealed class PrintHandler : QwpColumnBatchHandler
+while (await reader.ReadBatchAsync())
 {
-    public override void OnBatch(QwpColumnBatch batch)
+    var batch = reader.Current;
+    for (var row = 0; row < batch.RowCount; row++)
     {
-        for (var row = 0; row < batch.RowCount; row++)
-        {
-            if (batch.IsNull(2, row)) continue;
-            var ts = batch.GetLongValue(0, row);           // TIMESTAMP — microseconds
-            var sym = batch.GetString(1, row);             // SYMBOL — null for NULL
-            var price = batch.GetDoubleValue(2, row);
-            Console.WriteLine($"{ts} {sym} {price}");
-        }
+        if (batch.IsNull(2, row)) continue;
+        var ts = batch.GetLongValue(0, row);           // TIMESTAMP — microseconds
+        var sym = batch.GetString(1, row);             // SYMBOL — null for NULL
+        var price = batch.GetDoubleValue(2, row);
+        Console.WriteLine($"{ts} {sym} {price}");
     }
-
-    public override void OnEnd(long totalRows) =>
-        Console.WriteLine($"done: {totalRows} rows");
-
-    public override void OnError(byte status, string message) =>
-        Console.Error.WriteLine($"query failed: 0x{status:X2} {message}");
 }
+
+Console.WriteLine($"done: {reader.TotalRows} rows");
 ```
 
-The `QwpColumnBatch` instance — and every span its accessors return — is
-**reused across batches**. Do not store a reference past the `OnBatch`
-invocation; copy any string / array data you need to keep.
+The `QwpColumnBatch` returned by `reader.Current` — and every span its
+accessors return — is **reused across batches**: it is valid only until the
+next `ReadBatchAsync()` call. Do not store a reference past the current
+iteration; copy any string / array data you need to keep.
 
 ### Reading result batches
 
@@ -1074,11 +1131,11 @@ value accessors return a zero-like sentinel (`0`, `false`, `'\0'`, `null`,
 | `GetDateValue(col, row)` | `DATE` (millis since Unix epoch; alias for `GetLongValue`) |
 | `GetFloatValue(col, row)` | `FLOAT` |
 | `GetDoubleValue(col, row)` | `DOUBLE` |
-| `GetStringSpan(col, row)` | `VARCHAR`, `SYMBOL` (UTF-8 bytes; valid only during the `OnBatch` call) |
+| `GetStringSpan(col, row)` | `VARCHAR`, `SYMBOL` (UTF-8 bytes; valid only until the next `ReadBatchAsync()`) |
 | `GetString(col, row)` | any column — best-effort allocating string; `null` for NULL |
 | `GetSymbol(col, row)` / `GetSymbolId(col, row)` | `SYMBOL` (managed string / dictionary id) |
 | `GetSymbolForId(col, dictId)` / `GetSymbolDictSize(col)` | `SYMBOL` dictionary access |
-| `GetBinarySpan(col, row)` | `BINARY` (raw bytes; valid only during the `OnBatch` call) |
+| `GetBinarySpan(col, row)` | `BINARY` (raw bytes; valid only until the next `ReadBatchAsync()`) |
 | `GetUuid(col, row)` / `GetUuidLo(col, row)` / `GetUuidHi(col, row)` | `UUID` (as `Guid`, or as 64-bit halves on the QWP wire layout) |
 | `GetLong256(col, row)` (BigInteger) / `GetLong256(col, row, out w0, out w1, out w2, out w3)` | `LONG256` (BigInteger, or four 64-bit limbs least → most significant) |
 | `GetDecimal64UnscaledValue(col, row)` + `GetDecimalScale(col)` | `DECIMAL64` |
@@ -1096,28 +1153,29 @@ with the type-specific accessor when the column type is not known statically.
 ### DDL and DML statements
 
 Non-`SELECT` statements (`CREATE TABLE`, `INSERT`, `UPDATE`, `ALTER`, `DROP`,
-`TRUNCATE`) run through the same `ExecuteAsync`. The server emits `EXEC_DONE`
-instead of result batches — overload `OnExecDone` to consume it:
+`TRUNCATE`) run through the same `ExecuteReaderAsync`. They return no result
+batches, so the **first** `ReadBatchAsync()` returns `false`; the completion
+metadata is then available on the reader as `RowsAffected` and `OpType`:
 
 ```csharp
-await client.ExecuteAsync(
+await using var reader = await client.ExecuteReaderAsync(
     "CREATE TABLE trades ("
     + "ts TIMESTAMP, symbol SYMBOL, price DOUBLE, amount LONG"
-    + ") TIMESTAMP(ts) PARTITION BY DAY WAL",
-    new DdlHandler());
+    + ") TIMESTAMP(ts) PARTITION BY DAY WAL");
 
-internal sealed class DdlHandler : QwpColumnBatchHandler
-{
-    public override void OnExecDone(byte opType, long rowsAffected) =>
-        Console.WriteLine($"done: opType={opType} rows={rowsAffected}");
+while (await reader.ReadBatchAsync()) { /* no batches for DDL/DML */ }
 
-    public override void OnError(byte status, string message) =>
-        Console.Error.WriteLine($"DDL/DML failed: 0x{status:X2} {message}");
-}
+Console.WriteLine($"done: opType={reader.OpType} rows={reader.RowsAffected}");
 ```
 
-`rowsAffected` reports the row count for `INSERT` / `UPDATE` / `DELETE`. Pure
-DDL (`CREATE`, `DROP`, `ALTER`, `TRUNCATE`) reports `0`.
+A server-side failure (bad SQL, permission error, …) throws
+`QwpQueryException` from `ReadBatchAsync`; catch it to handle the error — the
+client stays usable for the next query.
+
+`RowsAffected` reports the row count for `INSERT` / `UPDATE` / `DELETE`.
+`OpType` is a `QwpOpType` (`CreateTable`, `Insert`, `Drop`, `Alter`,
+`Truncate`, …). Pure DDL (`CREATE`, `DROP`, `ALTER`, `TRUNCATE`) reports
+`RowsAffected = 0`.
 
 ### Bind parameters
 
@@ -1133,14 +1191,17 @@ const string sql =
 
 foreach (var symbol in new[] { "ETH-USD", "BTC-USD" })
 {
-    await client.ExecuteAsync(
+    await using var reader = await client.ExecuteReaderAsync(
         sql,
         binds =>
         {
             binds.SetVarchar(0, symbol);
             binds.SetDouble(1, 2000.0);
-        },
-        new PrintHandler());
+        });
+    while (await reader.ReadBatchAsync())
+    {
+        // consume reader.Current — see "Reading result batches"
+    }
 }
 ```
 
@@ -1186,22 +1247,24 @@ binds =>
 There are two ways to cancel an in-flight query, and they differ in whether
 the connection survives:
 
-- **`client.Cancel()`** — cooperative. Posts a QWP `CANCEL` frame to the
-  server; the query terminates with `OnError(status=0x0A, …)` (or, if the
-  server raced to finish, a normal `OnEnd`). The WebSocket stays open and
-  the client is reusable for the next `ExecuteAsync`. `Cancel()` is
-  thread-safe and a no-op when no query is in flight. It does **not**
-  interrupt an in-progress `ReceiveAsync`; if the server hangs and never
-  acknowledges, `ExecuteAsync` will not return.
+- **`reader.Cancel()`** (or `client.Cancel()`) — cooperative. Posts a QWP
+  `CANCEL` frame to the server; the stream then ends with a `ReadBatchAsync()`
+  that returns `false` and `reader.WasCancelled == true` (or, if the server
+  raced to finish, a normal end with `WasCancelled == false`). The WebSocket
+  stays open and the client is reusable for the next query. `Cancel()` is
+  thread-safe and a no-op when no query is in flight. It does **not** interrupt
+  an in-progress `ReceiveAsync`; if the server hangs and never acknowledges,
+  `ReadBatchAsync()` will not return.
 - **`CancellationToken` cancellation** — terminal. Cancelling the token
-  passed to `ExecuteAsync` tears down the WebSocket; the client transitions
-  to a non-recoverable state. Use it as a hard stop when cooperative cancel
-  is not viable.
+  passed to `ReadBatchAsync()` tears down the WebSocket and throws
+  `OperationCanceledException`; the client transitions to a non-recoverable
+  state. Use it as a hard stop when cooperative cancel is not viable.
 
 ### Query error status codes
 
-`OnError(byte status, string message)` carries the QWP wire status byte. The
-codes the server raises today:
+A server-side query failure throws `QwpQueryException` from `ReadBatchAsync`.
+Its `Status` (a `QwpStatusCode`) carries the QWP wire status byte and
+`ServerMessage` the server's text. The codes the server raises today:
 
 | Code   | Name              | Description                                       |
 |--------|-------------------|---------------------------------------------------|
@@ -1212,19 +1275,33 @@ codes the server raises today:
 | `0x0A` | `Cancelled`       | Query terminated by `CANCEL`                      |
 | `0x0B` | `LimitExceeded`   | Protocol limit hit (oversized payload, bind cap)  |
 
-`OnError` can arrive before any `OnBatch` (parse failure, schema mismatch on
-binds) or mid-stream (storage failure, server shutdown). Once `OnError`
-fires, no further frames arrive for that query — the next `ExecuteAsync` on
-the same client starts fresh, unless the failure was a transport-level
-exception thrown out of `ExecuteAsync` (which is terminal — see Failover
-below).
+`QwpQueryException` can be thrown before the first batch (parse failure,
+schema mismatch on binds) or mid-stream (storage failure, server shutdown). It
+ends the query at a clean frame boundary, so the client stays usable — the next
+query on the same client starts fresh. A transport-level failure instead
+surfaces as a plain `IngressError` (or `OperationCanceledException` from a hard
+cancel), which **is** terminal — see Failover below.
+
+```csharp
+try
+{
+    await using var reader = await client.ExecuteReaderAsync("SELECT * FROM trades");
+    while (await reader.ReadBatchAsync()) { /* consume reader.Current */ }
+}
+catch (QwpQueryException ex)
+{
+    Console.Error.WriteLine(
+        $"query failed: {ex.Status} (0x{(byte)ex.Status:X2}) {ex.ServerMessage}");
+}
+```
 
 ### Failover
 
 When multiple addresses are listed in `addr=`, the query client tries them
 in order on connect and on every mid-stream reconnect. Egress failover is
-**per-query**: the loop runs within a single `ExecuteAsync` call; between
-queries the client uses whichever endpoint last succeeded.
+**per-query**: the loop runs within a single query — from `ExecuteReaderAsync`
+until the reader is disposed; between queries the client uses whichever
+endpoint last succeeded.
 
 | Connect-string key | Default | Description |
 |---|---|---|
@@ -1246,25 +1323,30 @@ provide at least two addresses.
 :::
 
 **Handling partial results.** When the connection fails over mid-stream the
-server replays the query from scratch — the client invokes
-`OnFailoverReset(QwpServerInfo?)` before the first replayed batch arrives so
-the handler can drop any accumulated state:
+server replays the query from scratch. The read that resumes after the
+reconnect sets `reader.FailoverReset == true` — check it after each
+`ReadBatchAsync()` and drop any rows you accumulated from the aborted attempt,
+because the server is resending from row 0:
 
 ```csharp
-public override void OnFailoverReset(QwpServerInfo? newNode)
+var rows = new List<Row>();
+while (await reader.ReadBatchAsync())
 {
-    Console.WriteLine($"failover to {newNode?.NodeId ?? "<unknown>"}");
-    results.Clear();   // drop partial rows; server will resend from row 0
+    if (reader.FailoverReset)
+    {
+        Console.WriteLine($"failover to {reader.ServerInfo?.NodeId ?? "<unknown>"}");
+        rows.Clear();   // discard partial rows; server resends from row 0
+    }
+    Accumulate(rows, reader.Current);
 }
 ```
 
-If `OnFailoverReset` itself throws, the in-flight query is abandoned and the
-exception bubbles out of `ExecuteAsync`. `OnFailoverReset` only fires
-mid-stream; reconnects that happen between queries are handled internally
-and do not invoke the callback.
+`FailoverReset` is set only on a mid-stream replay; reconnects that happen
+between queries are handled internally and never set the flag. If the failover
+budget is exhausted, `ReadBatchAsync()` throws (transport-level, terminal).
 
 **Role mismatch.** If the requested `target=` cannot be satisfied by any
-endpoint, the factory or the next `ExecuteAsync` throws
+endpoint, the factory or the next `ExecuteReaderAsync` throws
 `QwpRoleMismatchException`. Its `Target` property echoes the requested
 filter; `LastObserved` carries the last `QwpServerInfo` the client saw, so
 your application can distinguish "no primary available" from
@@ -1294,7 +1376,7 @@ await using var client = await QueryClient.NewAsync(
 to its maximum of `9`, so levels above 9 are accepted for connect-string parity
 with the other clients but yield no extra compression. Inspect
 `client.NegotiatedCompression` after connect to see what the server actually
-chose. Batches decompress transparently — your `OnBatch` code is unchanged.
+chose. Batches decompress transparently — your read loop is unchanged.
 
 ### Query connect-string reference
 
@@ -1381,7 +1463,7 @@ WebSocket options:
 
 Pool keys (`sender_pool_min` / `sender_pool_max`, `query_pool_min` /
 `query_pool_max`, `acquire_timeout_ms`, `idle_timeout_ms`, `max_lifetime_ms`,
-`housekeeper_interval_ms`) are read by the
+`housekeeper_interval_ms`, `lazy_connect`) are read by the
 [`QuestDBClient`](#connection-pooling-with-questdbclient) handle — see
 [Pool configuration](#pool-configuration). The egress-only keys (`compression`,
 `compression_level`, `target`, `zone`, `failover_*`, `initial_credit`,
@@ -1502,10 +1584,34 @@ while (true)
 
     try
     {
-        await client.ExecuteAsync(
+        await using var reader = await client.ExecuteReaderAsync(
             "SELECT ts, symbol, price, amount FROM trades "
-            + "ORDER BY ts DESC LIMIT 10",
-            new PrintHandler());
+            + "ORDER BY ts DESC LIMIT 10");
+        while (await reader.ReadBatchAsync())
+        {
+            if (reader.FailoverReset)
+            {
+                // Fires only when failover happens mid-query. The server
+                // resends from row 0 — drop any accumulated partial results.
+                Console.WriteLine(
+                    $"failover reset to node={reader.ServerInfo?.NodeId ?? "<unknown>"} "
+                    + $"role={reader.ServerInfo?.RoleName ?? "<unknown>"}");
+            }
+
+            var batch = reader.Current;
+            for (var row = 0; row < batch.RowCount; row++)
+            {
+                Console.WriteLine(
+                    $"{batch.GetLongValue(0, row)} "
+                    + $"{batch.GetString(1, row)} "
+                    + $"{batch.GetDoubleValue(2, row)} "
+                    + $"{batch.GetDoubleValue(3, row)}");
+            }
+        }
+    }
+    catch (QwpQueryException ex)   // query-level error; the client stays usable
+    {
+        Console.Error.WriteLine($"query error {ex.Status}: {ex.ServerMessage}");
     }
     catch (Exception ex)   // failover exhausted, transport tear-down, etc.
     {
@@ -1524,36 +1630,6 @@ internal sealed class IngestListener : ISenderConnectionListener
     public void OnEvent(SenderConnectionEvent evt) =>
         Console.WriteLine($"{evt.Kind} {evt.Host}:{evt.Port}");
 }
-
-internal sealed class PrintHandler : QwpColumnBatchHandler
-{
-    public override void OnBatch(QwpColumnBatch batch)
-    {
-        for (var row = 0; row < batch.RowCount; row++)
-        {
-            Console.WriteLine(
-                $"{batch.GetLongValue(0, row)} "
-                + $"{batch.GetString(1, row)} "
-                + $"{batch.GetDoubleValue(2, row)} "
-                + $"{batch.GetDoubleValue(3, row)}");
-        }
-    }
-
-    public override void OnEnd(long totalRows) =>
-        Console.WriteLine($"({totalRows} rows)");
-
-    public override void OnError(byte status, string message) =>
-        Console.Error.WriteLine($"query error 0x{status:X2}: {message}");
-
-    public override void OnFailoverReset(QwpServerInfo? newNode)
-    {
-        // Fires only when failover happens mid-query. Clear any
-        // accumulated partial results — the server will resend from row 0.
-        Console.WriteLine(
-            $"failover reset to node={newNode?.NodeId ?? "<unknown>"} "
-            + $"role={newNode?.RoleName ?? "<unknown>"}");
-    }
-}
 ```
 
 Notes on the pattern:
@@ -1562,10 +1638,10 @@ Notes on the pattern:
   (`reconnect_max_duration_millis`, default 5 min) walks the address list
   transparently and resumes once a healthy host is reachable. The
   application keeps publishing.
-- **Egress failover is per-query** — the loop runs only inside one
-  `ExecuteAsync`. A total outage that exceeds `failover_max_duration_ms`
-  leaves the `QueryClient` terminal; the `recreate-on-catch` outer loop is
-  the supported recovery shape.
+- **Egress failover is per-query** — the loop runs only inside one query
+  (from `ExecuteReaderAsync` until the reader is disposed). A total outage that
+  exceeds `failover_max_duration_ms` leaves the `QueryClient` terminal; the
+  `recreate-on-catch` outer loop is the supported recovery shape.
 - **Connect strings are shared-vocabulary, side-private** — the same
   `ws::` / `wss::` URL works for both sides. Each parser silently ignores
   the keys belonging to the other half. The ingest sender pins QWP v1 and
