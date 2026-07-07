@@ -1,5 +1,5 @@
 ---
-slug: /connect/clients/c-api-reference
+slug: /connect/clients/c-and-cpp-pooled
 title: C/C++ client (pooled API) draft
 sidebar_label: C/C++ pooled API (draft)
 description: "Draft guide for the QuestDB C and C++ pooled connection API: questdb_db / questdb::pool for column-major, row-major, and Arrow ingestion plus the query reader, with authentication, failover, and durability guidance, over QWP/WebSocket."
@@ -7,11 +7,9 @@ description: "Draft guide for the QuestDB C and C++ pooled connection API: quest
 
 :::caution Draft
 
-Work-in-progress guide for the **pooled** C/C++ API on the
-`jh_conn_pool_refactor` branch, built side-by-side with the existing
-[C & C++ guide](/docs/connect/clients/c-and-cpp/) for comparison. Documents the
-connection-pool entry point (`questdb_db_*` in C, `questdb::pool` in C++). APIs
-may change before release.
+Guide for the **pooled** C/C++ API: the connection-pool entry point
+(`questdb_db_*` in C, `questdb::pool` in C++), available with QuestDB 10.0.
+This is a pre-release API and may change before release.
 
 :::
 
@@ -188,7 +186,7 @@ int main(void)
     // (chunk, name, name_len, data, row_count, validity_or_NULL, err_out)
     if (!column_sender_chunk_column_f64(chunk, "price", 5, price, n, NULL, &err)) goto on_error;
     if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
-    if (!column_sender_chunk_designated_timestamp_nanos(chunk, ts_ns, n, &err)) goto on_error;
+    if (!column_sender_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
     if (!column_sender_flush(conn, chunk, &err)) goto on_error;                 // publish
     if (!column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK
@@ -231,7 +229,7 @@ int main()
         questdb::ingress::column_chunk chunk{"trades"};
         chunk.column_f64("price", price, n)
              .column_f64("amount", amount, n)
-             .designated_timestamp_nanos(ts_ns, n);
+             .at_nanos(ts_ns, n);
 
         conn.flush(chunk);   // publish into the store-and-forward queue
         conn.wait();         // ack barrier (qwpws_ack_level::ok, waits indefinitely)
@@ -291,25 +289,37 @@ timestamp setters take no validity parameter.
 
 ### Column setters
 
-Every setter takes `(chunk, name, name_len, data, row_count, validity, err_out)`
-in C and chains on `column_chunk` in C++. Complete list:
+The fixed-width scalar and temporal setters take
+`(chunk, name, name_len, data, row_count, validity, err_out)` in C — and the
+same arguments minus `chunk`, `name_len`, and `err_out`, chained on
+`column_chunk`, in C++ (`name` is a `std::string_view`; errors throw). Three
+families take extra arguments:
+
+- **`column_ts`** inserts a `column_sender_ts_unit unit` (passed as `uint32_t`
+  on the ABI) before `validity`.
+- **`column_str` / `column_binary`** replace `data` with
+  `(offsets, bytes, bytes_len)` in Arrow Utf8 / Binary layout.
+- **`symbol_i8` / `_i16` / `_i32`** replace `data` with `(codes, row_count,
+  dict_offsets, dict_offsets_len, dict_bytes, dict_bytes_len)`.
+
+See `column_sender.h` for the exact signatures. Complete list:
 
 | Setter | Input per row | QuestDB type |
 | --- | --- | --- |
 | `column_i8` / `column_i16` / `column_i32` / `column_i64` | signed int | `BYTE` / `SHORT` / `INT` / `LONG` |
 | `column_f32` / `column_f64` | float / double | `FLOAT` / `DOUBLE` |
 | `column_bool` | LSB-first packed bitmap | `BOOLEAN` |
-| `column_ts_nanos` / `column_ts_micros` | int64 since epoch | `TIMESTAMP_NS` / `TIMESTAMP` |
-| `column_date_millis` | int64 millis since epoch | `DATE` |
+| `column_ts` + `column_sender_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
+| `column_date` | int64 millis since epoch | `DATE` |
 | `column_uuid` | 16 bytes | `UUID` |
 | `column_long256` | 32 bytes (4 LE limbs) | `LONG256` |
 | `column_ipv4` | uint32 | `IPV4` |
-| `column_varchar` | Arrow Utf8 offsets + bytes | `VARCHAR` |
+| `column_str` | Arrow Utf8 offsets + bytes | `VARCHAR` |
 | `column_binary` | Arrow Binary offsets + bytes | `BINARY` |
-| `symbol_dict_i8` / `_i16` / `_i32` | dict codes + Utf8 dictionary | `SYMBOL` |
+| `symbol_i8` / `_i16` / `_i32` | dict codes + Utf8 dictionary | `SYMBOL` |
 
 Designated timestamp (exactly once per chunk, before flush):
-`designated_timestamp_nanos` / `_micros` / `_millis` / `_seconds` (millis and
+`at_nanos` / `at_micros` / `at_millis` / `at_seconds` (millis and
 seconds are widened to micros on the wire). Decimals, geohash, arrays, and the
 remaining Arrow type matrix are reachable through the
 [Arrow appenders](#arrow-ingestion) and the NumPy appender
@@ -336,6 +346,7 @@ batch. Requires a build with `QUESTDB_CLIENT_ENABLE_ARROW` (CMake option
 ```cpp
 using namespace questdb::ingress::literals;
 
+// Requires a build with QUESTDB_CLIENT_ENABLE_ARROW.
 // `array` + `schema` from any Arrow C Data Interface producer, e.g.
 // arrow::ExportRecordBatch(*batch, &array, &schema) in Arrow C++.
 void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
