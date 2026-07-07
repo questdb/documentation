@@ -94,8 +94,12 @@ The steps are:
 
 1. Build a sender from a connect string (`ws::` for plain, `wss::` for TLS).
 2. Append rows with the fluent `Table` / `Symbol` / `Column` / `At` builder.
-3. Call `SendAsync()` (or rely on auto-flush) to publish.
-4. Dispose the sender — `await using` drains in-flight frames on close.
+3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
+   and waits for the server ACK**. Auto-flush publishes full batches on its own,
+   but the final partial batch is only guaranteed once you call `SendAsync()`.
+4. Dispose the sender. **Dispose does not send** — it is pure resource release,
+   and any rows still buffered (not yet sent or auto-flushed) are **discarded**.
+   Always `SendAsync()` before disposing.
 
 We recommend supplying the event's own timestamp to `AtAsync`. Ingestion-time
 timestamps preclude deduplication, which is
@@ -300,13 +304,14 @@ using QuestDB.Qwp.Query;
 
 await using var client = QuestDBClient.Connect("ws::addr=localhost:9000;");
 
-// Ingest: borrow a sender, write rows, dispose to flush + return it to the pool.
+// Ingest: borrow a sender, write rows, Send() to publish, dispose to return it.
 using (var sender = client.BorrowSender())
 {
     await sender.Table("trades")
         .Symbol("symbol", "ETH-USD")
         .Column("price", 2615.54)
         .AtAsync(DateTime.UtcNow);
+    await sender.SendAsync();   // MUST send before dispose — dispose does not
 }
 
 // Query: run SQL on a pooled query client (.NET 7+).
@@ -338,10 +343,11 @@ string.
 ### Borrowing a sender
 
 `BorrowSender()` (or `BorrowSenderAsync(ct)`) leases a sender from the pool.
-**Dispose it to flush its rows and return it to the pool** — disposing a pooled
-sender does *not* close the underlying connection; the real disconnect happens
-only when the handle itself is disposed (or the housekeeper reaps an idle one).
-Use a `using` block:
+**Call `Send()` / `SendAsync()` before disposing** — dispose is pure resource
+release: it discards any buffered-but-unsent rows and returns the entry to the
+pool, it does **not** send. Disposing a pooled sender does *not* close the
+underlying connection either; the real disconnect happens only when the handle
+itself is disposed (or the housekeeper reaps an idle one). Use a `using` block:
 
 ```csharp
 await Parallel.ForEachAsync(batches, async (batch, ct) =>
@@ -352,8 +358,8 @@ await Parallel.ForEachAsync(batches, async (batch, ct) =>
             .Symbol("symbol", row.Symbol)
             .Column("price", row.Price)
             .AtAsync(row.Timestamp, ct);
-    await sender.SendAsync(ct);
-}); // dispose returns each sender to the pool
+    await sender.SendAsync(ct);   // publish before dispose — dispose won't
+}); // SendAsync published the rows; dispose just returns each sender to the pool
 ```
 
 - A borrowed sender is single-threaded — borrow one per thread / unit of work
@@ -667,19 +673,34 @@ sender.Table("trades").Symbol("symbol", "ETH-USD").Column("price", 2615.54)
 await sender.SendAsync();
 ```
 
-On QWP, a flush returns once the batch is accepted by the local send engine —
-**before** the server acknowledges it. Server-side errors surface
-asynchronously; see [Delivery tracking](#delivery-tracking).
+On QWP what `Send` waits for depends on the sender:
+
+- A **standalone** `ws` / `wss` sender (`Sender.New` / `Sender.NewQwp`)
+  **drains**: `Send()` / `SendAsync()` flushes the batch and blocks until the
+  server acknowledges it, bounded by `close_flush_timeout_millis` (throwing
+  `IngressError` on timeout). A successful `SendAsync()` therefore means the
+  rows are delivered.
+- A **pooled** sender (from `BorrowSender`) hands the frame to the send ring
+  and returns immediately; the pooled connection ships it asynchronously and
+  delivery is confirmed with `Flush()` / [`IQuestDBClient.Flush()`](#closing).
+
+Either way, **dispose never sends** — a sender that is disposed without a
+preceding `Send()` / `SendAsync()` drops its buffered rows. Server-side
+rejections surface asynchronously regardless; see
+[Delivery tracking](#delivery-tracking) and
+[Asynchronous error handling](#asynchronous-error-handling).
 
 ## Delivery tracking
 
-Awaiting ACKs is **optional**: an app that never calls `PingAsync` or
-`AwaitAckedFsnAsync` and just `await using`-disposes the sender is safe —
-`DisposeAsync` drains in-flight ACKs, bounded by `close_flush_timeout_millis`
-(default 60000 ms). Reach for the APIs below when the app needs to (a) know a
-specific write made it before continuing, (b) cooperate with QuestDB
-Enterprise durable-replication watermarks, or (c) co-ordinate a graceful
-shutdown that must not exit until the queue has drained.
+The explicit ACK APIs (`PingAsync`, `AwaitAckedFsnAsync`) are **optional**: on
+a standalone `ws` sender a successful `SendAsync()` already drains — it waits
+for the server ACK, bounded by `close_flush_timeout_millis` (default 60000 ms).
+What is **not** optional is calling `SendAsync()` before you dispose:
+`DisposeAsync` is pure resource release and does **not** flush or wait for ACKs,
+so any rows still buffered at dispose are dropped. Reach for the APIs below when
+the app needs to (a) know a specific write made it before continuing, (b)
+cooperate with QuestDB Enterprise durable-replication watermarks, or (c)
+co-ordinate a graceful shutdown that must not exit until the queue has drained.
 
 `Sender.NewQwp(...)` returns `IQwpWebSocketSender`, which adds QWP-only
 delivery operations on top of `ISender`:
@@ -717,9 +738,13 @@ if (!acked) Console.Error.WriteLine("timed out waiting for server ACK");
 
 ## Asynchronous error handling
 
-QWP ingestion is asynchronous: a flush returns once the batch is accepted by
-the local send engine, before the server validates it. Server rejections and
-protocol violations surface separately.
+The server validates batches, and rejections are reported **out of band**:
+they arrive at the [error handler](#error-handler) on a background dispatcher
+rather than being thrown from the `Send` call that published the batch. (A
+standalone `Send` / `SendAsync` waits for the *ACK* of a successful batch, but
+a rejection produces an error frame, not an ACK — so it still surfaces through
+the handler, not the `Send` return.) This section covers how those
+asynchronous errors are classified and handled.
 
 ### How errors surface
 
@@ -994,12 +1019,13 @@ they only mutate the in-process encode buffer, which grows up to
 `max_buf_size` (default 100 MiB). Backpressure surfaces at flush time:
 
 - **In-memory mode (no `sf_dir`).** The in-flight publish window caps how
-  many unacknowledged frames can sit on the connection. When the server is
-  reachable but slow, `SendAsync()` waits for ACK-driven capacity before
-  returning. When the server is unreachable for longer than the in-flight
-  window can absorb, the rows stay buffered until either the connection
-  recovers or `DisposeAsync` fires and `close_flush_timeout_millis` elapses.
-  In-memory mode does **not** survive a process exit; unacked frames are lost.
+  many unacknowledged frames can sit on the connection. On a standalone sender
+  `SendAsync()` drains, so when the server is reachable but slow it waits for
+  ACK-driven capacity before returning. When the server is unreachable, the
+  drain waits up to `close_flush_timeout_millis` and then throws a timeout
+  `IngressError`. Dispose does **not** drain, so anything unsent at that point
+  is dropped; in-memory mode does **not** survive a process exit either —
+  unacked frames are lost.
 - **Store-and-forward mode (`sf_dir` set).** `SendAsync()` appends to the
   on-disk segment and returns quickly; the I/O loop drains it in the
   background. If the disk queue is at its `sf_max_total_bytes` cap, the
@@ -1421,18 +1447,23 @@ empties it without sending. Buffer growth is bounded by `init_buf_size` /
 
 ## Closing the sender
 
-Dispose the sender to flush and drain in-flight frames. Prefer `await using`
-(or `DisposeAsync`) so the close path is non-blocking and surfaces delivery
-errors:
+**Always `Send()` / `SendAsync()` before disposing.** Dispose (and
+`DisposeAsync`) is **pure resource release**: it does not flush, does not wait
+for ACKs, and does not throw — any rows still buffered are **discarded**. On a
+standalone `ws` sender `SendAsync()` drains (flushes and waits for the server
+ACK, bounded by `close_flush_timeout_millis`), so the reliable pattern is
+"`SendAsync()`, then dispose":
 
 ```csharp
 await using var sender = Sender.New("ws::addr=localhost:9000;");
 // ... ingest ...
-// DisposeAsync drains in-flight ACKs, bounded by close_flush_timeout_millis (default 60000).
+await sender.SendAsync();   // flush + await ACK; dispose alone would drop these rows
 ```
 
-With `sf_dir` set, anything still un-acked at close is persisted to disk so a
-later sender with the same `sf_dir` / `sender_id` replays it.
+With `sf_dir` set, frames that were already **sent** (handed to the on-disk
+ring) but not yet ACKed persist to disk and replay on the next run with the
+same `sf_dir` / `sender_id`. Rows that were only buffered — never sent — are
+not on disk and are lost regardless.
 
 ## Configuration reference
 
@@ -1459,7 +1490,7 @@ WebSocket options:
 | `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |
 | `ping_timeout` | 5000 | Bound on `PingAsync` waiting for the ACK window to drain. |
 | `error_inbox_capacity` / `connection_listener_inbox_capacity` | 256 / 256 | Async error and connection-event inbox capacities. |
-| `close_flush_timeout_millis` | 60000 | Bound on the drain at dispose. |
+| `close_flush_timeout_millis` | 60000 | Bound on the ACK wait when a standalone `Send` / `SendAsync` drains (and the default `Flush` timeout). `0` = flush without waiting for ACK. Dispose does not drain. |
 
 Pool keys (`sender_pool_min` / `sender_pool_max`, `query_pool_min` /
 `query_pool_max`, `acquire_timeout_ms`, `idle_timeout_ms`, `max_lifetime_ms`,
