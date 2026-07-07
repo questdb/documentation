@@ -19,7 +19,169 @@ protocol carried over WebSocket. The pool is the **front door** for
 everything: open it once, then borrow a column-major sender (chunks or
 Arrow batches), a row-major sender, or a query reader.
 
-## API overview
+## Quick start
+
+Open a pool, borrow a **row sender** to write a row, then borrow a **reader** to
+read it back — the common "insert and query" path. Everything below expands on
+this; for bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
+[Sending data: column-major](#sending-data-column-major).
+
+### C++
+
+```cpp
+#include <questdb/ingress/column_sender.hpp>  // pool + row sender
+#include <questdb/egress/reader.hpp>          // pool::borrow_reader
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    questdb::pool pool{"ws::addr=localhost:9000;"};
+
+    // Insert: borrow a row sender, write a row, flush, wait for the ack.
+    {
+        auto sender = pool.borrow_row_sender();
+        auto buffer = sender.new_buffer();
+        buffer.table("trades"_tn)
+              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .column("price"_cn, 2615.54)
+              .at(questdb::ingress::timestamp_nanos::now());
+        sender.flush(buffer);
+        sender.wait();
+    }
+
+    // Query: borrow a reader, run SQL, print rows.
+    auto reader = pool.borrow_reader();
+    auto cur = reader.execute("SELECT symbol, price FROM trades LIMIT 5"_utf8);
+    while (auto batch = cur.next_batch())
+    {
+        for (size_t r = 0; r < batch->row_count(); ++r)
+        {
+            auto price = batch->column(1).get<double>(r);
+            std::cout << batch->column(0).symbol(r).value_or("NULL") << " "
+                      << (price ? std::to_string(*price) : "NULL") << "\n";
+        }
+    }
+}
+```
+
+### C
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + row_sender
+#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <questdb/egress/reader.h>            // reader
+#include <stdio.h>
+
+int main(void)
+{
+    line_sender_error* err = NULL;   /* pool + row sender use this error type */
+    reader_error* rerr = NULL;       /* reader / cursor use this error type */
+    questdb_db* db = NULL;
+    row_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+    reader* rd = NULL;
+    reader_cursor* cursor = NULL;
+
+    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    if (!db) goto on_error;
+
+    /* Insert: borrow a row sender, write a row, flush, wait for the ack. */
+    sender = questdb_db_borrow_row_sender(db, &err);
+    if (!sender) goto on_error;
+    buffer = row_sender_new_buffer(sender, &err);
+    if (!buffer) goto on_error;
+    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
+    if (!row_sender_flush(sender, buffer, &err)) goto on_error;
+    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;
+    line_sender_buffer_free(buffer);
+    buffer = NULL;
+    questdb_db_return_row_sender(db, sender);
+    sender = NULL;
+
+    /* Query: borrow a reader, run SQL, print rows. */
+    rd = questdb_db_borrow_reader(db, &rerr);
+    if (!rd) goto on_reader_error;
+    cursor = reader_execute(rd,
+        QDB_UTF8_LITERAL("SELECT symbol, price FROM trades LIMIT 5"), &rerr);
+    if (!cursor) goto on_reader_error;
+
+    const reader_batch* batch;
+    while ((batch = reader_cursor_next_batch(cursor, &rerr)) != NULL)
+    {
+        size_t rows = reader_batch_row_count(batch);
+        reader_column_data d_symbol, d_price;
+        reader_symbol_dict dict;
+        if (!reader_batch_column_data(batch, 0, &d_symbol, &rerr)) goto on_reader_error;
+        if (!reader_batch_column_data(batch, 1, &d_price, &rerr)) goto on_reader_error;
+        if (!reader_batch_symbol_dict(batch, &dict, &rerr)) goto on_reader_error;
+        for (size_t r = 0; r < rows; ++r)
+        {
+            bool sym_null = false, price_null = false;
+            const char* sym = NULL;
+            size_t sym_len = 0;
+            if (!reader_column_data_get_symbol(&d_symbol, &dict, r, &sym, &sym_len, &sym_null))
+                goto on_reader_error;
+            double price = reader_column_data_get_f64(&d_price, r, &price_null);
+
+            if (sym_null)   printf("NULL ");
+            else            printf("%.*s ", (int)sym_len, sym);
+            if (price_null) printf("NULL\n");
+            else            printf("%g\n", price);
+        }
+    }
+    if (rerr) goto on_reader_error;
+
+    reader_cursor_free(cursor);
+    questdb_db_return_reader(db, rd);
+    questdb_db_close(db);
+    return 0;
+
+on_error:;
+    {
+        size_t len = 0;
+        const char* msg = line_sender_error_msg(err, &len);
+        fprintf(stderr, "error: %.*s\n", (int)len, msg);
+        line_sender_error_free(err);
+    }
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_drop_row_sender(db, sender);
+    questdb_db_close(db);
+    return 1;
+
+on_reader_error:;
+    {
+        size_t len = 0;
+        const char* msg = reader_error_msg(rerr, &len);
+        fprintf(stderr, "error: %.*s\n", (int)len, msg);
+        reader_error_free(rerr);
+    }
+    reader_cursor_free(cursor);
+    if (rd) questdb_db_return_reader(db, rd);
+    questdb_db_close(db);
+    return 1;
+}
+```
+
+## The pool
+
+`questdb_db` (C) / `questdb::pool` (C++) is a thread-safe handle that owns a set
+of reusable QWP/WebSocket connections. Open one per deployment, share it across
+threads, close it at shutdown.
+
+You don't open connections yourself: **borrow** a lease — a row sender, column
+sender, or reader — use it on one thread, then **return** it (recycles the
+connection) or **drop** it (retires it). In C++ this happens on destruction —
+for the borrowed sender wrappers and the pooled reader alike — and
+`drop_on_return()` forces a drop. The pool connects lazily and handles reconnect
+and failover underneath.
+
+The pooled API at a glance:
 
 | Concern | C | C++ |
 | --- | --- | --- |
@@ -32,13 +194,9 @@ Arrow batches), a row-major sender, or a query reader.
 | Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
 | Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
 
-One `questdb_db` pool vends three kinds of borrow, each from its own
-independently-capped free list (the combined live-connection ceiling is
-`3 * pool_max`). The C++ types are thin RAII wrappers over the C ABI; the
-pool, borrows, chunk, and reader free/return themselves on scope exit and
-report errors as exceptions.
-
 ### Which borrow?
+
+Match the borrow to the shape of your data:
 
 | You have | Borrow | Why |
 | --- | --- | --- |
@@ -50,6 +208,8 @@ Both senders may target the same tables; QuestDB unifies the schema
 server-side.
 
 ## Headers
+
+Writing pulls in the sender headers; querying adds the reader header.
 
 ```c
 #include <questdb/ingress/column_sender.h>   // C: pool + column-major + row-major senders
@@ -83,6 +243,9 @@ questdb::pool pool{"ws::addr=localhost:9000;"};   // alias of questdb::ingress::
 
 ### Pool keys
 
+The connect string also accepts pool-tuning keys; the defaults suit most
+callers.
+
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `pool_size` | 1 | Warm/minimum connections. The reaper keeps this many once connections have been opened. |
@@ -114,7 +277,8 @@ than waiting for a return. Two consequences:
   exhaustion.
 
 Each borrow kind (column, row, reader) has its own `pool_max`-capped free
-list, so heavy ingestion cannot starve queries.
+list — so heavy ingestion cannot starve queries — and the combined
+live-connection ceiling is `3 * pool_max`.
 
 ## Authentication and TLS
 
@@ -144,6 +308,117 @@ Because the pool connects lazily, a bad credential surfaces as
 `line_sender_error_auth_error` from the **first borrow** on each connection —
 handle it there, not at `connect` (see
 [Which errors mean what](#which-errors-mean-what)).
+
+## Sending data: row-major
+
+Borrow a row sender and flush a `line_sender_buffer` — the classic ILP buffer
+you build field-by-field. Get a protocol-matched buffer straight from the sender
+(`row_sender_new_buffer` in C, `borrowed_row_sender::new_buffer()` in C++); it is
+the only buffer a `row_sender` accepts. The row sender uses a single error type
+(`line_sender_error`) throughout.
+
+The pool is the shared handle; a borrowed row sender is single-thread — borrow
+one per worker.
+
+### C
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + row_sender
+#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <stdio.h>
+
+int main(void)
+{
+    line_sender_error* err = NULL;
+    questdb_db* db = NULL;
+    row_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+
+    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    if (!db) goto on_error;
+
+    sender = questdb_db_borrow_row_sender(db, &err);
+    if (!sender) goto on_error;
+
+    buffer = row_sender_new_buffer(sender, &err);   // protocol-matched QWP/WS buffer
+    if (!buffer) goto on_error;
+    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
+
+    if (!row_sender_flush(sender, buffer, &err)) goto on_error;   // sends + clears the buffer
+
+    line_sender_buffer_free(buffer);
+    questdb_db_return_row_sender(db, sender);
+    questdb_db_close(db);
+    return 0;
+
+on_error:;
+    size_t len = 0;
+    const char* msg = line_sender_error_msg(err, &len);
+    fprintf(stderr, "error: %.*s\n", (int)len, msg);
+    line_sender_error_free(err);
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_drop_row_sender(db, sender);
+    questdb_db_close(db);
+    return 1;
+}
+```
+
+### C++
+
+```cpp
+#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/line_sender.hpp>
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        questdb::pool pool{"ws::addr=localhost:9000;"};
+        auto sender = pool.borrow_row_sender();   // borrowed_row_sender (RAII)
+
+        auto buffer = sender.new_buffer();        // protocol-matched buffer
+        buffer.table("trades"_tn)
+              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .column("price"_cn, 2615.54)
+              .at(questdb::ingress::timestamp_nanos::now());
+
+        sender.flush(buffer);   // borrowed_row_sender::flush(line_sender_buffer&)
+        return 0;
+    }
+    catch (const questdb::ingress::line_sender_error& e)
+    {
+        std::cerr << "error: " << e.what() << "\n";
+        return 1;
+    }
+}
+```
+
+:::caution No auto-flush
+
+There are no `auto_flush_rows` / `auto_flush_bytes` keys for the QWP/WebSocket
+row sender — flushing is always explicit. Accumulate rows in the buffer on your
+own cadence (row count, byte size via `line_sender_buffer_size`, or a timer)
+and call `flush` yourself. Null columns are written by **omission**: skip the
+column for that row — there is no `set_null` call.
+
+:::
+
+:::note Row-sender ack tracking
+
+`row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for the
+server ACK. For a blocking barrier over everything published so far, call
+`row_sender_wait` / `sender.wait()`. For non-blocking pipelining, publish with an
+FSN-returning flush and compare watermarks — see
+[FSN progress](#fsn-progress-non-blocking) below.
+
+:::
 
 ## Sending data: column-major
 
@@ -394,117 +669,6 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
   unsupported kinds (`Struct`, `Map`, `Interval`, ...) are listed in
   `column_sender.h`; unsupported types fail with
   `line_sender_error_arrow_unsupported_column_kind`.
-
-## Sending data: row-major
-
-Borrow a row sender and flush a `line_sender_buffer` — the classic ILP buffer
-you build field-by-field. Get a protocol-matched buffer straight from the sender
-(`row_sender_new_buffer` in C, `borrowed_row_sender::new_buffer()` in C++); it is
-the only buffer a `row_sender` accepts. The row sender uses a single error type
-(`line_sender_error`) throughout.
-
-As with the column sender, the pool is the shared handle; a borrowed row sender
-is single-thread — borrow one per worker.
-
-### C
-
-```c
-#include <questdb/ingress/column_sender.h>   // pool + row_sender
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer
-#include <stdio.h>
-
-int main(void)
-{
-    line_sender_error* err = NULL;
-    questdb_db* db = NULL;
-    row_sender* sender = NULL;
-    line_sender_buffer* buffer = NULL;
-
-    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
-    if (!db) goto on_error;
-
-    sender = questdb_db_borrow_row_sender(db, &err);
-    if (!sender) goto on_error;
-
-    buffer = row_sender_new_buffer(sender, &err);   // protocol-matched QWP/WS buffer
-    if (!buffer) goto on_error;
-    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
-    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
-    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
-    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
-
-    if (!row_sender_flush(sender, buffer, &err)) goto on_error;   // sends + clears the buffer
-
-    line_sender_buffer_free(buffer);
-    questdb_db_return_row_sender(db, sender);
-    questdb_db_close(db);
-    return 0;
-
-on_error:;
-    size_t len = 0;
-    const char* msg = line_sender_error_msg(err, &len);
-    fprintf(stderr, "error: %.*s\n", (int)len, msg);
-    line_sender_error_free(err);
-    line_sender_buffer_free(buffer);
-    if (sender) questdb_db_drop_row_sender(db, sender);
-    questdb_db_close(db);
-    return 1;
-}
-```
-
-### C++
-
-```cpp
-#include <questdb/ingress/column_sender.hpp>
-#include <questdb/ingress/line_sender.hpp>
-#include <iostream>
-
-using namespace questdb::ingress::literals;
-
-int main()
-{
-    try
-    {
-        questdb::pool pool{"ws::addr=localhost:9000;"};
-        auto sender = pool.borrow_row_sender();   // borrowed_row_sender (RAII)
-
-        auto buffer = sender.new_buffer();        // protocol-matched buffer
-        buffer.table("trades"_tn)
-              .symbol("symbol"_cn, "ETH-USD"_utf8)
-              .column("price"_cn, 2615.54)
-              .at(questdb::ingress::timestamp_nanos::now());
-
-        sender.flush(buffer);   // borrowed_row_sender::flush(line_sender_buffer&)
-        return 0;
-    }
-    catch (const questdb::ingress::line_sender_error& e)
-    {
-        std::cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-}
-```
-
-:::caution No auto-flush
-
-There are no `auto_flush_rows` / `auto_flush_bytes` keys for the QWP/WebSocket
-row sender — flushing is always explicit. Accumulate rows in the buffer on your
-own cadence (row count, byte size via `line_sender_buffer_size`, or a timer)
-and call `flush` yourself. Null columns are written by **omission**: skip the
-column for that row — there is no `set_null` call.
-
-:::
-
-:::note Row-sender ack tracking
-
-`row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for the
-server ACK. For a blocking barrier over everything published so far, call
-`row_sender_wait` / `sender.wait()`. For non-blocking pipelining, publish with an
-FSN-returning flush and compare watermarks — see
-[FSN progress](#fsn-progress-non-blocking) below.
-
-:::
 
 ## Querying data
 
