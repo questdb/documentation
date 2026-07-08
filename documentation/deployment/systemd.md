@@ -83,6 +83,7 @@ ExecStart=/usr/lib/jvm/java-25-openjdk-amd64/bin/java \
 -Dcontainerized=false \
 -ea -Dnoebug \
 --add-exports java.base/jdk.internal.math=io.questdb \
+--add-exports java.base/jdk.internal.vm=io.questdb \
 -p /home/[USER_NAME]/bin/questdb.jar \
 -m io.questdb/io.questdb.ServerMain \
 -d /home/[USER_NAME]/var/lib/questdb
@@ -100,6 +101,31 @@ SyslogIdentifier=questdb
 [Install]
 WantedBy=multi-user.target
 ```
+
+For QuestDB Enterprise, launch the enterprise module
+(`com.questdb/com.questdb.EntServerMain`) and target both `io.questdb` and
+`com.questdb` on the module flags. The corresponding `ExecStart` is:
+
+```shell
+ExecStart=/home/[USER_NAME]/questdb-enterprise/bin/java \
+-XX:+UnlockExperimentalVMOptions \
+-XX:+AlwaysPreTouch \
+-XX:+UseParallelGC \
+-ea -Dnoebug \
+--sun-misc-unsafe-memory-access=allow \
+--enable-native-access=io.questdb,com.questdb \
+--add-opens=java.base/java.lang=io.questdb,com.questdb \
+--add-opens=java.base/java.lang.reflect=io.questdb,com.questdb \
+--add-opens=java.base/java.nio=io.questdb,com.questdb \
+--add-opens=java.base/java.time.zone=io.questdb,com.questdb \
+--add-exports=java.base/jdk.internal.vm=io.questdb,com.questdb \
+-m com.questdb/com.questdb.EntServerMain \
+-d /home/[USER_NAME]/var/lib/questdb
+```
+
+The Enterprise package is a self-contained runtime image: the `io.questdb` and
+`com.questdb` modules are built into `bin/java`, so no `--module-path` / `-p` is
+required.
 
 `LimitNOFILE=1048576` raises the open-files limit above systemd's default of
 `524288`, which is below what QuestDB recommends. The kernel `vm.max_map_count`
