@@ -15,9 +15,8 @@ This is a pre-release API and may change before release.
 
 The C and C++ clients ingest and query over
 [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), a columnar binary
-protocol carried over WebSocket. The pool is the **front door** for
-everything: open it once, then borrow a column-major sender (chunks or
-Arrow batches), a row-major sender, or a query reader.
+protocol carried over WebSocket. The pool is the entry point for both ingesting
+and querying data: borrow a sender to write rows, or a reader to execute SQL queries.
 
 ## Quick start
 
