@@ -795,5 +795,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - [Connect string reference](/docs/connect/clients/connect-string/)
 - [QWP protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/)
-- [C/C++ pooled API](/docs/connect/clients/c-and-cpp-pooled/) (the same pool, in C/C++)
+- [C & C++ client](/docs/connect/clients/c-and-cpp/) (the same pool, in C/C++)
 - [Query overview](/docs/query/overview/)

@@ -96,11 +96,6 @@ module.exports = {
               label: "C & C++",
             },
             {
-              id: "connect/clients/c-api-reference",
-              type: "doc",
-              label: "C/C++ pooled API (draft)",
-            },
-            {
               id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
