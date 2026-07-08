@@ -19,14 +19,15 @@ The client lives at
 [questdb/c-questdb-client](https://github.com/questdb/c-questdb-client): one
 `questdb_client` library that serves both languages, since the C++ API is
 header-only wrappers over the C ABI. It needs C11 for the C API and C++17 or
-newer for the C++ API. The fastest integration is CMake `FetchContent`:
+newer for the C++ API. The fastest integration is CMake `FetchContent`; pin a
+release tag or commit SHA for production builds:
 
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
     c_questdb_client_proj
     GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
-    GIT_TAG        7.0.0)   # pin the latest release
+    GIT_TAG        main)   # replace with a release tag or commit SHA
 FetchContent_MakeAvailable(c_questdb_client_proj)
 
 target_link_libraries(your_target questdb_client)
@@ -75,7 +76,7 @@ int main()
         auto sender = pool.borrow_row_sender();
         auto buffer = sender.new_buffer();
         buffer.table("trades"_tn)
-              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .symbol("symbol"_cn, "ETH-USDT"_utf8)
               .column("price"_cn, 2615.54)
               .at(questdb::ingress::timestamp_nanos::now());
         sender.flush(buffer);
@@ -131,7 +132,7 @@ int main(void)
     if (!buffer) goto on_error;
     if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+                                   QDB_UTF8_LITERAL("ETH-USDT"), &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
     if (!row_sender_flush(sender, buffer, &err)) goto on_error;
@@ -403,7 +404,7 @@ int main()
 
         auto buffer = sender.new_buffer();        // protocol-matched buffer
         buffer.table("trades"_tn)
-              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .symbol("symbol"_cn, "ETH-USDT"_utf8)
               .column("price"_cn, 2615.54)
               .at(questdb::ingress::timestamp_nanos::now());
 
@@ -442,7 +443,7 @@ int main(void)
     if (!buffer) goto on_error;
     if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+                                   QDB_UTF8_LITERAL("ETH-USDT"), &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
 
@@ -1090,7 +1091,7 @@ int main()
                 for (int i = 0; i < 100; ++i)
                 {
                     buffer.table("trades"_tn)
-                          .symbol("symbol"_cn, "ETH-USD"_utf8)
+                          .symbol("symbol"_cn, "ETH-USDT"_utf8)
                           .column("price"_cn, 2615.54 + w)
                           .at(questdb::ingress::timestamp_nanos::now());
                 }
@@ -1133,7 +1134,7 @@ static void* worker(void* arg)
     {
         if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
         if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                       QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+                                       QDB_UTF8_LITERAL("ETH-USDT"), &err)) goto on_error;
         if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
         if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
     }
@@ -1248,7 +1249,7 @@ int main()
 
         auto buffer = sender.new_buffer();
         buffer.table("trades"_tn)
-              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .symbol("symbol"_cn, "ETH-USDT"_utf8)
               .column("price"_cn, 2615.54)
               .at(questdb::ingress::timestamp_nanos::now());
 
@@ -1297,7 +1298,7 @@ int main(void)
     if (!buffer) goto on_error;
     if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+                                   QDB_UTF8_LITERAL("ETH-USDT"), &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
 
