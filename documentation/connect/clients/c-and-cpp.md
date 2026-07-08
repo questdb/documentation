@@ -13,11 +13,45 @@ The C and C++ clients ingest and query over
 protocol carried over WebSocket. The pool is the entry point for both ingesting
 and querying data: borrow a sender to write rows, or a reader to execute SQL queries.
 
+## CMake setup
+
+The client lives at
+[questdb/c-questdb-client](https://github.com/questdb/c-questdb-client): one
+`questdb_client` library that serves both languages, since the C++ API is
+header-only wrappers over the C ABI. It needs C11 for the C API and C++17 or
+newer for the C++ API. The fastest integration is CMake `FetchContent`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    c_questdb_client_proj
+    GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
+    GIT_TAG        7.0.0)   # pin the latest release
+FetchContent_MakeAvailable(c_questdb_client_proj)
+
+target_link_libraries(your_target questdb_client)
+```
+
+- The query reader is compiled in by default (CMake option
+  `QUESTDB_ENABLE_READER`, default `ON`). Ingestion-only builds can set it to
+  `OFF` to drop the reader's transitive dependencies.
+- [Arrow ingestion](#arrow-ingestion) is opt-in: build with
+  `-DQUESTDB_ENABLE_ARROW=ON`.
+- The library links statically by default; `-DBUILD_SHARED_LIBS=ON` builds a
+  shared library instead. Outside CMake, add the repo's `include/` directory
+  to your include path and link `-lquestdb_client`.
+- `git submodule` / `git subtree` grafting and building from source are
+  covered in the repo's
+  [DEPENDENCY.md](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
+
 ## Quick start
 
 Open a pool, borrow a **row sender** to write a row, then borrow a **reader** to
-read it back: the common "insert and query" path. For bulk/columnar and Arrow
-ingestion, see [The pool](#the-pool) and
+read it back: the common "insert and query" path. The read-back pauses
+briefly because the flush ack confirms the server accepted the row, while
+visibility to queries follows within milliseconds (see
+[Durability and backpressure](#durability-and-backpressure)). For
+bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
 [Sending data: column-major](#sending-data-column-major).
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
@@ -26,7 +60,9 @@ ingestion, see [The pool](#the-pool) and
 ```cpp
 #include <questdb/ingress/column_sender.hpp>  // pool + row sender
 #include <questdb/egress/reader.hpp>          // pool::borrow_reader
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 using namespace questdb::ingress::literals;
 
@@ -45,6 +81,11 @@ int main()
         sender.flush(buffer);
         sender.wait();
     }
+
+    // The ack means the server accepted the row, not that it is queryable
+    // yet; visibility follows within milliseconds. Pause so the immediate
+    // read-back below sees the row.
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Query: borrow a reader, run SQL, print rows.
     auto reader = pool.borrow_reader();
@@ -68,6 +109,7 @@ int main()
 #include <questdb/ingress/column_sender.h>   // pool + row_sender + line_sender_buffer
 #include <questdb/egress/reader.h>            // reader
 #include <stdio.h>
+#include <threads.h>
 
 int main(void)
 {
@@ -98,6 +140,11 @@ int main(void)
     buffer = NULL;
     questdb_db_return_row_sender(db, sender);
     sender = NULL;
+
+    /* The ack means the server accepted the row, not that it is queryable
+       yet; visibility follows within milliseconds. Pause so the immediate
+       read-back below sees the row. */
+    thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL);
 
     /* Query: borrow a reader, run SQL, print rows. */
     rd = questdb_db_borrow_reader(db, &rerr);
@@ -970,7 +1017,10 @@ local queue that owns delivery, and returns before the server ACKs.
    (C++ `wait()`) block until everything published so far reaches an ack
    level: `qwpws_ack_level_ok` (server accepted) or `qwpws_ack_level_durable`
    (Enterprise: uploaded to object storage, not just in the server's WAL).
-   The timeout is a **no-progress deadline**: it fires
+   Neither level means the rows are already **visible to queries**: visibility
+   follows WAL apply, typically within milliseconds, so a query issued right
+   after the ack can miss the newest rows. An empty read-back is not data
+   loss. The timeout is a **no-progress deadline**: it fires
    only if the watermark stops advancing; on timeout the frames stay queued.
    Call `wait` again or watch FSNs; don't re-flush.
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
