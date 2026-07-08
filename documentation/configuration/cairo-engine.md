@@ -17,6 +17,15 @@ large analytical queries, or specific storage configurations.
 
 The locale used to handle date types.
 
+### cairo.plugin.root
+
+- **Default**: none
+- **Reloadable**: no
+
+Path to the directory containing plugin JAR files. When empty, the plugin
+system is disabled. See the
+[Plugin system guide](/docs/operations/plugins/) for details.
+
 ### cairo.root
 
 - **Default**: `db`
