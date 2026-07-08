@@ -39,7 +39,8 @@ target_link_libraries(your_target questdb_client)
 
 - The query reader is compiled in by default (CMake option
   `QUESTDB_ENABLE_READER`, default `ON`). Ingestion-only builds can set it to
-  `OFF` to drop the reader's transitive dependencies.
+  `OFF` to drop the reader code paths and their `zstd` dependency; the saving
+  is modest, so bother only when minimizing footprint.
 - [Arrow ingestion](#arrow-ingestion) is opt-in: build with
   `-DQUESTDB_ENABLE_ARROW=ON`.
 - The library links statically by default; `-DBUILD_SHARED_LIBS=ON` builds a
@@ -140,7 +141,7 @@ int main(void)
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
     if (!row_sender_flush(sender, buffer, &err)) goto on_error;
-    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;
+    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* 0 = no deadline */
     line_sender_buffer_free(buffer);
     buffer = NULL;
     questdb_db_return_row_sender(db, sender);
@@ -320,11 +321,24 @@ callers.
 | `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
 | `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires `questdb_db_reap_idle` / `pool::reap_idle`. |
 
+When to change them: raise `pool_size` when workers borrow intermittently and
+a cold borrow after idle reaping would pay reconnect and auth latency; the
+reaper keeps that many connections warm. `pool_idle_timeout_ms` trades idle
+sockets against that same reconnect cost. Pick `pool_reap=manual` when you
+want to control the shrink cadence yourself instead of running a background
+reaper thread; call `reap_idle` on your own schedule.
+
 Setting `sf_dir` opts the column sender into **store-and-forward** with on-disk
 durability. In store-and-forward mode the pool currently supports a **single
 active borrower**: an explicit `pool_size > 1` or `pool_max > 1` is rejected,
 and an omitted `pool_max` is treated as `1` for the column sender. `sender_id`
-and the other `sf_*` keys require an explicit `sf_dir`.
+and the other `sf_*` keys require an explicit `sf_dir`. `sender_id` names the
+on-disk slot (`<sf_dir>/<sender_id>/`, default `default`): keep it stable
+across restarts so replay finds the spool, and unique per producer sharing an
+`sf_dir`; a second process opening the same slot fails fast with a
+slot-in-use error instead of corrupting the spool. Full `sf_*` key semantics
+are in the
+[connect string reference](/docs/connect/clients/connect-string/#sf-keys).
 
 ### Sizing the pool
 
@@ -357,10 +371,13 @@ wss::addr=db.example.com:9000;username=admin;password=quest;   # HTTP basic
 wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (Enterprise, recommended)
 ```
 
-- **TLS**: use the `wss` scheme. Pick the root store with `tls_ca=webpki_roots`
-  / `os_roots` / `webpki_and_os_roots`, or `tls_roots=/path/ca.pem` for a
-  custom CA. `tls_verify=unsafe_off` disables verification (testing only;
-  requires an `insecure-skip-verify` build).
+- **TLS**: use the `wss` scheme. `tls_ca` picks the root store; the default,
+  `webpki_roots`, ships with the client and behaves the same in every
+  environment (good for containers). Use `os_roots` when trust is managed at
+  the OS level (corporate CAs pushed to the host), `webpki_and_os_roots` for
+  both, or `tls_roots=/path/ca.pem` for a private CA. `tls_verify=unsafe_off`
+  disables verification (testing only; requires an `insecure-skip-verify`
+  build).
 - **`auth_timeout_ms`** (default 15000) bounds the WebSocket upgrade.
 
 Because the pool connects lazily, a bad credential surfaces as
@@ -478,8 +495,12 @@ on_error:;
 There are no `auto_flush_rows` / `auto_flush_bytes` keys for the QWP/WebSocket
 row sender; flushing is always explicit. Accumulate rows in the buffer on your
 own cadence (row count, byte size via `line_sender_buffer_size`, or a timer)
-and call `flush` yourself. Null columns are written by **omission**: skip the
-column for that row. There is no `set_null` call.
+and call `flush` yourself. A good starting cadence is about 1,000 rows or
+100 ms, whichever comes first: the auto-flush defaults of the other QWP
+clients. Flushing every row collapses throughput, and a single flush must
+stay under the `sf_max_bytes` payload cap (default 4 MiB). Null columns are
+written by **omission**: skip the column for that row. There is no `set_null`
+call.
 
 :::
 
@@ -487,7 +508,11 @@ column for that row. There is no `set_null` call.
 
 `row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for the
 server ACK. For a blocking barrier over everything published so far, call
-`row_sender_wait` / `sender.wait()`. For non-blocking pipelining, publish with an
+`row_sender_wait` / `sender.wait()`. A C `timeout_millis` of `0` (and the C++
+default argument) waits with no deadline; a non-zero value is a no-progress
+deadline, not a total cap (see
+[Durability and backpressure](#durability-and-backpressure)). For
+non-blocking pipelining, publish with an
 FSN-returning flush and compare watermarks; see
 [FSN progress](#fsn-progress-non-blocking) below.
 
@@ -574,7 +599,7 @@ int main(void)
     if (!column_sender_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
     if (!column_sender_flush(conn, chunk, &err)) goto on_error;                 // publish
-    if (!column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK
+    if (!column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK; 0 = no deadline
 
     column_sender_chunk_free(chunk);
     questdb_db_return_column_sender(db, conn);   // return the borrow to the pool
@@ -773,19 +798,12 @@ read typed columns. In C, `reader_query_execute` **consumes** the query handle
 (sets your pointer to `NULL`). A borrowed reader, like the senders, is
 single-thread; the pool it came from is the shared, thread-safe handle.
 
-Two ways to get a reader, mirroring the writer side:
-
-- **Pooled.** C++: `auto r = pool.borrow_reader();` returns a
-  `questdb::egress::reader` that returns itself to the pool on scope exit
-  (shown in the C++ tab of the example below). C:
-  `reader* r = questdb_db_borrow_reader(db, &err);`, returned with
-  `questdb_db_return_reader(db, r)` (or force-retired with
-  `reader_drop_on_return(r)` / C++ `r.drop_on_return()`).
-- **Standalone.** A one-off connection: C `reader_from_conf(...)`, C++
-  `questdb::egress::reader{conf}`.
-
-The reader pool is capped independently of the sender pools. The examples in
-both tabs borrow from the pool.
+Borrow the reader from the pool: C++ `auto r = pool.borrow_reader();` returns
+a `questdb::egress::reader` that returns itself to the pool on scope exit; C
+`reader* r = questdb_db_borrow_reader(db, &err);` is returned with
+`questdb_db_return_reader(db, r)` (or force-retired with
+`reader_drop_on_return(r)` / C++ `r.drop_on_return()`). The reader pool is
+capped independently of the sender pools.
 
 :::warning Mid-stream query failover can duplicate rows
 
@@ -869,9 +887,7 @@ int main()
 The pooled C reader needs both error types: `questdb_db_connect` lives in
 `column_sender.h` and reports a `line_sender_error`, while every reader call
 uses the distinct `reader_error` (the extra type is needed only for the
-`connect` call, shown in the example). For a pool-free reader, swap
-`questdb_db_connect` + `questdb_db_borrow_reader` for a single
-`reader_from_conf(conf, &err)`.
+`connect` call, shown in the example).
 
 ```c
 #include <questdb/ingress/column_sender.h>   // questdb_db pool + questdb_db_connect
@@ -958,18 +974,52 @@ pick the right accessor.
 </TabItem>
 </Tabs>
 
-For parameterised queries, prepare then bind: C `reader_prepare` +
-`reader_query_bind_*` + `reader_query_execute`; C++ `reader.prepare(sql)`
-chained with `bind_*`, then `execute()`. Plain `execute(sql)` is the no-bind
-shortcut. The reader must outlive any cursor it produces.
+### Parameterised queries
+
+Prepare then bind: C `reader_prepare` + `reader_query_bind_*` +
+`reader_query_execute`; C++ `reader.prepare(sql)` chained with `bind_*`, then
+`execute()`. Plain `execute(sql)` is the no-bind shortcut. The reader must
+outlive any cursor it produces. The complete bind surface (C
+`reader_query_bind_<name>`, C++ `bind_<name>` on the prepared query):
+
+| Bind | Input | QuestDB type |
+| --- | --- | --- |
+| `bind_bool` | `bool` | `BOOLEAN` |
+| `bind_i8` / `bind_i16` / `bind_i32` / `bind_i64` | signed int | `BYTE` / `SHORT` / `INT` / `LONG` |
+| `bind_f32` / `bind_f64` | float / double | `FLOAT` / `DOUBLE` |
+| `bind_timestamp_micros` / `bind_timestamp_nanos` | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
+| `bind_date_millis` | int64 millis since epoch | `DATE` |
+| `bind_char` | UTF-16 code unit | `CHAR` |
+| `bind_decimal64` / `bind_decimal128` / `bind_decimal256` | unscaled value + scale | `DECIMAL` |
+| `bind_geohash` | bits + precision | `GEOHASH` |
+| `bind_varchar` | UTF-8 string | `VARCHAR` |
+| `bind_uuid` | 16 bytes | `UUID` |
+| `bind_long256` | 32 bytes | `LONG256` |
+| `bind_binary` | bytes + length | `BINARY` (not yet accepted server-side) |
+| `bind_ipv4` | uint32, host order | `IPV4` (not yet accepted server-side) |
+
+To bind SQL NULL, use the typed NULL binds: `bind_null(kind)`, plus the
+parameterised forms `bind_null_varchar`, `bind_null_binary`,
+`bind_null_decimal64` / `_128` / `_256` (scale) and `bind_null_geohash`
+(precision). Ingestion writes nulls by omission and has no `set_null`;
+querying **does** have NULL binds. There are **no array binds**: `double[]` /
+`long[]` appear only as result columns. `bind_binary` and `bind_ipv4` (and
+their NULL forms) compile but fail at execute with
+`reader_error_invalid_bind` on current servers.
 
 ## Failover, retry, and pool lifecycle
 
 The pool owns reconnection and connection health so borrowers don't have to:
 
 - **Multiple endpoints.** Comma-separate hosts in one `addr=` (or repeat the
-  key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The pool rotates away
-  from unhealthy endpoints on borrow.
+  key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The endpoints must be
+  replicas of one logical deployment
+  ([Enterprise replication](/docs/connect/wire-protocols/qwp-ingress-websocket/#failover-and-high-availability));
+  listing unrelated instances splits your data across them. The pool rotates
+  away from unhealthy endpoints on borrow and follows the writable primary on
+  a role reject. `target=` filters by role (e.g. `target=primary`); when
+  every reachable endpoint handshakes but none matches the filter, the borrow
+  fails with `role_mismatch` rather than a connect error.
 - **Retrying borrow.** `questdb_db_borrow_column_sender_with_retry(db,
   budget_ms, &err)` and `questdb_db_borrow_row_sender_with_retry(...)` (C++
   `pool::borrow_column_sender_with_retry(budget_ms)` /
@@ -1022,7 +1072,13 @@ local queue that owns delivery, and returns before the server ACKs.
    (C++ `wait()`) block until everything published so far reaches an ack
    level: `qwpws_ack_level_ok` (server accepted) or `qwpws_ack_level_durable`
    (Enterprise: uploaded to object storage, not just in the server's WAL).
-   Neither level means the rows are already **visible to queries**: visibility
+   The durable level takes effect only when the pool was opened with
+   `request_durable_ack=on` (Enterprise with replication; against a server
+   that cannot provide it, the connect fails with `protocol_version_error`).
+   Without that key, a durable wait silently behaves like `ok`. See the
+   protocol page's
+   [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+   section. Neither level means the rows are already **visible to queries**: visibility
    follows WAL apply, typically within milliseconds, so a query issued right
    after the ack can miss the newest rows. An empty read-back is not data
    loss. The timeout is a **no-progress deadline**: it fires
@@ -1030,7 +1086,7 @@ local queue that owns delivery, and returns before the server ACKs.
    Call `wait` again or watch FSNs; don't re-flush.
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
-   `close_flush_timeout`. With `sf_dir`, frames persist on disk and **replay on
+   `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist on disk and **replay on
    the next borrow** (same `sender_id`), surviving process restarts. Strongly
    recommended for multi-host deployments: during failover, flushes keep
    landing on disk instead of filling RAM.
@@ -1143,7 +1199,7 @@ static void* worker(void* arg)
         if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
     }
     if (!row_sender_flush(sender, buffer, &err)) goto on_error;
-    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* ack barrier */
+    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* ack barrier; 0 = no deadline */
 
     line_sender_buffer_free(buffer);
     questdb_db_return_row_sender(db, sender);
@@ -1204,8 +1260,10 @@ Orderly shutdown is: **wait, return, close.**
 
 1. If you need delivery confirmation, call `wait` on each sender first (or
    check FSN watermarks); pool close only drains best-effort within
-   `close_flush_timeout` on an in-memory queue. With `sf_dir`, unacked frames
-   survive on disk regardless and replay on the next run.
+   `close_flush_timeout_millis` (default 5000 ms; `0` disables the drain; see
+   the [connect string reference](/docs/connect/clients/connect-string/)) on
+   an in-memory queue. With `sf_dir`, unacked frames survive on disk
+   regardless and replay on the next run.
 2. Return or drop every borrow. In C++, scope exit does this.
 3. `questdb_db_close(db)` (C++: `pool` destructor). Accepts `NULL`. This is
    the **final owner release**: don't call it concurrently with borrows or
@@ -1225,7 +1283,8 @@ plain return and force-drop.
 ## Production shape: TLS, token, multi-host, retry
 
 A production-shaped configuration: TLS with OS roots, bearer token, two
-endpoints, a store-and-forward spool, and a retry-bounded borrow:
+endpoints, a store-and-forward spool, durable acks, and a retry-bounded
+borrow:
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -1243,9 +1302,11 @@ int main()
         questdb::pool pool{
             "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
             "token=YOUR_BEARER_TOKEN;"
-            "tls_ca=os_roots;"
+            "tls_ca=os_roots;"              // trust the OS store (corporate CAs)
             "sf_dir=/var/spool/questdb;"
-            "sender_id=ingest-01;"};
+            "sender_id=ingest-01;"
+            // Enterprise; the connect fails against a server without replication.
+            "request_durable_ack=on;"};
 
         // First borrow opens the connection: give it the failover budget.
         auto sender =
@@ -1258,7 +1319,8 @@ int main()
               .at(questdb::ingress::timestamp_nanos::now());
 
         sender.flush(buffer);                       // lands in the sf_dir spool
-        sender.wait(questdb::ingress::qwpws_ack_level::durable);  // Enterprise
+        // Durable barrier; needs request_durable_ack=on above.
+        sender.wait(questdb::ingress::qwpws_ack_level::durable);
         return 0;
     }
     catch (const questdb::ingress::line_sender_error& e)
@@ -1287,9 +1349,11 @@ int main(void)
     const char* conf =
         "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
         "token=YOUR_BEARER_TOKEN;"
-        "tls_ca=os_roots;"
+        "tls_ca=os_roots;"              /* trust the OS store (corporate CAs) */
         "sf_dir=/var/spool/questdb;"
-        "sender_id=ingest-01;";
+        "sender_id=ingest-01;"
+        /* Enterprise; the connect fails against a server without replication. */
+        "request_durable_ack=on;";
     db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
@@ -1306,7 +1370,8 @@ int main(void)
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
 
-    /* flush lands in the sf_dir spool; the durable wait is Enterprise. */
+    /* flush lands in the sf_dir spool; the durable barrier needs the
+       request_durable_ack=on key above. */
     if (!row_sender_flush(sender, buffer, &err)) goto on_error;
     if (!row_sender_wait(sender, qwpws_ack_level_durable, 0, &err)) goto on_error;
 
