@@ -76,7 +76,7 @@ int main()
 {
     questdb::pool pool{"ws::addr=localhost:9000;"};
 
-    // Insert: borrow a row sender, write a row, flush, wait for the ack.
+    // Insert: borrow a row sender, write a row, flush + wait for the ack.
     {
         auto sender = pool.borrow_row_sender();
         auto buffer = sender.new_buffer();
@@ -84,8 +84,7 @@ int main()
               .symbol("symbol"_cn, "ETH-USDT"_utf8)
               .column("price"_cn, 2615.54)
               .at(questdb::ingress::timestamp_nanos::now());
-        sender.flush(buffer);
-        sender.wait();
+        sender.flush_and_wait(buffer);
     }
 
     // The ack means the server accepted the row, not that it is queryable
@@ -130,7 +129,7 @@ int main(void)
     db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
     if (!db) goto on_error;
 
-    /* Insert: borrow a row sender, write a row, flush, wait for the ack. */
+    /* Insert: borrow a row sender, write a row, flush + wait for the ack. */
     sender = questdb_db_borrow_row_sender(db, &err);
     if (!sender) goto on_error;
     buffer = row_sender_new_buffer(sender, &err);
@@ -140,8 +139,7 @@ int main(void)
                                    QDB_UTF8_LITERAL("ETH-USDT"), &err)) goto on_error;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
-    if (!row_sender_flush(sender, buffer, &err)) goto on_error;
-    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* 0 = no deadline */
+    if (!row_sender_flush_and_wait(sender, buffer, qwpws_ack_level_ok, &err)) goto on_error;
     line_sender_buffer_free(buffer);
     buffer = NULL;
     questdb_db_return_row_sender(db, sender);
@@ -241,6 +239,7 @@ The pooled API at a glance:
 | Borrow a **reader** | `questdb_db_borrow_reader` → `reader*` | `pool::borrow_reader()` → `reader` |
 | Column batch | `column_sender_chunk*` | `questdb::ingress::column_chunk` |
 | Arrow batch flush | `column_sender_flush_arrow_batch_at_column` | `borrowed_column_sender::flush_arrow_batch()` |
+| One-call flush + ack barrier | `row_sender_flush_and_wait` / `column_sender_flush_and_wait` | `flush_and_wait()` on either sender |
 | Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
 | Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
 
@@ -506,11 +505,15 @@ call.
 
 :::note Row-sender ack tracking
 
-`row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for the
-server ACK. For a blocking barrier over everything published so far, call
-`row_sender_wait` / `sender.wait()`. A C `timeout_millis` of `0` (and the C++
-default argument) waits with no deadline; a non-zero value is a no-progress
-deadline, not a total cap (see
+`row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for
+the server ACK. `row_sender_flush_and_wait` (C++
+`sender.flush_and_wait(buffer)`) is the one-call flush + ack barrier; its
+wait is bounded by the pool-wide `request_timeout` no-progress deadline
+(default 30000 ms). For a blocking barrier over everything published so far,
+or to pick a per-call deadline, compose `flush` with `row_sender_wait` /
+`sender.wait()`: a C `timeout_millis` of `0` (and the C++ default argument)
+waits with no deadline; a non-zero value is a no-progress deadline, not a
+total cap (see
 [Durability and backpressure](#durability-and-backpressure)). For
 non-blocking pipelining, publish with an
 FSN-returning flush and compare watermarks; see
@@ -524,7 +527,8 @@ Borrow a store-and-forward column sender, build a `chunk` of columns (each a
 contiguous array plus a row count), set the designated timestamp, then flush.
 `flush` publishes the chunk into the store-and-forward queue; `wait` is an
 **ack barrier** that blocks until the server has acknowledged everything
-published so far.
+published so far. `flush_and_wait` combines the two for the simple
+synchronous path, shown below.
 
 The `questdb_db` / `questdb::pool` is the only handle you share across threads;
 a borrowed sender belongs to the thread that took it, so borrow one per worker
@@ -554,8 +558,7 @@ int main()
              .column_f64("amount", amount, n)
              .at_nanos(ts_ns, n);
 
-        conn.flush(chunk);   // publish into the store-and-forward queue
-        conn.wait();         // ack barrier (qwpws_ack_level::ok, waits indefinitely)
+        conn.flush_and_wait(chunk);   // publish + ack barrier in one call
         return 0;
     }
     catch (const questdb::ingress::line_sender_error& e)
@@ -598,8 +601,8 @@ int main(void)
     if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
     if (!column_sender_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
-    if (!column_sender_flush(conn, chunk, &err)) goto on_error;                 // publish
-    if (!column_sender_wait(conn, qwpws_ack_level_ok, 0, &err)) goto on_error;  // wait for ACK; 0 = no deadline
+    // publish + ACK barrier in one call
+    if (!column_sender_flush_and_wait(conn, chunk, qwpws_ack_level_ok, &err)) goto on_error;
 
     column_sender_chunk_free(chunk);
     questdb_db_return_column_sender(db, conn);   // return the borrow to the pool
@@ -630,9 +633,11 @@ on_error:;
 - **`flush` is not durability.** A successful `column_sender_flush` means the
   frame was accepted by the local store-and-forward queue, which owns delivery,
   not that the server has ACKed it. `column_sender_wait` (C++ `conn.wait()`)
-  only *observes* the ACK; it is a barrier, not a commit step. Publish many
-  chunks, then `wait` once (`qwpws_ack_level_durable` waits for durable upload,
-  Enterprise). See [Durability and backpressure](#durability-and-backpressure).
+  only *observes* the ACK; it is a barrier, not a commit step.
+  `flush_and_wait` is the one-call form; for throughput, publish many chunks
+  with `flush`, then `wait` once (`qwpws_ack_level_durable` waits for durable
+  upload, Enterprise). See
+  [Durability and backpressure](#durability-and-backpressure).
 - **Return the borrow.** C: `questdb_db_return_column_sender` (recycle) or
   `questdb_db_drop_column_sender` (retire a possibly in-doubt conn); C++ does
   it in the `borrowed_column_sender` destructor, and `drop_on_return()` forces
@@ -742,8 +747,9 @@ using namespace questdb::ingress::literals;
 void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
 {
     auto conn = pool.borrow_column_sender();       // one per thread
-    conn.flush_arrow_batch("trades"_tn, array, schema, "ts"_cn);
-    conn.wait();                                      // ack barrier
+    // Publish + ack barrier in one call; plain flush_arrow_batch() + wait()
+    // is the pipelined form.
+    conn.flush_arrow_batch_and_wait("trades"_tn, array, schema, "ts"_cn);
 }
 ```
 
@@ -758,11 +764,11 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
     column_sender* conn = questdb_db_borrow_column_sender(db, err);
     if (!conn)
         return false;
-    bool ok = column_sender_flush_arrow_batch_at_column(
+    /* Publish + ACK barrier in one call; column_sender_flush_arrow_batch_at_column
+       followed by column_sender_wait is the pipelined form. */
+    bool ok = column_sender_flush_arrow_batch_at_column_and_wait(
         conn, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
-        QDB_COLUMN_NAME_LITERAL("ts"), NULL, 0, err);
-    if (ok)
-        ok = column_sender_wait(conn, qwpws_ack_level_ok, 0, err);
+        QDB_COLUMN_NAME_LITERAL("ts"), NULL, 0, qwpws_ack_level_ok, err);
     questdb_db_return_column_sender(db, conn);
     return ok;
 }
@@ -1075,7 +1081,9 @@ local queue that owns delivery, and returns before the server ACKs.
    The durable level takes effect only when the pool was opened with
    `request_durable_ack=on` (Enterprise with replication; against a server
    that cannot provide it, the connect fails with `protocol_version_error`).
-   Without that key, a durable wait silently behaves like `ok`. See the
+   Without that key, a durable `wait` silently behaves like `ok`, while
+   `flush_and_wait` at the durable level fails up front with
+   `invalid_api_call` before touching the buffer or chunk. See the
    protocol page's
    [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
    section. Neither level means the rows are already **visible to queries**: visibility
@@ -1083,7 +1091,9 @@ local queue that owns delivery, and returns before the server ACKs.
    after the ack can miss the newest rows. An empty read-back is not data
    loss. The timeout is a **no-progress deadline**: it fires
    only if the watermark stops advancing; on timeout the frames stay queued.
-   Call `wait` again or watch FSNs; don't re-flush.
+   Call `wait` again or watch FSNs; don't re-flush. `wait` takes the deadline
+   per call (`0` = none); `flush_and_wait` uses the pool-wide
+   `request_timeout` (default 30000 ms).
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist on disk and **replay on
