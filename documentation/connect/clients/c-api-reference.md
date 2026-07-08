@@ -21,8 +21,8 @@ and querying data: borrow a sender to write rows, or a reader to execute SQL que
 ## Quick start
 
 Open a pool, borrow a **row sender** to write a row, then borrow a **reader** to
-read it back — the common "insert and query" path. Everything below expands on
-this; for bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
+read it back: the common "insert and query" path. For bulk/columnar and Arrow
+ingestion, see [The pool](#the-pool) and
 [Sending data: column-major](#sending-data-column-major).
 
 ### C++
@@ -173,12 +173,11 @@ on_reader_error:;
 of reusable QWP/WebSocket connections. Open one per deployment, share it across
 threads, close it at shutdown.
 
-You don't open connections yourself: **borrow** a lease — a row sender, column
-sender, or reader — use it on one thread, then **return** it (recycles the
-connection) or **drop** it (retires it). In C++ this happens on destruction —
-for the borrowed sender wrappers and the pooled reader alike — and
-`drop_on_return()` forces a drop. The pool connects lazily and handles reconnect
-and failover underneath.
+You don't open connections yourself: **borrow** a lease (a row sender, column
+sender, or reader), use it on one thread, then **return** it (recycles the
+connection) or **drop** it (retires it). In C++ the borrowed sender wrappers and
+the pooled reader return on destruction; `drop_on_return()` forces a drop. The
+pool connects lazily and handles reconnect and failover underneath.
 
 The pooled API at a glance:
 
@@ -199,9 +198,9 @@ Match the borrow to the shape of your data:
 
 | You have | Borrow | Why |
 | --- | --- | --- |
-| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_column_sender`) | Whole columns are encoded in one pass — no per-row assembly. Store-and-forward queue owns delivery. |
+| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_column_sender`) | Whole columns are encoded in one pass, with no per-row assembly. The store-and-forward queue owns delivery. |
 | Events arriving one at a time (tickers, order flow, telemetry) | **Row-major** (`borrow_row_sender`) | Build rows field-by-field into a buffer, flush batches on your cadence. |
-| SQL to run — verification read-backs, dashboards, downsampling | **Reader** (`borrow_reader`) | Streams typed columnar batches with flow control. |
+| SQL to run: verification read-backs, dashboards, downsampling | **Reader** (`borrow_reader`) | Streams typed columnar batches with flow control. |
 
 Both senders may target the same tables; QuestDB unifies the schema
 server-side.
@@ -254,13 +253,13 @@ callers.
 
 Setting `sf_dir` opts the column sender into **store-and-forward** with on-disk
 durability. In store-and-forward mode the pool currently supports a **single
-active borrower** — an explicit `pool_size > 1` or `pool_max > 1` is rejected,
+active borrower**: an explicit `pool_size > 1` or `pool_max > 1` is rejected,
 and an omitted `pool_max` is treated as `1` for the column sender. `sender_id`
 and the other `sf_*` keys require an explicit `sf_dir`.
 
 ### Sizing the pool
 
-**A borrow at the cap fails immediately — there is no blocking acquire.**
+**A borrow at the cap fails immediately; there is no blocking acquire.**
 When `pool_max` handles of one kind are already out, `questdb_db_borrow_*`
 returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws) rather
 than waiting for a return. Two consequences:
@@ -271,21 +270,21 @@ than waiting for a return. Two consequences:
   hit.
 - **If borrows are short-lived and demand can spike past the cap**, treat the
   at-cap error as backpressure: return a borrow elsewhere, or retry after a
-  delay in your own loop. Don't confuse it with the connect-retry helpers —
+  delay in your own loop. Don't confuse it with the connect-retry helpers;
   `borrow_*_with_retry` retries *connection establishment*, not cap
   exhaustion.
 
 Each borrow kind (column, row, reader) has its own `pool_max`-capped free
-list — so heavy ingestion cannot starve queries — and the combined
-live-connection ceiling is `3 * pool_max`.
+list, so heavy ingestion cannot starve queries. The combined live-connection
+ceiling is `3 * pool_max`.
 
 ## Authentication and TLS
 
 Authentication happens during the WebSocket upgrade, before any binary frames
 are exchanged. The pooled connect string takes the same keys as the standalone
-sender — see the
+sender; see the
 [C & C++ guide](/docs/connect/clients/c-and-cpp/#authentication-and-tls) for
-the full treatment. Summary:
+details. Summary:
 
 ```text
 wss::addr=db.example.com:9000;username=admin;password=quest;   # HTTP basic
@@ -304,19 +303,19 @@ wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (E
   table.
 
 Because the pool connects lazily, a bad credential surfaces as
-`line_sender_error_auth_error` from the **first borrow** on each connection —
-handle it there, not at `connect` (see
+`line_sender_error_auth_error` from the **first borrow** on each connection.
+Handle it there, not at `connect` (see
 [Which errors mean what](#which-errors-mean-what)).
 
 ## Sending data: row-major
 
-Borrow a row sender and flush a `line_sender_buffer` — the classic ILP buffer
-you build field-by-field. Get a protocol-matched buffer straight from the sender
+Borrow a row sender and flush a `line_sender_buffer` built field-by-field. Get
+a protocol-matched buffer straight from the sender
 (`row_sender_new_buffer` in C, `borrowed_row_sender::new_buffer()` in C++); it is
 the only buffer a `row_sender` accepts. The row sender uses a single error type
 (`line_sender_error`) throughout.
 
-The pool is the shared handle; a borrowed row sender is single-thread — borrow
+The pool is the shared handle; a borrowed row sender is single-thread, so borrow
 one per worker.
 
 ### C
@@ -402,10 +401,10 @@ int main()
 :::caution No auto-flush
 
 There are no `auto_flush_rows` / `auto_flush_bytes` keys for the QWP/WebSocket
-row sender — flushing is always explicit. Accumulate rows in the buffer on your
+row sender; flushing is always explicit. Accumulate rows in the buffer on your
 own cadence (row count, byte size via `line_sender_buffer_size`, or a timer)
 and call `flush` yourself. Null columns are written by **omission**: skip the
-column for that row — there is no `set_null` call.
+column for that row. There is no `set_null` call.
 
 :::
 
@@ -414,7 +413,7 @@ column for that row — there is no `set_null` call.
 `row_sender_flush` (C++ `sender.flush(buffer)`) publishes without waiting for the
 server ACK. For a blocking barrier over everything published so far, call
 `row_sender_wait` / `sender.wait()`. For non-blocking pipelining, publish with an
-FSN-returning flush and compare watermarks — see
+FSN-returning flush and compare watermarks; see
 [FSN progress](#fsn-progress-non-blocking) below.
 
 :::
@@ -428,7 +427,7 @@ contiguous array plus a row count), set the designated timestamp, then flush.
 published so far.
 
 The `questdb_db` / `questdb::pool` is the only handle you share across threads;
-a borrowed sender belongs to the thread that took it — borrow one per worker
+a borrowed sender belongs to the thread that took it, so borrow one per worker
 (store-and-forward mode allows a single active borrower).
 
 ### C
@@ -522,9 +521,9 @@ int main()
 - **Reuse the chunk** across flushes: on a successful flush it is cleared but
   keeps its capacity; on failure it is left untouched.
 - All columns (and the timestamp) must share the same `row_count`. The chunk
-  **borrows** your arrays — they must outlive the flush.
+  **borrows** your arrays; they must outlive the flush.
 - **`flush` is not durability.** A successful `column_sender_flush` means the
-  frame was accepted by the local store-and-forward queue, which owns delivery —
+  frame was accepted by the local store-and-forward queue, which owns delivery,
   not that the server has ACKed it. `column_sender_wait` (C++ `conn.wait()`)
   only *observes* the ACK; it is a barrier, not a commit step. Publish many
   chunks, then `wait` once (`qwpws_ack_level_durable` waits for durable upload,
@@ -534,7 +533,7 @@ int main()
   it in the `borrowed_column_sender` destructor, and `drop_on_return()` forces
   a drop. The return path already retires conns that have latched a terminal
   error or whose pool has been closed, so plain return/destruction is correct for
-  healthy conns — reach for drop only after an error that may have left in-doubt
+  healthy conns. Drop only after an error that may have left in-doubt
   or uncommitted frames on the conn.
 
 ### Null values
@@ -558,13 +557,13 @@ questdb::ingress::validity_view validity{amount_valid, 3};
 chunk.column_f64("amount", amount, 3, &validity);
 ```
 
-The **designated timestamp is always non-null** per the QWP wire spec — the
+The **designated timestamp is always non-null** per the QWP wire spec: the
 timestamp setters take no validity parameter.
 
 ### Column setters
 
 The fixed-width scalar and temporal setters take
-`(chunk, name, name_len, data, row_count, validity, err_out)` in C — and the
+`(chunk, name, name_len, data, row_count, validity, err_out)` in C, and the
 same arguments minus `chunk`, `name_len`, and `err_out`, chained on
 `column_chunk`, in C++ (`name` is a `std::string_view`; errors throw). Three
 families take extra arguments:
@@ -609,8 +608,8 @@ timestamp as a column literally named `timestamp`. Query it back with
 
 ## Arrow ingestion
 
-If your data is already in Arrow — Arrow C++, PyArrow, polars, pandas, DuckDB,
-nanoarrow — skip the per-column setters and flush a whole `RecordBatch` through
+If your data is already in Arrow (Arrow C++, PyArrow, polars, pandas, DuckDB,
+nanoarrow), skip the per-column setters and flush a whole `RecordBatch` through
 the [Arrow C Data Interface](https://arrow.apache.org/docs/format/CDataInterface.html)
 (`ArrowArray` + `ArrowSchema`). One call encodes the batch, picks the
 designated timestamp from a named column, and publishes it as one logical
@@ -651,7 +650,7 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
 
 - The designated timestamp comes from the named `Timestamp(_)` column
   (`"ts"` above). `flush_arrow_batch_at_now` (explicit opt-in) lets the server
-  stamp arrival time instead — don't use it when the batch carries real event
+  stamp arrival time instead; don't use it when the batch carries real event
   time.
 - **Ownership**: on success `array->release` is consumed (set to `NULL`); the
   caller keeps `schema`. On failure check `array->release != NULL` before
@@ -678,29 +677,29 @@ single-thread; the pool it came from is the shared, thread-safe handle.
 
 Two ways to get a reader, mirroring the writer side:
 
-- **Pooled** — C++: `auto r = pool.borrow_reader();` returns a
+- **Pooled.** C++: `auto r = pool.borrow_reader();` returns a
   `questdb::egress::reader` that returns itself to the pool on scope exit (the
   **C++ example below** uses this). C:
   `reader* r = questdb_db_borrow_reader(db, &err);`, returned with
   `questdb_db_return_reader(db, r)` (or force-retired with
   `reader_drop_on_return(r)` / C++ `r.drop_on_return()`).
-- **Standalone** — a one-off connection: C `reader_from_conf(...)`, C++
+- **Standalone.** A one-off connection: C `reader_from_conf(...)`, C++
   `questdb::egress::reader{conf}`.
 
 The reader pool is capped independently of the sender pools. Both examples
-below borrow from the pool. One **C** wrinkle: `questdb_db_connect` lives in
+below borrow from the pool. In C, `questdb_db_connect` lives in
 `column_sender.h` and reports a `line_sender_error`, while every reader call
-uses the distinct `reader_error` — so the pooled C reader needs that one extra
-error type, but only for the `connect` call (shown inline below). For a
+uses the distinct `reader_error`, so the pooled C reader needs both error
+types (the extra one only for the `connect` call, shown inline below). For a
 pool-free reader, swap `questdb_db_connect` + `questdb_db_borrow_reader` for a
 single `reader_from_conf(conf, &err)`. In C++ both surface as exceptions, so
-`pool.borrow_reader()` is friction-free.
+`pool.borrow_reader()` needs no extra handling.
 
 :::warning Mid-stream query failover can duplicate rows
 
 If the connection fails over while a result set is streaming, the query
 restarts on the new endpoint and rows you already consumed are delivered
-again. Any query that feeds aggregation or writes must handle this — see the
+again. Any query that feeds aggregation or writes must handle this; see the
 [dedicated hazard section](/docs/connect/clients/c-and-cpp/#mid-stream-failover-hazard-duplicate-rows)
 of the main guide for detection and mitigation patterns.
 
@@ -860,7 +859,7 @@ The pool owns reconnection and connection health so borrowers don't have to:
   are terminal; `budget_ms == 0` makes a single attempt.
 - **Failover budget.** `questdb_db_reconnect_max_duration_ms(db)` (C++
   `pool::reconnect_max_duration_ms()`, default 300000 ms) is the pool's overall
-  reconnect budget — pass the remaining budget to the `_with_retry` calls when
+  reconnect budget. Pass the remaining budget to the `_with_retry` calls when
   tracking a deadline.
 - **Return vs. drop.** Returning a healthy borrow recycles its connection;
   dropping retires it and the next borrow opens a fresh one. The return path
@@ -883,8 +882,8 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | --- | --- | --- | --- |
 | `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
 | `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_*_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay on the next borrow. |
-| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe — the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
-| `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit — queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
+| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe; the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
+| `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
 | `invalid_api_call` | Borrow at `pool_max` cap, pool closed, or API misuse | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 When in doubt after an ingestion error: **return is always memory-safe** (the
@@ -895,24 +894,23 @@ and the next borrower must not commit them.
 ## Durability and backpressure {#durability-and-backpressure}
 
 The QWP/WebSocket writers are asynchronous: every flush **publishes** into a
-local queue that owns delivery, and returns before the server ACKs. The
-durability story in one place:
+local queue that owns delivery, and returns before the server ACKs.
 
-1. **`flush` = local acceptance.** Success means the frame is queued locally,
-   nothing more. The background runner delivers, receives ACKs, reconnects,
-   and replays as needed — even while the conn is parked in the pool.
+1. **`flush` = local acceptance.** Success means only that the frame is queued
+   locally. The background runner delivers, receives ACKs, reconnects,
+   and replays as needed, even while the conn is parked in the pool.
 2. **`wait` = observation.** `column_sender_wait` / `row_sender_wait`
    (C++ `wait()`) block until everything published so far reaches an ack
    level: `qwpws_ack_level_ok` (server accepted) or `qwpws_ack_level_durable`
-   (Enterprise: uploaded to object storage — distinguish "in the server's WAL"
-   from "durable off-box"). The timeout is a **no-progress deadline**: it fires
-   only if the watermark stops advancing; on timeout the frames stay queued —
-   call `wait` again or watch FSNs, don't re-flush.
+   (Enterprise: uploaded to object storage, not just in the server's WAL).
+   The timeout is a **no-progress deadline**: it fires
+   only if the watermark stops advancing; on timeout the frames stay queued.
+   Call `wait` again or watch FSNs; don't re-flush.
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
    `close_flush_timeout`. With `sf_dir`, frames persist on disk and **replay on
    the next borrow** (same `sender_id`), surviving process restarts. Strongly
-   recommended for multi-host deployments — during failover, flushes keep
+   recommended for multi-host deployments: during failover, flushes keep
    landing on disk instead of filling RAM.
 4. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
    unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
@@ -929,10 +927,10 @@ returns before the server ACKs. Beyond the blocking `wait` barrier, both senders
 expose **frame sequence numbers (FSNs)** for non-blocking progress tracking while
 the same borrow is still held:
 
-- Publish with an FSN-returning flush — C `column_sender_flush_and_get_fsn` /
+- Publish with an FSN-returning flush: C `column_sender_flush_and_get_fsn` /
   `row_sender_flush_and_get_fsn`; C++ `flush_and_get_fsn()` (returns
   `std::optional<uint64_t>`).
-- Keep doing work, then compare the saved FSN against the completion watermark —
+- Keep doing work, then compare the saved FSN against the completion watermark:
   C `column_sender_acked_fsn` / `row_sender_acked_fsn`; C++ `acked_fsn()`. The
   publication boundary has completed once `acked_fsn` returns a value `>=` your
   saved FSN.
@@ -942,8 +940,8 @@ portable receipts you can check through a later, unrelated pool borrow.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
-The pool is the **only** thread-safe handle. Every borrowed handle — sender,
-reader, chunk, buffer — belongs to the thread that took it. The recommended
+The pool is the **only** thread-safe handle. Every borrowed handle (sender,
+reader, chunk, buffer) belongs to the thread that took it. The recommended
 pattern: share the pool, give each worker its own borrow for its lifetime, and
 size `pool_max` to the worker count.
 
@@ -993,12 +991,12 @@ int main()
 Notes:
 
 - Do **not** pass a borrowed sender between threads mid-borrow, even with your
-  own locking — return it and borrow again on the other thread.
+  own locking. Return it and borrow again on the other thread.
 - Chunks and buffers are also single-thread, but you may **build** a chunk on
   one thread and flush it through a sender borrowed on another, as long as the
   handoff is ordered (e.g. via a queue) and only one thread touches it at a
   time.
-- Store-and-forward mode is single-borrower by design — use one dedicated
+- Store-and-forward mode is single-borrower by design; use one dedicated
   writer thread for the SF column sender.
 
 ## Closing
@@ -1006,7 +1004,7 @@ Notes:
 Orderly shutdown is: **wait, return, close.**
 
 1. If you need delivery confirmation, call `wait` on each sender first (or
-   check FSN watermarks) — pool close only drains best-effort within
+   check FSN watermarks); pool close only drains best-effort within
    `close_flush_timeout` on an in-memory queue. With `sf_dir`, unacked frames
    survive on disk regardless and replay on the next run.
 2. Return or drop every borrow. In C++, scope exit does this.
@@ -1017,19 +1015,18 @@ Orderly shutdown is: **wait, return, close.**
 Outstanding borrows are **independent leases**: returning or dropping them
 after close is safe (they close instead of recycling), but new operations on
 them fail with `invalid_api_call`. Return and drop remain **mutually
-exclusive** per handle — exactly one, exactly once; a second release call on
+exclusive** per handle (exactly one, exactly once); a second release call on
 the same handle is undefined behavior.
 
-There is **no `must_close()` inspection call** — earlier drafts of this API had
-one, and it's gone deliberately. The return path itself detects a
+There is **no `must_close()` inspection call**: earlier drafts of this API had
+one and it was removed deliberately. The return path detects a
 terminally-latched connection and retires it; you only ever choose between
 plain return and force-drop.
 
 ## Production shape: TLS, token, multi-host, retry
 
-Everything above, combined the way a production deployment looks — TLS with OS
-roots, bearer token, two endpoints, store-and-forward spool, and a
-retry-bounded borrow:
+A production-shaped configuration: TLS with OS roots, bearer token, two
+endpoints, a store-and-forward spool, and a retry-bounded borrow:
 
 ```cpp
 #include <questdb/ingress/column_sender.hpp>
