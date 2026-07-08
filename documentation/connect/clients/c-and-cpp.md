@@ -19,7 +19,11 @@ The client lives at
 [questdb/c-questdb-client](https://github.com/questdb/c-questdb-client): one
 `questdb_client` library that serves both languages, since the C++ API is
 header-only wrappers over the C ABI. It needs C11 for the C API and C++17 or
-newer for the C++ API. The fastest integration is CMake `FetchContent`; pin a
+newer for the C++ API, plus a [Rust toolchain](https://rustup.rs/): the
+library core is implemented in Rust and is compiled from source (without it,
+CMake fails with `rustc not found in PATH`). The first build takes a few
+minutes while the Rust core and its dependencies compile; later builds hit
+the cache. The fastest integration is CMake `FetchContent`; pin a
 release tag or commit SHA for production builds:
 
 ```cmake
