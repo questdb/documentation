@@ -144,9 +144,9 @@ CREATE TABLE sensors (
 
 #### Storage policy clause
 
-When a [storage policy](/docs/concepts/storage-policy/) is attached to a table
-(Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in the
-`SHOW CREATE TABLE` output:
+When an active [storage policy](/docs/concepts/storage-policy/) is attached to a
+table (Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in
+the `SHOW CREATE TABLE` output:
 
 ```questdb-sql
 SHOW CREATE TABLE sensor_data;
@@ -160,9 +160,9 @@ CREATE TABLE 'sensor_data' (
 STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
 ```
 
-Stages that are not configured on the policy are omitted from the clause. A
-disabled policy (`ALTER TABLE ... DISABLE STORAGE POLICY`) still renders — the
-disabled state is not part of the DDL. See
+Stages that are not configured on the policy are omitted from the clause. Only
+an active policy renders: after `ALTER TABLE ... DISABLE STORAGE POLICY`, the
+policy is not shown in `SHOW CREATE TABLE`. See
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
 
 #### Enterprise variant

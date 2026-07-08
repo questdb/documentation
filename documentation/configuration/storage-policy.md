@@ -9,16 +9,17 @@ Storage policy is [Enterprise](/enterprise/) only.
 
 :::
 
-Storage policies automate partition lifecycle management, including local
-deletion and cold storage offloading. These settings control the scan interval,
-retry behavior, and worker threads for the storage policy engine.
+Storage policies automate partition lifecycle management: they convert older
+partitions to Parquet locally and drop local copies on a schedule. These
+settings control the scan interval, retry behavior, and worker threads for the
+storage policy engine.
 
 For details, see the
 [storage policy concept](/docs/concepts/storage-policy/) page.
 
 ## storage.policy.check.interval
 
-- **Default**: `15m`
+- **Default**: `5m`
 - **Reloadable**: no
 
 How often QuestDB scans for partitions to process.
@@ -47,10 +48,31 @@ CPU affinity for each storage policy worker thread (comma-separated list).
 
 ## storage.policy.worker.count
 
-- **Default**: `2`
+- **Default**: `4`
 - **Reloadable**: no
 
 Number of storage policy worker threads. Setting to `0` disables the feature.
+
+## storage.policy.worker.haltOnError
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Whether a storage policy worker thread halts when it hits an unhandled error.
+
+## storage.policy.worker.nap.threshold
+
+- **Default**: `100`
+- **Reloadable**: no
+
+Number of idle worker-loop iterations before a storage policy worker naps.
+
+## storage.policy.worker.sleep.threshold
+
+- **Default**: `500`
+- **Reloadable**: no
+
+Number of idle worker-loop iterations before a storage policy worker sleeps.
 
 ## storage.policy.worker.sleep.timeout
 
@@ -59,9 +81,9 @@ Number of storage policy worker threads. Setting to `0` disables the feature.
 
 Sleep duration when a storage policy worker has no tasks to process.
 
-## storage.policy.writer.wait.timeout
+## storage.policy.worker.yield.threshold
 
-- **Default**: `30s`
+- **Default**: `10`
 - **Reloadable**: no
 
-Timeout for acquiring the table writer during storage policy operations.
+Number of idle worker-loop iterations before a storage policy worker yields.
