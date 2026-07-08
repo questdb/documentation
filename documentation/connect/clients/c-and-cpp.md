@@ -5,6 +5,9 @@ sidebar_label: C & C++
 description: "QuestDB C and C++ client: the questdb_db / questdb::pool connection pool for column-major, row-major, and Arrow ingestion plus the query reader, with authentication, failover, and durability guidance, over QWP/WebSocket."
 ---
 
+import Tabs from "@theme/Tabs"
+import TabItem from "@theme/TabItem"
+
 The C and C++ clients ingest and query over
 [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), a columnar binary
 protocol carried over WebSocket. The pool is the entry point for both ingesting
@@ -17,7 +20,8 @@ read it back: the common "insert and query" path. For bulk/columnar and Arrow
 ingestion, see [The pool](#the-pool) and
 [Sending data: column-major](#sending-data-column-major).
 
-### C++
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
 #include <questdb/ingress/column_sender.hpp>  // pool + row sender
@@ -57,7 +61,8 @@ int main()
 }
 ```
 
-### C
+</TabItem>
+<TabItem value="c" label="C">
 
 ```c
 #include <questdb/ingress/column_sender.h>   // pool + row_sender
@@ -159,6 +164,9 @@ on_reader_error:;
 }
 ```
 
+</TabItem>
+</Tabs>
+
 ## The pool
 
 `questdb_db` (C) / `questdb::pool` (C++) is a thread-safe handle that owns a set
@@ -201,25 +209,44 @@ server-side.
 
 Writing pulls in the sender headers; querying adds the reader header.
 
-```c
-#include <questdb/ingress/column_sender.h>   // C: pool + column-major + row-major senders
-#include <questdb/ingress/line_sender.h>      // C: line_sender_buffer (row building)
-#include <questdb/egress/reader.h>            // C: query reader
-```
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp> // C++: questdb::pool + senders
-#include <questdb/egress/reader.hpp>         // C++: questdb::egress::reader (+ pool::borrow_reader)
+#include <questdb/ingress/column_sender.hpp> // questdb::pool + senders
+#include <questdb/egress/reader.hpp>         // questdb::egress::reader (+ pool::borrow_reader)
 ```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + column-major + row-major senders
+#include <questdb/ingress/line_sender.h>      // line_sender_buffer (row building)
+#include <questdb/egress/reader.h>            // query reader
+```
+
+</TabItem>
+</Tabs>
 
 ## Connecting
 
 The connect string uses a QWP/WebSocket scheme: `ws` / `wss` (or the `qwpws` /
 `qwpwss` aliases). For auth and TLS keys, see the
 [connect string reference](/docs/connect/clients/connect-string/). The pool is
-**lazy**: `questdb_db_connect` parses and validates the string but opens no
-connection, so auth / TLS / connect errors surface from the first borrow, not
-from `connect`.
+**lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
+parse and validate the string but open no connection, so auth / TLS / connect
+errors surface from the first borrow, not at construction.
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+questdb::pool pool{"ws::addr=localhost:9000;"};   // alias of questdb::ingress::pool
+```
+
+</TabItem>
+<TabItem value="c" label="C">
 
 ```c
 line_sender_error* err = NULL;
@@ -227,9 +254,8 @@ questdb_db* db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
 if (!db) { /* read err, handle */ }
 ```
 
-```cpp
-questdb::pool pool{"ws::addr=localhost:9000;"};   // alias of questdb::ingress::pool
-```
+</TabItem>
+</Tabs>
 
 ### Pool keys
 
@@ -313,7 +339,42 @@ the only buffer a `row_sender` accepts. The row sender uses a single error type
 The pool is the shared handle; a borrowed row sender is single-thread, so borrow
 one per worker.
 
-### C
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/line_sender.hpp>
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        questdb::pool pool{"ws::addr=localhost:9000;"};
+        auto sender = pool.borrow_row_sender();   // borrowed_row_sender (RAII)
+
+        auto buffer = sender.new_buffer();        // protocol-matched buffer
+        buffer.table("trades"_tn)
+              .symbol("symbol"_cn, "ETH-USD"_utf8)
+              .column("price"_cn, 2615.54)
+              .at(questdb::ingress::timestamp_nanos::now());
+
+        sender.flush(buffer);   // borrowed_row_sender::flush(line_sender_buffer&)
+        return 0;
+    }
+    catch (const questdb::ingress::line_sender_error& e)
+    {
+        std::cerr << "error: " << e.what() << "\n";
+        return 1;
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
 
 ```c
 #include <questdb/ingress/column_sender.h>   // pool + row_sender
@@ -360,38 +421,8 @@ on_error:;
 }
 ```
 
-### C++
-
-```cpp
-#include <questdb/ingress/column_sender.hpp>
-#include <questdb/ingress/line_sender.hpp>
-#include <iostream>
-
-using namespace questdb::ingress::literals;
-
-int main()
-{
-    try
-    {
-        questdb::pool pool{"ws::addr=localhost:9000;"};
-        auto sender = pool.borrow_row_sender();   // borrowed_row_sender (RAII)
-
-        auto buffer = sender.new_buffer();        // protocol-matched buffer
-        buffer.table("trades"_tn)
-              .symbol("symbol"_cn, "ETH-USD"_utf8)
-              .column("price"_cn, 2615.54)
-              .at(questdb::ingress::timestamp_nanos::now());
-
-        sender.flush(buffer);   // borrowed_row_sender::flush(line_sender_buffer&)
-        return 0;
-    }
-    catch (const questdb::ingress::line_sender_error& e)
-    {
-        std::cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-}
-```
+</TabItem>
+</Tabs>
 
 :::caution No auto-flush
 
@@ -425,7 +456,44 @@ The `questdb_db` / `questdb::pool` is the only handle you share across threads;
 a borrowed sender belongs to the thread that took it, so borrow one per worker
 (store-and-forward mode allows a single active borrower).
 
-### C
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+#include <questdb/ingress/column_sender.hpp>
+#include <iostream>
+
+int main()
+{
+    try
+    {
+        questdb::pool pool{"ws::addr=localhost:9000;"};
+        auto conn = pool.borrow_column_sender();   // RAII: returns to pool on scope exit
+
+        double price[]  = {2615.54, 2616.00, 2617.25};
+        double amount[] = {0.00044, 0.00050, 0.00021};
+        int64_t ts_ns[] = {1700000000000000000, 1700000000001000000, 1700000000002000000};
+        size_t n = 3;
+
+        questdb::ingress::column_chunk chunk{"trades"};
+        chunk.column_f64("price", price, n)
+             .column_f64("amount", amount, n)
+             .at_nanos(ts_ns, n);
+
+        conn.flush(chunk);   // publish into the store-and-forward queue
+        conn.wait();         // ack barrier (qwpws_ack_level::ok, waits indefinitely)
+        return 0;
+    }
+    catch (const questdb::ingress::line_sender_error& e)
+    {
+        std::cerr << "error: " << e.what() << "\n";
+        return 1;
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
 
 ```c
 #include <questdb/ingress/column_sender.h>
@@ -476,40 +544,8 @@ on_error:;
 }
 ```
 
-### C++
-
-```cpp
-#include <questdb/ingress/column_sender.hpp>
-#include <iostream>
-
-int main()
-{
-    try
-    {
-        questdb::pool pool{"ws::addr=localhost:9000;"};
-        auto conn = pool.borrow_column_sender();   // RAII: returns to pool on scope exit
-
-        double price[]  = {2615.54, 2616.00, 2617.25};
-        double amount[] = {0.00044, 0.00050, 0.00021};
-        int64_t ts_ns[] = {1700000000000000000, 1700000000001000000, 1700000000002000000};
-        size_t n = 3;
-
-        questdb::ingress::column_chunk chunk{"trades"};
-        chunk.column_f64("price", price, n)
-             .column_f64("amount", amount, n)
-             .at_nanos(ts_ns, n);
-
-        conn.flush(chunk);   // publish into the store-and-forward queue
-        conn.wait();         // ack barrier (qwpws_ack_level::ok, waits indefinitely)
-        return 0;
-    }
-    catch (const questdb::ingress::line_sender_error& e)
-    {
-        std::cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-}
-```
+</TabItem>
+</Tabs>
 
 ### Notes
 
@@ -537,6 +573,19 @@ Column-major nulls use an Arrow-shape validity bitmap: bit = 1 means **valid**,
 LSB-first, one bit per row. Null rows' data slots are ignored (any value works).
 Pass `NULL` (C) / omit the argument (C++) for a column with no nulls.
 
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+double amount[] = {0.00044, 0.0, 0.00021};       // row 1 is null; slot ignored
+uint8_t amount_valid[] = {0x05};                 // 0b101: rows 0 and 2 valid
+questdb::ingress::validity_view validity{amount_valid, 3};
+chunk.column_f64("amount", amount, 3, &validity);
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
 ```c
 double amount[] = {0.00044, 0.0, 0.00021};       // row 1 is null; slot ignored
 uint8_t amount_valid[] = {0x05};                 // 0b101: rows 0 and 2 valid
@@ -545,12 +594,8 @@ if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, 3, &validity, &e
     goto on_error;
 ```
 
-```cpp
-double amount[] = {0.00044, 0.0, 0.00021};       // row 1 is null; slot ignored
-uint8_t amount_valid[] = {0x05};                 // 0b101: rows 0 and 2 valid
-questdb::ingress::validity_view validity{amount_valid, 3};
-chunk.column_f64("amount", amount, 3, &validity);
-```
+</TabItem>
+</Tabs>
 
 The **designated timestamp is always non-null** per the QWP wire spec: the
 timestamp setters take no validity parameter.
@@ -611,6 +656,9 @@ designated timestamp from a named column, and publishes it as one logical
 batch. Requires a build with `QUESTDB_CLIENT_ENABLE_ARROW` (CMake option
 `QUESTDB_ENABLE_ARROW`).
 
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
 ```cpp
 using namespace questdb::ingress::literals;
 
@@ -624,6 +672,9 @@ void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
     conn.wait();                                      // ack barrier
 }
 ```
+
+</TabItem>
+<TabItem value="c" label="C">
 
 ```c
 // `array` + `schema` from any Arrow C Data Interface producer.
@@ -642,6 +693,9 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
     return ok;
 }
 ```
+
+</TabItem>
+</Tabs>
 
 - The designated timestamp comes from the named `Timestamp(_)` column
   (`"ts"` above). `flush_arrow_batch_at_now` (explicit opt-in) lets the server
@@ -673,22 +727,16 @@ single-thread; the pool it came from is the shared, thread-safe handle.
 Two ways to get a reader, mirroring the writer side:
 
 - **Pooled.** C++: `auto r = pool.borrow_reader();` returns a
-  `questdb::egress::reader` that returns itself to the pool on scope exit (the
-  **C++ example below** uses this). C:
+  `questdb::egress::reader` that returns itself to the pool on scope exit
+  (shown in the C++ tab of the example below). C:
   `reader* r = questdb_db_borrow_reader(db, &err);`, returned with
   `questdb_db_return_reader(db, r)` (or force-retired with
   `reader_drop_on_return(r)` / C++ `r.drop_on_return()`).
 - **Standalone.** A one-off connection: C `reader_from_conf(...)`, C++
   `questdb::egress::reader{conf}`.
 
-The reader pool is capped independently of the sender pools. Both examples
-below borrow from the pool. In C, `questdb_db_connect` lives in
-`column_sender.h` and reports a `line_sender_error`, while every reader call
-uses the distinct `reader_error`, so the pooled C reader needs both error
-types (the extra one only for the `connect` call, shown inline below). For a
-pool-free reader, swap `questdb_db_connect` + `questdb_db_borrow_reader` for a
-single `reader_from_conf(conf, &err)`. In C++ both surface as exceptions, so
-`pool.borrow_reader()` needs no extra handling.
+The reader pool is capped independently of the sender pools. The examples in
+both tabs borrow from the pool.
 
 :::warning Mid-stream query failover can duplicate rows
 
@@ -714,7 +762,67 @@ yet, so there is nothing to duplicate.
 
 :::
 
-### C
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+#include <questdb/egress/reader.hpp>   // also pulls in questdb::pool
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main()
+{
+    try
+    {
+        questdb::pool pool{"ws::addr=localhost:9000;"};
+        auto reader = pool.borrow_reader();   // RAII: returns to the pool on scope exit
+        auto cur = reader.execute("SELECT x AS n, x * 1.5 AS d FROM long_sequence(5)"_utf8);
+
+        while (auto bo = cur.next_batch())
+        {
+            auto& batch = *bo;
+            for (size_t r = 0; r < batch.row_count(); ++r)
+            {
+                for (size_t c = 0; c < batch.column_count(); ++c)
+                {
+                    auto col = batch.column(c);
+                    if (col.kind() == questdb::egress::column_kind::double_)
+                    {
+                        auto v = col.get<double>(r);             // std::optional-like
+                        std::cout << (v ? std::to_string(*v) : "NULL") << " ";
+                    }
+                    else if (col.kind() == questdb::egress::column_kind::long_)
+                    {
+                        auto v = col.get<int64_t>(r);
+                        std::cout << (v ? std::to_string(*v) : "NULL") << " ";
+                    }
+                }
+                std::cout << "\n";
+            }
+        }
+        return 0;
+    }
+    // The pool ctor throws questdb::ingress::line_sender_error; reader/query
+    // calls throw questdb::egress::reader_error. Both derive from
+    // std::exception, so one catch covers the pooled path.
+    catch (const std::exception& e)
+    {
+        std::cerr << "error: " << e.what() << "\n";
+        return 1;
+    }
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+The pooled C reader needs both error types: `questdb_db_connect` lives in
+`column_sender.h` and reports a `line_sender_error`, while every reader call
+uses the distinct `reader_error` (the extra type is needed only for the
+`connect` call, shown in the example). For a pool-free reader, swap
+`questdb_db_connect` + `questdb_db_borrow_reader` for a single
+`reader_from_conf(conf, &err)`.
 
 ```c
 #include <questdb/ingress/column_sender.h>   // questdb_db pool + questdb_db_connect
@@ -798,60 +906,13 @@ Read values with the `static inline reader_column_data_get_*` accessors; each
 takes `(&col, row, &is_null)`. Dispatch on `col.kind` (`reader_column_kind`) to
 pick the right accessor.
 
-### C++
+</TabItem>
+</Tabs>
 
-```cpp
-#include <questdb/egress/reader.hpp>   // also pulls in questdb::pool
-#include <iostream>
-
-using namespace questdb::ingress::literals;
-
-int main()
-{
-    try
-    {
-        questdb::pool pool{"ws::addr=localhost:9000;"};
-        auto reader = pool.borrow_reader();   // RAII: returns to the pool on scope exit
-        auto cur = reader.execute("SELECT x AS n, x * 1.5 AS d FROM long_sequence(5)"_utf8);
-
-        while (auto bo = cur.next_batch())
-        {
-            auto& batch = *bo;
-            for (size_t r = 0; r < batch.row_count(); ++r)
-            {
-                for (size_t c = 0; c < batch.column_count(); ++c)
-                {
-                    auto col = batch.column(c);
-                    if (col.kind() == questdb::egress::column_kind::double_)
-                    {
-                        auto v = col.get<double>(r);             // std::optional-like
-                        std::cout << (v ? std::to_string(*v) : "NULL") << " ";
-                    }
-                    else if (col.kind() == questdb::egress::column_kind::long_)
-                    {
-                        auto v = col.get<int64_t>(r);
-                        std::cout << (v ? std::to_string(*v) : "NULL") << " ";
-                    }
-                }
-                std::cout << "\n";
-            }
-        }
-        return 0;
-    }
-    // The pool ctor throws questdb::ingress::line_sender_error; reader/query
-    // calls throw questdb::egress::reader_error. Both derive from
-    // std::exception, so one catch covers the pooled path.
-    catch (const std::exception& e)
-    {
-        std::cerr << "error: " << e.what() << "\n";
-        return 1;
-    }
-}
-```
-
-Use `reader.prepare(sql)` and chain `bind_*` for parameterised queries;
-`reader.execute(sql)` is the no-bind shortcut. The reader must outlive any
-cursor it produces.
+For parameterised queries, prepare then bind: C `reader_prepare` +
+`reader_query_bind_*` + `reader_query_execute`; C++ `reader.prepare(sql)`
+chained with `bind_*`, then `execute()`. Plain `execute(sql)` is the no-bind
+shortcut. The reader must outlive any cursor it produces.
 
 ## Failover, retry, and pool lifecycle
 
@@ -954,6 +1015,9 @@ reader, chunk, buffer) belongs to the thread that took it. The recommended
 pattern: share the pool, give each worker its own borrow for its lifetime, and
 size `pool_max` to the worker count.
 
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
 ```cpp
 #include <questdb/ingress/column_sender.hpp>
 #include <thread>
@@ -997,6 +1061,81 @@ int main()
 }
 ```
 
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + row_sender
+#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <pthread.h>
+#include <stdio.h>
+
+static void* worker(void* arg)
+{
+    questdb_db* db = (questdb_db*)arg;
+    line_sender_error* err = NULL;
+    row_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+
+    /* One borrow per worker; lives for the worker's lifetime. */
+    sender = questdb_db_borrow_row_sender(db, &err);
+    if (!sender) goto on_error;
+    buffer = row_sender_new_buffer(sender, &err);
+    if (!buffer) goto on_error;
+
+    for (int i = 0; i < 100; ++i)
+    {
+        if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
+        if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+                                       QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+        if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
+        if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
+    }
+    if (!row_sender_flush(sender, buffer, &err)) goto on_error;
+    if (!row_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* ack barrier */
+
+    line_sender_buffer_free(buffer);
+    questdb_db_return_row_sender(db, sender);
+    return NULL;
+
+on_error:;
+    size_t len = 0;
+    const char* msg = line_sender_error_msg(err, &len);
+    fprintf(stderr, "worker: %.*s\n", (int)len, msg);
+    line_sender_error_free(err);
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_drop_row_sender(db, sender);
+    return NULL;
+}
+
+int main(void)
+{
+    line_sender_error* err = NULL;
+    /* pool_max bounds each borrow kind: size it to the worker count. */
+    questdb_db* db = questdb_db_connect("ws::addr=localhost:9000;pool_max=4;", 35, &err);
+    if (!db)
+    {
+        size_t len = 0;
+        const char* msg = line_sender_error_msg(err, &len);
+        fprintf(stderr, "connect: %.*s\n", (int)len, msg);
+        line_sender_error_free(err);
+        return 1;
+    }
+
+    pthread_t workers[4];
+    for (int w = 0; w < 4; ++w)
+        pthread_create(&workers[w], NULL, worker, db);
+    for (int w = 0; w < 4; ++w)
+        pthread_join(workers[w], NULL);
+
+    questdb_db_close(db);
+    return 0;
+}
+```
+
+</TabItem>
+</Tabs>
+
 Notes:
 
 - Do **not** pass a borrowed sender between threads mid-borrow, even with your
@@ -1037,6 +1176,9 @@ plain return and force-drop.
 A production-shaped configuration: TLS with OS roots, bearer token, two
 endpoints, a store-and-forward spool, and a retry-bounded borrow:
 
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
 ```cpp
 #include <questdb/ingress/column_sender.hpp>
 #include <iostream>
@@ -1075,6 +1217,68 @@ int main()
     }
 }
 ```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + row_sender
+#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <stdio.h>
+#include <string.h>
+
+int main(void)
+{
+    line_sender_error* err = NULL;
+    questdb_db* db = NULL;
+    row_sender* sender = NULL;
+    line_sender_buffer* buffer = NULL;
+
+    const char* conf =
+        "wss::addr=db-primary.example.com:9000,db-replica.example.com:9000;"
+        "token=YOUR_BEARER_TOKEN;"
+        "tls_ca=os_roots;"
+        "sf_dir=/var/spool/questdb;"
+        "sender_id=ingest-01;";
+    db = questdb_db_connect(conf, strlen(conf), &err);
+    if (!db) goto on_error;
+
+    /* First borrow opens the connection: give it the failover budget. */
+    sender = questdb_db_borrow_row_sender_with_retry(
+        db, questdb_db_reconnect_max_duration_ms(db), &err);
+    if (!sender) goto on_error;
+
+    buffer = row_sender_new_buffer(sender, &err);
+    if (!buffer) goto on_error;
+    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+                                   QDB_UTF8_LITERAL("ETH-USD"), &err)) goto on_error;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
+
+    /* flush lands in the sf_dir spool; the durable wait is Enterprise. */
+    if (!row_sender_flush(sender, buffer, &err)) goto on_error;
+    if (!row_sender_wait(sender, qwpws_ack_level_durable, 0, &err)) goto on_error;
+
+    line_sender_buffer_free(buffer);
+    questdb_db_return_row_sender(db, sender);
+    questdb_db_close(db);
+    return 0;
+
+on_error:;
+    size_t len = 0;
+    const char* msg = line_sender_error_msg(err, &len);
+    fprintf(stderr, "error: %.*s\n", (int)len, msg);
+    line_sender_error_free(err);
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_drop_row_sender(db, sender);
+    questdb_db_close(db);
+    return 1;
+}
+```
+
+</TabItem>
+</Tabs>
 
 ## Conventions and lifecycle
 
