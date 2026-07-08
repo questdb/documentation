@@ -315,7 +315,7 @@ Create `d`, `x` & `y` tokens for client usage.
 - `jq`: For pretty JSON output.
 
 <Tabs defaultValue="macos" values={[ { label: "macOS", value: "macos" },
-{ label: "Debian", value: "debian" }, { label: "Ubuntu", value: "ubuntu" }, ]}>
+{ label: "Debian", value: "debian" }, { label: "Ubuntu", value: "ubuntu" }, { label: "RHEL", value: "rhel" }, ]}>
 
 <TabItem value="macos">
 
@@ -329,8 +329,8 @@ brew install jq
 <TabItem value="debian">
 
 ```bash
-yum install jose
-yum install jq
+apt install jose
+apt install jq
 ```
 
 </TabItem>
@@ -340,6 +340,15 @@ yum install jq
 ```bash
 apt install jose
 apt install jq
+```
+
+</TabItem>
+
+<TabItem value="rhel">
+
+```bash
+dnf install jose
+dnf install jq
 ```
 
 </TabItem>
