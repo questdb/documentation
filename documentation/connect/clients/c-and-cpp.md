@@ -65,8 +65,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + row_sender
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <questdb/ingress/column_sender.h>   // pool + row_sender + line_sender_buffer
 #include <questdb/egress/reader.h>            // reader
 #include <stdio.h>
 
@@ -207,7 +206,8 @@ server-side.
 
 ## Headers
 
-Writing pulls in the sender headers; querying adds the reader header.
+One header covers all writing (it pulls in the row-buffer API for you);
+querying adds the reader header.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -221,8 +221,7 @@ Writing pulls in the sender headers; querying adds the reader header.
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + column-major + row-major senders
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer (row building)
+#include <questdb/ingress/column_sender.h>   // pool + senders + line_sender_buffer
 #include <questdb/egress/reader.h>            // query reader
 ```
 
@@ -344,7 +343,6 @@ one per worker.
 
 ```cpp
 #include <questdb/ingress/column_sender.hpp>
-#include <questdb/ingress/line_sender.hpp>
 #include <iostream>
 
 using namespace questdb::ingress::literals;
@@ -377,8 +375,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + row_sender
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <questdb/ingress/column_sender.h>   // pool + row_sender + line_sender_buffer
 #include <stdio.h>
 
 int main(void)
@@ -1065,8 +1062,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + row_sender
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <questdb/ingress/column_sender.h>   // pool + row_sender + line_sender_buffer
 #include <pthread.h>
 #include <stdio.h>
 
@@ -1222,8 +1218,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + row_sender
-#include <questdb/ingress/line_sender.h>      // line_sender_buffer
+#include <questdb/ingress/column_sender.h>   // pool + row_sender + line_sender_buffer
 #include <stdio.h>
 #include <string.h>
 
