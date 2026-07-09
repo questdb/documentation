@@ -1016,28 +1016,30 @@ The QWP/WebSocket writers are asynchronous: every flush **publishes** into a
 local queue that owns delivery, and returns before the server ACKs.
 
 1. **`flush` = local acceptance.** Success means only that the frame is queued
-   locally. The background runner delivers, receives ACKs, reconnects,
-   and replays as needed, even while the conn is parked in the pool.
+   locally. All communication with the QuestDB server happens on the
+   **background runner**: it delivers frames, receives ACKs, reconnects, and
+   replays as needed, even while the conn is parked in the pool.
 2. **`wait` = observation.** `column_sender_wait` / `row_sender_wait`
-   (C++ `wait()`) block until everything published so far reaches an ack
-   level: `qwpws_ack_level_ok` (server accepted) or `qwpws_ack_level_durable`
-   (Enterprise: uploaded to object storage, not just in the server's WAL).
-   The durable level takes effect only when the pool was opened with
-   `request_durable_ack=on` (Enterprise with replication; against a server
-   that cannot provide it, the connect fails with `protocol_version_error`).
-   Without that key, a durable `wait` silently behaves like `ok`, while
-   `flush_and_wait` at the durable level fails up front with
-   `invalid_api_call` before touching the buffer or chunk. See the
-   protocol page's
-   [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
-   section. Neither level means the rows are already **visible to queries**: visibility
-   follows WAL apply, typically within milliseconds, so a query issued right
-   after the ack can miss the newest rows. An empty read-back is not data
-   loss. The timeout is a **no-progress deadline**: it fires
-   only if the watermark stops advancing; on timeout the frames stay queued.
-   Call `wait` again or watch FSNs; don't re-flush. `wait` takes the deadline
-   per call (`0` = none); `flush_and_wait` uses the pool-wide
-   `request_timeout` (default 30000 ms).
+   (C++ `wait()`) block until everything published so far is acknowledged.
+   - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
+     frames. `qwpws_ack_level_durable` additionally waits until they are
+     uploaded to object storage, not just in the server's WAL (Enterprise
+     with replication; see the protocol page's
+     [durable acknowledgement](/docs/connect/wire-protocols/qwp-ingress-websocket/#durable-acknowledgement)
+     section). Durable acks must be requested at pool open with
+     `request_durable_ack=on`; the connect fails with
+     `protocol_version_error` when the server cannot provide them, and
+     without the key any durable-level `wait` or `flush_and_wait` fails up
+     front with `invalid_api_call`, leaving the buffer or chunk untouched.
+   - **Ack is not visibility.** Rows become visible to queries after WAL
+     apply, typically within milliseconds of the ack, so a query issued
+     right after the ack can miss the newest rows. An empty read-back is
+     not data loss.
+   - **The timeout is a no-progress deadline.** It fires only if the ack
+     watermark stops advancing. On timeout the frames stay queued: call
+     `wait` again or watch FSNs; don't re-flush. `wait` takes its deadline
+     per call (`0` = none); `flush_and_wait` uses the pool-wide
+     `request_timeout` (default 30000 ms).
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist
