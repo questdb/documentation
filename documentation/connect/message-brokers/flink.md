@@ -11,7 +11,7 @@ import InterpolateReleaseData from "../../../src/components/InterpolateReleaseDa
 import CodeBlock from "@theme/CodeBlock"
 
 [Apache Flink](https://flink.apache.org/) is a popular framework and
-[stream processing](/glossary/stream-processing) engine. QuestDB ships a
+[stream processing](/glossary/stream-processing/) engine. QuestDB ships a
 [QuestDB Flink Sink connector](https://github.com/questdb/flink-questdb-connector)
 for fast ingestion from Apache Flink into QuestDB. The connector implements the
 [Table API and SQL](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/overview/)

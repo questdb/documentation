@@ -1,6 +1,6 @@
 ---
 slug: /connect/clients/date-to-timestamp-conversion
-title: Date to Timestamp Conversion in Different Programming Languages
+title: Date-to-timestamp conversion by language
 sidebar_label: Date to Timestamp
 description:
   How to convert language-native date/time values into QuestDB timestamp
@@ -393,4 +393,3 @@ echo "Timestamp (microseconds): " . $timestamp_precise . PHP_EOL;
 ```
 
 Learn more about the [ILP text format](/docs/connect/compatibility/ilp/advanced-settings/).
-

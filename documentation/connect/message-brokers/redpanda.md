@@ -11,7 +11,7 @@ description:
 platform that uses C++ and Raft to replace Java and Zookeeper. Since it is Kafka
 compatible, it can be used with the
 [QuestDB Kafka connector](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector),
-providing an alternative data [streaming](/glossary/stream-processing) option.
+providing an alternative data [streaming](/glossary/stream-processing/) option.
 
 This guide also covers [Redpanda Connect](#redpanda-connect), a stream processing
 tool that can be used to build data pipelines.

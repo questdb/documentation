@@ -479,16 +479,16 @@ too — on a schedule you define. This supersedes plain TTL in Enterprise, where
 ### Migrating from TTL when upgrading from OSS
 
 Tables that were created in OSS keep their existing `TTL` setting after you
-upgrade to Enterprise — no data is lost at upgrade time. However, Enterprise
-rejects any **new** `TTL` changes on tables (both `CREATE TABLE ... TTL` and
-`ALTER TABLE SET TTL <non-zero>`) with:
+upgrade to Enterprise — no data is lost at upgrade time. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is then rejected with:
 
 ```
-TTL settings are deprecated, please, create a storage policy instead
+TTL is not supported on Enterprise tables; use a storage policy instead
 ```
 
-Materialized views are not affected: they continue to use `TTL` for retention
-in Enterprise.
+(`CREATE TABLE ... TTL` is still accepted for backward compatibility: Enterprise
+translates it into a `STORAGE POLICY(DROP LOCAL ...)`.) Materialized views are
+not affected: they continue to use `TTL` for retention in Enterprise.
 
 To move a legacy table from `TTL` to a storage policy:
 

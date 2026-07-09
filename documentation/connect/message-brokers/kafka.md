@@ -646,7 +646,7 @@ Use Debezium's `ExtractNewRecordState` transformation to extract the new record
 state. DELETE events are dropped by default.
 
 See the [Debezium sample project](https://github.com/questdb/kafka-questdb-connector/tree/main/kafka-questdb-connector-samples/stocks)
-and the blog post [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium).
+and the blog post [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium/).
 
 **Typical pattern:** Use a relational database for current state and QuestDB
 for change history. For example, PostgreSQL holds current stock prices while
@@ -693,5 +693,5 @@ key.converter.schemas.enable=false
 
 ## See also
 
-- [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium)
-- [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector)
+- [Change Data Capture with QuestDB and Debezium](/blog/2023/01/03/change-data-capture-with-questdb-and-debezium/)
+- [Realtime crypto tracker with QuestDB Kafka Connector](/blog/realtime-crypto-tracker-with-questdb-kafka-connector/)
