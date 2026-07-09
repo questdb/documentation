@@ -143,7 +143,7 @@ incrementally in a single forward pass over a partitioned frame:
 - **Cumulative and bounded aggregates**: `sum`, `avg`, `count`, `min`, `max`,
   `ksum`, `first_value`, `last_value`, `nth_value`
 - **Offset**: `lag`
-- **Statistics**: `variance`, `stddev`, covariance, correlation, and EWMA
+- **Statistics**: `variance`, `stddev`, covariance, correlation, EMA, and VWEMA
 
 Every window function must have a `PARTITION BY` clause. Both bounded `ROWS` and
 bounded `RANGE` frames are supported.
