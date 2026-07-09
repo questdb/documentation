@@ -665,7 +665,8 @@ the [Arrow C Data Interface](https://arrow.apache.org/docs/format/CDataInterface
 (`ArrowArray` + `ArrowSchema`). One call encodes the batch, picks the
 designated timestamp from a named column, and publishes it as one logical
 batch. Requires a build with `QUESTDB_CLIENT_ENABLE_ARROW` (CMake option
-`QUESTDB_ENABLE_ARROW`).
+`QUESTDB_ENABLE_ARROW`). For the read direction, see
+[Arrow result batches](#arrow-result-batches).
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -945,7 +946,7 @@ querying **does** have NULL binds. There are **no array binds**: `double[]` /
 their NULL forms) compile but fail at execute with
 `reader_error_invalid_bind` on current servers.
 
-### Arrow result batches
+## Arrow result batches
 
 Instead of reading cell-by-cell, export each result batch as an
 [Arrow C Data Interface](https://arrow.apache.org/docs/format/CDataInterface.html)
