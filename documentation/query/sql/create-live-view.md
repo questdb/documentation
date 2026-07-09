@@ -29,8 +29,8 @@ Where:
   [window functions](/docs/query/functions/window-functions/overview/).
 
 `FLUSH EVERY` is required and must come first. `IN MEMORY`, `PARTITION BY`, and
-`BACKFILL` are optional and may appear in any order. All view-level clauses
-precede `AS`.
+`BACKFILL` are optional and may appear in any order. These four clauses all
+precede `AS`; the optional `OWNED BY` clause follows the query.
 
 ## Parameters
 
@@ -170,7 +170,8 @@ The view query is validated at creation time and must:
   maintained incrementally (see
   [supported functions](/docs/concepts/live-views/#supported-window-functions)).
 - Give every window function a `PARTITION BY` clause.
-- Not use `SAMPLE BY`, `GROUP BY`, `ORDER BY`, or `LIMIT` in the view query.
+- Not use `SAMPLE BY`, `GROUP BY`, a top-level `ORDER BY`, or `LIMIT` in the view
+  query. The `ORDER BY` inside a window's `OVER (...)` is required and allowed.
 - Not use non-deterministic functions such as `now()`, `sysdate()`,
   `systimestamp()`, or `rnd_*()`.
 - Not read another live view.
@@ -267,6 +268,14 @@ OWNED BY analysts;
 | `live view base table must have a designated timestamp` | The base table has no designated timestamp |
 | `non-deterministic function cannot be used in materialized view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
 | `permission denied` | Missing required permission (Enterprise) |
+
+:::note
+
+The non-determinism check is the same guard materialized views use, so its error
+message names "materialized view" even when it is raised for a live view. The
+rule and its effect are identical for both view types.
+
+:::
 
 ## See also
 

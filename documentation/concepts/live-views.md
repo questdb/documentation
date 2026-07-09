@@ -37,7 +37,7 @@ serve different query shapes:
 | Output cardinality | One row per base row | One row per time bucket |
 | Typical use | Running totals, moving averages, rankings | OHLC bars, downsampled summaries |
 | Base tables | A single WAL-backed table | One or more tables (JOINs allowed) |
-| Freshness control | `FLUSH EVERY`, `IN MEMORY` | `REFRESH` strategy |
+| Freshness / durability | `FLUSH EVERY`, `IN MEMORY` | `REFRESH` strategy |
 
 Use a materialized view when you want to aggregate rows into time buckets. Use a
 live view when you want to keep a row-per-input result of a window computation.
@@ -78,12 +78,15 @@ FROM trades;
 Query it like any table:
 
 ```questdb-sql title="Query the live view"
-SELECT * FROM trades_ma
-WHERE timestamp IN '$today';
+SELECT * FROM trades_ma;
 ```
 
 The view updates incrementally as new rows arrive in `trades`. Each new trade
-produces one output row carrying its moving average.
+produces one output row carrying its moving average. A direct `SELECT` of the
+full output rows sees data as soon as it is refreshed. Filtering a read to a
+timestamp interval (for example `WHERE timestamp IN '$today'`) is served from the
+disk tier and can trail by up to one `FLUSH EVERY` interval; see
+[Freshness](#freshness).
 
 ## How live views work
 
@@ -216,7 +219,7 @@ base columns its query references:
   the view keeps refreshing.
 - Dropping, renaming, or changing the type of a referenced column invalidates the
   view.
-- Renaming, dropping, or truncating the base table invalidates the view.
+- Renaming or dropping the base table invalidates the view.
 - `DROP PARTITION`, `TRUNCATE`, and base TTL eviction freeze the already-emitted
   rows and the view continues forward from where it was.
 
