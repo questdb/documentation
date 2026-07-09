@@ -590,10 +590,11 @@ to lift it for a trusted principal. A user who assumes a service account takes o
 the service account's limit. The cap applies to the principal's queries on both
 the primary and replicas.
 
-Materialized view refresh and WAL apply run under internal contexts rather than a
-principal, so they stay bounded only by their own
+`UPDATE`, materialized view refresh, and WAL apply run under internal contexts
+rather than a principal, so they stay bounded only by their own
 [workload limits](/docs/configuration/cairo-engine/#memory-limits) and never pick
-up a per-principal limit.
+up a per-principal limit. A large `UPDATE` is therefore not capped by a
+`SET MEMORY LIMIT` override.
 
 :::note
 
