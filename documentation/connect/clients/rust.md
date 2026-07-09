@@ -165,10 +165,14 @@ disables verification (testing only).
 `flush()` lands in a local durable queue instead of blocking on the server, and a
 background thread delivers it for you — reconnecting, rotating endpoints, and
 replaying as needed. By default the queue is in-memory; set `sf_dir` to make it
-**disk-backed**, so it survives a client restart. In disk-backed mode the column
-pool is single-borrower — an explicit `pool_size > 1` or `pool_max > 1` is
-rejected, and an omitted `pool_max` is treated as `1`. `sender_id` and the other
-`sf_*` keys require an explicit `sf_dir`.
+**disk-backed**, so it survives a client restart. In disk-backed mode the pool
+mints one slot per borrowed sender, kind-scoped as
+`<sf_dir>/<sender_id>-col-<index>/` and `<sf_dir>/<sender_id>-row-<index>/`,
+so `pool_size` / `pool_max` keep their normal per-kind meaning and a restarted
+pool re-adopts the same slots. `sender_id` is the slot base: give each pool
+sharing an `sf_dir` a unique base. The `sf_max_bytes` / `sf_max_total_bytes` /
+`sf_append_deadline_millis` keys tune the queue in both memory and disk mode;
+`sender_id` has no effect without `sf_dir`.
 
 :::
 

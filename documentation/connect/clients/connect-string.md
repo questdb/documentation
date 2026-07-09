@@ -443,6 +443,14 @@ equivalent — same architecture, no durability across restarts.
   digits, `_`, `-`. No path separators, no `.`, no spaces. Two senders
   sharing the same `sender_id` collide on the slot lock — the second one
   fails fast. Default: `default`.
+  For pooled senders (`questdb_db` / `questdb::pool` / Rust `QuestDb`),
+  `sender_id` is the slot **base** rather than a literal directory: the pool
+  mints kind-scoped per-slot directories `<sf_dir>/<sender_id>-col-<index>/`
+  and `<sf_dir>/<sender_id>-row-<index>/`, and the un-suffixed path applies
+  only to non-pooled senders. The minted names belong to that pool's
+  namespace, so pools sharing one `sf_dir` need distinct bases; the
+  slot-in-use error covers both cases (another process or pool holds the
+  slot).
 - `sf_durability` — disk durability mode. Currently only `memory` is
   shipping. (`flush` and `append` per-write fsync modes are planned.)
 - `sf_max_bytes` — per-segment rotation threshold. Must be ≥ the largest

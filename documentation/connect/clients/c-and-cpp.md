@@ -234,7 +234,7 @@ Match the borrow to the shape of your data:
 
 | You have | Borrow | Why |
 | --- | --- | --- |
-| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_column_sender`) | Whole columns are encoded in one pass, with no per-row assembly. The store-and-forward queue owns delivery. |
+| Columnar data already in arrays, Arrow batches, or DataFrames (bulk loads, backfills, ETL) | **Column-major** (`borrow_column_sender`) | Whole columns are encoded in one pass, with no per-row assembly. |
 | Events arriving one at a time (tickers, order flow, telemetry) | **Row-major** (`borrow_row_sender`) | Build rows field-by-field into a buffer, flush batches on your cadence. |
 | SQL to run: verification read-backs, dashboards, downsampling | **Reader** (`borrow_reader`) | Streams typed columnar batches with flow control. |
 
@@ -247,8 +247,11 @@ The connect string uses a QWP/WebSocket scheme: `ws` / `wss` (or the `qwpws` /
 `qwpwss` aliases). For auth and TLS keys, see the
 [connect string reference](/docs/connect/clients/connect-string/). The pool is
 **lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
-parse and validate the string but open no connection, so auth / TLS / connect
-errors surface from the first borrow, not at construction.
+parse and validate the string but perform no blocking network I/O, so auth /
+TLS / connect errors surface from the first borrow, not at construction. The
+one exception is disk-backed store-and-forward: connect may pre-open recovery
+senders for slots left dirty by a previous run, and their initial connect and
+replay run in the background.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -464,8 +467,7 @@ published so far. `flush_and_wait` combines the two for the simple
 synchronous path, shown below.
 
 The `questdb_db` / `questdb::pool` is the only handle you share across threads;
-a borrowed sender belongs to the thread that took it, so borrow one per worker
-(store-and-forward mode allows a single active borrower).
+a borrowed sender belongs to the thread that took it, so borrow one per worker.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -1038,10 +1040,12 @@ local queue that owns delivery, and returns before the server ACKs.
    `request_timeout` (default 30000 ms).
 3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
-   `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist on disk and **replay on
-   the next borrow** (same `sender_id`), surviving process restarts. Strongly
-   recommended for multi-host deployments: during failover, flushes keep
-   landing on disk instead of filling RAM.
+   `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist
+   in per-sender disk slots and **replay automatically** when a pool with the
+   same `sender_id` base reopens: connect pre-opens recovery senders for
+   dirty slots and replays them in the background, no borrow required.
+   Strongly recommended for multi-host deployments: during failover, flushes
+   keep landing on disk instead of filling RAM.
 4. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
    unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
    10 GiB disk mode). At a cap, `flush` blocks up to
@@ -1185,8 +1189,9 @@ Notes:
   one thread and flush it through a sender borrowed on another, as long as the
   handoff is ordered (e.g. via a queue) and only one thread touches it at a
   time.
-- Store-and-forward mode is single-borrower by design; use one dedicated
-  writer thread for the SF column sender.
+- Each borrowed sender owns its own store-and-forward queue (its own disk
+  slot when `sf_dir` is set), so this pattern applies unchanged in
+  store-and-forward mode.
 
 ## Failover, retry, and pool lifecycle
 
@@ -1231,7 +1236,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | Error code | Meaning | Borrow state | What to do |
 | --- | --- | --- | --- |
 | `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
-| `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_*_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay on the next borrow. |
+| `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_*_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe; the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
 | `invalid_api_call` | Borrow at `pool_max` cap, pool closed, or API misuse | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
@@ -1260,16 +1265,26 @@ sockets against that same reconnect cost. Pick `pool_reap=manual` when you
 want to control the shrink cadence yourself instead of running a background
 reaper thread; call `reap_idle` on your own schedule.
 
-Setting `sf_dir` opts the column sender into **store-and-forward** with on-disk
-durability. In store-and-forward mode the pool currently supports a **single
-active borrower**: an explicit `pool_size > 1` or `pool_max > 1` is rejected,
-and an omitted `pool_max` is treated as `1` for the column sender. `sender_id`
-and the other `sf_*` keys require an explicit `sf_dir`. `sender_id` names the
-on-disk slot (`<sf_dir>/<sender_id>/`, default `default`): keep it stable
-across restarts so replay finds the spool, and unique per producer sharing an
-`sf_dir`; a second process opening the same slot fails fast with a
-slot-in-use error instead of corrupting the spool. Full `sf_*` key semantics
-are in the
+Every borrowed sender, row or column, writes through a local
+**store-and-forward** queue. Without `sf_dir` the queue is in memory and
+private to the borrow; setting `sf_dir` switches it to an on-disk slot that
+survives process restarts. The pool mints one slot per borrow, kind-scoped:
+`<sf_dir>/<sender_id>-col-<index>/` and `<sf_dir>/<sender_id>-row-<index>/`,
+with stable lowest-free-first indices in `[0, pool_max)`, so a restarted pool
+re-adopts the same slots and replays their unacked frames. `pool_size` and
+`pool_max` keep their normal per-kind meaning in both modes.
+
+`sender_id` (default `default`) is the slot **base**, not a literal directory
+name: keep it stable across restarts so replay finds the slots, and give each
+pool sharing an `sf_dir` a unique base, because the `<sender_id>-col-*` /
+`<sender_id>-row-*` directories belong to that pool's namespace. A genuine
+collision (a second process, or two pools with the same base) fails fast with
+a slot-in-use error naming the holder pid instead of corrupting the spool. An
+un-suffixed `<sf_dir>/<sender_id>/` directory is not pool-managed; it is
+treated as an orphan and drained only with `drain_orphans=on`. The
+`sf_max_bytes`, `sf_max_total_bytes`, and `sf_append_deadline_millis` keys
+tune the queue in both memory and disk mode; `sender_id` has no effect
+without `sf_dir`. Full `sf_*` key semantics are in the
 [connect string reference](/docs/connect/clients/connect-string/#sf-keys).
 
 ### Sizing the pool
@@ -1277,7 +1292,10 @@ are in the
 **A borrow at the cap fails immediately; there is no blocking acquire.**
 When `pool_max` handles of one kind are already out, `questdb_db_borrow_*`
 returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws) rather
-than waiting for a return. Two consequences:
+than waiting for a return. The one exception is disk-backed
+store-and-forward: an at-cap borrow may wait up to
+`close_flush_timeout_millis` for a sender that is currently closing to
+release its slot before failing. Two consequences:
 
 - **Size `pool_max` to your worker count.** The natural pattern is one borrow
   per worker thread held for the worker's lifetime (see
@@ -1290,8 +1308,8 @@ than waiting for a return. Two consequences:
   exhaustion.
 
 Each borrow kind (column, row, reader) has its own `pool_max`-capped free
-list, so heavy ingestion cannot starve queries. The combined live-connection
-ceiling is `3 * pool_max`.
+list, so heavy ingestion cannot starve queries; budget up to `pool_max` live
+connections per kind.
 
 ## FSN progress (non-blocking) {#fsn-progress-non-blocking}
 
