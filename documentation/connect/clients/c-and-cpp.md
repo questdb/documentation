@@ -17,14 +17,11 @@ and querying data: borrow a sender to write rows, or a reader to execute SQL que
 
 The client lives at
 [questdb/c-questdb-client](https://github.com/questdb/c-questdb-client): one
-`questdb_client` library that serves both languages, since the C++ API is
-header-only wrappers over the C ABI. It needs C11 for the C API and C++17 or
-newer for the C++ API, plus a [Rust toolchain](https://rustup.rs/): the
-library core is implemented in Rust and is compiled from source (without it,
-CMake fails with `rustc not found in PATH`). The first build takes a few
-minutes while the Rust core and its dependencies compile; later builds hit
-the cache. The fastest integration is CMake `FetchContent`; pin a
-release tag or commit SHA for production builds:
+`questdb_client` library for both languages (the C++ API is header-only
+wrappers over the C ABI). Requirements: C11 (C API) or C++17 (C++ API), and a
+[Rust toolchain](https://rustup.rs/) to build the Rust core from source. The
+fastest integration is CMake `FetchContent`; pin a release tag or commit SHA
+for production builds:
 
 ```cmake
 include(FetchContent)
