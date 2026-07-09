@@ -18,6 +18,7 @@ SHOW { TABLES
      | PARTITIONS FROM tableName
      | CREATE TABLE tableName
      | CREATE VIEW viewName
+     | CREATE LIVE VIEW viewName
      | USER [userName]
      | USERS
      | GROUPS [userName]
@@ -36,6 +37,8 @@ SHOW { TABLES
 - `SHOW PARTITIONS` returns the partition information for the selected table.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
+- `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
+  view.
 - `SHOW USER` shows user secret (enterprise-only)
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
     (enterprise-only)
@@ -200,6 +203,21 @@ SHOW CREATE VIEW my_view;
 
 This returns the `CREATE VIEW` statement that would recreate the view,
 including any `DECLARE` parameters if the view is parameterized.
+
+### SHOW CREATE LIVE VIEW
+
+```questdb-sql title="retrieving live view ddl"
+SHOW CREATE LIVE VIEW trades_ma;
+```
+
+| ddl |
+| --- |
+| CREATE LIVE VIEW 'trades_ma' FLUSH EVERY 1s IN MEMORY 5s PARTITION BY DAY AS (<br/>SELECT timestamp, symbol, avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING) AS moving_avg FROM trades<br/>); |
+
+This returns the `CREATE LIVE VIEW` statement that would recreate the
+[live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
+`IN MEMORY`, `PARTITION BY`, and `BACKFILL` clauses. On QuestDB Enterprise the
+output also carries an `OWNED BY` clause identifying the view's owner.
 
 ### SHOW PARTITIONS
 

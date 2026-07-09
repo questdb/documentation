@@ -334,6 +334,7 @@ module.exports = {
                   id: "query/sql/acl/create-group",
                   type: "doc",
                         },
+                "query/sql/create-live-view",
                 "query/sql/create-mat-view",
                 {
                   id: "query/sql/acl/create-service-account",
@@ -355,6 +356,7 @@ module.exports = {
                   id: "query/sql/acl/drop-group",
                   type: "doc",
                         },
+                "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
                 {
                   id: "query/sql/acl/drop-service-account",
@@ -533,6 +535,11 @@ module.exports = {
               type: "doc",
               label: "Materialized Views",
             },
+            {
+              id: "concepts/live-views",
+              type: "doc",
+              label: "Live Views",
+            },
             "concepts/deduplication",
             "concepts/ttl",
             "concepts/storage-policy",
@@ -589,6 +596,7 @@ module.exports = {
         "configuration/http-server",
         "configuration/iam",
         "configuration/ingestion",
+        "configuration/live-views",
         "configuration/logging-metrics",
         "configuration/materialized-views",
         "configuration/http-min-server",
