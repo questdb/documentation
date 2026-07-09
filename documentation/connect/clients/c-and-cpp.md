@@ -38,7 +38,8 @@ target_link_libraries(your_target questdb_client)
   `QUESTDB_ENABLE_READER`, default `ON`). Ingestion-only builds can set it to
   `OFF` to drop the reader code paths and their `zstd` dependency; the saving
   is modest, so bother only when minimizing footprint.
-- [Arrow ingestion](#arrow-ingestion) is opt-in: build with
+- Arrow support ([ingestion](#arrow-ingestion) and
+  [result batches](#arrow-result-batches)) is opt-in: build with
   `-DQUESTDB_ENABLE_ARROW=ON`.
 - The library links statically by default; `-DBUILD_SHARED_LIBS=ON` builds a
   shared library instead. Outside CMake, add the repo's `include/` directory
@@ -943,6 +944,67 @@ querying **does** have NULL binds. There are **no array binds**: `double[]` /
 `long[]` appear only as result columns. `bind_binary` and `bind_ipv4` (and
 their NULL forms) compile but fail at execute with
 `reader_error_invalid_bind` on current servers.
+
+### Arrow result batches
+
+Instead of reading cell-by-cell, export each result batch as an
+[Arrow C Data Interface](https://arrow.apache.org/docs/format/CDataInterface.html)
+`ArrowArray` + `ArrowSchema` pair. This is the efficient path for large result
+sets, and a zero-copy handoff to polars, pandas, or DuckDB. It uses the same
+interface as [Arrow ingestion](#arrow-ingestion) and the same build flag
+(`QUESTDB_ENABLE_ARROW`).
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+// Requires a build with QUESTDB_CLIENT_ENABLE_ARROW.
+auto cur = reader.execute("SELECT symbol, price FROM trades"_utf8);
+while (auto batch = cur.next_arrow_batch())   // std::nullopt at end of stream
+{
+    // batch->array / batch->schema are an owned Arrow pair, independent of the
+    // cursor. Hand them to a consumer; ImportRecordBatch zeroes the slots.
+    auto rb = arrow::ImportRecordBatch(&batch->array, &batch->schema).ValueOrDie();
+    // ... use rb ...
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+/* Requires a build with QUESTDB_CLIENT_ENABLE_ARROW. */
+struct ArrowArray array;
+struct ArrowSchema schema;
+for (;;)
+{
+    // out slots must be uninitialised (zeroed or already-released) on each call
+    reader_arrow_batch_result rc =
+        reader_cursor_next_arrow_batch(cursor, &array, &schema, &err);
+    if (rc == reader_arrow_batch_end) break;
+    if (rc == reader_arrow_batch_error) goto on_error;
+    /* array + schema are now an owned Arrow pair: pass to a consumer, then
+       release whatever it did not take. */
+    if (array.release) array.release(&array);
+    if (schema.release) schema.release(&schema);
+}
+```
+
+</TabItem>
+</Tabs>
+
+- **Ownership.** On `_ok` the caller owns the batch's `release` callbacks. The
+  C++ `arrow_batch` frees them in its destructor unless you hand it off;
+  passing it to an Arrow consumer such as `arrow::ImportRecordBatch` consumes
+  and zeroes the slots. Each C call needs fresh out slots (zeroed, or whose
+  previous `release` already ran), otherwise it leaks the prior batch.
+- **Compact symbols (C).** `reader_cursor_next_arrow_batch_compact` emits each
+  `SYMBOL` column with only the dictionary values that batch references, under
+  batch-local codes: smaller batches when symbols are sparse.
+- **Schema drift.** If the table's schema changes mid-stream the call returns
+  `reader_error_schema_drift`; the cursor re-snapshots and re-delivers the
+  triggering batch under the new schema on the next call, so nothing is
+  dropped.
 
 ## Durability and backpressure {#durability-and-backpressure}
 
