@@ -39,6 +39,10 @@ ALTER SERVICE ACCOUNT serviceAccountName DROP TOKEN TYPE
     { JWK | REST [token] };
 ```
 
+```questdb-sql title="Set or clear memory limit"
+ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT { size | UNLIMITED };
+```
+
 ## Description
 
 - `ALTER SERVICE ACCOUNT serviceAccountName ENABLE` - enables service account.
@@ -56,6 +60,20 @@ ALTER SERVICE ACCOUNT serviceAccountName DROP TOKEN TYPE
   adds REST token to the service account.
 - `ALTER USER serviceAccountName DROP TOKEN TYPE REST token` - removes REST
   token from the service account.
+- `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT size` - caps the
+  native memory the service account's queries may allocate. `size` is a byte
+  count or a size with a `K`, `M`, or `G` suffix, such as `512M` or `2G`.
+- `ALTER SERVICE ACCOUNT serviceAccountName SET MEMORY LIMIT UNLIMITED` - removes
+  the limit. `SET MEMORY LIMIT 0` does the same.
+
+A user who assumes the service account runs under its memory limit. A set limit
+overrides the configured
+[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+workload limit — binding even when larger — and the workload limit applies only
+when the service account has none. Group limits are never merged into a service
+account. Setting it requires the `SET MEMORY LIMIT` permission. See
+[memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
+workload limits resolve.
 
 ## Examples
 
@@ -165,3 +183,15 @@ SHOW SERVICE ACCOUNT client_app;
 | Password   | true    |
 | JWK Token  | false   |
 | REST Token | false   |
+
+### Set memory limit
+
+```questdb-sql
+-- cap the service account's queries at 1 GiB of native memory
+ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT 1G;
+-- remove the limit
+ALTER SERVICE ACCOUNT ingest SET MEMORY LIMIT UNLIMITED;
+```
+
+The configured value can be verified with `SHOW SERVICE ACCOUNTS`, which reports
+it in the `memory_limit` column.

@@ -17,6 +17,8 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 For full documentation of the Access Control List and Role-based Access Control,
 see the [RBAC operations](/docs/security/rbac) page.
 
+---
+
 ## Syntax
 
 ```questdb-sql title="Enable / disable"
@@ -37,6 +39,10 @@ ALTER USER userName DROP TOKEN TYPE
     { JWK | REST [token] };
 ```
 
+```questdb-sql title="Set or clear memory limit"
+ALTER USER userName SET MEMORY LIMIT { size | UNLIMITED };
+```
+
 ## Description
 
 - `ALTER USER username ENABLE` - enables user account.
@@ -54,6 +60,19 @@ ALTER USER userName DROP TOKEN TYPE
   REST token to user account.
 - `ALTER USER username DROP TOKEN TYPE REST token` - removes REST token from
   user account.
+- `ALTER USER username SET MEMORY LIMIT size` - caps the native memory the
+  user's queries may allocate. `size` is a byte count or a size with a `K`, `M`,
+  or `G` suffix, such as `512M` or `2G`.
+- `ALTER USER username SET MEMORY LIMIT UNLIMITED` - removes the limit. `SET
+  MEMORY LIMIT 0` does the same.
+
+The limit applies to the user's queries on both the primary and replicas. A set
+limit takes priority over the user's groups and overrides the configured
+[`cairo.query.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits)
+workload limit, binding even when larger. Setting it requires the
+`SET MEMORY LIMIT` permission. See
+[memory limits](/docs/security/rbac/#memory-limits) for how per-principal and
+workload limits resolve.
 
 ## Examples
 
@@ -160,3 +179,15 @@ SHOW USER john;
 | Password   | true    |
 | JWK Token  | false   |
 | REST Token | false   |
+
+### Set memory limit
+
+```questdb-sql
+-- cap the user's queries at 512 MiB of native memory
+ALTER USER john SET MEMORY LIMIT 512M;
+-- remove the limit
+ALTER USER john SET MEMORY LIMIT UNLIMITED;
+```
+
+The configured value can be verified with `SHOW USERS`, which reports the
+effective limit in the `memory_limit` column.

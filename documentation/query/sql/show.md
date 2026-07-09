@@ -284,10 +284,15 @@ SHOW USER john;
 SHOW USERS;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| name  | enabled | memory_limit |
+| ----- | ------- | ------------ |
+| admin | true    | null         |
+| john  | true    | 536870912    |
+
+The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
+`null` when no limit applies. For a user it is the effective limit — its own
+limit, or, when it has none, the most restrictive of its groups'. See
+[memory limits](/docs/security/rbac/#memory-limits).
 
 ### SHOW GROUPS
 
@@ -295,15 +300,20 @@ SHOW USERS;
 SHOW GROUPS;
 ```
 
-or
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management | null           | null         |
+
+Filtering by a user lists the groups that user belongs to, without the
+`memory_limit` column:
 
 ```questdb-sql
 SHOW GROUPS john;
 ```
 
-| name       |
-| ---------- |
-| management |
+| name       | external_alias |
+| ---------- | -------------- |
+| management | null           |
 
 ### SHOW SERVICE ACCOUNT
 
@@ -329,26 +339,30 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| management | true    | null         |
+| svc1_admin | true    | null         |
+
+Filtering by a user or group instead lists the service accounts that principal
+can assume, with a `grant_option` column showing whether they may grant the
+assumption to others:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option |
+| ---------- | ------------ |
+| svc1_admin | false        |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option |
+| ---------- | ------------ |
+| svc1_admin | false        |
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 
