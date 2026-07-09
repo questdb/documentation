@@ -51,9 +51,10 @@ target_link_libraries(your_target questdb_client)
 ## Quick start
 
 Open a pool, borrow a **row sender** to write a row, then borrow a **reader** to
-read it back: the common "insert and query" path. The read-back pauses
-briefly because the flush ack confirms the server accepted the row, while
-visibility to queries follows within milliseconds (see
+read it back. This exercises both APIs in one runnable program; in production
+the ingestion and query paths are usually separate services that share only the
+table. The read-back pauses briefly because the flush ack confirms the server
+accepted the row, while visibility to queries follows within milliseconds (see
 [Durability and backpressure](#durability-and-backpressure)). For
 bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
 [Sending data: column-major](#sending-data-column-major).
