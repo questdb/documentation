@@ -226,20 +226,6 @@ connection) or **drop** it (retires it). In C++ the borrowed sender wrappers and
 the pooled reader return on destruction; `drop_on_return()` forces a drop. The
 pool connects lazily and handles reconnect and failover underneath.
 
-The pooled API at a glance:
-
-| Concern | C | C++ |
-| --- | --- | --- |
-| Connection pool | `questdb_db*` | `questdb::pool` |
-| Borrow a **column-major** writer | `questdb_db_borrow_column_sender` → `column_sender*` | `pool::borrow_column_sender()` → `borrowed_column_sender` |
-| Borrow a **row-major** writer | `questdb_db_borrow_row_sender` → `row_sender*` | `pool::borrow_row_sender()` → `borrowed_row_sender` |
-| Borrow a **reader** | `questdb_db_borrow_reader` → `reader*` | `pool::borrow_reader()` → `reader` |
-| Column batch | `column_sender_chunk*` | `questdb::ingress::column_chunk` |
-| Arrow batch flush | `column_sender_flush_arrow_batch_at_column` | `borrowed_column_sender::flush_arrow_batch()` |
-| One-call flush + ack barrier | `row_sender_flush_and_wait` / `column_sender_flush_and_wait` | `flush_and_wait()` on either sender |
-| Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
-| Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
-
 ### Which borrow?
 
 Match the borrow to the shape of your data:
@@ -252,30 +238,6 @@ Match the borrow to the shape of your data:
 
 Both senders may target the same tables; QuestDB unifies the schema
 server-side.
-
-## Headers
-
-One header covers all writing (it pulls in the row-buffer API for you);
-querying adds the reader header.
-
-<Tabs defaultValue="cpp" groupId="c-cpp">
-<TabItem value="cpp" label="C++">
-
-```cpp
-#include <questdb/ingress/column_sender.hpp> // questdb::pool + senders
-#include <questdb/egress/reader.hpp>         // questdb::egress::reader (+ pool::borrow_reader)
-```
-
-</TabItem>
-<TabItem value="c" label="C">
-
-```c
-#include <questdb/ingress/column_sender.h>   // pool + senders + line_sender_buffer
-#include <questdb/egress/reader.h>            // query reader
-```
-
-</TabItem>
-</Tabs>
 
 ## Connecting
 
@@ -304,58 +266,6 @@ if (!db) { /* read err, handle */ }
 
 </TabItem>
 </Tabs>
-
-### Pool keys
-
-The connect string also accepts pool-tuning keys; the defaults suit most
-callers.
-
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `pool_size` | 1 | Warm/minimum connections. The reaper keeps this many once connections have been opened. |
-| `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
-| `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
-| `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires `questdb_db_reap_idle` / `pool::reap_idle`. |
-
-When to change them: raise `pool_size` when workers borrow intermittently and
-a cold borrow after idle reaping would pay reconnect and auth latency; the
-reaper keeps that many connections warm. `pool_idle_timeout_ms` trades idle
-sockets against that same reconnect cost. Pick `pool_reap=manual` when you
-want to control the shrink cadence yourself instead of running a background
-reaper thread; call `reap_idle` on your own schedule.
-
-Setting `sf_dir` opts the column sender into **store-and-forward** with on-disk
-durability. In store-and-forward mode the pool currently supports a **single
-active borrower**: an explicit `pool_size > 1` or `pool_max > 1` is rejected,
-and an omitted `pool_max` is treated as `1` for the column sender. `sender_id`
-and the other `sf_*` keys require an explicit `sf_dir`. `sender_id` names the
-on-disk slot (`<sf_dir>/<sender_id>/`, default `default`): keep it stable
-across restarts so replay finds the spool, and unique per producer sharing an
-`sf_dir`; a second process opening the same slot fails fast with a
-slot-in-use error instead of corrupting the spool. Full `sf_*` key semantics
-are in the
-[connect string reference](/docs/connect/clients/connect-string/#sf-keys).
-
-### Sizing the pool
-
-**A borrow at the cap fails immediately; there is no blocking acquire.**
-When `pool_max` handles of one kind are already out, `questdb_db_borrow_*`
-returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws) rather
-than waiting for a return. Two consequences:
-
-- **Size `pool_max` to your worker count.** The natural pattern is one borrow
-  per worker thread held for the worker's lifetime (see
-  [Concurrency](#concurrency-one-borrow-per-worker)); then the cap is never
-  hit.
-- **If borrows are short-lived and demand can spike past the cap**, treat the
-  at-cap error as backpressure: return a borrow elsewhere, or retry after a
-  delay in your own loop. Don't confuse it with the connect-retry helpers;
-  `borrow_*_with_retry` retries *connection establishment*, not cap
-  exhaustion.
-
-Each borrow kind (column, row, reader) has its own `pool_max`-capped free
-list, so heavy ingestion cannot starve queries. The combined live-connection
-ceiling is `3 * pool_max`.
 
 ## Authentication and TLS
 
@@ -391,6 +301,30 @@ following are **not** supported:
 | OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
 | Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the pool and build a fresh one with the new token. |
+
+## Headers
+
+One header covers all writing (it pulls in the row-buffer API for you);
+querying adds the reader header.
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+#include <questdb/ingress/column_sender.hpp> // questdb::pool + senders
+#include <questdb/egress/reader.hpp>         // questdb::egress::reader (+ pool::borrow_reader)
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+#include <questdb/ingress/column_sender.h>   // pool + senders + line_sender_buffer
+#include <questdb/egress/reader.h>            // query reader
+```
+
+</TabItem>
+</Tabs>
 
 ## Sending data: row-major
 
@@ -1010,59 +944,6 @@ querying **does** have NULL binds. There are **no array binds**: `double[]` /
 their NULL forms) compile but fail at execute with
 `reader_error_invalid_bind` on current servers.
 
-## Failover, retry, and pool lifecycle
-
-The pool owns reconnection and connection health so borrowers don't have to:
-
-- **Multiple endpoints.** Comma-separate hosts in one `addr=` (or repeat the
-  key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The endpoints must be
-  replicas of one logical deployment
-  ([Enterprise replication](/docs/connect/wire-protocols/qwp-ingress-websocket/#failover-and-high-availability));
-  listing unrelated instances splits your data across them. The pool rotates
-  away from unhealthy endpoints on borrow and follows the writable primary on
-  a role reject. `target=` filters by role (e.g. `target=primary`); when
-  every reachable endpoint handshakes but none matches the filter, the borrow
-  fails with `role_mismatch` rather than a connect error.
-- **Retrying borrow.** `questdb_db_borrow_column_sender_with_retry(db,
-  budget_ms, &err)` and `questdb_db_borrow_row_sender_with_retry(...)` (C++
-  `pool::borrow_column_sender_with_retry(budget_ms)` /
-  `borrow_row_sender_with_retry(budget_ms)`) retry the connect within `budget_ms`
-  using the pool's reconnect backoff. Authentication and protocol-version errors
-  are terminal; `budget_ms == 0` makes a single attempt.
-- **Failover budget.** `questdb_db_reconnect_max_duration_ms(db)` (C++
-  `pool::reconnect_max_duration_ms()`, default 300000 ms) is the pool's overall
-  reconnect budget. Pass the remaining budget to the `_with_retry` calls when
-  tracking a deadline.
-- **Return vs. drop.** Returning a healthy borrow recycles its connection;
-  dropping retires it and the next borrow opens a fresh one. The return path
-  **already** drops any conn that latched a terminal error or whose pool has been
-  closed, so plain return/RAII destruction is the default. Use
-  `questdb_db_drop_*` / `drop_on_return()` only after an error where the next
-  borrower must not inherit the connection (or, for store-and-forward, must not
-  commit its in-doubt frames).
-- **Reaping.** With `pool_reap=auto` a background reaper closes idle connections
-  above `pool_size` after `pool_idle_timeout_ms`. With `pool_reap=manual`, call
-  `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`), which returns the number
-  of connections it closed.
-
-### Which errors mean what {#which-errors-mean-what}
-
-Dispatch on `line_sender_error_get_code(err)` (C++
-`e.code()`). What to do with the borrow after each class:
-
-| Error code | Meaning | Borrow state | What to do |
-| --- | --- | --- | --- |
-| `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
-| `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_*_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay on the next borrow. |
-| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe; the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
-| `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
-| `invalid_api_call` | Borrow at `pool_max` cap, pool closed, or API misuse | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
-
-When in doubt after an ingestion error: **return is always memory-safe** (the
-pool inspects the conn and retires it if unhealthy); **drop** is the
-conservative choice when the error left frames whose fate you can't determine
-and the next borrower must not commit them.
-
 ## Durability and backpressure {#durability-and-backpressure}
 
 The QWP/WebSocket writers are asynchronous: every flush **publishes** into a
@@ -1104,24 +985,6 @@ local queue that owns delivery, and returns before the server ACKs.
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
    single payload larger than `sf_max_bytes` (default 4 MiB) is rejected
    immediately instead.
-
-## FSN progress (non-blocking) {#fsn-progress-non-blocking}
-
-Every QWP/WebSocket flush is asynchronous: it publishes into the local queue and
-returns before the server ACKs. Beyond the blocking `wait` barrier, both senders
-expose **frame sequence numbers (FSNs)** for non-blocking progress tracking while
-the same borrow is still held:
-
-- Publish with an FSN-returning flush: C `column_sender_flush_and_get_fsn` /
-  `row_sender_flush_and_get_fsn`; C++ `flush_and_get_fsn()` (returns
-  `std::optional<uint64_t>`).
-- Keep doing work, then compare the saved FSN against the completion watermark:
-  C `column_sender_acked_fsn` / `row_sender_acked_fsn`; C++ `acked_fsn()`. The
-  publication boundary has completed once `acked_fsn` returns a value `>=` your
-  saved FSN.
-
-FSNs are per-stream watermarks for the **currently borrowed** sender, not
-portable receipts you can check through a later, unrelated pool borrow.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
@@ -1260,6 +1123,129 @@ Notes:
   time.
 - Store-and-forward mode is single-borrower by design; use one dedicated
   writer thread for the SF column sender.
+
+## Failover, retry, and pool lifecycle
+
+The pool owns reconnection and connection health so borrowers don't have to:
+
+- **Multiple endpoints.** Comma-separate hosts in one `addr=` (or repeat the
+  key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The endpoints must be
+  replicas of one logical deployment
+  ([Enterprise replication](/docs/connect/wire-protocols/qwp-ingress-websocket/#failover-and-high-availability));
+  listing unrelated instances splits your data across them. The pool rotates
+  away from unhealthy endpoints on borrow and follows the writable primary on
+  a role reject. `target=` filters by role (e.g. `target=primary`); when
+  every reachable endpoint handshakes but none matches the filter, the borrow
+  fails with `role_mismatch` rather than a connect error.
+- **Retrying borrow.** `questdb_db_borrow_column_sender_with_retry(db,
+  budget_ms, &err)` and `questdb_db_borrow_row_sender_with_retry(...)` (C++
+  `pool::borrow_column_sender_with_retry(budget_ms)` /
+  `borrow_row_sender_with_retry(budget_ms)`) retry the connect within `budget_ms`
+  using the pool's reconnect backoff. Authentication and protocol-version errors
+  are terminal; `budget_ms == 0` makes a single attempt.
+- **Failover budget.** `questdb_db_reconnect_max_duration_ms(db)` (C++
+  `pool::reconnect_max_duration_ms()`, default 300000 ms) is the pool's overall
+  reconnect budget. Pass the remaining budget to the `_with_retry` calls when
+  tracking a deadline.
+- **Return vs. drop.** Returning a healthy borrow recycles its connection;
+  dropping retires it and the next borrow opens a fresh one. The return path
+  **already** drops any conn that latched a terminal error or whose pool has been
+  closed, so plain return/RAII destruction is the default. Use
+  `questdb_db_drop_*` / `drop_on_return()` only after an error where the next
+  borrower must not inherit the connection (or, for store-and-forward, must not
+  commit its in-doubt frames).
+- **Reaping.** With `pool_reap=auto` a background reaper closes idle connections
+  above `pool_size` after `pool_idle_timeout_ms`. With `pool_reap=manual`, call
+  `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`), which returns the number
+  of connections it closed.
+
+### Which errors mean what {#which-errors-mean-what}
+
+Dispatch on `line_sender_error_get_code(err)` (C++
+`e.code()`). What to do with the borrow after each class:
+
+| Error code | Meaning | Borrow state | What to do |
+| --- | --- | --- | --- |
+| `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
+| `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_*_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay on the next borrow. |
+| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe; the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
+| `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
+| `invalid_api_call` | Borrow at `pool_max` cap, pool closed, or API misuse | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
+
+When in doubt after an ingestion error: **return is always memory-safe** (the
+pool inspects the conn and retires it if unhealthy); **drop** is the
+conservative choice when the error left frames whose fate you can't determine
+and the next borrower must not commit them.
+
+### Pool keys
+
+The connect string accepts pool-tuning keys; the defaults suit most
+callers.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `pool_size` | 1 | Warm/minimum connections. The reaper keeps this many once connections have been opened. |
+| `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
+| `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
+| `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires `questdb_db_reap_idle` / `pool::reap_idle`. |
+
+When to change them: raise `pool_size` when workers borrow intermittently and
+a cold borrow after idle reaping would pay reconnect and auth latency; the
+reaper keeps that many connections warm. `pool_idle_timeout_ms` trades idle
+sockets against that same reconnect cost. Pick `pool_reap=manual` when you
+want to control the shrink cadence yourself instead of running a background
+reaper thread; call `reap_idle` on your own schedule.
+
+Setting `sf_dir` opts the column sender into **store-and-forward** with on-disk
+durability. In store-and-forward mode the pool currently supports a **single
+active borrower**: an explicit `pool_size > 1` or `pool_max > 1` is rejected,
+and an omitted `pool_max` is treated as `1` for the column sender. `sender_id`
+and the other `sf_*` keys require an explicit `sf_dir`. `sender_id` names the
+on-disk slot (`<sf_dir>/<sender_id>/`, default `default`): keep it stable
+across restarts so replay finds the spool, and unique per producer sharing an
+`sf_dir`; a second process opening the same slot fails fast with a
+slot-in-use error instead of corrupting the spool. Full `sf_*` key semantics
+are in the
+[connect string reference](/docs/connect/clients/connect-string/#sf-keys).
+
+### Sizing the pool
+
+**A borrow at the cap fails immediately; there is no blocking acquire.**
+When `pool_max` handles of one kind are already out, `questdb_db_borrow_*`
+returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws) rather
+than waiting for a return. Two consequences:
+
+- **Size `pool_max` to your worker count.** The natural pattern is one borrow
+  per worker thread held for the worker's lifetime (see
+  [Concurrency](#concurrency-one-borrow-per-worker)); then the cap is never
+  hit.
+- **If borrows are short-lived and demand can spike past the cap**, treat the
+  at-cap error as backpressure: return a borrow elsewhere, or retry after a
+  delay in your own loop. Don't confuse it with the connect-retry helpers;
+  `borrow_*_with_retry` retries *connection establishment*, not cap
+  exhaustion.
+
+Each borrow kind (column, row, reader) has its own `pool_max`-capped free
+list, so heavy ingestion cannot starve queries. The combined live-connection
+ceiling is `3 * pool_max`.
+
+## FSN progress (non-blocking) {#fsn-progress-non-blocking}
+
+Every QWP/WebSocket flush is asynchronous: it publishes into the local queue and
+returns before the server ACKs. Beyond the blocking `wait` barrier, both senders
+expose **frame sequence numbers (FSNs)** for non-blocking progress tracking while
+the same borrow is still held:
+
+- Publish with an FSN-returning flush: C `column_sender_flush_and_get_fsn` /
+  `row_sender_flush_and_get_fsn`; C++ `flush_and_get_fsn()` (returns
+  `std::optional<uint64_t>`).
+- Keep doing work, then compare the saved FSN against the completion watermark:
+  C `column_sender_acked_fsn` / `row_sender_acked_fsn`; C++ `acked_fsn()`. The
+  publication boundary has completed once `acked_fsn` returns a value `>=` your
+  saved FSN.
+
+FSNs are per-stream watermarks for the **currently borrowed** sender, not
+portable receipts you can check through a later, unrelated pool borrow.
 
 ## Closing
 
@@ -1401,6 +1387,22 @@ on_error:;
 
 </TabItem>
 </Tabs>
+
+## API at a glance
+
+The pooled surface in both languages:
+
+| Concern | C | C++ |
+| --- | --- | --- |
+| Connection pool | `questdb_db*` | `questdb::pool` |
+| Borrow a **column-major** writer | `questdb_db_borrow_column_sender` → `column_sender*` | `pool::borrow_column_sender()` → `borrowed_column_sender` |
+| Borrow a **row-major** writer | `questdb_db_borrow_row_sender` → `row_sender*` | `pool::borrow_row_sender()` → `borrowed_row_sender` |
+| Borrow a **reader** | `questdb_db_borrow_reader` → `reader*` | `pool::borrow_reader()` → `reader` |
+| Column batch | `column_sender_chunk*` | `questdb::ingress::column_chunk` |
+| Arrow batch flush | `column_sender_flush_arrow_batch_at_column` | `borrowed_column_sender::flush_arrow_batch()` |
+| One-call flush + ack barrier | `row_sender_flush_and_wait` / `column_sender_flush_and_wait` | `flush_and_wait()` on either sender |
+| Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
+| Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
 
 ## Conventions and lifecycle
 
