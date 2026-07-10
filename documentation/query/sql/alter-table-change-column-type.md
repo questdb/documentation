@@ -130,6 +130,40 @@ result in `NULL` values for inconvertable string values.
 When column type change results into range overflow or precision loss, the same
 rules as explicit [CAST](/docs/query/sql/cast/) apply.
 
+## Parquet partitions
+
+`ALTER TABLE ... ALTER COLUMN ... TYPE` works on tables that contain
+[Parquet partitions](/docs/query/export-parquet/#in-place-conversion). Reads
+return the converted values on every query, matching the behaviour of native
+partitions exactly, including `NULL` sentinels, `BYTE`/`SHORT`/`CHAR` column
+tops, date and timestamp scaling, and UTF-16/UTF-8 text transcoding.
+
+By default the conversion is **lazy**: the Parquet partitions are not rewritten
+by the `ALTER`. The type change is recorded in the table metadata and applied on
+the query path, where each Parquet row group is decoded once and buffered for
+the rows that follow. This keeps the `ALTER` cheap regardless of how much data
+is stored as Parquet.
+
+An [out-of-order (O3)](/docs/concepts/out-of-order-data/) write that later lands
+on a converted Parquet partition rewrites that partition with the new type,
+materialising the conversion permanently for that partition.
+
+:::note Eager conversions
+
+Some conversions cannot be applied lazily. In these cases QuestDB first converts
+the affected Parquet partitions back to native format, one rewrite per affected
+partition, before applying the type change:
+
+- Conversions where the source or target type is `SYMBOL`.
+- Chained conversions where the on-disk Parquet type no longer matches the
+  current column metadata, for example a second type change on a column that was
+  already converted lazily.
+
+Unlike the metadata-only lazy path, these partition rewrites carry an I/O cost
+proportional to the amount of Parquet data in the affected partitions.
+
+:::
+
 ## Unsupported Conversions
 
 Converting from the type to itself is not supported.
