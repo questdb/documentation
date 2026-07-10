@@ -112,8 +112,7 @@ that matches your ingestion and query latency budget.
 
 ## Connecting
 
-Use `ws` for plain WebSocket or `wss` for TLS. `qwpws` and `qwpwss` are
-accepted aliases:
+Use `ws` for plain WebSocket or `wss` for TLS:
 
 ```rust
 use questdb::QuestDb;

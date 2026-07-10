@@ -241,8 +241,8 @@ server-side.
 
 ## Connecting
 
-The connect string uses a QWP/WebSocket scheme: `ws` / `wss` (or the `qwpws` /
-`qwpwss` aliases). For auth and TLS keys, see the
+The connect string uses a QWP/WebSocket scheme: `ws` / `wss`. For auth and TLS
+keys, see the
 [connect string reference](/docs/connect/clients/connect-string/). The pool is
 **lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
 parse and validate the string but perform no blocking network I/O, so auth /
