@@ -651,8 +651,7 @@ Reader failover has a separate policy:
 | `failover_backoff_max_ms` | `1000` | Retry-delay ceiling. |
 
 A mid-query failover restarts the query from the beginning. To opt in, install
-`on_failover_reset` or `on_failover_progress` and discard any rows retained
-from the failed attempt:
+`on_failover_reset` and discard any rows retained from the failed attempt:
 
 ```rust
 let mut cursor = reader
@@ -669,10 +668,11 @@ let mut cursor = reader
     .execute()?;
 ```
 
-Without a failover callback, a mid-stream transport failure returns an error
-instead of silently repeating rows. Callbacks run synchronously while the
-cursor is being driven; keep them short and do not call back into the same
-reader or cursor.
+Without an `on_failover_reset` callback, a mid-stream failure after the first
+delivered batch returns `ErrorCode::FailoverWouldDuplicate` instead of silently
+repeating rows. The `on_failover_progress` callback is telemetry-only and does
+not authorize replay. Callbacks run synchronously while the cursor is being
+driven; keep them short and do not call back into the same reader or cursor.
 
 ## Closing
 
