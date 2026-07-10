@@ -34,10 +34,8 @@ FetchContent_MakeAvailable(c_questdb_client_proj)
 target_link_libraries(your_target questdb_client)
 ```
 
-- The query reader is compiled in by default (CMake option
-  `QUESTDB_ENABLE_READER`, default `ON`). Ingestion-only builds can set it to
-  `OFF` to drop the reader code paths and their `zstd` dependency; the saving
-  is modest, so bother only when minimizing footprint.
+- The query reader and its `zstd` dependency are always compiled into the C
+  and C++ library. There is no reader feature toggle.
 - Arrow support ([ingestion](#arrow-ingestion) and
   [result batches](#arrow-result-batches)) is opt-in: build with
   `-DQUESTDB_ENABLE_ARROW=ON`.

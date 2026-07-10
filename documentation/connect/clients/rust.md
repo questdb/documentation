@@ -12,12 +12,17 @@ return its connection to the pool.
 
 ## Quick start
 
-Add the client with the query feature enabled:
+Add the client:
 
-```toml title="Cargo.toml"
+```text title="Cargo.toml"
 [dependencies]
-questdb-rs = { version = "7", features = ["sync-reader-qwp-ws"] }
+questdb-rs = "7"
 ```
+
+The default features enable both directions: `sync-sender` for ILP/TCP,
+ILP/HTTP, and pooled QWP/WebSocket ingestion, and `sync-reader` for
+QWP/WebSocket queries with Zstandard result decompression. They also enable
+bundled TLS roots and the `ring` cryptography backend.
 
 The following program writes one uniquely marked row through a pooled row
 sender, waits for the server to accept it, then polls for query visibility:
@@ -105,56 +110,6 @@ and a bind parameter so it cannot accidentally report an older row. In
 production, poll for the application condition you need and choose a timeout
 that matches your ingestion and query latency budget.
 
-### Feature guide
-
-Writing works with the default crate features. Enable only the integrations
-your application uses:
-
-| Feature | Default | Use it for |
-| --- | --- | --- |
-| `sync-sender` | Yes | The pool and its row-major and column-major QWP/WebSocket writers. It also enables the standalone ILP/TCP and ILP/HTTP senders. |
-| `sync-reader-qwp-ws` | No | `Reader` and `Cursor`. Pooled `QuestDb::borrow_reader()` also requires `sync-sender-qwp-ws`, which the default features enable. |
-| `sync-reader-zstd` | No | Zstandard-compressed query result batches. |
-| `arrow-ingress` / `arrow-egress` | No | Arrow ingestion / Arrow query results. The `arrow` feature enables both. |
-| `polars-ingress` / `polars-egress` | No | Polars ingestion / Polars query results. The `polars` feature enables both. |
-| `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
-| `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
-| `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
-| `tls-native-certs` | No | TLS validation through the operating-system certificate store. |
-| `insecure-skip-verify` | No | `tls_verify=unsafe_off` for controlled testing only. |
-
-The deprecated aliases `sync-reader-ws`, `compression-zstd`, and
-`chrono_timestamp` still compile in version 7. Prefer the names above.
-
-If you disable default features, also enable exactly one crypto backend
-(`ring-crypto` or `aws-lc-crypto`) and at least one TLS root source
-(`tls-webpki-certs` or `tls-native-certs`). The method tables below name the
-feature that gates each API, not the complete no-default-features set.
-
-## The pool
-
-`QuestDb` owns reusable QWP/WebSocket connections. Create one pool per
-application or service process and share it across workers.
-
-### Choose a borrow
-
-Match the borrow to the shape of the work:
-
-| You have | Use | Why |
-| --- | --- | --- |
-| Events arriving one at a time | `borrow_row_sender()` | Build rows field by field and flush them in batches. |
-| Data already stored in column arrays | `borrow_column_sender()` | Encode whole columns without assembling rows. |
-| An Arrow `RecordBatch` or Polars `DataFrame` | `flush_arrow_batch()` or `flush_polars_dataframe()` | Let the pool own the direct sender, commit boundary, and return path. |
-| SQL to execute | `borrow_reader()` | Stream typed columnar result batches with binds and flow control. |
-
-Both writer borrows use store-and-forward queues. The pool-level Arrow and
-Polars helpers use a separate direct connection pool and block for an ACK.
-
-All borrowed handles return to their respective pools on `Drop`. A connection
-that has already latched a terminal error is retired automatically. Use
-`drop_on_return()` when your application deliberately abandons a backend and
-does not want it recycled.
-
 ## Connecting
 
 Use `ws` for plain WebSocket or `wss` for TLS. `qwpws` and `qwpwss` are
@@ -175,22 +130,7 @@ delivery runner in the background, so it can queue data while the server is
 temporarily unavailable. Reader, row-sender, and direct Arrow/Polars transport
 errors surface from the borrow or operation rather than from `connect()`.
 
-### Pool keys
-
-| Key | Default | Guidance |
-| --- | --- | --- |
-| `pool_size` | `1` | Warm minimum retained after connections have been opened. Set it near steady concurrent use. |
-| `pool_max` | `64` | Per-pool growth cap. Set it at or above peak concurrent borrows. |
-| `pool_idle_timeout_ms` | `60000` | Idle lifetime for connections above `pool_size`. |
-| `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
-| `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
-
-Setting an ingress `reconnect_*` key without explicitly setting
-`initial_connect_retry` promotes the initial mode to synchronous retry. See the
-[connect string reference](/docs/connect/clients/connect-string/) for the full
-grammar and all limits.
-
-### Authentication and TLS
+## Authentication and TLS
 
 Put credentials and TLS settings in the same connect string:
 
@@ -216,6 +156,31 @@ choices have feature requirements:
 | `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
 | `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
 | `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
+
+## The pool
+
+`QuestDb` owns reusable QWP/WebSocket connections. Create one pool per
+application or service process and share it across workers. Borrow a sender or
+reader for one unit of work, then let `Drop` return its connection to the pool.
+
+### Choose an API
+
+Match the API to the shape of the work:
+
+| You have | Use | Why |
+| --- | --- | --- |
+| Events arriving one at a time | `borrow_row_sender()` | Build rows field by field and flush them in batches. |
+| Data already stored in column arrays | `borrow_column_sender()` | Encode whole columns without assembling rows. |
+| An Arrow `RecordBatch` or Polars `DataFrame` | `flush_arrow_batch()` or `flush_polars_dataframe()` | Let the pool own the direct sender, commit boundary, and return path. |
+| SQL to execute | `borrow_reader()` | Stream typed columnar result batches with binds and flow control. |
+
+Both writer borrows use store-and-forward queues. The pool-level Arrow and
+Polars helpers use a separate direct connection pool and block for an ACK.
+
+All borrowed handles return to their respective pools on `Drop`. A connection
+that has already latched a terminal error is retired automatically. Use
+`drop_on_return()` when your application deliberately abandons a backend and
+does not want it recycled.
 
 ## Row-major ingestion
 
@@ -408,8 +373,7 @@ harmful.
 
 ## Querying
 
-Enable `sync-reader-qwp-ws`, borrow a reader, prepare SQL, bind values, execute,
-and pull typed batches:
+Borrow a reader, prepare SQL, bind values, execute, and pull typed batches:
 
 ```rust
 use questdb::{egress::column::ColumnView, QuestDb};
@@ -524,9 +488,11 @@ sets, set byte credit with `ReaderQuery::initial_credit()` and replenish it
 with `Cursor::add_credit()` as batches are consumed. A credit of `0` means
 unbounded.
 
-Enable `sync-reader-zstd` and set `compression=zstd` or `compression=auto` to
-accept compressed result batches. `compression_level` accepts `1` through
-`22`; the default advertised level is `1`.
+The default `sync-reader` feature includes Zstandard support. Set
+`compression=zstd` or `compression=auto` to accept compressed result batches.
+If you disable default features, also enable `sync-reader-zstd`.
+`compression_level` accepts `1` through `22`; the default advertised level is
+`1`.
 
 ## Delivery and durability
 
@@ -582,6 +548,68 @@ publication can wait for ACK-driven space and then return an error:
 Size the queue for the largest expected outage and ingest rate. If an in-memory
 queue cannot drain before close timeout, its remaining tail is lost. Disk mode
 keeps the tail for restart replay, subject to the page-cache durability limit.
+
+## Concurrency and sizing
+
+`QuestDb` is `Send + Sync` but not `Clone`. Wrap one pool in `Arc` and let each
+worker take its own short-lived borrow:
+
+```rust
+use std::sync::Arc;
+
+use questdb::QuestDb;
+
+let db = Arc::new(QuestDb::connect(
+    "ws::addr=localhost:9000;pool_size=4;pool_max=16;",
+)?);
+
+let workers: Vec<_> = (0..4)
+    .map(|_| {
+        let db = Arc::clone(&db);
+        std::thread::spawn(move || -> questdb::Result<()> {
+            let _sender = db.borrow_column_sender()?;
+            // Build and publish this worker's chunks here.
+            Ok(())
+        })
+    })
+    .collect();
+
+for worker in workers {
+    worker.join().expect("worker panicked")?;
+}
+```
+
+`BorrowedColumnSender`, `BorrowedRowSender`, `BorrowedReader`, and `Chunk` are
+not `Send` or `Sync`; use each on the thread that borrowed or built it. `Buffer`
+is owned reusable data and is not part of that thread-bound borrow list.
+
+### Pool settings
+
+| Key | Default | Guidance |
+| --- | --- | --- |
+| `pool_size` | `1` | Warm minimum retained after connections have been opened. Set it near steady concurrent use. |
+| `pool_max` | `64` | Per-pool growth cap. Set it at or above peak concurrent borrows. |
+| `pool_idle_timeout_ms` | `60000` | Idle lifetime for connections above `pool_size`. |
+| `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
+| `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
+
+Setting an ingress `reconnect_*` key without explicitly setting
+`initial_connect_retry` promotes the initial mode to synchronous retry. See the
+[connect string reference](/docs/connect/clients/connect-string/) for the full
+grammar and all limits.
+
+The column, row, and reader pools grow and cap independently. The pool-level
+Arrow and Polars helpers use another internal direct pool, so account for those
+connections when sizing the server. Avoid a single combined connection formula;
+the active paths in an application determine the total.
+
+Borrowing at `pool_max` normally fails immediately with
+`ErrorCode::InvalidApiCall`. In disk-backed store-and-forward mode, a row or
+column borrow may first wait up to `close_flush_timeout_millis` for a closing
+slot to release its disk lock.
+
+Keep borrows short. A borrow occupies its slot until `Drop`, even while the
+application is idle.
 
 ## Failover and errors
 
@@ -647,53 +675,6 @@ instead of silently repeating rows. Callbacks run synchronously while the
 cursor is being driven; keep them short and do not call back into the same
 reader or cursor.
 
-## Concurrency and sizing
-
-`QuestDb` is `Send + Sync` but not `Clone`. Wrap one pool in `Arc` and let each
-worker take its own short-lived borrow:
-
-```rust
-use std::sync::Arc;
-
-use questdb::QuestDb;
-
-let db = Arc::new(QuestDb::connect(
-    "ws::addr=localhost:9000;pool_size=4;pool_max=16;",
-)?);
-
-let workers: Vec<_> = (0..4)
-    .map(|_| {
-        let db = Arc::clone(&db);
-        std::thread::spawn(move || -> questdb::Result<()> {
-            let _sender = db.borrow_column_sender()?;
-            // Build and publish this worker's chunks here.
-            Ok(())
-        })
-    })
-    .collect();
-
-for worker in workers {
-    worker.join().expect("worker panicked")?;
-}
-```
-
-`BorrowedColumnSender`, `BorrowedRowSender`, `BorrowedReader`, and `Chunk` are
-not `Send` or `Sync`; use each on the thread that borrowed or built it. `Buffer`
-is owned reusable data and is not part of that thread-bound borrow list.
-
-The column, row, and reader pools grow and cap independently. The pool-level
-Arrow and Polars helpers use another internal direct pool, so account for those
-connections when sizing the server. Avoid a single combined connection formula;
-the active paths in an application determine the total.
-
-Borrowing at `pool_max` normally fails immediately with
-`ErrorCode::InvalidApiCall`. In disk-backed store-and-forward mode, a row or
-column borrow may first wait up to `close_flush_timeout_millis` for a closing
-slot to release its disk lock.
-
-Keep borrows short. A borrow occupies its slot until `Drop`, even while the
-application is idle.
-
 ## Closing
 
 Dropping `QuestDb` or calling `db.close()` stops the reaper, rejects future
@@ -711,6 +692,39 @@ Closing drains store-and-forward queues on a best-effort basis for
 
 Under `pool_reap=manual`, call `reap_idle()` periodically if the pool should
 shrink above its warm floor.
+
+## Crate features
+
+Writing and querying work with the default crate features. Enable optional
+integrations only when your application uses them:
+
+| Feature | Default | Use it for |
+| --- | --- | --- |
+| `sync-sender` | Yes | The pool and its row-major and column-major QWP/WebSocket writers. It also enables the standalone ILP/TCP and ILP/HTTP senders. |
+| `sync-reader` | Yes | QWP/WebSocket queries with Zstandard decompression. It enables `sync-reader-qwp-ws` and `sync-reader-zstd`. |
+| `tls-webpki-certs` | Yes | TLS validation with the bundled Web PKI root certificates. |
+| `ring-crypto` | Yes | The default TLS cryptography backend. Do not combine it with `aws-lc-crypto`. |
+| `arrow-ingress` / `arrow-egress` | No | Arrow ingestion / Arrow query results. The `arrow` feature enables both. |
+| `polars-ingress` / `polars-egress` | No | Polars ingestion / Polars query results. The `polars` feature enables both. |
+| `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
+| `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
+| `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
+| `tls-native-certs` | No | TLS validation through the operating-system certificate store. |
+| `insecure-skip-verify` | No | `tls_verify=unsafe_off` for controlled testing only. |
+| `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |
+
+`almost-all-features` is intended for client development and CI. It extends
+the defaults with QWP/UDP, both TLS root sources, `insecure-skip-verify`, JSON
+test helpers, timestamp and array integrations, and both decimal crates. It
+selects `ring-crypto`, omits the mutually exclusive `aws-lc-crypto`, and
+excludes `arrow` and `polars`. Prefer the specific features your application
+uses.
+
+If you disable default features, select the sender and reader transports you
+need, exactly one crypto backend (`ring-crypto` or `aws-lc-crypto`), and at
+least one TLS root source (`tls-webpki-certs` or `tls-native-certs`). The method
+tables below name the feature that gates each API, not the complete
+no-default-features set.
 
 ## API at a glance
 
