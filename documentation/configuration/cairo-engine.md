@@ -58,6 +58,10 @@ available via the HTTP header
 [`options`](/docs/query/pgwire/overview/)
 connection property.
 
+The related `query.timeout` key sets the same global timeout using a duration
+value (for example, `120s`, `1m` or `500ms`). When both are set, `query.timeout`
+takes precedence over `query.timeout.sec`.
+
 ## Commit and write behavior
 
 ### cairo.commit.mode
