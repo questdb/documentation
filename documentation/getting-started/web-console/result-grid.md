@@ -21,7 +21,8 @@ The Result Grid provides several action buttons in the toolbar to help you work 
 - **Move selected column to the front**: Moves the currently selected column to the leftmost position for better visibility
 - **Reset grid layout**: Resets the grid to its default column arrangement and removes all customizations including frozen columns and column reordering
 - **Refresh**: Re-executes the last query to update the results with fresh data
-- **Download result as CSV**: Downloads all data in the current result set as a CSV file for external analysis
+- **Download result as Parquet**: Downloads all data in the current result set as a [Parquet](/docs/query/export-parquet/) file for external analysis
+- **Download result as CSV**: Available from the download dropdown next to the Parquet button; downloads the current result set as a CSV file for external analysis
 
 ## Grid
 
