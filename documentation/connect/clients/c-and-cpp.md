@@ -455,6 +455,92 @@ FSN-returning flush and compare watermarks; see
 
 :::
 
+### Decimal columns
+
+`DECIMAL` columns (QuestDB server 9.2.0 or later) accept either a **string**
+value or a **binary** unscaled-integer value. Create the column ahead of time
+with the precision and scale you need
+(`CREATE TABLE trades (..., price DECIMAL(18, 2))`) so QuestDB stores it at the
+intended width and scale.
+
+Within each pending row-buffer batch, the first non-null decimal value for a
+column sets that column's wire scale. Later values can use the same or a smaller
+scale, but a larger scale fails at flush because it would lose precision.
+Encode every value at the table column's scale, for example `"1.20"` rather
+than `"1.2"` for `DECIMAL(..., 2)`, so row order does not affect the batch.
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+// `buffer` and `.table(...)` as in the row-major example above.
+using namespace questdb::ingress::decimal;   // "..."_decimal, decimal_view
+
+// String form: use '.' between the whole and fractional parts. "+Infinity",
+// "-Infinity" and "NaN" are accepted but decay to null once stored.
+buffer.table("trades"_tn)
+      .column("price"_cn, "2615.54"_decimal)
+      .at(questdb::ingress::timestamp_nanos::now());
+
+// Binary form: an unscaled value as two's-complement big-endian bytes plus a
+// scale. 12345 with scale 2 is 123.45. Scale <= 76, mantissa <= 32 bytes.
+const uint8_t unscaled[] = {0x30, 0x39};   // 12345
+buffer.table("trades"_tn)
+      .column("price"_cn, decimal_view(2, unscaled))
+      .at(questdb::ingress::timestamp_nanos::now());
+```
+
+`column` uses `DECIMAL256` on the wire. To use a narrower wire width, call
+`column_dec64` or `column_dec128`; they accept the same string or `decimal_view`
+value and raise `line_sender_error` if the unscaled value does not fit the
+selected width after conversion to the pending buffer's wire scale. You can
+also ingest a custom decimal type directly by implementing a
+`to_decimal_view_state_impl` customization point for it. See
+`examples/line_sender_cpp_example_decimal_custom.cpp` in the client repository.
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+// `buffer` and `err` as in the row-major example above.
+// String form (value + byte length). Format rules as described above.
+if (!line_sender_buffer_table(
+        buffer, QDB_TABLE_NAME_LITERAL("trades"), &err))
+    goto on_error;
+if (!line_sender_buffer_column_dec_str(
+        buffer, QDB_COLUMN_NAME_LITERAL("price"), "2615.54", 7, &err))
+    goto on_error;
+if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+    goto on_error;
+
+// Binary form: scale + unscaled value (two's-complement, big-endian).
+const uint8_t unscaled[] = {0x30, 0x39};   // 12345, scale 2 -> 123.45
+if (!line_sender_buffer_table(
+        buffer, QDB_TABLE_NAME_LITERAL("trades"), &err))
+    goto on_error;
+if (!line_sender_buffer_column_dec(
+        buffer, QDB_COLUMN_NAME_LITERAL("price"),
+        2, unscaled, sizeof(unscaled), &err))
+    goto on_error;
+if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err))
+    goto on_error;
+```
+
+`line_sender_buffer_column_dec64{,_str}` and `_dec128{,_str}` pin the wire width
+to `DECIMAL64` / `DECIMAL128`.
+
+</TabItem>
+</Tabs>
+
+The decimal setters above are row-sender only. For column-major ingestion, use
+the [Arrow appenders](#arrow-ingestion) or the NumPy appender
+`column_sender_chunk_append_numpy_column`.
+
+See the [Decimal datatype reference](/docs/query/datatypes/decimal/) for
+precision and storage widths, and the
+[QWP decimal encoding](/docs/connect/wire-protocols/qwp-ingress-websocket/#decimal-types-decimal64-decimal128-decimal256)
+for the binary wire layout.
+
 ## Sending data: column-major
 
 Borrow a store-and-forward column sender, build a `chunk` of columns (each a
