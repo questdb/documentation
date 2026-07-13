@@ -265,6 +265,8 @@ OWNED BY analysts;
 | `table or view with the requested name already exists` | The name is taken by a table, view, or materialized view |
 | `live view FLUSH EVERY must be at least 100ms` | The `FLUSH EVERY` interval is below the minimum |
 | `live view select must be a simple scan of a single WAL base table; joins, subqueries, GROUP BY, ORDER BY and LIMIT are not supported yet` | The view query is not a simple scan of one base table |
+| `base table must be a WAL table` | The base object is a non-WAL table or a regular view |
+| `live views are not allowed as base tables in V1` | The base object is another live view |
 | `live view base table must have a designated timestamp` | The base table has no designated timestamp |
 | `non-deterministic function cannot be used in materialized view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
 | `permission denied` | Missing required permission (Enterprise) |

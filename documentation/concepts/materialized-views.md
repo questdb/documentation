@@ -97,6 +97,10 @@ Materialized views are ideal for:
 - **Historical summaries**: Data that doesn't need real-time accuracy
 - **OHLC calculations**: Candlestick charts, time-bucketed analytics
 
+Use a [live view](/docs/concepts/live-views/) instead when you need to
+incrementally maintain a row-per-input window computation, such as a moving
+average, running total, or ranking.
+
 Use regular [views](/docs/concepts/views/) instead when:
 
 - Query execution cost is acceptable for your workload
@@ -571,6 +575,8 @@ the replica's view was not fully up-to-date.
 - **Related Concepts**
   - [Views](/docs/concepts/views/): Virtual tables that compute results at query
     time
+  - [Live views](/docs/concepts/live-views/): Incrementally maintained
+    row-per-input window-function results
 
 - **SQL Commands**
 

@@ -128,9 +128,8 @@ Keep `FLUSH EVERY` small (for example `1s`) so this lag stays negligible.
 :::tip
 
 A live view falling behind sustained ingestion stays correct but grows stale.
-There is no automatic throttle. Monitor `lag_seqtxn` and `lag_micros` in
-[`live_views()`](/docs/query/functions/meta/#live_views) to detect a view that
-cannot keep up.
+There is no automatic throttle. See [Monitoring](#monitoring) for how to
+interpret lag and detect a view that cannot keep up.
 
 :::
 
@@ -225,6 +224,21 @@ base columns its query references:
 
 An invalidated view keeps serving its existing data and reports the reason in
 [`live_views()`](/docs/query/functions/meta/#live_views). It stops refreshing.
+Invalidation is permanent: reversing the schema change does not automatically
+revalidate the view, and `ALTER LIVE VIEW ... RESUME WAL` only recovers a
+suspended WAL writer.
+
+To recover, inspect `invalidation_reason`, repair the base-table schema, and
+save the definition before dropping the view:
+
+```questdb-sql
+SHOW CREATE LIVE VIEW trades_ma;
+```
+
+Then drop and recreate the live view. Add `BACKFILL` to the recreated definition
+if it must include history that is still present in the base table. Dropping the
+invalid view removes its materialized rows, including rows whose source history
+is no longer retained by the base table.
 
 Live views over [deduplicated](/docs/concepts/deduplication/) base tables are
 supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
@@ -242,6 +256,28 @@ SELECT view_name, base_table_name, view_status, lag_seqtxn, lag_micros
 FROM live_views();
 ```
 
+`lag_seqtxn` is the number of committed base-table WAL transactions beyond the
+view's durable processed watermark. It counts transactions, not rows: one
+transaction may contain one row or millions. A value of `0` means that the
+durable tier is caught up. A temporary non-zero value is expected between
+`FLUSH EVERY` cycles, especially when ingestion produces many small commits.
+
+There is no universal acceptable non-zero value. Sample the metric over time and
+compare it with the view's normal flush-cycle baseline. A bounded sawtooth that
+returns to zero around flushes is normal. A value that stays elevated for
+multiple flush intervals or keeps increasing indicates that the view cannot
+keep up.
+
+`lag_micros` reports the elapsed time since the last successful flush. It is a
+flush-activity indicator, not the timestamp difference between base and view
+rows, and can continue growing while an idle view has `lag_seqtxn = 0`.
+
+When lag grows persistently, check `view_status` and `writer_stall_micros` for a
+failed or blocked flush. Also verify CPU and I/O capacity, reduce the number or
+cost of maintained views, or increase the shared
+[`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/)
+setting.
+
 Live views also appear in [`tables()`](/docs/query/functions/meta/#tables) with
 `table_type = 'L'`, and are recognized by `SHOW CREATE LIVE VIEW`, `EXPLAIN`,
 `pg_class`, and `information_schema.tables`.
@@ -251,12 +287,22 @@ Live views also appear in [`tables()`](/docs/query/functions/meta/#tables) with
 Live views have a deliberately narrow surface in this first version. Statements
 outside it are rejected at creation time with a specific error:
 
+| Base object | Derived object | Supported |
+| ----------- | -------------- | --------- |
+| Live view | Regular view | Yes |
+| Live view | Materialized view | No |
+| Live view | Live view | No |
+| Regular view | Live view | No; a regular view is not a WAL table |
+| Materialized view | Live view | Yes |
+
+A full rebuild of a materialized view invalidates a live view that uses it as
+its base. Recreate the live view after the rebuild, following the recovery steps
+in [Base table lifecycle](#base-table-lifecycle).
+
 - **Single base table only.** No JOINs, subqueries, or CTEs in the view query.
 - **No pre-aggregation.** `SAMPLE BY` and `GROUP BY` are not allowed between the
   base table and the window functions. A view like "5-minute candles with a
   rolling VWAP" must pre-aggregate upstream.
-- **No live-view-on-live-view.** A live view cannot be the base of another live
-  view.
 - **Deterministic queries only.** Non-deterministic functions such as `now()`,
   `sysdate()`, `systimestamp()`, and `rnd_*()` are rejected in the projection,
   the `WHERE` filter, and window-function arguments.

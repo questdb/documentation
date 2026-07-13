@@ -164,8 +164,8 @@ Returns a `table` with the following columns:
 | `in_mem_rows` | LONG | Live row count held in the in-memory tier |
 | `o3_rejected_count` | LONG | Count of out-of-order base commits routed through replay |
 | `below_lower_bound_count` | LONG | Count of base rows dropped below the view's lower bound |
-| `lag_seqtxn` | LONG | Base transactions the view is behind (`base_table_txn - last_processed_seqtxn`) |
-| `lag_micros` | LONG | Time the view is behind the base table, in microseconds |
+| `lag_seqtxn` | LONG | Committed base WAL transactions beyond the view's durable processed watermark (`base_table_txn - last_processed_seqtxn`) |
+| `lag_micros` | LONG | Microseconds since the last successful flush |
 | `last_processed_seqtxn` | LONG | Last base transaction processed by the refresh worker |
 | `applied_watermark` | LONG | Last base transaction durably applied to the view's disk tier |
 | `lv_consumed_seqtxn` | LONG | Base WAL purge floor held by this view |
@@ -181,6 +181,14 @@ the peak-sticky arena footprint that does not shrink after a burst, while
 `in_mem_rows` is the live row count that drops as rows age out of the `IN MEMORY`
 window. Together they distinguish a view actively buffering rows from one holding
 capacity retained from a past burst.
+
+`lag_seqtxn` counts transactions, not rows. A value of `0` means the durable
+tier is caught up; a temporary non-zero value is expected between `FLUSH EVERY`
+cycles. Alert on a value that remains above its normal flush-cycle baseline or
+keeps increasing across samples rather than on a universal fixed threshold.
+`lag_micros` measures flush activity and may grow while an idle view has
+`lag_seqtxn = 0`. For operational guidance, see
+[Monitoring live views](/docs/concepts/live-views/#monitoring).
 
 **Examples:**
 
