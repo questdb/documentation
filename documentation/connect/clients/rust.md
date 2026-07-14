@@ -2,7 +2,7 @@
 slug: /connect/clients/rust
 title: Rust client for QuestDB
 sidebar_label: Rust
-description: "Use the QuestDB Rust connection pool for row and column ingestion, Arrow and Polars data, and streaming SQL queries over QWP."
+description: "Use the QuestDB Rust connection pool for Buffer, Chunk, Arrow, and Polars ingestion plus streaming SQL queries over QWP."
 ---
 
 The QuestDB Rust client uses one thread-safe `QuestDb` pool for ingestion and
@@ -24,8 +24,8 @@ ILP/HTTP, and pooled QWP/WebSocket ingestion, and `sync-reader` for
 QWP/WebSocket queries with Zstandard result decompression. They also enable
 bundled TLS roots and the `ring` cryptography backend.
 
-The following program writes one uniquely marked row through a pooled row
-sender, waits for the server to accept it, then polls for query visibility:
+The following program writes one uniquely marked row through a pooled sender,
+waits for the server to accept it, then polls for query visibility:
 
 ```rust
 use std::{
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     {
-        let mut sender = db.borrow_row_sender()?;
+        let mut sender = db.borrow_sender()?;
         let mut buffer = sender.new_buffer();
 
         buffer
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .column_f64("price", 2615.54)?
             .at(TimestampNanos::now())?;
 
-        sender.flush_and_wait(&mut buffer, AckLevel::Ok)?;
+        sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok)?;
     }
 
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -124,10 +124,10 @@ let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 network I/O. Disk-backed store-and-forward recovery is the exception: the pool
 may reopen dirty slots at construction and start replay in the background.
 
-The column sender creates its local producer on first borrow and connects its
-delivery runner in the background, so it can queue data while the server is
-temporarily unavailable. Reader, row-sender, and direct Arrow/Polars transport
-errors surface from the borrow or operation rather than from `connect()`.
+The ingestion sender creates its local producer on first borrow and connects
+its delivery runner in the background, so it can queue data while the server
+is temporarily unavailable. Reader and direct Arrow/Polars transport errors
+surface from the borrow or operation rather than from `connect()`.
 
 ## Authentication and TLS
 
@@ -168,12 +168,12 @@ Match the API to the shape of the work:
 
 | You have | Use | Why |
 | --- | --- | --- |
-| Events arriving one at a time | `borrow_row_sender()` | Build rows field by field and flush them in batches. |
-| Data already stored in column arrays | `borrow_column_sender()` | Encode whole columns without assembling rows. |
+| Events arriving one at a time | `borrow_sender()` + `Buffer` | Build rows field by field and flush them in batches. |
+| Data already stored in column arrays | `borrow_sender()` + `Chunk` | Encode whole columns without assembling rows. |
 | An Arrow `RecordBatch` or Polars `DataFrame` | `flush_arrow_batch()` or `flush_polars_dataframe()` | Let the pool own the direct sender, commit boundary, and return path. |
 | SQL to execute | `borrow_reader()` | Stream typed columnar result batches with binds and flow control. |
 
-Both writer borrows use store-and-forward queues. The pool-level Arrow and
+Buffer and chunk ingestion use store-and-forward. The pool-level Arrow and
 Polars helpers use a separate direct connection pool and block for an ACK.
 
 All borrowed handles return to their respective pools on `Drop`. A connection
@@ -181,17 +181,17 @@ that has already latched a terminal error is retired automatically. Use
 `drop_on_return()` when your application deliberately abandons a backend and
 does not want it recycled.
 
-## Row-major ingestion
+## Buffer ingestion
 
-Use the row sender for events that arrive one at a time. Build several rows in
-one `Buffer`, then flush on your application's size or time boundary:
+Use a `Buffer` for events that arrive one at a time. Build several rows, then
+flush through the sender on your application's size or time boundary:
 
 ```rust
 use questdb::{ingress::TimestampNanos, QuestDb};
 
 fn main() -> questdb::Result<()> {
     let db = QuestDb::connect("ws::addr=localhost:9000;")?;
-    let mut sender = db.borrow_row_sender()?;
+    let mut sender = db.borrow_sender()?;
     let mut buffer = sender.new_buffer();
 
     for (symbol, price, amount) in [
@@ -206,7 +206,7 @@ fn main() -> questdb::Result<()> {
             .at(TimestampNanos::now())?;
     }
 
-    sender.flush(&mut buffer)?;
+    sender.flush_buffer(&mut buffer)?;
     Ok(())
 }
 ```
@@ -215,9 +215,10 @@ fn main() -> questdb::Result<()> {
 assign the designated timestamp. When QWP auto-creates a table, that designated
 timestamp column is named `timestamp`.
 
-Reuse the same buffer across flushes. `flush()` clears it only after successful
-local publication and retains its allocated capacity. Use `flush_and_keep()`
-only when you need to retain the rows for another destination or operation.
+Reuse the same buffer across flushes. `flush_buffer()` clears it only after
+successful local publication and retains its allocated capacity. Use
+`flush_buffer_and_keep()` only when you need to retain the rows for another
+destination or operation.
 
 ### Buffer column setters
 
@@ -247,7 +248,7 @@ QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value in
 one of those columns is received as `false` or `0`; use a wider nullable type
 when the distinction matters.
 
-## Column-major ingestion {#sending-data-column-major}
+## Chunk ingestion {#sending-data-column-major}
 
 Use a `Chunk` when values already live in column slices. All columns and the
 designated timestamp must have the same row count:
@@ -262,7 +263,7 @@ use questdb::{
 
 fn main() -> questdb::Result<()> {
     let db = QuestDb::connect("ws::addr=localhost:9000;")?;
-    let mut sender = db.borrow_column_sender()?;
+    let mut sender = db.borrow_sender()?;
 
     let price = [2615.54_f64, 2616.00, 2617.25];
     let amount = [0.00044_f64, 0.00050, 0.00021];
@@ -495,12 +496,11 @@ If you disable default features, also enable `sync-reader-zstd`.
 
 ## Delivery and durability
 
-The row and column writer pools always use store-and-forward. Without `sf_dir`,
-the queue is in memory. With `sf_dir`, each borrowed writer uses a disk slot:
+The ingestion sender pool always uses store-and-forward. Without `sf_dir`, the
+queue is in memory. With `sf_dir`, each borrowed sender uses a disk slot:
 
 ```text
-<sf_dir>/<sender_id>-col-<index>/
-<sf_dir>/<sender_id>-row-<index>/
+<sf_dir>/<sender_id>-ingest-<index>/
 ```
 
 Give each pool that shares an `sf_dir` a distinct `sender_id`. On restart, the
@@ -515,10 +515,10 @@ or power loss. The only supported `sf_durability` mode is currently `memory`;
 
 | Need | Use | Meaning |
 | --- | --- | --- |
-| Highest throughput | `flush` | The local queue accepted the data. Delivery continues in the background. |
-| One-call delivery barrier | `flush_and_wait` | Publish, then wait using `request_timeout`. |
-| Per-call deadline | `flush`, then `wait(level, timeout)` | Wait with an explicit no-progress timeout. |
-| Non-blocking progress | `flush_and_get_fsn`, then `acked_fsn` | Observe a boundary while retaining the same borrow. |
+| Highest throughput | Buffer: `flush_buffer`; chunk: `flush` | The local queue accepted the data. Delivery continues in the background. |
+| One-call delivery barrier | Buffer: `flush_buffer_and_wait`; chunk: `flush_and_wait` | Publish, then wait using `request_timeout`. |
+| Per-call deadline | Publish, then `wait(level, timeout)` | Wait with an explicit no-progress timeout. |
+| Non-blocking progress | Buffer: `flush_buffer_and_get_fsn`; chunk: `flush_and_get_fsn`; then `acked_fsn` | Observe a boundary while retaining the same borrow. |
 
 `AckLevel::Ok` means the server accepted all frames through the boundary.
 `AckLevel::Durable` requires `request_durable_ack=on` and Enterprise server
@@ -566,7 +566,7 @@ let workers: Vec<_> = (0..4)
     .map(|_| {
         let db = Arc::clone(&db);
         std::thread::spawn(move || -> questdb::Result<()> {
-            let _sender = db.borrow_column_sender()?;
+            let _sender = db.borrow_sender()?;
             // Build and publish this worker's chunks here.
             Ok(())
         })
@@ -578,9 +578,9 @@ for worker in workers {
 }
 ```
 
-`BorrowedColumnSender`, `BorrowedRowSender`, `BorrowedReader`, and `Chunk` are
-not `Send` or `Sync`; use each on the thread that borrowed or built it. `Buffer`
-is owned reusable data and is not part of that thread-bound borrow list.
+`BorrowedSender`, `BorrowedReader`, and `Chunk` are not `Send` or `Sync`; use
+each on the thread that borrowed or built it. `Buffer` is owned reusable data
+and is not part of that thread-bound borrow list.
 
 ### Pool settings
 
@@ -597,15 +597,15 @@ Setting an ingress `reconnect_*` key without explicitly setting
 [connect string reference](/docs/connect/clients/connect-string/) for the full
 grammar and all limits.
 
-The column, row, and reader pools grow and cap independently. The pool-level
-Arrow and Polars helpers use another internal direct pool, so account for those
+The ingestion and reader pools grow and cap independently. The pool-level Arrow
+and Polars helpers use another internal direct pool, so account for those
 connections when sizing the server. Avoid a single combined connection formula;
 the active paths in an application determine the total.
 
 Borrowing at `pool_max` normally fails immediately with
-`ErrorCode::InvalidApiCall`. In disk-backed store-and-forward mode, a row or
-column borrow may first wait up to `close_flush_timeout_millis` for a closing
-slot to release its disk lock.
+`ErrorCode::InvalidApiCall`. In disk-backed store-and-forward mode, an
+ingestion borrow may first wait up to `close_flush_timeout_millis` for a
+closing slot to release its disk lock.
 
 Keep borrows short. A borrow occupies its slot until `Drop`, even while the
 application is idle.
@@ -699,7 +699,7 @@ integrations only when your application uses them:
 
 | Feature | Default | Use it for |
 | --- | --- | --- |
-| `sync-sender` | Yes | The pool and its row-major and column-major QWP/WebSocket writers. It also enables the standalone ILP/TCP and ILP/HTTP senders. |
+| `sync-sender` | Yes | Pooled QWP/WebSocket ingestion for buffers and chunks. It also enables the standalone ILP/TCP and ILP/HTTP senders. |
 | `sync-reader` | Yes | QWP/WebSocket queries with Zstandard decompression. It enables `sync-reader-qwp-ws` and `sync-reader-zstd`. |
 | `tls-webpki-certs` | Yes | TLS validation with the bundled Web PKI root certificates. |
 | `ring-crypto` | Yes | The default TLS cryptography backend. Do not combine it with `aws-lc-crypto`. |
@@ -737,8 +737,8 @@ These are the supported pool entry points:
 | Method | Feature | Purpose |
 | --- | --- | --- |
 | `QuestDb::connect(conf: &str)` | `sync-sender-qwp-ws` | Parse the connect string and create the pool. |
-| `borrow_row_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedRowSender`. |
-| `borrow_column_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedColumnSender`. |
+| `new_buffer()` | `sync-sender-qwp-ws` | Create a caller-owned QWP/WebSocket `Buffer` using the pool's name limit. |
+| `borrow_sender()` | `sync-sender-qwp-ws` | Borrow a `BorrowedSender` for buffers, chunks, or Arrow batches. |
 | `borrow_reader()` | `sync-sender-qwp-ws` + `sync-reader-qwp-ws` | Borrow a `BorrowedReader`. |
 | `flush_arrow_batch(table, batch, timestamp_column, overrides, ack_level)` | `arrow-ingress` | Ingest one Arrow batch through an internally borrowed direct sender. |
 | `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars frame with checkpointed failover replay. |
@@ -749,12 +749,19 @@ The crate also contains doc-hidden direct-sender, diagnostic, and FFI-owned
 entry points. They are internal integration surfaces, not supported Rust
 application APIs.
 
-### `BorrowedColumnSender` methods
+### `BorrowedSender` methods
 
-The standard methods operate on the sender's store-and-forward queue:
+`BorrowedSender` exposes these methods for caller-owned `Buffer` values and
+borrowed-slice `Chunk` values:
 
 | Method | Purpose |
 | --- | --- |
+| `new_buffer()` | Create a reusable `Buffer` using the pool settings. The buffer is independent of this lease. |
+| `flush_buffer(&mut Buffer)` | Publish a buffer locally and clear it on success. |
+| `flush_buffer_and_wait(&mut Buffer, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
+| `flush_buffer_and_keep(&Buffer)` | Publish without clearing the buffer. |
+| `flush_buffer_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final frame sequence number. |
+| `flush_buffer_and_keep_and_get_fsn(&Buffer)` | Publish without clearing and return the final FSN. |
 | `flush(&mut Chunk)` | Publish a chunk locally and clear it on success. |
 | `flush_and_wait(&mut Chunk, AckLevel)` | Publish, clear, and wait using the pool-wide `request_timeout`. |
 | `flush_and_get_fsn(&mut Chunk)` | Publish and return the final frame sequence number. |
@@ -763,8 +770,8 @@ The standard methods operate on the sender's store-and-forward queue:
 | `wait(AckLevel, Duration)` | Wait for everything published on this borrow, using an explicit no-progress timeout. |
 | `drop_on_return()` | Drop this backend instead of recycling it when the borrow ends. |
 
-With `arrow-ingress`, the same borrowed sender also exposes store-and-forward
-Arrow operations:
+With `arrow-ingress`, `BorrowedSender` also exposes store-and-forward Arrow
+operations:
 
 | Method | Timestamp | Completion |
 | --- | --- | --- |
@@ -776,27 +783,7 @@ Arrow operations:
 | `flush_arrow_batch_at_column_and_get_fsn` | Named Arrow column | Publish and return FSN |
 
 Prefer the pool-level `flush_arrow_batch()` for a one-off synchronous batch.
-Borrow a column sender when you want to pipeline several batches through its
-store-and-forward queue or observe FSN progress.
-
-### `BorrowedRowSender` methods
-
-| Method | Purpose |
-| --- | --- |
-| `new_buffer()` | Create a reusable `Buffer` with the sender's protocol settings. |
-| `flush(&mut Buffer)` | Publish locally and clear the buffer on success. |
-| `flush_and_wait(&mut Buffer, AckLevel)` | Publish, clear, and wait using `request_timeout`. |
-| `flush_and_keep(&Buffer)` | Publish without clearing the buffer. |
-| `flush_and_get_fsn(&mut Buffer)` | Publish, clear, and return the final FSN. |
-| `flush_and_keep_and_get_fsn(&Buffer)` | Publish without clearing and return the final FSN. |
-| `published_fsn()` | Read the highest locally published FSN. |
-| `acked_fsn()` | Read the highest completed FSN. |
-| `wait(AckLevel, Duration)` | Wait for everything published on this borrow. |
-| `drop_on_return()` | Drop this backend instead of recycling it. |
-| `flush_and_keep_with_flags(&Buffer, transactional)` | Feature-gated by `sync-sender-http`. On the pool's QWP transport, `transactional=true` is rejected. |
-
-`BorrowedRowSender` deliberately does not dereference to the standalone
-`Sender`. Use the methods on the borrowed handle itself.
+Borrow a sender to pipeline Arrow batches or observe FSN progress.
 
 ### `BorrowedReader` methods
 
