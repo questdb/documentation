@@ -453,6 +453,22 @@ variant before reading values:
 | `Geohash` | Bits plus precision |
 | `DoubleArray`, `LongArray` | Per-row shape and element data |
 
+For a `DECIMAL(p, s)` result, precision `p` selects the QWP variant:
+
+| Result precision | `ColumnView` variant |
+| --- | --- |
+| 1 through 18 | `Decimal64` |
+| 19 through 38 | `Decimal128` |
+| 39 through 76 | `Decimal256` |
+
+QWP sends scale `s` separately and reports the width bucket, not the exact
+precision `p`.
+
+Use `ColumnView::as_decimal()` to handle all three widths. `DecimalColumn`
+reports `byte_width()`, `max_precision()`, and `scale()`;
+`mantissa_le(row)` returns little-endian two's-complement bytes. Check
+`is_null(row)` before decoding them.
+
 Check `is_null(row)` before calling `value(row)` on fixed-width data. The raw
 value in a null slot is only a sentinel. `Symbol::resolve`, `Varchar::value`,
 and `Binary::value` return `None` for nulls.

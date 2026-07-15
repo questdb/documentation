@@ -991,6 +991,25 @@ pick the right accessor.
 </TabItem>
 </Tabs>
 
+### Decimal result widths
+
+For a `DECIMAL(p, s)` result, precision `p` selects the QWP kind:
+
+| Result precision | C kind | C++ kind |
+| --- | --- | --- |
+| 1 through 18 | `reader_column_kind_decimal64` | `column_kind::decimal64` |
+| 19 through 38 | `reader_column_kind_decimal128` | `column_kind::decimal128` |
+| 39 through 76 | `reader_column_kind_decimal256` | `column_kind::decimal256` |
+
+QWP sends scale `s` separately and reports the width bucket, not the exact
+precision `p`.
+
+For width-independent access, use `column::visit` and
+`decimal_view::mantissa_bytes(row)` in C++, or
+`reader_column_data_get_bytes` with `value_stride` in C. Both expose the
+mantissa as little-endian two's-complement bytes. Check for null before
+decoding it.
+
 ### Parameterised queries
 
 Prepare then bind: C `reader_prepare` + `reader_query_bind_*` +
