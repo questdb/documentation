@@ -1399,6 +1399,11 @@ while the borrow is still held:
   C `qwp_sender_acked_fsn`; C++ `acked_fsn()`. The
   publication boundary has completed once `acked_fsn` returns a value `>=` your
   saved FSN.
+- A no-value FSN is not an error. A successful flush of a non-empty buffer or
+  chunk always yields an FSN; no value (C: `has_value == false` in the
+  `line_sender_qwpws_fsn` out-param, C++: `std::nullopt`) means there was no
+  frame to publish. Likewise `acked_fsn` has no value until the first frame on
+  this borrow completes: keep polling, don't re-flush.
 
 FSNs are per-stream watermarks for the **currently borrowed** sender, not
 portable receipts you can check through a later, unrelated pool borrow.

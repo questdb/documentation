@@ -532,6 +532,13 @@ do not flush the same data again. `Duration::ZERO` disables the deadline.
 FSNs belong to the current sender stream and borrow. They are watermarks, not
 portable receipts that can be checked through an arbitrary later borrow.
 
+A successful FSN-returning flush of a non-empty buffer or chunk always returns
+`Some(fsn)`; `Ok(None)` only means there was nothing to publish. Similarly,
+`published_fsn()` and `acked_fsn()` return `Ok(None)` until this borrow
+publishes or completes its first frame, so treat `None` from `acked_fsn()` as
+"nothing acked yet", not as a failure. A saved boundary is covered once
+`acked_fsn()` returns a value at or above it.
+
 ### Backpressure
 
 Store-and-forward is bounded. When producers continuously outrun the server,
