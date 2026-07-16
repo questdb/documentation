@@ -228,10 +228,13 @@ except QuestDBError as e:
 `columns` dict for everything else, and the mandatory `at` designated
 timestamp: a `TimestampNanos`, a `datetime`, or the
 `questdb.ServerTimestamp` sentinel to let the server assign arrival time. A
-naive `datetime` passed as `at` is interpreted in the process-local
-timezone; pass timezone-aware values or `TimestampNanos` to avoid
-ambiguity. When QWP auto-creates a table, the designated timestamp column
-is named `timestamp`.
+naive `datetime` (no `tzinfo`) is interpreted as UTC — everywhere in the
+API — and the first such conversion emits a one-per-process `UserWarning`.
+Beware that `datetime.now()` is your local wall clock: for "now", use
+`TimestampNanos.now()` or `datetime.now(timezone.utc)`. Set the
+`QUESTDB_NAIVE_DATETIME=error` environment variable to reject naive
+`datetime` objects outright. When QWP auto-creates a table, the designated
+timestamp column is named `timestamp`.
 
 The handle is thread-safe; a sender lease is not. The lease is not a
 `Sender`; for `isinstance` checks and annotations use the exported
@@ -363,9 +366,9 @@ row ingestion. A frame the columnar path cannot express raises
 `UnsupportedDataFrameShapeError` with per-column failures in
 `column_failures`.
 
-Naive timestamps inside DataFrame columns are interpreted as UTC, matching
-the numpy `datetime64` convention, while a naive scalar `at` is interpreted
-as local time. Prefer timezone-aware values throughout.
+Naive timestamps — DataFrame columns and the scalar `at` alike — are
+interpreted as UTC, matching the numpy `datetime64` convention. Prefer
+timezone-aware values throughout.
 
 The call blocks until the ack and is safe from any thread: the handle owns
 the connection lease for the duration of the call.
@@ -438,8 +441,8 @@ frame = db.query(
 `binds` is a list or tuple. Elements may be `None`, `bool`, `int`, `float`,
 `str`, `datetime.datetime`, `TimestampNanos`, `TimestampMicros`, or
 `uuid.UUID`; any other type raises `TypeError` before the query is sent. A
-naive `datetime` bind is interpreted in the process-local timezone, like a
-scalar `at`.
+naive `datetime` bind is interpreted as UTC, the same rule as everywhere
+else in the API.
 
 ### Query leases
 
