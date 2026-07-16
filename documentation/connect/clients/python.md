@@ -95,15 +95,14 @@ db = questdb.connect("ws::addr=localhost:9000;")
 ```
 
 `questdb.connect()` accepts only QWP/WebSocket configuration strings; any
-other scheme raises `QuestDBError` with `QuestDBErrorCode.ConfigError`. It
-parses and validates the string without opening a connection: the first
-`sender()`, `dataframe()`, or `query()` call opens one, and later calls reuse
-pooled connections. `QuestDB.from_conf()` is the equivalent static
-constructor.
+other scheme raises `QuestDBError` with `QuestDBErrorCode.ConfigError`.
+`dataframe()`, `query()`, and `server_info()` connect on demand; `sender()`
+connects in the background. Use `flush(wait=True)` or `wait()` to surface
+sender connection and delivery errors. Later calls reuse pooled connections.
+`QuestDB.from_conf()` is the equivalent static constructor.
 
 QWP support is negotiated during the WebSocket upgrade (the
-`X-QWP-Version` header); against a server without QWP endpoints the upgrade
-fails and the first operation raises `QuestDBError`. See
+`X-QWP-Version` header); unsupported servers fail during that upgrade. See
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
 
 The handle is a context manager. Without `with`, call `db.close()` at
@@ -138,8 +137,8 @@ token = questdb.connect(
 ```
 
 Authentication happens during the WebSocket upgrade, before any data frames
-are exchanged. Because connections open lazily, a bad credential surfaces as
-`QuestDBErrorCode.AuthError` from the first operation, not from `connect()`.
+are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` during that
+upgrade, not from `connect()`.
 
 With `wss`, the default certificate root store is the bundled `webpki` set.
 Override it with configuration keys:
@@ -256,7 +255,7 @@ The Python value type selects the QuestDB column type:
 | `float` | `DOUBLE` |
 | `str` | `VARCHAR` |
 | `TimestampMicros`, `TimestampNanos`, `datetime.datetime` | `TIMESTAMP`, `TIMESTAMP_NS` |
-| `numpy.ndarray` of `float64` | `ARRAY(DOUBLE)`, QuestDB 9.0.0 or later |
+| `numpy.ndarray` of `float64` | `DOUBLE[]`, QuestDB 9.0.0 or later |
 | `decimal.Decimal` | `DECIMAL`, QuestDB 9.2.0 or later |
 | `None` | Column omitted for this row, stored as null |
 
@@ -360,7 +359,7 @@ Parameters:
 Numeric, string, timestamp, and decimal (`pyarrow.decimal32` through
 `decimal256`) column types map directly. Columns of `float64` numpy arrays or
 Arrow `list_` / `large_list` / `fixed_size_list` with a `float64` leaf become
-`ARRAY(DOUBLE)`. Null cells (`None`, `NaN`, `pd.NA`, and Arrow nulls) are
+`DOUBLE[]`. Null cells (`None`, `NaN`, `pd.NA`, and Arrow nulls) are
 stored as SQL nulls, with the same `BOOLEAN`, `BYTE`, and `SHORT` caveat as
 row ingestion. A frame the columnar path cannot express raises
 `UnsupportedDataFrameShapeError` with per-column failures in
@@ -667,9 +666,8 @@ db = questdb.connect(
 )
 ```
 
-`db.connection_events_delivered()` and `db.connection_events_dropped()`
-report totals, and [`server_info()`](#server-information) snapshots the
-handshake.
+`db.connection_events_delivered` and `db.connection_events_dropped` report
+totals. [`server_info()`](#server-information) snapshots the handshake.
 
 Reader failover has a separate policy:
 
