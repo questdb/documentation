@@ -134,6 +134,75 @@ If you want to re-read metadata for all user tables, simply use an asterisk:
 SELECT hydrate_table_metadata('*');
 ```
 
+## live_views
+
+`live_views()` returns the list of all [live views](/docs/concepts/live-views/)
+in the database, along with their status, refresh lag, in-memory footprint, and
+seed progress.
+
+**Arguments:**
+
+- `live_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` with the following columns:
+
+| Column | Type | Description |
+| ------ | ---- | ----------- |
+| `view_name` | STRING | Live view name |
+| `view_table_dir_name` | STRING | View directory name on disk |
+| `base_table_name` | STRING | Base table name |
+| `view_sql` | STRING | Query used to maintain the view |
+| `view_status` | STRING | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
+| `invalidation_reason` | STRING | Message explaining why the view was marked invalid |
+| `flush_every_interval` | LONG | `FLUSH EVERY` interval value |
+| `flush_every_interval_unit` | STRING | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
+| `in_memory_interval` | LONG | `IN MEMORY` interval value |
+| `in_memory_interval_unit` | STRING | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
+| `in_mem_bytes` | LONG | Native footprint of the in-memory tier, a peak-sticky high-water mark |
+| `in_mem_rows` | LONG | Live row count held in the in-memory tier |
+| `o3_rejected_count` | LONG | Count of late out-of-order rows rejected below the view lower bound; resets on restart |
+| `below_lower_bound_count` | LONG | Count of in-order base rows dropped below the view lower bound; resets on restart |
+| `lag_seqtxn` | LONG | Committed base WAL transactions beyond the view's durable processed watermark (`base_table_txn - last_processed_seqtxn`) |
+| `lag_micros` | LONG | Microseconds since the last successful flush |
+| `last_processed_seqtxn` | LONG | Last base transaction processed by the refresh worker |
+| `applied_watermark` | LONG | Last base transaction durably applied to the view's disk tier |
+| `lv_consumed_seqtxn` | LONG | Base WAL purge floor held by this view |
+| `view_lower_bound_timestamp` | TIMESTAMP | Lower timestamp bound below which base rows are ignored |
+| `writer_stall_micros` | LONG | Time a flush has been stalled waiting to write, in microseconds |
+| `seed_target_seqtxn` | LONG | Target base transaction for an in-progress initial seed |
+| `head_checkpoint_lv_seqtxn` | LONG | View transaction of the latest head checkpoint |
+| `head_checkpoint_max_ts` | TIMESTAMP | Maximum timestamp covered by the latest head checkpoint |
+| `head_checkpoint_state_bytes` | LONG | Size of the latest head checkpoint's window state |
+| `o3_resume_replay_rows` | LONG | Rows re-emitted by bounded out-of-order replays resumed from retained checkpoints; resets on restart |
+| `o3_boundary_replay_rows` | LONG | Rows re-emitted by full boundary-rebuild out-of-order replays; resets on restart |
+
+The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes` is
+the peak-sticky arena footprint that does not shrink after a burst, while
+`in_mem_rows` is the live row count that drops as rows age out of the `IN MEMORY`
+window. Together they distinguish a view actively buffering rows from one holding
+capacity retained from a past burst.
+
+`lag_seqtxn` counts transactions, not rows. A value of `0` means the durable
+tier is caught up; a temporary non-zero value is expected between `FLUSH EVERY`
+cycles. Alert on a value that remains above its normal flush-cycle baseline or
+keeps increasing across samples rather than on a universal fixed threshold.
+`lag_micros` measures flush activity and may grow while an idle view has
+`lag_seqtxn = 0`. For operational guidance, see
+[Monitoring live views](/docs/concepts/live-views/#monitoring).
+
+**Examples:**
+
+```questdb-sql title="List all live views"
+SELECT view_name, base_table_name, view_status, lag_seqtxn, lag_micros
+FROM live_views();
+```
+
+| view_name | base_table_name | view_status | lag_seqtxn | lag_micros |
+| --------- | --------------- | ----------- | ---------- | ---------- |
+| trades_ma | trades          | active      | 0          | 0          |
+
 ## materialized_views
 
 `materialized_views()` returns the list of all materialized views in the
@@ -618,7 +687,7 @@ Returns a `table` with the following columns:
 | Column | Type | Description |
 |--------|------|-------------|
 | `table_suspended` | BOOLEAN | Whether a WAL table is suspended (`false` for non-WAL tables) |
-| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view) |
+| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view), `L` (live view) |
 | `table_row_count` | LONG | Approximate row count at last tracked write |
 | `table_min_timestamp` | TIMESTAMP | Minimum timestamp of data in the table (updated on WAL merge) |
 | `table_max_timestamp` | TIMESTAMP | Maximum timestamp of data in the table (updated on WAL merge) |

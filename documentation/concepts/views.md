@@ -313,6 +313,7 @@ SELECT table_name, table_type FROM tables()
 | `T` | Regular table |
 | `V` | View |
 | `M` | Materialized view |
+| `L` | [Live view](/docs/concepts/live-views/) |
 
 ## Views vs materialized views
 

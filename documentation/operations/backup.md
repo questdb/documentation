@@ -362,7 +362,7 @@ primary/replica backups below).
 
 - **Database-wide only**: Backup captures the entire database. You cannot
   exclude tables or backup selected tables individually. Every backup includes
-  all user tables, materialized views, and metadata.
+  all user tables, materialized views, live views, and metadata.
 - **One backup at a time**: Only one backup can run at any given time. Starting
   a new backup while one is running will return an error.
 - **Primary and replica backups are separate**: Each QuestDB instance has its
