@@ -306,7 +306,7 @@ never accepts the rest, which is why chunk recovery differs from buffer
 recovery; see [Recovering from a failed flush](#recovering-from-a-failed-flush).
 
 The client halves the row range until each frame fits, stopping at 8 rows:
-validity bitmaps and boolean columns pack one row per bit, so a frame must
+validity bitmaps and boolean columns pack one bit per row, so a frame must
 start on a byte boundary. An 8-row frame is checked against the full 4 MiB
 rather than the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very
 large string, binary, or array values — the flush fails instead of splitting.
@@ -663,8 +663,9 @@ publishes or completes its first frame, so treat `None` from `acked_fsn()` as
 Recovery turns on `err.in_doubt()`, not on `err.code()` and not on whether the
 buffer or chunk still holds rows.
 
-When `in_doubt()` is `false`, the rows were provably not transmitted and your
-input is intact: re-flush it. When `in_doubt()` is `true`, delivery is
+When `in_doubt()` is `false`, the flush failed before the queue took the frame,
+so the rows never entered the send path and your input is intact: re-flush it.
+When `in_doubt()` is `true`, delivery is
 uncertain — do not blindly replay, because the queue may already hold the rows.
 Waiting never duplicates, so `wait()` (or observe `acked_fsn()`) for whatever
 the queue holds; replay the same rows only if the table's dedup/upsert keys
@@ -672,7 +673,7 @@ make duplicates harmless.
 
 The code alone cannot make this decision: a delivery-unknown failure typically
 reports `ErrorCode::FailoverRetry`, and a socket error is classified to that
-same code when the rows provably never left. Pair `in_doubt() == false` with a
+same code when nothing was ever published. Pair `in_doubt() == false` with a
 retryable code before re-sending.
 
 How much waiting recovers depends on the API:

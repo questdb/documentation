@@ -53,9 +53,9 @@ then borrows a **reader** to read it back. This exercises both APIs in one
 runnable program; in production the ingestion and query paths are usually
 separate services that share only the table.
 
-The read-back pauses for a second first. A flush ack means the server accepted
-the row; the row becomes visible to queries a few milliseconds later, once
-QuestDB applies the WAL to the table (see
+The read-back pauses for a second first. Flush-and-wait returns once the server
+has accepted the row; the row becomes visible to queries a few milliseconds
+later, once QuestDB applies the WAL to the table (see
 [Durability and backpressure](#durability-and-backpressure)). For bulk/columnar
 and Arrow ingestion, see [The pool](#the-pool) and
 [Sending data: chunks](#sending-data-column-major).
@@ -76,7 +76,7 @@ int main()
 {
     questdb::pool pool{"ws::addr=localhost:9000;"};
 
-    // Insert: borrow a sender, write a row, flush + wait for the ack.
+    // Insert: borrow a sender, write a row, flush-and-wait.
     {
         auto sender = pool.borrow_sender();
         auto buffer = sender.new_buffer();
@@ -87,8 +87,8 @@ int main()
         sender.flush_and_wait(buffer);
     }
 
-    // Pause so the read-back sees the row: the ack above means the server
-    // accepted it, and it becomes queryable a few milliseconds later.
+    // Pause so the read-back sees the row: the flush-and-wait above means the
+    // server accepted it, and it becomes queryable a few milliseconds later.
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Query: borrow a reader, run SQL, print rows.
@@ -132,7 +132,7 @@ int main(void)
     db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
-    /* Insert: borrow a sender, write a row, flush + wait for the ack. */
+    /* Insert: borrow a sender, write a row, flush-and-wait. */
     sender = questdb_db_borrow_sender(db, &err);
     if (!sender) goto on_error;
     buffer = questdb_db_new_buffer(db, &err);
@@ -148,8 +148,8 @@ int main(void)
     questdb_db_return_sender(db, sender);
     sender = NULL;
 
-    /* Pause so the read-back sees the row: the ack above means the server
-       accepted it, and it becomes queryable a few milliseconds later. */
+    /* Pause so the read-back sees the row: the flush-and-wait above means the
+       server accepted it, and it becomes queryable a few milliseconds later. */
     thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL);
 
     /* Query: borrow a reader, run SQL, print rows. */
@@ -230,20 +230,6 @@ use it on one thread, then **return** it (recycles the connection) or **drop**
 it (retires it). In C++ the borrowed sender wrapper and pooled reader return on
 destruction; `drop_on_return()` forces a drop. The pool connects lazily, and
 reconnects and fails over on its own.
-
-### One error type, two names (C) {#one-error-type-two-names}
-
-C code on this page shows both `line_sender_error` and `questdb_error`. **They
-are the same type**: `questdb_error` is a typedef of `line_sender_error`, the
-error codes are aliased (`questdb_error_auth_error` *is*
-`line_sender_error_auth_error`), and the accessors come in both spellings with
-identical behavior (`questdb_error_msg` / `line_sender_error_msg`).
-
-The `questdb_*` spelling is the neutral one, used by APIs that span ingest and
-query; the `line_sender_*` spelling shipped first and still works everywhere.
-Either name compiles against any error this page returns, so pick one per
-program and stay with it. The examples below use whichever spelling matches the
-header in view.
 
 ### Which borrow?
 
@@ -682,13 +668,13 @@ on_error:;
   on its own. The client targets about 2 MiB per frame — half of `sf_max_bytes`
   (default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. It
   halves the row range until each frame fits, stopping at 8 rows: validity
-  bitmaps and boolean columns pack one row per bit, so a frame must start on a
+  bitmaps and boolean columns pack one bit per row, so a frame must start on a
   byte boundary. An 8-row frame is checked against the full 4 MiB rather than
   the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
   string, binary, or array values — the flush fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code.** Check
-  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). False means the rows were
-  provably not transmitted and the chunk is intact: re-flush it. True means
+  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). False means the queue
+  never took the frame and the chunk is intact: re-flush it. True means
   delivery is uncertain, so `wait` for what the queue already holds, and resend
   the chunk only where the table's dedup keys make duplicate rows harmless. A
   chunk that split across frames needs extra care;
@@ -1208,9 +1194,10 @@ queue and returns before the server acks.
    typically reports `failover_retry`, and that code alone does not mean the
    input is safe to resend; likewise an emptied buffer does not mean the rows
    arrived, and a full one does not mean they didn't. `in_doubt == false` means
-   the rows were provably not transmitted and the buffer or chunk is intact, so
-   re-flush it. True means the queue may already hold them: wait rather than
-   re-flush, and replay the same rows only if the table's dedup keys make
+   the flush failed before the queue took the frame: the rows never entered the
+   send path, so nothing can reach the server and the buffer or chunk is
+   intact — re-flush it. True means the queue may already hold them: wait rather
+   than re-flush, and replay the same rows only if the table's dedup keys make
    duplicates harmless.
    - **A buffer is one frame, queued whole or not at all.** So an in-doubt
      buffer failure can only be a failed ack wait, with every row already
@@ -1691,7 +1678,7 @@ The pooled surface in both languages:
 - **Error handling.** C has one error type under two names: reader declarations
   spell it `questdb_error`, ingress declarations `line_sender_error`, and
   either name works anywhere (see
-  [One error type, two names](#one-error-type-two-names)). Fallible calls
+  [One error type, two names](#one-error-type-two-names) below). Fallible calls
   return `bool` or a handle (`NULL` on failure); read and free errors with
   `questdb_error_msg` / `questdb_error_free`, or the identical
   `line_sender_error_msg` / `line_sender_error_free`. In C++, catch
@@ -1705,6 +1692,26 @@ The pooled surface in both languages:
 - **Concurrency.** The pool is shared across threads; a borrowed handle belongs
   to one thread at a time. See
   [Concurrency: one borrow per worker](#concurrency-one-borrow-per-worker).
+
+### One error type, two names (C) {#one-error-type-two-names}
+
+The C library also ships the legacy Line Sender API for ILP ingestion, whose
+types all carry a `line_sender_` prefix. The QWP API shares some of them, the
+error object among them: it reports failures through the same
+`line_sender_error` rather than declaring an error type of its own. To keep the
+naming neutral across ingest and query, the headers alias it:
+
+```c
+typedef line_sender_error questdb_error;
+typedef line_sender_error_code questdb_error_code;
+```
+
+Hence the two spellings in C code on this page. They are the same type: the
+error codes are aliased too (`questdb_error_auth_error` *is*
+`line_sender_error_auth_error`), and the accessors come in both spellings with
+identical behavior (`questdb_error_msg` / `line_sender_error_msg`). Either name
+compiles against any error this page returns, so pick one per program and stay
+with it. The examples use whichever spelling matches the header in view.
 
 ## Full API reference
 
