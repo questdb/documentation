@@ -662,13 +662,13 @@ on_error:;
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
 - **A chunk too large for one frame is split** across several, publishing each
-  on its own. The limits derive from `sf_max_bytes` (default 4 MiB): the client
-  halves the row range until each frame fits, aiming for about 2 MiB per frame,
-  so any chunk of real size splits. Halving stops at 8 rows, because validity
-  bitmaps and boolean columns pack one row per bit and a frame can only begin
-  on a byte boundary. Such a block is held only to the queue's real limit of
-  about 4 MiB; if 8 rows still exceed it — which takes very large string,
-  binary, or array values — the flush fails instead of splitting.
+  on its own. The client targets about 2 MiB per frame — half of `sf_max_bytes`
+  (default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. It
+  halves the row range until each frame fits, stopping at 8 rows: validity
+  bitmaps and boolean columns pack one row per bit, so a frame must start on a
+  byte boundary. An 8-row frame is checked against the full 4 MiB rather than
+  the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
+  string, binary, or array values — the flush fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code or the chunk's
   state.** Check `line_sender_error_in_doubt` (C++: `e.in_doubt()`). When
   false, the rows were provably not transmitted and the chunk is intact:
@@ -1512,10 +1512,9 @@ them fail with `invalid_api_call`. Return and drop remain **mutually
 exclusive** per handle (exactly one, exactly once); a second release call on
 the same handle is undefined behavior.
 
-There is **no `must_close()` inspection call**: earlier drafts of this API had
-one and it was removed deliberately. The return path detects a
-terminally-latched connection and retires it; you only ever choose between
-plain return and force-drop.
+There is **no `must_close()` inspection call**: the return path detects a
+connection that has failed permanently and retires it, so you only ever choose
+between plain return and force-drop.
 
 ## Production shape: TLS, token, multi-host, retry
 
