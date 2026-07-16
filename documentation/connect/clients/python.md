@@ -5,12 +5,9 @@ sidebar_label: Python
 description: "Use the QuestDB Python client's QuestDB pool for row, DataFrame, and Arrow ingestion plus SQL queries over QWP."
 ---
 
-The QuestDB Python client uses one thread-safe `QuestDB` handle for ingestion
-and SQL queries over
-[QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Lease a
-short-lived sender for each unit of row-building work, bulk-load DataFrames
-through the handle, and run SQL with `query()`. Context managers return every
-lease to the pool.
+The QuestDB Python client uses one `QuestDB` handle for ingestion and SQL
+queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Lease a short-lived sender for each unit of row-building work, bulk-load DataFrames
+through the handle, and run SQL with `query()`. 
 
 ## Quick start
 
