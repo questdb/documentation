@@ -92,8 +92,24 @@ db = questdb.connect("ws::addr=localhost:9000;")
 
 `connect()` accepts only `ws`/`wss` configuration strings; ILP schemes such
 as `http::` or `tcp::` belong to the [legacy Sender](#legacy-ilp-clients).
-Servers without QWP support fail during the WebSocket upgrade; see
+It parses and validates the string without opening a connection: the first
+`sender()`, `dataframe()`, or `query()` call opens one, and later calls
+reuse pooled connections. Servers without QWP support fail during the
+WebSocket upgrade; see
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
+
+Instead of a configuration string, `connect()` also takes the equivalent
+keywords — `host=` (required in this form), `port=` (default 9000), and
+`tls=` (default `False`) — plus any further configuration keys as keyword
+arguments, with booleans mapping to `on`/`off`:
+
+```python
+db = questdb.connect(host="localhost", port=9000, sender_pool_max=8)
+```
+
+The two forms are mutually exclusive: passing both a configuration string
+and `host=`, or extra setting keywords alongside a configuration string,
+raises `TypeError`.
 
 The handle is a context manager. Without `with`, call `db.close()` at
 shutdown. `QuestDB.from_conf()` is the equivalent static constructor.
@@ -127,16 +143,21 @@ token = questdb.connect(
 ```
 
 Authentication happens during the WebSocket upgrade, before any data frames
-are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` during that
-upgrade, not from `connect()`.
+are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
+first operation that needs the connection, not from `connect()`. Queries and
+`dataframe()` calls raise it directly. Row senders connect in the
+background, so a fire-and-forget `flush()` can return before the upgrade
+fails; the error then surfaces from `flush(wait=True)`, `wait()`, or the
+next call on the lease — and immediately through the
+[connection listener](#failover-and-errors) as an `AuthFailed` event.
 
-With `wss`, the default certificate root store is the bundled `webpki` set.
-Override it with configuration keys:
+With `wss`, the default combines the bundled `webpki` root store with the
+operating-system certificate store. Override it with configuration keys:
 
 | Setting | Meaning |
 | --- | --- |
-| `tls_ca=os_roots` | Use the operating-system certificate store. |
-| `tls_ca=webpki_and_os_roots` | Combine the bundled and OS root stores. |
+| `tls_ca=os_roots` | Use only the operating-system certificate store. |
+| `tls_ca=webpki_roots` | Use only the bundled `webpki` root store. |
 | `tls_roots=/path/to/ca.pem` | Use a private CA bundle. |
 | `tls_verify=unsafe_off` | Disable verification; use only in controlled tests. |
 
@@ -181,8 +202,12 @@ Match the API to the shape of the work:
 There is no per-column setter or chunk API in the Python client; whole-frame
 `dataframe()` is the column-major path. Row senders use store-and-forward;
 `dataframe()` uses a separate direct connection pool and blocks for an ack.
-A sender lease also exposes `dataframe()`, which borrows a direct connection
-for that one call.
+Call it on the handle: `db.dataframe()`. A sender lease exposes the same
+`dataframe()` as a convenience, but it is not part of the lease's row
+stream — it borrows a direct connection for that one call, commits
+independently, has no ordering relationship with rows buffered on the lease
+via `row()`, and does not flush them. Mixing the two on one lease invites
+ordering surprises; prefer `db.dataframe()`.
 
 ## Row ingestion
 
@@ -283,8 +308,12 @@ call.
 delivery continues in the background. `flush(wait=True)` additionally blocks
 until the server acknowledges everything published on this lease, and
 `wait(timeout_millis)` is the standalone barrier with an explicit no-progress
-timeout (`0` means no deadline). Closing the lease (leaving the `with` block)
-flushes remaining rows without waiting.
+timeout (`0` means no deadline; `wait()` returns immediately when the lease
+published nothing). The barrier raises only on a terminal connection
+failure: server rejections are pushed to the pool's
+[rejection handler](#server-rejections) — logged by default — rather than
+raised from the wait. Closing the lease (leaving the `with` block) flushes
+remaining rows without waiting.
 
 The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`, and
 no FSN methods (`flush_and_get_fsn`, `await_acked_fsn`); those exist only on
@@ -443,9 +472,9 @@ the same `binds` and `reset_symbol_dict` arguments as `db.query(sql)`:
 import questdb
 
 with questdb.connect("ws::addr=localhost:9000;") as db:
-    with db.reader() as q:
-        recent = q.query("SELECT * FROM trades LIMIT 10").to_pandas()
-        again = q.query(
+    with db.reader() as reader:
+        recent = reader.query("SELECT * FROM trades LIMIT 10").to_pandas()
+        again = reader.query(
             "SELECT * FROM trades LIMIT 10", reset_symbol_dict=False
         ).to_pandas()
 ```
@@ -529,7 +558,9 @@ background delivery continues, so retry `wait()` rather than flushing the
 same rows again.
 
 `flush(wait=True)` and `wait()` observe the accepted (`Ok`) acknowledgement:
-the server took responsibility for the frames. A durable-level wait (waiting
+the server took responsibility for the frames. They are pure barriers —
+data-fate notification is a separate channel, the
+[rejection handler](#server-rejections). A durable-level wait (waiting
 for object-storage upload on Enterprise deployments) is not exposed on the
 pooled Python API. The `request_durable_ack=on` connect key is accepted, and
 a server without durable-ack support rejects the first operation with
@@ -654,6 +685,47 @@ db = questdb.connect(
 `db.connection_events_delivered` and `db.connection_events_dropped` report
 totals. [`server_info()`](#server-information) snapshots the handshake.
 
+### Server rejections
+
+The server can reject published frames — a schema mismatch, a parse error —
+after `flush()` has already returned. Rejections are pushed to the pool's
+rejection handler, one `QwpWsError` per rejection, on a dedicated dispatcher
+thread with a bounded drop-oldest inbox (`qwp_ws_error_inbox_capacity`,
+default 64). This covers every pooled connection, including rejections for
+rows whose sender lease was already closed:
+
+```python
+import questdb
+
+
+def on_rejection(error):
+    print(
+        error.category.tag,       # e.g. "schema_mismatch"
+        error.applied_policy.tag, # "terminal", "retriable", ...
+        error.message,
+        error.from_fsn,
+        error.to_fsn,
+    )
+
+
+db = questdb.connect(
+    "ws::addr=localhost:9000;",
+    qwp_ws_error_handler=on_rejection,
+)
+```
+
+Without a handler, every rejection is logged through the `questdb` Python
+logger — `ERROR` for terminal rejections, `WARNING` for retriable ones,
+which the store-and-forward queue replays — so rejections are never silent.
+The `db.rejection_events_delivered` and `db.rejection_events_dropped`
+properties report totals.
+
+Use the handler for dead-lettering, alerting, and metrics. Terminal
+rejections additionally latch the connection: the next call on the affected
+sender lease raises `QuestDBServerRejectionError`, and the pool retires the
+connection instead of lending it out again. Producer-side abort logic
+belongs with that raised error, not in the handler.
+
 Reader failover has a separate policy:
 
 | Key | Default | Meaning |
@@ -697,7 +769,7 @@ Codes you will most often dispatch on:
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
 | `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
 | `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` or PyCapsule consumer. | Discard partial state and rerun the query. |
-| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...). | Inspect `qwp_ws_error`; fix the data or the schema. |
+| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `qwp_ws_error`; fix the data or the schema. |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |
 
 `QuestDBServerRejectionError` marks a terminal server rejection; its
@@ -714,9 +786,10 @@ table names, column names, and SQL fragments, so sanitize them before
 forwarding to end-user UIs or third-party error trackers.
 
 After an error, close the lease or result as usual (or leave the `with`
-block): the pool inspects returned connections and retires any that latched
-a terminal error, so plain closing is always safe and the next lease gets a
-healthy connection.
+block): the pool inspects connections both when they are returned and when
+they are lent out, retiring any that latched a terminal error in between,
+so plain closing is always safe and the next lease gets a healthy
+connection.
 
 ### Server information
 
@@ -727,7 +800,7 @@ cluster and node identifiers.
 ## Closing
 
 `db.close()` (or leaving the `with` block) is idempotent: it waits for open
-sender and query leases to close, drains store-and-forward queues on a
+sender and reader leases to close, drains store-and-forward queues on a
 best-effort basis for `close_flush_timeout_millis` (default five seconds),
 and closes pooled connections. In-flight `QueryResult`s from one-shot
 `query(sql)` calls are not interrupted; they keep streaming and release
