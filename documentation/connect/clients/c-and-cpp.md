@@ -35,14 +35,14 @@ target_link_libraries(your_target questdb_client)
 ```
 
 - The query reader and its `zstd` dependency are always compiled into the C
-  and C++ library. There is no reader feature toggle.
+  and C++ library.
 - Arrow support ([ingestion](#arrow-ingestion) and
   [result batches](#arrow-result-batches)) is opt-in: build with
   `-DQUESTDB_ENABLE_ARROW=ON`.
 - The library links statically by default; `-DBUILD_SHARED_LIBS=ON` builds a
   shared library instead. Outside CMake, add the repo's `include/` directory
   to your include path and link `-lquestdb_client`.
-- `git submodule` / `git subtree` grafting and building from source are
+- Vendoring with `git submodule` / `git subtree`, and building from source, are
   covered in the repo's
   [DEPENDENCY.md](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
 
@@ -51,11 +51,13 @@ target_link_libraries(your_target questdb_client)
 The code below opens a connection pool, borrows a **sender** to write a row,
 then borrows a **reader** to read it back. This exercises both APIs in one
 runnable program; in production the ingestion and query paths are usually
-separate services that share only the table. The read-back pauses briefly
-because the flush ack confirms the server accepted the row, while visibility to
-queries follows within milliseconds, after QuestDB applied the WAL to the table
-(see [Durability and backpressure](#durability-and-backpressure)). For
-bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
+separate services that share only the table.
+
+The read-back pauses for a second first. A flush ack means the server accepted
+the row; the row becomes visible to queries a few milliseconds later, once
+QuestDB applies the WAL to the table (see
+[Durability and backpressure](#durability-and-backpressure)). For bulk/columnar
+and Arrow ingestion, see [The pool](#the-pool) and
 [Sending data: chunks](#sending-data-column-major).
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
@@ -85,9 +87,8 @@ int main()
         sender.flush_and_wait(buffer);
     }
 
-    // The ack means the server accepted the row, not that it is queryable
-    // yet; visibility follows within milliseconds. Pause so the immediate
-    // read-back below sees the row.
+    // Pause so the read-back sees the row: the ack above means the server
+    // accepted it, and it becomes queryable a few milliseconds later.
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Query: borrow a reader, run SQL, print rows.
@@ -117,8 +118,10 @@ int main()
 
 int main(void)
 {
-    line_sender_error* err = NULL;   /* pool + sender use this error type */
-    questdb_error* rerr = NULL;      /* reader / cursor error */
+    /* line_sender_error and questdb_error are the same type under two names,
+       so one variable would do; two keeps the error paths separate below. */
+    line_sender_error* err = NULL;   /* pool + sender */
+    questdb_error* rerr = NULL;      /* reader + cursor */
     questdb_db* db = NULL;
     qwp_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
@@ -145,9 +148,8 @@ int main(void)
     questdb_db_return_sender(db, sender);
     sender = NULL;
 
-    /* The ack means the server accepted the row, not that it is queryable
-       yet; visibility follows within milliseconds. Pause so the immediate
-       read-back below sees the row. */
+    /* Pause so the read-back sees the row: the ack above means the server
+       accepted it, and it becomes queryable a few milliseconds later. */
     thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL);
 
     /* Query: borrow a reader, run SQL, print rows. */
@@ -226,8 +228,22 @@ threads, close it at shutdown.
 You don't open connections yourself: **borrow** a lease (a sender or reader),
 use it on one thread, then **return** it (recycles the connection) or **drop**
 it (retires it). In C++ the borrowed sender wrapper and pooled reader return on
-destruction; `drop_on_return()` forces a drop. The pool connects lazily and
-handles reconnect and failover underneath.
+destruction; `drop_on_return()` forces a drop. The pool connects lazily, and
+reconnects and fails over on its own.
+
+### One error type, two names (C) {#one-error-type-two-names}
+
+C code on this page shows both `line_sender_error` and `questdb_error`. **They
+are the same type**: `questdb_error` is a typedef of `line_sender_error`, the
+error codes are aliased (`questdb_error_auth_error` *is*
+`line_sender_error_auth_error`), and the accessors come in both spellings with
+identical behavior (`questdb_error_msg` / `line_sender_error_msg`).
+
+The `questdb_*` spelling is the neutral one, used by APIs that span ingest and
+query; the `line_sender_*` spelling shipped first and still works everywhere.
+Either name compiles against any error this page returns, so pick one per
+program and stay with it. The examples below use whichever spelling matches the
+header in view.
 
 ### Which borrow?
 
@@ -290,9 +306,9 @@ wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (E
   environment (good for containers). Use `os_roots` when trust is managed at
   the OS level (corporate CAs pushed to the host), `webpki_and_os_roots` for
   both, or `tls_roots=/path/ca.pem` for a private CA. `tls_verify=unsafe_off`
-  disables verification (testing only). A standard CMake build compiles this
-  escape hatch in; a library built with
-  `-DQUESTDB_ENABLE_INSECURE_SKIP_VERIFY=OFF` rejects the key instead.
+  disables verification (testing only). A standard CMake build accepts this
+  key; a library built with `-DQUESTDB_ENABLE_INSECURE_SKIP_VERIFY=OFF`
+  rejects it.
 - **`auth_timeout_ms`** (default 15000) bounds the WebSocket upgrade.
 
 Because the pool connects lazily, a bad credential surfaces as
@@ -313,8 +329,8 @@ following are **not** supported:
 
 ## Headers
 
-One header covers all writing (it pulls in the row-buffer API for you);
-querying adds the reader header.
+One header covers all writing, including the row-buffer API; querying adds the
+reader header.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -337,10 +353,11 @@ querying adds the reader header.
 
 ## Sending data: row buffers {#sending-data-row-major}
 
-Borrow a sender and flush a `line_sender_buffer` built field-by-field. Create a
-pool-matched buffer with `questdb_db_new_buffer` in C or
-`borrowed_sender::new_buffer()` in C++. The buffer is caller-owned and is not
-tied to the sender borrow. Ingress uses `line_sender_error` throughout.
+Borrow a sender and flush a `line_sender_buffer` built field-by-field. Create
+the buffer from the pool — `questdb_db_new_buffer` in C,
+`borrowed_sender::new_buffer()` in C++ — so that it picks up the pool's
+protocol settings. The buffer is caller-owned and is not tied to the sender
+borrow.
 
 The pool is the shared handle; a borrowed sender is single-thread, so borrow one
 per worker.
@@ -361,7 +378,7 @@ int main()
         questdb::pool pool{"ws::addr=localhost:9000;"};
         auto sender = pool.borrow_sender();   // borrowed_sender (RAII)
 
-        auto buffer = sender.new_buffer();        // protocol-matched buffer
+        auto buffer = sender.new_buffer();        // buffer from the pool
         buffer.table("trades"_tn)
               .symbol("symbol"_cn, "ETH-USDT"_utf8)
               .column("price"_cn, 2615.54)
@@ -400,7 +417,7 @@ int main(void)
     sender = questdb_db_borrow_sender(db, &err);
     if (!sender) goto on_error;
 
-    buffer = questdb_db_new_buffer(db, &err);   // pool-matched QWP/WS buffer
+    buffer = questdb_db_new_buffer(db, &err);   // buffer from the pool
     if (!buffer) goto on_error;
     if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &err)) goto on_error;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
@@ -473,11 +490,11 @@ with the precision and scale you need
 (`CREATE TABLE trades (..., price DECIMAL(18, 2))`) so QuestDB stores it at the
 intended width and scale.
 
-Within each pending row-buffer batch, the first non-null decimal value for a
-column sets that column's wire scale. Later values can use the same or a smaller
-scale, but a larger scale fails at flush because it would lose precision.
-Encode every value at the table column's scale, for example `"1.20"` rather
-than `"1.2"` for `DECIMAL(..., 2)`, so row order does not affect the batch.
+Within one flush, the first non-null decimal value for a column fixes the scale
+that every later value in that flush is encoded at. Later values may use the
+same or a smaller scale; a larger one fails at flush, because encoding it would
+lose precision. Encode every value at the table column's scale — `"1.20"`
+rather than `"1.2"` for `DECIMAL(..., 2)` — and row order stops mattering.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -543,8 +560,7 @@ to `DECIMAL64` / `DECIMAL128`.
 </Tabs>
 
 The decimal setters above are available on row buffers. For chunk ingestion,
-use the [Arrow appenders](#arrow-ingestion) or the NumPy appender
-`column_sender_chunk_append_numpy_column`.
+use the [Arrow appenders](#arrow-ingestion).
 
 See the [Decimal datatype reference](/docs/query/datatypes/decimal/) for
 precision and storage widths, and the
@@ -555,9 +571,9 @@ for the binary wire layout.
 
 Borrow a sender, build a `chunk` of columns (each a contiguous array plus a row
 count), set the designated timestamp, then flush. `flush` publishes the chunk
-into the store-and-forward queue; `wait` is an **ack barrier** that blocks until
-the server has acknowledged everything published so far. `flush_and_wait`
-combines the two for the simple synchronous path, shown below.
+into the store-and-forward queue and returns; `wait` blocks until the server has
+acknowledged everything published so far. `flush_and_wait` combines the two for
+the simple synchronous path, shown below.
 
 The `questdb_db` / `questdb::pool` is the only handle you share across threads;
 a borrowed sender belongs to the thread that took it, so borrow one per worker.
@@ -586,7 +602,7 @@ int main()
              .column_f64("amount", amount, n)
              .at_nanos(ts_ns, n);
 
-        sender.flush_and_wait(chunk);   // publish + ack barrier in one call
+        sender.flush_and_wait(chunk);   // publish, then block until acked
         return 0;
     }
     catch (const questdb::error& e)
@@ -631,7 +647,7 @@ int main(void)
     if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
     if (!column_sender_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
-    // publish + ACK barrier in one call
+    // publish, then block until acked
     if (!qwp_sender_flush_chunk_and_wait(sender, chunk, qwpws_ack_level_ok, &err)) goto on_error;
 
     column_sender_chunk_free(chunk);
@@ -670,35 +686,29 @@ on_error:;
   byte boundary. An 8-row frame is checked against the full 4 MiB rather than
   the 2 MiB target; if 8 rows still exceed 4 MiB — which takes very large
   string, binary, or array values — the flush fails instead of splitting.
-- **Recovery depends on `in_doubt`, not on the error code or the chunk's
-  state.** Check `line_sender_error_in_doubt` (C++: `e.in_doubt()`). When
-  false, the rows were provably not transmitted and the chunk is intact:
-  re-flush it. When true, delivery is uncertain — do not blind-replay.
-  Waiting never duplicates, so wait for whatever the queue already holds —
-  after a failed ACK wait, that is the whole chunk. But a failure partway
-  through a split leaves the earlier frames queued and the rest never accepted,
-  so waiting alone will not deliver the remainder; recovering it means
-  resending the chunk, which is safe only if the table's dedup keys make
-  duplicate rows harmless. Do not infer which case you are in from whether the
-  chunk still holds rows: neither state means the rows are safe to resend. (To
-  poll progress without blocking, see
+- **Recovery depends on `in_doubt`, not on the error code.** Check
+  `line_sender_error_in_doubt` (C++: `e.in_doubt()`). False means the rows were
+  provably not transmitted and the chunk is intact: re-flush it. True means
+  delivery is uncertain, so `wait` for what the queue already holds, and resend
+  the chunk only where the table's dedup keys make duplicate rows harmless. A
+  chunk that split across frames needs extra care;
+  [Durability and backpressure](#durability-and-backpressure) has the full
+  rules. (To poll progress without blocking, see
   [FSN progress](#fsn-progress-non-blocking).)
-- **`flush` is not durability.** A successful `qwp_sender_flush_chunk` means the
-  frame was accepted by the local store-and-forward queue, which owns delivery,
-  not that the server has ACKed it. `qwp_sender_wait` (C++ `sender.wait()`)
-  only *observes* the ACK; it is a barrier, not a commit step.
-  `flush_and_wait` is the one-call form; for throughput, publish many chunks
-  with `flush`, then `wait` once (`qwpws_ack_level_durable` waits for durable
-  upload, Enterprise). See
+- **A successful `flush` is local acceptance, not delivery.**
+  `qwp_sender_flush_chunk` returning true means the local store-and-forward
+  queue took the frame; a background thread then delivers it and collects the
+  server's ack, which `qwp_sender_wait` (C++ `sender.wait()`) observes. For
+  throughput, publish many chunks with `flush`, then `wait` once
+  (`qwpws_ack_level_durable` waits for durable upload, Enterprise). See
   [Durability and backpressure](#durability-and-backpressure).
 - **Return the borrow.** C: `questdb_db_return_sender` (recycle) or
   `questdb_db_drop_sender` (retire a possibly in-doubt sender); C++ does
   it in the `borrowed_sender` destructor, and `drop_on_return()` forces
-  a drop. A sender that hits a terminal error records it permanently: every
-  later call on that sender fails the same way, and it cannot recover. The
-  return path retires those senders, and any whose pool has been closed, so
-  plain return/destruction is correct for healthy senders. Drop after an error
-  when the next borrower must not inherit that connection.
+  a drop. Once a sender hits a terminal error, every later call on it fails the
+  same way. The return path retires those senders, and any whose pool has been
+  closed, so plain return/destruction is correct for healthy senders. Drop
+  after an error when the next borrower must not inherit that connection.
 
 ### Null values
 
@@ -739,14 +749,14 @@ The fixed-width scalar and temporal setters take
 `(chunk, name, name_len, data, row_count, validity, err_out)` in C, and the
 same arguments minus `chunk`, `name_len`, and `err_out`, chained on
 `column_chunk`, in C++ (`name` is a `std::string_view`; errors throw). Three
-families take extra arguments:
+families vary from that shape:
 
-- **`column_ts`** inserts a `column_sender_ts_unit unit` (passed as `uint32_t`
-  on the ABI) before `validity`.
-- **`column_str` / `column_binary`** replace `data` with
-  `(offsets, bytes, bytes_len)` in Arrow Utf8 / Binary layout.
-- **`symbol_i8` / `_i16` / `_i32`** replace `data` with `(codes, row_count,
-  dict_offsets, dict_offsets_len, dict_bytes, dict_bytes_len)`.
+- **`column_ts`** takes one extra argument, a `column_sender_ts_unit` (a
+  `uint32_t` on the ABI), sitting between `row_count` and `validity`.
+- **`column_str` / `column_binary`** take `(offsets, bytes, bytes_len)` in
+  Arrow Utf8 / Binary layout in place of `data`.
+- **`symbol_i8` / `_i16` / `_i32`** take `(codes, row_count, dict_offsets,
+  dict_offsets_len, dict_bytes, dict_bytes_len)` in place of `data`.
 
 See `column_sender.h` for the exact signatures. Complete list:
 
@@ -767,9 +777,23 @@ See `column_sender.h` for the exact signatures. Complete list:
 Designated timestamp (exactly once per chunk, before flush):
 `at_nanos` / `at_micros` / `at_millis` / `at_seconds` (millis and
 seconds are widened to micros on the wire). Decimals, geohash, arrays, and the
-remaining Arrow type matrix are reachable through the
-[Arrow appenders](#arrow-ingestion) and the NumPy appender
-(`column_sender_chunk_append_numpy_column`).
+remaining Arrow types are reachable through the
+[Arrow appenders](#arrow-ingestion).
+
+:::note The NumPy appender is C-only, for programs embedding Python
+
+`column_sender.h` also declares `column_sender_chunk_append_numpy_column`,
+which appends a raw buffer tagged with a `column_sender_numpy_dtype`. It is
+there for hosts that already hold NumPy arrays. There is no C++ wrapper for it,
+by design: without a NumPy host it is awkward to call, and the
+[Arrow appenders](#arrow-ingestion) reach the same types through a safer
+interface. If you do have NumPy buffers in a C++ program, call the C function
+directly — and note it requires a C-contiguous buffer, since it walks `data`
+forward at the dtype's native stride and cannot see NumPy's strides. Pass a
+sliced, transposed, or reversed view and it reads out of bounds. Run
+`numpy.ascontiguousarray` first.
+
+:::
 
 :::note The designated timestamp column is named `timestamp` server-side
 
@@ -802,7 +826,7 @@ using namespace questdb::ingress::literals;
 void ingest(questdb::pool& pool, ArrowArray& array, const ArrowSchema& schema)
 {
     auto sender = pool.borrow_sender();       // one per thread
-    // Publish + ack barrier in one call; plain flush_arrow_batch() + wait()
+    // Publish, then block until acked; plain flush_arrow_batch() + wait()
     // is the pipelined form.
     sender.flush_arrow_batch_and_wait("trades"_tn, array, schema, "ts"_cn);
 }
@@ -819,7 +843,7 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
     qwp_sender* sender = questdb_db_borrow_sender(db, err);
     if (!sender)
         return false;
-    /* Publish + ACK barrier in one call; qwp_sender_flush_arrow_batch_at_column
+    /* Publish, then block until acked; qwp_sender_flush_arrow_batch_at_column
        followed by qwp_sender_wait is the pipelined form. */
     bool ok = qwp_sender_flush_arrow_batch_at_column_and_wait(
         sender, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
@@ -847,10 +871,9 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
   `column_sender_arrow_import_new` + `..._append_arrow_import` to import once
   and slice across many chunks.
 - Dictionary-encoded string columns map to `SYMBOL` by default; plain Utf8 to
-  `VARCHAR`. The full supported matrix (43 Arrow type classifications) and
-  unsupported kinds (`Struct`, `Map`, `Interval`, ...) are listed in
-  `column_sender.h`; unsupported types fail with
-  `line_sender_error_arrow_unsupported_column_kind`.
+  `VARCHAR`. `column_sender.h` lists every Arrow type the client accepts, and
+  the kinds it rejects (`Struct`, `Map`, `Interval`, ...); a rejected type
+  fails with `line_sender_error_arrow_unsupported_column_kind`.
 
 ## Querying data
 
@@ -879,10 +902,13 @@ recovery:
 - **Transparent replay**: install `reader_query_on_failover_reset` (C) /
   `query::on_failover_reset` (C++) on the prepared query, and discard any
   partial state you accumulated when it fires; the replayed stream then
-  arrives as if the query had just started. `on_failover_progress` reports the
-  reconnect lifecycle but does not authorize replay or clear the duplicate
-  guard. Callbacks run on the cursor's drive thread and must not call back into
-  the reader, query, or cursor.
+  arrives as if the query had just started. Installing this callback is what
+  enables replay — `on_failover_progress` only reports the reconnect
+  lifecycle, so a query carrying just that one still fails with
+  `questdb_error_failover_would_duplicate`.
+
+  Both callbacks run on the internal thread that drives the cursor, so they
+  must not call back into the reader, query, or cursor.
 
 Failover before the first batch is always transparent: no rows were consumed
 yet, so there is nothing to duplicate.
@@ -941,7 +967,8 @@ int main()
 </TabItem>
 <TabItem value="c" label="C">
 
-Pool and reader calls report `questdb_error` in C.
+This example uses the `questdb_error` spelling throughout, including for the
+pool call — see [One error type, two names](#one-error-type-two-names).
 
 ```c
 #include <questdb/ingress/column_sender.h>   // questdb_db pool + questdb_db_connect
@@ -1139,20 +1166,20 @@ for (;;)
   `SYMBOL` column with only the dictionary values that batch references, under
   batch-local codes: smaller batches when symbols are sparse.
 - **Schema drift.** If the table's schema changes mid-stream the call returns
-  `questdb_error_schema_drift`; the cursor re-snapshots and re-delivers the
-  triggering batch under the new schema on the next call, so nothing is
+  `questdb_error_schema_drift`. Call again: the cursor picks up the new schema
+  and re-delivers the batch that triggered the error under it, so no rows are
   dropped.
 
 ## Durability and backpressure {#durability-and-backpressure}
 
-QWP/WebSocket ingestion is asynchronous: every flush **publishes** into a
-local queue that owns delivery, and returns before the server ACKs.
+QWP/WebSocket ingestion is asynchronous: every flush **publishes** into a local
+queue and returns before the server acks.
 
 1. **`flush` = local acceptance.** Success means only that the frame is queued
-   locally. The client runs a **background thread** that owns all communication
-   with the QuestDB server: it delivers queued frames, receives ACKs, and
-   reconnects and replays after a connection failure. It keeps running after
-   you return the sender to the pool, so queued frames still reach the server.
+   locally. A **background thread** does all the talking to QuestDB: it
+   delivers queued frames, receives acks, and reconnects and replays after a
+   connection failure. It keeps running after you return the sender to the
+   pool, so queued frames still reach the server.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
    - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
@@ -1177,19 +1204,22 @@ local queue that owns delivery, and returns before the server ACKs.
      `flush_and_wait` uses the pool-wide `request_timeout` (default 30000 ms).
 3. **`in_doubt` decides whether to retry.** When a flush or wait fails, check
    `line_sender_error_in_doubt` (C++: `e.in_doubt()`) rather than the error
-   code: a delivery-unknown failure typically reports `failover_retry`, and
-   that code alone does not mean the input is safe to resend. False means the
-   rows were provably not transmitted and the buffer or chunk is intact, so
+   code or the state of your buffer or chunk. A delivery-unknown failure
+   typically reports `failover_retry`, and that code alone does not mean the
+   input is safe to resend; likewise an emptied buffer does not mean the rows
+   arrived, and a full one does not mean they didn't. `in_doubt == false` means
+   the rows were provably not transmitted and the buffer or chunk is intact, so
    re-flush it. True means the queue may already hold them: wait rather than
    re-flush, and replay the same rows only if the table's dedup keys make
    duplicates harmless.
-   - **A buffer is one indivisible frame.** Every publication failure is
-     provably-not-delivered, so an in-doubt buffer failure means the ACK wait
-     failed with every row already queued: waiting recovers it.
+   - **A buffer is one frame, queued whole or not at all.** So an in-doubt
+     buffer failure can only be a failed ack wait, with every row already
+     queued. Wait again and the queue delivers them.
    - **A chunk may be split** into several frames (see
      [Sending data: chunks](#sending-data-column-major)). A failure partway
      through queues the earlier frames and never accepts the rest, so waiting
-     delivers only part of the batch.
+     delivers only part of the batch. Getting the remainder means resending the
+     chunk, which is safe only where dedup keys absorb the duplicated rows.
 4. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, each sender's
@@ -1200,9 +1230,9 @@ local queue that owns delivery, and returns before the server ACKs.
    restarts so replay finds them; see [Pool keys](#pool-keys) for the
    directory layout. Strongly recommended for multi-host deployments: during
    failover, flushes keep landing on disk instead of filling RAM.
-5. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
+5. **Backpressure is bounded blocking.** Two caps apply at once: 128 in-flight
    unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
-   10 GiB disk mode). At a cap, `flush` blocks up to
+   10 GiB disk mode). On hitting either, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
    buffer whose single payload exceeds the frame cap derived from
@@ -1212,11 +1242,10 @@ local queue that owns delivery, and returns before the server ACKs.
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
 The pool is the **only** thread-safe handle. Senders and readers belong to the
-thread that borrowed them. Chunks and buffers you create rather than borrow,
-but they are single-thread all the same: only one thread may touch one at a
-time. The recommended
-pattern: share the pool, give each worker its own borrow for its lifetime, and
-size `pool_max` to the worker count.
+thread that borrowed them. Chunks and buffers are single-thread too: only one
+thread may touch one at a time. The recommended pattern: share the pool, give
+each worker its own borrow for its lifetime, and size `pool_max` to the worker
+count.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -1251,7 +1280,7 @@ int main()
                           .at(questdb::ingress::timestamp_nanos::now());
                 }
                 sender.flush(buffer);
-                sender.wait();   // ack barrier before the borrow returns
+                sender.wait();   // block until acked, before the borrow returns
             }
             catch (const questdb::error& e)
             {
@@ -1295,7 +1324,7 @@ static void* worker(void* arg)
         if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
     }
     if (!qwp_sender_flush_buffer(sender, buffer, &err)) goto on_error;
-    if (!qwp_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* ack barrier; 0 = no deadline */
+    if (!qwp_sender_wait(sender, qwpws_ack_level_ok, 0, &err)) goto on_error;   /* block until acked; 0 = no deadline */
 
     line_sender_buffer_free(buffer);
     questdb_db_return_sender(db, sender);
@@ -1348,8 +1377,8 @@ Notes:
   one thread and flush it through a sender borrowed on another, as long as the
   handoff is ordered (e.g. via a queue) and only one thread touches it at a
   time.
-- Each borrowed sender owns its own store-and-forward queue (its own disk
-  slot when `sf_dir` is set), so this pattern applies unchanged in
+- Each borrowed sender owns its own store-and-forward queue (its own directory
+  when `sf_dir` is set), so this pattern applies unchanged in
   store-and-forward mode.
 
 ## Failover, retry, and pool lifecycle
@@ -1380,10 +1409,10 @@ The pool owns reconnection and connection health so borrowers don't have to:
   closed, so plain return/RAII destruction is the default. Use
   `questdb_db_drop_sender` / `drop_on_return()` only after an error where the next
   borrower must not inherit the connection.
-- **Reaping.** With `pool_reap=auto` a background reaper closes idle connections
-  above `pool_size` after `pool_idle_timeout_ms`. With `pool_reap=manual`, call
-  `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`), which returns the number
-  of connections it closed.
+- **Closing idle connections.** With `pool_reap=auto` a background thread closes
+  idle connections above `pool_size` after `pool_idle_timeout_ms`. With
+  `pool_reap=manual`, call `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`)
+  yourself; it returns the number of connections it closed.
 
 ### Which errors mean what {#which-errors-mean-what}
 
@@ -1410,34 +1439,33 @@ callers.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `pool_size` | 1 | Warm/minimum connections. The reaper keeps this many once connections have been opened. |
+| `pool_size` | 1 | Warm/minimum connections. Once connections have been opened, this many stay open however long they sit idle. |
 | `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
 | `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
-| `pool_reap` | `auto` | `auto` runs a background reaper; `manual` requires `questdb_db_reap_idle` / `pool::reap_idle`. |
+| `pool_reap` | `auto` | `auto` closes idle connections on a background thread; `manual` leaves it to your `questdb_db_reap_idle` / `pool::reap_idle` calls. |
 
-When to change them: raise `pool_size` when workers borrow intermittently and
-a cold borrow after idle reaping would pay reconnect and auth latency; the
-reaper keeps that many connections warm. `pool_idle_timeout_ms` trades idle
-sockets against that same reconnect cost. Pick `pool_reap=manual` when you
-want to control the shrink cadence yourself instead of running a background
-reaper thread; call `reap_idle` on your own schedule.
+When to change them: raise `pool_size` when workers borrow intermittently and a
+cold borrow would pay reconnect and auth latency; that many connections stay
+warm. `pool_idle_timeout_ms` trades idle sockets against that same reconnect
+cost. Pick `pool_reap=manual` to control the shrink cadence yourself and avoid
+the background thread; call `reap_idle` on your own schedule.
 
 Every borrowed sender writes through a local **store-and-forward** queue.
 Without `sf_dir` the queue is in memory and private to the borrow; setting
-`sf_dir` switches it to an on-disk slot that survives process restarts. The
-pool mints one slot per borrow as
-`<sf_dir>/<sender_id>-ingest-<index>/`, with stable lowest-free-first indices
-in `[0, pool_max)`, so a restarted pool re-adopts the slots and replays their
-unacked frames.
+`sf_dir` moves it to a directory on disk that survives process restarts. The
+pool gives each borrow its own directory, named
+`<sf_dir>/<sender_id>-ingest-<index>/`, where `index` is the lowest free number
+in `[0, pool_max)`. Because those names are stable, a restarted pool re-adopts
+the directories and replays the unacked frames they hold.
 
-`sender_id` (default `default`) is the slot **base**, not a literal directory
-name: keep it stable across restarts so replay finds the slots, and give each
-pool sharing an `sf_dir` a unique base, because the
-`<sender_id>-ingest-*` directories belong to that pool's namespace. A genuine
-collision (a second process, or two pools with the same base) fails fast with
-a slot-in-use error naming the holder pid instead of corrupting the spool. An
-un-suffixed `<sf_dir>/<sender_id>/` directory is not pool-managed; it is
-treated as an orphan and drained only with `drain_orphans=on`. The
+`sender_id` (default `default`) is the **name prefix** for those directories,
+not a directory itself. Keep it stable across restarts so replay finds them,
+and give each pool sharing an `sf_dir` its own prefix, since a pool assumes
+every `<sender_id>-ingest-*` directory is its own. If two processes (or two
+pools) do share a prefix, the second one fails immediately with an in-use error
+naming the pid that holds the directory. A bare `<sf_dir>/<sender_id>/`
+directory, with no `-ingest-<index>` suffix, is not pool-managed: the pool
+treats it as an orphan and drains it only with `drain_orphans=on`. The
 `sf_max_bytes`, `sf_max_total_bytes`, and `sf_append_deadline_millis` keys
 tune the queue in both memory and disk mode; `sender_id` has no effect
 without `sf_dir`. Full `sf_*` key semantics are in the
@@ -1445,13 +1473,12 @@ without `sf_dir`. Full `sf_*` key semantics are in the
 
 ### Sizing the pool
 
-**A borrow at the cap fails immediately; there is no blocking acquire.**
+**A borrow at the cap fails immediately rather than waiting for a return.**
 When `pool_max` sender handles are already out, `questdb_db_borrow_sender`
-returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws) rather
-than waiting for a return. The exception is disk-backed
-store-and-forward: an at-cap borrow may wait up to
-`close_flush_timeout_millis` for a sender that is currently closing to
-release its slot before failing. Two consequences:
+returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws). The
+exception is disk-backed store-and-forward: an at-cap borrow may wait up to
+`close_flush_timeout_millis` for a sender that is currently closing to release
+its directory before failing. Two consequences:
 
 - **Size `pool_max` to your worker count.** The natural pattern is one borrow
   per worker thread held for the worker's lifetime (see
@@ -1459,9 +1486,9 @@ release its slot before failing. Two consequences:
   hit.
 - **If borrows are short-lived and demand can spike past the cap**, treat the
   at-cap error as backpressure: return a borrow elsewhere, or retry after a
-  delay in your own loop. Don't confuse it with the connect-retry helpers;
-  `borrow_sender_with_retry` retries *connection establishment*, not cap
-  exhaustion.
+  delay in your own loop. `borrow_sender_with_retry` will not help here — it
+  retries *connection establishment*, and at the cap the connection side is
+  working fine.
 
 The sender and reader pools are capped independently, each at `pool_max`, so
 heavy ingestion cannot starve queries; budget up to `pool_max` live connections
@@ -1482,14 +1509,15 @@ while the borrow is still held:
   acknowledged: C `qwp_sender_acked_fsn`; C++ `acked_fsn()`. The server has
   acknowledged everything you published up to that flush once `acked_fsn`
   returns a value `>=` your saved FSN.
-- A no-value FSN is not an error. A successful flush of a non-empty buffer or
-  chunk always yields an FSN; no value (C: `has_value == false` in the
-  `line_sender_qwpws_fsn` out-param, C++: `std::nullopt`) means there was no
+- A successful flush of a non-empty buffer or chunk always yields an FSN. No
+  value (C: `has_value == false` in the `line_sender_qwpws_fsn` out-param,
+  C++: `std::nullopt`) means the buffer or chunk was empty, so there was no
   frame to publish. Likewise `acked_fsn` has no value until the first frame on
   this borrow completes: keep polling, don't re-flush.
 
-FSNs are per-stream watermarks for the **currently borrowed** sender, not
-portable receipts you can check through a later, unrelated pool borrow.
+An FSN is a watermark on one borrowed sender's own stream, meaningful only
+while you hold that borrow. A later borrow from the same pool gets a fresh
+stream, and a number you saved from an earlier one means nothing against it.
 
 ## Closing
 
@@ -1507,15 +1535,15 @@ Orderly shutdown is: **wait, return, close.**
    other thread may be borrowing, returning, or reaping on the same handle
    while it runs.
 
-Outstanding borrows are **independent leases**: returning or dropping them
-after close is safe (they close instead of recycling), but new operations on
+Outstanding borrows **survive the pool's close**: returning or dropping them
+afterwards is safe (they close instead of recycling), but new operations on
 them fail with `invalid_api_call`. Return and drop remain **mutually
 exclusive** per handle (exactly one, exactly once); a second release call on
 the same handle is undefined behavior.
 
-There is **no `must_close()` inspection call**: the return path detects a
-connection that has failed permanently and retires it, so you only ever choose
-between plain return and force-drop.
+You never have to inspect a connection's health yourself. The return path
+detects one that has failed permanently and retires it, so the only choice is
+between plain return and drop.
 
 ## Production shape: TLS, token, multi-host, retry
 
@@ -1646,17 +1674,19 @@ The pooled surface in both languages:
 | Buffer flush | `qwp_sender_flush_buffer` | `borrowed_sender::flush(line_sender_buffer&)` |
 | Chunk flush | `qwp_sender_flush_chunk` | `borrowed_sender::flush(column_chunk&)` |
 | Arrow batch flush | `qwp_sender_flush_arrow_batch_at_column` | `borrowed_sender::flush_arrow_batch()` |
-| One-call flush + ACK barrier | `qwp_sender_flush_buffer_and_wait` / `qwp_sender_flush_chunk_and_wait` | `borrowed_sender::flush_and_wait()` overloads |
+| Flush, then block until acked | `qwp_sender_flush_buffer_and_wait` / `qwp_sender_flush_chunk_and_wait` | `borrowed_sender::flush_and_wait()` overloads |
 | Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
 
 ## Conventions and lifecycle
 
-- **Error handling.** C uses the `questdb_error` vocabulary throughout. Reader
-  functions take `questdb_error**`; ingress declarations use the equivalent
-  `line_sender_error**` typedef. Fallible calls return `bool` or a handle
-  (`NULL` on failure); read and free errors with `questdb_error_msg` and
-  `questdb_error_free` (or the equivalent sender-prefixed accessors). In C++,
-  catch `questdb::error` across pool, ingestion, and query operations.
+- **Error handling.** C has one error type under two names: reader declarations
+  spell it `questdb_error`, ingress declarations `line_sender_error`, and
+  either name works anywhere (see
+  [One error type, two names](#one-error-type-two-names)). Fallible calls
+  return `bool` or a handle (`NULL` on failure); read and free errors with
+  `questdb_error_msg` / `questdb_error_free`, or the identical
+  `line_sender_error_msg` / `line_sender_error_free`. In C++, catch
+  `questdb::error` across pool, ingestion, and query operations.
 - **Ownership.** C handles are created by `*_connect` / `*_new` / `*_from_conf`
   / `questdb_db_borrow_*` and released with `*_close` / `*_free` /
   `questdb_db_return_*` / `questdb_db_drop_*`. Return and drop are **mutually
