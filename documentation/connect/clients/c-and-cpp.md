@@ -290,8 +290,9 @@ wss::addr=db.example.com:9000;token=your_bearer_token;         # bearer token (E
   environment (good for containers). Use `os_roots` when trust is managed at
   the OS level (corporate CAs pushed to the host), `webpki_and_os_roots` for
   both, or `tls_roots=/path/ca.pem` for a private CA. `tls_verify=unsafe_off`
-  disables verification (testing only; requires an `insecure-skip-verify`
-  build).
+  disables verification (testing only). A standard CMake build compiles this
+  escape hatch in; a library built with
+  `-DQUESTDB_ENABLE_INSECURE_SKIP_VERIFY=OFF` rejects the key instead.
 - **`auth_timeout_ms`** (default 15000) bounds the WebSocket upgrade.
 
 Because the pool connects lazily, a bad credential surfaces as
@@ -1666,12 +1667,19 @@ The pooled surface in both languages:
   to one thread at a time. See
   [Concurrency: one borrow per worker](#concurrency-one-borrow-per-worker).
 
-## Scope and gaps
+## Full API reference
 
-- The pool vends **senders** and **readers** in both C and C++, matching the Rust
-  [`QuestDb`](/docs/connect/clients/rust/) surface.
-- The full ABI listing (every enum, struct, and function across the headers) can
-  be regenerated with `scripts/generate-c-api-reference.js`.
+The installed headers are the complete reference. They are generated from the
+client's Rust FFI crate, so they always match the shipped ABI:
+
+| Header | Covers |
+| --- | --- |
+| `questdb/ingress/column_sender.h` | Pool, senders, buffers, chunks, and the connect-string keys |
+| `questdb/ingress/line_sender.h` | Errors, table and column names, UTF-8 helpers |
+| `questdb/egress/reader.h` | Reader, cursor, and Arrow result batches |
+
+Each has a `.hpp` counterpart wrapping the same surface in RAII types that
+throw `questdb::error` instead of returning `false`.
 
 ## Next steps
 

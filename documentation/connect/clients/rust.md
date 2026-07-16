@@ -844,7 +844,7 @@ borrowed-slice `Chunk` values:
 | `published_fsn()` | Read the highest locally published FSN. |
 | `acked_fsn()` | Read the highest completed FSN. |
 | `wait(AckLevel, Duration)` | Wait for everything published on this borrow, using an explicit no-progress timeout. |
-| `drop_on_return()` | Drop this backend instead of recycling it when the borrow ends. |
+| `drop_on_return()` | Drop this connection instead of recycling it when the borrow ends. |
 
 With `arrow-ingress`, `BorrowedSender` also exposes store-and-forward Arrow
 operations:
