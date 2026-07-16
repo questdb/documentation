@@ -632,7 +632,7 @@ use std::sync::Arc;
 use questdb::QuestDb;
 
 let db = Arc::new(QuestDb::connect(
-    "ws::addr=localhost:9000;pool_size=4;pool_max=16;",
+    "ws::addr=localhost:9000;sender_pool_max=4;",
 )?);
 
 let workers: Vec<_> = (0..4)
@@ -659,9 +659,12 @@ and is not part of that thread-bound borrow list.
 
 | Key | Default | Guidance |
 | --- | --- | --- |
-| `pool_size` | `1` | Warm minimum retained after connections have been opened. Set it near steady concurrent use. |
-| `pool_max` | `64` | Per-pool growth cap. Set it at or above peak concurrent borrows. |
-| `pool_idle_timeout_ms` | `60000` | Idle lifetime for connections above `pool_size`. |
+| `sender_pool_min` | `1` | Warm minimum of ingestion connections retained once they have been opened. Set it near steady concurrent use. |
+| `sender_pool_max` | `4` | Ingestion pool growth cap. Set it at or above peak concurrent sender borrows. |
+| `query_pool_min` | `1` | Warm minimum of reader connections retained once they have been opened. |
+| `query_pool_max` | `4` | Reader pool growth cap. Set it at or above peak concurrent reader borrows. |
+| `acquire_timeout_ms` | `5000` | How long a borrow waits for a returned connection once its pool is at its cap. `0` fails fast. |
+| `idle_timeout_ms` | `60000` | Idle lifetime for connections above the warm minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `reap_idle()`. |
 | `initial_connect_retry` | `off` | `on`/`sync` retries initial connection synchronously; `async` starts background retry. |
 
@@ -675,10 +678,11 @@ and Polars helpers use another internal direct pool, so account for those
 connections when sizing the server. Avoid a single combined connection formula;
 the active paths in an application determine the total.
 
-Borrowing at `pool_max` normally fails immediately with
-`ErrorCode::InvalidApiCall`. In disk-backed store-and-forward mode, an
-ingestion borrow may first wait up to `close_flush_timeout_millis` for a
-closing slot to release its disk lock.
+A borrow at the pool's cap waits up to `acquire_timeout_ms` for another thread
+to return a connection, then fails with `ErrorCode::InvalidApiCall`. Set
+`acquire_timeout_ms=0` to fail fast instead. In disk-backed store-and-forward
+mode, an ingestion borrow may first wait up to `close_flush_timeout_millis` for
+a closing slot to release its disk lock.
 
 Keep borrows short. A borrow occupies its slot until `Drop`, even while the
 application is idle.
@@ -818,7 +822,7 @@ These are the supported pool entry points:
 | `borrow_reader()` | `sync-sender-qwp-ws` + `sync-reader-qwp-ws` | Borrow a `BorrowedReader`. |
 | `flush_arrow_batch(table, batch, timestamp_column, overrides, ack_level)` | `arrow-ingress` | Ingest one Arrow batch through an internally borrowed direct sender. |
 | `flush_polars_dataframe(table, dataframe, options)` | `polars-ingress` | Ingest a Polars frame with checkpointed failover replay. |
-| `reap_idle()` | `sync-sender-qwp-ws` | Close expired idle connections above `pool_size` and return the number closed. |
+| `reap_idle()` | `sync-sender-qwp-ws` | Close expired idle connections above the warm minimum and return the number closed. |
 | `close(self)` | `sync-sender-qwp-ws` | Consume and close the pool. Dropping it has the same effect. |
 
 The crate also contains doc-hidden direct-sender, diagnostic, and FFI-owned

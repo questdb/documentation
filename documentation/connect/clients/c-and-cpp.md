@@ -1244,8 +1244,8 @@ queue and returns before the server acks.
 The pool is the **only** thread-safe handle. Senders and readers belong to the
 thread that borrowed them. Chunks and buffers are single-thread too: only one
 thread may touch one at a time. The recommended pattern: share the pool, give
-each worker its own borrow for its lifetime, and size `pool_max` to the worker
-count.
+each worker its own borrow for its lifetime, and size `sender_pool_max` to the
+worker count.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -1260,8 +1260,9 @@ using namespace questdb::ingress::literals;
 
 int main()
 {
-    // pool_max bounds concurrent sender borrows: size it to the worker count.
-    questdb::pool pool{"ws::addr=localhost:9000;pool_max=4;"};
+    // sender_pool_max bounds concurrent sender borrows: size it to the worker
+    // count.
+    questdb::pool pool{"ws::addr=localhost:9000;sender_pool_max=4;"};
 
     std::vector<std::thread> workers;
     for (int w = 0; w < 4; ++w)
@@ -1343,8 +1344,9 @@ on_error:;
 int main(void)
 {
     line_sender_error* err = NULL;
-    /* pool_max bounds concurrent sender borrows: size it to the worker count. */
-    const char* conf = "ws::addr=localhost:9000;pool_max=4;";
+    /* sender_pool_max bounds concurrent sender borrows: size it to the worker
+       count. */
+    const char* conf = "ws::addr=localhost:9000;sender_pool_max=4;";
     questdb_db* db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db)
     {
@@ -1410,7 +1412,7 @@ The pool owns reconnection and connection health so borrowers don't have to:
   `questdb_db_drop_sender` / `drop_on_return()` only after an error where the next
   borrower must not inherit the connection.
 - **Closing idle connections.** With `pool_reap=auto` a background thread closes
-  idle connections above `pool_size` after `pool_idle_timeout_ms`. With
+  idle connections above the warm minimum after `idle_timeout_ms`. With
   `pool_reap=manual`, call `questdb_db_reap_idle(db)` (C++ `pool::reap_idle()`)
   yourself; it returns the number of connections it closed.
 
@@ -1425,7 +1427,7 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
 | `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
 | `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
-| `invalid_api_call` | Borrow at `pool_max` cap, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
+| `invalid_api_call` | Borrow still at the pool cap after `acquire_timeout_ms`, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
 If you are unsure which case you hit, **return is always safe**: the pool
 inspects the connection and retires it if unhealthy, so a broken connection
@@ -1437,26 +1439,32 @@ next borrower must not inherit the connection.
 The connect string accepts pool-tuning keys; the defaults suit most
 callers.
 
+The ingestion and query pools size independently, so each has its own pair of
+keys.
+
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `pool_size` | 1 | Warm/minimum connections. Once connections have been opened, this many stay open however long they sit idle. |
-| `pool_max` | 64 | Hard cap on auto-grow. Borrowing at the cap returns an error. |
-| `pool_idle_timeout_ms` | 60000 | Idle connections above `pool_size` are closed after this long. |
+| `sender_pool_min` | 1 | Warm/minimum ingestion connections. Once connections have been opened, this many stay open however long they sit idle. |
+| `sender_pool_max` | 4 | Hard cap on ingestion auto-grow. |
+| `query_pool_min` | 1 | Warm/minimum query connections. |
+| `query_pool_max` | 4 | Hard cap on query auto-grow. |
+| `acquire_timeout_ms` | 5000 | How long a borrow waits for a returned connection once its pool is at its cap, before returning an error. `0` fails fast. |
+| `idle_timeout_ms` | 60000 | Idle connections above the warm minimum are closed after this long. |
 | `pool_reap` | `auto` | `auto` closes idle connections on a background thread; `manual` leaves it to your `questdb_db_reap_idle` / `pool::reap_idle` calls. |
 
-When to change them: raise `pool_size` when workers borrow intermittently and a
-cold borrow would pay reconnect and auth latency; that many connections stay
-warm. `pool_idle_timeout_ms` trades idle sockets against that same reconnect
-cost. Pick `pool_reap=manual` to control the shrink cadence yourself and avoid
-the background thread; call `reap_idle` on your own schedule.
+When to change them: raise `sender_pool_min` / `query_pool_min` when workers
+borrow intermittently and a cold borrow would pay reconnect and auth latency;
+that many connections stay warm. `idle_timeout_ms` trades idle sockets against
+that same reconnect cost. Pick `pool_reap=manual` to control the shrink cadence
+yourself and avoid the background thread; call `reap_idle` on your own schedule.
 
 Every borrowed sender writes through a local **store-and-forward** queue.
 Without `sf_dir` the queue is in memory and private to the borrow; setting
 `sf_dir` moves it to a directory on disk that survives process restarts. The
 pool gives each borrow its own directory, named
 `<sf_dir>/<sender_id>-ingest-<index>/`, where `index` is the lowest free number
-in `[0, pool_max)`. Because those names are stable, a restarted pool re-adopts
-the directories and replays the unacked frames they hold.
+in `[0, sender_pool_max)`. Because those names are stable, a restarted pool
+re-adopts the directories and replays the unacked frames they hold.
 
 `sender_id` (default `default`) is the **name prefix** for those directories,
 not a directory itself. Keep it stable across restarts so replay finds them,
@@ -1473,15 +1481,16 @@ without `sf_dir`. Full `sf_*` key semantics are in the
 
 ### Sizing the pool
 
-**A borrow at the cap fails immediately rather than waiting for a return.**
-When `pool_max` sender handles are already out, `questdb_db_borrow_sender`
-returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws). The
-exception is disk-backed store-and-forward: an at-cap borrow may wait up to
-`close_flush_timeout_millis` for a sender that is currently closing to release
-its directory before failing. Two consequences:
+**A borrow at the cap waits for a return before it fails.** When
+`sender_pool_max` sender handles are already out, `questdb_db_borrow_sender`
+waits up to `acquire_timeout_ms` for another thread to return one; if none does,
+it returns `NULL` with `line_sender_error_invalid_api_call` (C++ throws). Set
+`acquire_timeout_ms=0` to fail fast instead. In disk-backed store-and-forward
+mode, an at-cap borrow may also wait up to `close_flush_timeout_millis` for a
+sender that is currently closing to release its directory. Two consequences:
 
-- **Size `pool_max` to your worker count.** The natural pattern is one borrow
-  per worker thread held for the worker's lifetime (see
+- **Size `sender_pool_max` to your worker count.** The natural pattern is one
+  borrow per worker thread held for the worker's lifetime (see
   [Concurrency](#concurrency-one-borrow-per-worker)); then the cap is never
   hit.
 - **If borrows are short-lived and demand can spike past the cap**, treat the
@@ -1490,9 +1499,9 @@ its directory before failing. Two consequences:
   retries *connection establishment*, and at the cap the connection side is
   working fine.
 
-The sender and reader pools are capped independently, each at `pool_max`, so
-heavy ingestion cannot starve queries; budget up to `pool_max` live connections
-for each active path.
+The sender and reader pools are capped independently, at `sender_pool_max` and
+`query_pool_max`, so heavy ingestion cannot starve queries; budget each active
+path up to its own cap in live connections.
 
 ## FSN progress (non-blocking) {#fsn-progress-non-blocking}
 
