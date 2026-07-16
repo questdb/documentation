@@ -791,6 +791,30 @@ reached the server, so replaying them can duplicate data; `in_doubt()` rather
 than `code()` decides whether re-sending is safe. See
 [Recovering from a failed flush](#recovering-from-a-failed-flush).
 
+`ErrorCode` is non-exhaustive, so a match on it needs a catch-all arm.
+
+`Error::new(code, msg)` constructs an error where your own code speaks for the
+client, such as a result column that is not the type the program expects:
+
+```rust
+use questdb::{egress::column::ColumnView, Error, ErrorCode};
+
+let ColumnView::Double(price) = batch.column(1)? else {
+    return Err(Error::new(
+        ErrorCode::InvalidApiCall,
+        "result column price is not a DOUBLE",
+    ));
+};
+```
+
+Keep your application's own conditions in your application's error type instead.
+`ErrorCode` describes client, transport, and server failures, and no variant
+stands for an application rule such as "the rows I ingested did not become
+visible within the deadline I chose". `questdb::Error` implements
+`std::error::Error` and is `Send + Sync`, so it propagates into a
+`Box<dyn Error>`, an `anyhow::Error`, or a `thiserror` enum with `?`, and a
+worker thread can return client and application failures through one type.
+
 The writer background runner reconnects and replays queued frames. The
 ingestion retry budget uses these keys:
 
