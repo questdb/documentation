@@ -650,11 +650,14 @@ on_error:;
   `chunk.clear()`).
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
-- **A chunk over the frame cap is split** across several frames, publishing
-  each on its own. The cap derives from `sf_max_bytes` (default 4 MiB), so a
-  chunk encoding to more than roughly 2 MiB splits — routine for the bulk
-  loads chunks are meant for. Only a chunk still too large at the 8-row floor
-  is rejected outright.
+- **A chunk too large for one frame is split** across several, publishing each
+  on its own. The limits derive from `sf_max_bytes` (default 4 MiB): the client
+  halves the row range until each frame fits, aiming for about 2 MiB per frame,
+  so any chunk of real size splits. Halving stops at 8 rows, because validity
+  bitmaps and boolean columns pack one row per bit and a frame can only begin
+  on a byte boundary. Such a block is held only to the queue's real limit of
+  about 4 MiB; if 8 rows still exceed it — which takes very large string,
+  binary, or array values — the flush fails instead of splitting.
 - **Recovery depends on `in_doubt`, not on the error code or the chunk's
   state.** Check `line_sender_error_in_doubt` (C++: `e.in_doubt()`). When
   false, the rows were provably not transmitted and the chunk is intact:

@@ -294,14 +294,19 @@ fn main() -> questdb::Result<()> {
 Use one `Chunk` per batch. Create the chunk after creating the batch's backing
 buffers, append the columns, and flush it before leaving that scope.
 
-A chunk over the frame cap is split across several frames, each published on
-its own. The cap derives from `sf_max_bytes` (default 4 MiB), so a chunk
-encoding to more than roughly 2 MiB splits — routine for the bulk loads chunks
-are meant for. Only a chunk still too large at the 8-row floor is rejected
-outright. A flush that fails partway through a split leaves the earlier frames
-queued and never accepts the rest, which is why chunk recovery differs from
-buffer recovery; see
+A chunk too large for one frame is split across several, each published on its
+own. The limits derive from `sf_max_bytes` (default 4 MiB): the client halves
+the row range until each frame fits, aiming for about 2 MiB per frame, so any
+chunk of real size splits. That matters because a flush failing partway through
+leaves the earlier frames queued and never accepts the rest, which is why chunk
+recovery differs from buffer recovery; see
 [Recovering from a failed flush](#recovering-from-a-failed-flush).
+
+Halving stops at 8 rows, because validity bitmaps and boolean columns pack one
+row per bit and a frame can only begin on a byte boundary. Such a block is held
+only to the queue's real limit of about 4 MiB; if 8 rows still exceed it —
+which takes very large string, binary, or array values — the flush fails
+instead of splitting.
 
 ### Chunk column setters
 
