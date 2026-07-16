@@ -644,10 +644,28 @@ on_error:;
 
 ### Notes
 
-- **Reuse the chunk** across flushes: on a successful flush it is cleared but
-  keeps its capacity; on failure it is left untouched.
+- **Reuse the chunk** across flushes: a flush clears it once the frame is
+  accepted into the local queue, while keeping its capacity. To reset a chunk
+  you built but decided not to send, call `column_sender_chunk_clear` (C++
+  `chunk.clear()`).
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
+- **A chunk over the frame cap is split** across several frames, publishing
+  each on its own. The cap derives from `sf_max_bytes` (default 4 MiB), so a
+  chunk encoding to more than roughly 2 MiB splits — routine for the bulk
+  loads chunks are meant for. Only a chunk still too large at the 8-row floor
+  is rejected outright.
+- **Recovery depends on `in_doubt`, not on the error code or the chunk's
+  state.** Check `line_sender_error_in_doubt` (C++: `e.in_doubt()`). When
+  false, the rows were provably not transmitted and the chunk is intact:
+  re-flush it. When true, delivery is uncertain — do not blind-replay.
+  Waiting never duplicates, so wait (or watch the FSN watermark) for what the
+  queue holds: after a failed ACK wait that is the whole chunk. But a failure
+  partway through a split leaves the earlier frames queued and the rest never
+  accepted, so waiting alone will not deliver the remainder; recovering it
+  means resending the chunk, which is safe only if the table's dedup keys make
+  duplicate rows harmless. Do not infer which case you are in from whether the
+  chunk still holds rows: neither state means the rows are safe to resend.
 - **`flush` is not durability.** A successful `qwp_sender_flush_chunk` means the
   frame was accepted by the local store-and-forward queue, which owns delivery,
   not that the server has ACKed it. `qwp_sender_wait` (C++ `sender.wait()`)
@@ -1135,7 +1153,22 @@ local queue that owns delivery, and returns before the server ACKs.
      `wait` again or watch FSNs; don't re-flush. `wait` takes its deadline
      per call (`0` = none); `flush_and_wait` uses the pool-wide
      `request_timeout` (default 30000 ms).
-3. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
+3. **`in_doubt` decides whether to retry.** When a flush or wait fails, check
+   `line_sender_error_in_doubt` (C++: `e.in_doubt()`) rather than the error
+   code: a delivery-unknown failure typically reports `failover_retry`, and
+   that code alone does not mean the input is safe to resend. False means the
+   rows were provably not transmitted and the buffer or chunk is intact, so
+   re-flush it. True means the queue may already hold them: wait rather than
+   re-flush, and replay the same rows only if the table's dedup keys make
+   duplicates harmless.
+   - **A buffer is one indivisible frame.** Every publication failure is
+     provably-not-delivered, so an in-doubt buffer failure means the ACK wait
+     failed with every row already queued: waiting recovers it.
+   - **A chunk may be split** into several frames (see
+     [Sending data: chunks](#sending-data-column-major)). A failure partway
+     through queues the earlier frames and never accepts the rest, so waiting
+     delivers only part of the batch.
+4. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
    `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist
    in per-sender disk slots and **replay automatically** when a pool with the
@@ -1143,13 +1176,14 @@ local queue that owns delivery, and returns before the server ACKs.
    dirty slots and replays them in the background, no borrow required.
    Strongly recommended for multi-host deployments: during failover, flushes
    keep landing on disk instead of filling RAM.
-4. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
+5. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
    unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
    10 GiB disk mode). At a cap, `flush` blocks up to
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
-   single payload larger than `sf_max_bytes` (default 4 MiB) is rejected
-   immediately instead.
+   buffer whose single payload exceeds the frame cap derived from
+   `sf_max_bytes` (default 4 MiB) is rejected immediately instead; an oversize
+   chunk is split across frames rather than rejected.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
