@@ -48,12 +48,13 @@ target_link_libraries(your_target questdb_client)
 
 ## Quick start
 
-Open a pool, borrow a **sender** to write a row, then borrow a **reader** to
-read it back. This exercises both APIs in one runnable program; in production
-the ingestion and query paths are usually separate services that share only the
-table. The read-back pauses briefly because the flush ack confirms the server
-accepted the row, while visibility to queries follows within milliseconds (see
-[Durability and backpressure](#durability-and-backpressure)). For
+The code below opens a connection pool, borrows a **sender** to write a row,
+then borrows a **reader** to read it back. This exercises both APIs in one
+runnable program; in production the ingestion and query paths are usually
+separate services that share only the table. The read-back pauses briefly
+because the flush ack confirms the server accepted the row, while visibility to
+queries follows within milliseconds, after QuestDB applied the WAL to the table
+(see [Durability and backpressure](#durability-and-backpressure)). For
 bulk/columnar and Arrow ingestion, see [The pool](#the-pool) and
 [Sending data: chunks](#sending-data-column-major).
 

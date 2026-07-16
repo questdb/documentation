@@ -5,10 +5,10 @@ sidebar_label: Rust
 description: "Use the QuestDB Rust connection pool for Buffer, Chunk, Arrow, and Polars ingestion plus streaming SQL queries over QWP."
 ---
 
-The QuestDB Rust client uses one thread-safe `QuestDb` pool for ingestion and
-SQL queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/).
-Borrow a short-lived writer or reader for each unit of work, then let `Drop`
-return its connection to the pool.
+The QuestDB Rust client uses a thread-safe `QuestDb` pool for ingestion and SQL
+queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Borrow
+a short-lived writer or reader for each unit of work, then let `Drop` return its
+connection to the pool.
 
 ## Quick start
 
@@ -19,10 +19,10 @@ Add the client:
 questdb-rs = "7"
 ```
 
-The default features enable both directions: `sync-sender` for ILP/TCP,
-ILP/HTTP, and pooled QWP/WebSocket ingestion, and `sync-reader` for
-QWP/WebSocket queries with Zstandard result decompression. They also enable
-bundled TLS roots and the `ring` cryptography backend.
+The default features enable both directions: `sync-sender` for pooled
+QWP/WebSocket ingestion (as well as the legacy ILP over TCP and HTTP), and
+`sync-reader` for QWP/WebSocket queries with `zstd` compression. They also
+enable bundled TLS roots and the `ring` cryptography backend.
 
 The following program writes one uniquely marked row through a pooled sender,
 waits for the server to accept it, then polls for query visibility:
@@ -84,7 +84,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     println!("{marker} {}", price.value(0));
                     found = true;
-                    break;
                 }
             }
 
@@ -104,11 +103,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-An `Ok` ACK confirms that QuestDB accepted the frame, but WAL application and
-query visibility happen asynchronously. The bounded poll uses a unique value
-and a bind parameter so it cannot accidentally report an older row. In
-production, poll for the application condition you need and choose a timeout
-that matches your ingestion and query latency budget.
+An `Ok` ACK confirms that QuestDB accepted the frame, but the row becomes
+visible only after the WAL is applied to the table. This happens asynchronously.
+The bounded poll uses a unique value and a bind parameter, so it cannot
+accidentally report an older row. In production, poll for the application
+condition you need and choose a timeout that matches your ingestion and query
+latency budget.
+
+Note that the polling code has an inner loop `while let Some(batch) =
+cursor.next_batch()?...`, which seems unnecessary since we're receiving a single
+row. However, the `Cursor` contract states we must either drain all batches or
+call `cancel()`. The loop showcases the general idiom for working with a cursor.
 
 ## Connecting
 
@@ -120,18 +125,20 @@ use questdb::QuestDb;
 let db = QuestDb::connect("ws::addr=localhost:9000;")?;
 ```
 
-`QuestDb::connect` parses the connect string and normally performs no blocking
-network I/O. Disk-backed store-and-forward recovery is the exception: the pool
-may reopen dirty slots at construction and start replay in the background.
+`QuestDb::connect` parses the connect string and doesn't normally perform any
+blocking network I/O. The exception to that happens when store-and-forward
+durability is in use, and the client detects unsent data left over from a
+previously crashed client. The pool may reopen the dirty slots at construction
+and start replaying them in the background.
 
-The ingestion sender creates its local producer on first borrow and connects
-its delivery runner in the background, so it can queue data while the server
-is temporarily unavailable. Reader and direct Arrow/Polars transport errors
-surface from the borrow or operation rather than from `connect()`.
+The ingestion sender creates its local producer on first borrow and connects its
+delivery runner in the background, so it can queue data while the server is
+temporarily unavailable. Reader errors and direct Arrow/Polars transport errors
+surface from the borrow or during operation rather than from `connect()`.
 
 ## Authentication and TLS
 
-Put credentials and TLS settings in the same connect string:
+Put the credentials and TLS settings in the connect string:
 
 ```rust
 use questdb::QuestDb;
@@ -176,10 +183,10 @@ Match the API to the shape of the work:
 Buffer and chunk ingestion use store-and-forward. The pool-level Arrow and
 Polars helpers use a separate direct connection pool and block for an ACK.
 
-All borrowed handles return to their respective pools on `Drop`. A connection
-that has already latched a terminal error is retired automatically. Use
-`drop_on_return()` when your application deliberately abandons a backend and
-does not want it recycled.
+All borrowed handles return to their respective pools on `Drop`. A connection in
+a terminal error state is retired automatically. Use `drop_on_return()` when
+your application deliberately abandons a connection and does not want it
+recycled.
 
 ## Buffer ingestion
 
@@ -284,9 +291,8 @@ fn main() -> questdb::Result<()> {
 }
 ```
 
-Reuse one `Chunk`. A successful flush clears its descriptors while retaining
-capacity. The chunk borrows the supplied slices, so each slice must remain
-alive until the flush returns.
+Use one `Chunk` per batch. Create the chunk after creating the batch's backing
+buffers, append the columns, and flush it before leaving that scope.
 
 ### Chunk column setters
 
@@ -313,9 +319,9 @@ bitmap where bit `1` means valid.
 `BYTE` or `SHORT` is encoded as `0`; a null `BOOLEAN` is encoded as `false`.
 Choose a wider nullable type if that distinction matters.
 
-Other lifecycle methods are `new`, `table`, `row_count`, `is_empty`, and
-`clear`. With `arrow-ingress`, `push_arrow_column` and
-`push_imported_arrow_slice` add Arrow data to an existing chunk.
+Other lifecycle methods are `new`, `table`, `row_count`, and `is_empty`. With
+`arrow-ingress`, `push_arrow_column` and `push_imported_arrow_slice` add Arrow
+data to an existing chunk.
 
 ## Arrow and Polars ingestion
 
