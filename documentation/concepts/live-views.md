@@ -286,6 +286,12 @@ cost of maintained views, or increase the shared
 [`mat.view.refresh.worker.count`](/docs/configuration/materialized-views/)
 setting.
 
+For out-of-order replay cost, compare `o3_resume_replay_rows` with
+`o3_boundary_replay_rows`. Resume replays start from a retained checkpoint and
+remain bounded to the affected tail. Boundary replays rebuild from the view's
+`START FROM` boundary and are more expensive. Both counters reset on restart;
+tune the checkpoint-retention settings when boundary rebuilds are frequent.
+
 Live views also appear in [`tables()`](/docs/query/functions/meta/#tables) with
 `table_type = 'L'`, and are recognized by `SHOW CREATE LIVE VIEW`, `EXPLAIN`,
 `pg_class`, and `information_schema.tables`.

@@ -154,7 +154,7 @@ Returns a `table` with the following columns:
 | `view_table_dir_name` | STRING | View directory name on disk |
 | `base_table_name` | STRING | Base table name |
 | `view_sql` | STRING | Query used to maintain the view |
-| `view_status` | STRING | View status: `active`, `seeding`, or `invalid` |
+| `view_status` | STRING | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
 | `invalidation_reason` | STRING | Message explaining why the view was marked invalid |
 | `flush_every_interval` | LONG | `FLUSH EVERY` interval value |
 | `flush_every_interval_unit` | STRING | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
@@ -162,8 +162,8 @@ Returns a `table` with the following columns:
 | `in_memory_interval_unit` | STRING | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
 | `in_mem_bytes` | LONG | Native footprint of the in-memory tier, a peak-sticky high-water mark |
 | `in_mem_rows` | LONG | Live row count held in the in-memory tier |
-| `o3_rejected_count` | LONG | Count of out-of-order base commits routed through replay |
-| `below_lower_bound_count` | LONG | Count of base rows dropped below the view's lower bound |
+| `o3_rejected_count` | LONG | Count of late out-of-order rows rejected below the view lower bound; resets on restart |
+| `below_lower_bound_count` | LONG | Count of in-order base rows dropped below the view lower bound; resets on restart |
 | `lag_seqtxn` | LONG | Committed base WAL transactions beyond the view's durable processed watermark (`base_table_txn - last_processed_seqtxn`) |
 | `lag_micros` | LONG | Microseconds since the last successful flush |
 | `last_processed_seqtxn` | LONG | Last base transaction processed by the refresh worker |
@@ -175,6 +175,8 @@ Returns a `table` with the following columns:
 | `head_checkpoint_lv_seqtxn` | LONG | View transaction of the latest head checkpoint |
 | `head_checkpoint_max_ts` | TIMESTAMP | Maximum timestamp covered by the latest head checkpoint |
 | `head_checkpoint_state_bytes` | LONG | Size of the latest head checkpoint's window state |
+| `o3_resume_replay_rows` | LONG | Rows re-emitted by bounded out-of-order replays resumed from retained checkpoints; resets on restart |
+| `o3_boundary_replay_rows` | LONG | Rows re-emitted by full boundary-rebuild out-of-order replays; resets on restart |
 
 The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes` is
 the peak-sticky arena footprint that does not shrink after a burst, while

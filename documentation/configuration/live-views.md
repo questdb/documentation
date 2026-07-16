@@ -21,6 +21,35 @@ view refresh. There are no dedicated live-view worker-pool properties.
 Time budget, in microseconds, for a single checkpoint write turn. Checkpoints let
 a restart or out-of-order replay resume without rebuilding the whole view.
 
+## cairo.live.view.checkpoint.retention.count
+
+- **Default**: `8`
+- **Reloadable**: no
+
+Maximum number of checkpoints retained per live view for bounded out-of-order
+replay. A deeper checkpoint ring lets a replay resume closer to a late row, at
+the cost of additional disk usage. The newest checkpoint is always retained. A
+value of `0` or less disables the count bound.
+
+## cairo.live.view.checkpoint.retention.max.bytes
+
+- **Default**: `67108864` (64 MiB)
+- **Reloadable**: no
+
+Maximum total serialized size of retained checkpoints per live view. When the
+ring exceeds this budget, QuestDB prunes the oldest checkpoints. The newest
+checkpoint is always retained. A value of `0` or less disables the byte bound.
+
+## cairo.live.view.checkpoint.retention.micros
+
+- **Default**: `0` (disabled)
+- **Reloadable**: no
+
+Optional event-time horizon for retained checkpoints. Checkpoints older than
+this distance from the newest checkpoint are pruned. Keep this disabled for
+low-rate or coarse-checkpoint views unless you specifically need an additional
+age bound, because a short horizon can leave only the newest replay anchor.
+
 ## cairo.live.view.checkpoint.rows
 
 - **Default**: `1000000`
@@ -87,6 +116,21 @@ Row-count threshold at which an anchored live view compacts a partition's
 per-function state. Compaction fires when a partition's anchor-map entry count
 exceeds this value and the frontier has advanced. Applies only to anchored views
 whose anchor is a monotone, fixed-duration-unit timestamp expression.
+
+## cairo.live.view.refresh.memory.limit.bytes
+
+- **Default**: `0` (unlimited)
+- **Reloadable**: yes
+
+Per-live-view limit on the peak memory used during a refresh cycle. It includes
+persistent window state and transient buffers such as Parquet row-group decode
+buffers. Exceeding the limit invalidates the view immediately; recovery requires
+dropping and recreating it.
+
+Size the limit above the refresh workload's allocation floor. In particular, a
+bounded `ROWS` frame allocates at least one
+`cairo.sql.window.store.page.size` page (1 MiB by default), and a Parquet-backed
+refresh may decode a complete row group.
 
 ## cairo.live.view.refresh.turn.max.commits
 
