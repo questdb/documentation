@@ -233,7 +233,10 @@ timezone; pass timezone-aware values or `TimestampNanos` to avoid
 ambiguity. When QWP auto-creates a table, the designated timestamp column
 is named `timestamp`.
 
-The handle is thread-safe; a sender lease is not. Take one lease per thread
+The handle is thread-safe; a sender lease is not. The lease is not a
+`Sender`; for `isinstance` checks and annotations use the exported
+`questdb.PooledSender` (queries: `questdb.PooledQuery`). Take one
+lease per thread
 and keep it on that thread (see
 [Concurrency and sizing](#concurrency-and-sizing)).
 
