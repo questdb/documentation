@@ -294,6 +294,15 @@ fn main() -> questdb::Result<()> {
 Use one `Chunk` per batch. Create the chunk after creating the batch's backing
 buffers, append the columns, and flush it before leaving that scope.
 
+A chunk over the frame cap is split across several frames, each published on
+its own. The cap derives from `sf_max_bytes` (default 4 MiB), so a chunk
+encoding to more than roughly 2 MiB splits — routine for the bulk loads chunks
+are meant for. Only a chunk still too large at the 8-row floor is rejected
+outright. A flush that fails partway through a split leaves the earlier frames
+queued and never accepts the rest, which is why chunk recovery differs from
+buffer recovery; see
+[Recovering from a failed flush](#recovering-from-a-failed-flush).
+
 ### Chunk column setters
 
 Most setters take `(name, data, validity)`. `Validity` uses an Arrow-style
@@ -561,6 +570,37 @@ publishes or completes its first frame, so treat `None` from `acked_fsn()` as
 "nothing acked yet", not as a failure. A saved boundary is covered once
 `acked_fsn()` returns a value at or above it.
 
+### Recovering from a failed flush {#recovering-from-a-failed-flush}
+
+Recovery turns on `err.in_doubt()`, not on `err.code()` and not on whether the
+buffer or chunk still holds rows.
+
+When `in_doubt()` is `false`, the rows were provably not transmitted and your
+input is intact: re-flush it. When `in_doubt()` is `true`, delivery is
+uncertain — do not blindly replay, because the queue may already hold the rows.
+Waiting never duplicates, so `wait()` (or observe `acked_fsn()`) for whatever
+the queue holds; replay the same rows only if the table's dedup/upsert keys
+make duplicates harmless.
+
+The code alone cannot make this decision: a delivery-unknown failure typically
+reports `ErrorCode::FailoverRetry`, and a socket error is classified to that
+same code when the rows provably never left. Pair `in_doubt() == false` with a
+retryable code before re-sending.
+
+How much waiting recovers depends on the API:
+
+- A `Buffer` publishes as one indivisible frame, and every publication failure
+  is provably-not-delivered. So an in-doubt buffer failure means the ACK wait
+  failed with every row already queued, and `wait()` recovers it.
+- A `Chunk` may be [split](#sending-data-column-major) across frames. A failure
+  partway through queues the earlier frames and never accepts the rest, so
+  waiting delivers only part of the batch. Recovering the remainder means
+  resending the chunk, which is safe only under dedup keys.
+
+Buffer and chunk state is not a substitute for this flag. An in-doubt chunk is
+cleared after a failed ACK wait but populated when a split remainder fails, so
+neither state tells you the rows are safe to resend.
+
 ### Backpressure
 
 Store-and-forward is bounded. When producers continuously outrun the server,
@@ -654,7 +694,10 @@ let db = QuestDb::connect(
 
 The crate uses one `questdb::Error` and `questdb::ErrorCode` vocabulary for
 ingestion and queries. Inspect `err.code()`, `err.msg()`, and, for publication
-failures, `err.in_doubt()`.
+failures, `err.in_doubt()`. A `true` result means the rows may already have
+reached the server, so replaying them can duplicate data; `in_doubt()` rather
+than `code()` decides whether re-sending is safe. See
+[Recovering from a failed flush](#recovering-from-a-failed-flush).
 
 The writer background runner reconnects and replays queued frames. The
 ingestion retry budget uses these keys:
