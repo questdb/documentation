@@ -183,7 +183,7 @@ Match the API to the shape of the work:
 | Events arriving one at a time | `db.sender()` + `row()` | Build rows field by field and flush them in batches. |
 | Data already in a DataFrame or Arrow table | `db.dataframe()` | Encode whole columns in one pass, with commit and ack handled per call. |
 | SQL to execute | `db.query(sql)` | Stream Arrow result batches into pandas, polars, or pyarrow. |
-| Several queries in a row | `db.query()` with no arguments | Lease one reader connection and run queries on it sequentially. |
+| Several queries in a row | `db.reader()` | Lease one reader connection and run queries on it sequentially. |
 
 There is no per-column setter or chunk API in the Python client; whole-frame
 `dataframe()` is the column-major path. Row senders use store-and-forward;
@@ -238,7 +238,7 @@ auto-creates a table, the designated timestamp column is named
 
 The handle is thread-safe; a sender lease is not. The lease is not a
 `Sender`; for `isinstance` checks and annotations use the exported
-`questdb.PooledSender` (queries: `questdb.PooledQuery`). Take one
+`questdb.PooledSender` (readers: `questdb.PooledReader`). Take one
 lease per thread
 and keep it on that thread (see
 [Concurrency and sizing](#concurrency-and-sizing)).
@@ -444,19 +444,19 @@ frame = db.query(
 naive `datetime` bind is interpreted as UTC, the same rule as everywhere
 else in the API.
 
-### Query leases
+### Reader leases
 
-`db.query()` with no arguments leases one reader connection — the read-side
-twin of `db.sender()`. Run queries on it sequentially with the same verb;
-the lease's `query()` takes the same `binds` and `reset_symbol_dict`
-arguments as the one-shot form, and `reset_symbol_dict=False` is effective
-here because every query runs on the same connection:
+`db.reader()` leases one reader connection — the read-side twin of
+`db.sender()`. Run queries on it sequentially; the lease's `query()` takes
+the same `binds` and `reset_symbol_dict` arguments as `db.query(sql)`, and
+`reset_symbol_dict=False` is effective here because every query runs on the
+same connection:
 
 ```python
 import questdb
 
 with questdb.connect("ws::addr=localhost:9000;") as db:
-    with db.query() as q:
+    with db.reader() as q:
         recent = q.query("SELECT * FROM trades LIMIT 10").to_pandas()
         again = q.query(
             "SELECT * FROM trades LIMIT 10", reset_symbol_dict=False
@@ -518,7 +518,7 @@ configuration string to accept Zstandard when the server supports it
 decompression is transparent. The `reset_symbol_dict` keyword (default
 `True`) gives each query a fresh `SYMBOL` dictionary; setting it to `False`
 keeps the dictionary warm only when consecutive queries reuse the same
-connection, which a [query lease](#query-leases) guarantees.
+connection, which a [reader lease](#reader-leases) guarantees.
 
 ## Delivery and durability
 
