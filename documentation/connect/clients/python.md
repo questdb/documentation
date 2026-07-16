@@ -229,12 +229,12 @@ except QuestDBError as e:
 timestamp: a `TimestampNanos`, a `datetime`, or the
 `questdb.ServerTimestamp` sentinel to let the server assign arrival time. A
 naive `datetime` (no `tzinfo`) is interpreted as UTC — everywhere in the
-API — and the first such conversion emits a one-per-process `UserWarning`.
-Beware that `datetime.now()` is your local wall clock: for "now", use
-`TimestampNanos.now()` or `datetime.now(timezone.utc)`. Set the
-`QUESTDB_NAIVE_DATETIME=error` environment variable to reject naive
-`datetime` objects outright. When QWP auto-creates a table, the designated
-timestamp column is named `timestamp`.
+API, and never as your machine's local timezone — and the first such
+conversion emits a one-per-process `UserWarning`. Beware that
+`datetime.now()` is your local wall clock: for "now", use
+`TimestampNanos.now()` or `datetime.now(timezone.utc)`. When QWP
+auto-creates a table, the designated timestamp column is named
+`timestamp`.
 
 The handle is thread-safe; a sender lease is not. The lease is not a
 `Sender`; for `isinstance` checks and annotations use the exported
