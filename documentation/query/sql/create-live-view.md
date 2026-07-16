@@ -16,7 +16,7 @@ CREATE LIVE VIEW [ IF NOT EXISTS ] viewName
 FLUSH EVERY duration
 [ IN MEMORY duration ]
 [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR ) ]
-[ BACKFILL ]
+START FROM ( NOW | BEGINNING | 'timestamp' )
 AS [ ( ] query [ ) ]
 [ OWNED BY ownerName ]
 ```
@@ -28,9 +28,10 @@ Where:
 - `query`: a `SELECT` over one WAL-backed base table whose projection contains
   [window functions](/docs/query/functions/window-functions/overview/).
 
-`FLUSH EVERY` is required and must come first. `IN MEMORY`, `PARTITION BY`, and
-`BACKFILL` are optional and may appear in any order. These four clauses all
-precede `AS`; the optional `OWNED BY` clause follows the query.
+`FLUSH EVERY` is required and must come first. `START FROM` is also required and
+may appear in any order with the optional `IN MEMORY` and `PARTITION BY`
+clauses. These clauses all precede `AS`; the optional `OWNED BY` clause follows
+the query.
 
 ## Parameters
 
@@ -41,7 +42,7 @@ precede `AS`; the optional `OWNED BY` clause follows the query.
 | `FLUSH EVERY` | How often computed rows are persisted to disk. Required |
 | `IN MEMORY` | Window of recent rows kept in RAM for fresh reads. Defaults to `FLUSH EVERY` |
 | `PARTITION BY` | Partitioning unit for the view's disk tier. Defaults to the base table's scheme |
-| `BACKFILL` | Materialize the base table's existing history before live-tailing |
+| `START FROM` | Inclusive event-time boundary: `NOW`, `BEGINNING`, or a timestamp literal. Required |
 | `query` | A window-function `SELECT` over a single WAL-backed base table |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
@@ -66,6 +67,7 @@ The minimum is `100ms`. The maximum is
 ```questdb-sql
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
@@ -86,6 +88,7 @@ and older data from disk. It defaults to `FLUSH EVERY`.
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
 IN MEMORY 5s
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
@@ -102,6 +105,7 @@ view inherits the base table's partitioning scheme.
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
 PARTITION BY HOUR
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
@@ -109,16 +113,35 @@ SELECT timestamp, symbol,
 FROM trades;
 ```
 
-### BACKFILL
+### START FROM
 
-By default a live view processes only the rows that arrive after it is created.
-Add `BACKFILL` to materialize the base table's existing history first. The sweep
-is resumable across restarts.
+`START FROM` defines the inclusive event-time boundary for rows in the live
+view. It is mandatory and accepts:
+
+- `NOW`: resolve the engine clock once when the view is created.
+- `BEGINNING`: include all base-table history.
+- A quoted timestamp literal: include rows whose designated timestamp is equal
+  to or later than that value.
+
+The boundary applies to the base table's designated timestamp, not to commit
+time. QuestDB performs a resumable initial seed for qualifying rows already
+present at creation, then continues refreshing from new base commits.
 
 ```questdb-sql
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
-BACKFILL
+START FROM BEGINNING
+AS
+SELECT timestamp, symbol,
+  avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
+    AS moving_avg
+FROM trades;
+```
+
+```questdb-sql title="Start from an explicit timestamp"
+CREATE LIVE VIEW trades_ma_from_april
+FLUSH EVERY 1s
+START FROM '2026-04-01T00:00:00.000000Z'
 AS
 SELECT timestamp, symbol,
   avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)
@@ -135,6 +158,7 @@ named `WINDOW` with either the `ANCHOR DAILY` shorthand or an
 ```questdb-sql title="Cumulative daily volume, reset each day"
 CREATE LIVE VIEW trades_daily_volume
 FLUSH EVERY 1s
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   sum(amount) OVER w AS cumulative_volume
@@ -145,6 +169,7 @@ WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ANCHOR DAILY);
 ```questdb-sql title="Anchor on an arbitrary expression"
 CREATE LIVE VIEW trades_hourly_volume
 FLUSH EVERY 1s
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   sum(amount) OVER w AS bucket_volume
@@ -193,7 +218,7 @@ CREATE LIVE VIEW IF NOT EXISTS trades_ma
 FLUSH EVERY 1s
 IN MEMORY 5s
 PARTITION BY HOUR
-BACKFILL
+START FROM BEGINNING
 AS
 SELECT
   timestamp,
@@ -212,7 +237,7 @@ This creates a view that:
 - Persists computed rows to disk every second (`FLUSH EVERY 1s`)
 - Keeps 5 seconds of recent rows in RAM for fresh reads (`IN MEMORY 5s`)
 - Partitions its disk tier by hour (`PARTITION BY HOUR`)
-- Materializes the existing history in `trades` before live-tailing (`BACKFILL`)
+- Includes all existing history in `trades` (`START FROM BEGINNING`)
 - Keeps a 300-row moving average of price per symbol
 
 ## Metadata
@@ -248,6 +273,7 @@ Assign ownership to a user, group, or service account:
 CREATE GROUP analysts;
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
+START FROM NOW
 AS
 SELECT timestamp, symbol,
   avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING)

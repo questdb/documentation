@@ -62,6 +62,7 @@ Create a live view that keeps a 300-row moving average of price per symbol:
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
 IN MEMORY 5s
+START FROM NOW
 AS
 SELECT
   timestamp,
@@ -169,6 +170,7 @@ clause:
 ```questdb-sql title="Cumulative daily volume per symbol"
 CREATE LIVE VIEW trades_daily_volume
 FLUSH EVERY 1s
+START FROM NOW
 AS
 SELECT
   timestamp,
@@ -185,18 +187,23 @@ WINDOW w AS (
 An anchored window must be partitioned, cannot use a bounded frame, and its
 anchor expression must be deterministic.
 
-## Backfill
+## Start boundary and historical data
 
-By default a live view only reflects data that arrives after it is created. Rows
-in the base table below the view's creation-time lower bound are not processed.
+Every live view has a mandatory `START FROM` clause that defines an event-time
+lower bound for its rows:
 
-Add the `BACKFILL` clause to materialize the base table's existing history before
-the view starts live-tailing:
+- `START FROM NOW` resolves to the creation time.
+- `START FROM BEGINNING` includes all base-table history.
+- `START FROM 'timestamp'` includes rows at or after the specified timestamp.
 
-```questdb-sql title="Backfill existing history"
+The boundary is inclusive and is evaluated against the base table's designated
+timestamp, not commit time. If qualifying rows already exist when the view is
+created, QuestDB seeds them before switching to continuous refresh.
+
+```questdb-sql title="Include all existing history"
 CREATE LIVE VIEW trades_ma
 FLUSH EVERY 1s
-BACKFILL
+START FROM BEGINNING
 AS
 SELECT
   timestamp,
@@ -206,8 +213,9 @@ SELECT
 FROM trades;
 ```
 
-The backfill sweep is resumable: it checkpoints its progress and continues after
-a restart.
+The seed sweep is resumable: it checkpoints its progress and continues after a
+restart. `START FROM NOW` can still seed existing future-dated rows whose
+designated timestamps are at or above the resolved creation-time boundary.
 
 ## Base table lifecycle
 
@@ -235,10 +243,10 @@ save the definition before dropping the view:
 SHOW CREATE LIVE VIEW trades_ma;
 ```
 
-Then drop and recreate the live view. Add `BACKFILL` to the recreated definition
-if it must include history that is still present in the base table. Dropping the
-invalid view removes its materialized rows, including rows whose source history
-is no longer retained by the base table.
+Then drop and recreate the live view. Use `START FROM BEGINNING` or an explicit
+timestamp if it must include history that is still present in the base table.
+Dropping the invalid view removes its materialized rows, including rows whose
+source history is no longer retained by the base table.
 
 Live views over [deduplicated](/docs/concepts/deduplication/) base tables are
 supported. A keep-last `UPSERT` replacement at an earlier timestamp is reflected
@@ -248,7 +256,7 @@ rather than sub-cycle fresh, because its refresh is coupled to base apply.
 ## Monitoring
 
 The [`live_views()`](/docs/query/functions/meta/#live_views) function exposes the
-state, refresh lag, in-memory footprint, and backfill progress of every live
+state, refresh lag, in-memory footprint, and seed progress of every live
 view:
 
 ```questdb-sql title="List all live views"

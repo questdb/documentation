@@ -138,7 +138,7 @@ SELECT hydrate_table_metadata('*');
 
 `live_views()` returns the list of all [live views](/docs/concepts/live-views/)
 in the database, along with their status, refresh lag, in-memory footprint, and
-backfill progress.
+seed progress.
 
 **Arguments:**
 
@@ -154,7 +154,7 @@ Returns a `table` with the following columns:
 | `view_table_dir_name` | STRING | View directory name on disk |
 | `base_table_name` | STRING | Base table name |
 | `view_sql` | STRING | Query used to maintain the view |
-| `view_status` | STRING | View status: `active`, `backfilling`, or `invalid` |
+| `view_status` | STRING | View status: `active`, `seeding`, or `invalid` |
 | `invalidation_reason` | STRING | Message explaining why the view was marked invalid |
 | `flush_every_interval` | LONG | `FLUSH EVERY` interval value |
 | `flush_every_interval_unit` | STRING | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
@@ -171,7 +171,7 @@ Returns a `table` with the following columns:
 | `lv_consumed_seqtxn` | LONG | Base WAL purge floor held by this view |
 | `view_lower_bound_timestamp` | TIMESTAMP | Lower timestamp bound below which base rows are ignored |
 | `writer_stall_micros` | LONG | Time a flush has been stalled waiting to write, in microseconds |
-| `backfill_target_seqtxn` | LONG | Target base transaction for an in-progress backfill |
+| `seed_target_seqtxn` | LONG | Target base transaction for an in-progress initial seed |
 | `head_checkpoint_lv_seqtxn` | LONG | View transaction of the latest head checkpoint |
 | `head_checkpoint_max_ts` | TIMESTAMP | Maximum timestamp covered by the latest head checkpoint |
 | `head_checkpoint_state_bytes` | LONG | Size of the latest head checkpoint's window state |

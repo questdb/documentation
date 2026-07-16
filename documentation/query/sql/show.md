@@ -212,11 +212,11 @@ SHOW CREATE LIVE VIEW trades_ma;
 
 | ddl |
 | --- |
-| CREATE LIVE VIEW 'trades_ma' FLUSH EVERY 1s IN MEMORY 5s PARTITION BY DAY AS (<br/>SELECT timestamp, symbol, avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING) AS moving_avg FROM trades<br/>); |
+| CREATE LIVE VIEW 'trades_ma' FLUSH EVERY 1s IN MEMORY 5s PARTITION BY DAY START FROM NOW AS (<br/>SELECT timestamp, symbol, avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING) AS moving_avg FROM trades<br/>); |
 
 This returns the `CREATE LIVE VIEW` statement that would recreate the
 [live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
-`IN MEMORY`, `PARTITION BY`, and `BACKFILL` clauses. On QuestDB Enterprise the
+`IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
 output also carries an `OWNED BY` clause identifying the view's owner.
 
 ### SHOW PARTITIONS
