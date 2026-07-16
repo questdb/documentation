@@ -71,11 +71,10 @@ if __name__ == "__main__":
         sys.exit(1)
 ```
 
-`flush(wait=True)` confirms that QuestDB accepted the rows, but WAL
-application and query visibility happen asynchronously. The bounded poll uses
-a unique value so it cannot accidentally report an older row. In production,
-poll for the application condition you need and choose a timeout that matches
-your ingestion and query latency budget.
+`flush(wait=True)` confirms that QuestDB accepted the rows, but query
+visibility happens asynchronously; the bounded poll with a unique marker
+waits for it without matching an older row. In production, poll for the
+condition you need with a timeout that matches your latency budget.
 
 Every client failure raises `QuestDBError`; catch it and dispatch on
 `e.code` as shown. The [error taxonomy](#error-taxonomy) describes the codes
@@ -91,19 +90,13 @@ import questdb
 db = questdb.connect("ws::addr=localhost:9000;")
 ```
 
-`questdb.connect()` accepts only QWP/WebSocket configuration strings; any
-other scheme raises `QuestDBError` with `QuestDBErrorCode.ConfigError`.
-`dataframe()`, `query()`, and `server_info()` connect on demand; `sender()`
-connects in the background. Use `flush(wait=True)` or `wait()` to surface
-sender connection and delivery errors. Later calls reuse pooled connections.
-`QuestDB.from_conf()` is the equivalent static constructor.
-
-QWP support is negotiated during the WebSocket upgrade (the
-`X-QWP-Version` header); unsupported servers fail during that upgrade. See
+`connect()` accepts only `ws`/`wss` configuration strings; ILP schemes such
+as `http::` or `tcp::` belong to the [legacy Sender](#legacy-ilp-clients).
+Servers without QWP support fail during the WebSocket upgrade; see
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
 
 The handle is a context manager. Without `with`, call `db.close()` at
-shutdown.
+shutdown. `QuestDB.from_conf()` is the equivalent static constructor.
 
 There is no `from_env()` on the pooled handle. To keep credentials out of
 code, put the configuration string in an environment variable and read it
@@ -165,10 +158,14 @@ following are **not** supported:
 
 `QuestDB` owns reusable QWP/WebSocket connections. Create one handle per
 application or service process and share it across threads. Each operation
-borrows a connection and returns it when the lease or result closes. When
-every slot is busy, a borrow waits up to `acquire_timeout_ms` (default five
-seconds) and then raises `QuestDBError` with
-`QuestDBErrorCode.InvalidApiCall` naming the exhausted pool.
+borrows a connection, opening one on demand, and returns it when the lease
+or result closes; when every slot is busy, a borrow waits for a free one
+(see [Pool settings](#pool-settings)).
+
+`connect()` performs no blocking network I/O. `dataframe()`, `query()`,
+and `server_info()` connect on first use; `sender()` connects in the
+background, so call `flush(wait=True)` or `wait()` to surface connection and
+delivery errors.
 
 ### Choose an API
 
@@ -223,21 +220,21 @@ except QuestDBError as e:
 `row()` takes the table name, a `symbols` dict for `SYMBOL` columns, a
 `columns` dict for everything else, and the mandatory `at` designated
 timestamp: a `TimestampNanos`, a `datetime`, or the
-`questdb.ServerTimestamp` sentinel to let the server assign arrival time. A
-naive `datetime` (no `tzinfo`) is interpreted as UTC — everywhere in the
-API, and never as your machine's local timezone — and the first such
-conversion emits a one-per-process `UserWarning`. Beware that
-`datetime.now()` is your local wall clock: for "now", use
-`TimestampNanos.now()` or `datetime.now(timezone.utc)`. When QWP
-auto-creates a table, the designated timestamp column is named
+`questdb.ServerTimestamp` sentinel to let the server assign arrival time.
+When QWP auto-creates a table, the designated timestamp column is named
 `timestamp`.
 
-The handle is thread-safe; a sender lease is not. The lease is not a
-`Sender`; for `isinstance` checks and annotations use the exported
-`questdb.PooledSender` (readers: `questdb.PooledReader`). Take one
-lease per thread
+A naive `datetime` (no `tzinfo`) is interpreted as UTC everywhere in the
+API, never as your machine's local timezone, and the first such conversion
+emits a one-per-process `UserWarning`. Beware that `datetime.now()` is your
+local wall clock: for "now", use `TimestampNanos.now()` or
+`datetime.now(timezone.utc)`.
+
+The handle is thread-safe; a sender lease is not. Take one lease per thread
 and keep it on that thread (see
-[Concurrency and sizing](#concurrency-and-sizing)).
+[Concurrency and sizing](#concurrency-and-sizing)). For `isinstance` checks
+and annotations, the lease type is `questdb.PooledSender` (readers:
+`questdb.PooledReader`), not `Sender`.
 
 `len(sender)` reports the number of buffered, not yet published rows.
 
@@ -289,14 +286,9 @@ until the server acknowledges everything published on this lease, and
 timeout (`0` means no deadline). Closing the lease (leaving the `with` block)
 flushes remaining rows without waiting.
 
-:::note Not on the pooled sender
-
-The 4.x `Sender` surface is intentionally absent from the pooled lease:
-there is no `transaction()`, no `new_buffer()` or `Buffer`, and no FSN
-methods (`flush_and_get_fsn`, `await_acked_fsn`). Those exist only on the
-standalone legacy `Sender`.
-
-:::
+The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`, and
+no FSN methods (`flush_and_get_fsn`, `await_acked_fsn`); those exist only on
+the standalone [legacy `Sender`](#legacy-ilp-clients).
 
 ## DataFrame ingestion
 
@@ -407,20 +399,21 @@ print(frame)
 The `to_*` methods materialize the complete result; prefer the `iter_*`
 variants for large results. The PyCapsule protocol lets Arrow consumers read
 the result directly without pyarrow installed, for example
-`polars.from_arrow(result)`.
-
-If the connection fails over mid-result, the `iter_*` and PyCapsule paths
-raise `QuestDBErrorCode.FailoverWouldDuplicate` instead of repeating rows you
-already consumed, while the `to_*` methods replay transparently; see
+`polars.from_arrow(result)`. For what each consumption style observes when
+the connection fails over mid-result, see
 [Failover and errors](#failover-and-errors).
 
-A `QueryResult` is single-use (one materialization or iteration consumes
-it) and must stay on the thread that created it. Fully draining it returns
-its connection to the pool; closing or abandoning a partially-consumed
-result drops the connection instead, and the pool refills on demand — a
-mid-stream cursor cannot be reused safely. Use the `with` block or call
-`close()`; a result that reaches the garbage collector without ever being
-drained or closed is released there and emits a `ResourceWarning`.
+A `QueryResult` is single-use and must stay on the thread that created it.
+Use the `with` block or call `close()`. Fully draining a result returns its
+connection to the pool; closing a partially-consumed one drops the
+connection instead (a mid-stream cursor cannot be reused safely) and the
+pool refills on demand. A result never drained or closed is released by the
+garbage collector with a `ResourceWarning`.
+
+Result compression defaults to `raw`; set `compression=auto` in the
+configuration string to accept Zstandard when the server supports it, with
+`compression_level` (default `1`) tuning the advertised level.
+Decompression is transparent.
 
 ### Bind parameters
 
@@ -442,11 +435,9 @@ else in the API.
 
 ### Reader leases
 
-`db.reader()` leases one reader connection — the read-side twin of
+`db.reader()` leases one reader connection, the read-side twin of
 `db.sender()`. Run queries on it sequentially; the lease's `query()` takes
-the same `binds` and `reset_symbol_dict` arguments as `db.query(sql)`, and
-`reset_symbol_dict=False` is effective here because every query runs on the
-same connection:
+the same `binds` and `reset_symbol_dict` arguments as `db.query(sql)`:
 
 ```python
 import questdb
@@ -458,6 +449,11 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
             "SELECT * FROM trades LIMIT 10", reset_symbol_dict=False
         ).to_pandas()
 ```
+
+The `reset_symbol_dict` keyword (default `True`) gives each query a fresh
+`SYMBOL` dictionary. Setting it to `False` keeps the dictionary warm across
+consecutive queries, which works only when they reuse the same connection,
+as a reader lease guarantees.
 
 A lease runs one query at a time: starting the next query while the
 previous result is undrained raises `QuestDBErrorCode.InvalidApiCall`, and
@@ -507,14 +503,6 @@ The Python surface exposes no affected-row count: there is no `rowcount` or
 stop streaming an active query; it is idempotent, and it takes effect
 between batch pulls — it cannot interrupt a pull already blocked on the
 network.
-
-Result compression defaults to `raw`. Set `compression=auto` in the
-configuration string to accept Zstandard when the server supports it
-(`compression_level`, default `1`, tunes the advertised level);
-decompression is transparent. The `reset_symbol_dict` keyword (default
-`True`) gives each query a fresh `SYMBOL` dictionary; setting it to `False`
-keeps the dictionary warm only when consecutive queries reuse the same
-connection, which a [reader lease](#reader-leases) guarantees.
 
 ## Delivery and durability
 
@@ -605,7 +593,7 @@ db.close()
 | --- | --- | --- |
 | `sender_pool_min` / `query_pool_min` | `1` | Warm minimum retained per pool after connections have been opened. Set it near steady concurrent use. |
 | `sender_pool_max` / `query_pool_max` | `4` | Per-pool growth cap. Set it at or above peak concurrent leases. |
-| `acquire_timeout_ms` | `5000` | How long a borrow waits for a free slot; `0` fails fast. |
+| `acquire_timeout_ms` | `5000` | How long a borrow waits for a free slot before `QuestDBError` with `QuestDBErrorCode.InvalidApiCall` names the exhausted pool; `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the pool minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `db.reap_idle()`. |
 
