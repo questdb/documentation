@@ -291,6 +291,10 @@ fn main() -> questdb::Result<()> {
 }
 ```
 
+The `at_*` setters take raw epoch `i64` values.
+`TimestampNanos::now().as_i64()` supplies the current time for `at_nanos`, and
+`TimestampMicros` has the same `as_i64()` accessor for `at_micros`.
+
 Use one `Chunk` per batch. Create the chunk after creating the batch's backing
 buffers, append the columns, and flush it before leaving that scope.
 
@@ -309,8 +313,25 @@ large string, binary, or array values — the flush fails instead of splitting.
 
 ### Chunk column setters
 
-Most setters take `(name, data, validity)`. `Validity` uses an Arrow-style
-bitmap where bit `1` means valid.
+Most setters take `(name, data, validity)`. Pass `None` for `validity` when
+every row carries a value. Otherwise build the bitmap with
+`Validity::from_bitmap(bits, bit_len)`: one bit per row, LSB-first within each
+byte, where `1` means valid. `bits` needs at least `ceil(bit_len / 8)` bytes,
+and any bits past `bit_len` are ignored:
+
+```rust
+use questdb::ingress::column_sender::Validity;
+
+// Rows 0 and 2 carry a price; row 1 is NULL.
+let price = [2615.54_f64, 0.0, 2617.25];
+let bits = [0b0000_0101_u8];
+let validity = Validity::from_bitmap(&bits, price.len())?;
+
+chunk.column_f64("price", &price, Some(&validity))?;
+```
+
+`bit_len` must equal the column's data length: the slot backing a null still
+needs an entry in `data`, which the encoder ignores.
 
 | QuestDB type | `Chunk` method | Input |
 | --- | --- | --- |
@@ -335,6 +356,45 @@ Choose a wider nullable type if that distinction matters.
 Other lifecycle methods are `new`, `table`, `row_count`, and `is_empty`. With
 `arrow-ingress`, `push_arrow_column` and `push_imported_arrow_slice` add Arrow
 data to an existing chunk.
+
+### Symbol columns in a chunk
+
+`SYMBOL` is the one shape that takes more than a single data slice. The per-row
+`codes` index a dictionary passed as two further arguments, `dict_offsets` and
+`dict_bytes`, in Arrow Utf8 layout:
+
+```rust
+use questdb::ingress::column_sender::Chunk;
+
+// A flat UTF-8 block plus one offset per entry boundary, so entry `i`
+// spans `dict_offsets[i]..dict_offsets[i + 1]`.
+let mut dict_bytes: Vec<u8> = Vec::new();
+let mut dict_offsets: Vec<i32> = vec![0];
+for instrument in ["BTC-USDT", "ETH-USDT"] {
+    dict_bytes.extend_from_slice(instrument.as_bytes());
+    dict_offsets.push(dict_bytes.len() as i32);
+}
+
+// One code per row: BTC-USDT, ETH-USDT, BTC-USDT.
+let codes = [0_i8, 1, 0];
+
+let mut chunk = Chunk::new("trades");
+chunk.symbol_i8("symbol", &codes, &dict_offsets, &dict_bytes, None)?;
+```
+
+Match the code width to the dictionary size: `symbol_i8` addresses up to 128
+entries, `symbol_i16` up to 32768, and `symbol_i32` beyond that. The
+`symbol_large_*` variants are identical except that `dict_offsets` is `&[i64]`,
+for a dictionary whose bytes exceed `i32::MAX`.
+
+Appending the column validates the dictionary: offsets must be non-negative and
+non-decreasing, the final offset must not exceed `dict_bytes.len()`, every entry
+must be valid UTF-8, and every non-null code must fall in `0..dict_len`, where
+`dict_len` is `dict_offsets.len() - 1`. Only the entries a batch references are
+sent, and a single dictionary entry is capped at 1 MiB.
+
+`column_str` and `column_binary` take the same offsets-and-bytes pair directly,
+without the code indirection, so `offsets` holds `row_count + 1` entries.
 
 ## Arrow and Polars ingestion
 
@@ -515,8 +575,32 @@ an iterator for large results.
 ### DDL, DML, cancellation, and flow control
 
 `execute` also runs statements such as `CREATE`, `ALTER`, `INSERT`, `UPDATE`,
-and `DROP`. Drain the cursor even when no result rows are expected. The terminal
-value reports `Terminal::ExecDone` and its affected-row count.
+and `DROP`. Drain the cursor even when no result rows are expected, then read
+the outcome from `cursor.terminal()`:
+
+```rust
+use questdb::egress::Terminal;
+
+let mut cursor = reader.execute(
+    "UPDATE trades SET amount = 0 WHERE amount < 0",
+)?;
+while cursor.next_batch()?.is_some() {}
+
+match cursor.terminal() {
+    Some(Terminal::ExecDone { rows_affected, .. }) => {
+        println!("{rows_affected} rows affected")
+    }
+    Some(Terminal::End { total_rows, .. }) => {
+        println!("{total_rows} rows returned")
+    }
+    _ => {}
+}
+```
+
+`terminal()` returns `None` until the stream ends, so read it once
+`next_batch()` has returned `None`. A statement that returns no rows finishes
+with `Terminal::ExecDone`; a `SELECT` finishes with `Terminal::End`, which
+reports `total_rows`. `Terminal` is non-exhaustive, so keep a catch-all arm.
 
 Call `cursor.cancel()` to cancel and drain an active query. For large result
 sets, set byte credit with `ReaderQuery::initial_credit()` and replenish it
