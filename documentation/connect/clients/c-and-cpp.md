@@ -250,9 +250,10 @@ keys, see the
 **lazy**: `questdb_db_connect` (C) and the `questdb::pool` constructor (C++)
 parse and validate the string but perform no blocking network I/O, so auth /
 TLS / connect errors surface from the first borrow, not at construction. The
-one exception is disk-backed store-and-forward: connect may pre-open recovery
-senders for slots left dirty by a previous run, and their initial connect and
-replay run in the background.
+one exception is the on-disk send queue (`sf_dir`, see
+[Durability and backpressure](#durability-and-backpressure)): at connect the
+pool reopens any queue directories a previous run left holding unacknowledged
+rows, then reconnects and resends them in the background.
 
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
@@ -406,7 +407,8 @@ int main(void)
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &err)) goto on_error;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &err)) goto on_error;
 
-    if (!qwp_sender_flush_buffer(sender, buffer, &err)) goto on_error;   // publishes + clears
+    // queues the rows locally and clears the buffer; does not wait for the server
+    if (!qwp_sender_flush_buffer(sender, buffer, &err)) goto on_error;
 
     line_sender_buffer_free(buffer);
     questdb_db_return_sender(db, sender);
@@ -444,19 +446,21 @@ call.
 
 :::note Buffer ACK tracking
 
-`qwp_sender_flush_buffer` (C++ `sender.flush(buffer)`) publishes without
-waiting for the server ACK. `qwp_sender_flush_buffer_and_wait` (C++
-`sender.flush_and_wait(buffer)`) is the one-call flush + ack barrier; its
-wait is bounded by the pool-wide `request_timeout` no-progress deadline
-(default 30000 ms). For a blocking barrier over everything published so far,
-or to pick a per-call deadline, compose `flush` with `qwp_sender_wait` /
-`sender.wait()`: a C `timeout_millis` of `0` (and the C++ default argument)
-waits with no deadline; a non-zero value is a no-progress deadline, not a
-total cap (see
-[Durability and backpressure](#durability-and-backpressure)). For
-non-blocking pipelining, publish with an
-FSN-returning flush and compare watermarks; see
-[FSN progress](#fsn-progress-non-blocking) below.
+`qwp_sender_flush_buffer` (C++ `sender.flush(buffer)`) queues the rows locally
+and returns without waiting for the server. `qwp_sender_flush_buffer_and_wait`
+(C++ `sender.flush_and_wait(buffer)`) flushes and then blocks until the server
+has acknowledged everything published so far. Its wait is bounded by the
+pool-wide `request_timeout` (default 30000 ms), which fires only if
+acknowledgements stop arriving — it is not a cap on total wait time.
+
+To pick your own deadline, call `flush` and then `qwp_sender_wait` /
+`sender.wait()` yourself. A C `timeout_millis` of `0` (and the C++ default
+argument) waits indefinitely; a non-zero value likewise fires only when
+acknowledgements stop arriving (see
+[Durability and backpressure](#durability-and-backpressure)). To track progress
+without blocking, use a flush that returns a frame sequence number (FSN) and
+check how far the acknowledged FSN has advanced; see
+[FSN progress](#fsn-progress-non-blocking).
 
 :::
 
@@ -669,13 +673,15 @@ on_error:;
   state.** Check `line_sender_error_in_doubt` (C++: `e.in_doubt()`). When
   false, the rows were provably not transmitted and the chunk is intact:
   re-flush it. When true, delivery is uncertain — do not blind-replay.
-  Waiting never duplicates, so wait (or watch the FSN watermark) for what the
-  queue holds: after a failed ACK wait that is the whole chunk. But a failure
-  partway through a split leaves the earlier frames queued and the rest never
-  accepted, so waiting alone will not deliver the remainder; recovering it
-  means resending the chunk, which is safe only if the table's dedup keys make
+  Waiting never duplicates, so wait for whatever the queue already holds —
+  after a failed ACK wait, that is the whole chunk. But a failure partway
+  through a split leaves the earlier frames queued and the rest never accepted,
+  so waiting alone will not deliver the remainder; recovering it means
+  resending the chunk, which is safe only if the table's dedup keys make
   duplicate rows harmless. Do not infer which case you are in from whether the
-  chunk still holds rows: neither state means the rows are safe to resend.
+  chunk still holds rows: neither state means the rows are safe to resend. (To
+  poll progress without blocking, see
+  [FSN progress](#fsn-progress-non-blocking).)
 - **`flush` is not durability.** A successful `qwp_sender_flush_chunk` means the
   frame was accepted by the local store-and-forward queue, which owns delivery,
   not that the server has ACKed it. `qwp_sender_wait` (C++ `sender.wait()`)
@@ -687,10 +693,11 @@ on_error:;
 - **Return the borrow.** C: `questdb_db_return_sender` (recycle) or
   `questdb_db_drop_sender` (retire a possibly in-doubt sender); C++ does
   it in the `borrowed_sender` destructor, and `drop_on_return()` forces
-  a drop. The return path already retires senders that have latched a terminal
-  error or whose pool has been closed, so plain return/destruction is correct
-  for healthy senders. Drop after an error when the next borrower must not
-  inherit that backend.
+  a drop. A sender that hits a terminal error records it permanently: every
+  later call on that sender fails the same way, and it cannot recover. The
+  return path retires those senders, and any whose pool has been closed, so
+  plain return/destruction is correct for healthy senders. Drop after an error
+  when the next borrower must not inherit that connection.
 
 ### Null values
 
@@ -1141,9 +1148,10 @@ QWP/WebSocket ingestion is asynchronous: every flush **publishes** into a
 local queue that owns delivery, and returns before the server ACKs.
 
 1. **`flush` = local acceptance.** Success means only that the frame is queued
-   locally. All communication with the QuestDB server happens on the
-   **background runner**: it delivers frames, receives ACKs, reconnects, and
-   replays as needed, even while the sender is parked in the pool.
+   locally. The client runs a **background thread** that owns all communication
+   with the QuestDB server: it delivers queued frames, receives ACKs, and
+   reconnects and replays after a connection failure. It keeps running after
+   you return the sender to the pool, so queued frames still reach the server.
 2. **`wait` = observation.** `qwp_sender_wait` (C++ `wait()`) blocks until
    everything published so far is acknowledged.
    - **Ack levels.** `qwpws_ack_level_ok` means the server accepted the
@@ -1160,11 +1168,12 @@ local queue that owns delivery, and returns before the server ACKs.
      apply, typically within milliseconds of the ack, so a query issued
      right after the ack can miss the newest rows. An empty read-back is
      not data loss.
-   - **The timeout is a no-progress deadline.** It fires only if the ack
-     watermark stops advancing. On timeout the frames stay queued: call
-     `wait` again or watch FSNs; don't re-flush. `wait` takes its deadline
-     per call (`0` = none); `flush_and_wait` uses the pool-wide
-     `request_timeout` (default 30000 ms).
+   - **The timeout is a no-progress deadline.** It fires only if the server
+     stops acknowledging frames, not as a cap on total wait time. On timeout
+     the frames stay queued: call `wait` again, or poll progress without
+     blocking with [frame sequence numbers](#fsn-progress-non-blocking). Don't
+     re-flush. `wait` takes its deadline per call (`0` = none);
+     `flush_and_wait` uses the pool-wide `request_timeout` (default 30000 ms).
 3. **`in_doubt` decides whether to retry.** When a flush or wait fails, check
    `line_sender_error_in_doubt` (C++: `e.in_doubt()`) rather than the error
    code: a delivery-unknown failure typically reports `failover_retry`, and
@@ -1182,12 +1191,14 @@ local queue that owns delivery, and returns before the server ACKs.
      delivers only part of the batch.
 4. **`sf_dir` = crash survival.** Without it the queue is in memory: a process
    crash loses unacked frames, and pool close drains best-effort within
-   `close_flush_timeout_millis` (default 5000). With `sf_dir`, frames persist
-   in per-sender disk slots and **replay automatically** when a pool with the
-   same `sender_id` base reopens: connect pre-opens recovery senders for
-   dirty slots and replays them in the background, no borrow required.
-   Strongly recommended for multi-host deployments: during failover, flushes
-   keep landing on disk instead of filling RAM.
+   `close_flush_timeout_millis` (default 5000). With `sf_dir`, each sender's
+   queue is a directory on disk, and frames **replay automatically** when a
+   pool restarts with the same `sender_id`: it finds the directories the
+   previous run left behind, and resends their unacknowledged frames in the
+   background without you borrowing anything. Keep `sender_id` stable across
+   restarts so replay finds them; see [Pool keys](#pool-keys) for the
+   directory layout. Strongly recommended for multi-host deployments: during
+   failover, flushes keep landing on disk instead of filling RAM.
 5. **Backpressure is bounded blocking.** Two stacked caps: 128 in-flight
    unacked frames, and `sf_max_total_bytes` (default 128 MiB memory mode,
    10 GiB disk mode). At a cap, `flush` blocks up to
@@ -1199,8 +1210,10 @@ local queue that owns delivery, and returns before the server ACKs.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
 
-The pool is the **only** thread-safe handle. Every borrowed handle (sender,
-reader, chunk, buffer) belongs to the thread that took it. The recommended
+The pool is the **only** thread-safe handle. Senders and readers belong to the
+thread that borrowed them. Chunks and buffers you create rather than borrow,
+but they are single-thread all the same: only one thread may touch one at a
+time. The recommended
 pattern: share the pool, give each worker its own borrow for its lifetime, and
 size `pool_max` to the worker count.
 
@@ -1362,7 +1375,7 @@ The pool owns reconnection and connection health so borrowers don't have to:
   tracking a deadline.
 - **Return vs. drop.** Returning a healthy borrow recycles its connection;
   dropping retires it and the next borrow opens a fresh one. The return path
-  **already** drops any conn that latched a terminal error or whose pool has been
+  drops any connection that has recorded a terminal error or whose pool has been
   closed, so plain return/RAII destruction is the default. Use
   `questdb_db_drop_sender` / `drop_on_return()` only after an error where the next
   borrower must not inherit the connection.
@@ -1379,14 +1392,15 @@ Dispatch on `line_sender_error_get_code(err)` (C++
 | Error code | Meaning | Borrow state | What to do |
 | --- | --- | --- | --- |
 | `auth_error`, `tls_error`, `unsupported_server`, `protocol_version_error` | Deployment/config problem | n/a (borrow failed) | Fix the connect string or server; retrying won't help. The retry helpers treat these as terminal. |
-| `failover_retry` | Transient transport failure; frames may be in-doubt | Latched terminal | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
-| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Latched terminal | Plain **return** is safe; the pool retires the latched conn. Fix the data before re-sending; blind retry re-fails. |
-| `server_flush_error` (SubmitTimedOut) | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
-| `invalid_api_call` | Borrow at `pool_max` cap, pool closed, or API misuse | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
+| `failover_retry` | Transient transport failure; frames may be in doubt | Dead — every later call fails | **Drop** the borrow, then re-borrow with `borrow_sender_with_retry(reconnect_max_duration_ms())`. With `sf_dir`, unresolved frames replay automatically. |
+| `server_rejection` | Server refused the data (schema/type conflict, bad name) | Dead — every later call fails | Plain **return** is safe; the pool retires the connection. Fix the data before re-sending; blind retry re-fails. |
+| `server_flush_error` | Backpressure deadline hit: queue full for `sf_append_deadline_millis` | Usable | Retry later, shed load, or raise the deadline. Nothing was dropped. See [backpressure](#durability-and-backpressure). |
+| `invalid_api_call` | Borrow at `pool_max` cap, pool closed, an operation on a borrow after close, or a durable-level wait without `request_durable_ack=on` | n/a | At-cap: treat as backpressure (see [Sizing the pool](#sizing-the-pool)). Closed pool: stop borrowing. |
 
-When in doubt after an ingestion error: **return is always memory-safe** (the
-pool inspects the connection and retires it if unhealthy); **drop** is the
-conservative choice when the next borrower must not inherit the backend.
+If you are unsure which case you hit, **return is always safe**: the pool
+inspects the connection and retires it if unhealthy, so a broken connection
+never reaches the next borrower. **Drop** is the conservative choice when the
+next borrower must not inherit the connection.
 
 ### Pool keys
 
@@ -1448,9 +1462,9 @@ release its slot before failing. Two consequences:
   `borrow_sender_with_retry` retries *connection establishment*, not cap
   exhaustion.
 
-The sender and reader pools have independently `pool_max`-capped free lists,
-so heavy ingestion cannot starve queries; budget up to `pool_max` live
-connections for each active path.
+The sender and reader pools are capped independently, each at `pool_max`, so
+heavy ingestion cannot starve queries; budget up to `pool_max` live connections
+for each active path.
 
 ## FSN progress (non-blocking) {#fsn-progress-non-blocking}
 
@@ -1463,10 +1477,10 @@ while the borrow is still held:
   `qwp_sender_flush_buffer_and_get_fsn` or
   `qwp_sender_flush_chunk_and_get_fsn`; C++ `flush_and_get_fsn()` (overloaded
   for buffers and chunks, returning `std::optional<uint64_t>`).
-- Keep doing work, then compare the saved FSN against the completion watermark:
-  C `qwp_sender_acked_fsn`; C++ `acked_fsn()`. The
-  publication boundary has completed once `acked_fsn` returns a value `>=` your
-  saved FSN.
+- Keep doing work, then compare the saved FSN against how far the server has
+  acknowledged: C `qwp_sender_acked_fsn`; C++ `acked_fsn()`. The server has
+  acknowledged everything you published up to that flush once `acked_fsn`
+  returns a value `>=` your saved FSN.
 - A no-value FSN is not an error. A successful flush of a non-empty buffer or
   chunk always yields an FSN; no value (C: `has_value == false` in the
   `line_sender_qwpws_fsn` out-param, C++: `std::nullopt`) means there was no
@@ -1487,9 +1501,10 @@ Orderly shutdown is: **wait, return, close.**
    an in-memory queue. With `sf_dir`, unacked frames survive on disk
    regardless and replay on the next run.
 2. Return or drop every borrow. In C++, scope exit does this.
-3. `questdb_db_close(db)` (C++: `pool` destructor). Accepts `NULL`. This is
-   the **final owner release**: don't call it concurrently with borrows or
-   reaps on the same handle.
+3. `questdb_db_close(db)` (C++: `pool` destructor). Accepts `NULL`. Unlike
+   every other pool call, this one is **not safe to run concurrently**: no
+   other thread may be borrowing, returning, or reaping on the same handle
+   while it runs.
 
 Outstanding borrows are **independent leases**: returning or dropping them
 after close is safe (they close instead of recycling), but new operations on
