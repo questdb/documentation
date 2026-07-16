@@ -112,6 +112,7 @@ int main()
 #include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
 #include <questdb/egress/reader.h>            // reader
 #include <stdio.h>
+#include <string.h>
 #include <threads.h>
 
 int main(void)
@@ -124,7 +125,8 @@ int main(void)
     reader* rd = NULL;
     reader_cursor* cursor = NULL;
 
-    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    const char* conf = "ws::addr=localhost:9000;";
+    db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
     /* Insert: borrow a sender, write a row, flush + wait for the ack. */
@@ -264,7 +266,8 @@ questdb::pool pool{"ws::addr=localhost:9000;"};   // alias of questdb::ingress::
 
 ```c
 line_sender_error* err = NULL;
-questdb_db* db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+const char* conf = "ws::addr=localhost:9000;";
+questdb_db* db = questdb_db_connect(conf, strlen(conf), &err);
 if (!db) { /* read err, handle */ }
 ```
 
@@ -379,6 +382,7 @@ int main()
 ```c
 #include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
 #include <stdio.h>
+#include <string.h>
 
 int main(void)
 {
@@ -387,7 +391,8 @@ int main(void)
     qwp_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
 
-    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    const char* conf = "ws::addr=localhost:9000;";
+    db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
     sender = questdb_db_borrow_sender(db, &err);
@@ -593,6 +598,7 @@ int main()
 ```c
 #include <questdb/ingress/column_sender.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(void)
 {
@@ -601,7 +607,8 @@ int main(void)
     qwp_sender* sender = NULL;
     column_sender_chunk* chunk = NULL;
 
-    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    const char* conf = "ws::addr=localhost:9000;";
+    db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db) goto on_error;
 
     sender = questdb_db_borrow_sender(db, &err);
@@ -932,6 +939,7 @@ Pool and reader calls report `questdb_error` in C.
 #include <questdb/ingress/column_sender.h>   // questdb_db pool + questdb_db_connect
 #include <questdb/egress/reader.h>            // reader
 #include <stdio.h>
+#include <string.h>
 
 int main(void)
 {
@@ -941,7 +949,8 @@ int main(void)
     reader_query* query = NULL;
     reader_cursor* cursor = NULL;
 
-    db = questdb_db_connect("ws::addr=localhost:9000;", 24, &err);
+    const char* conf = "ws::addr=localhost:9000;";
+    db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db)
     {
         size_t len = 0;
@@ -1248,6 +1257,7 @@ int main()
 #include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 
 static void* worker(void* arg)
 {
@@ -1291,7 +1301,8 @@ int main(void)
 {
     line_sender_error* err = NULL;
     /* pool_max bounds concurrent sender borrows: size it to the worker count. */
-    questdb_db* db = questdb_db_connect("ws::addr=localhost:9000;pool_max=4;", 35, &err);
+    const char* conf = "ws::addr=localhost:9000;pool_max=4;";
+    questdb_db* db = questdb_db_connect(conf, strlen(conf), &err);
     if (!db)
     {
         size_t len = 0;
