@@ -197,6 +197,7 @@ Match the API to the shape of the work:
 | Data already in a DataFrame or Arrow table | `db.dataframe()` | Encode whole columns in one pass, with commit and ack handled per call. |
 | SQL to execute | `db.query(sql)` | Stream Arrow result batches into pandas, polars, or pyarrow. |
 | Several queries in a row | `db.reader()` | Lease one reader connection and run queries on it sequentially. |
+| A statement to run (DDL, `INSERT`) | `db.execute(sql)` | Run, drain, and return the connection; output is discarded. |
 
 There is no per-column setter or chunk API in the Python client; whole-frame
 `dataframe()` is the column-major path. Row senders use store-and-forward;
@@ -539,25 +540,28 @@ the `pd.read_sql` convention.
 
 ### DDL, DML, and cancellation
 
-`query()` also runs statements such as `CREATE`, `ALTER`, `INSERT`, `UPDATE`,
-and `DROP`; consume or close the result even when no rows are expected:
+Statements such as `CREATE`, `ALTER`, `INSERT`, `UPDATE`, and `DROP` go
+through `execute(sql, binds=None)`: it runs the statement, drains the
+result, and returns the pooled connection in one call. `PooledReader`
+offers the same verb, keeping the lease usable for the next call:
 
 ```python
 import questdb
 
 with questdb.connect("ws::addr=localhost:9000;") as db:
-    with db.query(
+    db.execute(
         "CREATE TABLE IF NOT EXISTS trades ("
         "  timestamp TIMESTAMP, symbol SYMBOL,"
         "  price DOUBLE, amount DOUBLE"
         ") TIMESTAMP(timestamp) PARTITION BY DAY WAL"
-    ) as result:
-        result.to_pandas()
+    )
 ```
 
-A statement result carries no rows, so `to_pandas()` returns an empty frame.
-The Python surface exposes no affected-row count: there is no `rowcount` or
-`rows_affected` on `QueryResult`. Call `result.cancel()` to ask the server to
+Whatever a statement returns — a `COPY` status row, admin-function rows, a
+stray `SELECT` — is discarded; use `query()` when you want the result.
+`execute()` returns `None`: the Python surface exposes no affected-row
+count, and there is no `rowcount` or `rows_affected` on `QueryResult`
+either. Call `result.cancel()` to ask the server to
 stop streaming an active query; it is idempotent, and it takes effect
 between batch pulls — it cannot interrupt a pull already blocked on the
 network.
