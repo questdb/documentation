@@ -98,17 +98,21 @@ WebSocket upgrade; see
 [protocol versioning](/docs/connect/wire-protocols/overview/#versioning).
 
 Instead of a configuration string, `connect()` also takes the equivalent
-keywords — `host=` (required in this form), `port=` (default 9000), and
-`tls=` (default `False`) — plus any further configuration keys as keyword
-arguments, with booleans mapping to `on`/`off`:
+endpoint keywords — `host=` (required in this form), `port=` (default
+9000), and `tls=` (default `False`). With either form, any further
+configuration keys can be passed as keyword arguments; booleans map to
+`on`/`off` (`tls_verify=False` maps to `unsafe_off`):
 
 ```python
+db = questdb.connect("ws::addr=localhost:9000;", sender_pool_max=8)
 db = questdb.connect(host="localhost", port=9000, sender_pool_max=8)
 ```
 
-The two forms are mutually exclusive: passing both a configuration string
-and `host=`, or extra setting keywords alongside a configuration string,
-raises `TypeError`.
+The configuration string stays the portable base. The endpoint keywords
+cannot be combined with one — passing `host=`, `port=`, or `tls=`
+alongside a configuration string raises `TypeError`; put the address in
+the string — and a setting present both in the string and as a keyword
+raises `ValueError` instead of one silently overriding the other.
 
 The handle is a context manager. Without `with`, call `db.close()` at
 shutdown. `QuestDB.from_conf()` is the equivalent static constructor.
