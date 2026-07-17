@@ -11,9 +11,10 @@ through the handle, and run SQL with `query()`.
 
 ## Quick start
 
-Install the client. Python 3.10 or newer is required; `pandas`, `polars`,
-`pyarrow`, and `numpy` are optional and only needed for the DataFrame and
-array paths (the quick start below reads its result into pandas):
+Install the client. Python 3.10 or newer is required, and `numpy` is
+installed automatically as a dependency. `pandas`, `polars`, and `pyarrow`
+are optional and only needed for the DataFrame paths (the quick start below
+reads its result into pandas):
 
 ```bash
 python3 -m pip install -U questdb pandas
@@ -173,7 +174,7 @@ following are **not** supported:
 | --- | --- | --- |
 | OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the handle and build a fresh one with the new token. |
+| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | On token expiry, close the handle and build a fresh one with the new token. |
 
 ## The pool
 
@@ -672,8 +673,9 @@ duplicate them once the original frames land.
 
 To observe connection state, pass a listener when connecting. It receives
 one `ConnectionEvent` per state transition — `kind`
-(a `ConnectionEventKind`), `host` / `port`, `attempt_number`, `cause_code` /
-`cause_msg`, and `timestamp_millis` — on a dedicated dispatcher thread with
+(a `ConnectionEventKind`), `host` / `port`, `previous_host` /
+`previous_port`, `attempt_number`, `cause_code` / `cause_msg`, and
+`timestamp_millis` — on a dedicated dispatcher thread with
 a bounded drop-oldest inbox (`connection_event_inbox_capacity`, default 64;
 the keyword's literal default `0` selects that native default), so a slow
 listener cannot stall ingestion:
