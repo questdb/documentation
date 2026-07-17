@@ -379,8 +379,26 @@ Parameters:
 | `table_name` | The table to load into. A NumPy-backed pandas frame may instead carry the name as `df.index.name`; Arrow-native input (polars, pyarrow, pyarrow-backed pandas) requires an explicit name. The columnar path loads one table per call: `table_name_col` raises `UnsupportedDataFrameShapeError` — split multi-table frames (e.g. `df.groupby(col)`) and load each group. |
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
-| `max_rows_per_batch` | Rows per published batch, default 16384. |
+| `max_rows_per_batch` | Rows per published batch, default 16384. Sets pipelining granularity, not a safety limit — see below. |
 | `schema_overrides` | Per-column wire-type overrides, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`; values are `symbol`, `ipv4`, `char`, or `geohash`. |
+
+`max_rows_per_batch` decides how the frame is cut into published batches,
+and each batch is one unit of encoding, memory, and server-side apply.
+It is not a safety limit: the client splits any batch that exceeds the
+negotiated per-batch byte cap regardless of this setting, and a single row
+is never bounded by it. What it does control:
+
+- Peak client memory: each batch is encoded and held as one frame.
+- Recovery quantum: a commit checkpoint fires every 100 batches, so
+  `max_rows_per_batch × 100` rows is the replay window on a transient
+  failover and the committed-prefix granularity behind `in_doubt`.
+- Per-batch overhead: very small batches pay framing and server-side
+  apply costs per batch.
+
+The default suits mixed workloads. Raise it for narrow numeric rows,
+lower it for very wide rows or tight memory budgets. Streaming Arrow
+input (`pa.RecordBatchReader`, capsule streams) is not re-batched — the
+producer's batch size governs; re-batch at the source if needed.
 
 Numeric, string, timestamp, and decimal (`pyarrow.decimal32` through
 `decimal256`) column types map directly. Columns of `float64` numpy arrays or
@@ -488,9 +506,12 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
 ```
 
 The `reset_symbol_dict` keyword (default `True`) gives each query a fresh
-`SYMBOL` dictionary. Setting it to `False` keeps the dictionary warm across
-consecutive queries, which works only when they reuse the same connection,
-as a reader lease guarantees.
+`SYMBOL` dictionary. The default keeps each result's dictionary exactly as
+large as the values it uses, so materialising `SYMBOL` columns into pandas
+or polars categoricals stays compact and cheap. Setting it to `False`
+keeps the dictionary warm across consecutive queries — skipping the
+re-interning of symbols the connection already knows — which works only
+when they reuse the same connection, as a reader lease guarantees.
 
 A lease runs one query at a time: starting the next query while the
 previous result is undrained raises `QuestDBErrorCode.InvalidApiCall`, and
