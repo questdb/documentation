@@ -46,6 +46,29 @@ target_link_libraries(your_target questdb_client)
   covered in the repo's
   [DEPENDENCY.md](https://github.com/questdb/c-questdb-client/blob/main/doc/DEPENDENCY.md).
 
+### Headers
+
+Three QWP entry headers, in both a C (`.h`) and a C++ (`.hpp`) flavour:
+
+| Header | Provides |
+| --- | --- |
+| `questdb/client` | The pool: `questdb_db` / `questdb::pool` |
+| `questdb/ingress/qwp_sender` | Senders: `questdb_db_borrow_sender` / `pool::borrow_sender()` |
+| `questdb/egress/qwp_reader` | Readers: `questdb_db_borrow_reader` / `pool::borrow_reader()` |
+
+Both borrow headers include the pool header, so a program that only ingests
+includes only `qwp_sender`, and one that only queries includes only
+`qwp_reader` — each gets the pool along with it. Include `client` directly to hold
+or configure a pool in a translation unit that borrows nothing itself. Mixing
+the C and C++ flavours in one translation unit is fine; the C++ API is a
+header-only wrapper over the C ABI.
+
+The shared error, table/column name and UTF-8 types (`line_sender_error`,
+`line_sender_buffer`, the `_utf8` literals) live in
+`questdb/ingress/line_sender.h`, which all three entry headers include, so the
+examples below use them without naming that header. The
+[Full API reference](#full-api-reference) maps the whole surface.
+
 ## Quick start
 
 The code below opens a connection pool, borrows a **sender** to write a row,
@@ -64,8 +87,8 @@ and Arrow ingestion, see [The pool](#the-pool) and
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp>  // pool + sender
-#include <questdb/egress/reader.hpp>          // pool::borrow_reader
+#include <questdb/ingress/qwp_sender.hpp>  // pool::borrow_sender
+#include <questdb/egress/qwp_reader.hpp>          // pool::borrow_reader
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -110,8 +133,8 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
-#include <questdb/egress/reader.h>            // reader
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
+#include <questdb/egress/qwp_reader.h>            // questdb_db_borrow_reader
 #include <stdio.h>
 #include <string.h>
 #include <threads.h>
@@ -125,8 +148,8 @@ int main(void)
     questdb_db* db = NULL;
     qwp_sender* sender = NULL;
     line_sender_buffer* buffer = NULL;
-    reader* rd = NULL;
-    reader_cursor* cursor = NULL;
+    qwp_reader* rd = NULL;
+    qwp_reader_cursor* cursor = NULL;
 
     const char* conf = "ws::addr=localhost:9000;";
     db = questdb_db_connect(conf, strlen(conf), &err);
@@ -155,27 +178,27 @@ int main(void)
     /* Query: borrow a reader, run SQL, print rows. */
     rd = questdb_db_borrow_reader(db, &rerr);
     if (!rd) goto on_query_error;
-    cursor = reader_execute(rd,
+    cursor = qwp_reader_execute(rd,
         QDB_UTF8_LITERAL("SELECT symbol, price FROM trades LIMIT 5"), &rerr);
     if (!cursor) goto on_query_error;
 
-    const reader_batch* batch;
-    while ((batch = reader_cursor_next_batch(cursor, &rerr)) != NULL)
+    const qwp_reader_batch* batch;
+    while ((batch = qwp_reader_cursor_next_batch(cursor, &rerr)) != NULL)
     {
-        size_t rows = reader_batch_row_count(batch);
-        reader_column_data d_symbol, d_price;
-        reader_symbol_dict dict;
-        if (!reader_batch_column_data(batch, 0, &d_symbol, &rerr)) goto on_query_error;
-        if (!reader_batch_column_data(batch, 1, &d_price, &rerr)) goto on_query_error;
-        if (!reader_batch_symbol_dict(batch, &dict, &rerr)) goto on_query_error;
+        size_t rows = qwp_reader_batch_row_count(batch);
+        qwp_reader_column_data d_symbol, d_price;
+        qwp_reader_symbol_dict dict;
+        if (!qwp_reader_batch_column_data(batch, 0, &d_symbol, &rerr)) goto on_query_error;
+        if (!qwp_reader_batch_column_data(batch, 1, &d_price, &rerr)) goto on_query_error;
+        if (!qwp_reader_batch_symbol_dict(batch, &dict, &rerr)) goto on_query_error;
         for (size_t r = 0; r < rows; ++r)
         {
             bool sym_null = false, price_null = false;
             const char* sym = NULL;
             size_t sym_len = 0;
-            if (!reader_column_data_get_symbol(&d_symbol, &dict, r, &sym, &sym_len, &sym_null))
+            if (!qwp_reader_column_data_get_symbol(&d_symbol, &dict, r, &sym, &sym_len, &sym_null))
                 goto on_query_error;
-            double price = reader_column_data_get_f64(&d_price, r, &price_null);
+            double price = qwp_reader_column_data_get_f64(&d_price, r, &price_null);
 
             if (sym_null)   printf("NULL ");
             else            printf("%.*s ", (int)sym_len, sym);
@@ -185,8 +208,8 @@ int main(void)
     }
     if (rerr) goto on_query_error;
 
-    reader_cursor_free(cursor);
-    reader_close(rd);
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(rd);
     questdb_db_close(db);
     return 0;
 
@@ -209,8 +232,8 @@ on_query_error:;
         fprintf(stderr, "error: %.*s\n", (int)len, msg);
         questdb_error_free(rerr);
     }
-    reader_cursor_free(cursor);
-    reader_close(rd);
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(rd);
     questdb_db_close(db);
     return 1;
 }
@@ -322,16 +345,16 @@ reader header.
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp> // questdb::pool + sender
-#include <questdb/egress/reader.hpp>         // questdb::egress::reader (+ pool::borrow_reader)
+#include <questdb/ingress/qwp_sender.hpp> // pool::borrow_sender
+#include <questdb/egress/qwp_reader.hpp>         // pool::borrow_reader
 ```
 
 </TabItem>
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
-#include <questdb/egress/reader.h>            // query reader
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
+#include <questdb/egress/qwp_reader.h>            // questdb_db_borrow_reader
 ```
 
 </TabItem>
@@ -352,7 +375,7 @@ per worker.
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/qwp_sender.hpp>
 #include <iostream>
 
 using namespace questdb::ingress::literals;
@@ -385,7 +408,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
 #include <stdio.h>
 #include <string.h>
 
@@ -568,7 +591,7 @@ a borrowed sender belongs to the thread that took it, so borrow one per worker.
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/qwp_sender.hpp>
 #include <iostream>
 
 int main()
@@ -603,7 +626,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>
+#include <questdb/ingress/qwp_sender.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -612,7 +635,7 @@ int main(void)
     line_sender_error* err = NULL;
     questdb_db* db = NULL;
     qwp_sender* sender = NULL;
-    column_sender_chunk* chunk = NULL;
+    qwp_chunk* chunk = NULL;
 
     const char* conf = "ws::addr=localhost:9000;";
     db = questdb_db_connect(conf, strlen(conf), &err);
@@ -626,17 +649,17 @@ int main(void)
     int64_t ts_ns[] = {1700000000000000000, 1700000000001000000, 1700000000002000000};
     size_t n = 3;
 
-    chunk = column_sender_chunk_new("trades", 6, &err);
+    chunk = qwp_chunk_new("trades", 6, &err);
     if (!chunk) goto on_error;
     // (chunk, name, name_len, data, row_count, validity_or_NULL, err_out)
-    if (!column_sender_chunk_column_f64(chunk, "price", 5, price, n, NULL, &err)) goto on_error;
-    if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
-    if (!column_sender_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
+    if (!qwp_chunk_column_f64(chunk, "price", 5, price, n, NULL, &err)) goto on_error;
+    if (!qwp_chunk_column_f64(chunk, "amount", 6, amount, n, NULL, &err)) goto on_error;
+    if (!qwp_chunk_at_nanos(chunk, ts_ns, n, &err)) goto on_error;
 
     // publish, then block until acked
     if (!qwp_sender_flush_chunk_and_wait(sender, chunk, qwpws_ack_level_ok, &err)) goto on_error;
 
-    column_sender_chunk_free(chunk);
+    qwp_chunk_free(chunk);
     questdb_db_return_sender(db, sender);   // return the borrow to the pool
     questdb_db_close(db);
     return 0;
@@ -646,7 +669,7 @@ on_error:;
     const char* msg = line_sender_error_msg(err, &len);
     fprintf(stderr, "error: %.*s\n", (int)len, msg);
     line_sender_error_free(err);
-    column_sender_chunk_free(chunk);
+    qwp_chunk_free(chunk);
     if (sender) questdb_db_drop_sender(db, sender);  // drop a possibly-in-doubt sender
     questdb_db_close(db);
     return 1;
@@ -660,7 +683,7 @@ on_error:;
 
 - **Reuse the chunk** across flushes: a flush clears it once the frame is
   accepted into the local queue, while keeping its capacity. To reset a chunk
-  you built but decided not to send, call `column_sender_chunk_clear` (C++
+  you built but decided not to send, call `qwp_chunk_clear` (C++
   `chunk.clear()`).
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
@@ -718,8 +741,8 @@ chunk.column_f64("amount", amount, 3, &validity);
 ```c
 double amount[] = {0.00044, 0.0, 0.00021};       // row 1 is null; slot ignored
 uint8_t amount_valid[] = {0x05};                 // 0b101: rows 0 and 2 valid
-column_sender_validity validity = {amount_valid, 3};
-if (!column_sender_chunk_column_f64(chunk, "amount", 6, amount, 3, &validity, &err))
+qwp_validity validity = {amount_valid, 3};
+if (!qwp_chunk_column_f64(chunk, "amount", 6, amount, 3, &validity, &err))
     goto on_error;
 ```
 
@@ -737,21 +760,21 @@ same arguments minus `chunk`, `name_len`, and `err_out`, chained on
 `column_chunk`, in C++ (`name` is a `std::string_view`; errors throw). Three
 families vary from that shape:
 
-- **`column_ts`** takes one extra argument, a `column_sender_ts_unit` (a
+- **`column_ts`** takes one extra argument, a `qwp_ts_unit` (a
   `uint32_t` on the ABI), sitting between `row_count` and `validity`.
 - **`column_str` / `column_binary`** take `(offsets, bytes, bytes_len)` in
   Arrow Utf8 / Binary layout in place of `data`.
 - **`symbol_i8` / `_i16` / `_i32`** take `(codes, row_count, dict_offsets,
   dict_offsets_len, dict_bytes, dict_bytes_len)` in place of `data`.
 
-See `column_sender.h` for the exact signatures. Complete list:
+See `qwp_sender.h` for the exact signatures. Complete list:
 
 | Setter | Input per row | QuestDB type |
 | --- | --- | --- |
 | `column_i8` / `column_i16` / `column_i32` / `column_i64` | signed int | `BYTE` / `SHORT` / `INT` / `LONG` |
 | `column_f32` / `column_f64` | float / double | `FLOAT` / `DOUBLE` |
 | `column_bool` | LSB-first packed bitmap | `BOOLEAN` |
-| `column_ts` + `column_sender_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
+| `column_ts` + `qwp_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
 | `column_date` | int64 millis since epoch | `DATE` |
 | `column_uuid` | 16 bytes | `UUID` |
 | `column_long256` | 32 bytes (4 LE limbs) | `LONG256` |
@@ -768,8 +791,8 @@ remaining Arrow types are reachable through the
 
 :::note The NumPy appender is C-only, for programs embedding Python
 
-`column_sender.h` also declares `column_sender_chunk_append_numpy_column`,
-which appends a raw buffer tagged with a `column_sender_numpy_dtype`. It is
+`qwp_sender.h` also declares `qwp_chunk_append_numpy_column`,
+which appends a raw buffer tagged with a `qwp_numpy_dtype`. It is
 there for hosts that already hold NumPy arrays. There is no C++ wrapper for it,
 by design: without a NumPy host it is awkward to call, and the
 [Arrow appenders](#arrow-ingestion) reach the same types through a safer
@@ -849,29 +872,29 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
 - **Ownership**: on success `array->release` is consumed (set to `NULL`); the
   caller keeps `schema`. On failure check `array->release != NULL` before
   invoking it.
-- Per-column wire-type hints (`column_sender_arrow_override`: force
+- Per-column wire-type hints (`qwp_arrow_override`: force
   SYMBOL/VARCHAR, IPv4, char, geohash precision) steer encoding without
   touching the Arrow schema.
 - To append Arrow **columns** into a chunk alongside hand-built ones, use
-  `column_sender_chunk_append_arrow_column`, or
-  `column_sender_arrow_import_new` + `..._append_arrow_import` to import once
+  `qwp_chunk_append_arrow_column`, or
+  `qwp_arrow_import_new` + `..._append_arrow_import` to import once
   and slice across many chunks.
 - Dictionary-encoded string columns map to `SYMBOL` by default; plain Utf8 to
-  `VARCHAR`. `column_sender.h` lists every Arrow type the client accepts, and
+  `VARCHAR`. `qwp_sender.h` lists every Arrow type the client accepts, and
   the kinds it rejects (`Struct`, `Map`, `Interval`, ...); a rejected type
   fails with `line_sender_error_arrow_unsupported_column_kind`.
 
 ## Querying data
 
 Get a reader (QWP/WebSocket only), prepare/execute SQL, then stream batches and
-read typed columns. In C, `reader_query_execute` **consumes** the query handle
+read typed columns. In C, `qwp_reader_query_execute` **consumes** the query handle
 (sets your pointer to `NULL`). A borrowed reader, like the senders, is
 single-thread; the pool it came from is the shared, thread-safe handle.
 
 Borrow the reader from the pool: C++ `auto r = pool.borrow_reader();` returns
 a `questdb::egress::reader` that returns itself to the pool on scope exit; in C,
-close the borrowed handle with `reader_close(r)` to return it. Call
-`reader_drop_on_return(r)` / C++ `r.drop_on_return()` first to retire it
+close the borrowed handle with `qwp_reader_close(r)` to return it. Call
+`qwp_reader_drop_on_return(r)` / C++ `r.drop_on_return()` first to retire it
 instead. The reader pool is capped independently of the sender pool.
 
 :::warning Mid-stream query failover can duplicate rows
@@ -885,7 +908,7 @@ recovery:
   `questdb_error_failover_would_duplicate` (C++ throws `questdb::error` with
   the same `code()`) instead of double-delivering. Free the cursor and
   re-execute the query from scratch.
-- **Transparent replay**: install `reader_query_on_failover_reset` (C) /
+- **Transparent replay**: install `qwp_reader_query_on_failover_reset` (C) /
   `query::on_failover_reset` (C++) on the prepared query, and discard any
   partial state you accumulated when it fires; the replayed stream then
   arrives as if the query had just started. Installing this callback is what
@@ -905,7 +928,7 @@ yet, so there is nothing to duplicate.
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/egress/reader.hpp>   // also pulls in questdb::pool
+#include <questdb/egress/qwp_reader.hpp>   // questdb::pool + reader
 #include <iostream>
 
 using namespace questdb::ingress::literals;
@@ -957,8 +980,7 @@ This example uses the `questdb_error` spelling throughout, including for the
 pool call — see [One error type, two names](#one-error-type-two-names).
 
 ```c
-#include <questdb/ingress/column_sender.h>   // questdb_db pool + questdb_db_connect
-#include <questdb/egress/reader.h>            // reader
+#include <questdb/egress/qwp_reader.h>            // questdb_db pool + reader
 #include <stdio.h>
 #include <string.h>
 
@@ -966,9 +988,9 @@ int main(void)
 {
     questdb_error* err = NULL;
     questdb_db* db = NULL;
-    reader* rd = NULL;
-    reader_query* query = NULL;
-    reader_cursor* cursor = NULL;
+    qwp_reader* rd = NULL;
+    qwp_reader_query* query = NULL;
+    qwp_reader_cursor* cursor = NULL;
 
     const char* conf = "ws::addr=localhost:9000;";
     db = questdb_db_connect(conf, strlen(conf), &err);
@@ -984,32 +1006,32 @@ int main(void)
     rd = questdb_db_borrow_reader(db, &err);   // pooled borrow
     if (!rd) goto on_error;
 
-    query = reader_prepare(rd,
+    query = qwp_reader_prepare(rd,
         QDB_UTF8_LITERAL("SELECT x AS n, x * 1.5 AS d FROM long_sequence(5)"), &err);
     if (!query) goto on_error;
-    cursor = reader_query_execute(&query, &err);   // consumes `query`
+    cursor = qwp_reader_query_execute(&query, &err);   // consumes `query`
     if (!cursor) goto on_error;
 
-    const reader_batch* batch;
-    while ((batch = reader_cursor_next_batch(cursor, &err)) != NULL)
+    const qwp_reader_batch* batch;
+    while ((batch = qwp_reader_cursor_next_batch(cursor, &err)) != NULL)
     {
-        size_t rows = reader_batch_row_count(batch);
-        size_t cols = reader_batch_column_count(batch);
+        size_t rows = qwp_reader_batch_row_count(batch);
+        size_t cols = qwp_reader_batch_column_count(batch);
         for (size_t c = 0; c < cols; ++c)
         {
-            reader_column_data col;
-            if (!reader_batch_column_data(batch, c, &col, &err)) goto on_error;
+            qwp_reader_column_data col;
+            if (!qwp_reader_batch_column_data(batch, c, &col, &err)) goto on_error;
             for (size_t r = 0; r < rows; ++r)
             {
                 bool is_null = false;
-                if (col.kind == reader_column_kind_double)
+                if (col.kind == qwp_reader_column_kind_double)
                 {
-                    double v = reader_column_data_get_f64(&col, r, &is_null);
+                    double v = qwp_reader_column_data_get_f64(&col, r, &is_null);
                     printf(is_null ? "NULL " : "%g ", v);
                 }
-                else if (col.kind == reader_column_kind_long)
+                else if (col.kind == qwp_reader_column_kind_long)
                 {
-                    int64_t v = reader_column_data_get_i64(&col, r, &is_null);
+                    int64_t v = qwp_reader_column_data_get_i64(&col, r, &is_null);
                     printf(is_null ? "NULL " : "%lld ", (long long)v);
                 }
             }
@@ -1018,8 +1040,8 @@ int main(void)
     }
     if (err) goto on_error;   // next_batch returns NULL at end-of-stream AND on error
 
-    reader_cursor_free(cursor);
-    reader_close(rd);   // return the borrow to the pool
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(rd);   // return the borrow to the pool
     questdb_db_close(db);
     return 0;
 
@@ -1028,16 +1050,16 @@ on_error:;
     const char* msg = questdb_error_msg(err, &len);
     fprintf(stderr, "error: %.*s\n", (int)len, msg);
     questdb_error_free(err);
-    reader_query_free(query);
-    reader_cursor_free(cursor);
-    reader_close(rd);   // pool drops it if the transport tore down
+    qwp_reader_query_free(query);
+    qwp_reader_cursor_free(cursor);
+    qwp_reader_close(rd);   // pool drops it if the transport tore down
     questdb_db_close(db);
     return 1;
 }
 ```
 
-Read values with the `static inline reader_column_data_get_*` accessors; each
-takes `(&col, row, &is_null)`. Dispatch on `col.kind` (`reader_column_kind`) to
+Read values with the `static inline qwp_reader_column_data_get_*` accessors; each
+takes `(&col, row, &is_null)`. Dispatch on `col.kind` (`qwp_reader_column_kind`) to
 pick the right accessor.
 
 </TabItem>
@@ -1049,26 +1071,26 @@ For a `DECIMAL(p, s)` result, precision `p` selects the QWP kind:
 
 | Result precision | C kind | C++ kind |
 | --- | --- | --- |
-| 1 through 18 | `reader_column_kind_decimal64` | `column_kind::decimal64` |
-| 19 through 38 | `reader_column_kind_decimal128` | `column_kind::decimal128` |
-| 39 through 76 | `reader_column_kind_decimal256` | `column_kind::decimal256` |
+| 1 through 18 | `qwp_reader_column_kind_decimal64` | `column_kind::decimal64` |
+| 19 through 38 | `qwp_reader_column_kind_decimal128` | `column_kind::decimal128` |
+| 39 through 76 | `qwp_reader_column_kind_decimal256` | `column_kind::decimal256` |
 
 QWP sends scale `s` separately and reports the width bucket, not the exact
 precision `p`.
 
 For width-independent access, use `column::visit` and
 `decimal_view::mantissa_bytes(row)` in C++, or
-`reader_column_data_get_bytes` with `value_stride` in C. Both expose the
+`qwp_reader_column_data_get_bytes` with `value_stride` in C. Both expose the
 mantissa as little-endian two's-complement bytes. Check for null before
 decoding it.
 
 ### Parameterised queries
 
-Prepare then bind: C `reader_prepare` + `reader_query_bind_*` +
-`reader_query_execute`; C++ `reader.prepare(sql)` chained with `bind_*`, then
+Prepare then bind: C `qwp_reader_prepare` + `qwp_reader_query_bind_*` +
+`qwp_reader_query_execute`; C++ `reader.prepare(sql)` chained with `bind_*`, then
 `execute()`. Plain `execute(sql)` is the no-bind shortcut. The reader must
 outlive any cursor it produces. The complete bind surface (C
-`reader_query_bind_<name>`, C++ `bind_<name>` on the prepared query):
+`qwp_reader_query_bind_<name>`, C++ `bind_<name>` on the prepared query):
 
 | Bind | Input | QuestDB type |
 | --- | --- | --- |
@@ -1129,10 +1151,10 @@ struct ArrowSchema schema;
 for (;;)
 {
     // out slots must be uninitialised (zeroed or already-released) on each call
-    reader_arrow_batch_result rc =
-        reader_cursor_next_arrow_batch(cursor, &array, &schema, &err);
-    if (rc == reader_arrow_batch_end) break;
-    if (rc == reader_arrow_batch_error) goto on_error;
+    qwp_reader_arrow_batch_result rc =
+        qwp_reader_cursor_next_arrow_batch(cursor, &array, &schema, &err);
+    if (rc == qwp_reader_arrow_batch_end) break;
+    if (rc == qwp_reader_arrow_batch_error) goto on_error;
     /* array + schema are now an owned Arrow pair: pass to a consumer, then
        release whatever it did not take. */
     if (array.release) array.release(&array);
@@ -1148,7 +1170,7 @@ for (;;)
   passing it to an Arrow consumer such as `arrow::ImportRecordBatch` consumes
   and zeroes the slots. Each C call needs fresh out slots (zeroed, or whose
   previous `release` already ran), otherwise it leaks the prior batch.
-- **Compact symbols (C).** `reader_cursor_next_arrow_batch_compact` emits each
+- **Compact symbols (C).** `qwp_reader_cursor_next_arrow_batch_compact` emits each
   `SYMBOL` column with only the dictionary values that batch references, under
   batch-local codes: smaller batches when symbols are sparse.
 - **Schema drift.** If the table's schema changes mid-stream the call returns
@@ -1238,7 +1260,7 @@ worker count.
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/qwp_sender.hpp>
 #include <thread>
 #include <vector>
 #include <iostream>
@@ -1285,7 +1307,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -1551,7 +1573,7 @@ borrow:
 <TabItem value="cpp" label="C++">
 
 ```cpp
-#include <questdb/ingress/column_sender.hpp>
+#include <questdb/ingress/qwp_sender.hpp>
 #include <iostream>
 
 using namespace questdb::ingress::literals;
@@ -1596,7 +1618,7 @@ int main()
 <TabItem value="c" label="C">
 
 ```c
-#include <questdb/ingress/column_sender.h>   // pool + qwp_sender + line_sender_buffer
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
 #include <stdio.h>
 #include <string.h>
 
@@ -1664,14 +1686,14 @@ The pooled surface in both languages:
 | --- | --- | --- |
 | Connection pool | `questdb_db*` | `questdb::pool` |
 | Borrow a sender | `questdb_db_borrow_sender` → `qwp_sender*` | `pool::borrow_sender()` → `borrowed_sender` |
-| Borrow a **reader** | `questdb_db_borrow_reader` → `reader*` | `pool::borrow_reader()` → `reader` |
+| Borrow a **reader** | `questdb_db_borrow_reader` → `qwp_reader*` | `pool::borrow_reader()` → `reader` |
 | Row buffer | `line_sender_buffer*` | `questdb::ingress::line_sender_buffer` |
-| Column chunk | `column_sender_chunk*` | `questdb::ingress::column_chunk` |
+| Column chunk | `qwp_chunk*` | `questdb::ingress::column_chunk` |
 | Buffer flush | `qwp_sender_flush_buffer` | `borrowed_sender::flush(line_sender_buffer&)` |
 | Chunk flush | `qwp_sender_flush_chunk` | `borrowed_sender::flush(column_chunk&)` |
 | Arrow batch flush | `qwp_sender_flush_arrow_batch_at_column` | `borrowed_sender::flush_arrow_batch()` |
 | Flush, then block until acked | `qwp_sender_flush_buffer_and_wait` / `qwp_sender_flush_chunk_and_wait` | `borrowed_sender::flush_and_wait()` overloads |
-| Streaming result | `reader_cursor*` → `reader_batch*` | `cursor` → `batch` → `column` |
+| Streaming result | `qwp_reader_cursor*` → `qwp_reader_batch*` | `cursor` → `batch` → `column` |
 
 ## Conventions and lifecycle
 
@@ -1715,14 +1737,14 @@ with it. The examples use whichever spelling matches the header in view.
 
 ## Full API reference
 
-The installed headers are the complete reference. They are generated from the
-client's Rust FFI crate, so they always match the shipped ABI:
+The installed headers are the complete reference:
 
 | Header | Covers |
 | --- | --- |
-| `questdb/ingress/column_sender.h` | Pool, senders, buffers, chunks, and the connect-string keys |
+| `questdb/client.h` | The pool, its lifecycle, the connect-string keys, connection events, and pool diagnostics |
+| `questdb/ingress/qwp_sender.h` | Sender borrowing, buffers, chunks, and ingestion |
 | `questdb/ingress/line_sender.h` | Errors, table and column names, UTF-8 helpers |
-| `questdb/egress/reader.h` | Reader, cursor, and Arrow result batches |
+| `questdb/egress/qwp_reader.h` | Reader borrowing, queries, cursors, and Arrow result batches |
 
 Each has a `.hpp` counterpart wrapping the same surface in RAII types that
 throw `questdb::error` instead of returning `false`.

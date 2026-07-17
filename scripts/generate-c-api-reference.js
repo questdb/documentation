@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /*
- * Extract the QuestDB C client API surface from the cbindgen-generated headers
- * into Docusaurus markdown.
+ * Extract the QuestDB C client API surface from the committed headers into
+ * Docusaurus markdown.
  *
- * Source of truth: the committed headers in c-questdb-client/include/questdb/**.
- * They are generated from the FFI crate (questdb-rs-ffi) via cbindgen.
+ * Source of truth: the committed headers in c-questdb-client/include/questdb/**,
+ * every one of which is hand-written. (`line_sender.gen.h` is a cbindgen
+ * cross-check artifact; it is gitignored and never shipped.)
  *
  * Usage:
  *   node scripts/generate-c-api-reference.js \
- *     /path/to/c-questdb-client/include/questdb/ingress/line_sender.h [more headers...]
+ *     /path/to/c-questdb-client/include/questdb/client.h [more headers...]
  *
  * Emits one markdown "## <header>" section per header: enums, structs (opaque +
  * value), and functions grouped by common name prefix, each with its signature
@@ -288,9 +289,10 @@ if (!headerFiles.length) {
 }
 const titleFor = (p) => {
   const b = path.basename(p);
-  if (b.includes("column_sender")) return "Ingress: column-major sender + connection pool (`column_sender.h`)";
+  if (b.includes("client")) return "Connection pool (`client.h`)";
+  if (b.includes("qwp_sender")) return "Ingress: column-major sender (`qwp_sender.h`)";
   if (b.includes("line_sender")) return "Ingress: row-major ILP sender (`line_sender.h`)";
-  if (b.includes("line_reader")) return "Egress: query reader (`line_reader.h`)";
+  if (b.includes("qwp_reader")) return "Egress: query reader (`qwp_reader.h`)";
   return b;
 };
 const blocks = [];
