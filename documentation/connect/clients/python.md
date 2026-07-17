@@ -72,10 +72,8 @@ if __name__ == "__main__":
         sys.exit(1)
 ```
 
-`flush(wait=True)` confirms that QuestDB accepted the rows, but query
-visibility happens asynchronously; the bounded poll with a unique marker
-waits for it without matching an older row. In production, poll for the
-condition you need with a timeout that matches your latency budget.
+`flush(wait=True)` confirms that QuestDB accepted the rows; query
+visibility happens asynchronously, which is why the example polls.
 
 Every client failure raises `QuestDBError`; catch it and dispatch on
 `e.code` as shown. The [error taxonomy](#error-taxonomy) describes the codes
