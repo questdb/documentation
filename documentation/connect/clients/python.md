@@ -7,7 +7,7 @@ description: "Use the QuestDB Python client's QuestDB pool for row, DataFrame, a
 
 The QuestDB Python client uses one `QuestDB` handle for ingestion and SQL
 queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Lease a short-lived sender for each unit of row-building work, bulk-load DataFrames
-through the handle, and run SQL with `query()`. 
+through the handle, and run SQL with `query()`.
 
 ## Quick start
 
@@ -159,7 +159,7 @@ operating-system certificate store. Override it with configuration keys:
 | `tls_ca=os_roots` | Use only the operating-system certificate store. |
 | `tls_ca=webpki_roots` | Use only the bundled `webpki` root store. |
 | `tls_roots=/path/to/ca.pem` | Use a private CA bundle. |
-| `tls_verify=unsafe_off` | Disable verification; use only in controlled tests. |
+| `tls_verify=unsafe_off` | Rejected by released wheels with `ConfigError`: verification cannot be disabled. Only source builds that opt in at compile time (`QUESTDB_INSECURE_SKIP_VERIFY=1`) accept it, for test harnesses and MITM debugging. |
 
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
@@ -278,6 +278,9 @@ The Python value type selects the QuestDB column type:
 | `decimal.Decimal` | `DECIMAL`, QuestDB 9.2.0 or later |
 | `None` | Column omitted for this row, stored as null |
 
+Nulls are written by omission: skip the key or pass `None`; there is no
+`set_null` call.
+
 Strings passed in the `symbols` dict become interned `SYMBOL` values;
 strings in `columns` become `VARCHAR`. `DECIMAL` columns must be created
 ahead of time with `CREATE TABLE ... (price DECIMAL(18, 2), ...)`; the server
@@ -298,9 +301,7 @@ type when the distinction matters.
 The pooled sender has no `auto_flush_rows` or `auto_flush_interval` keys;
 flushing is always explicit. Accumulate rows on your own cadence (row count
 via `len(sender)`, or a timer) and call `flush()` yourself. A good starting
-cadence is about 1,000 rows or 100 ms, whichever comes first. Nulls are
-written by omission (skip the key or pass `None`); there is no `set_null`
-call.
+cadence is about 1,000 rows or 100 ms, whichever comes first.
 
 :::
 
@@ -315,9 +316,17 @@ failure: server rejections are pushed to the pool's
 raised from the wait. Closing the lease (leaving the `with` block) flushes
 remaining rows without waiting.
 
-The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`, and
-no FSN methods (`flush_and_get_fsn`, `await_acked_fsn`); those exist only on
-the standalone [legacy `Sender`](#legacy-ilp-clients).
+The pooled lease has no `transaction()`, no `new_buffer()` or `Buffer`,
+and no manual progress pump; those exist only on the standalone
+[legacy `Sender`](#legacy-ilp-clients). The rest of the ws delivery
+surface is on the lease: `flush_and_get_fsn()` /
+`flush_and_keep_and_get_fsn()` return the published frame's sequence
+number, `await_acked_fsn(fsn, timeout_millis)` waits for its
+acknowledgement, `published_fsn()` / `acked_fsn()` report progress without
+blocking, and `poll_error()` / `error_events_dropped()` pull the
+rejections recorded since the lease was borrowed. FSNs are watermarks of
+the lease's pooled connection — use them while the lease is held; they are
+not portable across leases.
 
 ## DataFrame ingestion
 
@@ -368,7 +377,7 @@ Parameters:
 
 | Parameter | Meaning |
 | --- | --- |
-| `table_name` / `table_name_col` | A fixed table name, or the column (by name or index) that names the table per row. |
+| `table_name` | The table to load into. A NumPy-backed pandas frame may instead carry the name as `df.index.name`; Arrow-native input (polars, pyarrow, pyarrow-backed pandas) requires an explicit name. The columnar path loads one table per call: `table_name_col` raises `UnsupportedDataFrameShapeError` — split multi-table frames (e.g. `df.groupby(col)`) and load each group. |
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
 | `max_rows_per_batch` | Rows per published batch, default 16384. |
@@ -574,7 +583,7 @@ publication can wait for ack-driven space and then raise
 | Key | Default | Purpose |
 | --- | --- | --- |
 | `sf_max_bytes` | `4 MiB` | Segment and single-payload size cap. |
-| `sf_max_total_bytes` | `128 MiB` in memory, `10 GiB` on disk | Total queue budget per sender. |
+| `sf_max_total_bytes` | `128 MiB` in memory, `10 GiB` on disk (never below 2 × `sf_max_bytes`) | Total queue budget per sender. |
 | `sf_append_deadline_millis` | `30000` | Maximum no-progress wait for queue space. |
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a lease or the handle closes. |
 
@@ -665,8 +674,9 @@ To observe connection state, pass a listener when connecting. It receives
 one `ConnectionEvent` per state transition — `kind`
 (a `ConnectionEventKind`), `host` / `port`, `attempt_number`, `cause_code` /
 `cause_msg`, and `timestamp_millis` — on a dedicated dispatcher thread with
-a bounded drop-oldest inbox (`connection_event_inbox_capacity`, default
-64), so a slow listener cannot stall ingestion:
+a bounded drop-oldest inbox (`connection_event_inbox_capacity`, default 64;
+the keyword's literal default `0` selects that native default), so a slow
+listener cannot stall ingestion:
 
 ```python
 import questdb
@@ -689,9 +699,10 @@ totals. [`server_info()`](#server-information) snapshots the handshake.
 
 The server can reject published frames — a schema mismatch, a parse error —
 after `flush()` has already returned. Rejections are pushed to the pool's
-rejection handler, one `QwpWsError` per rejection, on a dedicated dispatcher
-thread with a bounded drop-oldest inbox (`qwp_ws_error_inbox_capacity`,
-default 64). This covers every pooled connection, including rejections for
+rejection handler, one `SenderError` per rejection, on a dedicated dispatcher
+thread with a bounded drop-oldest inbox (`error_event_inbox_capacity`,
+default 64; the keyword's literal default `0` selects that native default).
+This covers every pooled connection, including rejections for
 rows whose sender lease was already closed:
 
 ```python
@@ -710,14 +721,14 @@ def on_rejection(error):
 
 db = questdb.connect(
     "ws::addr=localhost:9000;",
-    qwp_ws_error_handler=on_rejection,
+    error_handler=on_rejection,
 )
 ```
 
 Without a handler, every rejection is logged through the `questdb` Python
 logger — `ERROR` for terminal rejections, `WARNING` for retriable ones,
 which the store-and-forward queue replays — so rejections are never silent.
-The `db.rejection_events_delivered` and `db.rejection_events_dropped`
+The `db.error_events_delivered` and `db.error_events_dropped`
 properties report totals.
 
 Use the handler for dead-lettering, alerting, and metrics. Terminal
@@ -725,6 +736,8 @@ rejections additionally latch the connection: the next call on the affected
 sender lease raises `QuestDBServerRejectionError`, and the pool retires the
 connection instead of lending it out again. Producer-side abort logic
 belongs with that raised error, not in the handler.
+
+### Reader failover
 
 Reader failover has a separate policy:
 
@@ -757,7 +770,7 @@ All failures raise `QuestDBError` (or a subclass). Inspect:
 | --- | --- |
 | `code` | A `QuestDBErrorCode` member; compare by identity, e.g. `err.code is QuestDBErrorCode.Cancelled`. |
 | `in_doubt` | `True` when the failed operation may already have delivered its input; retrying can duplicate rows without deduplication. |
-| `qwp_ws_error` | Structured server diagnostic for QWP sender failures, or `None`. |
+| `sender_error` | Structured server diagnostic for QWP sender failures, or `None`. |
 
 Codes you will most often dispatch on:
 
@@ -769,11 +782,11 @@ Codes you will most often dispatch on:
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
 | `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
 | `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` or PyCapsule consumer. | Discard partial state and rerun the query. |
-| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `qwp_ws_error`; fix the data or the schema. |
+| `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |
 
 `QuestDBServerRejectionError` marks a terminal server rejection; its
-`qwp_ws_error` payload carries `category` (schema mismatch, parse error,
+`sender_error` payload carries `category` (schema mismatch, parse error,
 security error, ...), `applied_policy` (retriable or terminal), `status`,
 `message`, and the affected `from_fsn` / `to_fsn` frame range.
 `UnsupportedDataFrameShapeError` reports per-column DataFrame failures. The
@@ -781,7 +794,7 @@ legacy `IngressError` name remains an alias of `QuestDBError`.
 
 No server correlation or request ID is surfaced. Message text is
 server-generated English prose and is not a stable API: dispatch on `code`
-and `qwp_ws_error.category`, not on message contents. Messages can echo
+and `sender_error.category`, not on message contents. Messages can echo
 table names, column names, and SQL fragments, so sanitize them before
 forwarding to end-user UIs or third-party error trackers.
 
