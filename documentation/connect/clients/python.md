@@ -300,12 +300,17 @@ QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value
 in one of those columns is received as `false` or `0`; use a wider nullable
 type when the distinction matters.
 
-:::caution No auto-flush
+:::note Auto-flush
 
-The pooled sender has no `auto_flush_rows` or `auto_flush_interval` keys;
-flushing is always explicit. Accumulate rows on your own cadence (row count
-via `len(sender)`, or a timer) and call `flush()` yourself. A good starting
-cadence is about 1,000 rows or 100 ms, whichever comes first.
+The pooled sender auto-flushes by default when its buffer reaches 1,000 rows,
+or when the next row arrives at least 100 ms after the first buffered row.
+The interval is checked only by `row()`; there is no background timer that
+flushes an idle buffer. Byte-based auto-flush is off by default.
+
+Override the thresholds with `auto_flush_rows`, `auto_flush_interval`, and
+`auto_flush_bytes`, or use `auto_flush=off` to disable row-triggered
+publishing. Auto-flush does not wait for an acknowledgement; errors propagate
+from `row()`.
 
 :::
 
@@ -330,7 +335,8 @@ acknowledgement, `published_fsn()` / `acked_fsn()` report progress without
 blocking, and `poll_error()` / `error_events_dropped()` pull the
 rejections recorded since the lease was borrowed. FSNs are watermarks of
 the lease's pooled connection — use them while the lease is held; they are
-not portable across leases.
+not portable across leases. Use `auto_flush=off` when
+`flush_and_get_fsn()` must define exact application batches.
 
 ## DataFrame ingestion
 
