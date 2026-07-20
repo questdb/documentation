@@ -168,7 +168,7 @@ callers block up to `acquire_timeout_ms` then throw.
 | Key | Default |
 | --- | ---: |
 | `sender_id` | `default` |
-| `sf_max_bytes` (segment size) | `4 MiB` |
+| `sf_max_segment_bytes` (segment size) | `4 MiB` |
 | `sf_max_total_bytes` (SF mode) | `10 GiB` |
 | `sf_durability` | `MEMORY` |
 | `sf_append_deadline_millis` | `30000` |

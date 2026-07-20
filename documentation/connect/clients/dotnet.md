@@ -956,7 +956,7 @@ RAM cap.
 |---|---|---|
 | `sf_dir` | unset | Enables disk-backed SF when set. |
 | `sender_id` | `default` | Slot identity (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
-| `sf_max_bytes` | 4 MiB | Per-segment size cap. |
+| `sf_max_segment_bytes` | 4 MiB | Per-segment size cap. |
 | `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
 | `sf_append_deadline_millis` | 30000 | Max time a flush blocks waiting for queue capacity. |
 | `drain_orphans` | `off` | If `on`, take over stale slots from a crashed sender. |
@@ -1034,9 +1034,9 @@ they only mutate the in-process encode buffer, which grows up to
   the engine latches a terminal error and the next producer call surfaces it.
   No data is dropped while the publisher is parked.
 
-A single batch larger than `sf_max_bytes` (default 4 MiB) is rejected
+A single batch larger than `sf_max_segment_bytes` (default 4 MiB) is rejected
 immediately — it does not enter the backpressure wait. Reduce the rows you
-accumulate per flush, or raise `sf_max_bytes` to fit your largest single
+accumulate per flush, or raise `sf_max_segment_bytes` to fit your largest single
 payload.
 
 ## Transactions
@@ -1482,7 +1482,7 @@ WebSocket options:
 | `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
 | `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
 | `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and slot identity. |
-| `sf_max_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
+| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
 | `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
 | `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
 | `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |

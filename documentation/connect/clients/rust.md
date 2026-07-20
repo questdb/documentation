@@ -299,7 +299,7 @@ Use one `Chunk` per batch. Create the chunk after creating the batch's backing
 buffers, append the columns, and flush it before leaving that scope.
 
 A chunk too large for one frame is split across several, each published on its
-own. The client targets about 2 MiB per frame — half of `sf_max_bytes` (default
+own. The client targets about 2 MiB per frame — half of `sf_max_segment_bytes` (default
 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. That matters
 because a flush failing partway through leaves the earlier frames queued and
 never accepts the rest, which is why chunk recovery differs from buffer
@@ -697,7 +697,7 @@ publication can wait for ACK-driven space and then return an error:
 
 | Key | Default | Purpose |
 | --- | --- | --- |
-| `sf_max_bytes` | `4 MiB` | Segment size. |
+| `sf_max_segment_bytes` | `4 MiB` | Segment size. |
 | `sf_max_total_bytes` | `128 MiB` in memory, `10 GiB` on disk | Total queue budget per sender. |
 | `sf_append_deadline_millis` | `30000` | Maximum no-progress wait for queue space. |
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a sender or pool closes. |

@@ -77,7 +77,7 @@ is `posix_fallocate`; on macOS, `F_PREALLOCATE` / `F_ALLOCATEALL`. The
 substrate refuses to fall back silently to `ftruncate` on filesystems
 where these are unsupported — sparse files would risk a `SIGBUS` later
 when the mmap'd region writes into a hole. On filesystems where the
-native layer **must** fall back to `ftruncate`, size `sf_max_bytes`
+native layer **must** fall back to `ftruncate`, size `sf_max_segment_bytes`
 conservatively against free space.
 
 ## Lock collisions in practice
@@ -102,7 +102,7 @@ is skipped, not stolen.
 
 Two limits matter:
 
-### `sf_max_bytes` — per-segment file size (default `4 MiB`)
+### `sf_max_segment_bytes` — per-segment file size (default `4 MiB`)
 
 This is the rotation threshold and the unit of trim. Segments that are
 smaller release disk faster but waste more space on the active tail;

@@ -465,7 +465,7 @@ your own cadence (row count, byte size via `line_sender_buffer_size`, or a
 timer) and call `flush` yourself. A good starting cadence is about 1,000 rows or
 100 ms, whichever comes first: the auto-flush defaults of the other QWP
 clients. Flushing every row collapses throughput, and a single flush must
-stay under the `sf_max_bytes` payload cap (default 4 MiB). Null columns are
+stay under the `sf_max_segment_bytes` payload cap (default 4 MiB). Null columns are
 written by **omission**: skip the column for that row. There is no `set_null`
 call.
 
@@ -688,7 +688,7 @@ on_error:;
 - All columns (and the timestamp) must share the same `row_count`. The chunk
   **borrows** your arrays; they must outlive the flush.
 - **A chunk too large for one frame is split** across several, publishing each
-  on its own. The client targets about 2 MiB per frame — half of `sf_max_bytes`
+  on its own. The client targets about 2 MiB per frame — half of `sf_max_segment_bytes`
   (default 4 MiB) — so a chunk encoding to more than roughly 2 MiB splits. It
   halves the row range until each frame fits, stopping at 8 rows: validity
   bitmaps and boolean columns pack one bit per row, so a frame must start on a
@@ -1245,7 +1245,7 @@ queue and returns before the server acks.
    `sf_append_deadline_millis` (default 30000), then returns
    `server_flush_error`. Nothing is dropped or overwritten while blocked. A
    buffer whose single payload exceeds the frame cap derived from
-   `sf_max_bytes` (default 4 MiB) is rejected immediately instead; an oversize
+   `sf_max_segment_bytes` (default 4 MiB) is rejected immediately instead; an oversize
    chunk is split across frames rather than rejected.
 
 ## Concurrency: one borrow per worker {#concurrency-one-borrow-per-worker}
@@ -1483,7 +1483,7 @@ pools) do share a prefix, the second one fails immediately with an in-use error
 naming the pid that holds the directory. A bare `<sf_dir>/<sender_id>/`
 directory, with no `-ingest-<index>` suffix, is not pool-managed: the pool
 treats it as an orphan and drains it only with `drain_orphans=on`. The
-`sf_max_bytes`, `sf_max_total_bytes`, and `sf_append_deadline_millis` keys
+`sf_max_segment_bytes`, `sf_max_total_bytes`, and `sf_append_deadline_millis` keys
 tune the queue in both memory and disk mode; `sender_id` has no effect
 without `sf_dir`. Full `sf_*` key semantics are in the
 [connect string reference](/docs/connect/clients/connect-string/#sf-keys).

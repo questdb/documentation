@@ -26,7 +26,7 @@ mode.
 |---|---|---|---|
 | `sf_dir` | path | unset | Group root directory. When set, the slot lives at `<sf_dir>/<sender_id>/` and unacked data is durable across process restarts. When unset, the substrate runs in memory mode. |
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
-| `sf_max_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
+| `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
 | `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
 | `sf_durability` | enum | `memory` | Reserved for future per-batch / per-frame fsync modes. Only `memory` is currently implemented; `flush` and `append` parse but are rejected at build time. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |

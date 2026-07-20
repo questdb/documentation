@@ -610,8 +610,8 @@ publication can wait for ack-driven space and then raise
 
 | Key | Default | Purpose |
 | --- | --- | --- |
-| `sf_max_bytes` | `4 MiB` | Segment and single-payload size cap. |
-| `sf_max_total_bytes` | `128 MiB` in memory, `10 GiB` on disk (never below 2 × `sf_max_bytes`) | Total queue budget per sender. |
+| `sf_max_segment_bytes` | `4 MiB` | Segment and single-payload size cap. |
+| `sf_max_total_bytes` | `128 MiB` in memory, `10 GiB` on disk (never below 2 × `sf_max_segment_bytes`) | Total queue budget per sender. |
 | `sf_append_deadline_millis` | `30000` | Maximum no-progress wait for queue space. |
 | `close_flush_timeout_millis` | `5000` | Best-effort drain window when a lease or the handle closes. |
 
