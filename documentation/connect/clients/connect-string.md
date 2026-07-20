@@ -6,18 +6,18 @@ description:
   Drives ingress, egress, multi-host failover, and store-and-forward.
 ---
 
-The QuestDB native client is configured with a single connect string. The
-same string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
-multi-host failover, and the store-and-forward substrate. The native-client
-contract is a shared option vocabulary: the same connect string can configure
-both ingress and egress across language implementations. Implementation-specific
-exceptions are called out in the affected key section and client page.
+A single connect string configures the QuestDB native client. The same
+string format drives QWP (QuestDB Wire Protocol) ingress, QWP egress,
+multi-host failover, and the store-and-forward substrate. All language
+implementations share one option vocabulary, so the same connect string can
+configure both ingress and egress in any client. Where an implementation
+deviates, the affected key section and client page call it out.
 
-A `ws::` / `wss::` connect string is a single input shared by both the
-ingress sender and the egress query client. Each direction reads the keys
-relevant to it and ignores keys meant only for the other direction, so one
-connect string configures both without edits. The *Applies to:* tag on each
-section below marks which direction a key affects.
+One `ws::` / `wss::` connect string serves both the ingress sender and the
+egress query client. Each direction reads the keys relevant to it and
+ignores keys meant only for the other direction, so the same string
+configures both without edits. The *Applies to:* tag on each section below
+marks which direction a key affects.
 
 For legacy InfluxDB Line Protocol (ILP) transports (`http`, `https`, `tcp`,
 `tcps`), see the [ILP overview](/docs/connect/compatibility/ilp/overview/).
@@ -111,8 +111,8 @@ per-language syntax.
 
 ## Common patterns {#common-patterns}
 
-Canonical shapes for typical deployments. Each can be extended with
-auth, failover, or store-and-forward options from the sections below.
+Canonical shapes for typical deployments. Extend each with auth, failover,
+or store-and-forward options from the sections below.
 
 ### Local development (no auth, no TLS)
 
@@ -174,7 +174,7 @@ caveats), follow the section links from the [Key index](#key-index).
 | Tune ingest batching                              | ingress   | —                                      | Clients with auto-flush: `auto_flush_rows`, `auto_flush_interval`, `auto_flush_bytes`       |
 | Disable auto-flush (manual `flush()` only)        | ingress   | `auto_flush=off`                       | —                                                                                           |
 | Memory-buffered ingest (no disk durability)       | ingress   | (omit `sf_dir`)                        | `init_buf_size`, `max_buf_size`                                                             |
-| Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
+| Durable store-and-forward ingest                  | ingress   | `sf_dir`                               | `sender_id`, `sf_max_segment_bytes`, `sf_max_total_bytes`, `sf_append_deadline_millis`              |
 | Run multiple senders sharing one `sf_dir`         | ingress   | `sf_dir`, `sender_id`                  | unique `sender_id` per sender                                                               |
 | Orphan recovery for crashed senders               | ingress   | `drain_orphans=on`                     | `max_background_drainers`                                                                   |
 | End-to-end durable acknowledgement                | ingress   | `request_durable_ack=on`               | `durable_ack_keepalive_interval_millis`                                                     |
@@ -198,8 +198,9 @@ The schema prefix selects the QWP transport.
 | `wss`  | WebSocket + TLS | `9000`       | QWP over TLS-secured WebSocket. Recommended for production.                                                          |
 | `udp`  | UDP             | `9007`       | Fire-and-forget metrics ingest, single table per datagram. |
 
-The default port is applied when `addr` omits `:port`. Note that `wss` does
-**not** default to `443`: both `ws` and `wss` use `9000` unless overridden.
+The client applies the default port when `addr` omits `:port`. Note that
+`wss` does **not** default to `443`: both `ws` and `wss` use `9000` unless
+overridden.
 
 QWP negotiates its protocol version during the WebSocket upgrade — clients
 do not need to configure it.
@@ -231,7 +232,7 @@ the TLS handshake is server-authenticated only. `tls_roots` /
 
 *Applies to: ingress and egress.*
 
-TLS is enabled by selecting the `wss` schema.
+Selecting the `wss` schema enables TLS.
 
 - `tls_verify` — controls server certificate verification. Options: `on`,
   `unsafe_off`. Default: `on`. `unsafe_off` disables verification; **use
@@ -240,8 +241,8 @@ TLS is enabled by selecting the `wss` schema.
 - `tls_roots` — path to a file of trusted root certificates, used instead
   of the system trust store. The on-disk format is client-specific — the
   Java client loads a JKS keystore, the .NET client a PKCS#12 / PFX
-  bundle, and some clients a PEM file. If omitted, the system default
-  trust store is used.
+  bundle, and some clients a PEM file. If omitted, the client uses the
+  system default trust store.
 - `tls_roots_password` — password for the `tls_roots` file, for clients
   whose trust-store format requires one. Clients that load a passwordless
   format (for example, PEM) reject this key.
@@ -256,7 +257,7 @@ store. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
 specifics.
 
-Mutual TLS (client certificates) is not supported by QuestDB — the server
+QuestDB does not support mutual TLS (client certificates) — the server
 does not negotiate client certificates regardless of client. See
 [Authentication](#auth) for the supported credential paths.
 
@@ -269,9 +270,9 @@ See also the [server-side TLS configuration](/docs/security/tls/).
 *Applies to: ingress.*
 
 The client buffers rows in memory and flushes them to the server in batches.
-For clients that implement auto-flushing, these keys control when the buffer
-is sent without an explicit `flush()` call. The three triggers below are OR'd:
-whichever threshold trips first sends the batch.
+For clients that implement auto-flushing, these keys control when the client
+sends the buffer without an explicit `flush()` call. The three triggers below
+act independently: whichever threshold trips first sends the batch.
 
 - `auto_flush` — global enable. Options: `on`, `off`. Default where supported:
   `on`.
@@ -280,16 +281,16 @@ whichever threshold trips first sends the batch.
 - `auto_flush_rows` — flush when the buffered row count reaches this
   threshold. Set to `off` to disable. Default where supported: `1000`.
 - `auto_flush_interval` — flush when this many milliseconds have elapsed
-  since the first buffered row. Evaluated on the next `at()` / `flush()`
-  call (not driven by a wall-clock timer). Set to `off` to disable.
-  Default where supported: `100` (100 ms).
+  since the first buffered row. The client evaluates the interval on the
+  next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
+  disable. Default where supported: `100` (100 ms).
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
   size. Set to `off` to disable. Default where supported: `8m` (8 MiB). Accepts
   [size suffixes](#size-suffixes). When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
-  advertised `X-QWP-Max-Batch-Size` at handshake (one-way: a configured
-  value smaller than the advertised cap is kept as-is). The 10% margin
-  absorbs encoding overhead such as schema and dict-delta bytes.
+  advertised `X-QWP-Max-Batch-Size` at handshake (one-way: the client
+  keeps a configured value already below the advertised cap). The 10%
+  margin absorbs encoding overhead such as schema and dict-delta bytes.
   Setting `off` opts out of byte-based auto-flush entirely — the
   handshake clamp does not re-enable it, and the application takes
   responsibility for not producing oversized batches. Older servers
@@ -324,7 +325,7 @@ flushing.
 
 ### Size suffixes {#size-suffixes}
 
-Size-typed values (`init_buf_size`, `max_buf_size`, `sf_max_bytes`,
+Size-typed values (`init_buf_size`, `max_buf_size`, `sf_max_segment_bytes`,
 `sf_max_total_bytes`) accept JVM-style unit suffixes. Suffixes are
 case-insensitive and 1024-based, matching `-Xmx` conventions:
 
@@ -348,8 +349,8 @@ is no secondary server to fail over to.
 
 :::
 
-The connect string accepts multiple `host:port` pairs in `addr`. Two
-syntaxes are accepted and accumulate:
+The connect string accepts multiple `host:port` pairs in `addr`. The
+parser accepts two syntaxes and accumulates entries across both:
 
 ```
 ws::addr=node-a:9000,node-b:9000,node-c:9000;
@@ -359,7 +360,7 @@ ws::addr=node-a:9000,node-b:9000,node-c:9000;
 ws::addr=node-a:9000;addr=node-b:9000;addr=node-c:9000;
 ```
 
-Empty entries (`,,`, or leading / trailing commas) are rejected.
+The parser rejects empty entries (`,,`, or leading / trailing commas).
 
 The I/O loop rotates through the endpoints on every reconnect attempt
 within a single outage budget. When the server rejects the connection
@@ -371,8 +372,8 @@ backoff.
 
 Both `target` and `zone` apply to **egress only**. QuestDB is currently a
 single-primary cluster: ingress automatically follows the primary across
-the host list and adapts when the primary moves to another node. These
-keys are silently accepted on ingress but have no effect.
+the host list and adapts when the primary moves to another node. Ingress
+silently accepts these keys and ignores them.
 
 - `target` — server-role filter applied per endpoint after the upgrade
   reads `SERVER_INFO`. Options:
@@ -384,7 +385,7 @@ keys are silently accepted on ingress but have no effect.
     queries to avoid contending with the ingest traffic the primary is
     handling.
 
-  Endpoints whose role does not match the filter are skipped.
+  The client skips endpoints whose role does not match the filter.
 
 - `zone` — client zone identifier (opaque, case-insensitive — e.g.
   `eu-west-1a`, `dc-amsterdam`). When set, egress prefers endpoints whose
@@ -394,11 +395,11 @@ keys are silently accepted on ingress but have no effect.
   same-zone endpoint is unhealthy. With `target=primary`, zone preference
   collapses: the writer is followed regardless of zone.
 
-The full behavioural model — host picker policy, host-health states, error
-classification, and backoff schedule — is documented under
-[Client failover](/docs/high-availability/client-failover/concepts/).
-Server-side HA is covered separately under the
-[High Availability section](/docs/high-availability/overview/).
+[Client failover](/docs/high-availability/client-failover/concepts/)
+documents the full behavioural model — host picker policy, host-health
+states, error classification, and backoff schedule. The
+[High Availability section](/docs/high-availability/overview/) covers
+server-side HA separately.
 
 Related: [Reconnect and failover](#reconnect-keys),
 [Store-and-forward](#sf-keys).
@@ -435,9 +436,9 @@ equivalent — same architecture, no durability across restarts.
   Path handling:
   - Taken verbatim. Absolute paths recommended for production; relative
     paths resolve against the process working directory.
-  - Shell-style expansions like `~` are **not** expanded by the client.
-  - The leaf directory is created automatically if missing, but its parent
-    must already exist — the client does not create paths recursively.
+  - The client does **not** expand shell-style syntax such as `~`.
+  - The client creates the leaf directory if it is missing, but the parent
+    must already exist — it does not create paths recursively.
 - `sender_id` — slot identity. The slot lives at `<sf_dir>/<sender_id>/`,
   used verbatim as the directory name. Allowed characters: letters,
   digits, `_`, `-`. No path separators, no `.`, no spaces. Two senders
@@ -453,11 +454,11 @@ equivalent — same architecture, no durability across restarts.
   slot).
 - `sf_durability` — disk durability mode. Currently only `memory` is
   shipping. (`flush` and `append` per-write fsync modes are planned.)
-- `sf_max_bytes` — per-segment rotation threshold. Must be ≥ the largest
+- `sf_max_segment_bytes` — per-segment rotation threshold. Must be ≥ the largest
   single flushed frame. Default: `4 MiB` (`4m`). Accepts
   [size suffixes](#size-suffixes).
-- `sf_max_total_bytes` — hard cap on per-slot storage. When the cap is
-  reached, append blocks until ACKs trim space (see
+- `sf_max_total_bytes` — hard cap on per-slot storage. When the slot
+  reaches the cap, `append()` blocks until ACKs trim space (see
   `sf_append_deadline_millis`). Defaults: `10 GiB` (`10g`) in SF mode,
   `128 MiB` (`128m`) in memory mode. Accepts size suffixes.
 
@@ -466,7 +467,7 @@ equivalent — same architecture, no durability across restarts.
 SF persists outgoing frames and the durable-ack watermark to disk under
 `<sf_dir>/<sender_id>/`.
 
-**Recovery is triggered at Sender creation.** When the application
+**Sender creation triggers recovery.** When the application
 instantiates a new sender — `Sender.fromConfig(...)`, `Sender.fromEnv()`,
 or the builder — the client analyses the on-disk state under `sf_dir`
 before returning control. There is no background daemon; replay is part
@@ -483,15 +484,14 @@ exit, SIGKILL, host crash, or reboot — instantiate a new sender with the
    sender does not leave the slot stuck.
 2. Recovery reads the persisted ack watermark and replays every on-disk
    segment past it against the server. Replay runs on the I/O thread in
-   parallel with the application's new `append()` calls — the application
-   is not blocked.
+   parallel with the application's new `append()` calls — it does not
+   block the application.
 
 If `sf_dir` is a relative path, ensure the process resolves it the same
 way after restart (typically: use an absolute path).
 
-For an **abandoned** slot to be picked up by a *different* sender — the
-original is never coming back — see [Orphan recovery](#orphan-recovery)
-below.
+For a *different* sender to pick up an **abandoned** slot — the original
+is never coming back — see [Orphan recovery](#orphan-recovery) below.
 
 **At-least-once delivery.** Replay can re-send frames the server already
 accepted but did not durable-acknowledge before the previous sender died.
@@ -503,16 +503,16 @@ the full model and recipe.
 ### Backpressure
 
 - `sf_append_deadline_millis` — maximum time `append()` waits for trim to
-  free space when the cap is hit. If the deadline fires, the call throws.
-  Default: `30000` (30 s).
+  free space when the slot hits the cap. If the deadline fires, the call
+  throws. Default: `30000` (30 s).
 
 ### Orphan recovery
 
 When `drain_orphans=on`, the new sender scans `<sf_dir>/*` at startup for
 sibling slots that are unlocked and contain unacked data. The scan runs
-as part of Sender creation (alongside the same-slot recovery above). Each
-orphan slot is locked, drained on its own dedicated connection, and
-released — **multiple orphans drain in parallel**, up to
+as part of Sender creation (alongside the same-slot recovery above). The
+sender locks each orphan slot, drains it on its own dedicated connection,
+and releases it — **multiple orphans drain in parallel**, up to
 `max_background_drainers` concurrent drains.
 
 - `drain_orphans` — `on` enables the orphan drainer pool. Default: `off`.
@@ -551,8 +551,8 @@ architecture is that a producer survives an arbitrarily long outage.
   constructor gives up and returns the error. The running loop and the
   `async` initial connect never consult it. Default: `300000` (5 min).
   Setting this enables `initial_connect_retry=on` implicitly; see below.
-- `initial_connect_retry` — whether the initial connect attempt is retried
-  on failure.
+- `initial_connect_retry` — whether the client retries the initial connect
+  attempt on failure.
   - `off` (default, alias `false`) — fail fast on initial connect failure.
   - `on` (aliases `sync`, `true`) — retry synchronously on the user
     thread, up to `reconnect_max_duration_millis`.
@@ -564,9 +564,9 @@ architecture is that a producer survives an arbitrarily long outage.
   also choosing an `initial_connect_retry` mode promotes
   `initial_connect_retry` to `on` automatically, so the budget also covers
   the *first* connect attempt — without the promotion,
-  `reconnect_max_duration_millis` would be inert. To keep the historical
-  fail-fast behaviour on first connect while still tuning the backoff, set
-  `initial_connect_retry=off` explicitly; the override is preserved.
+  `reconnect_max_duration_millis` would be inert. To keep fail-fast
+  behaviour on the first connect while still tuning the backoff, set
+  `initial_connect_retry=off` explicitly; the explicit setting wins.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
   milliseconds waiting for buffered frames to drain. Default: `5000` (5 s).
   Set to `0` or `-1` for fast close (skip the drain).
@@ -604,8 +604,8 @@ that drives this protocol is enterprise-only.
 :::
 
 QuestDB Enterprise ships Write-Ahead Logs (WALs) from the primary to an
-object store or another file system — typically over the network. Once a
-WAL is durably shipped, the server emits a `STATUS_DURABLE_ACK` frame to
+object store or another file system — typically over the network. After
+durably shipping a WAL, the server emits a `STATUS_DURABLE_ACK` frame to
 the store-and-forward client; the client marks that frame's FSN as durable
 only after this acknowledgement arrives.
 
@@ -629,18 +629,18 @@ wire protocol for the underlying mechanism.
 
 *Applies to: egress (query client).*
 
-These keys are accepted by the QWP query client's connect string (the
-egress / `QwpQueryClient` path). The Sender (ingress) silently consumes
-the same keys so that a single connect string can be shared between the
-Sender and the `QwpQueryClient` without an "unknown configuration key"
-error — the Sender does not interpret the values. Range, enum, and
-type checks happen on the egress side; a value the `QwpQueryClient`
-parser would reject is still silently accepted by the Sender.
+The QWP query client's connect string (the egress / `QwpQueryClient`
+path) accepts these keys. The Sender (ingress) silently consumes the same
+keys so that the Sender and the `QwpQueryClient` can share a single
+connect string without an "unknown configuration key" error — the Sender
+does not interpret the values. Range, enum, and type checks happen on the
+egress side; the Sender silently accepts even a value the
+`QwpQueryClient` parser would reject.
 
 - `compression` — result-batch compression the client advertises. Options:
-  `raw` (default — no compression, the accept-encoding header is omitted so
-  pre-compression servers see an unchanged handshake), `zstd` (demand
-  zstd), `auto` (accept zstd if the server offers it).
+  `raw` (default — no compression; the client omits the accept-encoding
+  header, so pre-compression servers see an unchanged handshake), `zstd`
+  (demand zstd), `auto` (accept zstd if the server offers it).
 - `compression_level` — zstd level hint. Range `1`–`22` (server clamps to
   `1`–`9`). Default `1` — the cheapest server-side CPU; raise it if you
   measure a meaningful ratio improvement on your payload and the server has
@@ -650,18 +650,19 @@ parser would reject is still silently accepted by the Sender.
   non-zero budget to bound server push on a memory-constrained client.
 - `max_batch_rows` — upper bound on rows per result batch.
 - `query_close_timeout_ms` — bounds the close-path cleanup drain (closing a
-  cursor mid-result-set, breaking out of iteration) before the connection
-  is declared desynced and discarded. Positive integer milliseconds;
-  default `5000` (5 s).
+  cursor mid-result-set, breaking out of iteration) before the client
+  declares the connection desynced and discards it. Positive integer
+  milliseconds; default `5000` (5 s).
 - `buffer_pool_size` — number of decoded result-batch buffers the I/O
   thread keeps in rotation. Sets the in-flight window between the
-  receive/decode loop and the user's `onBatch` callback: at most this many
-  batches are decoded ahead of the consumer. Default: `4`. Minimum: `1`
+  receive/decode loop and the user's `onBatch` callback: the I/O thread
+  decodes at most this many batches ahead of the consumer. Default: `4`.
+  Minimum: `1`
   (no read-ahead — the I/O thread waits for each `releaseBuffer()` call
   before decoding the next batch). Each buffer reserves about 64 KiB of
   native scratch, so raising the value grows pinned memory linearly. When
   the pool drains, the I/O thread parks and the TCP receive window closes,
-  applying back-pressure to the server. Must be set before `connect()`.
+  applying back-pressure to the server. Set it before `connect()`.
 
 Equivalent options exist on the query client's builder API (for example,
 `WithQwpQueryCompression`, `WithQwpQueryCompressionLevel`,
@@ -682,13 +683,13 @@ consumed by the application.
 
 The following per-category keys select the **error policy** for each class
 of server rejection. There is **no drop policy**: the client never silently
-discards data. A rejected batch is either replayed — `retriable` recycles the
-connection and replays from the acknowledged watermark; `retriable_other`
-does the same but rotates to the next endpoint (the node cannot serve writes
-at all) — or halts the sender loudly with the bytes preserved in the
-store-and-forward log (`terminal`). A frame that keeps being rejected with no
-ack progress escalates to a terminal via the poison-frame detector
-(`max_frame_rejections`, default `4`).
+discards data. The client either replays a rejected batch — `retriable`
+recycles the connection and replays from the acknowledged watermark;
+`retriable_other` does the same but rotates to the next endpoint (the node
+cannot serve writes at all) — or halts loudly with the bytes preserved in
+the store-and-forward log (`terminal`). A frame that the server keeps
+rejecting with no ack progress escalates to a terminal via the
+poison-frame detector (`max_frame_rejections`, default `4`).
 
 - `on_server_error` — global default for server-reject status frames.
   Accepts `auto` \| `terminal` \| `retriable` \| `retriable_other`.
@@ -775,7 +776,7 @@ description and behaviour notes.
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
 | `sf_durability`                         | enum (`memory`)               | `memory`                      | [Store-and-forward](#sf-keys)                                 |
-| `sf_max_bytes`                          | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
+| `sf_max_segment_bytes`                          | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
