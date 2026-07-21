@@ -20,11 +20,15 @@ is reclaimed afterwards by a background job.
 
 :::note
 
-`EXPIRE ROWS` is **materialized-view-only**, and the view must be a
-**passthrough** (non-aggregating) view: `SELECT * FROM base` with no
-`SAMPLE BY` / `GROUP BY`. `CREATE TABLE ... EXPIRE ROWS` and aggregating views
-are rejected. For base-table retention use [TTL](/docs/concepts/ttl/) or, on
-Enterprise, [storage policies](/docs/concepts/storage-policy/).
+`EXPIRE ROWS` is **materialized-view-only**: `CREATE TABLE ... EXPIRE ROWS` is
+rejected. It is designed for a **passthrough** (non-aggregating) view — `SELECT
+* FROM base` with no `SAMPLE BY` / `GROUP BY` — where the view mirrors base
+rows 1:1 and reclamation is permanent. An aggregating view is **accepted with a
+logged advisory**: reads stay filtered, but a later refresh can regenerate
+reclaimed rows from base rows that still exist (see
+[Requirements](#requirements)). For base-table retention use
+[TTL](/docs/concepts/ttl/) or, on Enterprise,
+[storage policies](/docs/concepts/storage-policy/).
 
 :::
 
@@ -47,19 +51,28 @@ requirement.
 
 ## Requirements
 
-`EXPIRE ROWS` requires a **passthrough materialized view**:
+`EXPIRE ROWS` is designed for a **passthrough materialized view**:
 
 - The view query is `SELECT * FROM base`. A column subset and a `WHERE` filter
-  are allowed; aggregation, `SAMPLE BY`, `GROUP BY`, `LATEST ON`, `DISTINCT`,
-  `UNION`, and `JOIN` are not — they make the view non-passthrough and are
-  rejected with
-  `EXPIRE ROWS is only supported on passthrough (non-aggregating) materialized views`.
+  keep the view passthrough; aggregation, `SAMPLE BY`, `GROUP BY`, `LATEST ON`,
+  `DISTINCT`, `UNION`, and `JOIN` make it non-passthrough.
 - The view inherits the base table's
   [designated timestamp](/docs/concepts/designated-timestamp/) and partitioning.
 
 A passthrough view mirrors its base table 1:1 and refreshes incrementally, so it
 is effectively a continuously-maintained replica. `EXPIRE ROWS` prunes that
 replica down to the rows you want to keep — without touching the base table.
+
+A **non-passthrough (aggregating) view is accepted with a logged advisory**
+rather than rejected: the read filter still hides expired rows, but physical
+reclamation only sticks when base-table retention is aligned with the expiry
+horizon — a later incremental or full refresh can regenerate a reclaimed row
+from base rows that still exist.
+
+A policied view must also stand alone: `CREATE MATERIALIZED VIEW` rejects a
+defining query that reads a policied view (as its base or in a join), and
+`ALTER ... SET EXPIRE` is rejected on a view that other materialized views
+derive from — otherwise those views would copy expired rows on refresh.
 
 ## The modes
 
@@ -95,7 +108,7 @@ EXPIRE ROWS
 | `KEEP LATEST`      | Keep the latest row per `PARTITION BY` key, by the designated timestamp.                  |
 | `ON timestampCol`  | Optional; if given it must name the view's designated timestamp.                          |
 | `HIGHEST\|LOWEST`  | Keep rows at the max / min of `col` per group (`N` omitted), or the top `N` per group.    |
-| `CLEANUP EVERY`    | How often the background reclamation job runs for this view. Defaults to `1h` if omitted. |
+| `CLEANUP EVERY`    | How often the background reclamation job runs for this view: `<number><unit>` with unit `s`/`m`/`h`/`d`/`w`. Defaults to `1h` if omitted. |
 
 ## Worked examples
 
@@ -286,7 +299,9 @@ On QuestDB Enterprise, cleanup runs on the **primary only**, but the reclamation
 still replicates: the compaction commits are ordinary WAL transactions, so
 replicas reclaim the identical rows by applying them. A read-only replica neither
 runs the job nor needs to. Disable the job with `cairo.row.expiry.enabled=false`
-in `server.conf` (reads stay filtered; only reclamation stops).
+in `server.conf` (reads stay filtered; only reclamation stops); the setting is
+read at startup, so changing it requires a restart. A failing sweep retries
+after one second, doubling the per-view retry gap up to a 10-minute cap.
 
 To observe reclamation, compare the physical row count per partition before and
 after a sweep:
@@ -328,20 +343,32 @@ is not already unique).
 
 Physical deletion is only safe when expiry is **monotonic**: a row that is
 expired now must stay expired forever. All the relative modes (`KEEP LATEST`,
-`KEEP HIGHEST/LOWEST`, `KEEP N`) are monotonic by construction, as is a
-designated-timestamp predicate such as `WHEN ts < now()` (a row only gets
-older). A scalar `WHEN predicate` is arbitrary SQL, so **monotonicity is the
-author's responsibility**.
+`KEEP HIGHEST/LOWEST`, `KEEP N`) are monotonic by construction. A scalar
+`WHEN predicate` is arbitrary SQL, so the cleanup job reclaims disk only for
+predicates it can **prove** monotonic:
+
+- clock-free predicates (`WHEN amount < 1.5`), and
+- designated-timestamp thresholds of a proven advancing-clock shape: a bare
+  clock (`ts < now()`), a bare clock minus a non-negative constant
+  (`ts < now() - 7200000000`), or a fixed-unit look-back `dateadd` on a bare
+  clock (`ts < dateadd('d', -1, now())`, units `s`/`m`/`h`/`d`/`w` and finer).
+
+Anything else **skips cleanup**: calendar units (`dateadd('M', -1, now())` — a
+month is a variable amount), look-forward offsets (`dateadd('h', 1, now())`),
+further clock arithmetic, non-constant offsets, and arbitrary window `WHEN`
+predicates. A skipped policy stays correct at read time (the filter recomputes
+on every read), but its disk is not reclaimed until the policy is changed to a
+proven shape.
 
 :::warning
 
 A non-monotonic predicate such as `WHEN ts > now()` expires *future* rows that
 **un-expire** as `now()` advances. The read filter recomputes `now()` on every
-read and stays correct, but the cleanup job assumes monotonicity and may
-physically delete a row that a later read would otherwise show (recoverable only
-by a full refresh). Write `WHEN` predicates that expire things in the **past**
-(`ts < now()`) or against fixed thresholds — never rows that the passage of time
-will later keep.
+read and stays correct, and the cleanup job skips such a policy rather than
+risk physically deleting a row a later read must show — at the cost of disk
+never being reclaimed for it. Write `WHEN` predicates that expire things in the
+**past** or against fixed thresholds — never rows that the passage of time will
+later keep.
 
 :::
 
@@ -355,15 +382,15 @@ SHOW CREATE MATERIALIZED VIEW trades_latest;
 ```
 
 The [`materialized_views()`](/docs/query/functions/meta/) function exposes the
-policy in the `expire_predicate` and `expire_cleanup_every` columns (both
+policy in the `expire_clause` and `expire_cleanup_every` columns (both
 `NULL` when no policy is set):
 
 ```questdb-sql title="List EXPIRE ROWS policies"
-SELECT view_name, expire_predicate, expire_cleanup_every
+SELECT view_name, expire_clause, expire_cleanup_every
 FROM materialized_views();
 ```
 
-| view_name     | expire_predicate                | expire_cleanup_every |
+| view_name     | expire_clause                   | expire_cleanup_every |
 | ------------- | ------------------------------- | -------------------- |
 | trades_sized  | amount < 1.5                    | 1h                   |
 | trades_latest | KEEP LATEST PARTITION BY symbol | 1h                   |
@@ -402,6 +429,16 @@ rather than breaking subsequent reads.
   rejected.
 - **Non-monotonic `WHEN` predicates are unsupported for cleanup** — see
   [monotonicity](#monotonicity-and-cleanup-safety) above.
+- **Reserved column name.** The window/keep modes compute the keep-set through a
+  synthetic boolean column named `__qdb_re_keep`; a policy is rejected on a view
+  that exposes a column with that name.
+- **No line comments in the clause.** The clause text is stored verbatim and
+  embedded into generated SQL, so `--` comments are rejected inside an
+  `EXPIRE ROWS` clause; terminated block comments (`/* ... */`) are fine.
+- **Compacting a Parquet partition rewrites it as native storage.** When cleanup
+  compacts a *partially*-expired partition held in Parquet, the partition
+  reverts to native QuestDB storage until the Parquet-conversion job re-converts
+  it. Reclamation correctness is unaffected.
 
 ## Related documentation
 

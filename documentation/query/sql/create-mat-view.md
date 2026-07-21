@@ -31,7 +31,7 @@ Where:
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
 - `query`: Must contain `SAMPLE BY` or time-based `GROUP BY` (except for the
   passthrough views used by `EXPIRE ROWS` — see below)
-- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]` — passthrough views only
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]` — designed for passthrough views (see below)
 
 ## Parameters
 
@@ -289,8 +289,11 @@ whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows — the late
 per key, the top-N per group, or rows matching a predicate — recomputed
 continuously as the view refreshes.
 
-`EXPIRE ROWS` applies **only to passthrough (non-aggregating) views** — the query
-is `SELECT * FROM base` with no `SAMPLE BY` / `GROUP BY`:
+`EXPIRE ROWS` is designed for **passthrough (non-aggregating) views** — the
+query is `SELECT * FROM base` with no `SAMPLE BY` / `GROUP BY`. An aggregating
+view is accepted with a logged advisory (a later refresh can regenerate
+reclaimed rows). The defining query must not read another policied view, as its
+base or in a join:
 
 ```questdb-sql title="Passthrough view that keeps the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (

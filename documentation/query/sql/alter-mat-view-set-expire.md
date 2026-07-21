@@ -7,8 +7,9 @@ description:
 ---
 
 Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/)
-row-retention policy on a **passthrough** materialized view. Expired rows are
-hidden from queries immediately and reclaimed on disk in the background.
+row-retention policy on a materialized view (designed for **passthrough**
+views — see the concept page). Expired rows are hidden from queries immediately
+and reclaimed on disk in the background.
 
 ## Syntax
 
@@ -79,12 +80,13 @@ ALTER MATERIALIZED VIEW trades_mirror DROP EXPIRE;
 
 ## Behavior
 
-| Aspect            | Description                                                                  |
-| ----------------- | ---------------------------------------------------------------------------- |
-| Passthrough only  | The view must be `SELECT * FROM base`; aggregating views are rejected        |
-| Validation        | The policy is checked against the view's columns before it is applied        |
-| Immediate effect  | Reads are filtered to the kept rows as soon as the policy is set             |
-| Replication       | The policy and the reclamation it drives replicate as normal WAL traffic     |
+| Aspect                  | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| Passthrough recommended | An aggregating view is accepted with a logged advisory: a later refresh can regenerate reclaimed rows, so align base-table retention with the expiry horizon |
+| No dependent views      | Rejected when other materialized views derive from this view (they would copy expired rows on refresh) |
+| Validation              | The policy is checked against the view's columns before it is applied        |
+| Immediate effect        | Reads are filtered to the kept rows as soon as the policy is set             |
+| Replication             | The policy and the reclamation it drives replicate as normal WAL traffic     |
 
 ## Permissions (Enterprise)
 
@@ -99,9 +101,11 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 | Error | Cause |
 | ----- | ----- |
 | `materialized view does not exist` | View with the specified name doesn't exist |
-| `EXPIRE ROWS is only supported on passthrough (non-aggregating) materialized views` | View aggregates (e.g. `SAMPLE BY`) |
+| `cannot set an EXPIRE ROWS policy on '...': it is the base of N materialized view(s), which would copy expired rows on refresh` | Other materialized views derive from this view |
 | `EXPIRE ROWS KEEP LATEST ON must name the designated timestamp ...` | `ON` names a column other than the designated timestamp |
 | `invalid EXPIRE ROWS KEEP LATEST column: ...` | A `PARTITION BY` key column does not exist |
+| `EXPIRE ROWS KEEP / window retention cannot be used on a view with a column named '__qdb_re_keep'` | The view exposes a column named like the reserved keep column |
+| `invalid EXPIRE ROWS predicate: ...` | The predicate does not parse, bind, or type-check against the view's columns |
 | `permission denied` | Missing `ALTER MATERIALIZED VIEW` permission (Enterprise) |
 
 ## See also
