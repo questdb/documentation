@@ -22,13 +22,16 @@ AS [ ( ] query [ ) ]
 [ TIMESTAMP ( columnRef ) ]
 [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
       [ TTL n timeUnit ] ]
+[ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
 [ OWNED BY ownerName ]
 ```
 
 Where:
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
+- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY` (except for the
+  passthrough views used by `EXPIRE ROWS` — see below)
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]` — designed for passthrough views (see below)
 
 ## Parameters
 
@@ -43,6 +46,7 @@ Where:
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
+| `EXPIRE ROWS` | Row-level retention for passthrough views (see below) |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
 ## Rules and defaults
@@ -277,6 +281,42 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
+
+## EXPIRE ROWS
+
+Attach a row-level retention policy with `EXPIRE ROWS`. Unlike `TTL` (which drops
+whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows — the latest
+per key, the top-N per group, or rows matching a predicate — recomputed
+continuously as the view refreshes.
+
+`EXPIRE ROWS` is designed for **passthrough (non-aggregating) views** — the
+query is `SELECT * FROM base` with no `SAMPLE BY` / `GROUP BY`. An aggregating
+view is accepted with a logged advisory (a later refresh can regenerate
+reclaimed rows). The defining query must not read another policied view, as its
+base or in a join:
+
+```questdb-sql title="Passthrough view that keeps the latest row per symbol"
+CREATE MATERIALIZED VIEW trades_latest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+```
+
+The clause goes after the query (and after `PARTITION BY` if present):
+
+```
+EXPIRE ROWS
+  { WHEN predicate
+  | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
+  | KEEP [ N ] ( HIGHEST | LOWEST ) col [ PARTITION BY col [, col ...] ] }
+  [ CLEANUP EVERY duration ]
+```
+
+Expired rows are hidden from queries immediately and reclaimed on disk in the
+background (`CLEANUP EVERY`, default `1h`). Change or remove a policy with
+[`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
+
+See the [Expiring rows](/docs/concepts/deep-dive/expire-rows/) concept page for
+all modes, worked examples, and semantics (NULLs, ties, monotonicity).
 
 ## Complete example
 
