@@ -108,11 +108,8 @@ db = questdb.connect("ws::addr=localhost:9000;", sender_pool_max=8)
 db = questdb.connect(host="localhost", port=9000, sender_pool_max=8)
 ```
 
-The configuration string stays the portable base. The endpoint keywords
-cannot be combined with one — passing `host=`, `port=`, or `tls=`
-alongside a configuration string raises `TypeError`; put the address in
-the string — and a setting present both in the string and as a keyword
-raises `ValueError` instead of one silently overriding the other.
+The endpoint must come from one form only, and giving the same setting in
+both places is an error.
 
 The handle is a context manager. Without `with`, call `db.close()` at
 shutdown. `QuestDB.from_conf()` is the equivalent static constructor.
@@ -162,7 +159,7 @@ operating-system certificate store. Override it with configuration keys:
 | `tls_ca=os_roots` | Use only the operating-system certificate store. |
 | `tls_ca=webpki_roots` | Use only the bundled `webpki` root store. |
 | `tls_roots=/path/to/ca.pem` | Use a private CA bundle. |
-| `tls_verify=unsafe_off` | Rejected by released wheels with `ConfigError`: verification cannot be disabled. Only source builds that opt in at compile time (`QUESTDB_INSECURE_SKIP_VERIFY=1`) accept it, for test harnesses and MITM debugging. |
+| `tls_verify=unsafe_off` | Rejected: certificate verification cannot be disabled in released wheels. |
 
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
@@ -302,15 +299,16 @@ type when the distinction matters.
 
 :::note Auto-flush
 
-The pooled sender auto-flushes by default when its buffer reaches 1,000 rows,
-or when the next row arrives at least 100 ms after the first buffered row.
-The interval is checked only by `row()`; there is no background timer that
-flushes an idle buffer. Byte-based auto-flush is off by default.
+The pooled sender auto-flushes by default at 1,000 rows, after 100 ms, or when
+its estimated encoded size reaches 90% of the current QWP frame limit. Until
+the server advertises that limit, the byte threshold is 8 MiB (or the lower
+local queue limit). The interval is checked only by `row()`; there is no
+background timer that flushes an idle buffer.
 
 Override the thresholds with `auto_flush_rows`, `auto_flush_interval`, and
-`auto_flush_bytes`, or use `auto_flush=off` to disable row-triggered
-publishing. Auto-flush does not wait for an acknowledgement; errors propagate
-from `row()`.
+`auto_flush_bytes`. Set `auto_flush_bytes=off` to disable only the byte trigger,
+or `auto_flush=off` to disable all row-triggered publishing. Auto-flush does not
+wait for an acknowledgement; errors propagate from `row()`.
 
 :::
 
@@ -387,7 +385,7 @@ Parameters:
 
 | Parameter | Meaning |
 | --- | --- |
-| `table_name` | The table to load into. A NumPy-backed pandas frame may instead carry the name as `df.index.name`; Arrow-native input (polars, pyarrow, pyarrow-backed pandas) requires an explicit name. The columnar path loads one table per call: `table_name_col` raises `UnsupportedDataFrameShapeError` — split multi-table frames (e.g. `df.groupby(col)`) and load each group. |
+| `table_name` | The table to load into; one table per call. `table_name_col` is not supported: split multi-table frames and load each group. |
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
 | `max_rows_per_batch` | Rows per published batch, default 16384. Sets pipelining granularity, not a safety limit — see below. |
@@ -402,7 +400,7 @@ is never bounded by it. What it does control:
 - Peak client memory: each batch is encoded and held as one frame.
 - Recovery quantum: a commit checkpoint fires every 100 batches, so
   `max_rows_per_batch × 100` rows is the replay window on a transient
-  failover and the committed-prefix granularity behind `in_doubt`.
+  failover.
 - Per-batch overhead: very small batches pay framing and server-side
   apply costs per batch.
 
@@ -524,10 +522,9 @@ keeps the dictionary warm across consecutive queries — skipping the
 re-interning of symbols the connection already knows — which works only
 when they reuse the same connection, as a reader lease guarantees.
 
-A lease runs one query at a time: starting the next query while the
-previous result is undrained raises `QuestDBErrorCode.InvalidApiCall`, and
-a lease whose previous result was closed before it was drained reports
-itself terminal — close it and take a fresh one. Keep each lease on the
+A lease runs one query at a time: drain or close the previous result
+before starting the next. A lease whose previous result was closed before
+it was drained is terminal; close it and take a fresh one. Keep each lease on the
 thread that created it; `db.close()` waits for open leases.
 
 ### Result types and nulls
@@ -537,7 +534,7 @@ thread that created it; `db.close()` waits for open leases.
 | `BOOLEAN`, `BYTE`, `SHORT` | `bool`, `int8`, `int16`; always non-null, server-side nulls arrive as `false` or `0` |
 | `INT`, `LONG` | Plain `int32` / `int64` when the column has no nulls; nullable `Int32` / `Int64` with `pd.NA` when it does |
 | `FLOAT`, `DOUBLE` | `float32` / `float64` with `NaN` for null |
-| `TIMESTAMP`, `TIMESTAMP_NS` | Timezone-naive `datetime64[ns]` holding UTC instants, `NaT` for null |
+| `TIMESTAMP`, `TIMESTAMP_NS` | Timezone-naive `datetime64[us]` / `datetime64[ns]` holding UTC instants, `NaT` for null |
 | `SYMBOL` | `Categorical` sharing one dictionary across batches |
 | `VARCHAR` | Strings with `None` for null |
 | `DECIMAL`, `UUID`, `BINARY` | `object` columns of `decimal.Decimal`, `uuid.UUID`, `bytes` |
@@ -667,7 +664,7 @@ db.close()
 | --- | --- | --- |
 | `sender_pool_min` / `query_pool_min` | `1` | Warm minimum retained per pool after connections have been opened. Set it near steady concurrent use. |
 | `sender_pool_max` / `query_pool_max` | `4` | Per-pool growth cap. Set it at or above peak concurrent leases. |
-| `acquire_timeout_ms` | `5000` | How long a borrow waits for a free slot before `QuestDBError` with `QuestDBErrorCode.InvalidApiCall` names the exhausted pool; `0` fails fast. |
+| `acquire_timeout_ms` | `5000` | How long a borrow waits for a free slot before failing; `0` fails fast. |
 | `idle_timeout_ms` | `60000` | Idle lifetime for connections above the pool minimum. |
 | `pool_reap` | `auto` | Use `manual` only when your application will call `db.reap_idle()`. |
 
@@ -709,9 +706,8 @@ one `ConnectionEvent` per state transition — `kind`
 (a `ConnectionEventKind`), `host` / `port`, `previous_host` /
 `previous_port`, `attempt_number`, `cause_code` / `cause_msg`, and
 `timestamp_millis` — on a dedicated dispatcher thread with
-a bounded drop-oldest inbox (`connection_event_inbox_capacity`, default 64;
-the keyword's literal default `0` selects that native default), so a slow
-listener cannot stall ingestion:
+a bounded drop-oldest inbox (`connection_event_inbox_capacity`, default 64),
+so a slow listener cannot stall ingestion:
 
 ```python
 import questdb
@@ -736,8 +732,7 @@ The server can reject published frames — a schema mismatch, a parse error —
 after `flush()` has already returned. Rejections are pushed to the pool's
 rejection handler, one `SenderError` per rejection, on a dedicated dispatcher
 thread with a bounded drop-oldest inbox (`error_event_inbox_capacity`,
-default 64; the keyword's literal default `0` selects that native default).
-This covers every pooled connection, including rejections for
+default 64). This covers every pooled connection, including rejections for
 rows whose sender lease was already closed:
 
 ```python
