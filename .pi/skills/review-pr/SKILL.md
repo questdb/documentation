@@ -1,6 +1,9 @@
 ---
 name: review-pr
 description: Review QuestDB documentation pull requests for placement, discoverability, dual-audience (human + LLM) quality, example coverage, and SQL syntax diagrams. Use when reviewing a docs PR, a new or changed page, or assessing whether documentation is findable, correct, and usable by both engineers and LLMs that build systems against QuestDB.
+allowed-tools: bash read subagent
+metadata:
+  argument-hint: "[PR number, URL, or branch] [--level=0..2]"
 ---
 
 # QuestDB documentation PR reviewer
@@ -22,14 +25,29 @@ review checklist rather than restating it here.
 
 ## How to run a review
 
-1. **Get the diff and the scope.** Identify every file the PR adds or changes.
+1. **Resolve the target and get the diff.** The skill reviews either a named
+   PR or the current branch.
+
+   - **If invoked with a PR number or URL** (after stripping any `--level=N`,
+     `-lN`, or bare-digit level token), check it out so full-file reads and
+     `yarn build` run against the PR branch, and capture its metadata and
+     existing review comments:
+     ```bash
+     PR='<PR number or URL from the invocation, with the level token removed>'
+     gh pr view "$PR" --json number,title,body,labels,state,headRefName
+     gh pr checkout "$PR"
+     gh pr view "$PR" --comments
+     ```
+   - **If no PR is given**, review the current branch as-is.
+
+   Either way, identify the scope — list new pages, changed pages, and any
+   `sidebars.js` change separately:
    ```bash
    git fetch origin
    git diff --stat origin/main...HEAD -- documentation/
    git diff origin/main...HEAD -- documentation/sidebars.js
    ```
-   List new pages, changed pages, and any `sidebars.js` change separately. A
-   new page with no `sidebars.js` change is an immediate red flag (see
+   A new page with no `sidebars.js` change is an immediate red flag (see
    Pillar 1).
 
 2. **Read each new or changed page in full**, not just the diff hunk. Placement
@@ -43,6 +61,13 @@ review checklist rather than restating it here.
 
 4. **Score against the pillars below**, assign a severity to each finding, and
    produce the review using the output format at the end.
+
+5. **For non-trivial PRs, escalate to the agent passes.** The pillar review is
+   a single-pass, checklist-anchored read — the right default for small edits,
+   but checklists have a blind spot (a reviewer scoring fixed pillars tends to
+   confirm them and miss failure modes the pillars don't name). For new pages,
+   flagship/SQL-reference pages, or any change an LLM will build against, run
+   the **Adversarial review agents** pass below (levels 1-2).
 
 ## Severity levels
 
@@ -220,6 +245,184 @@ Check:
 - **Changelog.** If the change is user-facing, confirm the `docs-changelog`
   skill's criteria are met (or flag that a changelog entry is owed).
 
+## Adversarial review agents (deeper pass)
+
+For marquee pages, large PRs, or any change an LLM will build against, add a
+deeper pass that spawns **fresh-context adversarial agents** — agents whose
+only job is to attack the page, with no checklist to anchor them. This mirrors
+the multi-agent review in the `questdb/questdb` repo, adapted to documentation.
+Because docs are a graph that humans and LLMs traverse, the deeper pass also
+maps the change surface and walks the reader's cross-page journey, not just
+each page in isolation.
+
+### Review depth (levels)
+
+Parse the invocation for a level token (`--level=N`, `-lN`, or a bare `0`-`2`).
+Default to **0**. State the chosen level in one line at the start of the review
+(e.g. "Reviewing at level 1"); if defaulted, mention that level 2 exists.
+
+| Level | What runs |
+|-------|-----------|
+| **0 (default)** | Single-pass inline pillar review (the procedure above). No agents. Use for typo fixes, small edits, single-page tweaks. |
+| **1** | Build the change surface map, then spawn structured agents 1-4 (Agent 4 = cross-page navigation) and the fresh-context adversarial agent (5) in parallel; verify findings. Use for new pages, multi-page changes, and link/sidebar changes. |
+| **2** | Full change surface map and all six agents (adds the LLM one-shot consumer, 6) with per-finding verification. Use for flagship/SQL-reference pages and large PRs. |
+
+### Map the change surface (levels 1-2)
+
+Before spawning agents, build a change surface map — the docs analog of a code
+reviewer's blast-radius analysis. A page change ripples to its neighbors;
+produce this inventory, don't guess it:
+
+- **Inbound links.** For every changed, renamed, or moved page, search the repo
+  for links pointing at it (old path *and* new path). A renamed or moved page
+  whose old path still has inbound links is an orphan-link defect.
+  ```bash
+  rg -n "query/sql/foo" documentation/   # repeat per changed page path
+  ```
+- **Outbound links & indirection chains.** Where each changed page sends the
+  reader ("see X"). Flag chains longer than two hops, circular "see X → see Y
+  → see X" loops, and links that dead-end on a page that doesn't answer the
+  question.
+- **Sidebar neighbors.** The siblings immediately before/after each changed
+  entry in `sidebars.js`. Note label collisions and whether an insertion
+  shifted or duplicated a neighbor.
+- **Shared schema & vocabulary.** The demo datasets, column names, and key
+  terms the changed pages use, versus what their neighbors and linked pages use
+  — the raw material for spotting terminology and schema drift across pages.
+- **Reading path(s).** The realistic journeys a reader takes through the
+  changed set (concept → guide → SQL reference). These are the scripts Agent 4
+  walks.
+
+This map is required input for Agent 4 and sharpens agents 1-3. Skip it only at
+level 0.
+
+### Spawning review agents in pi
+
+> Harness note: this skill runs inside **pi**. Launch parallel agents with the
+> `subagent(...)` tool using fresh-context `reviewer` agents — there is no
+> Claude `Agent` tool. Search the repo with `bash` (`rg`, `grep`, `find`) plus
+> `read`; pi has no separate `Grep`/`Glob` tools.
+
+Each agent task must be self-contained — the child does not inherit this
+conversation. Give every task: the diff (or have the child re-run the `git
+diff` from step 1), the change surface map (for the structured agents), the
+list of new/changed pages with their `sidebars.js` context, its role
+instructions below, and an explicit "review only — do not edit any files"
+constraint.
+
+```typescript
+subagent({
+  tasks: [
+    { agent: "reviewer", task: "Agent 1 — Technical correctness. <diff + changed pages + Agent 1 instructions>. Review only; do not edit." },
+    { agent: "reviewer", task: "Agent 2 — Placement & retrieval. <...>. Review only; do not edit." },
+    { agent: "reviewer", task: "Agent 3 — Information flow, examples & syntax. <...>. Review only; do not edit." },
+    { agent: "reviewer", task: "Agent 4 — Cross-page navigation & coherence. <change surface map + reading paths + linked pages>. Review only; do not edit." },
+    { agent: "reviewer", task: "Agent 5 — Fresh-context adversarial. <ONLY the changed page text + file paths; NO pillars>. Review only; do not edit." }
+  ],
+  context: "fresh"
+})
+```
+
+The adversarial agents (5 and 6) must NOT receive the pillars, the severity
+table, or any checklist — give them only the page content (and, for Agent 6,
+the user task). The parent session owns synthesis, deduplication, verification,
+and the final report; children only return findings.
+
+### Structured agents (pillars and change surface)
+
+**Agent 1 — Technical correctness & runnable examples (Pillar 0).** Build the
+site (`yarn build`). Run every `demo`-tagged and runnable SQL example against
+the demo instance or a local build. Cross-check every function signature,
+parameter name, type, default, and behavior claim against the product and the
+`questdb/sql-parser` repo. A broken build, an example that does not run, or a
+signature that does not match the product is **Critical**.
+
+**Agent 2 — Placement, findability & retrieval (Pillars 1, 4).** Map the click
+path to the page. Verify section, depth-vs-importance, `sidebar_label`,
+ordering, and that the page exists in `sidebars.js` at all. Check the
+`description` frontmatter is a specific ~150-char sentence, that the title and
+headings carry real search terms, and that the page has inbound links from
+sibling/concept pages. A buried marquee feature or a page missing from the
+sidebar is **Critical**.
+
+**Agent 3 — Information flow, examples & syntax grammar (Pillars 2, 3, 5).**
+Check the intro states what/why, the flow is intro → syntax → reference →
+examples, and sections are self-contained. Verify example coverage per
+documented form/clause, consistent demo schema and finance-friendly naming,
+and that SQL reference pages carry a text-based `questdb-sql` syntax block (not
+a railroad SVG) as the first H2, with both `!=`/`<>` spellings and no
+horizontal scroll.
+
+**Agent 4 — Cross-page navigation & coherence (human + LLM).** Consumes the
+change surface map. Walk each reading path and judge every page-to-page
+transition twice:
+
+- **As a human reader:** does each transition flow? Are prerequisites
+  established before the page that needs them? Is each concept explained once,
+  in one canonical place — not duplicated or, worse, contradicted across pages?
+  Do "see X" links land on a page that actually answers the question instead of
+  bouncing the reader around?
+- **As an LLM doing retrieval:** if these pages are retrieved independently and
+  out of order, does each still stand on its own? Do terminology and schema
+  stay consistent so an LLM stitching two pages together doesn't hit
+  contradictory column names or definitions? Do cross-links give a path to the
+  missing context, or dead-end? Is there one canonical page an LLM would cite
+  for this topic, or is the answer smeared across several with no clear home?
+
+Output a verdict per transition — COHERENT / BROKEN / DRIFT — each BROKEN or
+DRIFT naming the exact link, orphaned inbound link, terminology/schema
+mismatch, or circular chain. Orphaned inbound links and cross-page
+contradictions are at least **Major**. Skip this agent only when the PR touches
+a single page and changes no links or sidebar entries.
+
+### Adversarial agents (no checklist — escape pillar anchoring)
+
+**Agent 5 — Fresh-context adversarial reader.** Give this agent ONLY the raw
+text of the changed pages and their file paths. Do NOT give it the pillars, the
+severity levels, or any checklist. Its sole instruction:
+
+> You are a skeptical staff engineer who was told this page answers your
+> problem. Find every way it misleads you, omits something you need, states
+> something that is wrong or unverifiable, buries the answer, or wastes your
+> time. Quote the exact passage for each problem.
+
+It may use `read` and `bash` (`rg`/`grep`/`find`) to explore the repo and the
+product to confirm a claim is wrong. Findings are not pre-classified — each
+states what's wrong, where, and why. A finding here that none of agents 1-4
+produced is high signal: the structured review's frame missed it.
+
+**Agent 6 — LLM one-shot consumer (the docs-specific adversarial test).** This
+agent operationalizes Pillar 2's one-shot test. Give it ONLY the changed page
+as if it were the single retrieved context, plus one realistic user task the
+page claims to solve (for example, "write the SQL to X using this feature").
+Instruct it to actually produce the runnable solution from the page alone:
+
+> Wherever you must guess a parameter, invent a column or table, assume a
+> default, or reach for knowledge not on this page, stop and record it as a
+> gap. Every guess is a documentation defect.
+
+The output is the attempted solution plus a list of every point the page forced
+a guess. Each gap is at least **Major** — it is concrete proof of a one-shot
+failure that the prose-level pillar check only asserts in the abstract.
+
+### Verify before reporting
+
+Adversarial agents over-fire. Before any finding reaches the report, verify it:
+
+- **"Example doesn't run" / "claim is wrong":** re-run the example or re-check
+  the signature against the product yourself. Never relay an agent's claim
+  unverified.
+- **"Buried / missing from sidebar":** open `sidebars.js` and confirm the path.
+- **"Orphaned inbound link" / "broken or circular chain" (Agent 4):** resolve
+  the link target yourself; a valid relative path the build accepts is not a
+  defect.
+- **"Forced a guess" (Agent 6):** confirm the needed fact is genuinely absent
+  from the page, not merely one section away behind a clear inline link.
+
+Classify each finding as CONFIRMED, FALSE POSITIVE, or CONFIRMED-with-nuance.
+Move false positives to the **Downgraded** section of the output with a
+one-line dismissal each, so the author can audit the reasoning.
+
 ## Producing the review
 
 Structure the review so the author can act on it immediately:
@@ -230,6 +433,10 @@ Structure the review so the author can act on it immediately:
 3. **Non-blocking** — Minor and Nit findings, briefly.
 4. **What works** — call out what the PR does well, so good patterns get
    reinforced.
+5. **Downgraded (false positives)** — only when agent passes ran (levels 1-2):
+   findings raised by an agent but dismissed on verification, one line each
+   stating the original claim and why it was dropped. Also state the verified
+   vs dropped count (e.g. "6 findings verified, 3 false positives removed").
 
 Reference exact paths (`documentation/query/sql/foo.md`) and, where useful,
 line numbers. Propose the fix, don't just name the problem. Be direct and

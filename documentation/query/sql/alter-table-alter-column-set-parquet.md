@@ -12,7 +12,7 @@ values, significantly speeding up equality and `IN` queries on large Parquet
 partitions.
 
 These settings only affect
-[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+[Parquet partitions](/docs/connect/compatibility/export-parquet/#in-place-conversion) and are
 ignored for native partitions.
 
 ## Syntax

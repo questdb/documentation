@@ -76,8 +76,23 @@ export const RemoteRepoExample = ({
     }
   }
 
-  const example: Example = repoExample[id]
-  const headerMd = example?.header
+  const example: Example | undefined = repoExample[id]
+
+  if (example === undefined) {
+    // The example is not in the remote-repo-example plugin data: its
+    // source file has not landed in the client repo yet, or the manifest
+    // entry is missing. The plugin (plugins/remote-repo-example) already
+    // skips absent files with a warning rather than failing the build;
+    // mirror that here instead of crashing the entire static-site
+    // generation. The block renders once the example lands upstream.
+    console.warn(
+      `[RemoteRepoExample] no example "${id}" in remote-repo-example ` +
+        `data; skipping. It will render once it lands in the source repo.`,
+    )
+    return null
+  }
+
+  const headerMd = example.header
   let code = example.code ?? ""
 
   const valueReplaceMap = [

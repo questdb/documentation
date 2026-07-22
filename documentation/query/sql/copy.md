@@ -176,7 +176,7 @@ These options are provided as key-value pairs after the `WITH` keyword.
 ### Examples
 
 For more details on parallel import, please also see
-[Importing data in bulk via CSV](/docs/ingestion/import-csv/#import-csv-via-copy-sql).
+[Importing data in bulk via CSV](/docs/connect/compatibility/import-csv/#import-csv-via-copy-sql).
 
 ```questdb-sql title="COPY"
 COPY weather FROM 'weather.csv' WITH HEADER true FORMAT 'yyyy-MM-ddTHH:mm:ss.SSSUUUZ' ON ERROR SKIP_ROW;

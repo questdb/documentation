@@ -51,7 +51,7 @@ Traffic will be unencrypted between PgBouncer and QuestDB. This setup is only su
 
 
 :::info Related Documentation
-- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/)
 - [QuestDB security](/docs/security/tls/)
 - [PgBouncer documentation](https://www.pgbouncer.org/config.html)
 :::

@@ -90,7 +90,7 @@ The following options are available:
 
 ## Other considerations
 
-- Please refer to the [ILP overview](/docs/ingestion/ilp/overview) for
+- Please refer to the [ILP overview](/docs/connect/compatibility/ilp/overview) for
   details about transactions, error control, delivery guarantees, health check,
   or table and column auto-creation.
 - The method `flush()` can be called to force sending the internal buffer to a

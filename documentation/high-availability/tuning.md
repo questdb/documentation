@@ -279,6 +279,7 @@ For example, a 2 MiB WAL segment becomes ~256 KiB in the transport layer.
 
 ## Next steps
 
-- [Replication overview](/docs/high-availability/overview/) - How replication works
+- [High availability overview](/docs/high-availability/overview/) - How replication works
 - [Setup guide](/docs/high-availability/setup/) - Configure replication
+- [Client failover](/docs/high-availability/client-failover/concepts/) - Configure clients to follow a primary promotion
 - [Configuration reference](/docs/configuration/overview/) - All server settings

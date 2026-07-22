@@ -52,4 +52,4 @@ export const screenshotTitle =
 
 ## See also
 
-- [QuestDB Postgres wire protocol](/docs/query/pgwire/overview/)
+- [QuestDB Postgres wire protocol](/docs/connect/compatibility/pgwire/overview/)

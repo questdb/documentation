@@ -29,13 +29,13 @@ platforms:
 Ingest, store, and process high-throughput and real-time data streams with these
 integrations:
 
-- **[Apache Kafka](/docs/ingestion/message-brokers/kafka):** A distributed
+- **[Apache Kafka](/docs/connect/message-brokers/kafka):** A distributed
   event streaming platform for high-throughput data pipelines.
-- [Telegraf](/docs/ingestion/message-brokers/telegraf/): Collect and report metrics from
+- [Telegraf](/docs/connect/message-brokers/telegraf/): Collect and report metrics from
   various sources.
-- **[Redpanda](/docs/ingestion/message-brokers/redpanda/):** A Kafka-compatible streaming
+- **[Redpanda](/docs/connect/message-brokers/redpanda/):** A Kafka-compatible streaming
   platform for simplified data pipelines.
-- [Apache Flink](/docs/ingestion/message-brokers/flink/): Process real-time data streams
+- [Apache Flink](/docs/connect/message-brokers/flink/): Process real-time data streams
   efficiently.
   tasks at scale.
 

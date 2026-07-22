@@ -12,8 +12,8 @@ specific types.
 
 For most applications, you will import your data using methods like the InfluxDB
 Line Protocol, CSV imports, or integration with third-party tools such as
-Telegraf, [Kafka](/docs/ingestion/message-brokers/kafka), or Prometheus. If your interest lies in data ingestion rather
-than generation, refer to our [ingestion overview](/docs/ingestion/overview/).
+Telegraf, [Kafka](/docs/connect/message-brokers/kafka), or Prometheus. If your interest lies in data ingestion rather
+than generation, refer to our [ingestion overview](/docs/connect/overview/).
 Alternatively, the [QuestDB demo instance](https://demo.questdb.io) offers a
 practical way to explore data creation and manipulation without setting up your
 dataset.
@@ -31,8 +31,8 @@ All commands are run through the [Web Console](/docs/getting-started/web-console
 `http://localhost:9000`.
 
 You can also run the same SQL via the
-[Postgres endpoint](/docs/query/pgwire/overview/) or the
-[REST API](/docs/query/rest-api/).
+[Postgres endpoint](/docs/connect/compatibility/pgwire/overview/) or the
+[REST API](/docs/connect/compatibility/rest-api/).
 
 If QuestDB is not running locally, checkout the
 [quick start](/docs/getting-started/quick-start/).

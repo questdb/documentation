@@ -54,9 +54,9 @@ it makes ConnectorX to avoid using features not supported by QuestDB.
 
 ## Ingestion vs Querying
 This guides deals with querying data from QuestDB using Polars. For ingestion to QuestDB we recommend using the
-[QuestDB Python client](/docs/ingestion/clients/python/).
+[QuestDB Python client](/docs/connect/clients/python/).
 
 ## Additional Resources
 - [Integration with Pandas](/docs/integrations/data-processing/pandas/)
-- [QuestDB Client for fast ingestion](/docs/ingestion/clients/python/)
-- [Python clients guide](/docs/query/pgwire/python/)
+- [QuestDB Client for fast ingestion](/docs/connect/clients/python/)
+- [Python clients guide](/docs/connect/compatibility/pgwire/python/)

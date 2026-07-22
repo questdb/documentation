@@ -262,7 +262,7 @@ pg.password=your_secure_password
 ```
 
 **InfluxDB line protocol** - edit `conf/auth.json`. See
-[ILP authentication](/docs/ingestion/ilp/overview/#authentication).
+[ILP authentication](/docs/connect/compatibility/ilp/overview/#authentication).
 
 Restart after changes:
 

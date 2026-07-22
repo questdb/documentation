@@ -280,7 +280,7 @@ yields.
 :::note
 
 The UDP receiver is deprecated since QuestDB version 6.5.2. We recommend
-[ILP over HTTP](/docs/ingestion/ilp/overview/) instead.
+[ILP over HTTP](/docs/connect/compatibility/ilp/overview/) instead.
 
 :::
 

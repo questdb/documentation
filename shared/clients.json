@@ -1,6 +1,6 @@
 [
   {
-    "href": "/docs/ingestion/clients/c-and-cpp",
+    "href": "/docs/connect/clients/c-and-cpp",
     "name": "C & C++",
     "description":
       "High-performance client for systems programming and embedded applications.",
@@ -8,7 +8,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/ingestion/clients/dotnet",
+    "href": "/docs/connect/clients/dotnet",
     "name": ".NET",
     "description":
       "Cross-platform client for building applications with .NET technologies.",
@@ -16,7 +16,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/dotnet",
+    "href": "/docs/connect/compatibility/pgwire/dotnet",
     "name": ".NET",
     "description":
       "Query QuestDB using Npgsql or other .NET PostgreSQL drivers.",
@@ -24,7 +24,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/ingestion/clients/go",
+    "href": "/docs/connect/clients/go",
     "name": "Go",
     "description":
       "An open-source programming language supported by Google with built-in concurrency.",
@@ -32,7 +32,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/go",
+    "href": "/docs/connect/compatibility/pgwire/go",
     "name": "Go",
     "description":
       "Query QuestDB using pgx or other Go PostgreSQL drivers.",
@@ -40,7 +40,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/ingestion/clients/java",
+    "href": "/docs/connect/clients/java",
     "name": "Java",
     "description":
       "Platform-independent client for enterprise applications and Android development.",
@@ -48,7 +48,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/java",
+    "href": "/docs/connect/compatibility/pgwire/java",
     "name": "Java",
     "description":
       "Query QuestDB using JDBC with any PostgreSQL-compatible driver.",
@@ -56,7 +56,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/ingestion/clients/nodejs",
+    "href": "/docs/connect/clients/nodejs",
     "name": "Node.js",
     "description":
       "Node.js® is an open-source, cross-platform JavaScript runtime environment.",
@@ -64,7 +64,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/nodejs",
+    "href": "/docs/connect/compatibility/pgwire/nodejs",
     "name": "Node.js",
     "description":
       "Query QuestDB using pg or other Node.js PostgreSQL clients.",
@@ -72,7 +72,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/ingestion/clients/python",
+    "href": "/docs/connect/clients/python",
     "name": "Python",
     "description":
       "Python is a programming language that lets you work quickly and integrate systems more effectively.",
@@ -80,7 +80,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/python",
+    "href": "/docs/connect/compatibility/pgwire/python",
     "name": "Python",
     "description":
       "Query QuestDB using psycopg, asyncpg, or other Python drivers.",
@@ -88,7 +88,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/ingestion/clients/rust",
+    "href": "/docs/connect/clients/rust",
     "name": "Rust",
     "description":
       "Systems programming language focused on safety, speed, and concurrency.",
@@ -96,7 +96,7 @@
     "protocol": "ILP"
   },
   {
-    "href": "/docs/query/pgwire/rust",
+    "href": "/docs/connect/compatibility/pgwire/rust",
     "name": "Rust",
     "description":
       "Query QuestDB using tokio-postgres or other Rust PostgreSQL crates.",
@@ -104,7 +104,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/query/pgwire/php",
+    "href": "/docs/connect/compatibility/pgwire/php",
     "name": "PHP",
     "description":
       "Query QuestDB using PDO or other PHP PostgreSQL extensions.",
@@ -112,7 +112,7 @@
     "protocol": "PGWire"
   },
   {
-    "href": "/docs/query/pgwire/r",
+    "href": "/docs/connect/compatibility/pgwire/r",
     "name": "R",
     "description":
       "Query QuestDB using RPostgres or other R database packages.",

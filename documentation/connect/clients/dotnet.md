@@ -1,0 +1,1692 @@
+---
+slug: /connect/clients/dotnet
+title: .NET client for QuestDB
+sidebar_label: .NET
+description:
+  "QuestDB .NET client for high-throughput data ingestion and SQL querying
+  over the QWP binary protocol (WebSocket)."
+---
+
+import { ILPClientsTable } from "@theme/ILPClientsTable"
+import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
+
+The QuestDB .NET client connects to QuestDB over the
+[QWP binary protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/) (WebSocket).
+QWP is a column-oriented binary wire format: smaller and faster than the text
+ILP used by `http::` and `tcp::`, with the full QuestDB type system, automatic
+table creation, schema evolution, multi-host failover, and optional
+store-and-forward durability.
+
+Two complementary clients live in the same NuGet package:
+
+- **Ingestion** (`Sender` / `IQwpWebSocketSender`): column-oriented batched
+  writes with automatic table creation, schema evolution, and optional
+  store-and-forward durability.
+- **Querying** (`QueryClient` / `IQwpQueryClient`): parameterised SQL over the
+  QWP egress endpoint (`/read/v1`), with streaming columnar batches, DDL/DML
+  execution, per-query failover, and credit-based flow control. See
+  [Querying and SQL execution](#querying-and-sql-execution).
+
+For applications that ingest or query from **multiple threads**, wrap both in a
+shared, thread-safe [`QuestDBClient`](#connection-pooling-with-questdbclient)
+handle. It owns elastic pools of senders and query clients, hands out a sender
+or runs a query on demand, and is the recommended entry point for long-running
+services. Construct one, share it across threads, dispose it at shutdown.
+
+:::tip Legacy transports
+
+The same `Sender` also speaks ILP over HTTP and TCP. This page documents the
+recommended WebSocket (QWP) path; ILP keeps working unchanged for existing
+deployments. For ILP transport details, see the
+[ILP overview](/docs/connect/compatibility/ilp/overview/).
+
+:::
+
+<ILPClientsTable language=".NET" />
+
+## Requirements
+
+- **.NET 7.0 or higher** for the `ws::` / `wss::` (QWP) transport — it depends
+  on header-aware `ClientWebSocket` APIs. The HTTP and TCP transports work on
+  .NET 6.0+.
+- QuestDB must be running. If not, see the
+  [quick start guide](/docs/getting-started/quick-start/).
+
+## Client installation
+
+Install the NuGet package with the dotnet CLI:
+
+```shell
+dotnet add package net-questdb-client
+```
+
+## Quick start
+
+### Ingest data
+
+Build a sender from a connect string, append rows, and flush:
+
+```csharp
+using System;
+using QuestDB;
+using QuestDB.Senders;
+
+await using var sender = Sender.New("ws::addr=localhost:9000;");
+
+await sender.Table("trades")
+    .Symbol("symbol", "ETH-USD")
+    .Symbol("side", "sell")
+    .Column("price", 2615.54)
+    .Column("amount", 0.00044)
+    .AtAsync(DateTime.UtcNow);
+
+await sender.Table("trades")
+    .Symbol("symbol", "BTC-USD")
+    .Symbol("side", "buy")
+    .Column("price", 39269.98)
+    .Column("amount", 0.001)
+    .AtAsync(DateTime.UtcNow);
+
+await sender.SendAsync();
+```
+
+The steps are:
+
+1. Build a sender from a connect string (`ws::` for plain, `wss::` for TLS).
+2. Append rows with the fluent `Table` / `Symbol` / `Column` / `At` builder.
+3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
+   and waits for the server ACK**. Auto-flush publishes full batches on its own,
+   but the final partial batch is only guaranteed once you call `SendAsync()`.
+4. Dispose the sender. **Dispose does not send** — it is pure resource release,
+   and any rows still buffered (not yet sent or auto-flushed) are **discarded**.
+   Always `SendAsync()` before disposing.
+
+We recommend supplying the event's own timestamp to `AtAsync`. Ingestion-time
+timestamps preclude deduplication, which is
+[important for exactly-once processing](/docs/connect/compatibility/ilp/overview/#exactly-once-delivery-vs-at-least-once-delivery).
+
+### Query data
+
+Read the same rows back over the QWP egress endpoint. `QueryClient` lives in
+the same NuGet package:
+
+```csharp
+using QuestDB;
+using QuestDB.Qwp.Query;
+
+await using var client = await QueryClient.NewAsync("ws::addr=localhost:9000;");
+
+await using var reader = await client.ExecuteReaderAsync(
+    "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10");
+
+while (await reader.ReadBatchAsync())
+{
+    var batch = reader.Current;
+    for (var row = 0; row < batch.RowCount; row++)
+    {
+        Console.WriteLine(
+            $"ts={batch.GetLongValue(0, row)} "
+            + $"symbol={batch.GetString(1, row)} "
+            + $"price={batch.GetDoubleValue(2, row)} "
+            + $"amount={batch.GetDoubleValue(3, row)}");
+    }
+}
+
+Console.WriteLine($"done: {reader.TotalRows} rows");
+```
+
+`ExecuteReaderAsync` submits the query and returns an `IQwpQueryReader` — a
+`DbDataReader`-style **pull cursor**. Iterate it with `ReadBatchAsync()`; each
+call advances to the next columnar batch in `reader.Current`. Dispose the
+reader (`await using`) to end the query. A server-side query failure throws
+`QwpQueryException`. See
+[Querying and SQL execution](#querying-and-sql-execution) for the full egress
+surface (bind parameters, DDL/DML, failover, compression).
+
+:::note
+
+`Sender` is single-threaded and owns one connection. To send in parallel,
+create one sender per producer thread. If those senders share a
+[store-and-forward](#store-and-forward) directory, each must be configured
+with a distinct `sender_id` so they do not contend for the same on-disk
+slot — see [Store-and-forward](#store-and-forward).
+
+:::
+
+## Authentication and TLS
+
+Authentication happens at the HTTP level during the WebSocket upgrade, before
+any binary frames are exchanged.
+
+### Basic authentication
+
+```csharp
+using var sender = Sender.New(
+    "wss::addr=db.example.com:9000;username=admin;password=quest;");
+```
+
+### Token authentication
+
+_QuestDB Enterprise only._ Token auth avoids the per-request overhead of basic
+auth and is the recommended path for Enterprise deployments.
+
+```csharp
+using var sender = Sender.New(
+    "wss::addr=db.example.com:9000;token=your_bearer_token;");
+```
+
+`username`/`password` and `token` are mutually exclusive.
+
+### TLS
+
+Select the `wss` schema to enable TLS.
+
+- `tls_verify` — `on` (default) or `unsafe_off`. `unsafe_off` disables
+  certificate verification; use only for testing.
+- `tls_roots` — path to a PKCS#12 / PFX bundle pinning a custom CA.
+- `tls_roots_password` — password for the `tls_roots` file.
+
+```csharp
+// Development only — never disable verification in production.
+using var sender = Sender.New("wss::addr=localhost:9000;tls_verify=unsafe_off;");
+```
+
+`auth_timeout_ms` (default 15000) bounds how long the client waits for the
+WebSocket upgrade response. `connect_timeout`, when set, bounds the whole
+per-endpoint connect (TCP + TLS + upgrade) and overrides `auth_timeout_ms` for
+that purpose; left unset, it inherits `auth_timeout_ms`.
+
+### Unsupported authentication paths
+
+| Path | Status | Workaround |
+|---|---|---|
+| OIDC token acquisition or in-band refresh | Not supported by this client. It does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...` above, and rebuild the sender / query client when the token nears expiry. |
+| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss://`. See the connect-string reference for the canonical statement. |
+| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, `await sender.DisposeAsync()` and build a fresh sender with the new token. The same applies to `QueryClient`. |
+
+### Production example (TLS + token + multi-host)
+
+A realistic Enterprise deployment combines `wss`, token auth, multi-host
+failover, and a store-and-forward directory so unacked frames survive a
+sender restart:
+
+```csharp
+// Ingestion — write to any writeable node.
+await using var sender = Sender.NewQwp(
+    "wss::addr=db-primary:9000,db-replica:9000;"
+    + "token=your_bearer_token;"
+    + "sf_dir=/var/lib/myapp/qdb-sf;"
+    + "sender_id=ingest-1;"
+    + "reconnect_max_duration_millis=300000;");
+
+// Querying — prefer a replica to offload the primary.
+await using var query = await QueryClient.NewAsync(
+    "wss::addr=db-primary:9000,db-replica:9000;"
+    + "token=your_bearer_token;"
+    + "target=replica;"
+    + "failover=on;failover_max_duration_ms=30000;");
+```
+
+`tls_verify=unsafe_off` is **never** safe in production; pin a CA with
+`tls_roots=/path/to/roots.pfx;tls_roots_password=...` if you need to override
+the system trust store.
+
+## Ways to create the client
+
+There are three ways to create a client instance:
+
+1. **From a connect string** — the most common way. It describes the whole
+   configuration in one string and is portable across language clients.
+
+   ```csharp
+   using var sender = Sender.New("ws::addr=localhost:9000;");
+   ```
+
+2. **From an environment variable.** `QDB_CLIENT_CONF` holds the connect
+   string, keeping credentials out of source code.
+
+   ```bash
+   export QDB_CLIENT_CONF="wss::addr=localhost:9000;token=your_bearer_token;"
+   ```
+
+   ```csharp
+   using var sender = Sender.FromEnv();
+   ```
+
+   To set properties programmatically on top of a connect string, use
+   `Configure` and `Build`:
+
+   ```csharp
+   using var sender =
+       (Sender.Configure("ws::addr=localhost:9000;") with { auto_flush = AutoFlushType.off })
+       .Build();
+   ```
+
+3. **From `SenderOptions`** — bind options from configuration:
+
+   ```json
+   {
+     "QuestDB": { "addr": "localhost:9000", "protocol": "ws" }
+   }
+   ```
+
+   ```csharp
+   var options = new ConfigurationBuilder()
+       .AddJsonFile("config.json")
+       .Build()
+       .GetSection("QuestDB")
+       .Get<SenderOptions>();
+   await using var sender = Sender.New(options);
+   ```
+
+`Sender.New` and `Sender.FromEnv` return `ISender`. For the QWP-only
+operations — ping, `seqTxn` watermarks, FSN tracking, decimal columns — call
+`Sender.NewQwp(connectString)` (or `Sender.NewQwp(options)`) instead: it takes
+the same `ws::` / `wss::` configuration and returns `IQwpWebSocketSender`
+directly, so you skip the `is IQwpWebSocketSender` cast.
+
+For the full list of connect-string keys and defaults, see the
+[connect string reference](/docs/connect/clients/connect-string/).
+
+## Connection pooling with `QuestDBClient`
+
+A `Sender` owns one connection and is **not thread-safe**; the same is true of a
+`QueryClient`. For a service that ingests or queries from many threads, create
+one shared **`QuestDBClient`** — a thread-safe handle that owns an elastic pool
+of senders and (on .NET 7+) a pool of query clients, plus a background
+housekeeper that closes idle and over-age connections. Build it once, share it
+across threads, dispose it at shutdown. It is the .NET counterpart of the Java
+[`QuestDB`](/docs/connect/clients/java/#the-questdb-handle) handle.
+
+```csharp
+using QuestDB;
+using QuestDB.Qwp.Query;
+
+await using var client = QuestDBClient.Connect("ws::addr=localhost:9000;");
+
+// Ingest: borrow a sender, write rows, Send() to publish, dispose to return it.
+using (var sender = client.BorrowSender())
+{
+    await sender.Table("trades")
+        .Symbol("symbol", "ETH-USD")
+        .Column("price", 2615.54)
+        .AtAsync(DateTime.UtcNow);
+    await sender.SendAsync();   // MUST send before dispose — dispose does not
+}
+
+// Query: run SQL on a pooled query client (.NET 7+).
+await using var reader = await client.ExecuteReaderAsync("SELECT count(*) FROM trades");
+while (await reader.ReadBatchAsync())
+    Console.WriteLine(reader.Current.GetLongValue(0, 0));
+```
+
+### Creating the handle
+
+| Factory | Purpose |
+|---|---|
+| `QuestDBClient.Connect(connStr)` | One connect string drives both pools. A `ws` / `wss` string configures ingest **and** query; an `http` / `tcp` string configures ingest only (no query pool). |
+| `QuestDBClient.Connect(ingestConnStr, queryConnStr)` | Separate ingress and egress endpoints. The query string must be `ws` / `wss`. |
+| `QuestDBClient.Builder()` … `.Build()` | Programmatic pool tuning — sizes, timeouts, separate configs. |
+
+```csharp
+await using var client = QuestDBClient.Builder()
+    .FromConfig("ws::addr=localhost:9000;")
+    .SenderPoolMin(2).SenderPoolMax(8)
+    .QueryPoolMin(1).QueryPoolMax(4)
+    .AcquireTimeout(TimeSpan.FromSeconds(5))
+    .Build();
+```
+
+A pool knob set on the builder always wins over the same key in the connect
+string.
+
+### Borrowing a sender
+
+`BorrowSender()` (or `BorrowSenderAsync(ct)`) leases a sender from the pool.
+**Call `Send()` / `SendAsync()` before disposing** — dispose is pure resource
+release: it discards any buffered-but-unsent rows and returns the entry to the
+pool, it does **not** send. Disposing a pooled sender does *not* close the
+underlying connection either; the real disconnect happens only when the handle
+itself is disposed (or the housekeeper reaps an idle one). Use a `using` block:
+
+```csharp
+await Parallel.ForEachAsync(batches, async (batch, ct) =>
+{
+    using var sender = client.BorrowSender();   // one per unit of work
+    foreach (var row in batch)
+        await sender.Table("trades")
+            .Symbol("symbol", row.Symbol)
+            .Column("price", row.Price)
+            .AtAsync(row.Timestamp, ct);
+    await sender.SendAsync(ct);   // publish before dispose — dispose won't
+}); // SendAsync published the rows; dispose just returns each sender to the pool
+```
+
+- A borrowed sender is single-threaded — borrow one per thread / unit of work
+  and never share it across threads.
+- When every sender is in use and the pool is at `sender_pool_max`,
+  `BorrowSender()` blocks up to `acquire_timeout_ms`, then throws `IngressError`
+  with `ErrorCode.PoolExhausted`.
+- For the QWP-only operations (ping, `seqTxn` watermarks, FSN tracking,
+  decimal / extended columns), cast the borrowed `ISender` to
+  `IQwpWebSocketSender` — pooled `ws` / `wss` senders implement it.
+- If the handle's ingest config sets `sf_dir`, each pooled sender owns a
+  distinct on-disk slot `<sender_id>-<index>`, so
+  [store-and-forward](#store-and-forward) works across the whole pool without
+  extra configuration.
+
+### Querying from the pool
+
+_Requires .NET 7+ and a `ws` / `wss` query configuration._ Each execution
+borrows a query client for the lifetime of the returned reader and returns it
+automatically when the reader is disposed — there is no explicit borrow/release
+for queries:
+
+```csharp
+// One-shot, bind-less:
+await using (var reader = await client.ExecuteReaderAsync("SELECT * FROM trades LIMIT 10"))
+{
+    while (await reader.ReadBatchAsync())
+        Console.WriteLine($"batch rows={reader.Current.RowCount}");
+}
+
+// Fluent, with bind parameters:
+await using var r = await client.NewQuery()
+    .Sql("SELECT ts, price FROM trades WHERE symbol = $1 LIMIT $2")
+    .Binds(b => { b.SetVarchar(0, "ETH-USD"); b.SetLong(1, 100); })
+    .ExecuteReaderAsync();
+while (await r.ReadBatchAsync())
+    Console.WriteLine($"batch rows={r.Current.RowCount}");
+```
+
+- `NewQuery()` returns a fresh `Query`; one in-flight execution per `Query`, so
+  allocate a new one per concurrent query. The query pool caps concurrency at
+  `query_pool_max`. **Dispose the reader** (`await using`) to end the query and
+  return its client to the pool — an open reader holds one of the
+  `query_pool_max` permits, so leaving readers open exhausts the pool.
+- The reader is the same
+  [`IQwpQueryReader`](#querying-and-sql-execution) returned by `QueryClient`;
+  bind parameters, DDL/DML, compression, and per-query failover all behave
+  identically.
+- Cancellation: `query.Cancel()` (or `reader.Cancel()`) is cooperative (the
+  client is re-pooled); cancelling the `CancellationToken` passed to
+  `ReadBatchAsync` is a hard cancel that tears the connection down and discards
+  that client.
+- Calling `NewQuery()` / `ExecuteReaderAsync(...)` on a handle built from an
+  `http` / `tcp` ingest string with no query config throws `IngressError` —
+  supply a `ws` / `wss` query config via the builder's `QueryConfig(...)` or
+  `QuestDBClient.Connect(ingest, query)`.
+
+### Separate ingress and egress endpoints
+
+When reads target a replica or go through a different load balancer, give each
+side its own connect string:
+
+```csharp
+await using var client = QuestDBClient.Connect(
+    "wss::addr=ingest.cluster:9000;token=YOUR_TOKEN;",   // ingest → primary
+    "wss::addr=read-replica.cluster:9000;token=YOUR_TOKEN;target=replica;");
+```
+
+The same split is available on the builder via `IngestConfig(...)` /
+`QueryConfig(...)`.
+
+### Pool configuration
+
+Set these on the builder, or as connect-string keys (the builder setter wins):
+
+| Builder method | Connect-string key | Default | Description |
+|---|---|---|---|
+| `SenderPoolMin(int)` | `sender_pool_min` | `1` | Senders kept open when idle (`0` lets the pool close them all). |
+| `SenderPoolMax(int)` | `sender_pool_max` | `4` | Maximum senders the pool opens. |
+| `QueryPoolMin(int)` | `query_pool_min` | `1` | Query clients kept open when idle. |
+| `QueryPoolMax(int)` | `query_pool_max` | `4` | Maximum query clients the pool opens. |
+| `AcquireTimeout(TimeSpan)` | `acquire_timeout_ms` | `5000` | How long a borrow blocks when the pool is at max before throwing. |
+| `IdleTimeout(TimeSpan)` | `idle_timeout_ms` | `60000` | Idle time before the housekeeper closes a connection (never below `min`). |
+| `MaxLifetime(TimeSpan)` | `max_lifetime_ms` | `1800000` | Maximum connection age before the housekeeper recycles it. |
+| `HousekeeperInterval(TimeSpan)` | `housekeeper_interval_ms` | `5000` | How often the housekeeper sweeps (minimum 100 ms). |
+| `LazyConnect(bool)` | `lazy_connect` | `off` | Tolerant startup — build the handle while the server is down (see [Tolerant startup](#tolerant-startup-lazy_connect)). |
+
+`SenderPoolSize(n)` / `QueryPoolSize(n)` are shortcuts for `min == max == n`.
+Observe pool state via `client.AvailableSenderCount` / `client.TotalSenderCount`
+(and `AvailableQueryClientCount` / `TotalQueryClientCount` on .NET 7+).
+
+### Tolerant startup (`lazy_connect`) {#tolerant-startup-lazy_connect}
+
+_Requires the `QuestDBClient` handle._ By default `Connect(...)` / `Build()`
+opens the pool eagerly and fails if the server is unreachable. With
+`lazy_connect` the handle builds even while the server is down, so a service
+can start before QuestDB is up, buffer writes, and read once it comes online:
+
+```csharp
+// Connect-string key (default off):
+await using var client = QuestDBClient.Connect("ws::addr=localhost:9000;lazy_connect=on;");
+
+// Or on the builder — an explicit call wins over the connect-string key:
+await using var client2 = QuestDBClient.Builder()
+    .FromConfig("ws::addr=localhost:9000;")
+    .LazyConnect()
+    .Build();
+```
+
+When enabled:
+
+- **Ingest connects asynchronously.** For a `ws` / `wss` ingest config,
+  `Build()` injects `initial_connect_retry=async` (when you have not set it
+  yourself), so construction never blocks on a down server. Rows buffer in
+  memory — or in [store-and-forward](#store-and-forward) when `sf_dir` is set —
+  and drain once a server becomes reachable.
+- **Reads connect on first use.** The query pool defaults `query_pool_min=0`
+  (when you leave it unset) so nothing connects eagerly; the pool stays enabled
+  and the first `NewQuery()` / `ExecuteReaderAsync()` opens a connection lazily
+  once the server is up.
+
+`Build()` **rejects a conflicting blocking-startup knob** up front with
+`IngressError`:
+
+- an explicit `initial_connect_retry` set to a blocking mode (anything other
+  than `async`), or
+- an explicit `query_pool_min > 0`, which would pre-warm the read pool eagerly.
+
+Drop the conflicting key — or set `initial_connect_retry=async` /
+`query_pool_min=0` — to combine it with `lazy_connect`. The key lives in the
+shared connect-string vocabulary, so a plain
+[`Sender`](#ways-to-create-the-client) parses and ignores it; only the
+`QuestDBClient` pool acts on it.
+
+### Closing
+
+`QuestDBClient` is `IDisposable` and `IAsyncDisposable`. Prefer `await using`
+(or `DisposeAsync`) so the drain is non-blocking. Closing stops the
+housekeeper, closes the query pool, then flushes and disconnects every sender;
+it is idempotent, and threads blocked in `BorrowSender()` are released with an
+error.
+
+## Data ingestion
+
+### Building rows
+
+A row starts with a table name, then symbols, then other columns, and is
+finished with a timestamp:
+
+```csharp
+await sender.Table("trades")     // 1. select the target table
+    .Symbol("symbol", "ETH-USD") // 2. symbols first
+    .Column("price", 2615.54)    // 3. other columns
+    .AtAsync(DateTime.UtcNow);   // 4. finish the row
+```
+
+- **`Table(name)`** — must be called first for each row.
+- **`Symbol(name, value)`** — a [symbol](/docs/concepts/symbol/) is a
+  dictionary-encoded string; all symbols must come before other columns.
+- **`Column(name, value)`** — overloaded for every QuestDB type reachable
+  from `ISender`; see [Type reference](#type-reference) for the full matrix
+  and the additional `IQwpWebSocketSender` setters.
+- **`At(...)` / `AtAsync(...)`** — finishes the row with the
+  [designated timestamp](/docs/concepts/designated-timestamp/). `AtNow()` /
+  `AtNowAsync()` let the server assign it (this defeats deduplication).
+
+Tables and columns are created automatically if they do not exist. Use the
+`Async` overloads (`AtAsync`, `SendAsync`) to avoid blocking the calling
+thread.
+
+### Type reference
+
+`ISender` covers the everyday types from the .NET runtime overloads.
+`IQwpWebSocketSender` adds the QWP-only types that ILP cannot carry — cast
+the sender (or build it with `Sender.NewQwp(...)`) to reach them:
+
+| QuestDB type | `ISender` setter | `IQwpWebSocketSender` setter | Null variant |
+|---|---|---|---|
+| `SYMBOL` | `Symbol(name, ReadOnlySpan<char>)` | — | omit the call |
+| `BOOLEAN` | `Column(name, bool)` | — | `NullableColumn(name, bool?)` |
+| `BYTE` (i8) | — | `ColumnByte(name, sbyte)` | omit the call |
+| `SHORT` (i16) | — | `ColumnShort(name, short)` | omit the call |
+| `INT` (i32) | `Column(name, int)` | — | omit the call (use `long?` overload for nullable) |
+| `LONG` (i64) | `Column(name, long)` | — | `NullableColumn(name, long?)` |
+| `FLOAT` (f32) | — | `ColumnFloat(name, float)` | omit the call |
+| `DOUBLE` (f64) | `Column(name, double)` | — | `NullableColumn(name, double?)` |
+| `CHAR` | `Column(name, char)` | — | `NullableColumn(name, char?)` |
+| `VARCHAR` | `Column(name, ReadOnlySpan<char>)` | — | `NullableColumn(name, string?)` |
+| `BINARY` | — | `ColumnBinary(name, ReadOnlySpan<byte>)` | omit the call |
+| `UUID` | `Column(name, Guid)` | — | `NullableColumn(name, Guid?)` |
+| `LONG256` | — | `ColumnLong256(name, BigInteger)` (non-negative) | omit the call |
+| `DATE` | — | `ColumnDate(name, long millisSinceEpoch)` | omit the call |
+| `TIMESTAMP` (non-designated) | `Column(name, DateTime)` / `Column(name, DateTimeOffset)` | — | `NullableColumn(name, DateTime?)` / `NullableColumn(name, DateTimeOffset?)` |
+| `TIMESTAMP_NS` (non-designated) | `ColumnNanos(name, long timestampNanos)` | — | omit the call |
+| `IPv4` | — | `ColumnIPv4(name, System.Net.IPAddress)` | omit the call |
+| `GEOHASH` | — | `ColumnGeohash(name, ulong hash, int precisionBits)` (1–60 bits) | omit the call |
+| `DECIMAL64` | — | `ColumnDecimal64(name, decimal)` / `ColumnDecimal64(name, long unscaled, byte scale)` | omit the call |
+| `DECIMAL128` | `Column(name, decimal)` (default for `decimal`) | `ColumnDecimal128(name, long lo, long hi, byte scale)` (full 38-digit range) | `NullableColumn(name, decimal?)` |
+| `DECIMAL256` | — | `ColumnDecimal256(name, decimal)` / `ColumnDecimal256(name, long, long, long, long, byte scale)` | omit the call |
+| `DOUBLE[]` / `LONG[]` (n-D arrays) | `Column<T>(name, ReadOnlySpan<T>)` / `Column<T>(name, IEnumerable<T>, IEnumerable<int> shape)` / `Column(name, Array)` | — | `NullableColumn(name, Array?)` |
+| Designated timestamp | `AtAsync(DateTime)` / `At(DateTime)` / `AtAsync(DateTimeOffset)` / `At(DateTimeOffset)` / `AtAsync(long micros)` / `At(long micros)` / `AtNanosAsync(long)` / `AtNanos(long)` | — | **required, not null** |
+
+The single-arg `Column(name, decimal)` writes `DECIMAL128` so it never
+overflows `System.Decimal` (~29 significant digits) — see
+[Decimal columns](#decimal-columns) for picking a narrower width.
+
+### Null values
+
+The .NET client has no `setNull` method. Two idioms produce a NULL:
+
+1. **`NullableColumn(name, T?)`** — the wrapper writes a value when the
+   nullable argument is set and skips the column when it is `null`:
+
+   ```csharp
+   sender.Table("trades")
+       .Symbol("symbol", "ETH-USD")
+       .NullableColumn("price", maybePrice)  // null → column omitted
+       .NullableColumn("notes", maybeNotes);  // null → column omitted
+   await sender.AtAsync(DateTime.UtcNow);
+   ```
+
+2. **Omit the setter** — every column not set on a row is gap-filled with
+   NULL when the row is finished. The two idioms produce the same wire
+   output; `NullableColumn` just makes the optionality explicit at the call
+   site.
+
+On a brand-new table, an omitted column is not inferred from that row. The
+server only adds the column when a later row supplies a non-null value for
+it, so first-row nulls leave the column absent until then.
+
+The designated timestamp **cannot** be null — every row requires one of
+`AtAsync(DateTime)`, `AtAsync(DateTimeOffset)`, `AtAsync(long micros)`, or
+`AtNanosAsync(long)`.
+
+`Symbol(name, value)` and the string overload of `Column(name, value)` take
+`ReadOnlySpan<char>`, which cannot itself be null; an empty span is a valid
+non-null empty string. Use `NullableColumn(name, string?)` if your value can
+be `null`.
+
+### Decimal columns
+
+:::caution
+
+Decimal ingestion requires QuestDB 9.2.0 or later. Pre-create decimal columns
+with `DECIMAL(precision, scale)`. See the
+[decimal data type](/docs/query/datatypes/decimal/#creating-tables-with-decimals)
+page.
+
+:::
+
+`Column(name, decimal)` writes a `DECIMAL128` (16-byte) column:
+
+```csharp
+sender.Table("fx_prices")
+    .Symbol("pair", "EURUSD")
+    .Column("bid", 1.071234m)    // scale locked on first write
+    .Column("ask", 1.071258m);
+await sender.AtAsync(DateTime.UtcNow);
+```
+
+`DECIMAL128` matches the range of .NET's `System.Decimal` (~29 significant
+digits). `DECIMAL64` holds only 18 digits, so it cannot be the safe default —
+a large `decimal` would overflow it.
+
+:::tip Narrower columns
+
+If your values fit in 18 digits — typical for prices and quantities — the
+8-byte `DECIMAL64` halves wire and storage size. Either pre-create the column
+as `DECIMAL(p, s)` with `p ≤ 18` (the stored width follows the column
+definition, not the wire width), or cast to `IQwpWebSocketSender` and call
+`ColumnDecimal64` explicitly.
+
+:::
+
+`ColumnDecimal64` and `ColumnDecimal256` (32-byte) also accept a
+`System.Decimal`. All three widths additionally expose an unscaled-mantissa
+overload with an explicit scale, for values beyond `System.Decimal`'s
+~28-digit range.
+
+## Flushing
+
+Buffered rows are not on the wire until they are flushed — automatically or
+explicitly.
+
+### Auto-flushing
+
+Unlike the C/Rust QWP clients, the .NET WebSocket sender **supports
+auto-flushing**. After each `At` / `AtAsync` call the sender checks three
+OR'd triggers; whichever trips first publishes the batch.
+
+| Key | `ws` default | Description |
+|---|---|---|
+| `auto_flush` | `on` | Master switch. `off` requires explicit `Send`. |
+| `auto_flush_rows` | `1000` | Flush after this many buffered rows. |
+| `auto_flush_interval` | `100` ms | Flush after this long since the first buffered row. |
+| `auto_flush_bytes` | `8 MiB` | Flush after the encode buffer reaches this size. |
+
+```csharp
+// Tune the batch size, or disable auto-flush entirely.
+using var sender = Sender.New("ws::addr=localhost:9000;auto_flush_rows=5000;");
+using var manual = Sender.New("ws::addr=localhost:9000;auto_flush=off;");
+```
+
+### Explicit flushing
+
+Call `Send()` or `SendAsync()` to publish buffered rows immediately:
+
+```csharp
+sender.Table("trades").Symbol("symbol", "ETH-USD").Column("price", 2615.54)
+      .At(DateTime.UtcNow);
+await sender.SendAsync();
+```
+
+On QWP what `Send` waits for depends on the sender:
+
+- A **standalone** `ws` / `wss` sender (`Sender.New` / `Sender.NewQwp`)
+  **drains**: `Send()` / `SendAsync()` flushes the batch and blocks until the
+  server acknowledges it, bounded by `close_flush_timeout_millis` (throwing
+  `IngressError` on timeout). A successful `SendAsync()` therefore means the
+  rows are delivered.
+- A **pooled** sender (from `BorrowSender`) hands the frame to the send ring
+  and returns immediately; the pooled connection ships it asynchronously and
+  delivery is confirmed with `Flush()` / [`IQuestDBClient.Flush()`](#closing).
+
+Either way, **dispose never sends** — a sender that is disposed without a
+preceding `Send()` / `SendAsync()` drops its buffered rows. Server-side
+rejections surface asynchronously regardless; see
+[Delivery tracking](#delivery-tracking) and
+[Asynchronous error handling](#asynchronous-error-handling).
+
+## Delivery tracking
+
+The explicit ACK APIs (`PingAsync`, `AwaitAckedFsnAsync`) are **optional**: on
+a standalone `ws` sender a successful `SendAsync()` already drains — it waits
+for the server ACK, bounded by `close_flush_timeout_millis` (default 60000 ms).
+What is **not** optional is calling `SendAsync()` before you dispose:
+`DisposeAsync` is pure resource release and does **not** flush or wait for ACKs,
+so any rows still buffered at dispose are dropped. Reach for the APIs below when
+the app needs to (a) know a specific write made it before continuing, (b)
+cooperate with QuestDB Enterprise durable-replication watermarks, or (c)
+co-ordinate a graceful shutdown that must not exit until the queue has drained.
+
+`Sender.NewQwp(...)` returns `IQwpWebSocketSender`, which adds QWP-only
+delivery operations on top of `ISender`:
+
+```csharp
+await using var sender = Sender.NewQwp("ws::addr=localhost:9000;");
+
+// ... ingest rows, then flush ...
+await sender.SendAsync();
+
+// Drain the in-flight ACK window: every batch sent so far is acknowledged
+// once this returns. Bounded by ping_timeout.
+await sender.PingAsync();
+
+// Per-table commit watermark (populated once the server ACKs a batch).
+Console.WriteLine($"trades committed seqTxn: {sender.GetHighestAckedSeqTxn("trades")}");
+```
+
+For frame-level tracking, every flush is assigned a frame sequence number
+(FSN):
+
+```csharp
+long fsn = await sender.FlushAndGetSequenceAsync();
+bool acked = await sender.AwaitAckedFsnAsync(fsn, TimeSpan.FromSeconds(10));
+if (!acked) Console.Error.WriteLine("timed out waiting for server ACK");
+```
+
+| Member | Returns |
+|---|---|
+| `FlushAndGetSequenceAsync()` | FSN of the highest frame published by this call. |
+| `AckedFsn` | Highest FSN the server has acknowledged. |
+| `AwaitAckedFsnAsync(fsn, timeout)` | Block until `AckedFsn` reaches `fsn`. |
+| `GetHighestAckedSeqTxn(table)` | Highest committed `seqTxn` per table (`-1` if none). |
+| `GetHighestDurableSeqTxn(table)` | Highest durably-uploaded `seqTxn` per table. |
+
+## Asynchronous error handling
+
+The server validates batches, and rejections are reported **out of band**:
+they arrive at the [error handler](#error-handler) on a background dispatcher
+rather than being thrown from the `Send` call that published the batch. (A
+standalone `Send` / `SendAsync` waits for the *ACK* of a successful batch, but
+a rejection produces an error frame, not an ACK — so it still surfaces through
+the handler, not the `Send` return.) This section covers how those
+asynchronous errors are classified and handled.
+
+### How errors surface
+
+Each error is classified into a `SenderErrorCategory` and assigned a
+`SenderErrorPolicy`:
+
+| Policy | Effect | Default categories |
+|---|---|---|
+| `DropAndContinue` | The rejected batch is dropped; the sender keeps running. | `SchemaMismatch`, `WriteError` |
+| `Halt` | The sender latches terminal; the next producer call throws `LineSenderServerException`. | `ParseError`, `InternalError`, `SecurityError`, `ProtocolViolation`, `Unknown` |
+
+After a `Halt`, discard the sender and create a new one.
+
+### Error handler
+
+Install a `SenderErrorHandler` on `SenderOptions` to observe every error. It
+runs on a background dispatcher — never the I/O or producer thread — so a slow
+handler cannot stall publishing; thrown exceptions are caught and traced.
+
+```csharp
+var options = Sender.Configure("ws::addr=localhost:9000;");
+options.error_handler = err =>
+    Console.Error.WriteLine(
+        $"qwp error: category={err.Category} policy={err.AppliedPolicy} " +
+        $"fsn=[{err.FromFsn},{err.ToFsn}] table={err.TableName} msg={err.ServerMessage}");
+
+await using var sender = Sender.NewQwp(options);
+```
+
+`error_inbox_capacity` (default 256, minimum 16) bounds the async error inbox;
+on overflow the oldest entry is dropped — `IQwpWebSocketSender.DroppedErrorNotifications`
+counts how often that happened.
+
+### Error payload fields
+
+Each `SenderError` carries the following fields:
+
+| Field | Description |
+|---|---|
+| `Category` | `SchemaMismatch`, `ParseError`, `InternalError`, `SecurityError`, `WriteError`, `ProtocolViolation`, `Unknown`. Use for programmatic dispatch. |
+| `AppliedPolicy` | `DropAndContinue` (batch dropped, sender continues) or `Halt` (sender latched terminal; next API call throws `LineSenderServerException`). |
+| `ServerStatusByte` | Raw QWP status byte (e.g. `0x03` for `SchemaMismatch`). `-1` (`SenderError.NoStatusByte`) on `ProtocolViolation` and engine-internal terminal failures. |
+| `ServerMessage` | Human-readable server text (≤ 1024 UTF-8 bytes), or `null`. See [Message stability](#message-stability) and [PII safety](#message-pii). |
+| `MessageSequence` | Server's per-frame QWP wire sequence for the error frame. `-1` (`SenderError.NoMessageSequence`) for engine-internal failures. **Resets on reconnect** — only meaningful within one connection. |
+| `FromFsn` / `ToFsn` | Inclusive client-side FSN span of the affected batch. Pair with `FlushAndGetSequenceAsync()` to identify the rejected rows. |
+| `TableName` | Rejected table; `null` for multi-table batches or when the server did not attribute the error. |
+| `DetectedAtUtc` | Wall-clock receipt time on the I/O thread; for ops timelines, not for correlation. |
+| `Exception` | Non-`null` for engine-internal failures (connect-budget exhaustion, fatal upgrade reject); `null` for server rejections. |
+| `IsInitialConnect` | `true` if the engine never reached a first successful connection (config / connectivity issue); always `false` for server-side rejections. |
+
+#### Message stability {#message-stability}
+
+`ServerMessage` is a human-readable diagnostic — **not a stable contract.**
+QWP error frames carry a server-supplied UTF-8 string capped at 1024 bytes by
+the wire spec; the text mirrors QuestDB's normal SQL error formatting and has
+historically been reworded across releases. The field may be empty. Use
+`Category` and `ServerStatusByte` for programmatic dispatch; never
+pattern-match on `ServerMessage`.
+
+#### PII / secret safety {#message-pii}
+
+`ServerMessage` may include fragments of the client's own payload — for
+example, an offending column value quoted back by a schema or parse
+rejection. `TableName` and any text exposed by `Exception.Message` are
+similarly user-controlled. **Treat them as potentially containing PII or
+secrets.** Log them at the trust level of the data being sent, and sanitise
+before forwarding to external error trackers (Sentry, Datadog, end-user UIs).
+The other `SenderError` fields are safe to forward as-is — they carry only
+structural metadata.
+
+#### Correlating with server-side logs
+
+QWP does not surface a server-issued request or connection identifier. The
+closest correlation handle is the `(MessageSequence, FromFsn, ToFsn)` tuple
+plus the connection start time from your application logs — `MessageSequence`
+resets on reconnect, so it only disambiguates frames within a single
+connection. When filing a support ticket, include the connection start time
+and the `(MessageSequence, FromFsn, ToFsn)` triple.
+
+### Synchronous errors
+
+Misconfiguration and API-misuse errors surface synchronously as `IngressError`
+(or its subclass `LineSenderServerException` for HALT-policy server
+rejections). They are thrown directly from the call site:
+
+| Site | Throws when |
+|---|---|
+| `Sender.New(...)` / `Sender.NewQwp(...)` / `QueryClient.New(...)` | The connect string is malformed (missing `::`, unknown key, invalid value), required fields are absent, or mutually exclusive auth modes are combined. `Sender.NewQwp` additionally rejects non-`ws::` / `wss::` schemes. |
+| `Sender.FromEnv()` / `QueryClient.FromEnv()` | `QDB_CLIENT_CONF` is unset or blank. |
+| `Column(...)` / `Symbol(...)` before `Table(...)` | The row has not been started; the builder requires `Table(...)` first. |
+| Array `Column(...)` overloads | The `shape` does not match the element count, dimensionality exceeds 32, or the element type is not `double` / `long`. |
+| `ColumnGeohash(...)` | `precisionBits` is outside `[1, 60]`. |
+| `ColumnDecimal*(...)` with explicit `scale` | `scale` is outside `[0, 18]` (DECIMAL64), `[0, 38]` (DECIMAL128), or `[0, 76]` (DECIMAL256). |
+| Producer-thread call after `Halt` policy fired | The next `Table`, `Column`, `AtAsync`, or `SendAsync` throws `LineSenderServerException` carrying the latched `SenderError`. Discard the sender and create a new one. |
+
+Authentication failures surface differently between paths: a `401` / `403`
+during the WebSocket upgrade returns synchronously from `Sender.New` /
+`QueryClient.New` as `IngressError` (since the upgrade is part of `connect`),
+while an upgrade that succeeded but later loses the connection and is denied
+on reconnect surfaces asynchronously as a `SecurityError` `SenderError` with
+the sender latched terminal.
+
+### Per-category policy
+
+Override the default policy per category with the `on_*_error` connect-string
+keys (values `halt` or `drop`):
+
+```csharp
+// Treat a schema mismatch as fatal instead of dropping the batch.
+using var sender = Sender.New(
+    "ws::addr=localhost:9000;on_schema_mismatch_error=halt;");
+```
+
+| Key | Scope |
+|---|---|
+| `on_server_error` | Catch-all default for every category. |
+| `on_schema_mismatch_error` (alias: `on_schema_error`) | Schema-validation rejections. |
+| `on_parse_error` | Client-side parse errors. |
+| `on_internal_error` | Unexpected client-side errors. |
+| `on_security_error` | Auth / TLS errors. |
+| `on_write_error` | Transport write failures. |
+
+`ProtocolViolation` and `Unknown` are always `Halt`, regardless of these keys.
+For programmatic control, set `SenderOptions.error_policy_resolver` to a
+`SenderErrorPolicyResolver` delegate.
+
+### Connection-level errors
+
+These are not delivered through the `error_handler` because they happen
+before the I/O loop is operating against a healthy connection — they surface
+synchronously from the factory, from `ExecuteReaderAsync` / `ReadBatchAsync`,
+or as listener events:
+
+- **Authentication failure** (`401` / `403` during the WebSocket upgrade) —
+  terminal across all endpoints. The reconnect / failover loop stops
+  immediately rather than replaying the same credential against every host.
+- **Malformed frames** — `QwpDecodeException` (egress) or `IngressError`
+  with a `ProtocolViolation` category (ingress); the WebSocket is closed
+  with a terminal code. The sender / query client transitions to a
+  non-recoverable state.
+- **Role mismatch** — `QwpRoleMismatchException` from `QueryClient.NewAsync`
+  or the next `ExecuteReaderAsync` when no endpoint matches the configured
+  `target=any|primary|replica` filter. `LastObserved` carries the most
+  recent `QwpServerInfo` to distinguish "no primary available" from
+  "all endpoints unreachable".
+- **TCP / TLS connect failure** — treated as transient on the ingress side
+  and fed into the reconnect loop, capped by `reconnect_max_duration_millis`.
+
+### Error classification
+
+A summary of how the engine treats each error class on the wire:
+
+| Source | Status | Effect |
+|---|---|---|
+| Auth (`401` / `403`) on any endpoint | Terminal | Halts the failover loop immediately; the sender / query client latches non-recoverable. |
+| Role reject (`421` + `X-QuestDB-Role`) | Topology-level (transient if `PRIMARY_CATCHUP`, otherwise terminal for the loop) | The client tries the next endpoint; if every endpoint rejects, surfaces as `QwpRoleMismatchException` (egress) or the sender's reconnect loop exhausts. |
+| Version mismatch during upgrade | Per-endpoint, **not** terminal | The client moves on to the next endpoint. |
+| Server rejection of a batch (`SchemaMismatch`, `ParseError`, `WriteError`, etc.) | Per the `on_*_error` policy — default is `DropAndContinue` for `SchemaMismatch` / `WriteError`, `Halt` for everything else. | `DropAndContinue` keeps the sender alive; `Halt` latches the sender so the next producer call throws `LineSenderServerException`. |
+| TCP / TLS failure, `404`, `503`, mid-stream drop | Transient | Fed into the ingress reconnect loop (`reconnect_max_*` keys) or, on egress, the per-query failover loop (`failover_*` keys). |
+| `ProtocolViolation`, `Unknown` | Terminal | Always `Halt`, regardless of `on_*_error` settings. |
+
+### Connection events
+
+Implement `ISenderConnectionListener` and assign it to
+`SenderOptions.ConnectionListener` to observe connection-state transitions:
+
+```csharp
+class Listener : ISenderConnectionListener
+{
+    public void OnEvent(SenderConnectionEvent evt) =>
+        Console.WriteLine($"{evt.Kind} {evt.Host}:{evt.Port}");
+}
+
+var options = Sender.Configure("ws::addr=db-a:9000,db-b:9000;");
+options.ConnectionListener = new Listener();
+await using var sender = Sender.NewQwp(options);
+```
+
+Event kinds: `Connected`, `Disconnected`, `Reconnected`, `FailedOver`,
+`EndpointAttemptFailed`, `AllEndpointsUnreachable`, `AuthFailed`,
+`ReconnectBudgetExhausted`. Listeners run on a dedicated dispatcher thread.
+
+`AuthFailed` and `ReconnectBudgetExhausted` are **terminal**: the sender
+latches a non-recoverable failure, the next producer-thread call (`Table`,
+`Column`, `AtAsync`, `SendAsync`) throws `IngressError` (or
+`LineSenderServerException` if a HALT-policy error was latched alongside),
+and no further data can be sent. Discard the sender, build a new one, and
+replay any state your application owns. `DroppedConnectionNotifications` on
+`IQwpWebSocketSender` counts events that were dropped because a slow listener
+fell behind the dispatcher inbox.
+
+## Store-and-forward
+
+With store-and-forward (SF) enabled, unacknowledged frames are persisted to
+disk and replayed after reconnection, surviving sender process restarts:
+
+```csharp
+using var sender = Sender.New(
+    "ws::addr=localhost:9000;sf_dir=/var/lib/myapp/qdb-sf;sender_id=ingest-1;");
+```
+
+Without `sf_dir` the send queue lives in process memory and is lost if the
+process exits; the reconnect loop still spans transient outages, bounded by a
+RAM cap.
+
+<SfDedupWarning />
+
+| Key | Default | Description |
+|---|---|---|
+| `sf_dir` | unset | Enables disk-backed SF when set. |
+| `sender_id` | `default` | Slot identity (`A-Za-z0-9_-`). Use a distinct id per sender process sharing one `sf_dir`. |
+| `sf_max_segment_bytes` | 4 MiB | Per-segment size cap. |
+| `sf_max_total_bytes` | 128 MiB (memory) / 10 GiB (disk) | Cap on total queued bytes. |
+| `sf_append_deadline_millis` | 30000 | Max time a flush blocks waiting for queue capacity. |
+| `drain_orphans` | `off` | If `on`, take over stale slots from a crashed sender. |
+
+## Durable acknowledgement
+
+:::note Enterprise
+
+Durable acknowledgement requires QuestDB Enterprise with primary replication.
+
+:::
+
+By default the server confirms a batch once it is committed to the local
+[WAL](/docs/concepts/write-ahead-log/). With `request_durable_ack=on`, the
+client tracks when the batch is durably uploaded to object storage:
+
+```csharp
+await using var sender = Sender.NewQwp(
+    "ws::addr=localhost:9000;sf_dir=/var/lib/myapp/qdb-sf;request_durable_ack=on;");
+
+// ... ingest rows ...
+await sender.SendAsync();
+
+Console.WriteLine($"trades durable seqTxn: {sender.GetHighestDurableSeqTxn("trades")}");
+```
+
+## Failover and high availability
+
+:::note Enterprise
+
+Multi-host failover is most useful with QuestDB Enterprise primary-replica
+replication.
+
+:::
+
+Supply a comma-separated address list (or repeat `addr=`). The client connects
+to one endpoint and walks the list to the next healthy peer when the
+connection breaks:
+
+```csharp
+using var sender = Sender.New(
+    "ws::addr=db-primary:9000,db-replica:9000;sf_dir=/var/lib/myapp/qdb-sf;");
+```
+
+| Key | Default | Description |
+|---|---|---|
+| `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
+| `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
+| `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
+| `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). Setting any `reconnect_*` key promotes this to `on`. |
+
+`sf_dir` is strongly recommended for multi-host deployments: a flush writes to
+disk and returns quickly while the reconnect loop replays to the new primary
+in the background, instead of blocking until `sf_append_deadline_millis`.
+
+### Backpressure on send
+
+Row builders (`Table`, `Symbol`, `Column`, `NullableColumn`) never block —
+they only mutate the in-process encode buffer, which grows up to
+`max_buf_size` (default 100 MiB). Backpressure surfaces at flush time:
+
+- **In-memory mode (no `sf_dir`).** The in-flight publish window caps how
+  many unacknowledged frames can sit on the connection. On a standalone sender
+  `SendAsync()` drains, so when the server is reachable but slow it waits for
+  ACK-driven capacity before returning. When the server is unreachable, the
+  drain waits up to `close_flush_timeout_millis` and then throws a timeout
+  `IngressError`. Dispose does **not** drain, so anything unsent at that point
+  is dropped; in-memory mode does **not** survive a process exit either —
+  unacked frames are lost.
+- **Store-and-forward mode (`sf_dir` set).** `SendAsync()` appends to the
+  on-disk segment and returns quickly; the I/O loop drains it in the
+  background. If the disk queue is at its `sf_max_total_bytes` cap, the
+  append blocks waiting for the loop to trim acknowledged frames, bounded by
+  `sf_append_deadline_millis` (default 30 000 ms). If the deadline elapses
+  the engine latches a terminal error and the next producer call surfaces it.
+  No data is dropped while the publisher is parked.
+
+A single batch larger than `sf_max_segment_bytes` (default 4 MiB) is rejected
+immediately — it does not enter the backpressure wait. Reduce the rows you
+accumulate per flush, or raise `sf_max_segment_bytes` to fit your largest single
+payload.
+
+## Transactions
+
+:::caution WebSocket / QWP does not support transactions
+
+The `Transaction` / `Commit` / `Rollback` API is **HTTP-only**. The QWP
+WebSocket sender rejects it — QWP frames are independently acknowledged batches.
+Use [store-and-forward](#store-and-forward) plus
+[DEDUP](/docs/concepts/deduplication/) keys for delivery guarantees on QWP.
+
+:::
+
+For transactional ILP over HTTP, see the
+[ILP overview](/docs/connect/compatibility/ilp/overview#http-transaction-semantics).
+
+## Querying and SQL execution
+
+`QueryClient` sends SQL statements over the
+[QWP egress](/docs/connect/wire-protocols/qwp-egress-websocket/) endpoint
+(`/read/v1`). `ExecuteReaderAsync` submits the query and returns an
+[`IQwpQueryReader`](#reading-result-batches) — a `DbDataReader`-style **pull
+cursor** you drive yourself: each `ReadBatchAsync()` advances to the next
+columnar batch in `reader.Current`, and disposing the reader ends the query.
+
+Because you consume the stream by awaiting `ReadBatchAsync()` to completion,
+operations are easy to sequence:
+
+```csharp
+// DDL/DML return no batches — drive the reader to completion to sequence.
+await using (var r = await client.ExecuteReaderAsync("CREATE TABLE trades (...) ..."))
+    while (await r.ReadBatchAsync()) { }
+// Table exists by this point
+
+await using (var r = await client.ExecuteReaderAsync("INSERT INTO trades VALUES (...) ..."))
+    while (await r.ReadBatchAsync()) { }
+// Data is committed by this point
+
+await using (var reader = await client.ExecuteReaderAsync("SELECT * FROM trades"))
+    while (await reader.ReadBatchAsync()) { /* consume reader.Current */ }
+// Results have been fully consumed by this point
+```
+
+One `QueryClient` owns one WebSocket and runs **one query at a time** — the
+reader holds that single-flight slot until it is disposed. To run queries in
+parallel, create one client per concurrent caller (or use the
+[`QuestDBClient` query pool](#querying-from-the-pool)) — the same
+multi-publisher pattern as for `Sender`.
+
+### Building a query client
+
+```csharp
+using QuestDB;
+using QuestDB.Qwp.Query;
+
+await using var client = await QueryClient.NewAsync("ws::addr=localhost:9000;");
+```
+
+| Factory | Returns | Notes |
+|---|---|---|
+| `QueryClient.New(string connStr)` | `IQwpQueryClient` | Synchronous. Hops the threadpool to avoid sync-over-async deadlocks on UI / classic ASP.NET. |
+| `QueryClient.New(QueryOptions options)` | `IQwpQueryClient` | For programmatic configuration. |
+| `QueryClient.NewAsync(string connStr, CancellationToken)` | `Task<IQwpQueryClient>` | **Preferred from async code.** |
+| `QueryClient.NewAsync(QueryOptions, CancellationToken)` | `Task<IQwpQueryClient>` | Same, programmatic. |
+| `QueryClient.FromEnv()` | `IQwpQueryClient` | Reads the connect string from `QDB_CLIENT_CONF`. |
+
+The egress side requires .NET 7+, the same minimum as the QWP sender.
+`QueryClient` is constructed and connected up-front: by the time the factory
+returns, the WebSocket upgrade has completed and the negotiated server
+metadata is available via `client.ServerInfo`, `client.NegotiatedVersion`,
+and `client.NegotiatedCompression`.
+
+### Executing SELECT queries
+
+```csharp
+await using var reader = await client.ExecuteReaderAsync(
+    "SELECT ts, symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 100");
+
+while (await reader.ReadBatchAsync())
+{
+    var batch = reader.Current;
+    for (var row = 0; row < batch.RowCount; row++)
+    {
+        if (batch.IsNull(2, row)) continue;
+        var ts = batch.GetLongValue(0, row);           // TIMESTAMP — microseconds
+        var sym = batch.GetString(1, row);             // SYMBOL — null for NULL
+        var price = batch.GetDoubleValue(2, row);
+        Console.WriteLine($"{ts} {sym} {price}");
+    }
+}
+
+Console.WriteLine($"done: {reader.TotalRows} rows");
+```
+
+The `QwpColumnBatch` returned by `reader.Current` — and every span its
+accessors return — is **reused across batches**: it is valid only until the
+next `ReadBatchAsync()` call. Do not store a reference past the current
+iteration; copy any string / array data you need to keep.
+
+### Reading result batches
+
+`QwpColumnBatch` exposes typed accessors for every QuestDB column type. All
+value accessors return a zero-like sentinel (`0`, `false`, `'\0'`, `null`,
+`-1`, `Guid.Empty`, `BigInteger.Zero`, empty span) for a NULL cell; call
+`IsNull(col, row)` first to disambiguate from a legal zero value.
+
+| Accessor | QuestDB column types |
+|---|---|
+| `IsNull(col, row)` | all types — call before any value accessor when the column is nullable |
+| `GetBoolValue(col, row)` | `BOOLEAN` |
+| `GetByteValue(col, row)` / `GetSByteValue(col, row)` | `BYTE` (uint8 or sbyte view) |
+| `GetShortValue(col, row)` | `SHORT` |
+| `GetCharValue(col, row)` | `CHAR` (UTF-16 code unit) |
+| `GetIntValue(col, row)` | `INT`, `IPv4` |
+| `GetIPv4Value(col, row)` | `IPv4` (packed `int`; same bits as `GetIntValue`) |
+| `GetLongValue(col, row)` | `LONG`, `TIMESTAMP`, `TIMESTAMP_NS`, `DATE` (see units below) |
+| `GetTimestampValue(col, row)` | `TIMESTAMP` / `TIMESTAMP_NS` (alias for `GetLongValue`; consult `GetColumnWireType` for the unit) |
+| `GetDateValue(col, row)` | `DATE` (millis since Unix epoch; alias for `GetLongValue`) |
+| `GetFloatValue(col, row)` | `FLOAT` |
+| `GetDoubleValue(col, row)` | `DOUBLE` |
+| `GetStringSpan(col, row)` | `VARCHAR`, `SYMBOL` (UTF-8 bytes; valid only until the next `ReadBatchAsync()`) |
+| `GetString(col, row)` | any column — best-effort allocating string; `null` for NULL |
+| `GetSymbol(col, row)` / `GetSymbolId(col, row)` | `SYMBOL` (managed string / dictionary id) |
+| `GetSymbolForId(col, dictId)` / `GetSymbolDictSize(col)` | `SYMBOL` dictionary access |
+| `GetBinarySpan(col, row)` | `BINARY` (raw bytes; valid only until the next `ReadBatchAsync()`) |
+| `GetUuid(col, row)` / `GetUuidLo(col, row)` / `GetUuidHi(col, row)` | `UUID` (as `Guid`, or as 64-bit halves on the QWP wire layout) |
+| `GetLong256(col, row)` (BigInteger) / `GetLong256(col, row, out w0, out w1, out w2, out w3)` | `LONG256` (BigInteger, or four 64-bit limbs least → most significant) |
+| `GetDecimal64UnscaledValue(col, row)` + `GetDecimalScale(col)` | `DECIMAL64` |
+| `GetDecimal128Lo(col, row)` / `GetDecimal128Hi(col, row)` + `GetDecimalScale(col)` | `DECIMAL128` (two int64 limbs) |
+| `GetDecimal256(col, row, out ll, out lh, out hl, out hh)` + `GetDecimalScale(col)` | `DECIMAL256` (four int64 limbs least → most significant) |
+| `GetGeohashValue(col, row)` + `GetGeohashPrecisionBits(col)` | `GEOHASH` (packed bits + per-column precision; `-1` value for NULL) |
+| `GetDoubleArraySpan(col, row)` / `GetDoubleArrayElements(col, row)` | `DOUBLE[]` (row-major, flattened) |
+| `GetLongArraySpan(col, row)` / `GetLongArrayElements(col, row)` | `LONG[]` (row-major, flattened) |
+| `GetArrayNDims(col, row)` / `GetArrayShape(col, row)` | array dimensionality and shape (per row) |
+| `GetColumnName(col)` / `GetColumnWireType(col)` / `ColumnCount` / `RowCount` / `BatchSeq` / `RequestId` | column / batch metadata |
+
+`GetColumnWireType(col)` returns the `QwpTypeCode` of the column; pair it
+with the type-specific accessor when the column type is not known statically.
+
+### DDL and DML statements
+
+Non-`SELECT` statements (`CREATE TABLE`, `INSERT`, `UPDATE`, `ALTER`, `DROP`,
+`TRUNCATE`) run through the same `ExecuteReaderAsync`. They return no result
+batches, so the **first** `ReadBatchAsync()` returns `false`; the completion
+metadata is then available on the reader as `RowsAffected` and `OpType`:
+
+```csharp
+await using var reader = await client.ExecuteReaderAsync(
+    "CREATE TABLE trades ("
+    + "ts TIMESTAMP, symbol SYMBOL, price DOUBLE, amount LONG"
+    + ") TIMESTAMP(ts) PARTITION BY DAY WAL");
+
+while (await reader.ReadBatchAsync()) { /* no batches for DDL/DML */ }
+
+Console.WriteLine($"done: opType={reader.OpType} rows={reader.RowsAffected}");
+```
+
+A server-side failure (bad SQL, permission error, …) throws
+`QwpQueryException` from `ReadBatchAsync`; catch it to handle the error — the
+client stays usable for the next query.
+
+`RowsAffected` reports the row count for `INSERT` / `UPDATE` / `DELETE`.
+`OpType` is a `QwpOpType` (`CreateTable`, `Insert`, `Drop`, `Alter`,
+`Truncate`, …). Pure DDL (`CREATE`, `DROP`, `ALTER`, `TRUNCATE`) reports
+`RowsAffected = 0`.
+
+### Bind parameters
+
+Parameterised queries use a `QwpBindSetter` delegate. It receives a
+`QwpBindValues` and **must set indices in strict ascending order starting at
+zero** — gaps and reuses throw `IngressError`. Bind indices are 0-based
+(`$1` → index `0`):
+
+```csharp
+const string sql =
+    "SELECT ts, symbol, price, amount FROM trades "
+    + "WHERE symbol = $1 AND price >= $2 LIMIT 1000";
+
+foreach (var symbol in new[] { "ETH-USD", "BTC-USD" })
+{
+    await using var reader = await client.ExecuteReaderAsync(
+        sql,
+        binds =>
+        {
+            binds.SetVarchar(0, symbol);
+            binds.SetDouble(1, 2000.0);
+        });
+    while (await reader.ReadBatchAsync())
+    {
+        // consume reader.Current — see "Reading result batches"
+    }
+}
+```
+
+| Setter | Bind type |
+|---|---|
+| `SetBoolean(index, bool)` | `BOOLEAN` |
+| `SetByte(index, byte)` | `BYTE` (uint8) |
+| `SetShort(index, short)` | `SHORT` |
+| `SetChar(index, char)` | `CHAR` |
+| `SetInt(index, int)` | `INT` |
+| `SetLong(index, long)` | `LONG` |
+| `SetFloat(index, float)` | `FLOAT` |
+| `SetDouble(index, double)` | `DOUBLE` |
+| `SetDate(index, long millis)` | `DATE` |
+| `SetTimestampMicros(index, long)` | `TIMESTAMP` |
+| `SetTimestampNanos(index, long)` | `TIMESTAMP_NS` |
+| `SetVarchar(index, string?)` | `VARCHAR` / `STRING` / `SYMBOL` (`null` ⇒ NULL bind) |
+| `SetUuid(index, Guid)` / `SetUuid(index, long lo, long hi)` | `UUID` |
+| `SetLong256(index, BigInteger)` (non-negative) / `SetLong256(index, long w0, long w1, long w2, long w3)` | `LONG256` |
+| `SetGeohash(index, int precisionBits, long value)` | `GEOHASH` (1–60 bits) |
+| `SetDecimal64(index, int scale, long unscaled)` | `DECIMAL64` (`scale` 0–18) |
+| `SetDecimal128(index, int scale, long lo, long hi)` | `DECIMAL128` (`scale` 0–38) |
+| `SetDecimal256(index, int scale, long ll, long lh, long hl, long hh)` | `DECIMAL256` (`scale` 0–76) |
+
+Up to `1024` bind parameters are accepted per query.
+
+To bind a typed NULL — necessary when the placeholder type would otherwise
+be inferred from the value — use `SetNull` with the wire type code, or the
+type-specific overloads that carry scale / precision:
+
+```csharp
+binds =>
+{
+    binds.SetVarchar(0, null);                        // null VARCHAR (also SetNull(0, QwpTypeCode.Varchar))
+    binds.SetNull(1, QwpTypeCode.Long);               // null LONG
+    binds.SetNullGeohash(2, precisionBits: 20);       // null GEOHASH with explicit precision
+    binds.SetNullDecimal64(3, scale: 4);              // null DECIMAL64 with explicit scale
+};
+```
+
+### Cancellation
+
+There are two ways to cancel an in-flight query, and they differ in whether
+the connection survives:
+
+- **`reader.Cancel()`** (or `client.Cancel()`) — cooperative. Posts a QWP
+  `CANCEL` frame to the server; the stream then ends with a `ReadBatchAsync()`
+  that returns `false` and `reader.WasCancelled == true` (or, if the server
+  raced to finish, a normal end with `WasCancelled == false`). The WebSocket
+  stays open and the client is reusable for the next query. `Cancel()` is
+  thread-safe and a no-op when no query is in flight. It does **not** interrupt
+  an in-progress `ReceiveAsync`; if the server hangs and never acknowledges,
+  `ReadBatchAsync()` will not return.
+- **`CancellationToken` cancellation** — terminal. Cancelling the token
+  passed to `ReadBatchAsync()` tears down the WebSocket and throws
+  `OperationCanceledException`; the client transitions to a non-recoverable
+  state. Use it as a hard stop when cooperative cancel is not viable.
+
+### Query error status codes
+
+A server-side query failure throws `QwpQueryException` from `ReadBatchAsync`.
+Its `Status` (a `QwpStatusCode`) carries the QWP wire status byte and
+`ServerMessage` the server's text. The codes the server raises today:
+
+| Code   | Name              | Description                                       |
+|--------|-------------------|---------------------------------------------------|
+| `0x03` | `SchemaMismatch`  | Bind parameter type incompatible with placeholder |
+| `0x05` | `ParseError`      | SQL syntax error or malformed message             |
+| `0x06` | `InternalError`   | Server-side execution failure                     |
+| `0x08` | `SecurityError`   | Authorization failure                             |
+| `0x0A` | `Cancelled`       | Query terminated by `CANCEL`                      |
+| `0x0B` | `LimitExceeded`   | Protocol limit hit (oversized payload, bind cap)  |
+
+`QwpQueryException` can be thrown before the first batch (parse failure,
+schema mismatch on binds) or mid-stream (storage failure, server shutdown). It
+ends the query at a clean frame boundary, so the client stays usable — the next
+query on the same client starts fresh. A transport-level failure instead
+surfaces as a plain `IngressError` (or `OperationCanceledException` from a hard
+cancel), which **is** terminal — see Failover below.
+
+```csharp
+try
+{
+    await using var reader = await client.ExecuteReaderAsync("SELECT * FROM trades");
+    while (await reader.ReadBatchAsync()) { /* consume reader.Current */ }
+}
+catch (QwpQueryException ex)
+{
+    Console.Error.WriteLine(
+        $"query failed: {ex.Status} (0x{(byte)ex.Status:X2}) {ex.ServerMessage}");
+}
+```
+
+### Failover
+
+When multiple addresses are listed in `addr=`, the query client tries them
+in order on connect and on every mid-stream reconnect. Egress failover is
+**per-query**: the loop runs within a single query — from `ExecuteReaderAsync`
+until the reader is disposed; between queries the client uses whichever
+endpoint last succeeded.
+
+| Connect-string key | Default | Description |
+|---|---|---|
+| `failover` | `on` | Master switch for per-query reconnect-and-replay. |
+| `failover_max_attempts` | `8` | Max reconnect attempts per query. |
+| `failover_backoff_initial_ms` | `50` | First post-failure sleep. |
+| `failover_backoff_max_ms` | `1000` | Cap on per-attempt sleep. |
+| `failover_max_duration_ms` | `30000` | Total wall-clock budget per query (`0` ⇒ unbounded). The loop ends when either this or `failover_max_attempts` fires first. |
+| `target` | `any` | Endpoint role filter: `any` (STANDALONE, PRIMARY, PRIMARY_CATCHUP, REPLICA), `primary` (STANDALONE, PRIMARY, PRIMARY_CATCHUP), or `replica` (REPLICA only). |
+| `zone` | unset | Opaque zone hint; with `target=any` / `target=replica`, prefers endpoints whose advertised `zone_id` matches. Ignored with `target=primary`. |
+
+:::warning Failover requires multiple endpoints
+
+Failover rotates across the addresses listed in `addr=`. With a single
+address, there is no other host to try and the loop exhausts after one
+attempt regardless of `failover_max_attempts`. For failover to be useful,
+provide at least two addresses.
+
+:::
+
+**Handling partial results.** When the connection fails over mid-stream the
+server replays the query from scratch. The read that resumes after the
+reconnect sets `reader.FailoverReset == true` — check it after each
+`ReadBatchAsync()` and drop any rows you accumulated from the aborted attempt,
+because the server is resending from row 0:
+
+```csharp
+var rows = new List<Row>();
+while (await reader.ReadBatchAsync())
+{
+    if (reader.FailoverReset)
+    {
+        Console.WriteLine($"failover to {reader.ServerInfo?.NodeId ?? "<unknown>"}");
+        rows.Clear();   // discard partial rows; server resends from row 0
+    }
+    Accumulate(rows, reader.Current);
+}
+```
+
+`FailoverReset` is set only on a mid-stream replay; reconnects that happen
+between queries are handled internally and never set the flag. If the failover
+budget is exhausted, `ReadBatchAsync()` throws (transport-level, terminal).
+
+**Role mismatch.** If the requested `target=` cannot be satisfied by any
+endpoint, the factory or the next `ExecuteReaderAsync` throws
+`QwpRoleMismatchException`. Its `Target` property echoes the requested
+filter; `LastObserved` carries the last `QwpServerInfo` the client saw, so
+your application can distinguish "no primary available" from
+"all endpoints unreachable".
+
+**Authentication failure is terminal.** A `401` / `403` from any failover
+candidate aborts the loop without trying the remaining hosts — replaying an
+unsupported credential against every host wastes time and floods server
+logs.
+
+### Compression
+
+Negotiate zstd compression to reduce egress bandwidth on large result sets:
+
+```csharp
+await using var client = await QueryClient.NewAsync(
+    "ws::addr=localhost:9000;compression=zstd;compression_level=3;");
+```
+
+| Value | Behaviour |
+|---|---|
+| `raw` (default) | No compression — sent as `raw` in the upgrade header. |
+| `zstd` | Demand zstd; the server falls back to raw per-batch when raw is smaller. |
+| `auto` | Advertise both; the server picks zstd if it supports it, else raw. |
+
+`compression_level` accepts the full zstd range `[1, 22]`; the server clamps it
+to its maximum of `9`, so levels above 9 are accepted for connect-string parity
+with the other clients but yield no extra compression. Inspect
+`client.NegotiatedCompression` after connect to see what the server actually
+chose. Batches decompress transparently — your read loop is unchanged.
+
+### Query connect-string reference
+
+The connect string is shared with the ingest sender; the query parser
+accepts the full union and silently ignores the keys that only the sender
+acts on, so one connect string drives both clients without erroring. The
+keys it honours:
+
+| Category | Keys |
+|---|---|
+| Addressing | `addr` (one or comma-separated `host:port` entries), `path` (defaults to `/read/v1`), `protocol` (auto-derived from the `ws::` / `wss::` scheme) |
+| TLS | `tls_verify`, `tls_roots`, `tls_roots_password` |
+| Auth | `username` / `password` (HTTP Basic), `token` (Bearer), `auth_timeout_ms` |
+| Routing | `target`, `zone`, `client_id` |
+| Failover | `failover`, `failover_max_attempts`, `failover_backoff_initial_ms`, `failover_backoff_max_ms`, `failover_max_duration_ms` |
+| Streaming | `compression`, `compression_level`, `max_batch_rows`, `initial_credit` |
+
+`initial_credit` (bytes; `0` = unbounded) caps how much data the server may
+emit before pausing for a `CREDIT` frame from the client — useful when a
+single result is much larger than the consumer's working set. The client
+auto-replenishes credit per consumed batch.
+
+`username`/`password` and `token` are mutually exclusive; setting both
+raises `IngressError`. Control characters are rejected in all string
+values (connect-string parsing is strict).
+
+## Misc
+
+### Cancelling a row
+
+`CancelRow` discards the partially-built current row, before it is finished:
+
+```csharp
+sender.Table("trades").Symbol("symbol", "ETH-USD").CancelRow();
+```
+
+### Buffer management
+
+`Truncate()` trims the internal buffer back to `init_buf_size`; `Clear()`
+empties it without sending. Buffer growth is bounded by `init_buf_size` /
+`max_buf_size`.
+
+## Closing the sender
+
+**Always `Send()` / `SendAsync()` before disposing.** Dispose (and
+`DisposeAsync`) is **pure resource release**: it does not flush, does not wait
+for ACKs, and does not throw — any rows still buffered are **discarded**. On a
+standalone `ws` sender `SendAsync()` drains (flushes and waits for the server
+ACK, bounded by `close_flush_timeout_millis`), so the reliable pattern is
+"`SendAsync()`, then dispose":
+
+```csharp
+await using var sender = Sender.New("ws::addr=localhost:9000;");
+// ... ingest ...
+await sender.SendAsync();   // flush + await ACK; dispose alone would drop these rows
+```
+
+With `sf_dir` set, frames that were already **sent** (handed to the on-disk
+ring) but not yet ACKed persist to disk and replay on the next run with the
+same `sf_dir` / `sender_id`. Rows that were only buffered — never sent — are
+not on disk and are lost regardless.
+
+## Configuration reference
+
+For the full list of connect-string keys and defaults, see the
+[connect string reference](/docs/connect/clients/connect-string/). Common
+WebSocket options:
+
+| Key | Default | Description |
+|---|---|---|
+| `addr` | required | One or more `host:port` entries, comma-separated or repeated. Default port `9000`. |
+| `username` / `password` | unset | HTTP basic auth. |
+| `token` | unset | Bearer token auth (Enterprise). |
+| `auth_timeout_ms` | 15000 | Per-endpoint WebSocket-upgrade timeout. |
+| `connect_timeout` | = `auth_timeout_ms` | Per-endpoint connect budget (TCP + TLS + upgrade); overrides `auth_timeout_ms` when set. |
+| `tls_verify` / `tls_roots` / `tls_roots_password` | `on` / — / — | TLS configuration (`wss` only). |
+| `auto_flush` / `auto_flush_rows` / `auto_flush_interval` / `auto_flush_bytes` | `on` / 1000 / 100 ms / 8 MiB | Auto-flush triggers. |
+| `init_buf_size` / `max_buf_size` / `max_name_len` | 64 KiB / 100 MiB / 127 | Encode-buffer sizing; max table/column name length. |
+| `sf_dir` / `sender_id` | unset / `default` | Store-and-forward directory and slot identity. |
+| `sf_max_segment_bytes` / `sf_max_total_bytes` / `sf_append_deadline_millis` | 4 MiB / 128 MiB (mem) · 10 GiB (disk) / 30000 | Store-and-forward sizing and append backpressure deadline. |
+| `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
+| `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
+| `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |
+| `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Per-outage reconnect budget and backoff. |
+| `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |
+| `ping_timeout` | 5000 | Bound on `PingAsync` waiting for the ACK window to drain. |
+| `error_inbox_capacity` / `connection_listener_inbox_capacity` | 256 / 256 | Async error and connection-event inbox capacities. |
+| `close_flush_timeout_millis` | 60000 | Bound on the ACK wait when a standalone `Send` / `SendAsync` drains (and the default `Flush` timeout). `0` = flush without waiting for ACK. Dispose does not drain. |
+
+Pool keys (`sender_pool_min` / `sender_pool_max`, `query_pool_min` /
+`query_pool_max`, `acquire_timeout_ms`, `idle_timeout_ms`, `max_lifetime_ms`,
+`housekeeper_interval_ms`, `lazy_connect`) are read by the
+[`QuestDBClient`](#connection-pooling-with-questdbclient) handle — see
+[Pool configuration](#pool-configuration). The egress-only keys (`compression`,
+`compression_level`, `target`, `zone`, `failover_*`, `initial_credit`,
+`max_batch_rows`, `client_id`) are covered under
+[Querying and SQL execution](#querying-and-sql-execution).
+
+## Migration from ILP (HTTP/TCP)
+
+The `Table` / `Symbol` / `Column` / `At` builder is unchanged. To switch a
+sender to QWP/WebSocket:
+
+| Aspect | HTTP (ILP) | WebSocket (QWP) |
+|---|---|---|
+| Connect string schema | `http::` / `https::` | `ws::` / `wss::` |
+| Factory | `Sender.New(...)` returns `ISender` | Same; or `Sender.NewQwp(...)` returns `IQwpWebSocketSender` directly (skip the `is IQwpWebSocketSender` cast for QWP-only methods like `PingAsync`, `ColumnDecimal64`, FSN tracking) |
+| Type surface | ILP textual types | Full QuestDB type system (DECIMAL64/128/256, BYTE, SHORT, FLOAT, DATE, IPv4, GEOHASH, LONG256, BINARY, n-D arrays) via `IQwpWebSocketSender` |
+| Error model | Synchronous on `Send` | Async — observed via [`error_handler`](#error-handler), FSN / `seqTxn` watermarks |
+| Transactions | Supported | Not supported (use SF + DEDUP) |
+| Store-and-forward | Not available | Available (`sf_dir`) |
+| Multi-endpoint failover | HTTP only | Built in (comma-separated `addr`) |
+| Querying | Not available | [`QueryClient`](#querying-and-sql-execution) on the same NuGet package |
+| Connection pooling | `QuestDBClient` (sender pool) | `QuestDBClient` (sender + query pools) |
+| Minimum runtime | .NET 6.0 | .NET 7.0 |
+
+The minimal swap is "change the connect string from `http::` to `ws::` (or
+`https::` to `wss::`) and drop any transaction calls"; reach for
+`Sender.NewQwp(...)` when the application also needs the QWP-only column
+types, delivery watermarks, or `PingAsync`.
+
+## Full example: ingestion and querying with failover
+
+This example combines a multi-host ingest sender with the recreate-on-
+terminal-failure pattern for the query client. It uses `Sender.NewQwp` for
+ingest (so the QWP-only methods are directly reachable), TLS + token auth,
+store-and-forward, and a connection listener.
+
+```csharp
+using QuestDB;
+using QuestDB.Qwp.Query;
+using QuestDB.Senders;
+using QuestDB.Utils;
+
+const string ingestConnStr =
+    "wss::addr=db-primary:9000,db-replica:9000;"   // Enterprise: wss + multi-host
+    + "token=your_bearer_token;"                    // Enterprise: token auth
+    + "tls_verify=unsafe_off;"                      // test only!
+    + "sf_dir=/var/lib/myapp/qdb-sf;"               // disk-backed durability
+    + "sender_id=ingest-1;"                         // distinct per process
+    + "reconnect_max_duration_millis=300000;";
+
+const string queryConnStr =
+    "wss::addr=db-primary:9000,db-replica:9000;"
+    + "token=your_bearer_token;"
+    + "tls_verify=unsafe_off;"                      // test only!
+    + "target=replica;"                             // offload reads
+    + "failover=on;failover_max_attempts=8;"
+    + "failover_max_duration_ms=30000;";
+
+// ─── Ingestion ──────────────────────────────────────────────────────
+
+var ingestOptions = Sender.Configure(ingestConnStr);
+ingestOptions.error_handler = err =>
+    Console.Error.WriteLine(
+        $"batch rejected: category={err.Category} table={err.TableName} "
+        + $"fsn=[{err.FromFsn},{err.ToFsn}] msg={err.ServerMessage}");
+ingestOptions.ConnectionListener = new IngestListener();
+
+await using var sender = Sender.NewQwp(ingestOptions);
+
+for (var i = 0; i < 100; i++)
+{
+    await sender.Table("trades")
+        .Symbol("symbol", "ETH-USD")
+        .Symbol("side", i % 2 == 0 ? "buy" : "sell")
+        .Column("price", 2615.54 + i * 0.01)
+        .Column("amount", 0.001 * (i + 1))
+        .AtAsync(DateTime.UtcNow);
+}
+
+// Bound the publish on a known FSN, then drain remaining ACKs on dispose.
+long fsn = await sender.FlushAndGetSequenceAsync();
+await sender.AwaitAckedFsnAsync(fsn, TimeSpan.FromSeconds(10));
+
+// Connection events you may see in IngestListener.OnEvent:
+//   Connected db-primary:9000               — initial connection
+//   Disconnected db-primary:9000            — primary dropped
+//   EndpointAttemptFailed db-primary:9000   — retries during outage
+//   FailedOver db-replica:9000              — replica took over
+//
+// With sf_dir set, unacked frames are persisted to disk during the
+// outage and replayed once the new primary is reachable.
+
+
+// ─── Querying (recreate-on-terminal pattern) ────────────────────────
+
+// The QueryClient enters a terminal state once the failover budget is
+// exhausted (or on CancellationToken cancel, AuthFailed, or
+// QwpRoleMismatchException). The application must Dispose the dead
+// client and build a new one. This loop encodes that contract.
+
+IQwpQueryClient? client = null;
+
+while (true)
+{
+    if (client is null)
+    {
+        try
+        {
+            client = await QueryClient.NewAsync(queryConnStr);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"connect failed: {ex.Message}");
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            continue;
+        }
+    }
+
+    try
+    {
+        await using var reader = await client.ExecuteReaderAsync(
+            "SELECT ts, symbol, price, amount FROM trades "
+            + "ORDER BY ts DESC LIMIT 10");
+        while (await reader.ReadBatchAsync())
+        {
+            if (reader.FailoverReset)
+            {
+                // Fires only when failover happens mid-query. The server
+                // resends from row 0 — drop any accumulated partial results.
+                Console.WriteLine(
+                    $"failover reset to node={reader.ServerInfo?.NodeId ?? "<unknown>"} "
+                    + $"role={reader.ServerInfo?.RoleName ?? "<unknown>"}");
+            }
+
+            var batch = reader.Current;
+            for (var row = 0; row < batch.RowCount; row++)
+            {
+                Console.WriteLine(
+                    $"{batch.GetLongValue(0, row)} "
+                    + $"{batch.GetString(1, row)} "
+                    + $"{batch.GetDoubleValue(2, row)} "
+                    + $"{batch.GetDoubleValue(3, row)}");
+            }
+        }
+    }
+    catch (QwpQueryException ex)   // query-level error; the client stays usable
+    {
+        Console.Error.WriteLine($"query error {ex.Status}: {ex.ServerMessage}");
+    }
+    catch (Exception ex)   // failover exhausted, transport tear-down, etc.
+    {
+        Console.Error.WriteLine($"query failed terminally: {ex.Message}");
+        try { await client.DisposeAsync(); } catch { /* best-effort */ }
+        client = null;       // recreate on next iteration
+        continue;
+    }
+
+    await Task.Delay(TimeSpan.FromSeconds(2));
+}
+
+
+internal sealed class IngestListener : ISenderConnectionListener
+{
+    public void OnEvent(SenderConnectionEvent evt) =>
+        Console.WriteLine($"{evt.Kind} {evt.Host}:{evt.Port}");
+}
+```
+
+Notes on the pattern:
+
+- **Ingestion failover is continuous** — the sender's reconnect loop
+  (`reconnect_max_duration_millis`, default 5 min) walks the address list
+  transparently and resumes once a healthy host is reachable. The
+  application keeps publishing.
+- **Egress failover is per-query** — the loop runs only inside one query
+  (from `ExecuteReaderAsync` until the reader is disposed). A total outage that
+  exceeds `failover_max_duration_ms` leaves the `QueryClient` terminal; the
+  `recreate-on-catch` outer loop is the supported recovery shape.
+- **Connect strings are shared-vocabulary, side-private** — the same
+  `ws::` / `wss::` URL works for both sides. Each parser silently ignores
+  the keys belonging to the other half. The ingest sender pins QWP v1 and
+  does not read `SERVER_INFO`, so the `zone=` key is accepted but ignored
+  on ingress; egress honours it for replica preference when
+  `target=any|replica`.
+
+## Next steps
+
+Explore more examples in the
+[GitHub repository](https://github.com/questdb/net-questdb-client), and read
+[Querying and SQL execution](#querying-and-sql-execution) on this page to
+add SQL reads on the same WebSocket transport.
+
+For SQL reference material, see the [Query & SQL overview](/docs/query/overview/).
+
+Need help? Visit the [Community Forum](https://community.questdb.com/).

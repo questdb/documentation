@@ -58,7 +58,7 @@ heavily by third-party tools to provide visualizations, such as within
 libraries like [Polars](/docs/integrations/data-processing/polars/).
 
 > Need to ingest data first? Checkout our
-> [Ingestion overview](/docs/ingestion/overview/).
+> [Ingestion overview](/docs/connect/overview/).
 
 ## QuestDB Web Console
 
@@ -97,7 +97,7 @@ against the demo instance.
 
 Query QuestDB using the PostgreSQL endpoint via the default port `8812`.
 
-See [PGWire Client overview](/docs/query/pgwire/overview/) for details on how to
+See [PGWire Client overview](/docs/connect/compatibility/pgwire/overview/) for details on how to
 connect to QuestDB using PostgreSQL clients.
 
 Brief examples in multiple languages are shown below.
@@ -144,7 +144,7 @@ Brief examples in multiple languages are shown below.
 
 #### Further Reading
 
-See the [PGWire Client overview](/docs/query/pgwire/overview/) for more details on how to use PostgreSQL
+See the [PGWire Client overview](/docs/connect/compatibility/pgwire/overview/) for more details on how to use PostgreSQL
 clients to connect to QuestDB.
 
 ## REST HTTP API
@@ -156,12 +156,12 @@ The REST API is accessible on port `9000` and has the following query-capable
 entrypoints:
 
 For details such as content type, query parameters and more, refer to the
-[REST HTTP API](/docs/query/rest-api/) reference.
+[REST HTTP API](/docs/connect/compatibility/rest-api/) reference.
 
 | Entrypoint                                  | HTTP Method | Description                             | REST HTTP API Reference                                       |
 | :------------------------------------------ | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
-| [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/query/rest-api/#exp---export-data)      |
-| [`/exec?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/query/rest-api/#exec---execute-queries) |
+| [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/connect/compatibility/rest-api/#exp---export-data)      |
+| [`/exec?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
 
 #### `/exp`: SQL Query to CSV
 

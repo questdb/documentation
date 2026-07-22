@@ -14,9 +14,9 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 Transport Layer Security (TLS) encryption is available on all supported network
 interfaces and protocols:
 
-- [InfluxDB Line Protocol over TCP](/docs/ingestion/ilp/overview/)
-- [PGWire](/docs/query/pgwire/overview/)
-- [HTTP](/docs/query/rest-api/) (REST API)
+- [InfluxDB Line Protocol over TCP](/docs/connect/compatibility/ilp/overview/)
+- [PGWire](/docs/connect/compatibility/pgwire/overview/)
+- [HTTP](/docs/connect/compatibility/rest-api/) (REST API)
 
 It's possible to configure encryption on all interfaces at once or individually.
 

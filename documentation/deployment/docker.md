@@ -53,16 +53,16 @@ Below each parameter is described in detail.
 
 This parameter will expose a port to the host. You can specify:
 
-- `-p 9000:9000` - [REST API](/docs/query/rest-api/) and
+- `-p 9000:9000` - [REST API](/docs/connect/compatibility/rest-api/) and
   [Web Console](/docs/getting-started/web-console/overview/)
-- `-p 9009:9009` - [InfluxDB line protocol](/docs/ingestion/ilp/overview/)
-- `-p 8812:8812` - [Postgres wire protocol](/docs/query/pgwire/overview/)
+- `-p 9009:9009` - [InfluxDB line protocol](/docs/connect/compatibility/ilp/overview/)
+- `-p 8812:8812` - [Postgres wire protocol](/docs/connect/compatibility/pgwire/overview/)
 - `-p 9003:9003` -
   [Min health server](/docs/operations/logging-metrics/#minimal-http-server)
 
 All ports are optional, you can pick only the ones you need. For example, it is
 enough to expose `8812` if you only plan to use
-[Postgres wire protocol](/docs/query/pgwire/overview/).
+[Postgres wire protocol](/docs/connect/compatibility/pgwire/overview/).
 
 ### `-v` parameter to mount storage
 
@@ -161,11 +161,11 @@ the root cause.
 When QuestDB is running, you can start interacting with it:
 
 - Port `9000` is for REST. More info is available on the
-  [REST documentation page](/docs/query/rest-api/).
+  [REST documentation page](/docs/connect/compatibility/rest-api/).
 - Port `8812` is used for Postgres. Check our
-  [Postgres reference page](/docs/query/pgwire/overview/).
+  [Postgres reference page](/docs/connect/compatibility/pgwire/overview/).
 - Port `9009` is dedicated to InfluxDB Line Protocol. Consult our
-  [InfluxDB protocol page](/docs/ingestion/ilp/overview/).
+  [InfluxDB protocol page](/docs/connect/compatibility/ilp/overview/).
 
 ## Data persistence
 

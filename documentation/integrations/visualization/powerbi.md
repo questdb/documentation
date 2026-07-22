@@ -131,5 +131,5 @@ If you'd like QuestDB to support this feature, please add a 👍 to [this GitHub
 
 ## Further Reading
 
-- [QuestDB PGWire](/docs/query/pgwire/overview/)
+- [QuestDB PGWire](/docs/connect/compatibility/pgwire/overview/)
 - [PowerBI Documentation](https://docs.microsoft.com/en-us/power-bi/)

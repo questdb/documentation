@@ -537,6 +537,7 @@ http.net.connection.sndbuf=2m
 | [OpenID Connect (OIDC)](/docs/configuration/oidc/) | OIDC integration | ✓ |
 | [Parallel SQL execution](/docs/configuration/parallel-sql-execution/) | Query parallelism settings | |
 | [Postgres wire protocol](/docs/configuration/postgres-wire-protocol/) | PostgreSQL wire protocol connections | |
+| [QuestDB Wire Protocol (QWP)](/docs/configuration/qwp/) | QWP protocol limits and UDP receiver | |
 | [Replication](/docs/configuration/database-replication/) | High availability cluster replication | ✓ |
 | [Shared workers](/docs/configuration/shared-workers/) | Worker thread pools | |
 | [Storage policy](/docs/configuration/storage-policy/) | Partition lifecycle management | ✓ |

@@ -450,13 +450,13 @@ Returns a table with the following columns:
   attached (`name` of the partition will contain the `.attachable` extension)
 - `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
   has been generated. Set by either
-  [manual Parquet conversion](/docs/query/export-parquet/#in-place-conversion)
+  [manual Parquet conversion](/docs/connect/compatibility/export-parquet/#in-place-conversion)
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
   [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
   (Enterprise)
 - `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format:
   the native files have been removed and reads are served from the Parquet
-  file. Set the same way as `hasParquetGenerated` — either manually or by a
+  file. Set the same way as `hasParquetGenerated`: either manually or by a
   storage policy's `TO PARQUET` stage
 - `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
   file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
