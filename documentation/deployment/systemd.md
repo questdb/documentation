@@ -345,3 +345,16 @@ View its journal:
 ```shell
 sudo journalctl --unit=questdb.service --follow
 ```
+
+## Unexpected restarts
+
+If QuestDB restarts without an error, check the systemd journal:
+
+```shell
+sudo journalctl --unit=questdb.service --since "today"
+```
+
+On Ubuntu, package updates may restart affected services through `needrestart`,
+including during unattended upgrades. See Ubuntu's
+[automatic updates documentation](https://ubuntu.com/server/docs/how-to/software/automatic-updates/#service-restarts)
+for configuration options.

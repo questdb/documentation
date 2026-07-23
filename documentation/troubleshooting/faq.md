@@ -16,19 +16,6 @@ following levels to assist filtering:
 
 Check the [log](/docs/operations/logging-metrics/) page for the available log levels.
 
-## Why did QuestDB restart without an error?
-
-Check the systemd journal:
-
-```shell
-sudo journalctl --unit=questdb.service --since "today"
-```
-
-On Ubuntu, package updates may restart affected services through `needrestart`,
-including during unattended upgrades. See Ubuntu's
-[automatic updates documentation](https://ubuntu.com/server/docs/how-to/software/automatic-updates/#service-restarts)
-for details and configuration options.
-
 ## How do I delete a row?
 
 See our guide on [modifying data](/docs/operations/modifying-data/).
