@@ -7,6 +7,9 @@ These settings control materialized view SQL support and the background refresh
 job. Materialized views can use dedicated worker threads or share the server's
 common pool.
 
+To cap the native memory a single refresh may allocate, see
+[`cairo.mat.view.refresh.memory.limit.bytes`](/docs/configuration/cairo-engine/#memory-limits).
+
 ## cairo.mat.view.enabled
 
 - **Default**: `true`

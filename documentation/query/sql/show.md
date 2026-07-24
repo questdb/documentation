@@ -284,10 +284,17 @@ SHOW USER john;
 SHOW USERS;
 ```
 
-| name  |
-| ----- |
-| admin |
-| john  |
+| name  | enabled | memory_limit |
+| ----- | ------- | ------------ |
+| admin | true    | null         |
+| john  | true    | 536870912    |
+
+The `memory_limit` column is reported in bytes (`536870912` is 512 MiB) and is
+`null` when no limit applies. For a user it is the effective limit — its own
+limit, or, when it has none, the most restrictive of its groups'. In
+`SHOW GROUPS` and `SHOW SERVICE ACCOUNTS` below it is instead the listed
+entity's own limit, since neither inherits one. See
+[memory limits](/docs/security/rbac/#memory-limits).
 
 ### SHOW GROUPS
 
@@ -295,15 +302,21 @@ SHOW USERS;
 SHOW GROUPS;
 ```
 
-or
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management | null           | 2147483648   |
+
+Filtering by a user lists the groups that user belongs to, with the same
+columns. Each row's `memory_limit` is that group's own limit, which is how you
+see which inherited limit binds for a user with no limit of its own:
 
 ```questdb-sql
 SHOW GROUPS john;
 ```
 
-| name       |
-| ---------- |
-| management |
+| name       | external_alias | memory_limit |
+| ---------- | -------------- | ------------ |
+| management | null           | 2147483648   |
 
 ### SHOW SERVICE ACCOUNT
 
@@ -329,26 +342,31 @@ SHOW SERVICE ACCOUNT ilp_ingestion;
 SHOW SERVICE ACCOUNTS;
 ```
 
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
+| name       | enabled | memory_limit |
+| ---------- | ------- | ------------ |
+| management | true    | null         |
+| svc1_admin | true    | 268435456    |
+
+Filtering by a user or group instead lists the service accounts that principal
+can assume. The `enabled` column is replaced by `grant_option`, showing whether
+they may grant the assumption to others, and `memory_limit` reports each listed
+service account's own limit:
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS john;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 268435456    |
 
 ```questdb-sql
 SHOW SERVICE ACCOUNTS admin_group;
 ```
 
-| name       |
-| ---------- |
-| svc1_admin |
+| name       | grant_option | memory_limit |
+| ---------- | ------------ | ------------ |
+| svc1_admin | false        | 268435456    |
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 

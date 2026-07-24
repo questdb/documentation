@@ -224,18 +224,27 @@ Returns metadata on running SQL queries, including columns such as:
 - query_start - timestamp of when query started
 - state_change - timestamp of latest query state change, such as a cancellation
 - state - state of running query, can be `active` or `cancelled`
+- memory_used - native memory currently allocated by the query, in bytes. Only
+  the allocation sites covered by the
+  [per-query memory limit](/docs/configuration/cairo-engine/#memory-limits) are
+  counted
+- memory_limit - effective native memory limit for the query, in bytes, or
+  `null` when the query runs unlimited. On QuestDB Enterprise a set principal
+  [memory limit](/docs/security/rbac/#memory-limits) overrides the configured
+  workload limit; the workload limit applies only when the principal has none
 - query - text of sql query
 
 **Examples:**
 
 ```questdb-sql
-SELECT * FROM query_activity();
+SELECT query_id, username, state, memory_used, memory_limit, query
+FROM query_activity();
 ```
 
-| query_id | worker_id | worker_pool | username | query_start                 | state_change                | state  | query                                                     |
-| -------- | --------- | ----------- | -------- | --------------------------- | --------------------------- | ------ | --------------------------------------------------------- |
-| 62179    | 5         | shared      | bob      | 2024-01-09T10:03:05.557397Z | 2024-01-09T10:03:05.557397  | active | select \* from query_activity()                           |
-| 57777    | 6         | shared      | bob      | 2024-01-09T08:58:55.988017Z | 2024-01-09T08:58:55.988017Z | active | SELECT symbol,approx_percentile(price, 50, 2) from trades |
+| query_id | username | state  | memory_used | memory_limit | query                                                      |
+| -------- | -------- | ------ | ----------- | ------------ | ---------------------------------------------------------- |
+| 62179    | bob      | active | 262144      | null         | SELECT \* FROM query_activity()                            |
+| 57777    | bob      | active | 8388608     | 536870912    | SELECT symbol, approx_percentile(price, 50, 2) FROM trades |
 
 ## reader_pool
 
