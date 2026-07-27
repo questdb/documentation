@@ -148,48 +148,83 @@ seed progress.
 
 Returns a `table` with the following columns:
 
-| Column | Type | Description |
-| ------ | ---- | ----------- |
-| `view_name` | STRING | Live view name |
-| `view_table_dir_name` | STRING | View directory name on disk |
-| `base_table_name` | STRING | Base table name |
-| `view_sql` | STRING | Query used to maintain the view |
-| `view_status` | STRING | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
-| `invalidation_reason` | STRING | Message explaining why the view was marked invalid |
-| `flush_every_interval` | LONG | `FLUSH EVERY` interval value |
-| `flush_every_interval_unit` | STRING | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
-| `in_memory_interval` | LONG | `IN MEMORY` interval value |
-| `in_memory_interval_unit` | STRING | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY` |
-| `in_mem_bytes` | LONG | Native footprint of the in-memory tier, a peak-sticky high-water mark |
-| `in_mem_rows` | LONG | Live row count held in the in-memory tier |
-| `o3_rejected_count` | LONG | Count of late out-of-order rows rejected below the view lower bound; resets on restart |
-| `below_lower_bound_count` | LONG | Count of in-order base rows dropped below the view lower bound; resets on restart |
-| `lag_seqtxn` | LONG | Committed base WAL transactions beyond the view's durable processed watermark (`base_table_txn - last_processed_seqtxn`) |
-| `lag_micros` | LONG | Microseconds since the last successful flush |
-| `last_processed_seqtxn` | LONG | Last base transaction processed by the refresh worker |
-| `applied_watermark` | LONG | Last base transaction durably applied to the view's disk tier |
-| `lv_consumed_seqtxn` | LONG | Base WAL purge floor held by this view |
-| `view_lower_bound_timestamp` | TIMESTAMP | Lower timestamp bound below which base rows are ignored |
-| `writer_stall_micros` | LONG | Time a flush has been stalled waiting to write, in microseconds |
-| `seed_target_seqtxn` | LONG | Target base transaction for an in-progress initial seed |
-| `head_checkpoint_lv_seqtxn` | LONG | View transaction of the latest head checkpoint |
-| `head_checkpoint_max_ts` | TIMESTAMP | Maximum timestamp covered by the latest head checkpoint |
-| `head_checkpoint_state_bytes` | LONG | Size of the latest head checkpoint's window state |
-| `o3_resume_replay_rows` | LONG | Rows re-emitted by bounded out-of-order replays resumed from retained checkpoints; resets on restart |
-| `o3_boundary_replay_rows` | LONG | Rows re-emitted by full boundary-rebuild out-of-order replays; resets on restart |
+| Column                                         | Type      | Description                                                                                                            |
+| ---------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `view_name`                                    | STRING    | Live view name                                                                                                         |
+| `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                            |
+| `base_table_name`                              | STRING    | Base table name                                                                                                        |
+| `view_sql`                                     | STRING    | Query used to maintain the view                                                                                        |
+| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
+| `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                     |
+| `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                           |
+| `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                |
+| `in_memory_interval`                           | LONG      | `IN MEMORY` interval value                                                                                             |
+| `in_memory_interval_unit`                      | STRING    | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                  |
+| `in_mem_bytes`                                 | LONG      | Native capacity of the in-memory tier; a peak-sticky high-water mark                                                   |
+| `in_mem_rows`                                  | LONG      | Live row count in the published in-memory tier                                                                         |
+| `o3_rejected_count`                            | LONG      | Late out-of-order rows rejected below the view lower bound; resets on restart                                          |
+| `below_lower_bound_count`                      | LONG      | In-order rows dropped below the view lower bound; resets on restart                                                    |
+| `lag_seqtxn`                                   | LONG      | Committed base WAL transactions beyond `last_processed_seqtxn`                                                         |
+| `lag_micros`                                   | LONG      | Microseconds since the last successful flush                                                                           |
+| `last_processed_seqtxn`                        | LONG      | Last base transaction processed by the refresh worker                                                                  |
+| `applied_watermark`                            | LONG      | Last base transaction durably applied to the view's disk tier                                                          |
+| `lv_consumed_seqtxn`                           | LONG      | Base WAL purge floor held by this view                                                                                 |
+| `view_lower_bound_timestamp`                   | TIMESTAMP | Resolved `START FROM` boundary; `NULL` for `BEGINNING`                                                                 |
+| `writer_stall_micros`                          | LONG      | Current uninterrupted flush-writer stall duration, or `0`                                                              |
+| `seed_target_seqtxn`                           | LONG      | Target base transaction during initial seeding; otherwise `NULL`                                                       |
+| `o3_resume_replay_rows`                        | LONG      | Rows emitted by repairs resumed from a checkpoint; resets on restart                                                   |
+| `o3_boundary_replay_rows`                      | LONG      | Rows emitted by rebuild repairs; resets on restart                                                                     |
+| `o3_replay_scan_rows`                          | LONG      | Base rows scanned by both repair paths; resets on restart                                                              |
+| `checkpoint_timeline_generation`               | LONG      | Current published checkpoint-timeline generation                                                                       |
+| `checkpoint_timeline_entries`                  | LONG      | Checkpoint roots in the current generation                                                                             |
+| `checkpoint_timeline_normalized_base_seqtxn`   | LONG      | Base transaction through which the timeline is normalized                                                              |
+| `checkpoint_timeline_logical_bytes`            | LONG      | Bytes the roots would use as independent complete state images                                                         |
+| `checkpoint_timeline_physical_bytes`           | LONG      | Bytes physically stored for the current timeline generation                                                            |
+| `checkpoint_timeline_shared_bytes`             | LONG      | Logical bytes avoided through state sharing                                                                            |
+| `checkpoint_timeline_sharing_ratio`            | DOUBLE    | Shared bytes divided by logical bytes                                                                                  |
+| `checkpoint_timeline_row_position_delta_bytes` | LONG      | Bytes used by the row-position delta index                                                                             |
+| `checkpoint_data_segment_count`                | LONG      | Data segments found by the latest checkpoint purge sweep                                                               |
+| `checkpoint_obsolete_segment_bytes`            | LONG      | Obsolete segment bytes found by the latest purge sweep                                                                 |
+| `checkpoint_oldest_pinned_generation`          | LONG      | Oldest checkpoint generation still retained                                                                            |
+| `checkpoint_gc_lag_generations`                | LONG      | Generations between the current and oldest retained generation                                                         |
+| `checkpoint_last_write_micros`                 | LONG      | Duration of the latest checkpoint write                                                                                |
+| `checkpoint_last_restore_micros`               | LONG      | Duration of the latest checkpoint restore                                                                              |
+| `checkpoint_last_write_new_bytes`              | LONG      | New bytes written by the latest checkpoint publication                                                                 |
+| `checkpoint_last_lookup_depth`                 | LONG      | Metadata-tree depth of the latest checkpoint lookup                                                                    |
+| `checkpoint_repair_in_progress`                | BOOLEAN   | Whether a localized repair is suspended across refresh turns                                                           |
+| `checkpoint_repair_correction_timestamp`       | TIMESTAMP | Earliest timestamp whose output may have changed in the active repair                                                  |
+| `checkpoint_repair_low_timestamp`              | TIMESTAMP | Inclusive base timestamp from which the active repair scans                                                            |
+| `checkpoint_repair_high_timestamp`             | TIMESTAMP | Repair convergence boundary; `NULL` when it runs to end of data                                                        |
+| `checkpoint_repair_roots_versioned`            | LONG      | Checkpoint roots versioned by repairs; resets on restart                                                               |
+| `checkpoint_repair_new_bytes`                  | LONG      | Bytes written by repairs; resets on restart                                                                            |
+| `checkpoint_repair_resumes`                    | LONG      | Times a repair resumed in a later refresh turn; resets on restart                                                      |
+| `checkpoint_repair_failures`                   | LONG      | Repair failures; resets on restart                                                                                     |
+| `checkpoint_repair_plan`                       | STRING    | Available localized plan: `range`, `rows`, `anchor`, a `+` combination, `none`, or `NULL` before compilation           |
+| `checkpoint_repair_last_disposition`           | STRING    | Last executor used: `localized rebuild`, `boundary rebuild`, or `resume from anchor`                                   |
+| `checkpoint_repair_last_denial`                | STRING    | Reason the last repair did not use a localized rebuild; otherwise `NULL`                                               |
 
-The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes` is
-the peak-sticky arena footprint that does not shrink after a burst, while
-`in_mem_rows` is the live row count that drops as rows age out of the `IN MEMORY`
-window. Together they distinguish a view actively buffering rows from one holding
-capacity retained from a past burst.
+The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes`
+is the peak-sticky arena footprint that does not shrink after a burst, while
+`in_mem_rows` is the live row count that drops as rows age out of the
+`IN MEMORY` window. Together they distinguish a view actively buffering rows
+from one holding capacity retained from a past burst.
 
 `lag_seqtxn` counts transactions, not rows. A value of `0` means the durable
 tier is caught up; a temporary non-zero value is expected between `FLUSH EVERY`
 cycles. Alert on a value that remains above its normal flush-cycle baseline or
 keeps increasing across samples rather than on a universal fixed threshold.
 `lag_micros` measures flush activity and may grow while an idle view has
-`lag_seqtxn = 0`. For operational guidance, see
+`lag_seqtxn = 0`.
+
+The checkpoint columns describe the current persistent timeline, its storage and
+lookup cost, and out-of-order repair activity. Timeline fields are `NULL` before
+the first generation is published. The data-segment and obsolete-byte fields
+reflect the latest purge sweep and remain `NULL` until a sweep has run.
+`checkpoint_repair_plan` describes the query's available repair bounds, while
+the disposition and denial columns report what the most recent repair actually
+did.
+
+For operational guidance, see
 [Monitoring live views](/docs/concepts/live-views/#monitoring).
 
 **Examples:**

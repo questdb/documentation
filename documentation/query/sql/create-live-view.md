@@ -151,9 +151,16 @@ FROM trades;
 
 ## Anchored windows
 
-An anchored window resets its cumulative aggregate on a boundary. Declare it in a
-named `WINDOW` with either the `ANCHOR DAILY` shorthand or an
-`ANCHOR EXPRESSION` clause:
+An anchored window resets its functions on a boundary. Declare it in a named
+`WINDOW` with one of these forms:
+
+```questdb-sql
+ANCHOR DAILY 'HH:MM' [ 'timezone' ]
+ANCHOR EXPRESSION expression
+```
+
+`ANCHOR DAILY` requires a quoted 24-hour time. An optional IANA time zone makes
+the reset follow local civil time; without one, the boundary is in UTC.
 
 ```questdb-sql title="Cumulative daily volume, reset each day"
 CREATE LIVE VIEW trades_daily_volume
@@ -163,8 +170,15 @@ AS
 SELECT timestamp, symbol,
   sum(amount) OVER w AS cumulative_volume
 FROM trades
-WINDOW w AS (PARTITION BY symbol ORDER BY timestamp ANCHOR DAILY);
+WINDOW w AS (
+  PARTITION BY symbol
+  ORDER BY timestamp
+  ANCHOR DAILY '00:00'
+);
 ```
+
+For example, `ANCHOR DAILY '09:30' 'America/New_York'` resets at the New York
+market open and follows daylight-saving transitions.
 
 ```questdb-sql title="Anchor on an arbitrary expression"
 CREATE LIVE VIEW trades_hourly_volume
@@ -181,9 +195,16 @@ WINDOW w AS (
 );
 ```
 
-An anchored window must be partitioned, must `ORDER BY` the designated timestamp
-ascending, cannot use a bounded frame, and its anchor expression must be
-deterministic.
+An anchored window must:
+
+- Be a named window; `ANCHOR` is not supported in an inline `OVER (...)`.
+- Use `PARTITION BY` with base-table columns directly.
+- `ORDER BY` the designated timestamp ascending.
+- Use the default unbounded frame; `ANCHOR` cannot be combined with a bounded
+  `ROWS` or `RANGE` frame.
+
+A live view supports at most one anchored window. An `ANCHOR EXPRESSION` must be
+deterministic, non-constant, and return `TIMESTAMP`, `LONG`, or `INT`.
 
 ## Query constraints
 
@@ -191,12 +212,21 @@ The view query is validated at creation time and must:
 
 - Read a single WAL-backed base table that has a designated timestamp. No JOINs,
   subqueries, or CTEs.
-- Contain [window functions](/docs/query/functions/window-functions/overview/) that can be
-  maintained incrementally (see
+- Contain [window functions](/docs/query/functions/window-functions/overview/)
+  that can be maintained incrementally (see
   [supported functions](/docs/concepts/live-views/#supported-window-functions)).
-- Give every window function a `PARTITION BY` clause.
-- Not use `SAMPLE BY`, `GROUP BY`, a top-level `ORDER BY`, or `LIMIT` in the view
-  query. The `ORDER BY` inside a window's `OVER (...)` is required and allowed.
+- Give every stateful window function a `PARTITION BY` clause.
+- Use a bounded `ROWS` or `RANGE` frame, or a named anchored window. Ranking
+  functions (`row_number`, `rank`, and `dense_rank`) must be anchored. Frames
+  starting at `UNBOUNDED PRECEDING` are rejected except for stateless
+  `last_value` shapes.
+- Not use `SAMPLE BY`, `GROUP BY`, a top-level `ORDER BY`, or `LIMIT` in the
+  view query. The `ORDER BY` inside a window's `OVER (...)` is required and
+  allowed.
+- List output columns explicitly; wildcard projections such as `SELECT *` are
+  not allowed.
+- Not filter on the base table's designated timestamp. Other deterministic
+  `WHERE` predicates are supported.
 - Not use non-deterministic functions such as `now()`, `sysdate()`,
   `systimestamp()`, or `rnd_*()`.
 - Not read another live view.
@@ -284,26 +314,20 @@ OWNED BY analysts;
 
 ## Errors
 
-| Error | Cause |
-| ----- | ----- |
-| `live views are disabled` | Live-view support is turned off (`cairo.live.view.enabled=false`) |
-| `live view already exists` | A live view of this name exists and `IF NOT EXISTS` was not specified |
-| `table or view with the requested name already exists` | The name is taken by a table, view, or materialized view |
-| `live view FLUSH EVERY must be at least 100ms` | The `FLUSH EVERY` interval is below the minimum |
-| `live view select must be a simple scan of a single WAL base table; joins, subqueries, GROUP BY, ORDER BY and LIMIT are not supported yet` | The view query is not a simple scan of one base table |
-| `base table must be a WAL table` | The base object is a non-WAL table or a regular view |
-| `live views are not allowed as base tables in V1` | The base object is another live view |
-| `live view base table must have a designated timestamp` | The base table has no designated timestamp |
-| `non-deterministic function cannot be used in materialized view` | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function |
-| `permission denied` | Missing required permission (Enterprise) |
-
-:::note
-
-The non-determinism check is the same guard materialized views use, so its error
-message names "materialized view" even when it is raised for a live view. The
-rule and its effect are identical for both view types.
-
-:::
+| Error                                                                                                                                      | Cause                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `live views are disabled`                                                                                                                  | Live-view support is turned off (`cairo.live.view.enabled=false`)                |
+| `live view already exists`                                                                                                                 | A live view of this name exists and `IF NOT EXISTS` was not specified            |
+| `table or view with the requested name already exists`                                                                                     | The name is taken by a table, view, or materialized view                         |
+| `live view FLUSH EVERY must be at least 100ms`                                                                                             | The `FLUSH EVERY` interval is below the minimum                                  |
+| `live view select must be a simple scan of a single WAL base table; joins, subqueries, GROUP BY, ORDER BY and LIMIT are not supported yet` | The view query is not a simple scan of one base table                            |
+| `base table must be a WAL table`                                                                                                           | The base object is a non-WAL table or a regular view                             |
+| `live views are not allowed as base tables in V1`                                                                                          | The base object is another live view                                             |
+| `live view base table must have a designated timestamp`                                                                                    | The base table has no designated timestamp                                       |
+| `wildcard column select is not allowed in live view queries`                                                                               | The top-level projection contains `*`                                            |
+| `live view unbounded window must have an ANCHOR clause`                                                                                    | A stateful partitioned window uses the default unbounded frame without an anchor |
+| `non-deterministic function cannot be used in live view`                                                                                   | The query uses `now()`, `rnd_*()`, or a similar non-deterministic function       |
+| `permission denied`                                                                                                                        | Missing required permission (Enterprise)                                         |
 
 ## See also
 
