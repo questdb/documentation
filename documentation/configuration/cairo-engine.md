@@ -25,6 +25,13 @@ The locale used to handle date types.
 Directory for storing database tables and metadata. This directory is relative
 to the server root directory provided at startup.
 
+If you set it to an absolute path, QuestDB no longer derives its other
+directories from the server root directory. The `conf`, `import`, `export`,
+`tmp` and `.checkpoint` directories are then created as siblings of the
+directory you specify, rather than as children of the server root directory.
+Under Docker this places them outside the mounted volume, so leave `cairo.root`
+at its default and change the volume mapping instead.
+
 ### cairo.system.table.prefix
 
 - **Default**: `sys.`
