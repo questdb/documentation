@@ -13,61 +13,50 @@ and partition storage size on disk.
 ## Syntax
 
 ```questdb-sql
-SHOW { TABLES
-     | COLUMNS FROM tableName
-     | PARTITIONS FROM tableName
-     | CREATE TABLE tableName
-     | CREATE VIEW viewName
+SHOW { COLUMNS FROM tableName
      | CREATE DATABASE
          [ { INCLUDE | EXCLUDE } { ALL | (category [, ...]) } ]
-     | USER [userName]
-     | USERS
+     | CREATE MATERIALIZED VIEW matViewName
+     | CREATE TABLE tableName
+     | CREATE VIEW viewName
      | GROUPS [userName]
-     | SERVICE ACCOUNT [accountName]
-     | SERVICE ACCOUNTS [userName]
+     | PARAMETERS
+     | PARTITIONS FROM tableName
      | PERMISSIONS [entityName]
      | SERVER_VERSION
-     | PARAMETERS };
+     | SERVICE ACCOUNT [accountName]
+     | SERVICE ACCOUNTS [userName]
+     | TABLES
+     | USER [userName]
+     | USERS };
 ```
 
 ## Description
 
-- `SHOW TABLES` returns all the tables.
 - `SHOW COLUMNS` returns all the columns and their metadata for the selected
   table.
-- `SHOW PARTITIONS` returns the partition information for the selected table.
-- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
-- `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
 - `SHOW CREATE DATABASE` returns DDL statements that recreate every object
   in the database, one per row, ordered so dependencies come first.
-- `SHOW USER` shows user secret (enterprise-only)
+- `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
+  recreate a materialized view.
+- `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
+- `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
     (enterprise-only)
-- `SHOW USERS` shows all users (enterprise-only)
-- `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
-- `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
-  user/group (enterprise-only)
+- `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
+  their values and the source of the value
+- `SHOW PARTITIONS` returns the partition information for the selected table.
 - `SHOW PERMISSIONS` displays permissions of user, group or service account
   (enterprise-only)
 - `SHOW SERVER_VERSION` displays PostgreSQL compatibility version
-- `SHOW PARAMETERS` shows configuration keys and their matching `env_var_name`,
-  their values and the source of the value
+- `SHOW SERVICE ACCOUNT` displays details of a service account (enterprise-only)
+- `SHOW SERVICE ACCOUNTS` displays all service accounts or those assigned to the
+  user/group (enterprise-only)
+- `SHOW TABLES` returns all the tables.
+- `SHOW USER` shows user secret (enterprise-only)
+- `SHOW USERS` shows all users (enterprise-only)
 
 ## Examples
-
-### SHOW TABLES
-
-```questdb-sql title="show tables" demo
-SHOW TABLES;
-```
-
-| table_name      |
-| --------------- |
-| ethblocks_json  |
-| trades          |
-| weather         |
-| AAPL_orderbook  |
-| trips           |
 
 ### SHOW COLUMNS
 
@@ -88,122 +77,6 @@ The `indexType` column shows the index type (`POSTING`, `POSTING DELTA`,
 `indexInclude` column lists the names of columns included in a
 [posting index's](/docs/concepts/deep-dive/posting-index/) covering
 sidecar, as a comma-separated string.
-
-### SHOW CREATE TABLE
-
-```questdb-sql title="retrieving table ddl" demo
-SHOW CREATE TABLE trades;
-```
-
-| ddl                                                                                                                                                                                                                                      |
-|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WAL WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
-
-This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
-
-```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
-	price DOUBLE,
-	amount DOUBLE,
-	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
-```
-
-#### Posting index with covering columns
-
-When a symbol column has a posting index with `INCLUDE`, the DDL reflects
-the index type and covered columns. The designated timestamp is appended
-to the `INCLUDE` list automatically, so a table created with
-`INCLUDE (price, exchange)` round-trips as
-`INCLUDE (price, exchange, timestamp)`:
-
-```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE INDEX TYPE POSTING INCLUDE (price, exchange, timestamp),
-	exchange SYMBOL CAPACITY 256 CACHE,
-	price DOUBLE,
-	amount DOUBLE,
-	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
-```
-
-#### Per-column Parquet encoding
-
-When columns have per-column Parquet encoding or compression overrides, they
-appear in the `SHOW CREATE TABLE` output:
-
-```questdb-sql
-CREATE TABLE sensors (
-	ts TIMESTAMP,
-	temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
-	humidity FLOAT PARQUET(rle_dictionary),
-	device_id VARCHAR PARQUET(default, lz4_raw),
-	status INT
-) timestamp(ts) PARTITION BY DAY BYPASS WAL;
-```
-
-#### Storage policy clause
-
-When an active [storage policy](/docs/concepts/storage-policy/) is attached to a
-table (Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in
-the `SHOW CREATE TABLE` output:
-
-```questdb-sql
-SHOW CREATE TABLE sensor_data;
-```
-
-```text
-CREATE TABLE 'sensor_data' (
-    ts TIMESTAMP,
-    value DOUBLE
-) timestamp(ts) PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
-```
-
-Stages that are not configured on the policy are omitted from the clause. Only
-an active policy renders: after `ALTER TABLE ... DISABLE STORAGE POLICY`, the
-policy is not shown in `SHOW CREATE TABLE`. See
-[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
-
-#### Enterprise variant
-
-[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
-
-For example,
-
-```questdb-sql
-CREATE TABLE trades (
-	symbol SYMBOL CAPACITY 256 CACHE,
-	side SYMBOL CAPACITY 256 CACHE,
-	price DOUBLE,
-	amount DOUBLE,
-	timestamp TIMESTAMP
-) timestamp(timestamp) PARTITION BY DAY WAL
-WITH maxUncommittedRows=500000, o3MaxLag=600000000us
-OWNED BY 'admin';
-```
-
-This clause assigns permissions for the table to that user.
-
-If permissions should be assigned to a different user,
-please modify this clause appropriately.
-
-### SHOW CREATE VIEW
-
-```questdb-sql title="retrieving view ddl"
-SHOW CREATE VIEW my_view;
-```
-
-| ddl                                                                |
-| ------------------------------------------------------------------ |
-| CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades);   |
-
-This returns the `CREATE VIEW` statement that would recreate the view,
-including any `DECLARE` parameters if the view is parameterized.
 
 ### SHOW CREATE DATABASE
 
@@ -323,22 +196,152 @@ while the schema categories need no access control permission, so a user with
 only `SELECT` can still dump the structure. When access control is disabled the
 command degrades to a schema-only dump.
 
-### SHOW PARTITIONS
+### SHOW CREATE MATERIALIZED VIEW
 
-```questdb-sql
-SHOW PARTITIONS FROM my_table;
+```questdb-sql title="retrieving materialized view ddl" demo
+SHOW CREATE MATERIALIZED VIEW bbo_1s;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+| ddl |
+| --- |
+| CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS (SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s) PARTITION BY DAY; |
 
-See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
-full column list, including `hasParquetGenerated`, `isParquet`, and
-`parquetFileSize`.
+This returns the `CREATE MATERIALIZED VIEW` statement that would recreate the
+materialized view, including its base table, refresh strategy, and partitioning.
+
+### SHOW CREATE TABLE
+
+```questdb-sql title="retrieving table ddl" demo
+SHOW CREATE TABLE trades;
+```
+
+| ddl                                                                                                                                                                                                                                      |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WAL WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
+
+This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
+
+```questdb-sql
+CREATE TABLE trades (
+	symbol SYMBOL CAPACITY 256 CACHE,
+	side SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+```
+
+#### Posting index with covering columns
+
+When a symbol column has a posting index with `INCLUDE`, the DDL reflects
+the index type and covered columns. The designated timestamp is appended
+to the `INCLUDE` list automatically, so a table created with
+`INCLUDE (price, exchange)` round-trips as
+`INCLUDE (price, exchange, timestamp)`:
+
+```questdb-sql
+CREATE TABLE trades (
+	symbol SYMBOL CAPACITY 256 CACHE INDEX TYPE POSTING INCLUDE (price, exchange, timestamp),
+	exchange SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us;
+```
+
+#### Per-column Parquet encoding
+
+When columns have per-column Parquet encoding or compression overrides, they
+appear in the `SHOW CREATE TABLE` output:
+
+```questdb-sql
+CREATE TABLE sensors (
+	ts TIMESTAMP,
+	temperature DOUBLE PARQUET(rle_dictionary, zstd(3)),
+	humidity FLOAT PARQUET(rle_dictionary),
+	device_id VARCHAR PARQUET(default, lz4_raw),
+	status INT
+) timestamp(ts) PARTITION BY DAY BYPASS WAL;
+```
+
+#### Storage policy clause
+
+When an active [storage policy](/docs/concepts/storage-policy/) is attached to a
+table (Enterprise only), the policy renders as a `STORAGE POLICY(...)` clause in
+the `SHOW CREATE TABLE` output:
+
+```questdb-sql
+SHOW CREATE TABLE sensor_data;
+```
+
+```text
+CREATE TABLE 'sensor_data' (
+    ts TIMESTAMP,
+    value DOUBLE
+) timestamp(ts) PARTITION BY DAY
+STORAGE POLICY(TO PARQUET 3 DAYS, DROP LOCAL 1 MONTH) WAL;
+```
+
+Stages that are not configured on the policy are omitted from the clause. Only
+an active policy renders: after `ALTER TABLE ... DISABLE STORAGE POLICY`, the
+policy is not shown in `SHOW CREATE TABLE`. See
+[ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+#### Enterprise variant
+
+[QuestDB Enterprise](/enterprise/) will include an additional `OWNED BY` clause populated with the current user.
+
+For example,
+
+```questdb-sql
+CREATE TABLE trades (
+	symbol SYMBOL CAPACITY 256 CACHE,
+	side SYMBOL CAPACITY 256 CACHE,
+	price DOUBLE,
+	amount DOUBLE,
+	timestamp TIMESTAMP
+) timestamp(timestamp) PARTITION BY DAY WAL
+WITH maxUncommittedRows=500000, o3MaxLag=600000000us
+OWNED BY 'admin';
+```
+
+This clause assigns permissions for the table to that user.
+
+If permissions should be assigned to a different user,
+please modify this clause appropriately.
+
+### SHOW CREATE VIEW
+
+```questdb-sql title="retrieving view ddl"
+SHOW CREATE VIEW my_view;
+```
+
+| ddl                                                                |
+| ------------------------------------------------------------------ |
+| CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades);   |
+
+This returns the `CREATE VIEW` statement that would recreate the view,
+including any `DECLARE` parameters if the view is parameterized.
+
+### SHOW GROUPS
+
+_Enterprise only._
+
+```questdb-sql
+SHOW GROUPS;
+```
+
+or
+
+```questdb-sql
+SHOW GROUPS john;
+```
+
+| name       |
+| ---------- |
+| management |
 
 ### SHOW PARAMETERS
 
@@ -382,97 +385,26 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 (SHOW PARAMETERS) WHERE  value_source <> 'default';
 ```
 
-### SHOW USER
+### SHOW PARTITIONS
 
 ```questdb-sql
-SHOW USER; --as john
+SHOW PARTITIONS FROM my_table;
 ```
 
-or
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
 
-```questdb-sql
-SHOW USER john;
-```
-
-| auth_type  | enabled |
-| ---------- | ------- |
-| Password   | false   |
-| JWK Token  | false   |
-| REST Token | false   |
-
-### SHOW USERS
-
-```questdb-sql
-SHOW USERS;
-```
-
-| name  |
-| ----- |
-| admin |
-| john  |
-
-### SHOW GROUPS
-
-```questdb-sql
-SHOW GROUPS;
-```
-
-or
-
-```questdb-sql
-SHOW GROUPS john;
-```
-
-| name       |
-| ---------- |
-| management |
-
-### SHOW SERVICE ACCOUNT
-
-```questdb-sql
-SHOW SERVICE ACCOUNT;
-```
-
-or
-
-```questdb-sql
-SHOW SERVICE ACCOUNT ilp_ingestion;
-```
-
-| auth_type  | enabled |
-| ---------- | ------- |
-| Password   | false   |
-| JWK Token  | false   |
-| REST Token | false   |
-
-### SHOW SERVICE ACCOUNTS
-
-```questdb-sql
-SHOW SERVICE ACCOUNTS;
-```
-
-| name       |
-| ---------- |
-| management |
-| svc1_admin |
-
-```questdb-sql
-SHOW SERVICE ACCOUNTS john;
-```
-
-| name       |
-| ---------- |
-| svc1_admin |
-
-```questdb-sql
-SHOW SERVICE ACCOUNTS admin_group;
-```
-
-| name       |
-| ---------- |
-| svc1_admin |
+See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
+full column list, including `hasParquetGenerated`, `isParquet`, and
+`parquetFileSize`.
 
 ### SHOW PERMISSIONS FOR CURRENT USER
+
+_Enterprise only._
 
 ```questdb-sql
 SHOW PERMISSIONS;
@@ -483,6 +415,8 @@ SHOW PERMISSIONS;
 | SELECT     |            |             | t            | G      |
 
 ### SHOW PERMISSIONS user
+
+_Enterprise only._
 
 ```questdb-sql
 SHOW PERMISSIONS admin;
@@ -495,6 +429,8 @@ SHOW PERMISSIONS admin;
 | UPDATE     | order_itme | quantity    | f            | G      |
 
 ### SHOW PERMISSIONS
+
+_Enterprise only._
 
 #### For a group
 
@@ -529,6 +465,102 @@ SHOW SERVER_VERSION;
 | server_version |
 | -------------- |
 | 12.3 (questdb) |
+
+### SHOW SERVICE ACCOUNT
+
+_Enterprise only._
+
+```questdb-sql
+SHOW SERVICE ACCOUNT;
+```
+
+or
+
+```questdb-sql
+SHOW SERVICE ACCOUNT ilp_ingestion;
+```
+
+| auth_type  | enabled |
+| ---------- | ------- |
+| Password   | false   |
+| JWK Token  | false   |
+| REST Token | false   |
+
+### SHOW SERVICE ACCOUNTS
+
+_Enterprise only._
+
+```questdb-sql
+SHOW SERVICE ACCOUNTS;
+```
+
+| name       |
+| ---------- |
+| management |
+| svc1_admin |
+
+```questdb-sql
+SHOW SERVICE ACCOUNTS john;
+```
+
+| name       |
+| ---------- |
+| svc1_admin |
+
+```questdb-sql
+SHOW SERVICE ACCOUNTS admin_group;
+```
+
+| name       |
+| ---------- |
+| svc1_admin |
+
+### SHOW TABLES
+
+```questdb-sql title="show tables" demo
+SHOW TABLES;
+```
+
+| table_name      |
+| --------------- |
+| ethblocks_json  |
+| trades          |
+| weather         |
+| AAPL_orderbook  |
+| trips           |
+
+### SHOW USER
+
+_Enterprise only._
+
+```questdb-sql
+SHOW USER; --as john
+```
+
+or
+
+```questdb-sql
+SHOW USER john;
+```
+
+| auth_type  | enabled |
+| ---------- | ------- |
+| Password   | false   |
+| JWK Token  | false   |
+| REST Token | false   |
+
+### SHOW USERS
+
+_Enterprise only._
+
+```questdb-sql
+SHOW USERS;
+```
+
+| name  |
+| ----- |
+| admin |
+| john  |
 
 ## See also
 
