@@ -8,17 +8,48 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## August 2026
+
+### Updated
+
+- [systemd deployment](/docs/deployment/systemd/) - Reworked the systemd service guide to cover both QuestDB Open Source and Enterprise
+- [Time to live (TTL)](/docs/concepts/ttl/) - Documented TTL on materialized views, set with `CREATE MATERIALIZED VIEW ... TTL` or `ALTER MATERIALIZED VIEW ... SET TTL` and managed independently of the base table's TTL
+- [Result grid](/docs/getting-started/web-console/result-grid/) - Documented the Parquet and CSV download options in the web console result grid
+- [Docker Compose configuration](/docs/cookbook/operations/docker-compose-config/) - Reworked the volume-permission guidance and explained why `QDB_CAIRO_ROOT` should not be set in Docker
+
+### Reference
+
+- Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
+
+## July 2026
+
+### QuestDB Enterprise Releases
+
+- [3.3.4](https://questdb.com/release-notes/) - Released July 31, 2026
+- [3.3.3](https://questdb.com/release-notes/) - Released July 1, 2026
+
+### Updated
+
+- [Storage policy](/docs/concepts/storage-policy/) - Clarified stage enforcement: `TO REMOTE` is now accepted and stored but not yet enforced, `DROP REMOTE` is rejected at parse time, and the policy check interval is 5 minutes
+- [systemd deployment](/docs/deployment/systemd/) - Added the `jdk.internal.vm` module export to the service example
+
 ## June 2026
 
 ### Releases
 
+- [9.4.3](https://questdb.com/release-notes/) - Released June 15, 2026
 - [9.4.2](https://questdb.com/release-notes/) - Released June 9, 2026
 - [9.4.1](https://questdb.com/release-notes/) - Released June 3, 2026
 
 ### QuestDB Enterprise Releases
 
+- [3.3.2](https://questdb.com/release-notes/) - Released June 23, 2026
 - [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
 - [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### New
+
+- [Row-level security](/docs/cookbook/sql/advanced/row-level-security/) - New cookbook recipe for restricting row visibility per user
 
 ### Reference
 
@@ -31,6 +62,8 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [systemd service example](/docs/deployment/systemd/) - Updated the Java requirement from 17 to 25 across deployment and quick-start prerequisites
+- [GCP deployment](/docs/deployment/gcp/) - Reworked for VM install and aligned with the AWS and Azure guides
+- [Capacity planning](/docs/getting-started/capacity-planning/) - Reworked the OS configuration guidance for open file limits and `vm.max_map_count`
 
 ## May 2026
 
