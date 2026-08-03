@@ -937,8 +937,9 @@ Memory page size used by `rnd_` functions. Supports `rnd_str()` and
 
 ## Parquet encoding
 
-Settings for Parquet-encoded partitions, used by storage policies and
-COPY TO exports.
+Settings for Parquet-encoded partitions, used by
+[table-level Parquet format](/docs/query/sql/create-table/#partition-format),
+storage policies, and COPY TO exports.
 
 ### cairo.partition.encoder.parquet.bloom.filter.fpp
 
@@ -1009,6 +1010,16 @@ Controls whether statistics are included in parquet-encoded partitions.
 - **Reloadable**: no
 
 Output Parquet version for parquet-encoded partitions. Can be `1` or `2`.
+
+### cairo.sql.parquet.cache.memory.size
+
+- **Default**: `256M`
+- **Reloadable**: no
+
+Per-cursor memory budget, in bytes, for caching decoded Parquet row groups
+while scanning Parquet partitions. It balances memory use against repeated
+row-group decoding. Replaces the deprecated slot-based
+`cairo.sql.parquet.frame.cache.capacity`, which is still accepted but ignored.
 
 ### cairo.sql.parquet.row.group.pruning.enabled
 
