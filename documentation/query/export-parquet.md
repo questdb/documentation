@@ -147,33 +147,26 @@ COPY market_data TO 'market_data_parquet_table' WITH FORMAT PARQUET COMPRESSION_
 
 ## In-place conversion
 
-:::warning
-At the moment, converting to Parquet in-place is work-in-progress and
-not recommended for production. We recommend caution and taking a snapshot before starting any
-in-place data conversion.
-:::
-
 When using in-place conversion, the partition(s) remain under QuestDB's control, and data can still be queried as if it
 were in native format.
 
+Parquet partitions behave like native partitions for most operations:
+
+* Inserts are supported, with and without dedup. When new or out-of-order rows
+  land on a Parquet partition, the partition is rewritten to include them.
+* Column type changes via
+  [`ALTER TABLE ALTER COLUMN TYPE`](/docs/query/sql/alter-table-change-column-type/)
+  are supported. On Parquet partitions the change is applied lazily; see that
+  page for details.
+* TTL applies to Parquet partitions, so expired partitions are dropped as usual.
+
 ### Limitations
 
-At its current state, in-place conversion of native partitions into Parquet has the following limitations:
-
-* We have been testing Parquet support for months, and we haven't experienced data corruption or data loss, but this is
-not guaranteed. It is strongly advised to back up first.
-* We have seen cases in which querying Parquet partitions leads to a database crash. This can happen if metadata in the
-table is different from metadata in the Parquet partitions, but it could also happen in other cases.
-* While converting data, writes to the partitions remain blocked.
-* After a partition has been converted to Parquet, it will not register any changes you send to that partition,
-including respecting any applicable TTL, unless you convert back to native.
-* Schema changes are not supported.
-* Some parallel queries are still not optimized for Parquet.
-
-For the reasons above, we recommend not using in-place conversion in production yet, unless you test extensively with
-the shape of the data and queries you will be running, and take frequent snapshots.
-
-All those caveats should disappear in the next few months, when we will announce it is ready for production.
+* `UPDATE` statements are not supported on Parquet partitions. Overwriting rows
+  through a dedup upsert is supported, since it is an insert.
+* While a partition is being converted, writes to that partition are briefly
+  blocked.
+* Some parallel queries are not yet optimized for Parquet.
 
 ### Converting to Parquet
 
