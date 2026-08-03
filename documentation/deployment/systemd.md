@@ -4,202 +4,357 @@ sidebar_label: systemd
 description: This document describes how to launch QuestDB using systemd.
 ---
 
-Use systemd to run QuestDB as a system or user service. This guide will
-demonstrate an initial configuration which you can use as the basis for your
-installation scripts. It will also demonstrate how to set up and start a QuestDB
-systemd service.
+import Tabs from "@theme/Tabs"
+import TabItem from "@theme/TabItem"
+import CodeBlock from "@theme/CodeBlock"
+import InterpolateReleaseData from "../../src/components/InterpolateReleaseData"
+
+Use systemd to run QuestDB as a service. For production deployments, we strongly
+recommend a system service running as a dedicated, unprivileged user. It starts
+at boot without depending on an interactive login and lets systemd apply the
+required resource limits directly.
+
+This guide provides system-service examples for QuestDB Open Source and QuestDB
+Enterprise.
 
 ## Prerequisites
 
 The prerequisites for deploying QuestDB with systemd are:
 
-- A Unix machine supporting systemd
-- Java 25 (OpenJDK 25 or compatible distribution)
+- A 64-bit Linux system (x86-64 or ARM64) running systemd
+- The QuestDB archive for your edition and architecture. Runtime archives
+  include Java. QuestDB Open Source on ARM64 uses the no-JRE archive and also
+  requires Java 25 and `unzip`.
 
 ## Initial system configuration
 
-The following commands inform a basis for your systemd service. Prior to running
-systemd, you will require some directory structure and a binary for QuestDB.
-Depending on your specific needs and operational preferences, your commands may
-differ. The goal is to give you a helpful starting point for the example
-service. The example presumes that you have used a privileged user to create a
-user with appropriately scoped permissions.
+Create a dedicated system user and group. The unit will create and manage its
+QuestDB root directory at `/var/lib/questdb`. If the `questdb` user already
+exists, skip the `useradd` command.
 
 ```bash
-#!/bin/bash
+sudo useradd --system --user-group \
+  --home-dir /var/lib/questdb \
+  --shell /usr/sbin/nologin \
+  questdb
+```
 
-# Install OpenJDK 25
-sudo apt-get update && sudo apt-get install -y openjdk-25-jdk
-export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
-export PATH=$JAVA_HOME/bin:$PATH
+For QuestDB Open Source, select your server architecture:
 
-# Download and set up QuestDB
-curl -s https://dl.questdb.io/snapshots/questdb-latest-no-jre-bin.tar.gz -o questdb.tar.gz
-mkdir -p ~/questdb/binary
-mkdir -p ~/bin ~/var/lib/questdb
-tar -xzf questdb.tar.gz -C ~/questdb/binary --strip-components 1
-mv ~/questdb/binary/questdb.jar ~/bin/
+<Tabs
+  groupId="linux-architecture"
+  defaultValue="x86-64"
+  values={[
+    { label: "x86-64", value: "x86-64" },
+    { label: "ARM64", value: "arm64" },
+  ]}
+>
+
+<TabItem value="x86-64">
+
+Download the current Linux runtime and extract it to `/opt/questdb`:
+
+<!-- prettier-ignore-start -->
+
+<InterpolateReleaseData
+renderText={(release) => (
+<CodeBlock className="language-bash">
+{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz -o questdb.tar.gz
+
+sudo install -d -o root -g root -m 0755 /opt/questdb
+sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1
+sudo chown -R root:root /opt/questdb`}
+</CodeBlock>
+)}
+/>
+
+<!-- prettier-ignore-end -->
+
+</TabItem>
+
+<TabItem value="arm64">
+
+On ARM64, use the no-JRE archive. Install Java 25 and `unzip` with your package
+manager, then download and extract QuestDB:
+
+<!-- prettier-ignore-start -->
+
+<InterpolateReleaseData
+renderText={(release) => (
+<CodeBlock className="language-bash">
+{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz -o questdb.tar.gz
+
+sudo install -d -o root -g root -m 0755 /opt/questdb
+sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1
+sudo install -d -o root -g root -m 0755 /opt/questdb/lib
+
+sudo unzip -jo /opt/questdb/questdb.jar \
+  'io/questdb/bin/linux-aarch64/*.so' \
+  -d /opt/questdb/lib
+
+sudo chown -R root:root /opt/questdb`}
+</CodeBlock>
+)}
+/>
+
+<!-- prettier-ignore-end -->
+
+The native libraries are installed under `/opt/questdb/lib` so that QuestDB can
+load them directly instead of extracting them to the system temporary directory.
+
+</TabItem>
+
+</Tabs>
+
+For QuestDB Enterprise, extract the runtime archive for your architecture to
+`/opt/questdb`. Run these commands from the directory containing the archive:
+
+<Tabs
+  groupId="linux-architecture"
+  defaultValue="x86-64"
+  values={[
+    { label: "x86-64", value: "x86-64" },
+    { label: "ARM64", value: "arm64" },
+  ]}
+>
+
+<TabItem value="x86-64">
+
+```bash
+sudo install -d -o root -g root -m 0755 /opt/questdb
+sudo tar -xzf questdb-enterprise-*-rt-linux-amd64.tar.gz \
+  -C /opt/questdb \
+  --strip-components 1
+sudo chown -R root:root /opt/questdb
+```
+
+</TabItem>
+
+<TabItem value="arm64">
+
+```bash
+sudo install -d -o root -g root -m 0755 /opt/questdb
+sudo tar -xzf questdb-enterprise-*-rt-linux-aarch64.tar.gz \
+  -C /opt/questdb \
+  --strip-components 1
+sudo chown -R root:root /opt/questdb
+```
+
+</TabItem>
+
+</Tabs>
+
+### SELinux
+
+If you have SELinux enabled, apply the default SELinux labels after extracting
+QuestDB:
+
+```bash
+sudo restorecon -R /opt/questdb
 ```
 
 ### Using a QuestDB server.conf
 
-Your QuestDB configuration is done in a `server.conf` file. The `server.conf`
-file is populated with safe defaults on first startup if it does not exist. It
-is common for users of QuestDB to stick with the default configuration.
-However, should you choose to update your own and serve it via a scripted method
-or similar, you may do so.
-
-Read more about the available options in our
-[Configuration reference page](/docs/configuration/overview/).
+With this unit, QuestDB creates `/var/lib/questdb/conf/server.conf` with default
+settings on first start. See the
+[configuration reference](/docs/configuration/overview/) for available options.
 
 ## Example questdb.service
 
-Create a new file called `questdb.service`:
+Create a file named `questdb.service` using the configuration for your edition.
+The examples set `QDB_ROOT` to `/var/lib/questdb`; QuestDB stores its `conf`,
+`db`, `log`, and `public` directories beneath it. Adjust the installation paths
+if necessary.
 
-```shell
-touch questdb.service
-```
+<!-- prettier-ignore-start -->
 
-The example below is a recommended starting point. Note the default QuestDB
-service configuration and system paths in line with the above example. Next,
-open the `questdb.service` file and add the following:
+<Tabs defaultValue="oss" values={[
+  { label: "QuestDB", value: "oss" },
+  { label: "QuestDB Enterprise", value: "enterprise" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="oss">
 
 ```shell
 [Unit]
 Description=QuestDB
-Documentation=https://www.questdb.com/docs/
-After=network.target
+Documentation=https://questdb.com/docs/deployment/systemd/
 
 [Service]
-Type=simple
+Type=exec
+User=questdb
+Group=questdb
 Restart=always
 RestartSec=2
-# Adjust java path to match requirements of a given distro
-ExecStart=/usr/lib/jvm/java-25-openjdk-amd64/bin/java \
--XX:+UnlockExperimentalVMOptions \
--XX:+AlwaysPreTouch \
--XX:+UseParallelGC \
--DQuestDB-Runtime-66535 \
--Dcontainerized=false \
--ea -Dnoebug \
---add-exports java.base/jdk.internal.math=io.questdb \
---add-exports java.base/jdk.internal.vm=io.questdb \
--p /home/[USER_NAME]/bin/questdb.jar \
--m io.questdb/io.questdb.ServerMain \
--d /home/[USER_NAME]/var/lib/questdb
+KillSignal=SIGTERM
+SuccessExitStatus=143
 
-ExecReload=/bin/kill -s HUP $MAINPID
+# QuestDB root directory
+Environment=QDB_ROOT=/var/lib/questdb
+StateDirectory=questdb
+StateDirectoryMode=0750
+ExecStartPre=/usr/bin/mkdir -p ${QDB_ROOT}/db
 
-# Raise the open-files limit
+ExecStart=/opt/questdb/bin/java \
+    -DQuestDB-Runtime-66535 \
+    -Dcontainerized=false \
+    -ea -Dnoebug \
+    -XX:ErrorFile=${QDB_ROOT}/db/hs_err_pid+%%p.log \
+    -XX:+UnlockExperimentalVMOptions \
+    -XX:+AlwaysPreTouch \
+    -XX:+UseParallelGC \
+    --sun-misc-unsafe-memory-access=allow \
+    --enable-native-access=io.questdb \
+    --add-opens=java.base/java.lang=io.questdb \
+    --add-opens=java.base/java.lang.reflect=io.questdb \
+    --add-opens=java.base/java.nio=io.questdb \
+    --add-opens=java.base/java.time.zone=io.questdb \
+    --add-exports=java.base/jdk.internal.vm=io.questdb \
+    -m io.questdb/io.questdb.ServerMain \
+    -d ${QDB_ROOT}
+
+# Raise the open-files limit to QuestDB's recommended value
 LimitNOFILE=1048576
 
-# Prevent writes to /usr, /boot, and /etc
 ProtectSystem=full
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=questdb
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-For QuestDB Enterprise, launch the enterprise module
-(`com.questdb/com.questdb.EntServerMain`) and target both `io.questdb` and
-`com.questdb` on the module flags. The corresponding `ExecStart` is:
+The unit above uses the bundled x86-64 runtime. On ARM64, replace its
+`ExecStart` directive with the following one:
 
 ```shell
-ExecStart=/home/[USER_NAME]/questdb-enterprise/bin/java \
--XX:+UnlockExperimentalVMOptions \
--XX:+AlwaysPreTouch \
--XX:+UseParallelGC \
--ea -Dnoebug \
---sun-misc-unsafe-memory-access=allow \
---enable-native-access=io.questdb,com.questdb \
---add-opens=java.base/java.lang=io.questdb,com.questdb \
---add-opens=java.base/java.lang.reflect=io.questdb,com.questdb \
---add-opens=java.base/java.nio=io.questdb,com.questdb \
---add-opens=java.base/java.time.zone=io.questdb,com.questdb \
---add-exports=java.base/jdk.internal.vm=io.questdb,com.questdb \
--m com.questdb/com.questdb.EntServerMain \
--d /home/[USER_NAME]/var/lib/questdb
+ExecStart=/usr/bin/java \
+    -DQuestDB-Runtime-66535 \
+    -Dcontainerized=false \
+    -Dquestdb.libs.dir=/opt/questdb/lib \
+    -ea -Dnoebug \
+    -XX:ErrorFile=${QDB_ROOT}/db/hs_err_pid+%%p.log \
+    -XX:+UnlockExperimentalVMOptions \
+    -XX:+AlwaysPreTouch \
+    -XX:+UseParallelGC \
+    --sun-misc-unsafe-memory-access=allow \
+    --enable-native-access=io.questdb \
+    --add-opens=java.base/java.lang=io.questdb \
+    --add-opens=java.base/java.lang.reflect=io.questdb \
+    --add-opens=java.base/java.nio=io.questdb \
+    --add-opens=java.base/java.time.zone=io.questdb \
+    --add-exports=java.base/jdk.internal.vm=io.questdb \
+    -p /opt/questdb/questdb.jar \
+    -m io.questdb/io.questdb.ServerMain \
+    -d ${QDB_ROOT}
 ```
 
-The Enterprise package is a self-contained runtime image: the `io.questdb` and
-`com.questdb` modules are built into `bin/java`, so no `--module-path` / `-p` is
-required.
+</TabItem>
 
-`LimitNOFILE=1048576` raises the open-files limit above systemd's default of
-`524288`, which is below what QuestDB recommends. The kernel `vm.max_map_count`
-limit cannot be set from a unit file; configure it separately. See
-[OS configuration](/docs/getting-started/capacity-planning/#os-configuration) for
-both.
-
-Next, move your `questdb.service` file into your user's `systemd` config:
+<TabItem value="enterprise">
 
 ```shell
-mv questdb.service  ~/.config/systemd/user/questdb.service
+[Unit]
+Description=QuestDB Enterprise
+Documentation=https://questdb.com/docs/deployment/systemd/
+
+[Service]
+Type=exec
+User=questdb
+Group=questdb
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+SuccessExitStatus=143
+
+# QuestDB root directory
+Environment=QDB_ROOT=/var/lib/questdb
+StateDirectory=questdb
+StateDirectoryMode=0750
+ExecStartPre=/usr/bin/mkdir -p ${QDB_ROOT}/db
+
+ExecStart=/opt/questdb/bin/java \
+    -DQuestDB-Runtime-66535 \
+    -Dcontainerized=false \
+    -ea -Dnoebug \
+    -XX:ErrorFile=${QDB_ROOT}/db/hs_err_pid+%%p.log \
+    -XX:+UnlockExperimentalVMOptions \
+    -XX:+AlwaysPreTouch \
+    -XX:+UseParallelGC \
+    --sun-misc-unsafe-memory-access=allow \
+    --enable-native-access=io.questdb,com.questdb \
+    --add-opens=java.base/java.lang=io.questdb,com.questdb \
+    --add-opens=java.base/java.lang.reflect=io.questdb,com.questdb \
+    --add-opens=java.base/java.nio=io.questdb,com.questdb \
+    --add-opens=java.base/java.time.zone=io.questdb,com.questdb \
+    --add-exports=java.base/jdk.internal.vm=io.questdb,com.questdb \
+    -m com.questdb/com.questdb.EntServerMain \
+    -d ${QDB_ROOT}
+
+# Raise the open-files limit to QuestDB's recommended value
+LimitNOFILE=1048576
+
+ProtectSystem=full
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=questdb
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Enable the service:
+</TabItem>
+
+</Tabs>
+
+`-XX:ErrorFile` writes JVM crash logs beneath `QDB_ROOT/db`; `%%p` is
+intentional.
+
+`SuccessExitStatus=143` records `systemctl stop` as a successful orderly
+shutdown.
+
+Configure `vm.max_map_count` and other recommended OS settings separately. See
+[OS configuration](/docs/getting-started/capacity-planning/#os-configuration).
+
+Install the unit:
 
 ```shell
-systemctl --user enable questdb.service
+sudo install -o root -g root -m 0644 \
+  questdb.service \
+  /etc/systemd/system/questdb.service
 ```
 
-Start the service:
+Reload systemd, enable QuestDB at boot, and start it now:
 
 ```shell
-systemctl --user start questdb
+sudo systemctl daemon-reload
+sudo systemctl enable --now questdb.service
 ```
 
-Check out the service status:
+Check the service status:
 
 ```shell
-systemctl --user status questdb.service
+sudo systemctl status questdb.service
 ```
 
-Your QuestDB instance should now be accessible at localhost, with services
-available at the following default ports:
+View its journal:
 
-- [Web Console](/docs/getting-started/web-console/overview/) &amp; REST API is available on port `9000`
-- PostgreSQL wire protocol available on `8812`
-- InfluxDB line protocol `9009` (TCP and UDP)
-- Health monitoring &amp; Prometheus `/metrics` `9003`
-
-## User vs. System
-
-As an operator, you can decide whether to run systemd as the "system" from root
-permissions, or a user with its own privileges. At the system level, root is
-required to make changes to the `systemctl` application. Services created this
-way will start and stop when the system is restarted.
-
-Unlike at the system level, user services will start & stop as the user session
-is activated or de-activated. You also do not need to apply `sudo` to make
-changes to the services.
-
-Consistent with the examples on this page, we recommend scoped users.
-
-
-## Daily timers
-
-If running QuestDB on a `systemd` based Linux (for example, `Ubuntu`) you may find that, by default, there are a number of daily upgrade timers enabled. 
-
-When executed, these tasks restart `systemd` services, which can cause interruptions to QuestDB. It will appear
-that QuestDB restarted with no errors or apparent trigger.
-
-To resolve it, either:
-
-- Force services to be listed for restart, but not restarted automatically.
-  - Modify `/etc/needrestart/needrestart.conf` to contain `$nrconf{restart} = 'l'`.
-- Disable the auto-upgrade services entirely:
-
-```bash
-sudo systemctl disable --now apt-daily-upgrade.timer
-sudo systemctl disable --now apt-daily.timer
-sudo systemctl disable --now unattended-upgrades.service
+```shell
+sudo journalctl --unit=questdb.service --follow
 ```
 
-You can check the status of the timers using:
+## Unexpected restarts
 
-```bash
-systemctl list-timers --all | grep apt
+If QuestDB restarts without an error, check the systemd journal:
+
+```shell
+sudo journalctl --unit=questdb.service --since "today"
 ```
+
+On Ubuntu, package updates may restart affected services through `needrestart`,
+including during unattended upgrades. See Ubuntu's
+[automatic updates documentation](https://ubuntu.com/server/docs/how-to/software/automatic-updates/#service-restarts)
+for configuration options.
