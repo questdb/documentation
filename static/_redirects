@@ -6,3 +6,8 @@
 
 # Anchors from old window.md -> new reference.md
 /docs/query/functions/window/?* /docs/query/functions/window-functions/reference/:splat 301
+
+# Parquet page moved from Query & SQL Reference to Concepts
+/docs/query/export-parquet/ /docs/concepts/parquet/ 301
+/docs/query/export-parquet /docs/concepts/parquet 301
+/docs/query/export-parquet/?* /docs/concepts/parquet/:splat 301
