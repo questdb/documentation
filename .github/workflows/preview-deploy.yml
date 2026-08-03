@@ -1,0 +1,98 @@
+name: Preview deploy
+
+# Trusted counterpart to "Preview trigger". Runs in the base-repository context
+# with Netlify secrets, but ONLY ever handles the pre-built artifact produced by
+# the build workflow. It never checks out or executes pull request code, so a
+# malicious fork cannot reach the credentials used here.
+
+on:
+  workflow_run:
+    workflows: ["Preview trigger"]
+    types: [completed]
+
+permissions:
+  actions: read # download the artifact from the triggering run
+  pull-requests: write # post the preview link as a comment
+  contents: read
+
+jobs:
+  deploy:
+    name: "PR preview deploy"
+    # Only deploy for successful pull_request builds.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download preview artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-build
+          path: build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR metadata
+        id: meta
+        run: |
+          echo "number=$(cat build/pr-number.txt)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(cat build/pr-sha.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to deploy
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          data=$(gh pr view "${{ steps.meta.outputs.number }}" \
+            --repo "${{ github.repository }}" \
+            --json labels,isCrossRepository)
+          cross=$(echo "$data" | jq -r '.isCrossRepository')
+          labeled=$(echo "$data" | jq -r '[.labels[].name] | index("preview") != null')
+          # Same-repo PRs always preview; fork PRs require the "preview" label.
+          if [ "$cross" = "false" ] || [ "$labeled" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping deploy: fork PR without the 'preview' label."
+          fi
+
+      - name: Install Netlify CLI
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.gate.outputs.enabled == 'true'
+        id: netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          PREVIEW_URL=$(netlify deploy \
+            --dir=build \
+            --no-build \
+            --auth="$NETLIFY_AUTH_TOKEN" \
+            --site="$NETLIFY_SITE_ID" \
+            --alias="preview-${{ steps.meta.outputs.number }}" \
+            --message="Preview Deploy from GitHub Actions" \
+            --json | jq -r '.deploy_url')
+          echo "url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR
+        if: steps.gate.outputs.enabled == 'true' && steps.netlify.outputs.url
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > comment.md <<EOF
+          :rocket: **Build success!**
+
+          Latest successful preview: ${{ steps.netlify.outputs.url }}/docs/
+
+          Commit SHA: ${{ steps.meta.outputs.sha }}
+
+          > :package: Build generates a preview & updates the link on each commit.
+          EOF
+          gh pr comment "${{ steps.meta.outputs.number }}" \
+            --repo "${{ github.repository }}" \
+            --edit-last --create-if-none \
+            --body-file comment.md

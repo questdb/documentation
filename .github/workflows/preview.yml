@@ -1,27 +1,25 @@
 name: Preview trigger
 
+# This workflow uses NO secrets. It builds the site from pull request code
+# (which, for forks, is untrusted) and uploads the result as an artifact.
+# The Netlify deploy runs separately in preview-deploy.yml via `workflow_run`,
+# so fork-supplied build code never executes with credentials in scope.
+
 on:
   pull_request:
-    types: ["opened", "edited", "synchronize"]
-  pull_request_target:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   pr-preview:
-    if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target' && github.event.label.name == 'preview')
     name: "PR preview"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout questdb.com repository
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "yarn"
@@ -29,44 +27,23 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Install Netlify CLI
-        run: npm install -g netlify-cli
-
       - name: Build site
         env:
           CONTEXT: deploy-preview
           NETLIFY: true
         run: yarn build --out-dir build/docs
 
-      - name: Deploy to Netlify
-        id: netlify
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      - name: Save PR metadata
         run: |
-          PREVIEW_URL=$(netlify deploy \
-            --dir=build \
-            --no-build \
-            --auth=$NETLIFY_AUTH_TOKEN \
-            --site=$NETLIFY_SITE_ID \
-            --alias=preview-${{ github.event.pull_request.number }} \
-            --message="Preview Deploy from GitHub Actions" \
-            --json | jq -r '.deploy_url')
-          echo "NETLIFY_PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
+          echo "${{ github.event.pull_request.number }}" > build/pr-number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > build/pr-sha.txt
 
-      - name: "Update PR"
-        if: env.NETLIFY_PREVIEW_URL
-        uses: thollander/actions-comment-pull-request@v2
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
         with:
-          message: |
-            :rocket: **Build success!**
-
-            Latest successful preview: ${{ env.NETLIFY_PREVIEW_URL }}/docs/
-
-            Commit SHA: ${{ github.event.pull_request.head.sha }}
-
-            > :package: Build generates a preview & updates link on each commit.
-          comment_tag: preview
+          name: preview-build
+          path: build
+          retention-days: 1
 
   validate-links:
     name: "Validate broken links"
@@ -74,12 +51,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "yarn"
@@ -88,5 +63,4 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build site for broken link validation
-        run: |
-          yarn build
+        run: yarn build
