@@ -18,6 +18,8 @@ SHOW { TABLES
      | PARTITIONS FROM tableName
      | CREATE TABLE tableName
      | CREATE VIEW viewName
+     | CREATE DATABASE
+         [ { INCLUDE | EXCLUDE } { ALL | (category [, ...]) } ]
      | USER [userName]
      | USERS
      | GROUPS [userName]
@@ -36,6 +38,8 @@ SHOW { TABLES
 - `SHOW PARTITIONS` returns the partition information for the selected table.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
+- `SHOW CREATE DATABASE` returns DDL statements that recreate every object
+  in the database, one per row, ordered so dependencies come first.
 - `SHOW USER` shows user secret (enterprise-only)
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
     (enterprise-only)
@@ -200,6 +204,124 @@ SHOW CREATE VIEW my_view;
 
 This returns the `CREATE VIEW` statement that would recreate the view,
 including any `DECLARE` parameters if the view is parameterized.
+
+### SHOW CREATE DATABASE
+
+`SHOW CREATE DATABASE` returns a logical, data-free dump of the whole database:
+one round-trippable DDL statement per row for every user object, much like
+`pg_dump --schema-only`. Replaying the statements from top to bottom on an empty
+instance recreates the database. No table data and no credentials are included.
+
+```questdb-sql title="SHOW CREATE DATABASE syntax"
+SHOW CREATE DATABASE
+    [ { INCLUDE | EXCLUDE } { ALL | (category [, ...]) } ];
+```
+
+An optional `INCLUDE` or `EXCLUDE` clause selects which object categories to
+dump. Each `category` is one of:
+
+- **Schema objects**: `TABLES`, `VIEWS`, `MATERIALIZED_VIEWS`.
+- **Access control** (Enterprise only): `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`,
+  `PERMISSIONS`.
+- **Umbrellas**: `SCHEMA` (all schema objects), `ACL` (all access control
+  objects), `ALL` (`SCHEMA` plus `ACL`).
+
+`INCLUDE`/`EXCLUDE` accept either `ALL` or a parenthesised list, so
+`INCLUDE ALL`, `EXCLUDE (MATERIALIZED_VIEWS)`, and `INCLUDE (TABLES, VIEWS)` are
+all valid. Called without a clause, the statement dumps the whole database:
+
+```questdb-sql title="Dump the database schema" demo
+SHOW CREATE DATABASE;
+```
+
+The result set has a single `ddl` column with one self-contained statement
+per row. Run against a database holding the
+[demo](https://demo.questdb.io) tables and materialized views, it returns one
+row per object:
+
+| ddl |
+| --- |
+| CREATE TABLE 'market_data' ( timestamp TIMESTAMP, symbol SYMBOL, bids DOUBLE[][], asks DOUBLE[][], best_bid DOUBLE, best_ask DOUBLE ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS; |
+| CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS ( SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s ) PARTITION BY DAY; |
+| CREATE MATERIALIZED VIEW 'bbo_1m' WITH BASE 'bbo_1s' REFRESH EVERY 1m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1s SAMPLE BY 1m ) PARTITION BY DAY; |
+| CREATE MATERIALIZED VIEW 'bbo_1h' WITH BASE 'bbo_1m' REFRESH EVERY 10m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1m SAMPLE BY 1h ) PARTITION BY MONTH; |
+| CREATE MATERIALIZED VIEW 'bbo_1d' WITH BASE 'bbo_1h' REFRESH EVERY 1h DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1h SAMPLE BY 1d ) PARTITION BY YEAR; |
+| ... |
+| CREATE TABLE 'trips' ( cab_type SYMBOL, vendor_id SYMBOL, pickup_datetime TIMESTAMP, dropoff_datetime TIMESTAMP, rate_code_id SYMBOL, pickup_latitude DOUBLE, pickup_longitude DOUBLE, dropoff_latitude DOUBLE, dropoff_longitude DOUBLE, passenger_count INT, trip_distance DOUBLE, fare_amount DOUBLE, extra DOUBLE, mta_tax DOUBLE, tip_amount DOUBLE, tolls_amount DOUBLE, ehail_fee DOUBLE, improvement_surcharge DOUBLE, congestion_surcharge DOUBLE, total_amount DOUBLE, payment_type SYMBOL, trip_type SYMBOL, pickup_location_id INT, dropoff_location_id INT ) timestamp(pickup_datetime) PARTITION BY MONTH; |
+
+Each `ddl` value is stored with formatting characters, so pasting a row into a
+text editor expands it to the indented form shown by
+[`SHOW CREATE TABLE`](#show-create-table).
+
+#### Output order
+
+Objects are emitted in dependency order: a materialized view or view is never
+reported before the base table or base materialized view it reads from. Within
+that constraint objects are ordered alphabetically. The demo chains several
+materialized views, for example `market_data` then `bbo_1s`, `bbo_1m`, `bbo_1h`,
+`bbo_1d`, and `fx_trades` then `fx_trades_ohlc_1m`, `fx_trades_ohlc_1d`. Each
+view in a chain appears only after the object it depends on, so a top-to-bottom
+replay always succeeds.
+
+#### Filtering by category
+
+Restrict a dump to specific categories with `INCLUDE`, or dump everything except
+a few with `EXCLUDE`:
+
+```questdb-sql title="Only tables" demo
+SHOW CREATE DATABASE INCLUDE (TABLES);
+```
+
+List several categories separated by commas:
+
+```questdb-sql title="Tables and materialized views" demo
+SHOW CREATE DATABASE INCLUDE (TABLES, MATERIALIZED_VIEWS);
+```
+
+```questdb-sql title="Everything except materialized views" demo
+SHOW CREATE DATABASE EXCLUDE (MATERIALIZED_VIEWS);
+```
+
+With no clause the statement defaults to `INCLUDE ALL`. In QuestDB open source
+there is no access control layer, so `ALL` and `SCHEMA` produce the same output.
+In [QuestDB Enterprise](/enterprise/) the default `ALL` also dumps the access
+control block, so use `INCLUDE (SCHEMA)` when you want the structure only.
+
+Filtering is applied per category, like `pg_dump -t`. Excluding a category that
+others depend on can leave dangling references, so a dump that omits a base
+table does not replay cleanly for the views built on it.
+
+:::note
+
+Filtering the dump rows with a `WHERE` clause, for example
+`(SHOW CREATE DATABASE) WHERE ddl ILIKE 'fx_%'` to select the objects of a
+single tenant, is not supported yet. Row-level filtering is planned for a future
+QuestDB release.
+
+:::
+
+#### Enterprise: access control
+
+In [QuestDB Enterprise](/enterprise/), `SHOW CREATE DATABASE` also dumps the
+access control layer after the schema objects, so a dump captures identities,
+memberships, and permissions alongside the tables and views:
+
+- `CREATE USER`, `CREATE GROUP`, and `CREATE SERVICE ACCOUNT` for each entity.
+- Memberships, as `ADD USER ... TO ...` and `ASSUME SERVICE ACCOUNT ... TO ...`.
+- Grants, as `GRANT <permissions> [ON ...] TO ... [WITH GRANT OPTION]`.
+
+`CREATE TABLE`, `CREATE VIEW`, and `CREATE MATERIALIZED VIEW` statements in an
+Enterprise dump also carry the `OWNED BY` clause identifying the owner.
+
+Credentials are never dumped: the `CREATE USER` and `CREATE SERVICE ACCOUNT`
+statements carry no password or token, so set these after replaying the dump.
+
+The Enterprise ACL categories are `USERS`, `GROUPS`, `SERVICE_ACCOUNTS`, and
+`PERMISSIONS`, grouped by the `ACL` umbrella. Each requires the matching `LIST`
+or `USER DETAILS` permission,
+while the schema categories need no access control permission, so a user with
+only `SELECT` can still dump the structure. When access control is disabled the
+command degrades to a schema-only dump.
 
 ### SHOW PARTITIONS
 
