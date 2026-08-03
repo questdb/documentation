@@ -133,7 +133,7 @@ rules as explicit [CAST](/docs/query/sql/cast/) apply.
 ## Parquet partitions
 
 `ALTER TABLE ... ALTER COLUMN ... TYPE` works on tables that contain
-[Parquet partitions](/docs/query/export-parquet/#in-place-conversion). Reads
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion). Reads
 return the converted values on every query, matching the behaviour of native
 partitions exactly, including `NULL` sentinels, `BYTE`/`SHORT`/`CHAR` column
 tops, date and timestamp scaling, and UTF-16/UTF-8 text transcoding.
