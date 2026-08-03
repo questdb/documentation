@@ -70,21 +70,57 @@ This configuration:
 
 
 :::warning Volume Permissions
-If you encounter permission errors with mounted volumes, ensure the QuestDB container user has write access to the host directory. You may need to set ownership with `chown -R 1000:1000 ./questdb_root` or run the container with a specific user ID.
+By default the `questdb/questdb` image starts as `root`, takes ownership of the
+mounted data directory, and then drops privileges to its own `questdb` user. In
+most cases you do not need to do anything.
+
+If you pin the container user with `user:`, the entrypoint can no longer fix
+ownership, so the host directory must already be writable by the uid and gid you
+pin.
 :::
 
 ## Custom data directory permissions
 
-```yaml title="Run with specific user/group for volume permissions"
+Pin the container user when you want QuestDB to write files as a specific
+account on the host, for example so that the data directory stays readable by
+your own user. Set `user:` to a uid and gid that owns the host directory, which
+is often `1000:1000` for the first non-root account on a Linux host. Run
+`id -u` and `id -g` to check:
+
+```yaml title="Run with a specific user/group for volume permissions"
 services:
   questdb:
     image: questdb/questdb
     user: "1000:1000"
-    environment:
-      - QDB_CAIRO_ROOT=/var/lib/questdb
     volumes:
       - ./questdb_data:/var/lib/questdb
 ```
+
+Make sure that user owns the host directory before starting the container:
+
+```bash
+mkdir -p questdb_data && sudo chown -R 1000:1000 questdb_data
+```
+
+:::caution Do not set `QDB_CAIRO_ROOT` in Docker
+The Docker image already uses `/var/lib/questdb` as its root directory, so
+`QDB_CAIRO_ROOT` is unnecessary. Setting it to an absolute path also changes how
+QuestDB derives its other directories: they become siblings of the data
+directory rather than children of the root directory.
+
+With `QDB_CAIRO_ROOT=/var/lib/questdb`, the checkpoint, import, export and
+temporary directories move to `/var/lib/.checkpoint`, `/var/lib/import`,
+`/var/lib/export` and `/var/lib/tmp` — all outside the mounted volume, in a
+directory the container user cannot write to. `CHECKPOINT CREATE` then fails
+with an error such as:
+
+```
+Could not create [dir=/var/lib/.checkpoint//var/lib/questdb/]
+```
+
+To change where data is stored on the host, change the left-hand side of the
+volume mapping instead.
+:::
 
 ## Complete configuration reference
 

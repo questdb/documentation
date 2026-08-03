@@ -26,6 +26,7 @@ This page tracks significant updates to the QuestDB documentation.
 - Documented custom root CA support for the replication object store: the `ca_cert_file` and `ca_builtin_roots` [connection-string parameters](/docs/high-availability/setup/#tls-with-a-private-or-self-signed-ca) trust a private, internal, or self-signed CA for S3, Azure Blob, and GCS stores
 - Added [`array_agg()`](/docs/query/functions/aggregation/#array_agg) aggregate function, covering scalar and array input forms, `SAMPLE BY` with FILL, and NULL handling
 - Documented the [`twap()`](/docs/query/functions/aggregation/#twap) designated-timestamp limitation: the timestamp argument must be the table's designated timestamp
+- Added [`kurtosis()`](/docs/query/functions/aggregation/#kurtosis--kurtosis_samp), [`kurtosis_pop()`](/docs/query/functions/aggregation/#kurtosis_pop), [`skewness()`](/docs/query/functions/aggregation/#skewness--skewness_samp), and [`skewness_pop()`](/docs/query/functions/aggregation/#skewness_pop) aggregate functions for distribution shape
 
 ### Updated
 

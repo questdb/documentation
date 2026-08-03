@@ -38,7 +38,11 @@ calculations. Functions are organized by category below.
 | [corr](#corr) | Pearson correlation coefficient |
 | [covar_pop](#covar_pop) | Population covariance |
 | [covar_samp](#covar_samp) | Sample covariance |
+| [kurtosis / kurtosis_samp](#kurtosis--kurtosis_samp) | Sample excess kurtosis |
+| [kurtosis_pop](#kurtosis_pop) | Population excess kurtosis |
 | [mode](#mode) | Most frequent value |
+| [skewness / skewness_samp](#skewness--skewness_samp) | Sample skewness |
+| [skewness_pop](#skewness_pop) | Population skewness |
 | [stddev / stddev_samp](#stddev--stddev_samp) | Sample standard deviation |
 | [stddev_pop](#stddev_pop) | Population standard deviation |
 | [var_pop](#var_pop) | Population variance |
@@ -1306,6 +1310,66 @@ SELECT ksum(a)
 FROM (SELECT rnd_double() a FROM long_sequence(100));
 ```
 
+## kurtosis / kurtosis_samp
+
+`kurtosis_samp(value)` - Calculates the sample excess kurtosis of a set of
+values, ignoring missing data (e.g., NULL values). Kurtosis measures the
+tailedness of a distribution. Following Fisher's definition, the value is
+shifted so that a normal distribution has kurtosis 0: positive values indicate
+heavier tails than the normal distribution, negative values indicate lighter
+tails. The sample variant applies the Fisher-Pearson bias correction and returns
+`null` when fewer than four non-null values are present.
+
+`kurtosis` is an alias for `kurtosis_samp`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`. Returns `null` when fewer than four non-null
+values are observed, or when all observed values are equal.
+
+#### Examples
+
+```questdb-sql demo title="Sample excess kurtosis"
+SELECT kurtosis_samp(value)
+FROM UNNEST(ARRAY[-10.0, -20.0, 100.0, 1000.0, 1000.0]);
+```
+
+| kurtosis_samp      |
+| :----------------- |
+| -3.289971233898511 |
+
+## kurtosis_pop
+
+`kurtosis_pop(value)` - Calculates the population excess kurtosis of a set of
+values, ignoring missing data (e.g., NULL values). Like `kurtosis_samp` this
+follows Fisher's definition (a normal distribution has kurtosis 0), but applies
+no bias correction. Defined when at least one non-null value is observed and the
+values are not all equal; otherwise returns `null`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`. Returns `null` when no non-null values are
+observed, or when all observed values are equal.
+
+#### Examples
+
+```questdb-sql demo title="Population excess kurtosis"
+SELECT kurtosis_pop(value)
+FROM UNNEST(ARRAY[-10.0, -20.0, 100.0, 1000.0, 1000.0]);
+```
+
+| kurtosis_pop       |
+| :----------------- |
+| -1.822492808474628 |
+
 ## last
 
 - `last(column_name)` - returns the last value of a column.
@@ -1578,6 +1642,66 @@ Return value type is `double`.
 SELECT nsum(a)
 FROM (SELECT rnd_double() a FROM long_sequence(100));
 ```
+
+## skewness / skewness_samp
+
+`skewness_samp(value)` - Calculates the sample skewness of a set of values,
+ignoring missing data (e.g., NULL values). Skewness measures the asymmetry of a
+distribution around its mean: positive values indicate a right-leaning (longer
+right tail) distribution, negative values indicate a left-leaning one, and zero
+indicates a symmetric distribution. The sample variant uses the Fisher-Pearson
+bias-corrected G1 estimator and returns `null` when fewer than three non-null
+values are present.
+
+`skewness` is an alias for `skewness_samp`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`. Returns `null` when fewer than three non-null
+values are observed, or when all observed values are equal.
+
+#### Examples
+
+```questdb-sql demo title="Sample skewness"
+SELECT skewness_samp(value)
+FROM UNNEST(ARRAY[-10.0, -20.0, 100.0, 1000.0, 1000.0]);
+```
+
+| skewness_samp      |
+| :----------------- |
+| 0.5745116147533554 |
+
+## skewness_pop
+
+`skewness_pop(value)` - Calculates the population skewness of a set of values,
+ignoring missing data (e.g., NULL values). Like `skewness_samp` this uses
+Fisher's moment-ratio definition, but applies no bias correction. Defined when
+at least one non-null value is observed and the values are not all equal;
+otherwise returns `null`.
+
+#### Parameters
+
+- `value` is any numeric value.
+
+#### Return value
+
+Return value type is `double`. Returns `null` when no non-null values are
+observed, or when all observed values are equal.
+
+#### Examples
+
+```questdb-sql demo title="Population skewness"
+SELECT skewness_pop(value)
+FROM UNNEST(ARRAY[-10.0, -20.0, 100.0, 1000.0, 1000.0]);
+```
+
+| skewness_pop        |
+| :------------------ |
+| 0.38539410733550217 |
 
 ## stddev / stddev_samp
 
