@@ -4,19 +4,42 @@ name: Preview trigger
 # (which, for forks, is untrusted) and uploads the result as an artifact.
 # The Netlify deploy runs separately in preview-deploy.yml via `workflow_run`,
 # so fork-supplied build code never executes with credentials in scope.
+#
+# Nothing this build writes is trusted by the deploy workflow: the deploy
+# derives the PR number, commit SHA and labels from the workflow_run event and
+# the GitHub API, never from files inside the artifact.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
 
+# Untrusted fork code runs here, so grant it the minimum.
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   pr-preview:
     name: "PR preview"
+    # Rebuild on code changes. For label events, only the "preview" label
+    # (which authorises fork previews) should trigger a rebuild, so unrelated
+    # label changes don't kick off a full build.
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'preview'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Build the exact PR head, not the ephemeral merge commit, so the
+          # preview matches what the author pushed and the reported commit SHA
+          # is meaningful. Also avoids checkout failures on conflicted PRs.
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,34 +56,9 @@ jobs:
           NETLIFY: true
         run: yarn build --out-dir build/docs
 
-      - name: Save PR metadata
-        run: |
-          echo "${{ github.event.pull_request.number }}" > build/pr-number.txt
-          echo "${{ github.event.pull_request.head.sha }}" > build/pr-sha.txt
-
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
           name: preview-build
           path: build
           retention-days: 1
-
-  validate-links:
-    name: "Validate broken links"
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "yarn"
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Build site for broken link validation
-        run: yarn build

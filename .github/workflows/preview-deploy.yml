@@ -4,6 +4,21 @@ name: Preview deploy
 # with Netlify secrets, but ONLY ever handles the pre-built artifact produced by
 # the build workflow. It never checks out or executes pull request code, so a
 # malicious fork cannot reach the credentials used here.
+#
+# The PR number, commit SHA and labels come from the workflow_run event and the
+# GitHub API, never from the artifact. No fork-controlled bytes ever reach a
+# shell command or the labelling decision, so there is no injection path back to
+# the token.
+#
+# NOTE for maintainers: the "preview" label is sticky. Once applied to a fork
+# PR it authorises every subsequent push on that PR to auto-deploy arbitrary
+# static content (including a fork-supplied _redirects proxy) to a QuestDB
+# Netlify preview alias. It cannot reach secrets, but remove the label if you
+# no longer trust the source.
+#
+# NOTE on rollout: workflow_run workflows only run from the copy on the default
+# branch, so this deploy half cannot be exercised from the PR that introduces
+# it. It takes effect once merged to main; verify with one throwaway PR after.
 
 on:
   workflow_run:
@@ -15,47 +30,91 @@ permissions:
   pull-requests: write # post the preview link as a comment
   contents: read
 
+# One in-flight deploy per source branch, so two quick pushes can't race two
+# deploys onto the same preview alias. The PR number isn't known until the job
+# runs, so key on the (fork) repo + branch that produced the build.
+concurrency:
+  group: preview-deploy-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: "PR preview deploy"
     # Only deploy for successful pull_request builds.
-    if: >
+    if: >-
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
+      - name: Resolve PR and deploy gate
+        id: gate
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const headSha = run.head_sha;
+            const baseRepo = context.payload.repository.full_name;
+
+            // Find the PR whose head is exactly this commit. Labels are read
+            // from the base-repo PR object (maintainer-controlled), so a fork
+            // cannot self-apply the "preview" label, and the PR number cannot
+            // be spoofed via the artifact.
+            const { data: prs } =
+              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: headSha,
+              });
+            const pr =
+              prs.find((p) => p.state === "open" && p.head.sha === headSha) ||
+              prs.find((p) => p.head.sha === headSha);
+
+            if (!pr) {
+              core.info(`No PR found for commit ${headSha}; skipping deploy.`);
+              core.setOutput("enabled", "false");
+              return;
+            }
+
+            // Guard the deleted-fork edge: pr.head.repo can be null.
+            const headRepoName = pr.head.repo && pr.head.repo.full_name;
+            const isCrossRepo = headRepoName !== baseRepo;
+            const hasPreviewLabel = pr.labels.some((l) => l.name === "preview");
+            // Same-repo PRs always preview; fork PRs require the label.
+            let enabled = !isCrossRepo || hasPreviewLabel;
+            if (!enabled) {
+              core.info('Fork PR without the "preview" label; skipping deploy.');
+            }
+
+            // The build job is skipped for unrelated label events, which still
+            // completes the "Preview trigger" run and fires workflow_run with no
+            // artifact. Only deploy if this run actually produced the preview
+            // artifact, so we never attempt a download that would red-X this run.
+            if (enabled) {
+              const { data: arts } =
+                await github.rest.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                });
+              if (!arts.artifacts.some((a) => a.name === "preview-build")) {
+                core.info("No preview-build artifact for this run; skipping.");
+                enabled = false;
+              }
+            }
+
+            core.setOutput("enabled", enabled ? "true" : "false");
+            core.setOutput("number", String(pr.number));
+            core.setOutput("sha", headSha);
+
       - name: Download preview artifact
+        if: steps.gate.outputs.enabled == 'true'
         uses: actions/download-artifact@v4
         with:
           name: preview-build
           path: build
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Read PR metadata
-        id: meta
-        run: |
-          echo "number=$(cat build/pr-number.txt)" >> "$GITHUB_OUTPUT"
-          echo "sha=$(cat build/pr-sha.txt)" >> "$GITHUB_OUTPUT"
-
-      - name: Decide whether to deploy
-        id: gate
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          data=$(gh pr view "${{ steps.meta.outputs.number }}" \
-            --repo "${{ github.repository }}" \
-            --json labels,isCrossRepository)
-          cross=$(echo "$data" | jq -r '.isCrossRepository')
-          labeled=$(echo "$data" | jq -r '[.labels[].name] | index("preview") != null')
-          # Same-repo PRs always preview; fork PRs require the "preview" label.
-          if [ "$cross" = "false" ] || [ "$labeled" = "true" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping deploy: fork PR without the 'preview' label."
-          fi
 
       - name: Install Netlify CLI
         if: steps.gate.outputs.enabled == 'true'
@@ -67,32 +126,31 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          # Trusted integer from the API. Passed via env and quoted so it is
+          # never interpolated into the script by the Actions template engine.
+          PR_NUMBER: ${{ steps.gate.outputs.number }}
         run: |
           PREVIEW_URL=$(netlify deploy \
             --dir=build \
             --no-build \
             --auth="$NETLIFY_AUTH_TOKEN" \
             --site="$NETLIFY_SITE_ID" \
-            --alias="preview-${{ steps.meta.outputs.number }}" \
+            --alias="preview-$PR_NUMBER" \
             --message="Preview Deploy from GitHub Actions" \
             --json | jq -r '.deploy_url')
           echo "url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL on PR
         if: steps.gate.outputs.enabled == 'true' && steps.netlify.outputs.url
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cat > comment.md <<EOF
-          :rocket: **Build success!**
+        uses: thollander/actions-comment-pull-request@fabd468d3a1a0b97feee5f6b9e499eab0dd903f6 # v2.5.0
+        with:
+          pr_number: ${{ steps.gate.outputs.number }}
+          comment_tag: preview
+          message: |
+            :rocket: **Build success!**
 
-          Latest successful preview: ${{ steps.netlify.outputs.url }}/docs/
+            Latest successful preview: ${{ steps.netlify.outputs.url }}/docs/
 
-          Commit SHA: ${{ steps.meta.outputs.sha }}
+            Commit SHA: ${{ steps.gate.outputs.sha }}
 
-          > :package: Build generates a preview & updates the link on each commit.
-          EOF
-          gh pr comment "${{ steps.meta.outputs.number }}" \
-            --repo "${{ github.repository }}" \
-            --edit-last --create-if-none \
-            --body-file comment.md
+            > :package: Build generates a preview & updates the link on each commit.
