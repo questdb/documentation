@@ -54,20 +54,38 @@ The locale used to handle timestamp types.
 
 When `false`, disables the `reload_config()` SQL function.
 
+### query.timeout
+
+- **Default**: `60s`
+- **Reloadable**: no
+
+A global timeout for long-running queries, given as a duration: `500ms`, `120s`,
+`2m` and `1h` are all valid, and a plain number is read as milliseconds.
+
+This key replaces `query.timeout.sec`. When both are set, `query.timeout` takes
+precedence; when neither is set, queries time out after 60 seconds.
+
+Per-query overrides are available via the HTTP header
+[`Statement-Timeout`](/docs/query/rest-api/#headers) or the Postgres
+[`options`](/docs/query/pgwire/overview/)
+connection property.
+
 ### query.timeout.sec
 
 - **Default**: `60`
 - **Reloadable**: no
 
-A global timeout in seconds for long-running queries. Per-query overrides are
-available via the HTTP header
-[`Statement-Timeout`](/docs/query/rest-api/#headers) or the Postgres
-[`options`](/docs/query/pgwire/overview/)
-connection property.
+:::note
 
-The related `query.timeout` key sets the same global timeout using a duration
-value (for example, `120s`, `1m` or `500ms`). When both are set, `query.timeout`
-takes precedence over `query.timeout.sec`.
+`query.timeout.sec` is deprecated. Use `query.timeout` instead, which takes a
+duration rather than a whole number of seconds. QuestDB reports this key as a
+deprecation advisory during config validation at startup.
+
+:::
+
+A global timeout in seconds for long-running queries. When `query.timeout` is
+also set, it takes precedence and this key is ignored. Per-query overrides work
+the same as for `query.timeout`.
 
 ## Commit and write behavior
 
