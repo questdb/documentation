@@ -285,6 +285,7 @@ module.exports = {
                     "query/sql/alter-table-drop-column",
                     "query/sql/alter-table-drop-partition",
                     "query/sql/alter-table-rename-column",
+                    "query/sql/alter-table-rebase-wal",
                     "query/sql/alter-table-resume-wal",
                     "query/sql/alter-table-set-format",
                     "query/sql/alter-table-set-param",
