@@ -8,17 +8,60 @@ description: Recent updates and improvements to the QuestDB documentation.
 
 This page tracks significant updates to the QuestDB documentation.
 
+## August 2026
+
+### New
+
+- [ALTER TABLE SET FORMAT](/docs/query/sql/alter-table-set-format/) - New reference page for switching a table's partition storage format between `NATIVE` and `PARQUET`
+
+### Reference
+
+- [CREATE TABLE](/docs/query/sql/create-table/#partition-format) - Added the `FORMAT { NATIVE | PARQUET }` clause to store partitions as Parquet by default on partitioned WAL tables
+- [SHOW CREATE MATERIALIZED VIEW](/docs/query/sql/show/#show-create-materialized-view) - Documented retrieving a materialized view's `CREATE` statement, and alphabetized the SHOW reference page
+- [SHOW CREATE DATABASE](/docs/query/sql/show/#show-create-database) - Documented dumping the whole database schema as round-trippable DDL, with `INCLUDE`/`EXCLUDE` category filtering
+- [EXPLAIN](/docs/query/sql/explain/) - Added the `Encode sort` / `Encode sort light` plan node to the plan-node reference
+- [LIMIT](/docs/query/sql/limit/#null-bounds) - Documented null `LIMIT` bounds (supplied via bind variables) and their two-bound semantics
+- Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
+- Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
+
+### Updated
+
+- [Parquet](/docs/concepts/parquet/) - Moved the Parquet page to Concepts and revamped it around creating tables as Parquet, in-place conversion (storage policies and `ALTER TABLE`), and export; also documented `ALTER COLUMN TYPE` on Parquet partitions and relaxed the in-place conversion constraints
+- [Storage engine](/docs/architecture/storage-engine/) - Reworked the three-tier storage model: local native or Parquet storage, then remote object storage
+- [systemd deployment](/docs/deployment/systemd/) - Reworked the systemd service guide to cover both QuestDB Open Source and Enterprise
+- [Time to live (TTL)](/docs/concepts/ttl/) - Documented TTL on materialized views, set with `CREATE MATERIALIZED VIEW ... TTL` or `ALTER MATERIALIZED VIEW ... SET TTL` and managed independently of the base table's TTL
+- [Result grid](/docs/getting-started/web-console/result-grid/) - Documented the Parquet and CSV download options in the web console result grid
+- [Docker Compose configuration](/docs/cookbook/operations/docker-compose-config/) - Reworked the volume-permission guidance and explained why `QDB_CAIRO_ROOT` should not be set in Docker
+
+## July 2026
+
+### QuestDB Enterprise Releases
+
+- [3.3.4](https://questdb.com/release-notes/) - Released July 31, 2026
+- [3.3.3](https://questdb.com/release-notes/) - Released July 1, 2026
+
+### Updated
+
+- [Storage policy](/docs/concepts/storage-policy/) - Clarified stage enforcement: `TO REMOTE` is now accepted and stored but not yet enforced, `DROP REMOTE` is rejected at parse time, and the policy check interval is 5 minutes
+- [systemd deployment](/docs/deployment/systemd/) - Added the `jdk.internal.vm` module export to the service example
+
 ## June 2026
 
 ### Releases
 
+- [9.4.3](https://questdb.com/release-notes/) - Released June 15, 2026
 - [9.4.2](https://questdb.com/release-notes/) - Released June 9, 2026
 - [9.4.1](https://questdb.com/release-notes/) - Released June 3, 2026
 
 ### QuestDB Enterprise Releases
 
+- [3.3.2](https://questdb.com/release-notes/) - Released June 23, 2026
 - [3.3.1](https://questdb.com/release-notes/) - Released June 9, 2026
 - [3.3.0](https://questdb.com/release-notes/) - Released June 3, 2026
+
+### New
+
+- [Row-level security](/docs/cookbook/sql/advanced/row-level-security/) - New cookbook recipe for restricting row visibility per user
 
 ### Reference
 
@@ -31,6 +74,8 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [systemd service example](/docs/deployment/systemd/) - Updated the Java requirement from 17 to 25 across deployment and quick-start prerequisites
+- [GCP deployment](/docs/deployment/gcp/) - Reworked for VM install and aligned with the AWS and Azure guides
+- [Capacity planning](/docs/getting-started/capacity-planning/) - Reworked the OS configuration guidance for open file limits and `vm.max_map_count`
 
 ## May 2026
 
@@ -106,7 +151,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 - [SQL reference pages](/docs/query/sql/select/) - Replaced railroad diagrams with code-based syntax blocks across 65 SQL pages, with updated examples
 - [SAMPLE BY](/docs/query/sql/sample-by/) - Updated timezone bucket alignment behavior
-- [Parquet export](/docs/query/export-parquet/) - Added partitioning options for exports
+- [Parquet export](/docs/concepts/parquet/) - Added partitioning options for exports
 - [WINDOW JOIN](/docs/query/sql/window-join/) - Documented dynamic window boundaries
 - [HORIZON JOIN](/docs/query/sql/horizon-join/) - Documented multi-RHS table support
 - [JOIN](/docs/query/sql/join/) - Improved join documentation and reorganized page
@@ -174,7 +219,7 @@ This page tracks significant updates to the QuestDB documentation.
 ### Updated
 
 - [Named windows](/docs/query/functions/window-functions/overview/) - Support for reusable `WINDOW` clause definitions
-- [Parquet export](/docs/query/export-parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
+- [Parquet export](/docs/concepts/parquet/) - Fixed compression defaults, restructured page, updated `read_parquet` types
 - [Backup](/docs/operations/backup/) - Documented `backup.schedule.cron` format, improved scheduler visibility
 - [Date/time functions](/docs/query/functions/date-time/) - Page updates and corrections
 - [Window functions](/docs/query/functions/window-functions/overview/) - Added limitation documentation
@@ -271,7 +316,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
-- [Parquet export](/docs/query/export-parquet/) - Complete documentation for exporting data to Parquet format
+- [Parquet export](/docs/concepts/parquet/) - Complete documentation for exporting data to Parquet format
 - [Shared pool configuration](/docs/configuration/shared-workers/) - Updated with network, query, and write shared pool options
 - [SQL hints](/docs/query/sql/asof-join/#choose-the-optimal-algorithm-with-an-sql-hint) - Rewritten section on temporal join hints
 
