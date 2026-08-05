@@ -20,7 +20,7 @@ of rows on each query.
 
 :::note
 
-Live views are a new feature. The supported SQL surface is deliberately narrow
+Live views are currently released as beta. The supported SQL surface is deliberately narrow
 in this first version. See [Limitations](#limitations) for the shapes that are
 rejected at creation time.
 

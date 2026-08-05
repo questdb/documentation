@@ -9,6 +9,15 @@ Creates a live view that incrementally maintains the result of a window-function
 query over a single base table and can be queried like a regular table. For a
 conceptual overview, see [Live views](/docs/concepts/live-views/).
 
+:::note
+
+Live views are currently released as beta. The supported SQL surface is deliberately narrow
+in this first version. See
+[Limitations](/docs/concepts/live-views/#limitations) for the shapes that are
+rejected at creation time.
+
+:::
+
 ## Syntax
 
 ```questdb-sql title="CREATE LIVE VIEW"
