@@ -16,6 +16,7 @@ and partition storage size on disk.
 SHOW { COLUMNS FROM tableName
      | CREATE DATABASE
          [ { INCLUDE | EXCLUDE } { ALL | (category [, ...]) } ]
+     | CREATE LIVE VIEW viewName
      | CREATE MATERIALIZED VIEW matViewName
      | CREATE TABLE tableName
      | CREATE VIEW viewName
@@ -37,6 +38,8 @@ SHOW { COLUMNS FROM tableName
   table.
 - `SHOW CREATE DATABASE` returns DDL statements that recreate every object
   in the database, one per row, ordered so dependencies come first.
+- `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
+  view.
 - `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
   recreate a materialized view.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
@@ -195,6 +198,21 @@ or `USER DETAILS` permission,
 while the schema categories need no access control permission, so a user with
 only `SELECT` can still dump the structure. When access control is disabled the
 command degrades to a schema-only dump.
+
+### SHOW CREATE LIVE VIEW
+
+```questdb-sql title="retrieving live view ddl"
+SHOW CREATE LIVE VIEW trades_ma;
+```
+
+| ddl |
+| --- |
+| CREATE LIVE VIEW 'trades_ma' FLUSH EVERY 1s IN MEMORY 5s PARTITION BY DAY START FROM NOW AS (<br/>SELECT timestamp, symbol, avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING) AS moving_avg FROM trades<br/>); |
+
+This returns the `CREATE LIVE VIEW` statement that would recreate the
+[live view](/docs/concepts/live-views/), including its `FLUSH EVERY`,
+`IN MEMORY`, `PARTITION BY`, and `START FROM` clauses. On QuestDB Enterprise the
+output also carries an `OWNED BY` clause identifying the view's owner.
 
 ### SHOW CREATE MATERIALIZED VIEW
 
