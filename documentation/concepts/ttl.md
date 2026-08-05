@@ -71,6 +71,25 @@ ALTER TABLE trades SET TTL 2w;
 For full syntax, see
 [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/).
 
+### On materialized views
+
+Materialized views support TTL as well, both at creation and afterward:
+
+```questdb-sql
+-- At view creation
+CREATE MATERIALIZED VIEW trades_hourly AS (
+  SELECT timestamp, symbol, avg(price) AS avg_price FROM trades SAMPLE BY 1h
+) PARTITION BY DAY TTL 7 DAYS;
+
+-- On an existing view
+ALTER MATERIALIZED VIEW trades_hourly SET TTL 7 DAYS;
+```
+
+A view's TTL is independent of its base table's TTL. For full syntax, see
+[CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/#ttl-time-to-live)
+and
+[ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/).
+
 ## How TTL works
 
 TTL drops partitions based on the **partition's time range**, not individual row

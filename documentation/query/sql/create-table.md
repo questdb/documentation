@@ -20,6 +20,7 @@ The first two modes accept the same set of optional clauses:
 
 - [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
 - [`PARTITION BY`](#partitioning) - partition unit and WAL mode
+- [`FORMAT`](#partition-format) - partition storage format (`NATIVE` or `PARQUET`)
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
 - [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
 - [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
@@ -39,6 +40,7 @@ TABLE [IF NOT EXISTS] tableName
         [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
             [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
@@ -60,6 +62,7 @@ TABLE [IF NOT EXISTS] tableName
         [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
             | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
             [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
@@ -202,6 +205,45 @@ one of the following:
 
 The partitioning strategy **cannot be changed** after the table has been
 created.
+
+## Partition format
+
+By default, table partitions are stored in QuestDB's `NATIVE` binary format. A
+partitioned [WAL](/docs/concepts/write-ahead-log/) table can instead store its
+partitions as [Parquet](/docs/concepts/parquet/) by adding a `FORMAT`
+clause after `PARTITION BY` (and after `TTL` or `STORAGE POLICY`, if present):
+
+```questdb-sql title="Store partitions as Parquet"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+FORMAT PARQUET
+WAL;
+```
+
+`FORMAT` accepts one of:
+
+- `NATIVE` (default): QuestDB's native column format.
+- `PARQUET`: partitions are stored as Parquet.
+
+Notes and constraints:
+
+- `FORMAT PARQUET` is only supported on **partitioned WAL tables**. It is
+  rejected on non-partitioned or `BYPASS WAL` tables.
+- To change the format after creation, use
+  [`ALTER TABLE SET FORMAT`](/docs/query/sql/alter-table-set-format/). Changing
+  the format does not convert existing partitions; it applies to partitions
+  written afterwards.
+- Out-of-order writes into a Parquet partition are more expensive than into a
+  native partition.
+
+To convert individual existing partitions instead of setting a table-wide
+format, see
+[in-place Parquet conversion](/docs/concepts/parquet/#in-place-conversion).
 
 ## Time To Live (TTL)
 
@@ -498,7 +540,7 @@ PARQUET(encoding [, compression[(level)]])
 Column definitions may include an optional
 `PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
 settings only affect
-[Parquet partitions](/docs/connect/compatibility/export-parquet/#in-place-conversion) and are
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion) and are
 ignored for native partitions. Encoding, compression, and bloom filter are all
 optional — use `default` for the encoding when specifying compression only.
 
@@ -626,7 +668,7 @@ configuration options.
 :::note
 
 When converting partitions with an explicit `bloom_filter_columns` option in
-[`CONVERT PARTITION`](/docs/connect/compatibility/export-parquet/#bloom-filters-for-in-place-conversion),
+[`CONVERT PARTITION`](/docs/concepts/parquet/#bloom-filters-for-in-place-conversion),
 the explicit list overrides per-column `BLOOM_FILTER` metadata.
 
 :::

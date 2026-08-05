@@ -39,26 +39,54 @@ appears consistent to all readers, even during ongoing write operations.
   width={1000}
 />
 
-### Tier Two: QuestDB Binary Table Storage
+### Tier Two: Local Table Storage
 
-Changes in the parallel WAL files are stored in columnar binary format by the TableWriter. The TableWriter
-also handles and resolves out-of-order data writes and enables deduplication. Column files use an append model.
+Changes in the parallel WAL files are stored on local disk in columnar format by
+the TableWriter. The TableWriter also handles and resolves out-of-order data
+writes and enables deduplication. Column files use an append model.
 
-The active (most recent) partition for each table is always stored in this storage tier for minimum query latency and
-to optimize writes in the event of out-of-order data or when updating sampling intervals in materialized views.
+By default, the active (most recent) partition for each table is stored in
+QuestDB's native binary format for minimum query latency and to optimize writes
+in the event of out-of-order data or when updating sampling intervals in
+materialized views.
 
-### Tier Three: Parquet, Locally or in an Object Store
+Locally, a partition can be stored in either of two formats:
 
-Older partitions (any partition other than the most recent one) can be converted to
-[Parquet](/docs/connect/compatibility/export-parquet) for both interoperability and compression ratio.
+- **QuestDB native binary format** (the default): the append-friendly columnar
+  format used for all partitions unless configured otherwise.
+- **[Parquet](/docs/concepts/parquet/)**: a compressed, interoperable format
+  for historical partitions. Parquet partitions remain fully available for
+  queries, users don't need to know whether a partition is native or Parquet,
+  and all QuestDB data types can be converted to Parquet.
 
-Partitions in Parquet format remain fully available for queries. Users don't need to know whether a partition is in QuestDB
-binary format or Parquet format. All the data types available in QuestDB can be converted to Parquet.
+A table's partitions can become Parquet in three ways:
 
-When using QuestDB Enterprise, tables can be configured to convert to Parquet automatically using
-[storage policies](/docs/concepts/storage-policy/). This can help reduce local disk usage
-while keeping historical data fully available for queries. Support for automatic upload
-of Parquet files to object storage will be added in a future release.
+- **By default at creation, or via ALTER**: store partitions as Parquet with the
+  `FORMAT PARQUET` clause on
+  [`CREATE TABLE`](/docs/query/sql/create-table/#partition-format), or switch an
+  existing table with
+  [`ALTER TABLE SET FORMAT`](/docs/query/sql/alter-table-set-format/).
+- **Manually, per partition**: convert individual partitions in place with
+  [in-place Parquet conversion](/docs/concepts/parquet/#in-place-conversion).
+- **Automatically, as partitions age**: convert on a schedule with
+  [storage policies](/docs/concepts/storage-policy/) (QuestDB Enterprise).
+
+### Tier Three: Remote Object Storage
+
+The third tier moves historical Parquet partitions off local disk into a remote
+store (such as S3, Azure Blob, or GCS in the cloud, or NFS for on-premise
+deployments), reducing the local storage footprint. These remote partitions
+remain directly queryable from QuestDB with SQL, exactly as if they were stored
+locally, and the primary and all replicas share the same object storage.
+
+In QuestDB Enterprise this is automated through
+[storage policies](/docs/concepts/storage-policy/), which control when partitions
+are converted to Parquet and when they are uploaded to and dropped from object
+storage (the `TO REMOTE` and `DROP REMOTE` policy stages).
+
+Once partitions are in object storage, they can be catalogued into data lakes,
+for example through Hive partition registration, an Iceberg catalog, or a
+DuckLake catalog.
 
 
 

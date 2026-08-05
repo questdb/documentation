@@ -25,6 +25,13 @@ The locale used to handle date types.
 Directory for storing database tables and metadata. This directory is relative
 to the server root directory provided at startup.
 
+If you set it to an absolute path, QuestDB no longer derives its other
+directories from the server root directory. The `conf`, `import`, `export`,
+`tmp` and `.checkpoint` directories are then created as siblings of the
+directory you specify, rather than as children of the server root directory.
+Under Docker this places them outside the mounted volume, so leave `cairo.root`
+at its default and change the volume mapping instead.
+
 ### cairo.system.table.prefix
 
 - **Default**: `sys.`
@@ -47,16 +54,38 @@ The locale used to handle timestamp types.
 
 When `false`, disables the `reload_config()` SQL function.
 
+### query.timeout
+
+- **Default**: `60s`
+- **Reloadable**: no
+
+A global timeout for long-running queries, given as a duration: `500ms`, `120s`,
+`2m` and `1h` are all valid, and a plain number is read as milliseconds.
+
+This key replaces `query.timeout.sec`. When both are set, `query.timeout` takes
+precedence; when neither is set, queries time out after 60 seconds.
+
+Per-query overrides are available via the HTTP header
+[`Statement-Timeout`](/docs/connect/compatibility/rest-api/#headers) or the
+Postgres [`options`](/docs/connect/compatibility/pgwire/overview/)
+connection property.
+
 ### query.timeout.sec
 
 - **Default**: `60`
 - **Reloadable**: no
 
-A global timeout in seconds for long-running queries. Per-query overrides are
-available via the HTTP header
-[`Statement-Timeout`](/docs/connect/compatibility/rest-api/#headers) or the Postgres
-[`options`](/docs/connect/compatibility/pgwire/overview/)
-connection property.
+:::note
+
+`query.timeout.sec` is deprecated. Use `query.timeout` instead, which takes a
+duration rather than a whole number of seconds. QuestDB reports this key as a
+deprecation advisory during config validation at startup.
+
+:::
+
+A global timeout in seconds for long-running queries. When `query.timeout` is
+also set, it takes precedence and this key is ignored. Per-query overrides work
+the same as for `query.timeout`.
 
 ## Commit and write behavior
 
@@ -930,8 +959,9 @@ Memory page size used by `rnd_` functions. Supports `rnd_str()` and
 
 ## Parquet encoding
 
-Settings for Parquet-encoded partitions, used by storage policies and
-COPY TO exports.
+Settings for Parquet-encoded partitions, used by
+[table-level Parquet format](/docs/query/sql/create-table/#partition-format),
+storage policies, and COPY TO exports.
 
 ### cairo.partition.encoder.parquet.bloom.filter.fpp
 
@@ -1002,6 +1032,16 @@ Controls whether statistics are included in parquet-encoded partitions.
 - **Reloadable**: no
 
 Output Parquet version for parquet-encoded partitions. Can be `1` or `2`.
+
+### cairo.sql.parquet.cache.memory.size
+
+- **Default**: `256M`
+- **Reloadable**: no
+
+Per-cursor memory budget, in bytes, for caching decoded Parquet row groups
+while scanning Parquet partitions. It balances memory use against repeated
+row-group decoding. Replaces the deprecated slot-based
+`cairo.sql.parquet.frame.cache.capacity`, which is still accepted but ignored.
 
 ### cairo.sql.parquet.row.group.pruning.enabled
 
