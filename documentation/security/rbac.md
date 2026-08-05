@@ -580,6 +580,7 @@ SELECT * FROM all_permissions();
 | CANCEL ANY COPY | Database | Cancel COPY operations |
 | CREATE TABLE | Database | Create tables |
 | CREATE MATERIALIZED VIEW | Database | Create materialized views |
+| CREATE LIVE VIEW | Database | Create live views |
 | DEDUP ENABLE | Database &#124; Table | Enable deduplication |
 | DEDUP DISABLE | Database &#124; Table | Disable deduplication |
 | DETACH PARTITION | Database &#124; Table | Detach partitions |
@@ -589,6 +590,7 @@ SELECT * FROM all_permissions();
 | DROP PARTITION | Database &#124; Table | Drop partitions |
 | DROP TABLE | Database &#124; Table | Drop tables |
 | DROP MATERIALIZED VIEW | Database &#124; Table | Drop materialized views |
+| DROP LIVE VIEW | Database &#124; Table | Drop live views |
 | ENABLE STORAGE POLICY | Database &#124; Table | Enable storage policies |
 | INSERT | Database &#124; Table | Insert data |
 | REFRESH MATERIALIZED VIEW | Database &#124; Table | Refresh materialized views |
