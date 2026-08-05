@@ -34,7 +34,7 @@ out one folder per partition, depends on your edition:
   so only the Iceberg registration is left to do.
 
 - **QuestDB open source** is manual end to end. First produce Parquet, by
-  [converting partitions in place or exporting](/docs/query/export-parquet/)
+  [converting partitions in place or exporting](/docs/concepts/parquet/)
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`), or by creating the table in
   Parquet format with [`CREATE TABLE`](/docs/query/sql/create-table/). QuestDB
   writes those files locally in its own partition layout, so you then move them to
@@ -182,7 +182,7 @@ tables, including the nanosecond and UUID handling described above.
 :::info Related documentation
 
 - [Storage policies](/docs/concepts/storage-policy/)
-- [Parquet export](/docs/query/export-parquet/)
+- [Parquet export](/docs/concepts/parquet/)
 - [CREATE TABLE](/docs/query/sql/create-table/)
 - [Partitions](/docs/concepts/partitions/)
 - [Designated timestamp](/docs/concepts/designated-timestamp/)
