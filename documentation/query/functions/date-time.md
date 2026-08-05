@@ -90,6 +90,7 @@ the designated timestamp for the scope of a query.
 | [days_in_month](#days_in_month) | Number of days in the month |
 | [extract](#extract) | Extract any time unit from timestamp |
 | [hour](#hour) | Extract hour (0-23) |
+| [is_end_of_month](#is_end_of_month) | Check if a timestamp is on the last day of its month |
 | [is_leap_year](#is_leap_year) | Check if year is a leap year |
 | [micros](#micros) | Extract microseconds (0-999) |
 | [millis](#millis) | Extract milliseconds (0-999) |
@@ -649,6 +650,45 @@ SELECT
 | interval_start              |
 | :-------------------------- |
 | 2024-10-08T11:09:47.573000Z |
+
+## is_end_of_month
+
+`is_end_of_month(value)` - returns `true` if `value` falls on the last calendar
+day of its month, `false` otherwise.
+
+The check is leap-year aware, so `29 February` is a month end in a leap year but
+`28 February` is not. The result depends only on the calendar day, so any time
+of day on the last day of the month returns `true`. A `null` input returns
+`false`.
+
+**Arguments:**
+
+- `value` is any `timestamp`, `timestamp_ns`, or `date`
+
+**Return value:**
+
+Return value type is `boolean`
+
+**Examples:**
+
+```questdb-sql demo title="Month-end check"
+SELECT
+  is_end_of_month('2024-02-29T00:00:00.000000Z'::timestamp) feb29_leap,
+  is_end_of_month('2023-02-28T00:00:00.000000Z'::timestamp) feb28_nonleap,
+  is_end_of_month('2024-02-28T00:00:00.000000Z'::timestamp) feb28_leap,
+  is_end_of_month(null) nul;
+```
+
+| feb29_leap | feb28_nonleap | feb28_leap | nul   |
+| :--------- | :------------ | :--------- | :---- |
+| true       | true          | false      | false |
+
+```questdb-sql title="Keep only month-end trades" demo
+SELECT timestamp, symbol, price
+FROM trades
+WHERE is_end_of_month(timestamp)
+LIMIT 10;
+```
 
 ## is_leap_year
 
