@@ -28,7 +28,7 @@ The header displays the following information:
 
 The panel is organized into two tabs: **Monitoring** and **Details**.
 
-## Monitoring Tab
+## Monitoring tab
 
 The Monitoring tab provides real-time health and ingestion information. It is the default view when opening the panel.
 
@@ -39,18 +39,18 @@ The Monitoring tab provides real-time health and ingestion information. It is th
   height={562}
 />
 
-### Critical Error Banners
+### Critical error banners
 
 When critical issues are detected, error banners appear at the top of the tab with actionable options:
 
 - **WAL Suspended**: Shown when Write-Ahead Log operations are suspended. Includes a "Resume WAL" button, an "Ask AI" button, and a link to relevant documentation.
 - **Materialized View Invalid**: Shown when a materialized view is in an invalid state. Displays the invalidation reason along with "Ask AI" and documentation links.
 
-### Row Count
+### Row count
 
 Displays the current row count and the last write timestamp. Hover over the timestamp to see the exact ISO timestamp with a copy option.
 
-### Materialized View Status
+### Materialized view status
 
 For materialized views, an additional status section shows:
 
@@ -85,7 +85,7 @@ A pulsing indicator appears when active ingestion is detected.
 For tables without WAL enabled, the Ingestion section displays a "Write-Ahead Log is disabled" status instead of the metrics grid.
 :::
 
-### Performance Alerts
+### Performance alerts
 
 When the health check system detects performance issues, alerts are displayed with:
 
@@ -94,7 +94,7 @@ When the health check system detects performance issues, alerts are displayed wi
 - An "Ask AI" button for troubleshooting assistance
 - A link to the relevant documentation
 
-## Details Tab
+## Details tab
 
 The Details tab provides structural information about the data source.
 
@@ -105,7 +105,7 @@ The Details tab provides structural information about the data source.
   height={816}
 />
 
-### Base Table
+### Base table
 
 For materialized views, this section shows the base table name with a clickable link to navigate to its details.
 
@@ -132,3 +132,11 @@ A grid displaying key storage configuration:
 | Deduplication | Whether deduplication is enabled or disabled |
 | Partitioning | Partition strategy of the data source |
 | Refresh Type | Refresh mode of a materialized view. See [materialized view refresh docs](/docs/query/sql/refresh-mat-view) for details |
+
+### Storage policy
+
+For tables with a [storage policy](/docs/concepts/storage-policy/), this section lists the configured stages, such as "To Parquet", "To Remote", "Drop Local", and "Drop Remote", along with their schedules.
+
+:::note
+Storage policy is [Enterprise](/enterprise/) only.
+:::

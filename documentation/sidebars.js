@@ -32,6 +32,28 @@ module.exports = {
           items: [
             "getting-started/web-console/overview",
             "getting-started/web-console/code-editor",
+            {
+              type: "category",
+              label: "Notebooks",
+              collapsed: true,
+              link: {
+                type: "doc",
+                id: "getting-started/web-console/notebooks/overview",
+              },
+              items: [
+                {
+                  type: "doc",
+                  id: "getting-started/web-console/notebooks/overview",
+                  label: "Overview",
+                },
+                "getting-started/web-console/notebooks/cells",
+                "getting-started/web-console/notebooks/charts",
+                "getting-started/web-console/notebooks/variables",
+                "getting-started/web-console/notebooks/live-dashboards",
+                "getting-started/web-console/notebooks/manage-share",
+              ],
+            },
+            "getting-started/web-console/mcp-connection",
             "getting-started/web-console/questdb-ai",
             "getting-started/web-console/metrics-view",
             "getting-started/web-console/schema-explorer",
