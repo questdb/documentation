@@ -312,112 +312,101 @@ increase overall CPU usage.
 
 ## OS configuration
 
-Changing system settings on the host OS can improve QuestDB performance. QuestDB
-may reach system limits relating to maximum open files, and virtual memory
-areas.
+QuestDB relies on two per-process OS limits that are often too low by default: the
+number of open files and the number of memory-mapped areas. Raise **both to
+1048576** before running in production. QuestDB warns when either is too low, in the
+[Web Console](/docs/getting-started/web-console/overview/) and the startup log;
+hitting a limit at runtime causes OS errors and can leave the database unstable.
 
-QuestDB writes operating system errors to its logs unchanged. We only recommend
-changing the following system settings in response to seeing such OS errors in
-the logs.
+| Limit | What it caps | Typical default | Recommended | Check current value |
+| --- | --- | --- | --- | --- |
+| Open files (`ulimit -n`) | File descriptors per process | `524288` (systemd) | `1048576` | QuestDB startup log |
+| `vm.max_map_count` | Memory-mapped regions per process | `65530` | `1048576` | startup log, or `cat /proc/sys/vm/max_map_count` |
 
-### Maximum open files
+### Maximum open files {#maximum-open-files}
 
-QuestDB uses a [columnar](/glossary/columnar-database/) storage model, and
-therefore its core data structures relate closely to the file system. Columnar
-data is stored in its own `.d` file, per time partition. In edge cases with
-extremely large tables, frequent out-of-order ingestion, or a high number of
-table partitions, the number of open files may hit a user or system-wide maximum
-limit, causing reduced performance and other unwanted behaviours.
+QuestDB's [columnar](/glossary/columnar-database/) storage keeps many files open,
+at least one per column per partition. Large tables, many partitions, or heavy
+out-of-order ingestion can push this past a low limit, causing "too many open
+files" errors (`errno=24`) and reduced performance. The Web Console shows:
 
-In Linux/MacOS environments, maximum open file limits for the current user:
+```
+fs.file-max limit is too low [current=524288, recommended=1048576]
+```
+
+:::note
+
+Despite the name, this is the **per-process** limit (`ulimit -n`), not the
+system-wide `fs.file-max` sysctl, which is already high on modern Linux and needs
+no change. On systemd distributions the per-process hard limit defaults to
+**524288**, below the recommended value, so a fresh install can trigger the warning.
+
+:::
+
+#### Raise the limit
+
+QuestDB logs both limits at startup:
+
+```
+A server-main fs.file-max checked [limit=1048576]
+A server-main vm.max_map_count checked [limit=1048576]
+```
+
+On Linux it is enough to raise the **hard** limit; the JVM raises its own soft limit
+to match at startup. For a **systemd service**, set `LimitNOFILE` in the unit's
+`[Service]` section:
+
+```ini title="questdb.service"
+[Service]
+LimitNOFILE=1048576
+```
 
 ```bash
-# Soft limit
-ulimit -Sn
-# Hard limit
-ulimit -Hn
+sudo systemctl daemon-reload && sudo systemctl restart questdb
 ```
 
-#### Setting the open file limit for the current user:
+When started **manually from a shell**, add a drop-in for the user that runs
+QuestDB, then log out and back in:
 
-On a Linux environment, one must increase the hard limit. On MacOS, both the
-hard and soft limits must be set. See
-[Max Open Files Limit on MacOS for the JVM](/blog/max-open-file-limit-macos-jvm/)
-for more details.
+```ini title="/etc/security/limits.d/99-questdb.conf"
+questdb soft nofile 1048576
+questdb hard nofile 1048576
+```
 
-Modify user limits using `ulimit`:
+On **macOS**, the JVM has a low built-in file-descriptor cap, but the `questdb.sh`
+launcher lifts it for you; you only need to raise the OS limits:
 
 ```bash
-# Hard limit
-ulimit -H -n 1048576
-# Soft limit
-ulimit -S -n 1048576
-```
-
-The system-wide limit should be increased correspondingly.
-
-#### Setting the system-wide open file limit on Linux:
-
-To increase this setting and persist this configuration change, the limit on the
-number of concurrently open files can be amended in `/etc/sysctl.conf`:
-
-```ini title="/etc/sysctl.conf"
-fs.file-max=1048576
-```
-
-To confirm that this value has been correctly configured, reload `sysctl` and
-check the current value:
-
-```bash
-# reload configuration
-sysctl -p
-# query current settings
-sysctl fs.file-max
-```
-
-#### Extra steps for systemd
-
-If you are running the QuestDB using `systemd`, you will also need to set the `LimitNOFILE` property in your service file.
-
-If you have followed the [setup guide](/docs/deployment/systemd/), then the file should be called `questdb.service` and be located at `~/.config/systemd/user/questdb.service`.
-
-Add this property to the `[Service]` section, setting it to at least `1048576`, or higher if you have set higher OS-wide limits.
-
-Then restart the service. If you have configured these settings correctly, any warnings in the [Web Console](/docs/getting-started/web-console/overview/) should now be cleared.
-
-#### Setting system-wide open file limit on MacOS:
-
-On MacOS, the system-wide limit can be modified by using `launchctl`:
-
-```shell
 sudo launchctl limit maxfiles 98304 2147483647
+ulimit -H -n 1048576
 ```
 
-To confirm the change, view the current settings using `sysctl`:
+See [Max Open Files Limit on macOS for the JVM](/blog/max-open-file-limit-macos-jvm/)
+for the details.
 
-```shell
-sysctl -a | grep kern.maxf
+### Maximum virtual memory areas (`vm.max_map_count`) {#max-virtual-memory-areas-limit}
+
+This applies to **Linux only**; macOS and Windows have no equivalent setting.
+
+QuestDB memory-maps its data files and can hold a very large number of mappings at
+once, especially under out-of-order ingestion. Each counts against the kernel's
+`vm.max_map_count`. On RHEL 9, Ubuntu 22.04, and Debian 12 this defaults to
+**65530**, far too low (newer distributions such as Ubuntu 24.04+, Fedora 39+ already
+ship `1048576`). When exhausted, `mmap` fails with out-of-memory errors
+([errno=12](/docs/troubleshooting/os-error-codes/)) that can destabilize the database.
+The Web Console shows:
+
+```
+vm.max_map_count limit is too low [current=65530, recommended=1048576]
 ```
 
-### Max virtual memory areas limit
+It is a kernel sysctl, independent of the open-files limit above. Set it with a
+drop-in and apply:
 
-The database relies on memory mapping to read and write data to its files. If
-the host machine has low limits on virtual memory mapping areas, this can cause
-out-of-memory exceptions
-([errno=12](/docs/troubleshooting/os-error-codes/)). To
-increase this setting and persist this configuration change, mapped memory area
-limits can be amended in `/etc/sysctl.conf`:
-
-```ini title="/etc/sysctl.conf"
+```ini title="/etc/sysctl.d/99-questdb.conf"
 vm.max_map_count=1048576
 ```
 
-Each mapped area may consume ~128 bytes for each map count i.e 1048576 may use
-1048576\*128 = 134MB of kernel memory.
-
 ```bash
-# reload configuration
-sysctl -p
-# query current settings
-cat /proc/sys/vm/max_map_count
+sudo sysctl --system
 ```

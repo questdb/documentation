@@ -228,7 +228,6 @@ module.exports = {
           ],
         },
         "query/rest-api",
-        "query/export-parquet",
         {
           type: "category",
           label: "Data Types",
@@ -286,7 +285,9 @@ module.exports = {
                     "query/sql/alter-table-drop-column",
                     "query/sql/alter-table-drop-partition",
                     "query/sql/alter-table-rename-column",
+                    "query/sql/alter-table-rebase-wal",
                     "query/sql/alter-table-resume-wal",
+                    "query/sql/alter-table-set-format",
                     "query/sql/alter-table-set-param",
                     "query/sql/alter-table-set-storage-policy",
                     "query/sql/alter-table-set-ttl",
@@ -522,6 +523,11 @@ module.exports = {
             "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
+            {
+              id: "concepts/parquet",
+              type: "doc",
+              label: "Parquet",
+            },
             "concepts/symbol",
             {
               id: "concepts/views",

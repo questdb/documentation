@@ -20,6 +20,7 @@ The first two modes accept the same set of optional clauses:
 
 - [`TIMESTAMP`](#designated-timestamp) - designated timestamp column
 - [`PARTITION BY`](#partitioning) - partition unit and WAL mode
+- [`FORMAT`](#partition-format) - partition storage format (`NATIVE` or `PARQUET`)
 - [`TTL`](#time-to-live-ttl) - time-to-live for partitions
 - [`STORAGE POLICY`](#storage-policy) - partition lifecycle automation (Enterprise)
 - [`DEDUP`](#deduplication) - deduplication keys (can also be set later with
@@ -36,10 +37,11 @@ TABLE [IF NOT EXISTS] tableName
     (columnName columnTypeDef [, columnName columnTypeDef ...])  -- see Type definition
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -57,10 +59,11 @@ TABLE [IF NOT EXISTS] tableName
     [, cast(columnRef AS columnTypeDef) ...]  -- see Type definition
     [, INDEX (columnRef [CAPACITY n | TYPE POSTING [DELTA | EF]]) ...]  -- see Column indexes
     [TIMESTAMP (columnName)
-        [PARTITION BY { NONE | YEAR | MONTH | DAY | HOUR }
-            [BYPASS WAL | WAL]
+        [PARTITION BY { NONE | YEAR | MONTH | WEEK | DAY | HOUR }
             [ TTL n { HOUR[S] | DAY[S] | WEEK[S] | MONTH[S] | YEAR[S] }
-            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]]]
+            | STORAGE POLICY ( policyStage [, policyStage ...] ) ]
+            [FORMAT { NATIVE | PARQUET }]
+            [BYPASS WAL | WAL]]]
     [DEDUP UPSERT KEYS (columnName [, columnName ...])]
     [WITH tableParameter]
     [IN VOLUME 'alias']
@@ -203,6 +206,45 @@ one of the following:
 The partitioning strategy **cannot be changed** after the table has been
 created.
 
+## Partition format
+
+By default, table partitions are stored in QuestDB's `NATIVE` binary format. A
+partitioned [WAL](/docs/concepts/write-ahead-log/) table can instead store its
+partitions as [Parquet](/docs/concepts/parquet/) by adding a `FORMAT`
+clause after `PARTITION BY` (and after `TTL` or `STORAGE POLICY`, if present):
+
+```questdb-sql title="Store partitions as Parquet"
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE,
+  amount DOUBLE
+) TIMESTAMP(timestamp)
+PARTITION BY DAY
+FORMAT PARQUET
+WAL;
+```
+
+`FORMAT` accepts one of:
+
+- `NATIVE` (default): QuestDB's native column format.
+- `PARQUET`: partitions are stored as Parquet.
+
+Notes and constraints:
+
+- `FORMAT PARQUET` is only supported on **partitioned WAL tables**. It is
+  rejected on non-partitioned or `BYPASS WAL` tables.
+- To change the format after creation, use
+  [`ALTER TABLE SET FORMAT`](/docs/query/sql/alter-table-set-format/). Changing
+  the format does not convert existing partitions; it applies to partitions
+  written afterwards.
+- Out-of-order writes into a Parquet partition are more expensive than into a
+  native partition.
+
+To convert individual existing partitions instead of setting a table-wide
+format, see
+[in-place Parquet conversion](/docs/concepts/parquet/#in-place-conversion).
+
 ## Time To Live (TTL)
 
 To store and analyze only recent data, configure a time-to-live (TTL) period on
@@ -262,10 +304,14 @@ information on the behavior of this feature.
 
 :::note
 
-In QuestDB Enterprise, `TTL` is deprecated — `CREATE TABLE ... TTL` is
-rejected with `TTL settings are deprecated, please, create a storage policy
-instead`. Use `STORAGE POLICY` instead. If a legacy table has a TTL set, clear
-it with `ALTER TABLE SET TTL 0` before setting a storage policy.
+In QuestDB Enterprise, use `STORAGE POLICY` instead of `TTL`.
+`CREATE TABLE ... TTL` is still accepted for backward compatibility and is
+translated into a `STORAGE POLICY(DROP LOCAL ...)`. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is rejected with `TTL is not
+supported on Enterprise tables; use a storage policy instead`. A table can still
+carry a TTL if it was created in QuestDB Open Source and later upgraded to
+Enterprise; clear that legacy TTL with `ALTER TABLE SET TTL 0` before setting a
+storage policy.
 
 :::
 
@@ -299,9 +345,9 @@ A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
 positive. A drop stage may not precede the write it depends on (`TO PARQUET`
 and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
 `TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
-removes its native files and serves reads from the Parquet file. `TO REMOTE`
-and `DROP REMOTE` are reserved syntax and are currently rejected at SQL parse
-time with `'TO REMOTE' is not supported yet` and
+removes its native files and serves reads from the Parquet file. Storage
+policies currently operate locally only: `TO REMOTE` is accepted and stored but
+not yet enforced, and `DROP REMOTE` is rejected at SQL parse time with
 `'DROP REMOTE' is not supported yet`.
 
 To modify a storage policy after table creation, see
@@ -494,7 +540,7 @@ PARQUET(encoding [, compression[(level)]])
 Column definitions may include an optional
 `PARQUET(encoding [, compression[(level)]] [, BLOOM_FILTER])` clause. These
 settings only affect
-[Parquet partitions](/docs/query/export-parquet/#in-place-conversion) and are
+[Parquet partitions](/docs/concepts/parquet/#in-place-conversion) and are
 ignored for native partitions. Encoding, compression, and bloom filter are all
 optional — use `default` for the encoding when specifying compression only.
 
@@ -622,7 +668,7 @@ configuration options.
 :::note
 
 When converting partitions with an explicit `bloom_filter_columns` option in
-[`CONVERT PARTITION`](/docs/query/export-parquet/#bloom-filters-for-in-place-conversion),
+[`CONVERT PARTITION`](/docs/concepts/parquet/#bloom-filters-for-in-place-conversion),
 the explicit list overrides per-column `BLOOM_FILTER` metadata.
 
 :::

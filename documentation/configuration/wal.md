@@ -14,6 +14,32 @@ files.
 
 When disabled, SQL executed by the WAL apply job always runs single-threaded.
 
+## cairo.wal.apply.suspended.tables
+
+- **Default**: none
+- **Reloadable**: yes
+
+Comma-separated list of table directory names (for example, `my_table~3`) whose
+WAL transactions the apply job must not apply, keeping them "hard suspended".
+Directory names are matched rather than logical names, so the suspension follows
+the physical table across a rename, and a new table that reuses the name is
+unaffected. This is the static counterpart to `ALTER TABLE ... SUSPEND WAL`,
+whose runtime set is tracked separately. A table listed here stays suspended
+until it is removed from the list.
+
+## cairo.wal.apply.suspended.write.denied
+
+- **Default**: `false`
+- **Reloadable**: yes
+
+When enabled, tables suspended from WAL apply (through
+`cairo.wal.apply.suspended.tables` or `ALTER TABLE ... SUSPEND WAL`) also reject
+new WAL writes with a distinct error, similar to writing to a dropped table.
+When disabled, suspension only excludes the table from WAL apply while writes
+keep buffering for later. Must be enabled to use
+[`ALTER TABLE ... REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/), so that
+suspension makes the table quiescent.
+
 ## cairo.wal.max.lag.txn.count
 
 - **Default**: `20`

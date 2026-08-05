@@ -1,5 +1,5 @@
 ---
-title: "QuestDB Documentation - SQL Time-Series Database Guides"
+title: "QuestDB Documentation: SQL time-series guides"
 sidebar_label: Introduction
 hide_title: true
 slug: /

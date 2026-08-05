@@ -67,7 +67,7 @@ WAL files when needed. Slower recovery, lower cost.
 | NFS filesystem | Supported |
 | HDFS | Planned |
 
-Need something else? [Contact us](/enterprise/contact).
+Need something else? [Contact us](/enterprise/contact/).
 
 ## Requirements
 

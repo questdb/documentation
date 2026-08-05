@@ -2484,12 +2484,12 @@
   resolved "https://registry.npmjs.org/@polka/url/-/url-1.0.0-next.28.tgz"
   integrity sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==
 
-"@questdb/sql-parser@0.1.8":
-  version "0.1.8"
-  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.8.tgz#8410004bcaa628903611c140ba89c3d301901ab5"
-  integrity sha512-Xoj1MPHRRBK7V7pEmesEkQ1Oprh3i6ZviEvGJfVgQIn2OjhzZ5ScyUNQl5ejIeOohXMbc2dqvbshvoneLWtjKQ==
+"@questdb/sql-parser@0.1.16":
+  version "0.1.16"
+  resolved "https://registry.yarnpkg.com/@questdb/sql-parser/-/sql-parser-0.1.16.tgz#bee1d13af2be07b84b4a3d4e92b8faf42a5d0049"
+  integrity sha512-HsrTjs5lC5bdC5AE1kttnI6RC4ibREfb8iPg2/+JUHZqgz1Qg3kcel8jPu7SrHocB3GP4HDuElAP7XEpE5Wb+g==
   dependencies:
-    chevrotain "^11.1.1"
+    chevrotain "11.1.1"
 
 "@radix-ui/number@1.1.0":
   version "1.1.0"
@@ -4997,7 +4997,7 @@ chevrotain-allstar@~0.3.0:
   dependencies:
     lodash-es "^4.17.21"
 
-chevrotain@^11.1.1:
+chevrotain@11.1.1:
   version "11.1.1"
   resolved "https://registry.yarnpkg.com/chevrotain/-/chevrotain-11.1.1.tgz#39be6f767cb22cc6a728246995ba906c5c2f2157"
   integrity sha512-f0yv5CPKaFxfsPTBzX7vGuim4oIC1/gcS7LUGdBSwl2dU6+FON6LVUksdOo1qJjoUvXNn45urgh8C+0a24pACQ==

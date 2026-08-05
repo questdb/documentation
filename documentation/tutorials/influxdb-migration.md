@@ -253,4 +253,4 @@ protocol, or compare QuestDB with Influx:
 - [ILP `server.conf` configuration](/docs/configuration/ingestion/)
 - [ILP API Overview](/docs/ingestion/ilp/overview/)
 - [Comparing TimescaleDB and QuestDB performance and architecture blog](/blog/timescaledb-vs-questdb-comparison/)
-- [Deep dive of QuestDB vs InfluxDB internals](/blog/2024/02/26/questdb-versus-influxdb/)
+- [Deep dive of QuestDB vs InfluxDB internals](/blog/influxdb-vs-questdb-comparison/)
