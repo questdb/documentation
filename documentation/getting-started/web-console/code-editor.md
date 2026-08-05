@@ -17,12 +17,13 @@ The **Code Editor** is the main workspace where you write and execute SQL querie
 The Monaco-based editor provides a powerful development environment for writing SQL queries with professional IDE features. It offers syntax highlighting, intelligent auto-completion for database objects, and multiple execution modes to suit different query workflows.
 
 ### Key features
-- **Syntax Highlighting**: Color-coded SQL keywords, strings, comments, and functions specific to QuestDB SQL
-- **Auto-Completion**: Intelligent suggestions for table names, columns, and SQL functions as you type
-- **Visual Query Status**: Glyph icons in the editor margin show query execution status (success, error, running)
-- **Error Markers**: Underlined error positions based on query results
-- **Multiple Execution Modes**: Support for single query execution, selection-based execution, and batch execution
-- **Query Planning**: Analyze query execution plans with EXPLAIN functionality
+
+- **Syntax highlighting**: Color-coded SQL keywords, strings, comments, and functions specific to QuestDB SQL
+- **Auto-completion**: Intelligent suggestions for table names, columns, and SQL functions as you type
+- **Visual query status**: Glyph icons in the editor margin show query execution status (success, error, running)
+- **Error markers**: Underlined error positions based on query results
+- **Multiple execution modes**: Support for single query execution, selection-based execution, and batch execution
+- **Query planning**: Analyze query execution plans with EXPLAIN functionality
 
 :::info
 Error markers and the query log are dynamically updated based on cursor position. When you place your cursor within a query, the query log will display the status of that specific query, and error markers will appear if the query execution was previously unsuccessful.
@@ -44,6 +45,7 @@ Click the icon in the left margin next to any SQL query to execute it.
 />
 
 The icon provides visual feedback:
+
 - **Hollow play icon**: Ready to execute
 - **Success icon**: Query executed successfully  
 - **Error icon**: Query failed with errors
@@ -83,26 +85,30 @@ The editor provides dedicated buttons on the top right for multiple query execut
   margin={false}
 />
 
-**Run Query Button**:
+**Run query button**:
+
 - Dynamically adapts based on your current selection and context
 - For single query: Shows "Run query" or "Run selected query"
 - For multiple selected queries: Shows "Run N selected queries"
 - **Keyboard shortcut**: `Ctrl/Cmd + Enter`
 
-**Run All Queries Button**:
+**Run all queries button**:
+
 - Executes every query in the current tab sequentially
 - **Keyboard shortcut**: `Ctrl/Cmd + Shift + Enter`
 
 #### Execution modes
 
-**Selected Queries Mode**:
+**Selected queries mode**:
 When you have multiple queries selected (partially or fully), the system runs only the selected portions of each query in sequence. This allows you to:
+
 - Run specific parts of larger queries
 - Execute a subset of queries from your tab
 - Test query fragments before running the complete set
 
-**All Queries Mode**:
+**All queries mode**:
 When you choose "Run all queries", the system executes every query in the tab from top to bottom. This mode includes:
+
 - **Confirmation dialog**: Prevents accidental execution of all queries
 - **Stop after failure option**: Checkbox to halt execution when a query fails (enabled by default)
 - **Progress tracking**: Real-time feedback showing successful and failed query counts
@@ -146,8 +152,8 @@ Access previously closed tabs and manage your query history.
   margin={false}
 />
 
-- **Restore Tab**: Click on an item to restore a previously closed tab from the history
-- **Clear History**: Remove all stored tab history to start fresh
+- **Restore tab**: Click on an item to restore a previously closed tab from the history
+- **Clear history**: Remove all stored tab history to start fresh
 
 ### Importing and exporting tabs
 

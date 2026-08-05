@@ -77,6 +77,13 @@ function replaceComponent(content, componentName, replacer) {
 }
 
 /**
+ * Public base URL for static assets. Screenshot and LazyVideo resolve their
+ * src through useBaseUrl(), so assets are served under the docs baseUrl
+ * ("/docs/"), not at the site root.
+ */
+const ASSET_BASE_URL = "https://questdb.com/docs"
+
+/**
  * Converts <Screenshot /> components to a markdown link so the alt text and
  * image URL survive in the raw markdown output
  */
@@ -89,7 +96,7 @@ function convertScreenshot(content) {
     }
     const urlPath = src.startsWith("/") ? src : `/${src}`
     const label = alt ? `Screenshot: ${alt}` : "Screenshot"
-    return `\n\n[${label}](https://questdb.com${urlPath})\n\n`
+    return `\n\n[${label}](${ASSET_BASE_URL}${urlPath})\n\n`
   })
 }
 
@@ -113,7 +120,7 @@ function convertVideo(content) {
       .basename(urlPath, path.extname(urlPath))
       .replace(/[-_]+/g, " ")
     const label = (match.props.label || match.props.title || name).trim()
-    return `\n\n[Video: ${label}](https://questdb.com${urlPath})\n\n`
+    return `\n\n[Video: ${label}](${ASSET_BASE_URL}${urlPath})\n\n`
   }
 
   const withNativeVideos = replaceComponent(content, 'video', replacer)

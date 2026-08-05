@@ -32,13 +32,13 @@ closing the popover) discards your draft.
 
 A pair like this parameterizes a whole dashboard:
 
-```questdb-sql
+```questdb-sql title="Notebook variables as a DECLARE block"
 DECLARE
   @symbol := 'BTC-USDT',
-  @start := dateadd('h', -1, now())
+  @window := '$now - 1h..$now'
 ```
 
-with cells querying `WHERE symbol = @symbol AND timestamp >= @start`.
+with cells querying `WHERE symbol = @symbol AND timestamp IN @window`.
 
 ## How variables are applied
 

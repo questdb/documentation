@@ -89,22 +89,22 @@ still draws the chart once, and a manual refresh always goes through.
 The dashboard pictured above, built on the demo `trades` table:
 
 1. Add a markdown cell as the title, and define `@symbol := 'BTC-USDT'` and
-   `@start := dateadd('h', -1, now())` under **Variables**.
+   `@window := '$now - 1h..$now'` under **Variables**.
 2. Add the price cell. Two statements in one cell draw candles with volume
    bars behind them; assign the volume query to the right axis in
    [Chart settings](/docs/getting-started/web-console/notebooks/charts#chart-settings)
    and cap that axis so the bars stay low:
 
-   ```questdb-sql
+   ```questdb-sql title="1-minute candles and volume for the last hour"
    SELECT timestamp, first(price) AS open, max(price) AS high,
      min(price) AS low, last(price) AS close
    FROM trades
-   WHERE symbol = @symbol AND timestamp >= @start
+   WHERE symbol = @symbol AND timestamp IN @window
    SAMPLE BY 1m;
 
    SELECT timestamp, sum(amount) AS volume
    FROM trades
-   WHERE symbol = @symbol AND timestamp >= @start
+   WHERE symbol = @symbol AND timestamp IN @window
    SAMPLE BY 1m;
    ```
 
