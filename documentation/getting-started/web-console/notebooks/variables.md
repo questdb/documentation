@@ -20,10 +20,10 @@ you have some). Each row is `@name := value`, where the value is any SQL
 expression: a string, a number, an interval, or a function call.
 
 <Screenshot
-  alt="The variables popover with symbol and start variables defined"
+  alt="The variables popover with symbol and window variables defined"
   src="images/docs/console/notebook-variables.webp"
-  height={277}
-  width={580}
+  height={274}
+  width={570}
 />
 
 **Add variable** appends a row. **Apply** validates every variable against
