@@ -407,6 +407,109 @@ actually does.
 Structure: Intro (what it does in one sentence) - Syntax - How it works
 (precise mechanics) - Examples (demoable) - Limitations.
 
+## Overview page sync
+
+Several sections have an overview or index page that lists every page in that
+section (e.g. `integrations/overview.md`, `cookbook/sql/finance/index.md`).
+These lists go stale silently: nothing in the build checks that the overview
+matches `sidebars.js`, so a missing entry is invisible until a reader can't
+find a page.
+
+**Whenever you add or remove a page in a section that has an overview page,
+update that overview in the same change. Do it automatically, without
+asking.**
+
+- **Adding a page**: add a bullet to the overview, in the section that
+  corresponds to its `sidebars.js` category.
+- **Removing a page**: delete its bullet from the overview.
+- **Renaming a page**: update the label and the link.
+
+Never leave an overview listing a page that no longer exists, or omitting one
+that does.
+
+### Match the sidebar, not your own judgement
+
+The overview must mirror `sidebars.js`, not what seems logically tidy:
+
+- **Section order** follows the sidebar's category order.
+- **Item order within a section** follows the sidebar's item order. That order
+  is curated, not alphabetical. Do not re-sort it alphabetically, and do not
+  "fix" it, even when it looks arbitrary.
+- **Section headings** should correspond to the sidebar's category labels.
+
+Where a page lives in the sidebar decides which overview section it belongs
+to. A page under the `Other Tools` sidebar category goes in the overview's
+"other tools" section even if its subject matter sounds like ingestion or
+analytics.
+
+### Do not rename existing headings
+
+Overview headings are anchor targets. Renaming `## Tooling and Interfaces` to
+`## Other Tools` changes `#tooling-and-interfaces` to `#other-tools` and
+breaks every inbound link.
+
+Only rename a heading when the user explicitly asks. When you do, first grep
+both repos for the old anchor and report what you find:
+
+```
+grep -rn --exclude-dir=node_modules --exclude-dir=.git \
+  --exclude-dir=build --exclude-dir=.docusaurus "old-anchor-slug" .
+```
+
+Adding, removing, and reordering bullets is safe. Renaming headings is not.
+
+### Moving a page between sections
+
+Moving a page across sidebar categories is not a mechanical edit. **Stop and
+ask the user** which outcome they want:
+
+1. **Point to the new location**: move the entry to the new section, leaving
+   one canonical home. Usually correct.
+2. **Duplicate it**: list it in both sections. Warn the user first, see below.
+3. **Remove it**: drop it from the overview entirely.
+
+Never pick one silently.
+
+### Why duplicate sidebar entries misbehave
+
+If the user wants the same page reachable from two sidebar categories, tell
+them what actually happens: **both categories highlight and auto-expand at
+once** whenever that page is open.
+
+This is not a bug and there is no config to disable it. In
+`@docusaurus/plugin-content-docs/src/client/docsUtils.tsx`:
+
+```js
+if (item.type === 'link') {
+  return isActive(item.href, activePath);
+}
+```
+
+Activeness is decided purely by URL. Authored `type: "doc"` entries are
+compiled to `type: 'link'` props carrying an href, so a `type: "link"` entry
+behaves identically to a duplicated doc id. There is no way to duplicate an
+entry without duplicating the highlight. Then in
+`@docusaurus/theme-classic/src/theme/DocSidebarItem/Category/index.tsx`:
+
+```js
+initialState: () => (isActive ? false : item.collapsed)
+```
+
+An active category always initializes expanded, reinforced by
+`useAutoExpandActiveCategory`.
+
+The one escape hatch: `isSamePath` compares normalized path strings and does
+**not** strip fragments, so an href containing `#` can never equal
+`activePath`. A cross-reference link with an anchor never highlights and never
+auto-expands:
+
+```js
+{ type: "link", label: "Message Brokers",
+  href: "/docs/integrations/overview/#data-ingestion-and-streaming" },
+```
+
+Prefer this, or a plain link in the overview body, over duplicating an entry.
+
 ## Configuration property sync
 
 When documenting a feature that introduces a new server configuration property
@@ -665,6 +768,9 @@ When reviewing a documentation page, check:
 - [ ] Result tables only where output is predictable
 - [ ] `yarn build` passes (no broken links)
 - [ ] Sidebar updated if new pages were added (`sidebars.js`)
+- [ ] Section overview page updated for any added, removed, or renamed page,
+      with section and item order matching `sidebars.js`
+- [ ] No overview heading renamed without checking inbound anchors first
 - [ ] New config properties added to `configuration/configuration-utils/_cairo.config.json`
 - [ ] New keywords/functions/types checked against `questdb/sql-parser` repo
       (default branch and open PRs)
