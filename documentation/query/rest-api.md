@@ -732,25 +732,43 @@ A HTTP status code of `400` is returned with the following response body:
 }
 ```
 
-## Authentication (RBAC)
+## Authentication
+
+The REST API supports two authentication types:
+
+- **HTTP basic authentication**, available in QuestDB Open Source and QuestDB
+  Enterprise.
+- **Token-based authentication**, available in QuestDB Enterprise only.
 
 :::note
 
 Role-based Access Control (RBAC) is available in
-[QuestDB Enterprise](/enterprise/). See the next paragraph for authentication in
-QuestDB Open Source.
+[QuestDB Enterprise](/enterprise/). On QuestDB Enterprise, prefer
+[token-based authentication](#authentication-via-token-in-questdb-enterprise)
+over basic authentication.
 
 :::
 
-REST API supports two authentication types:
+### HTTP basic authentication
 
-- HTTP basic authentication
-- Token-based authentication
+Basic authentication is the method web browsers use when they prompt for a
+username and password, and it is the only method available in QuestDB Open
+Source.
 
-The first authentication type is mainly supported by web browsers. But you can
-also apply user credentials programmatically in a `Authorization: Basic` header.
-This example `curl` command that executes a `SELECT 1;` query along with the
-`Authorization: Basic` header:
+In QuestDB Open Source, enable it by setting the configuration options
+`http.user` and `http.password` in `server.conf`:
+
+```shell
+http.user=my_user
+http.password=my_password
+```
+
+In QuestDB Enterprise, basic authentication uses the password of an existing
+database user, so there is nothing to enable in `server.conf`.
+
+You can also apply the credentials programmatically in an `Authorization: Basic`
+header. The `curl` flag `-u` builds that header for you. This example executes a
+`SELECT 1;` query:
 
 ```bash
 curl -G --data-urlencode "query=SELECT 1;" \
@@ -758,8 +776,48 @@ curl -G --data-urlencode "query=SELECT 1;" \
     http://localhost:9000/exec
 ```
 
-The second authentication type requires a REST API token to be specified in a
-`Authorization: Bearer` header:
+#### Building the Authorization header manually
+
+Not every HTTP client has an equivalent of curl's `-u` flag. In that case, build
+the header value yourself: join the username and password with a colon, then
+Base64-encode the result.
+
+```bash
+printf 'my_user:my_password' | base64
+# bXlfdXNlcjpteV9wYXNzd29yZA==
+```
+
+Use `printf` rather than `echo`, which appends a newline that ends up encoded as
+part of the password.
+
+Send the encoded value using the `Basic` scheme:
+
+```bash
+curl -G --data-urlencode "query=SELECT 1;" \
+    -H "Authorization: Basic bXlfdXNlcjpteV9wYXNzd29yZA==" \
+    http://localhost:9000/exec
+```
+
+The colon is the delimiter, so the username cannot contain one. Passwords can,
+since everything after the first colon is treated as the password.
+
+:::note
+
+Base64 is an encoding, not encryption. Anyone who can read the header can
+recover the credentials, so only send basic authentication over HTTPS or on a
+trusted network.
+
+:::
+
+### Authentication via token in QuestDB Enterprise
+
+Token-based authentication is the recommended method for programmatic access on
+QuestDB Enterprise. Unlike a password, a REST API token can be issued to a user
+or a service account, carries its own permission granularity, can be given an
+expiry, and can be revoked on its own without disrupting the user's other
+credentials.
+
+Specify the token in an `Authorization: Bearer` header:
 
 ```bash
 curl -G --data-urlencode "query=SELECT 1;" \
@@ -769,24 +827,3 @@ curl -G --data-urlencode "query=SELECT 1;" \
 
 Refer to the [user management](/docs/security/rbac/#user-management) page to
 learn more on how to generate a REST API token.
-
-## Authentication in QuestDB open source
-
-QuestDB Open Source supports HTTP basic authentication. To enable it, set the
-configuration options `http.user` and `http.password` in `server.conf`.
-
-The following example shows how to enable HTTP basic authentication in QuestDB
-open source:
-
-```shell
-http.user=my_user
-http.password=my_password
-```
-
-Then this `curl` command executes a `SELECT 1;` query:
-
-```bash
-curl -G --data-urlencode "query=SELECT 1;" \
-    -u "my_user:my_password" \
-    http://localhost:9000/exec
-```
