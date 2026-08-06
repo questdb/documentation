@@ -84,7 +84,7 @@ section of the server configuration page.
 Create a new file named `questdb.conf` in one of the locations Telegraf can
 load configuration files from and paste the following example:
 
-```shell title="/path/to/telegraf/config/questdb.conf" - Base plugins
+```shell title="/path/to/telegraf/config/questdb.conf - Base plugins"
 # Configuration for Telegraf agent
 [agent]
   ## Default data collection interval for all inputs
@@ -131,6 +131,37 @@ aggregator plugin will instead roll them into a more "dense" row as desired.
   drop_original = true
 
 ```
+
+### Authentication
+
+The configuration above assumes an unsecured instance. If your QuestDB instance
+requires authentication, add the credentials to the `outputs.influxdb_v2`
+plugin. The method depends on the edition.
+
+QuestDB Enterprise accepts a REST API token. Telegraf builds the
+`Authorization` header for you through the `token` setting:
+
+```shell title="/path/to/telegraf/config/questdb.conf - QuestDB Enterprise"
+[[outputs.influxdb_v2]]
+  urls = ["http://localhost:9000"]
+  token = "${QUESTDB_HTTP_TOKEN}"
+```
+
+QuestDB Open Source supports HTTP basic authentication and cannot generate
+tokens, so set the header yourself. Base64-encode the username and password
+joined by a colon, then send the result with the `Basic` scheme:
+
+```shell title="/path/to/telegraf/config/questdb.conf - QuestDB Open Source"
+[[outputs.influxdb_v2]]
+  urls = ["http://localhost:9000"]
+  http_headers = {"Authorization" = "Basic ${QUESTDB_BASIC_AUTH}"}
+```
+
+Here `QUESTDB_BASIC_AUTH` holds the encoded credentials, not the raw password.
+See [building the Authorization header manually](/docs/query/rest-api/#building-the-authorization-header-manually)
+for how to produce that value, and
+[authentication via token](/docs/query/rest-api/#authentication-via-token-in-questdb-enterprise)
+for how to generate an Enterprise REST API token.
 
 Run Telegraf and specify the configuration file with the QuestDB output:
 
