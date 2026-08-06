@@ -733,6 +733,16 @@ module.exports = {
           ],
         },
         {
+          // Message brokers live under Ingestion. This is a cross-reference to
+          // the overview section that lists them. The fragment is deliberate:
+          // Docusaurus decides sidebar activeness by comparing normalized
+          // paths without stripping it, so this link never highlights and
+          // never auto-expands a second category.
+          type: "link",
+          label: "Data Ingestion",
+          href: "/docs/integrations/overview/#data-ingestion-and-streaming",
+        },
+        {
           type: "category",
           label: "Data Processing",
           collapsed: true,
