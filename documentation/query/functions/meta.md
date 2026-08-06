@@ -560,7 +560,7 @@ Returns a table with the following columns:
   (Enterprise)
 - `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format:
   the native files have been removed and reads are served from the Parquet
-  file. Set the same way as `hasParquetGenerated` — either manually or by a
+  file. Set the same way as `hasParquetGenerated`: either manually or by a
   storage policy's `TO PARQUET` stage
 - `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
   file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise

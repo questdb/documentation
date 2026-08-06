@@ -45,7 +45,7 @@ automated backups, and multi-tier storage with seamless object storage integrati
 
 1. **[Quick start](/docs/getting-started/quick-start/)** - Install and run QuestDB
 2. **[Schema design](/docs/schema-design-essentials/)** - Design your tables
-3. **[Ingest data](/docs/ingestion/overview/)** - Bring your data using QuestDB clients
+3. **[Ingest data](/docs/connect/overview/)** - Bring your data using QuestDB clients
 4. **[Query data](/docs/query/overview/)** - Analyze with SQL
 
 ## Guides

@@ -1,19 +1,35 @@
 ---
-title: Replication overview
+title: High availability overview
 sidebar_label: Overview
 description:
-  Learn how QuestDB Enterprise replication works, its benefits, and architecture.
+  How QuestDB delivers high availability — server-side primary-replica
+  replication, plus client-side failover and store-and-forward.
 ---
 
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
-  Replication provides high availability and disaster recovery for your QuestDB cluster.
+  Primary-replica replication is a QuestDB Enterprise feature. Client failover
+  and store-and-forward are available to all native clients.
 </EnterpriseNote>
 
-QuestDB Enterprise provides **primary-replica replication** for high availability
-and disaster recovery. Your data is automatically synced to replica instances
-via an object store, with no direct network connections required between nodes.
+QuestDB approaches high availability in two layers, and a resilient deployment
+usually needs both:
+
+- **Server-side replication** keeps a hot copy of your data on one or more
+  replica nodes, so the cluster survives the loss of a node. This is a QuestDB
+  Enterprise feature, and it is the main subject of this page.
+- **Client-side resilience** keeps your applications connected across the
+  failover that replication makes possible.
+  [Client failover](/docs/high-availability/client-failover/concepts/) lets a
+  client walk a list of hosts when its connection breaks, and
+  [store-and-forward](/docs/high-availability/store-and-forward/concepts/)
+  buffers unacknowledged data locally so a producer never loses writes during
+  the gap.
+
+Replication moves the data; the client-side features make sure your
+applications follow it. The rest of this page covers replication — see the
+**Client Failover** and **Store-and-Forward** sections for the client side.
 
 ## Why use replication?
 
@@ -113,4 +129,10 @@ by you.
 
 ## Next steps
 
-Ready to set up replication? Continue to the [Setup Guide](/docs/high-availability/setup/).
+- [Setup Guide](/docs/high-availability/setup/) — configure object storage, the
+  primary, and replica nodes.
+- [Client failover](/docs/high-availability/client-failover/concepts/) —
+  configure your applications to follow a primary promotion automatically.
+- [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —
+  buffer unacknowledged writes on the client so a producer survives an outage
+  without data loss.
