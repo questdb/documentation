@@ -26,20 +26,9 @@ module.exports = {
           label: "QuestDB Enterprise Quick Start",
         },
         {
-          type: "category",
-          label: "Web Console",
-          collapsed: true,
-          items: [
-            "getting-started/web-console/overview",
-            "getting-started/web-console/code-editor",
-            "getting-started/web-console/questdb-ai",
-            "getting-started/web-console/metrics-view",
-            "getting-started/web-console/schema-explorer",
-            "getting-started/web-console/table-details",
-            "getting-started/web-console/result-grid",
-            "getting-started/web-console/query-log",
-            "getting-started/web-console/import-csv",
-          ],
+          type: "link",
+          label: "Web Console overview",
+          href: "/docs/getting-started/web-console/overview/",
         },
       ],
     },
@@ -549,6 +538,51 @@ module.exports = {
             "query/operators/text",
           ],
         },
+      ],
+    },
+
+    // ===================
+    // WEB CONSOLE
+    // ===================
+    {
+      type: "category",
+      label: "Web Console",
+      collapsed: true,
+      link: {
+        type: "doc",
+        id: "getting-started/web-console/overview",
+      },
+      items: [
+        "getting-started/web-console/code-editor",
+        {
+          type: "category",
+          label: "Notebooks",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "getting-started/web-console/notebooks/overview",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "getting-started/web-console/notebooks/overview",
+              label: "Overview",
+            },
+            "getting-started/web-console/notebooks/cells",
+            "getting-started/web-console/notebooks/charts",
+            "getting-started/web-console/notebooks/variables",
+            "getting-started/web-console/notebooks/live-dashboards",
+            "getting-started/web-console/notebooks/manage-share",
+          ],
+        },
+        "getting-started/web-console/mcp-connection",
+        "getting-started/web-console/questdb-ai",
+        "getting-started/web-console/metrics-view",
+        "getting-started/web-console/schema-explorer",
+        "getting-started/web-console/table-details",
+        "getting-started/web-console/result-grid",
+        "getting-started/web-console/query-log",
+        "getting-started/web-console/import-csv",
       ],
     },
 

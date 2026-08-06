@@ -1,10 +1,10 @@
 ---
-title: Query & SQL Overview
+title: Query & SQL overview
 sidebar_label: Overview
 description:
-  This document shows how to work with QuestDB as a time-series database by
-  generating dummy time-series data, inserting the data into a table, then
-  querying and cleaning up the example data set.
+  "How to query QuestDB: run SQL in the Web Console, connect with PostgreSQL
+  clients, use the REST HTTP API, or read Parquet files, with time-series
+  extensions like SAMPLE BY."
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -39,7 +39,7 @@ from"../partials/\_nodejs.exec.query.partial.mdx"
 import PythonExecQueryPartial from
 "../partials/\_python.exec.query.partial.mdx"
 
-Querying - as a base action - is performed in three primary ways:
+You can query QuestDB in four ways:
 
 1. Query via the
    [QuestDB Web Console](/docs/query/overview/#questdb-web-console)
@@ -57,7 +57,7 @@ heavily by third-party tools to provide visualizations, such as within
 [Grafana](/docs/integrations/visualization/grafana/), or for data analysis with dataframe
 libraries like [Polars](/docs/integrations/data-processing/polars/).
 
-> Need to ingest data first? Checkout our
+> Need to ingest data first? Check out our
 > [Ingestion overview](/docs/connect/overview/).
 
 ## QuestDB Web Console
@@ -65,11 +65,11 @@ libraries like [Polars](/docs/integrations/data-processing/polars/).
 The Web Console is available by default at
 `http://localhost:9000`. The GUI makes it easy to write, return
 and chart queries. There is autocomplete, syntax highlighting, errors, and more.
-If you want to test a query or interact direclty with your data in the cleanest
+If you want to test a query or interact directly with your data in the cleanest
 and simplest way, apply queries via the [Web Console](/docs/getting-started/web-console/overview/).
 
 <Screenshot
-  alt="A shot of the Web Console, showing auto complete and a colourful returned table."
+  alt="The Web Console showing the schema explorer and a live technical-analysis dashboard."
   src="images/docs/console/overview.webp"
   title="Click to zoom"
 />
