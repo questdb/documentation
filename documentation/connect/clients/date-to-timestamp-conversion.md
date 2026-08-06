@@ -24,7 +24,7 @@ The QuestDB Python client accepts either a `datetime.datetime` object, or a `pan
 ```python
 from datetime import datetime, date
 import pandas as pd
-from questdb.ingress import Sender
+import questdb
 
 date_str = '2024-08-05'
 
@@ -63,7 +63,6 @@ package main
 import (
     "fmt"
     "time"
-    "github.com/questdb/go-questdb-client/v4"
 )
 
 func main() {
@@ -124,7 +123,7 @@ public class Main {
         System.out.println("Instant: " + instant);
 
         // Example method call using QuestDB API
-        try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;")) {
+        try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
             sender.table("trades")
                     .symbol("symbol", "ETH-USD")
                     .symbol("side", "sell")
@@ -132,6 +131,7 @@ public class Main {
                     .doubleColumn("price", 2615.54)
                     .doubleColumn("amount", 0.00044)
                     .atNow();
+        }
     }
 }
 ```
@@ -162,7 +162,7 @@ public class Main {
         System.out.println("Epoch in Microseconds: " + epochMicro);
 
         // Example method call using QuestDB API
-        try (Sender sender = Sender.fromConfig("http::addr=localhost:9000;")) {
+        try (Sender sender = Sender.fromConfig("ws::addr=localhost:9000;")) {
             sender.table("trades")
                     .symbol("symbol", "ETH-USD")
                     .symbol("side", "sell")
@@ -170,9 +170,8 @@ public class Main {
                     .doubleColumn("price", 2615.54)
                     .doubleColumn("amount", 0.00044)
                     .atNow();
-
+        }
     }
-
 }
 ```
 
@@ -188,7 +187,7 @@ The QuestDB C client expects timestamp to be an `int64_t` in microseconds, so we
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h>
-#include <questdb/ingress/line_sender.hpp>
+#include <questdb/ingress/line_sender.h>
 
 
 int main() {
@@ -201,8 +200,7 @@ int main() {
 
     // Convert to microseconds
     int64_t microseconds = (int64_t)seconds * 1000000;
-    printf("Date: %s, Timestamp (microseconds): %ld
-", dateStr, microseconds);
+    printf("Date: %s, Timestamp (microseconds): %ld\n", dateStr, microseconds);
 
     // you can now pass the microseconds variable to the QuestDB client line_sender_buffer_column_ts_micros function
 
@@ -258,7 +256,7 @@ The QuestDB Rust client accepts either a `i64` Epoch in microseconds, or a `chro
 
 ```rust
 extern crate chrono;
-use questdb::ingress::{Sender, Buffer, TimestampMicros}
+use questdb::ingress::{Sender, Buffer, TimestampMicros};
 use chrono::{NaiveDate, NaiveDateTime};
 
 fn main() {
@@ -266,8 +264,10 @@ fn main() {
     let date_obj = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").expect("Failed to parse date");
 
     // Convert to NaiveDateTime for timestamp
-    let datetime = date_obj.and_hms(0, 0, 0);
-    let timestamp = datetime.timestamp_micros();
+    let datetime = date_obj.and_hms_opt(0, 0, 0).expect("Invalid time");
+    // `NaiveDateTime::timestamp_micros()` is deprecated in current chrono;
+    // go through `and_utc()` to make the UTC interpretation explicit.
+    let timestamp = datetime.and_utc().timestamp_micros();
 
     println!("Date: {}", date_obj);
     println!("Timestamp (microseconds): {}", timestamp);

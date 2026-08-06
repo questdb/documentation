@@ -30,6 +30,28 @@ Maximum number of distinct tables a single connection may write to. The
 server rejects messages referencing additional tables once this limit is
 reached.
 
+### qwp.max.uncommitted.rows
+
+- **Default**: `1000000`
+- **Reloadable**: no
+
+Maximum number of rows that may sit uncommitted in WAL writers across
+`FLAG_DEFER_COMMIT` frames before the server forces a commit. This is the
+server-side bound on the batch-splitting mechanism described in the
+[QWP ingress protocol](/docs/connect/wire-protocols/qwp-ingress-websocket/#flag_defer_commit).
+
+## Egress
+
+### qwp.egress.compression.force.level
+
+- **Default**: `0` (off)
+- **Reloadable**: yes
+
+Forces a server-side zstd compression level for query result batches,
+overriding the level the client requests via `X-QWP-Accept-Encoding`. `0`
+disables the override and honours the client's request. Any other value must
+be in the range `1`-`9`; the server refuses to start otherwise.
+
 ## UDP receiver
 
 :::note

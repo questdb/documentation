@@ -117,8 +117,9 @@ The `target=` key controls which server role the client is willing to bind to:
 
 `PRIMARY_CATCHUP` is a primary that has been promoted but has not yet caught
 up to its predecessor's WAL — the client treats it as transient and retries
-the same host (with a fresh round, no exponential backoff) until it either
-becomes a full `PRIMARY` or the outage budget expires.
+the same host (with a fresh round, no exponential backoff) until it becomes a
+full `PRIMARY`. On an ingress sender this retry has no deadline; the producer
+is bounded by buffer capacity rather than by elapsed time.
 
 A `421 Misdirected Request` response **without** an `X-QuestDB-Role` header
 is treated as a generic transport error, not a role reject — the client walks
@@ -136,12 +137,14 @@ very different goals.
 
 The ingress reconnect loop sits inside the store-and-forward I/O thread. It
 runs continuously in the background, retrying through outages while the
-producer keeps appending to the local buffer. The defaults are tuned for
-throughput-oriented workloads that can tolerate minutes of server unavailability:
+producer keeps appending to the local buffer. There is no wall-clock give-up:
+the loop retries an outage of any length, and what bounds your tolerance is
+buffer capacity (`sf_max_total_bytes` and disk), not a timer.
 
 - Initial backoff: `100 ms`
 - Maximum backoff: `5 s`
-- Per-outage budget: `5 minutes` (`reconnect_max_duration_millis`)
+- Per-outage budget: **none**. `reconnect_max_duration_millis` bounds only the
+  blocking sync initial connect, and the running loop never consults it.
 - Jitter: **equal-jitter** `[base, 2·base)` — non-zero lower bound damps
   reconnect storms when many producers share a cluster
 - Inter-host pause within a round: **none** — the client walks the full
@@ -208,8 +211,10 @@ peers), and generic frame-decode errors. The client records `TransportError`
 and walks to the next host.
 
 When a round exhausts with transient errors, the client sleeps for the
-backoff interval (clamped to the remaining outage budget) and starts the
-next round.
+backoff interval and starts the next round. On the ingress sender the rounds
+continue indefinitely; on the egress query client they are bounded by
+`failover_max_attempts` and `failover_max_duration_ms`, which apply per
+`execute()`.
 
 ## Mid-stream demotion
 

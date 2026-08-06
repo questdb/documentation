@@ -33,6 +33,15 @@ handle. It owns elastic pools of senders and query clients, hands out a sender
 or runs a query on demand, and is the recommended entry point for long-running
 services. Construct one, share it across threads, dispose it at shutdown.
 
+:::caution Beta
+
+The QWP sender, `QueryClient`, and store-and-forward APIs on this page are
+**beta**, shipped in `4.0.0-beta.1`. Expect the API to change before GA; track
+the [client releases](https://github.com/questdb/net-questdb-client/releases).
+The ILP over HTTP and TCP transports are unaffected and remain stable.
+
+:::
+
 :::tip Legacy transports
 
 The same `Sender` also speaks ILP over HTTP and TCP. This page documents the
@@ -97,6 +106,10 @@ The steps are:
 3. Call `SendAsync()` to publish. On a standalone `ws` sender this **flushes
    and waits for the server ACK**. Auto-flush publishes full batches on its own,
    but the final partial batch is only guaranteed once you call `SendAsync()`.
+   An ACK means QuestDB committed the frame to the WAL, not that the rows are
+   queryable yet: the WAL is applied to the table asynchronously. Rows are
+   usually visible within milliseconds, but read-after-write logic should poll
+   rather than assume.
 4. Dispose the sender. **Dispose does not send** — it is pure resource release,
    and any rows still buffered (not yet sent or auto-flushed) are **discarded**.
    Always `SendAsync()` before disposing.
@@ -110,6 +123,16 @@ timestamps preclude deduplication, which is
 Read the same rows back over the QWP egress endpoint. `QueryClient` lives in
 the same NuGet package:
 
+:::note Designated timestamp column name
+
+The ingest step above never issued a `CREATE TABLE`, so QuestDB auto-created
+`trades` and named its designated timestamp column `timestamp`. That is why the
+query below selects `timestamp` rather than `ts`. To control the name, create
+the table explicitly first with
+`CREATE TABLE trades (ts TIMESTAMP, ...) TIMESTAMP(ts)`.
+
+:::
+
 ```csharp
 using QuestDB;
 using QuestDB.Qwp.Query;
@@ -117,7 +140,7 @@ using QuestDB.Qwp.Query;
 await using var client = await QueryClient.NewAsync("ws::addr=localhost:9000;");
 
 await using var reader = await client.ExecuteReaderAsync(
-    "SELECT ts, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10");
+    "SELECT timestamp, symbol, price, amount FROM trades WHERE symbol = 'ETH-USD' LIMIT 10");
 
 while (await reader.ReadBatchAsync())
 {
@@ -314,7 +337,9 @@ using (var sender = client.BorrowSender())
     await sender.SendAsync();   // MUST send before dispose — dispose does not
 }
 
-// Query: run SQL on a pooled query client (.NET 7+).
+// Query: run SQL on a pooled query client (.NET 7+). Note the rows written
+// above may not be visible yet -- SendAsync waits for the ACK, but the WAL is
+// applied asynchronously. See "Durability is not visibility" above.
 await using var reader = await client.ExecuteReaderAsync("SELECT count(*) FROM trades");
 while (await reader.ReadBatchAsync())
     Console.WriteLine(reader.Current.GetLongValue(0, 0));
@@ -891,7 +916,8 @@ or as listener events:
   recent `QwpServerInfo` to distinguish "no primary available" from
   "all endpoints unreachable".
 - **TCP / TLS connect failure** — treated as transient on the ingress side
-  and fed into the reconnect loop, capped by `reconnect_max_duration_millis`.
+  and fed into the reconnect loop, which retries indefinitely on a running
+  sender.
 
 ### Error classification
 
@@ -918,7 +944,7 @@ class Listener : ISenderConnectionListener
         Console.WriteLine($"{evt.Kind} {evt.Host}:{evt.Port}");
 }
 
-var options = Sender.Configure("ws::addr=db-a:9000,db-b:9000;");
+var options = Sender.Configure("wss::addr=db-a:9000,db-b:9000;");
 options.ConnectionListener = new Listener();
 await using var sender = Sender.NewQwp(options);
 ```
@@ -998,12 +1024,12 @@ connection breaks:
 
 ```csharp
 using var sender = Sender.New(
-    "ws::addr=db-primary:9000,db-replica:9000;sf_dir=/var/lib/myapp/qdb-sf;");
+    "wss::addr=db-primary:9000,db-replica:9000;sf_dir=/var/lib/myapp/qdb-sf;");
 ```
 
 | Key | Default | Description |
 |---|---|---|
-| `reconnect_max_duration_millis` | 300000 | Per-outage reconnect budget. |
+| `reconnect_max_duration_millis` | 300000 | Sync initial-connect budget. |
 | `reconnect_initial_backoff_millis` | 100 | First post-failure sleep. |
 | `reconnect_max_backoff_millis` | 5000 | Cap on per-attempt sleep. |
 | `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). Setting any `reconnect_*` key promotes this to `on`. |
@@ -1486,7 +1512,7 @@ WebSocket options:
 | `sf_durability` | `memory` | Store-and-forward durability mode (only `memory` ships today). |
 | `drain_orphans` / `max_background_drainers` | `off` / 4 | Adopt crashed siblings' slots; max concurrent orphan drains. |
 | `request_durable_ack` / `durable_ack_keepalive_interval_millis` | `off` / 200 | Wait for durable upload (Enterprise); keepalive-ping interval while waiting. |
-| `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Per-outage reconnect budget and backoff. |
+| `reconnect_max_duration_millis` / `reconnect_initial_backoff_millis` / `reconnect_max_backoff_millis` | 300000 / 100 / 5000 | Sync initial-connect budget, plus the backoff the running loop uses while retrying indefinitely. |
 | `initial_connect_retry` | `off` | Retry the first connect (`off` / `on` / `async`). |
 | `ping_timeout` | 5000 | Bound on `PingAsync` waiting for the ACK window to drain. |
 | `error_inbox_capacity` / `connection_listener_inbox_capacity` | 256 / 256 | Async error and connection-event inbox capacities. |
@@ -1615,9 +1641,13 @@ while (true)
 
     try
     {
+        // `trades` was auto-created by the ingest above, so its designated
+        // timestamp column is named `timestamp`. Issue a CREATE TABLE first
+        // if you want to control that name. The rows may also not be visible
+        // yet — see "Durability is not visibility" above.
         await using var reader = await client.ExecuteReaderAsync(
-            "SELECT ts, symbol, price, amount FROM trades "
-            + "ORDER BY ts DESC LIMIT 10");
+            "SELECT timestamp, symbol, price, amount FROM trades "
+            + "ORDER BY timestamp DESC LIMIT 10");
         while (await reader.ReadBatchAsync())
         {
             if (reader.FailoverReset)
@@ -1665,10 +1695,11 @@ internal sealed class IngestListener : ISenderConnectionListener
 
 Notes on the pattern:
 
-- **Ingestion failover is continuous** — the sender's reconnect loop
-  (`reconnect_max_duration_millis`, default 5 min) walks the address list
-  transparently and resumes once a healthy host is reachable. The
-  application keeps publishing.
+- **Ingestion failover is continuous** — the sender's reconnect loop walks the
+  address list transparently and resumes once a healthy host is reachable,
+  retrying indefinitely. It is not bounded by
+  `reconnect_max_duration_millis`, which governs only the blocking initial
+  connect. The application keeps publishing.
 - **Egress failover is per-query** — the loop runs only inside one query
   (from `ExecuteReaderAsync` until the reader is disposed). A total outage that
   exceeds `failover_max_duration_ms` leaves the `QueryClient` terminal; the

@@ -28,7 +28,8 @@ mode.
 | `sender_id` | string | `default` | Slot subdirectory name. Two senders sharing the same `sender_id` and `sf_dir` will collide on the slot lock. Must not contain path separators or be empty. |
 | `sf_max_segment_bytes` | size | `4M` | Per-segment file size; rotation threshold. |
 | `sf_max_total_bytes` | size | `128M` (memory) / `10G` (SF) | Hard cap on resident SF storage. Triggers producer backpressure when full. |
-| `sf_durability` | enum | `memory` | Reserved for future per-batch / per-frame fsync modes. Only `memory` is currently implemented; `flush` and `append` parse but are rejected at build time. |
+| `sf_durability` | enum | `memory` | `memory` (page-cache durable) and `periodic` (background checkpoint to stable storage) both ship. `periodic` requires `sf_dir`. `flush` and `append` parse but are rejected at build time. The .NET client accepts `memory` only. |
+| `sf_sync_interval_millis` | int (ms) | `5000` | Checkpoint cadence for `sf_durability=periodic`; rejected without it. A floor, not a guarantee: scheduler and storage latency add to it. |
 | `sf_append_deadline_millis` | int (ms) | `30000` | How long a producer `appendBlocking` call waits for ACK-driven trim to free space before throwing. |
 | `drain_orphans` | bool | `off` | Scan `<sf_dir>/*` at startup and spawn drainers for sibling slots that contain unacked data. See [orphan adoption](/docs/high-availability/store-and-forward/concepts/#orphan-adoption). |
 | `max_background_drainers` | int | `4` | Cap on concurrent orphan drainers. |
@@ -47,11 +48,11 @@ and host-walk semantics are documented in
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Per-outage wall-clock budget. Resets on every successful reconnect. |
+| `reconnect_max_duration_millis` | int (ms) | `300000` (5 min) | Bounds the blocking sync initial connect only (`initial_connect_retry=on`/`sync`). A running sender's reconnect loop never consults it and retries indefinitely. |
 | `reconnect_initial_backoff_millis` | int (ms) | `100` | Initial backoff sleep at round exhaustion. |
 | `reconnect_max_backoff_millis` | int (ms) | `5000` | Cap on the exponential backoff. With equal-jitter the actual sleep lands in `[max, 2·max)`. |
 | `initial_connect_retry` | enum | `off` | `off` (alias `false`): first-connect failure is terminal. `on` (aliases `sync`, `true`): same retry loop as reconnect, blocking the constructor. `async`: same retry loop in the I/O thread, non-blocking. |
-| `close_flush_timeout_millis` | int (ms) | `5000` | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
+| `close_flush_timeout_millis` | int (ms) | `60000` on Java and .NET; `5000` on Rust, C, C++ and Python | `close()` blocks up to this long waiting for `ackedFsn ≥ publishedFsn`. `0` or `-1` skips the drain wait. The safety-net `checkError()` still runs. |
 
 Cross-reference:
 [connect-string #reconnect-keys](/docs/connect/clients/connect-string#reconnect-keys).
@@ -158,7 +159,7 @@ returns an upgrade without `X-QWP-Durable-Ack: enabled`.
 
 ```java
 try (Sender sender = Sender.fromConfig(
-        "ws::addr=node-a:9000;sf_dir=/var/lib/qdb-sender;"
+        "wss::addr=node-a:9000;sf_dir=/var/lib/qdb-sender;"
         + "sender_id=worker-" + workerInstanceId + ";"
         + "drain_orphans=on;max_background_drainers=8;")) {
     // ...
@@ -174,7 +175,7 @@ background and drains it.
 
 ```java
 try (Sender sender = Sender.fromConfig(
-        "ws::addr=primary:9000;sf_dir=/var/lib/qdb-sender;"
+        "wss::addr=primary:9000;sf_dir=/var/lib/qdb-sender;"
         + "sf_max_total_bytes=50G;"
         + "reconnect_max_duration_millis=3600000;"
         + "initial_connect_retry=async;")) {

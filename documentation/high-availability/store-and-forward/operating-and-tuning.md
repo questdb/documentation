@@ -264,8 +264,9 @@ A conformant client exposes at minimum:
 
 - **Reconnect health:** `reconnect_attempts - reconnect_succeeded` over
   time. A non-zero difference for more than a few seconds means the
-  wire is currently down. Alert if it stays elevated past your
-  `reconnect_max_duration_millis`.
+  wire is currently down. There is no budget-exhaustion event to alert on,
+  since a running sender retries indefinitely, so pick a duration threshold
+  that matches your buffer headroom and alert on that instead.
 - **Replay volume:** `frames_replayed` rate. Bursts are expected;
   sustained replay means a chronic instability.
 - **Backpressure:** `backpressure_stalls` rate. Any non-zero rate is a

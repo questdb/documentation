@@ -135,7 +135,7 @@ wss::addr=questdb.example.com:443;username=admin;password=secret;tls_roots=/etc/
 ### Ingest with store-and-forward across multiple nodes
 
 ```
-ws::addr=node-a:9000,node-b:9000;sf_dir=/var/lib/myapp/qdb-sf;sender_id=ingest-1;
+wss::addr=node-a:9000,node-b:9000;sf_dir=/var/lib/myapp/qdb-sf;sender_id=ingest-1;
 ```
 
 ### Query (egress) preferring a replica in your zone
@@ -212,15 +212,22 @@ do not need to configure it.
 QWP runs over WebSocket and uses HTTP-style credentials sent on the
 WebSocket upgrade request.
 
-- `username` — username for HTTP basic authentication.
-- `password` — password for HTTP basic authentication.
+- `username` — username for HTTP basic authentication. `user` is an accepted
+  alias.
+- `password` — password for HTTP basic authentication. `pass` is an accepted
+  alias.
 - `token` — bearer token sent as `Authorization: Bearer <token>`. Mutually
   exclusive with `username` / `password`. Token auth avoids the per-request
   overhead of basic auth and is the recommended path for Enterprise
   deployments.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
-  Does not cover TCP connect, TLS handshake, or post-upgrade frame reads —
-  those use OS or hard-coded defaults. Default: `15000` (15 s).
+  Does not cover TLS handshake or post-upgrade frame reads, which use OS or
+  hard-coded defaults. Default: `15000` (15 s).
+- `connect_timeout` — integer milliseconds, must be `> 0`. Applies to ingress
+  and egress. Bounds the TCP connect phase for each endpoint, so a black-holed
+  host in a multi-host `addr` no longer stalls the
+  [endpoint walk](#failover-keys) until the OS connect timeout. Unset by
+  default.
 
 **Mutual TLS (mTLS).** Not supported. The client validates the server's
 certificate against a trust store but cannot present a client certificate;
@@ -237,23 +244,56 @@ Selecting the `wss` schema enables TLS.
 - `tls_verify` — controls server certificate verification. Options: `on`,
   `unsafe_off`. Default: `on`. `unsafe_off` disables verification; **use
   only for testing** — bypassing verification makes the connection
-  vulnerable to MITM attacks.
+  vulnerable to MITM attacks. **Mutually exclusive with `tls_roots`** — see
+  below.
 - `tls_roots` — path to a file of trusted root certificates, used instead
-  of the system trust store. The on-disk format is client-specific — the
-  Java client loads a JKS keystore, the .NET client a PKCS#12 / PFX
-  bundle, and some clients a PEM file. If omitted, the client uses the
-  system default trust store.
-- `tls_roots_password` — password for the `tls_roots` file, for clients
-  whose trust-store format requires one. Clients that load a passwordless
-  format (for example, PEM) reject this key.
+  of the system trust store. If omitted, the client uses the system default
+  trust store. The accepted on-disk formats are client-specific:
+
+  | Client | Formats accepted at `tls_roots` |
+  |---|---|
+  | Java | PEM (default, no password), JKS, PKCS#12 |
+  | Rust, C, C++, Python | PEM (default), JKS, PKCS#12 |
+  | .NET | PKCS#12 / PFX |
+  | Go | none — OS trust store only, both keys rejected at parse time |
+
+- `tls_roots_password` — password for the `tls_roots` file. Required only for
+  a JKS or PKCS#12 trust store; PEM needs no password. Setting it without
+  `tls_roots` is an error.
+
+:::caution `tls_roots` and `tls_verify=unsafe_off` cannot be combined
+
+Supplying both is rejected at connect time:
+
+```
+tls_roots cannot be combined with tls_verify=unsafe_off; remove tls_verify to
+use custom roots, or remove tls_roots to disable certificate validation
+```
+
+The two express opposite intents — one pins a private CA, the other switches
+verification off entirely. Pick one. For a self-signed certificate in a test
+environment, `tls_verify=unsafe_off` alone is enough; to actually validate
+against your own CA, supply `tls_roots` and leave `tls_verify` at its default.
+
+:::
+
+PEM is the passwordless default path on Java, Rust, C, C++ and Python, so a
+private CA needs no `keytool` import:
+
+```text
+wss::addr=db.example.com:9000;tls_roots=/etc/ssl/ca.pem;
+```
+
+Existing JKS and PKCS#12 trust stores keep working through
+`tls_roots_password`, and PKCS#12 now also loads on Java 8.
 
 :::note Client support varies
 
-`tls_roots` / `tls_roots_password` support — and the trust-store file
-format expected — vary by client. Some clients (for example, Go) verify
-against the operating-system trust store only and **reject these keys at
-parse time**; to trust a private CA there, install it in the host trust
-store. Check the relevant
+The Go client verifies against the operating-system trust store only and
+**rejects both keys at parse time**; to trust a private CA there, install it in
+the host trust store. On Rust, C, C++ and Python, `tls_roots_password` switches
+the file to a Java keystore and is QWP/WebSocket only: other transports keep
+PEM as the sole format. Check the relevant
 [client library page](/docs/connect/overview/#client-libraries) for
 specifics.
 
@@ -285,8 +325,12 @@ act independently: whichever threshold trips first sends the batch.
   next `at()` / `flush()` call, not on a wall-clock timer. Set to `off` to
   disable. Default where supported: `100` (100 ms).
 - `auto_flush_bytes` — flush when the encode buffer reaches this byte
-  size. Set to `off` to disable. Default where supported: `8m` (8 MiB). Accepts
-  [size suffixes](#size-suffixes). When set to a positive value, the
+  size. Set to `off` to disable. Accepts
+  [size suffixes](#size-suffixes). **The default differs by client**: Java
+  ships it **disabled** (`0`), .NET defaults to `8m` (8 MiB), and Rust, C and
+  C++ reject the key outright. A Java application that assumes an 8 MiB byte
+  trigger is active will size batches expecting a flush that never fires.
+  When set to a positive value, the
   client clamps the effective threshold down to 90% of the server-
   advertised `X-QWP-Max-Batch-Size` at handshake (one-way: the client
   keeps a configured value already below the advertised cap). The 10%
@@ -353,14 +397,18 @@ The connect string accepts multiple `host:port` pairs in `addr`. The
 parser accepts two syntaxes and accumulates entries across both:
 
 ```
-ws::addr=node-a:9000,node-b:9000,node-c:9000;
+wss::addr=node-a:9000,node-b:9000,node-c:9000;
 ```
 
 ```
 ws::addr=node-a:9000;addr=node-b:9000;addr=node-c:9000;
 ```
 
-The parser rejects empty entries (`,,`, or leading / trailing commas).
+The parser rejects empty entries (`,,`, or leading / trailing commas), and
+also rejects a **duplicate** `host:port` — listing the same endpoint twice
+fails at connect time with `duplicate addr entry: <host:port>`. This catches
+the common case of templating an address list that collapses to the same node,
+which would otherwise silently halve your effective failover breadth.
 
 The I/O loop rotates through the endpoints on every reconnect attempt
 within a single outage budget. When the server rejects the connection
@@ -444,16 +492,33 @@ equivalent — same architecture, no durability across restarts.
   digits, `_`, `-`. No path separators, no `.`, no spaces. Two senders
   sharing the same `sender_id` collide on the slot lock — the second one
   fails fast. Default: `default`.
-  For pooled senders (`questdb_db` / `questdb::pool` / Rust `QuestDb`),
-  `sender_id` is the slot **base** rather than a literal directory: the pool
-  mints kind-scoped per-slot directories `<sf_dir>/<sender_id>-col-<index>/`
-  and `<sf_dir>/<sender_id>-row-<index>/`, and the un-suffixed path applies
-  only to non-pooled senders. The minted names belong to that pool's
-  namespace, so pools sharing one `sf_dir` need distinct bases; the
-  slot-in-use error covers both cases (another process or pool holds the
-  slot).
-- `sf_durability` — disk durability mode. Currently only `memory` is
-  shipping. (`flush` and `append` per-write fsync modes are planned.)
+  For pooled senders, `sender_id` is the slot **base** rather than a literal
+  directory: the pool mints one directory per slot, and the un-suffixed path
+  applies only to non-pooled senders. The minted name is client-specific:
+
+  | Client | Minted slot directory |
+  |---|---|
+  | Java (`QuestDB` facade) | `<sf_dir>/<sender_id>-<index>/` |
+  | Rust, C, C++ (`QuestDb` / `questdb::pool` / `questdb_db`) | `<sf_dir>/<sender_id>-ingest-<index>/` |
+
+  The minted names belong to that pool's namespace, so pools sharing one
+  `sf_dir` need distinct bases; the slot-in-use error covers both cases
+  (another process or pool holds the slot).
+- `sf_durability` — disk durability mode. `memory` (the default) and
+  `periodic` both ship. `periodic` requires `sf_dir` and checkpoints published
+  frames in the background at `sf_sync_interval_millis`. `flush` and `append`
+  are reserved: they parse but are rejected at `build()`.
+
+  Reach for `periodic` when you must survive host loss. `memory` mode is
+  process-crash durable but **not** host-crash durable, because the page cache
+  is lost on power failure.
+
+  The .NET client is the exception: it accepts only `memory` and rejects
+  anything else at parse time.
+- `sf_sync_interval_millis` — cadence at which `sf_durability=periodic`
+  checkpoints published frames to stable storage. Default: `5000`. Requires
+  `sf_durability=periodic`; rejected otherwise. The configured interval is a
+  floor, since scheduler and storage latency add to it.
 - `sf_max_segment_bytes` — per-segment rotation threshold. Must be ≥ the largest
   single flushed frame. Default: `4 MiB` (`4m`). Accepts
   [size suffixes](#size-suffixes).
@@ -568,8 +633,13 @@ architecture is that a producer survives an arbitrarily long outage.
   behaviour on the first connect while still tuning the backoff, set
   `initial_connect_retry=off` explicitly; the explicit setting wins.
 - `close_flush_timeout_millis` — `close()` blocks up to this many
-  milliseconds waiting for buffered frames to drain. Default: `5000` (5 s).
-  Set to `0` or `-1` for fast close (skip the drain).
+  milliseconds waiting for buffered frames to drain. Set to `0` or `-1` for
+  fast close (skip the drain). **The default differs by client**: `60000`
+  (60 s) on Java and .NET, `5000` (5 s) on Rust, C, C++ and Python, which
+  share the same Rust core.
+
+  This is the shutdown data-loss window. Setting it to `0` skips the drain
+  entirely and drops un-ACKed batches on every clean shutdown.
 
 Auth failures during reconnect (authentication rejected, version mismatch,
 durable-ack mismatch, non-101 upgrade without a role hint) are immediately
@@ -648,7 +718,11 @@ egress side; the Sender silently accepts even a value the
 - `initial_credit` — byte-credit flow-control budget. `0` (default) means
   unbounded: the server streams as fast as the network allows. Set a
   non-zero budget to bound server push on a memory-constrained client.
-- `max_batch_rows` — upper bound on rows per result batch.
+- `max_batch_rows` — upper bound on rows per result batch. Range
+  `1`-`1048576`; out-of-range values fail at parse time. Defaults to the
+  server's own limit when unset.
+- `client_id` — free-form client identifier sent on the upgrade as
+  `X-QWP-Client-Id`, for example `java/1.0.2`. Default is client-specific.
 - `query_close_timeout_ms` — bounds the close-path cleanup drain (closing a
   cursor mid-result-set, breaking out of iteration) before the client
   declares the connection desynced and discards it. Positive integer
@@ -670,6 +744,38 @@ Equivalent options exist on the query client's builder API (for example,
 [client library page](/docs/connect/overview/#client-libraries) for the
 per-language names.
 
+## Connection pool {#pool-keys}
+
+*Applies to: the pooled facade (`QuestDB.connect`, `questdb::pool`,
+`QuestDb::connect`, `questdb.connect`, `qdb.NewQuestDB`,
+`QuestDBClient.Connect`).*
+
+Every client now leads with a pooled facade, so these keys are a first-contact
+concern. The `Sender` and query-client parsers accept and ignore them; the
+facade reads them off the string. Each has an equivalent builder setter, and an
+explicit setter always wins over the string.
+
+- `sender_pool_min` — senders kept open even when idle. `0` lets the pool close
+  them all. Default: `1`.
+- `sender_pool_max` — maximum senders the pool opens. Default: `4`.
+- `query_pool_min` — query clients kept open even when idle. Default: `1`.
+- `query_pool_max` — maximum query clients the pool opens, which also caps
+  total in-flight queries. Default: `4`.
+- `acquire_timeout_ms` — how long a borrow waits for a free connection once the
+  pool is at `max`, before throwing. Default: `5000`.
+- `idle_timeout_ms` — how long an unused connection stays open before the
+  housekeeper closes it, never going below `min`. `0` keeps idle connections
+  forever. Default: `60000`.
+- `max_lifetime_ms` — maximum age of a connection; the housekeeper closes and
+  reopens older ones once idle. `0` means no age limit. Default: `1800000`
+  (30 min).
+- `housekeeper_interval_ms` — how often the housekeeper checks for idle and
+  over-age connections. Default: `5000`.
+- `lazy_connect` — when `on`, the pool defers opening its first connection
+  until the first borrow, so construction succeeds against a server that is
+  down. This is the supported way to tolerate a server that starts after your
+  application. Default: `off`.
+
 ## Error handling {#error-handling}
 
 *Applies to: ingress and egress.*
@@ -680,6 +786,17 @@ consumed by the application.
 - `error_inbox_capacity` — bounded capacity for async error notifications.
   Must be ≥ `16`. Overflow drops the oldest entry and bumps a
   `droppedErrorNotifications` counter. Default: `256`.
+
+:::caution Accepted, but not applied by every client
+
+Every client's parser accepts the six `on_*_error` keys below, but only
+clients that implement the policy layer act on them. **In the Java reference
+client they are currently accepted no-ops** — setting
+`on_write_error=retriable_other` parses cleanly and changes nothing. .NET does
+implement them, via `SenderErrorPolicy` and `SenderErrorCategory`. The
+category table and precedence model below describe the target contract.
+
+:::
 
 The following per-category keys select the **error policy** for each class
 of server rejection. There is **no drop policy**: the client never silently
@@ -733,16 +850,21 @@ description and behaviour notes.
 
 | Key                                     | Type                          | Default                       | Section                                                       |
 | --------------------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------------------- |
+| `acquire_timeout_ms`                    | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
 | `addr`                                  | `host:port[,host:port…]`      | required                      | [Multi-host failover](#failover-keys)                         |
 | `auth_timeout_ms`                       | int (ms)                      | `15000`                       | [Authentication](#auth)                                       |
 | `auto_flush`                            | enum (`on` / `off`)           | `on` (Rust: only `off`)       | [Auto-flushing](#auto-flush)                                  |
-| `auto_flush_bytes`                      | size                          | `8m` (Rust: rejected)         | [Auto-flushing](#auto-flush)                                  |
+| `auto_flush_bytes`                      | size                          | Java `0` (off) / .NET `8m` (Rust: rejected) | [Auto-flushing](#auto-flush)                    |
 | `auto_flush_interval`                   | int (ms) / `off`              | `100` (Rust: rejected)        | [Auto-flushing](#auto-flush)                                  |
 | `auto_flush_rows`                       | int / `off`                   | `1000` (Rust: rejected)       | [Auto-flushing](#auto-flush)                                  |
 | `buffer_pool_size`                      | int (≥ 1)                     | `4`                           | [Query client keys](#egress-keys)                             |
-| `close_flush_timeout_millis`            | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
+| `catch_up_cap_gap_min_escalation_window_millis` | int (ms)              | `300000` (5 min)              | [Store-and-forward](#sf-keys)                                 |
+| `client_id`                             | string                        | client-specific               | [Query client keys](#egress-keys)                             |
+| `close_flush_timeout_millis`            | int (ms)                      | Java/.NET `60000` / Rust, C, C++, Python `5000` | [Ingress reconnect](#reconnect-keys)        |
 | `compression`                           | enum (`raw` / `zstd` / `auto`) | `raw`                        | [Query client keys](#egress-keys)                             |
 | `compression_level`                     | int (`1`–`22`)                | `1`                           | [Query client keys](#egress-keys)                             |
+| `connect_timeout`                       | int (ms, `> 0`)               | unset                         | [Authentication](#auth)                                       |
+| `connection_listener_inbox_capacity`    | int (≥ 1)                     | `64` (Java) · `256` (Go, .NET) · not supported by Rust, C/C++, Python | [Error handling](#error-handling)        |
 | `drain_orphans`                         | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
 | `durable_ack_keepalive_interval_millis` | int (ms)                      | `200`                         | [Durable ACK](#durable-ack)                                   |
 | `error_inbox_capacity`                  | int (≥ 16)                    | `256`                         | [Error handling](#error-handling)                             |
@@ -754,8 +876,12 @@ description and behaviour notes.
 | `init_buf_size`                         | size                          | `65536` (64 KiB)              | [Buffer sizing](#buffer)                                      |
 | `initial_connect_retry`                 | enum (`off` / `on` / `async`) | `off` (auto-promoted to `on` when any explicit `reconnect_*` key is set) | [Ingress reconnect](#reconnect-keys)                          |
 | `initial_credit`                        | int (bytes)                   | `0` (unbounded)               | [Query client keys](#egress-keys)                             |
+| `housekeeper_interval_ms`               | int (ms)                      | `5000`                        | [Connection pool](#pool-keys)                                 |
+| `idle_timeout_ms`                       | int (ms)                      | `60000` (`0` ⇒ infinite)      | [Connection pool](#pool-keys)                                 |
+| `lazy_connect`                          | enum (`on` / `off`)           | `off`                         | [Connection pool](#pool-keys)                                 |
 | `max_background_drainers`               | int                           | `4`                           | [Store-and-forward](#sf-keys)                                 |
-| `max_batch_rows`                        | int                           | server default                | [Query client keys](#egress-keys)                             |
+| `max_batch_rows`                        | int (`1`–`1048576`)           | server default                | [Query client keys](#egress-keys)                             |
+| `max_lifetime_ms`                       | int (ms)                      | `1800000` (`0` ⇒ infinite)    | [Connection pool](#pool-keys)                                 |
 | `max_buf_size`                          | size                          | `104857600` (100 MiB)         | [Buffer sizing](#buffer)                                      |
 | `max_datagram_size`                     | size                          | (UDP) below typical MTU       | [Buffer sizing](#buffer)                                      |
 | `max_name_len`                          | int                           | `127`                         | [Buffer sizing](#buffer)                                      |
@@ -766,23 +892,42 @@ description and behaviour notes.
 | `on_security_error`                     | enum                          | `terminal`                    | [Error handling](#error-handling)                             |
 | `on_server_error`                       | enum                          | `auto`                        | [Error handling](#error-handling)                             |
 | `on_write_error`                        | enum                          | `retriable`                   | [Error handling](#error-handling)                             |
+| `pass`                                  | string                        | unset                         | [Authentication](#auth) (alias of `password`)                 |
 | `password`                              | string                        | unset                         | [Authentication](#auth)                                       |
+| `poison_min_escalation_window_millis`   | int (ms)                      | `5000`                        | [Error handling](#error-handling)                             |
 | `query_close_timeout_ms`                | int (ms)                      | `5000`                        | [Query client keys](#egress-keys)                             |
+| `query_pool_max`                        | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
+| `query_pool_min`                        | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `reconnect_initial_backoff_millis`      | int (ms)                      | `100`                         | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_backoff_millis`          | int (ms)                      | `5000`                        | [Ingress reconnect](#reconnect-keys)                          |
 | `reconnect_max_duration_millis`         | int (ms)                      | `300000` (5 min)              | [Ingress reconnect](#reconnect-keys)                          |
 | `request_durable_ack`                   | enum (`on` / `off`)           | `off`                         | [Durable ACK](#durable-ack)                                   |
 | `sender_id`                             | string                        | `default`                     | [Store-and-forward](#sf-keys)                                 |
+| `sender_pool_max`                       | int                           | `4`                           | [Connection pool](#pool-keys)                                 |
+| `sender_pool_min`                       | int                           | `1`                           | [Connection pool](#pool-keys)                                 |
 | `sf_append_deadline_millis`             | int (ms)                      | `30000` (30 s)                | [Store-and-forward](#sf-keys)                                 |
 | `sf_dir`                                | path                          | unset (memory mode)           | [Store-and-forward](#sf-keys)                                 |
-| `sf_durability`                         | enum (`memory`)               | `memory`                      | [Store-and-forward](#sf-keys)                                 |
-| `sf_max_segment_bytes`                          | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
+| `sf_durability`                         | enum (`memory` / `periodic`)  | `memory` (.NET: `memory` only) | [Store-and-forward](#sf-keys)                                |
+| `sf_max_segment_bytes`                  | size                          | `4 MiB`                       | [Store-and-forward](#sf-keys)                                 |
 | `sf_max_total_bytes`                    | size                          | `128 MiB` mem / `10 GiB` SF   | [Store-and-forward](#sf-keys)                                 |
+| `sf_sync_interval_millis`               | int (ms)                      | `5000`                        | [Store-and-forward](#sf-keys)                                 |
 | `target`                                | enum (`any` / `primary` / `replica`) | `any`                  | [Multi-host failover](#failover-keys)                         |
 | `tls_roots`                             | path                          | system trust store            | [TLS](#tls)                                                   |
-| `tls_roots_password`                    | string                        | — (client-specific)           | [TLS](#tls)                                                   |
+| `tls_roots_password`                    | string                        | unset (JKS / PKCS#12 only)    | [TLS](#tls)                                                   |
 | `tls_verify`                            | enum (`on` / `unsafe_off`)    | `on`                          | [TLS](#tls)                                                   |
 | `token`                                 | string                        | unset                         | [Authentication](#auth)                                       |
+| `transaction`                           | enum (`on` / `off`)           | `off`                         | [Store-and-forward](#sf-keys)                                 |
+| `user`                                  | string                        | unset                         | [Authentication](#auth) (alias of `username`)                 |
 | `username`                              | string                        | unset                         | [Authentication](#auth)                                       |
 | `zone`                                  | string                        | unset                         | [Multi-host failover](#failover-keys)                         |
+
+:::note Per-client divergence
+
+All clients share one option *vocabulary*, not one set of *defaults*. Where a
+default differs it is split above; `auto_flush_bytes`,
+`close_flush_timeout_millis` and `sf_durability` are the ones that bite most
+often. Do not assume a value read here applies to your language without
+checking its [client page](/docs/connect/overview/#client-libraries).
+
+:::
 

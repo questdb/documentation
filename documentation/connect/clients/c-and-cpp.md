@@ -28,7 +28,7 @@ include(FetchContent)
 FetchContent_Declare(
     c_questdb_client_proj
     GIT_REPOSITORY https://github.com/questdb/c-questdb-client.git
-    GIT_TAG        main)   # replace with a release tag or commit SHA
+    GIT_TAG        7.0.0)   # or a newer release tag, or a commit SHA
 FetchContent_MakeAvailable(c_questdb_client_proj)
 
 target_link_libraries(your_target questdb_client)
@@ -137,7 +137,7 @@ int main()
 #include <questdb/egress/qwp_reader.h>            // questdb_db_borrow_reader
 #include <stdio.h>
 #include <string.h>
-#include <threads.h>
+#include <unistd.h>
 
 int main(void)
 {
@@ -173,7 +173,7 @@ int main(void)
 
     /* Pause so the read-back sees the row: the flush-and-wait above means the
        server accepted it, and it becomes queryable a few milliseconds later. */
-    thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL);
+    sleep(1);
 
     /* Query: borrow a reader, run SQL, print rows. */
     rd = questdb_db_borrow_reader(db, &rerr);
@@ -1397,7 +1397,7 @@ Notes:
 The pool owns reconnection and connection health so borrowers don't have to:
 
 - **Multiple endpoints.** Comma-separate hosts in one `addr=` (or repeat the
-  key): `ws::addr=db-primary:9000,db-replica-1:9000;`. The endpoints must be
+  key): `wss::addr=db-primary:9000,db-replica-1:9000;`. The endpoints must be
   replicas of one logical deployment
   ([Enterprise replication](/docs/connect/wire-protocols/qwp-ingress-websocket/#failover-and-high-availability));
   listing unrelated instances splits your data across them. The pool rotates

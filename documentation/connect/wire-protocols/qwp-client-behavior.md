@@ -45,12 +45,11 @@ Use the direct `Sender` API (not the `QuestDB` facade — see
 [sharp edge #4](#known-sharp-edges)).
 
 ```java
-String cfg = "ws::addr=db-a:9000,db-b:9000;"
+String cfg = "wss::addr=db-a:9000,db-b:9000;"
         + "sf_dir=/var/lib/my-app/questdb-sf;"   // opt into disk durability
         + "sender_id=writer-1;"                  // unique per process per sf_dir
         + "initial_connect_retry=async;"         // non-blocking startup
-        + "reconnect_max_duration_millis=86400000;" // outage budget (24h)
-        + "sf_max_total_bytes=100g;";
+        + "sf_max_total_bytes=100g;";            // how long an outage you can absorb
 
 // For production, prefer the builder so you can install an error handler:
 try (Sender sender = Sender.builder(cfg)
@@ -67,9 +66,19 @@ Why each line matters:
 - `sf_dir` is the **only** SF enable switch — there is no boolean flag.
 - `initial_connect_retry=async` is what makes `build()` return without a live
   socket. Without it, startup is blocking (see [Mental model](#mental-model)).
-- `reconnect_max_duration_millis` is the outage budget for **both** the initial
-  connect and later reconnects. If it expires, the sender latches terminal and
-  stops; data already in `sf_dir` survives for a future sender on the same slot.
+- `sf_max_total_bytes` is what actually bounds how long an outage you survive.
+  A **running** sender retries indefinitely, so the limit is how much
+  unacknowledged data you can buffer, not a timer. Size it from your row rate
+  times your worst expected outage.
+
+:::note `reconnect_max_duration_millis` is not an outage budget
+
+It bounds only the **blocking** initial connect (`initial_connect_retry=on` /
+`sync`). Once a sender is running, the reconnect loop never consults it and
+retries a transport outage forever. Setting a large value here does nothing for
+a running producer. See [Reconnect and outage handling](#reconnect-and-outage-handling).
+
+:::
 
 **Error visibility ⚠:** the simplest path (`Sender.fromConfig(...)` + async)
 surfaces terminal async failures only *later*, through a producer call or at
@@ -80,12 +89,16 @@ surfaces terminal async failures only *later*, through a producer call or at
 ### Read client that only reads from replicas
 
 ```java
-String cfg = "ws::addr=replica-a:9000,replica-b:9000,replica-c:9000;"
+String cfg = "wss::addr=replica-a:9000,replica-b:9000,replica-c:9000;"
         + "target=replica;"   // without this, the client may bind a primary
         + "failover=on;";      // default; affects execute()-time recovery only
 
-try (QuestDB db = QuestDB.connect(cfg)) {
-    db.executeSql("select * from telemetry limit 10", myBatchHandler);
+try (QuestDB db = QuestDB.connect(cfg);
+     Query q = db.borrowQuery()) {
+    q.sql("select * from telemetry limit 10")
+     .handler(myBatchHandler)
+     .submit()
+     .await();
 }
 ```
 
@@ -169,14 +182,18 @@ callers block up to `acquire_timeout_ms` then throw.
 | --- | ---: |
 | `sender_id` | `default` |
 | `sf_max_segment_bytes` (segment size) | `4 MiB` |
-| `sf_max_total_bytes` (SF mode) | `10 GiB` |
-| `sf_durability` | `MEMORY` |
+| `sf_max_total_bytes` | `10 GiB` (SF mode) · `128 MiB` (memory mode) |
+| `sf_durability` | `memory` (also supports `periodic`) |
+| `sf_sync_interval_millis` | `5000` (requires `sf_durability=periodic`) |
 | `sf_append_deadline_millis` | `30000` |
-| `reconnect_max_duration_millis` | `300000` (`0` ⇒ **give up immediately**, not infinite ⚠) |
+| `reconnect_max_duration_millis` | `300000` — bounds the **blocking initial connect only** |
 | `reconnect_initial_backoff_millis` | `100` |
 | `reconnect_max_backoff_millis` | `5000` |
-| `close_flush_timeout_millis` | `60000` |
+| `close_flush_timeout_millis` | `60000` (Java/.NET) · `5000` (Rust/C/C++/Python) |
+| `connect_timeout` | unset — per-endpoint TCP connect bound, must be `> 0` |
 | `auth_timeout_ms` | `15000` |
+| `max_frame_rejections` | `4` |
+| `poison_min_escalation_window_millis` | `5000` |
 
 ### Query client
 
@@ -191,9 +208,10 @@ callers block up to `acquire_timeout_ms` then throw.
 | `auth_timeout_ms` | `15000` |
 | `serverInfoTimeoutMs` | `5000` (builder API only — no config key ⚠) |
 
-Note the inconsistent `0` convention: `idle_timeout_ms=0`/`max_lifetime_ms=0`
-mean *infinite*, but `reconnect_max_duration_millis=0` means *give up now*
-([sharp edge #2](#known-sharp-edges)).
+There is no "retry forever" setting to look for on the reconnect keys — a
+running sender already does. `reconnect_max_duration_millis` applies only to a
+blocking initial connect; see
+[Reconnect and outage handling](#reconnect-and-outage-handling).
 
 ---
 
@@ -206,8 +224,11 @@ surface — this matrix shows where each lives.
   `QwpQueryClient.fromConfig`, and `QuestDB.connect(...)`.
 - **Sender builder**: `Sender.builder(...)` (`LineSenderBuilder`) — direct
   ingest only.
-- **Facade builder**: `QuestDB.builder()` (`QuestDBBuilder`) — pool knobs only;
-  query/ingest behavior must come from the conn string.
+- **Facade builder**: `QuestDB.builder()` (`QuestDBBuilder`) — pool knobs plus
+  the ingest callbacks; addressing and per-direction behaviour come from the
+  conn string, which the facade takes via `fromConfig(...)`. The facade accepts
+  **one** config string for both directions; there is no separate
+  ingest/query config setter.
 
 | Knob | Conn string | Sender builder | Facade builder |
 | --- | :---: | :---: | :---: |
@@ -220,18 +241,32 @@ surface — this matrix shows where each lives.
 | `sf_dir`/`sender_id`/`sf_*` | ✅ | ✅ | via conn string |
 | `request_durable_ack` | ✅ | ✅ | via conn string |
 | `close_flush_timeout_millis` | ✅ | ✅ | via conn string |
-| `SenderErrorHandler` | ❌ | ✅ `errorHandler()` | ❌ (not reachable) |
-| `SenderConnectionListener` | ❌ | ✅ `connectionListener()` | ❌ (not reachable) |
+| `connect_timeout` | ✅ | ✅ `connectTimeoutMillis()` | via conn string |
+| `SenderErrorHandler` | ❌ | ✅ `errorHandler()` | ✅ `errorHandler()` |
+| `SenderConnectionListener` | ❌ | ✅ `connectionListener()` | ✅ `connectionListener()` |
+| `BackgroundDrainerListener` | ❌ | ✅ `drainerListener()` | ✅ `drainerListener()` |
+| `SenderProgressHandler` | ❌ | ❌ — post-construction only, see below | ❌ |
 | `target` | ✅ | n/a | via conn string |
 | `failover`/`failover_*` | ✅ | n/a | via conn string |
 | `serverInfoTimeoutMs` | ❌ | n/a | ❌ (QwpQueryClient builder only) |
 | `sender_pool_*`/`query_pool_*` | ✅ | n/a | ✅ |
 | `acquire_timeout_ms`/`idle_timeout_ms`/`max_lifetime_ms` | ✅ | n/a | ✅ |
+| `query_close_timeout_ms` | ✅ | n/a | ✅ `queryCloseTimeoutMillis()` |
+| `lazy_connect` | ✅ | n/a | via conn string |
 
-⚠ Gaps worth noting: the ingest **error handler / connection listener** cannot
-be installed through the facade at all, and **`serverInfoTimeoutMs`** has no
-config key, so a facade query client cannot tune it
-([sharp edge #6](#known-sharp-edges)).
+⚠ Two genuine gaps remain. **`serverInfoTimeoutMs`** has no config key, so a
+facade query client cannot tune it ([sharp edge #6](#known-sharp-edges)).
+And **`SenderProgressHandler`** has no builder setter on either surface — it is
+installed after construction on the concrete sender:
+
+```java
+if (sender instanceof QwpWebSocketSender) {
+    ((QwpWebSocketSender) sender).setProgressHandler(handler);
+}
+```
+
+The ingest **error handler**, **connection listener**, and **drainer listener**
+*are* reachable from the facade builder, and apply across the whole sender pool.
 
 ---
 
@@ -245,13 +280,24 @@ here.
 | # | Sharp edge | Status |
 | --- | --- | --- |
 | 1 | `initial_connect_retry` is implicitly promoted to `SYNC` when any `reconnect_*` knob is set — a resilience knob silently makes startup block. | Candidate |
-| 2 | `reconnect_max_duration_millis` name implies "reconnect only" but also governs initial connect; `0` means "give up now" while sibling `0`s mean "infinite"; no infinite mode exists. | Candidate |
+| 2 | `reconnect_max_duration_millis` is named as if it governs reconnection, but a running sender never consults it — it bounds only the blocking initial connect. | Candidate (naming) |
 | 3 | `failover` sounds like it covers startup but only affects post-connect query `execute()`. Queries have no async/lazy initial connect at all. | Candidate |
-| 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`. | Candidate |
+| 4 | No first-class write-only facade: a write-only user must still supply a query config and remember `query_pool_min=0`, or use `lazy_connect=true`. | Candidate |
 | 5 | A single endpoint returning `401`/`403` is treated as cluster-wide terminal and aborts the whole endpoint walk, even at startup, even if other endpoints would accept the credentials. | Intended (documented), revisit |
-| 6 | Ingest `errorHandler`/`connectionListener` and query `serverInfoTimeoutMs` are unreachable from the facade. | Candidate |
+| 6 | Query `serverInfoTimeoutMs` has no config key, so a facade query client cannot tune it. | Candidate |
 | 7 | The simplest API (`fromConfig` + async) has the worst error visibility — terminal async failures surface only on later producer calls or at `close()`. | Candidate |
-| 8 | No client-side TCP connect timeout: a black-holed host in `addr` blocks the endpoint walk until the OS connect timeout. | Intended (transport limitation), revisit |
+| 8 | `SenderProgressHandler` has no builder setter on either surface; it must be installed post-construction via `QwpWebSocketSender.setProgressHandler`. | Candidate |
+
+**Resolved since an earlier revision of this page** — do not reintroduce:
+
+- *"`reconnect_max_duration_millis=0` means give up immediately, while sibling
+  `0` values mean infinite."* The running loop no longer consults the key at
+  all, so the inconsistency is gone.
+- *"No client-side TCP connect timeout."* `connect_timeout` now bounds the TCP
+  connect phase per endpoint, so a black-holed host no longer stalls the walk
+  until the OS timeout.
+- *"Ingest `errorHandler` / `connectionListener` are unreachable from the
+  facade."* Both are on `QuestDBBuilder`, along with `drainerListener`.
 
 ---
 
@@ -265,8 +311,10 @@ here.
   `default`.
 - Multiple independent senders sharing one `sf_dir` must use distinct
   `sender_id` values, else the second fails because the slot lock is held.
-- In pooled `QuestDB` usage, `SenderPool` derives per-slot IDs from the base:
-  `<base>-0`, `<base>-1`, … so pooled senders never collide.
+- In pooled `QuestDB` usage, the pool derives per-slot IDs from the base so
+  pooled senders never collide. The minted name is client-specific: Java uses
+  `<base>-0`, `<base>-1`, …; the Rust, C and C++ pool uses
+  `<base>-ingest-0`, `<base>-ingest-1`, ….
 - On restart, the cursor engine opens existing segment files and replays
   unacknowledged frames; acknowledged/truncated frames are not replayed.
 
@@ -290,19 +338,47 @@ With `initial_connect_retry=async`:
 - Producer calls and `flush()` can run before the server exists; frames
   accumulate in the cursor engine (and on disk with `sf_dir`).
 - The I/O thread retries in the background using the same loop used after wire
-  failure.
-- If a server appears before the budget expires, buffered frames are
-  sent/replayed and ACK-driven trimming begins.
-- If the budget expires before any connection, the sender latches a terminal
-  `SenderError` whose message contains `never-connected-budget-exhausted`.
-- If it connected at least once and a later outage exhausts the budget, the
-  message contains `connection-lost-budget-exhausted`.
-- Terminal async errors go to a configured `SenderErrorHandler`; without one
-  they surface on later producer calls or at close-time.
+  failure, with capped exponential backoff and no wall-clock deadline.
+- When a server appears, buffered frames are sent/replayed and ACK-driven
+  trimming begins.
+- Terminal errors go to a configured `SenderErrorHandler`; without one they
+  surface on later producer calls or at close-time.
 
-There is no infinite-retry mode. For long maintenance windows, set a large
-`reconnect_max_duration_millis`. On budget exhaustion the current sender stops;
-persisted `sf_dir` data remains for a future sender on the same slot.
+A sender in async mode does not give up because time passed. What ends it is a
+**terminal** condition — authentication rejection, a durable-ack capability
+mismatch, or the poison-frame detector — or the producer hitting
+`sf_max_total_bytes` and exhausting `sf_append_deadline_millis` on `append()`.
+
+### Reconnect and outage handling
+
+**A running sender retries a transport outage indefinitely.** There is no
+wall-clock give-up and no budget-exhaustion event. Backoff grows from
+`reconnect_initial_backoff_millis` to `reconnect_max_backoff_millis` and stays
+there; the loop rotates through the endpoints in `addr` as it goes.
+
+`reconnect_max_duration_millis` has exactly two consumers, neither of which is
+the steady-state loop:
+
+1. The **blocking sync initial connect** (`initial_connect_retry=on` / `sync`),
+   which gives up and throws when the budget expires.
+2. The background drainer's **durable-ack capability-gap budget**, used when an
+   orphan slot repeatedly lands on a node that cannot serve durable acks.
+
+The practical consequence: what bounds your tolerance of a long outage is
+**buffer capacity, not time**. In SF mode that is `sf_max_total_bytes` against
+available disk; in memory mode it is the same key against RAM. When the cap is
+reached, `append()` blocks and then throws after
+`sf_append_deadline_millis` — that, not a timer, is the signal that an outage
+has outlasted your configuration.
+
+:::note Alignment
+
+This is the behaviour of the Java reference client and the .NET client. Other
+clients are aligned to it. If you are implementing a new client, the contract
+is: retry transport failures forever, surface only genuine terminal conditions,
+and apply back-pressure to the producer rather than dropping data.
+
+:::
 
 ### Ingest endpoint walk (`addr=a:9000,b:9000,...`)
 
@@ -389,8 +465,8 @@ reconnect/replay.
 | server down, reconnect duration set, no mode | `reconnect_max_duration_millis=...` | **synchronous** retry; build blocks ⚠ |
 | server down, async | `initial_connect_retry=async` | build returns; I/O thread retries |
 | server returns `401`/`403` | any mode | terminal auth failure; no endpoint continuation |
-| server appears before async budget | async + budget | buffered frames sent and ACKed |
-| server appears after async budget | async + exhausted | sender terminal; new sender/restart needed |
+| server appears later, any delay | `initial_connect_retry=async` | buffered frames sent and ACKed — the retry loop has no deadline |
+| server never appears, buffer fills | async + `sf_max_total_bytes` reached | `append()` blocks, then throws after `sf_append_deadline_millis`; the sender itself stays alive and keeps retrying |
 
 #### Read-replica startup (one bad endpoint, another replica works)
 
@@ -427,22 +503,32 @@ useful while aligning other clients. Primary source areas:
 
 ### `QuestDBBuilder.build()` steps
 
-1. Require both ingest and query configs.
-2. Parse + validate both configs without connecting (runs even when mins are
-   `0`; malformed pool/ingest/query/TLS/auth/enum/range values fail here).
-3. Resolve pool keys: explicit builder setters override conn-string keys;
-   conflicting pool values across the two conn strings fail.
-4. Construct `SenderPool` and `QueryClientPool`.
-5. Eagerly create `min` connections per pool.
-6. Start the `PoolHousekeeper`.
+1. Require a config string; `build()` throws
+   `IllegalStateException("configuration is required; call fromConfig()")`
+   if none was set. One string drives both pools.
+2. Parse + validate the config without connecting, once as the Sender would and
+   once as the query client would (runs even when both mins are `0`, so a
+   malformed pool/ingest/query/TLS/auth/enum/range value fails here).
+3. Resolve `lazy_connect`: when set, the ingest side is rewritten to
+   `initial_connect_retry=async` and the query pool defaults to `min=0`, so
+   startup tolerates a down server without disabling reads.
+4. Resolve pool keys: explicit builder setters override conn-string keys.
+5. Construct `SenderPool` and `QueryClientPool`.
+6. Eagerly create `min` connections per pool.
+7. Start the `PoolHousekeeper`.
 
 ### Initial-connect mode resolution (`Sender.java`)
 
 ```text
-if initialConnectMode set explicitly -> use it (incl. OFF + tuned budget)
+if initialConnectMode set explicitly -> use it (including OFF alongside tuned reconnect_* keys)
 else if any reconnect_* set          -> SYNC
 else                                 -> OFF
 ```
+
+This is the promotion behind [sharp edge #1](#known-sharp-edges): setting a
+`reconnect_*` key and nothing else turns startup into a blocking retry bounded
+by `reconnect_max_duration_millis`. Set `initial_connect_retry` explicitly to
+avoid it.
 
 ### Pooled SF startup recovery nuance
 
@@ -456,9 +542,18 @@ else                                 -> OFF
 - For immediate background drain of all slots, keep enough `sender_pool_min`
   slots warm or construct direct senders for the slots that must actively retry.
 
-### Reconnect deadline (`CursorWebSocketSendLoop`)
+### Reconnect loop (`CursorWebSocketSendLoop`)
 
-`deadlineNanos = outageStartNanos + reconnect_max_duration_millis * 1e6`; the
-loop runs `while (running && now < deadline)`. Hence `0` ⇒ no iterations ⇒
-immediate give-up. `QwpAuthFailedException` / `WebSocketUpgradeException` inside
-the loop are terminal across all endpoints.
+The loop has no wall-clock deadline. It retries while the sender is running,
+backing off from `reconnect_initial_backoff_millis` up to
+`reconnect_max_backoff_millis` and rotating endpoints between attempts. The
+source states the contract directly:
+
+> `reconnect_max_duration_millis` is intentionally NOT consulted by THIS loop.
+> Its holders pass it explicitly where it does apply: the blocking (non-lazy)
+> initial connect hands it to `connectWithRetry`, and `BackgroundDrainer`
+> converts it into the durable-ack capability-gap budget. Neither bounds this
+> loop's steady-state reconnect.
+
+`QwpAuthFailedException` and `WebSocketUpgradeException` raised inside the loop
+are terminal across all endpoints. Everything else is retried.

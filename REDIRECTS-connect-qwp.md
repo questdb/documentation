@@ -7,6 +7,7 @@ Base path: /docs/  (trailingSlash: true). Set up 301 redirects from OLD -> NEW.
 | /docs/ingestion/ilp/overview/ | /docs/connect/compatibility/ilp/overview/ |
 | /docs/ingestion/ilp/advanced-settings/ | /docs/connect/compatibility/ilp/advanced-settings/ |
 | /docs/ingestion/ilp/columnset-types/ | /docs/connect/compatibility/ilp/columnset-types/ |
+| /docs/ingestion/clients/configuration-string/ | /docs/connect/compatibility/ilp/overview/ |
 | /docs/ingestion/clients/date-to-timestamp-conversion/ | /docs/connect/clients/date-to-timestamp-conversion/ |
 | /docs/ingestion/clients/nodejs/ | /docs/connect/clients/nodejs/ |
 | /docs/ingestion/clients/python/ | /docs/connect/clients/python/ |
@@ -33,5 +34,12 @@ Base path: /docs/  (trailingSlash: true). Set up 301 redirects from OLD -> NEW.
 | /docs/query/pgwire/python/ | /docs/connect/compatibility/pgwire/python/ |
 | /docs/query/pgwire/java/ | /docs/connect/compatibility/pgwire/java/ |
 | /docs/query/pgwire/large-result-sets/ | /docs/connect/compatibility/pgwire/large-result-sets/ |
-| /docs/query/export-parquet/ | /docs/connect/compatibility/export-parquet/ |
 | /docs/query/rest-api/ | /docs/connect/compatibility/rest-api/ |
+
+Every row above is a page move except
+`/docs/ingestion/clients/configuration-string/`. That page documented the legacy
+ILP configuration string and was deleted rather than moved, because
+[ILP overview](/docs/connect/compatibility/ilp/overview/) already covers the
+same ground. Left in place it would have kept competing with
+[the QWP connect string](/docs/connect/clients/connect-string/) for the same
+search queries.

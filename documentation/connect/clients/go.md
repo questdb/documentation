@@ -43,21 +43,21 @@ ILP transport details, see the
 
 :::
 
-:::caution Pre-release
+:::caution Beta
 
 The pooled `QuestDB` facade (`qdb.Connect`, `BorrowSender`, `BorrowQuery`) and the
-QWP query API on this page are **pre-release**: they are not yet part of a tagged
+QWP query API on this page are **beta**: they are not yet part of a tagged
 `v4` release of `go-questdb-client`, so a plain
 `go get github.com/questdb/go-questdb-client/v4` will not resolve the types shown
-below. Until the first release that includes them, pin the API to the `qwip_go`
-branch:
+below. Until the first release that includes them, pin the API to `main`:
 
 ```bash
-go get github.com/questdb/go-questdb-client/v4@qwip_go
+go get github.com/questdb/go-questdb-client/v4@main
 ```
 
-This writes a pseudo-version of the branch tip into your `go.mod`. Expect the API
-to change before it ships; track the
+This writes a pseudo-version of the branch tip into your `go.mod`. The newest
+tag, `v4.2.0`, predates the facade. Expect the API to change before it ships;
+track the
 [client releases](https://github.com/questdb/go-questdb-client/releases) for the
 first tagged version, then move off the branch pin.
 
@@ -65,11 +65,11 @@ first tagged version, then move off the branch pin.
 
 ## Quick start
 
-The client requires Go 1.23 or later. Until the pre-release API ships in a tagged
-release, pull it from the `qwip_go` branch (see the note above):
+The client requires Go 1.23 or later. Until the beta API ships in a tagged
+release, pull it from `main` (see the note above):
 
 ```bash
-go get github.com/questdb/go-questdb-client/v4@qwip_go
+go get github.com/questdb/go-questdb-client/v4@main
 ```
 
 Construct one `QuestDB` handle per deployment, share it across goroutines, and
@@ -82,6 +82,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"time"
 
 	qdb "github.com/questdb/go-questdb-client/v4"
 )
@@ -117,13 +119,15 @@ func main() {
 		panic(err)
 	}
 
-	// Ingest: borrow a sender and write a row.
+	// Ingest: borrow a sender and write a row. The marker makes this run's row
+	// unique, so the read-back below cannot match a row from an earlier run.
+	marker := fmt.Sprintf("ETH-USD-%d", os.Getpid())
 	sender, err := db.BorrowSender(ctx)
 	if err != nil {
 		panic(err)
 	}
 	err = sender.Table("trades").
-		Symbol("symbol", "ETH-USD").
+		Symbol("symbol", marker).
 		Symbol("side", "sell").
 		Float64Column("price", 2615.54).
 		Float64Column("amount", 0.00044).
@@ -131,9 +135,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// Flush and wait for the server to acknowledge the row before reading it
-	// back. Flush and Close publish asynchronously (see Flushing), so without
-	// this the SELECT below could race the commit and return no rows.
+	// Flush and wait for the server to acknowledge the row. Flush and Close
+	// publish asynchronously (see Flushing), so without this the row may not
+	// have reached the server at all. The ACK confirms durability, not
+	// visibility -- see the poll below.
 	qs := sender.(qdb.QwpSender)
 	fsn, err := qs.FlushAndGetSequence(ctx)
 	if err != nil {
@@ -146,17 +151,34 @@ func main() {
 		panic(err)
 	}
 
-	// Query: run a SELECT and iterate its result batches.
-	cursor := query.Query(ctx,
-		"SELECT symbol, price FROM trades WHERE symbol = 'ETH-USD' LIMIT 10")
-	defer cursor.Close()
-	for batch, err := range cursor.Batches() {
-		if err != nil {
-			panic(err)
+	// Query: the ACK above confirms QuestDB accepted the frame. The row becomes
+	// visible to queries only after the WAL is applied, which happens
+	// asynchronously. Poll for visibility, bounded by a deadline.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		found := false
+		cursor := query.Query(ctx,
+			"SELECT symbol, price FROM trades WHERE symbol = $1 LIMIT 1",
+			qdb.WithQwpQueryBinds(func(b *qdb.QwpBinds) {
+				b.VarcharBind(0, marker)
+			}))
+		for batch, err := range cursor.Batches() {
+			if err != nil {
+				panic(err)
+			}
+			for row := 0; row < batch.RowCount(); row++ {
+				fmt.Println(batch.String(0, row), batch.Float64(1, row))
+				found = true
+			}
 		}
-		for row := 0; row < batch.RowCount(); row++ {
-			fmt.Println(batch.String(0, row), batch.Float64(1, row))
+		cursor.Close()
+		if found {
+			break
 		}
+		if time.Now().After(deadline) {
+			panic("timed out waiting for query visibility")
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 ```
@@ -168,7 +190,7 @@ both. Each side reads the connect-string keys it owns and ignores the rest.
 
 :::caution Read before building on these snippets
 
-The snippet above shows the correct minimal shape. Four behaviors will cause
+The snippet above shows the correct minimal shape. Five behaviors will cause
 stalled producers, corruption, or panics if you overlook them in real code:
 
 - **Ingestion errors are asynchronous.** `Flush` returning `nil` does **not**
@@ -178,10 +200,14 @@ stalled producers, corruption, or panics if you overlook them in real code:
   producer stalls into backpressure. Register an error handler with
   `qdb.WithQuestDBErrorHandler`. See [Ingestion errors](#ingestion-errors).
 - **A publish is not committed when `Flush` or `Close` returns.** Both hand the
-  rows to the send loop and return before the server commits them, so reading a
-  table back immediately after `Close` can race the commit and return zero rows.
-  Confirm durability with `FlushAndGetSequence` + `AwaitAckedFsn`, as the quick
-  start does. See [Flushing](#flushing).
+  rows to the send loop and return before the server commits them. Confirm
+  durability with `FlushAndGetSequence` + `AwaitAckedFsn`, as the quick start
+  does. See [Flushing](#flushing).
+- **Durability is not visibility.** An ACK means QuestDB committed the frame to
+  the WAL. The row becomes queryable only once the WAL is applied to the table,
+  which happens asynchronously, so a SELECT issued straight after the ACK can
+  still return zero rows. `AwaitAckedFsn` cannot close that gap. For
+  read-after-write, poll with a bounded deadline as the quick start does.
 - **A borrowed sender or query session is not safe for concurrent use.** The
   `QuestDB` handle is; an individual borrow is not. Borrow one per goroutine.
   See [Concurrency](#concurrency).
@@ -1227,7 +1253,7 @@ Everything below is the detail behind these three points.
 Specify comma-separated addresses in the connect string:
 
 ```text
-ws::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
+wss::addr=db-primary:9000,db-replica-1:9000,db-replica-2:9000;
 ```
 
 The pool tries endpoints in order and walks the list to find the next healthy one
@@ -1330,7 +1356,7 @@ Register a `SenderConnectionListener` on the `QuestDB` handle with
 failover transitions across every pooled sender:
 
 ```go
-db, err := qdb.NewQuestDB(ctx, "ws::addr=db-1:9000,db-2:9000;",
+db, err := qdb.NewQuestDB(ctx, "wss::addr=db-1:9000,db-2:9000;",
 	qdb.WithQuestDBConnectionListener(func(e qdb.SenderConnectionEvent) {
 		switch e.Kind {
 		case qdb.SenderConnected, qdb.SenderReconnected, qdb.SenderFailedOver:
@@ -1619,9 +1645,12 @@ func main() {
 			fmt.Printf("row error: %s\n", err)
 		}
 	}
-	// Flush and wait for the server to acknowledge every buffered row before
-	// reading it back. Flush and Close publish asynchronously and do not wait
-	// for the ack, so an immediate read could race the commit (see Flushing).
+	// Flush and wait for the ACK, which confirms QuestDB durably committed the
+	// rows to the WAL. Note the ACK does NOT mean they are queryable yet: the
+	// WAL is applied asynchronously, so the read below can still return fewer
+	// rows than were written. This example prints whatever is visible at that
+	// instant. For read-after-write, poll with a bounded deadline as the quick
+	// start does -- see "Durability is not visibility" above.
 	qs := sender.(qdb.QwpSender)
 	fsn, err := qs.FlushAndGetSequence(ctx)
 	if err != nil {

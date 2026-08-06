@@ -43,9 +43,10 @@ Unacked frames are written to mmap'd files under
 
 **Choose SF mode when:**
 
-- The producer process is long-running and outage budgets are measured
-  in minutes (the default `reconnect_max_duration_millis` is 5 minutes
-  for a reason).
+- The producer process is long-running and must ride out outages measured in
+  minutes or hours. A running sender retries indefinitely, so what caps your
+  tolerance is how much unacked data you can hold: `sf_max_total_bytes` and
+  the disk behind `sf_dir`, not a timer.
 - In-flight data must not be lost when the sender stops or its host
   reboots — crash, OOM kill, planned redeploy.
 - You ingest at rates where minutes of buffering exceeds RAM you can

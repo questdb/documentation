@@ -470,8 +470,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .execute()?;
 
     while let Some(batch) = cursor.next_batch()? {
-        let ColumnView::Timestamp(timestamp) = batch.column(0)? else {
-            unreachable!()
+        // A designated timestamp written with `TimestampNanos` — including
+        // every QWP auto-created table — arrives as `TimestampNanos`. A
+        // column declared `TIMESTAMP` arrives as `Timestamp` (microseconds).
+        // Match both unless you control the schema.
+        let timestamp = match batch.column(0)? {
+            ColumnView::TimestampNanos(c) => c,
+            ColumnView::Timestamp(c) => c,
+            _ => unreachable!(),
         };
         let ColumnView::Double(price) = batch.column(1)? else {
             unreachable!()
@@ -625,10 +631,14 @@ queue is in memory. With `sf_dir`, each borrowed sender uses a disk slot:
 Give each pool that shares an `sf_dir` a distinct `sender_id`. On restart, the
 pool reopens managed dirty slots and replays their unacknowledged frames.
 
-Disk mode does not call `fsync`. It is page-cache durable, which protects
-against a client-process crash but does not guarantee survival of a host crash
-or power loss. The only supported `sf_durability` mode is currently `memory`;
-`flush` and `append` are rejected.
+The default `sf_durability=memory` does not call `fsync`. It is page-cache
+durable, which protects against a client-process crash but does not guarantee
+survival of a host crash or power loss.
+
+Set `sf_durability=periodic` to survive host loss. It requires `sf_dir` and
+checkpoints published frames in the background every `sf_sync_interval_millis`
+(default `5000`). `flush` and `append` are reserved: they parse but are
+rejected at build time.
 
 ### Choose a completion mode
 
@@ -781,7 +791,7 @@ filters apply to every pooled path:
 use questdb::QuestDb;
 
 let db = QuestDb::connect(
-    "ws::addr=node-a:9000,node-b:9000,node-c:9000;target=primary;",
+    "wss::addr=node-a:9000,node-b:9000,node-c:9000;target=primary;",
 )?;
 ```
 

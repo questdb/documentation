@@ -320,6 +320,8 @@ Client to server. Initiates a new query cursor.
 |   type_code:     uint8       Column type code            |
 |   bind_block:    column_data Ingress column encoding     |
 |                              with row_count = 1          |
+| (if server advertised CAP_QUERY_FLAGS):                  |
+|   query_flags:   varint      Optional trailer            |
 +----------------------------------------------------------+
 ```
 
@@ -351,6 +353,22 @@ parameter and treats it identically to VARCHAR. Compliant clients should still
 send VARCHAR. A future revision may reject SYMBOL bind type codes.
 
 :::
+
+### query_flags
+
+An optional varint trailer. Append it **only** when the server advertised
+`CAP_QUERY_FLAGS` in [`SERVER_INFO.capabilities`](#server_info-0x18); omit it
+otherwise. Sending the trailer to a server that did not advertise support is a
+protocol error.
+
+| Bit | Name | Effect |
+|-----|------|--------|
+| `0x01` | `QUERY_FLAG_RESET_DICT` | Reset the connection-scoped SYMBOL dictionary before running this query, scoping it to this query alone. |
+
+`QUERY_FLAG_RESET_DICT` reaches the same state as a server-initiated
+`CACHE_RESET` with `RESET_MASK_DICT`. It is the only client-side way to bound
+[symbol dictionary](#symbol-dictionary) growth on a long-lived connection,
+which matters for BI-style workloads that run many queries over one session.
 
 ### Concurrency
 
@@ -572,9 +590,10 @@ before sending the first `QUERY_REQUEST`.
 
 **Capabilities:**
 
-| Bit          | Name     | Description                                              |
-|--------------|----------|----------------------------------------------------------|
-| `0x00000001` | CAP_ZONE | `zone_id` fields are appended after `node_id`.           |
+| Bit          | Name            | Description                                       |
+|--------------|-----------------|---------------------------------------------------|
+| `0x00000001` | CAP_ZONE        | `zone_id` fields are appended after `node_id`.    |
+| `0x00000002` | CAP_QUERY_FLAGS | The server parses the optional [`query_flags`](#query_flags) varint trailer on `QUERY_REQUEST`. |
 
 Clients encountering unknown capability bits must ignore them. Trailing fields
 gated by unset bits are absent from the frame.
@@ -597,7 +616,7 @@ Egress clients can accept multiple endpoints plus role and zone preferences on
 the connect string:
 
 ```text
-ws::addr=db-a:9000,db-b:9000,db-c:9000;target=any;zone=eu-west-1a;failover=on;
+wss::addr=db-a:9000,db-b:9000,db-c:9000;target=any;zone=eu-west-1a;failover=on;
 ```
 
 | Key        | Values                    | Default | Description                                   |
@@ -699,6 +718,12 @@ When either cap is crossed, the server emits `CACHE_RESET` with
 starts at `deltaStart = 0`.
 
 On disconnect, both sides reset the dictionary.
+
+A client can also opt into per-query scope rather than waiting for the caps.
+Setting [`QUERY_FLAG_RESET_DICT`](#query_flags) on a `QUERY_REQUEST` clears the
+dictionary before that query runs, reaching the same state as a server-initiated
+`CACHE_RESET` with `RESET_MASK_DICT`. This requires the server to have
+advertised `CAP_QUERY_FLAGS`.
 
 ## Cursor lifecycle
 

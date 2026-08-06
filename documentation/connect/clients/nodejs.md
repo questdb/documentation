@@ -12,6 +12,16 @@ import { ILPClientsTable } from "@theme/ILPClientsTable"
 QuestDB offers Node.js developers a dedicated client designed for efficient and
 high-performance data ingestion.
 
+:::note No QWP support yet
+
+Unlike the other clients in this section, the Node.js client does not speak the
+QuestDB Wire Protocol. It ingests over
+[ILP](/docs/connect/compatibility/ilp/overview/) using `http::` connect strings,
+and queries run over [PGWire](/docs/connect/compatibility/pgwire/nodejs/). The
+`http::` examples below are current, not stale. QWP support is planned.
+
+:::
+
 The Node.js client has solid benefits:
 
 - **Automatic table creation**: No need to define your schema upfront.

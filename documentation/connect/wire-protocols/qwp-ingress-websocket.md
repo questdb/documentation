@@ -225,7 +225,7 @@ output_byte(value)
 
 **Decoding:**
 
-```python
+```text
 result = 0
 shift = 0
 while True:
@@ -285,10 +285,32 @@ def zigzag_decode(n):
 
 | Bit | Mask   | Name                       | Description                                           |
 |-----|--------|----------------------------|-------------------------------------------------------|
-| 0-1 |        | Reserved                   | Must be 0                                             |
+| 0   | `0x01` | `FLAG_DEFER_COMMIT`        | Append rows to WAL writers without committing them    |
+| 1   |        | Reserved                   | Must be 0                                             |
 | 2   | `0x04` | `FLAG_GORILLA`             | Gorilla delta-of-delta encoding for timestamp columns |
 | 3   | `0x08` | `FLAG_DELTA_SYMBOL_DICT`   | Delta symbol dictionary mode enabled                  |
 | 4-7 |        | Reserved                   | Must be 0                                             |
+
+#### `FLAG_DEFER_COMMIT`
+
+This flag is how a client sends one logical batch that does not fit in a single
+frame. The server appends the frame's rows to WAL writers but does **not**
+commit them; they commit when a later frame arrives with the flag clear. The
+reference client sets the flag on every frame of a split except the last.
+
+Four consequences an implementer must handle:
+
+- **An OK on a deferred frame is not durability.** While deferred rows are
+  uncommitted, the server withholds advancement of the cumulative OK
+  watermark. Do not treat the ack as a commit.
+- **Deferred rows are rolled back on disconnect.** A store-and-forward slot
+  whose tail is entirely `FLAG_DEFER_COMMIT` frames with no covering commit
+  frame is an aborted group. The reference client detects and skips it during
+  recovery.
+- **An empty message with the flag clear forces a commit** without sending any
+  further data.
+- **The server caps how much may sit uncommitted**, via
+  [`qwp.max.uncommitted.rows`](/docs/configuration/qwp/#qwpmaxuncommittedrows).
 
 ### Complete message layout
 
@@ -599,9 +621,11 @@ Dictionary-encoded strings for low-cardinality columns.
 
 :::info WebSocket uses global delta dictionaries only
 
-WebSocket clients set `FLAG_DELTA_SYMBOL_DICT` (`0x08`) on every message
-and use the global delta dictionary mode **exclusively**. The per-table
-dictionary mode used by UDP datagrams is not covered here.
+WebSocket clients set `FLAG_DELTA_SYMBOL_DICT` (`0x08`) on every message and
+use the global delta dictionary mode **exclusively**. The alternative
+per-column mode described in
+[Per-column dictionary mode](#per-column-dictionary-mode) applies to UDP
+datagrams, which do not carry connection-scoped state.
 
 :::
 
@@ -623,6 +647,64 @@ The client owns the global ID assignment. Each new string gets the next
 sequential integer, starting from `0` on a fresh connection. Only the new
 entries since the previous message are transmitted; the server accumulates the
 dictionary for the lifetime of the connection.
+
+#### Sent watermark and reconnect catch-up
+
+A conformant client keeps a **monotonic sent watermark**: the highest global ID
+it has already transmitted on the current connection. Each message's delta
+section carries only the IDs above that watermark, so a symbol string crosses
+the wire exactly once per connection no matter how many messages reference it.
+
+The server holds the accumulated dictionary, so the two sides must not
+disagree about what has been sent. Two rules follow:
+
+- **On reconnect or failover the server's dictionary is empty.** Before any
+  post-reconnect data frame, the client must replay its **entire** dictionary
+  as a catch-up frame, re-establishing IDs `0..watermark`. Only then is the
+  producer's existing ID baseline valid again on the new connection.
+- **The catch-up may not fit one frame.** A dictionary larger than the
+  server-advertised
+  [`X-QWP-Max-Batch-Size`](#version-negotiation) must be split across as many
+  frames as needed. Each catch-up frame carries
+  [`FLAG_DEFER_COMMIT`](#flags-byte) so the server accumulates the entries
+  without committing anything — there are no rows to commit.
+
+If a client sends a delta whose `delta_start` runs past the server's current
+dictionary, the server rejects the frame with
+[`STATUS_DICTIONARY_GAP`](#status-codes). That status is **retriable**: the
+correct response is to re-register the dictionary from ID `0`, not to treat the
+frame as poisoned.
+
+Clients that layer store-and-forward on top must persist the dictionary
+alongside the frames, since frames on disk reference IDs rather than strings.
+See
+[store-and-forward concepts](/docs/high-availability/store-and-forward/concepts/#symbol-dict).
+
+#### Per-column dictionary mode
+
+When `FLAG_DELTA_SYMBOL_DICT` (`0x08`) is **not** set, each SYMBOL column
+carries its own dictionary inline, and the message references no
+connection-scoped state at all. This is the mode used by **UDP datagrams**,
+which are independent and cannot rely on per-connection accumulation.
+
+```text
++------------------------------------------------------------+
+| [Null flag + bitmap (see Null handling)]                   |
++------------------------------------------------------------+
+| dictionary_size: varint   Number of entries in this column |
+| For each dictionary entry:                                 |
+|   string_length: varint   UTF-8 byte length                |
+|   string_data:   bytes    UTF-8 encoded symbol string      |
++------------------------------------------------------------+
+| For each non-null row:                                     |
+|   index: varint           0-based dictionary entry index   |
++------------------------------------------------------------+
+```
+
+The indices are local to this column in this message — they are **not** global
+IDs. A decoder must parse the dictionary before reading the index array. The
+[`MAX_SYMBOL_DICTIONARY_SIZE`](#protocol-limits) limit of 2,000,000 entries
+applies per column in this mode, rather than per connection.
 
 ### Timestamp encoding
 
@@ -705,7 +787,7 @@ The first two timestamps are written in full as int64 values. Starting from
 the third timestamp (index `i = 2`), each subsequent value is encoded as a
 delta-of-deltas:
 
-```python
+```text
 delta_i  = t[i] - t[i - 1]
 dod_i    = delta_i - delta_{i-1}    # delta_{i-1} = t[i-1] - t[i-2]
 ```
@@ -891,6 +973,25 @@ table that committed data in the acknowledged batch. `tableCount` is 0 when no
 | 6    | `0x06` | INTERNAL_ERROR  | Server-side error                                |
 | 8    | `0x08` | SECURITY_ERROR  | Authorization failure                            |
 | 9    | `0x09` | WRITE_ERROR     | Write failure (e.g., table not accepting writes) |
+| 10   | `0x0A` | CANCELLED       | Egress-only. Query aborted because the client sent a `CANCEL` frame, or the server invoked explicit cancellation. |
+| 11   | `0x0B` | LIMIT_EXCEEDED  | Egress-only. Query aborted because a server-side limit was hit: query timeout, memory cap, circuit breaker, or OOM. |
+| 12   | `0x0C` | NOT_WRITABLE    | **Reserved.** Node cannot accept writes (read-only replica, or a demoting primary). |
+| 13   | `0x0D` | DICTIONARY_GAP  | A delta symbol dictionary whose start id runs past the server's connection dictionary. |
+
+The status namespace is shared between ingress and egress, which is why the two
+egress-only codes appear here.
+
+Two of these carry classification instructions a client cannot infer:
+
+- **`NOT_WRITABLE` is retriable with endpoint rotation, never terminal.**
+  Servers currently signal this condition with a reconnect-eligible
+  `NORMAL_CLOSURE` close rather than a NACK, so the code is reserved for now.
+  Treating it as fatal turns a routine primary demotion into an outage.
+- **`DICTIONARY_GAP` is retriable.** The client must re-register its symbol
+  dictionary from id 0 and resend. It is distinct from `PARSE_ERROR` because
+  the verdict depends on per-connection server state rather than on the
+  frame's bytes: the identical frame is accepted once the sender has
+  re-registered.
 
 ### Durable acknowledgement
 
@@ -953,7 +1054,7 @@ failures surface only as absence of a durable-ack frame.
 | Max table name length         | 127 bytes     |
 | Max column name length        | 127 bytes     |
 | Max in-flight batches         | 128           |
-| Max symbol dictionary entries | 1,000,000     |
+| Max symbol dictionary entries | 2,000,000     |
 
 The header's `table_count` field is a uint16, so the protocol ceiling for
 tables per message is 65,535 regardless of the configured limit. Individual
@@ -994,6 +1095,11 @@ back to ~1.9 MiB (safe against the default 2 MiB recv buffer). Operators who
 want larger batches must raise `http.recv.buffer.size` on the server (e.g.,
 `http.recv.buffer.size=17m` to use the full QWP 16 MB headroom); the next
 handshake will advertise the new ceiling automatically.
+
+A logical batch that exceeds the cap does not have to be split into separate
+transactions. Send it as several frames, setting
+[`FLAG_DEFER_COMMIT`](#flag_defer_commit) on all but the last, and the server
+commits the whole group when the final frame arrives with the flag clear.
 
 ## Client operation
 
@@ -1041,7 +1147,7 @@ section of the connect string reference:
 
 | Key                              | Default   | Description                               |
 |----------------------------------|-----------|-------------------------------------------|
-| `reconnect_max_duration_millis`  | `300000`  | Total outage budget before giving up.     |
+| `reconnect_max_duration_millis`  | `300000`  | Budget for the blocking sync initial connect only; the running loop retries indefinitely. |
 | `reconnect_initial_backoff_millis` | `100`   | First post-failure sleep.                 |
 | `reconnect_max_backoff_millis`   | `5000`    | Cap on per-attempt sleep.                 |
 | `initial_connect_retry`          | `off`     | Retry on first connect (`on`, `sync`, `async`). |

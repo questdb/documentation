@@ -181,10 +181,11 @@ The exception message distinguishes the two scenarios:
 
 ## Close and shutdown
 
-`close()` waits up to `close_flush_timeout_millis` (default 5 s) for
-`ackedFsn` to reach `publishedFsn` — i.e. for the server to acknowledge
-everything the producer has handed in. If the wait succeeds, all data is
-acked. If the timeout fires, a `WARN` is logged and:
+`close()` waits up to `close_flush_timeout_millis` for `ackedFsn` to reach
+`publishedFsn` — i.e. for the server to acknowledge everything the producer has
+handed in. The default differs by client: 60 s on Java and .NET, 5 s on Rust,
+C, C++ and Python. If the wait succeeds, all data is acked. If the timeout
+fires, a `WARN` is logged and:
 
 - in **SF mode**, the un-acked tail is left on disk and recovered by the
   next sender on the same slot;
@@ -238,6 +239,43 @@ the lowest surviving segment are not re-replayed.
 
 The file is **optional** — a conformant client may choose not to maintain
 it. The reference client does.
+
+### `.symbol-dict` {#symbol-dict}
+
+Each slot also persists its SYMBOL dictionary to a dot-prefixed side-file,
+`<sf_dir>/<sender_id>/.symbol-dict`.
+
+QWP sends each symbol string to the server **once per connection** and
+thereafter references it by a numeric id. A frame on disk therefore contains
+ids, not strings. If the dictionary that assigned those ids were lost, the
+replayed frames would reference ids the server has never seen and it would
+reject them with
+[`STATUS_DICTIONARY_GAP`](/docs/connect/wire-protocols/qwp-ingress-websocket/#status-codes).
+Persisting the dictionary alongside the frames is what makes a recovered or
+orphan-drained slot replayable on a fresh process.
+
+**Write-ahead ordering.** A new symbol is appended to `.symbol-dict` *before*
+the frame that references it is published. A crash can therefore leave
+dictionary entries with no referencing frame — harmless — but never a frame
+whose ids are unknown.
+
+**Durability matches the rest of store-and-forward: no fsync.** Writes go to
+the page cache. A process crash (including `SIGKILL`) preserves both the
+dictionary and the frames, because the page cache survives. A **host** crash
+or power loss can tear the dictionary tail, exactly as it can tear the segment
+frames themselves. Use `sf_durability=periodic` if you need checkpoints against
+host loss; see
+[Configuration](/docs/high-availability/store-and-forward/configuration/).
+
+**Torn tails are detected, not replayed.** The file is CRC-validated on open
+and any torn trailing entry is dropped. If the dictionary cannot be rebuilt —
+neither from the side-file's intact prefix nor from the surviving frames' own
+delta sections — the slot is **unreplayable**, and the client sets it aside
+rather than shipping frames whose ids nothing still backs. The reference client
+raises `UnreplayableSlotException`: `Sender.build()` sets the slot aside and
+starts the producer on a fresh one, and the background drainer marks it with a
+`.failed` sentinel so later orphan scans skip it. No data is silently
+discarded; the slot is preserved for inspection.
 
 ## Orphan adoption
 

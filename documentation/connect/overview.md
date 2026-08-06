@@ -38,12 +38,12 @@ and PGWire for queries.
 
 | Language  | QWP support |
 | --------- | ----------- |
-| Java      | ✓           |
-| C & C++   | ✓           |
-| Rust      | ✓           |
-| Go        | ✓           |
-| .NET      | ✓           |
-| Python    | Planned     |
+| Java      | ✓ Stable    |
+| C & C++   | ✓ Stable    |
+| Rust      | ✓ Stable    |
+| Python    | ✓ Stable    |
+| .NET      | Beta        |
+| Go        | Beta        |
 | Node.js   | Planned     |
 
 Highlights:
@@ -63,7 +63,7 @@ Highlights:
 
 Pick a language:
 
-<Clients />
+<Clients showProtocol="QWP" />
 
 ## Compatibility protocols
 
@@ -86,10 +86,15 @@ them.
 ## Wire protocols
 
 The byte-on-the-wire specifications for the **QuestDB Wire Protocol (QWP)**,
-including WebSocket variants for ingress and egress and a UDP variant for
-fire-and-forget metrics. Read these if you are **building a new QuestDB
-client library** in a language we don't yet support, or embedding QuestDB
-connectivity into an existing framework.
+covering the WebSocket variants for ingress and egress. Read these if you are
+**building a new QuestDB client library** in a language we don't yet support, or
+embedding QuestDB connectivity into an existing framework.
+
+QWP also has a UDP transport for fire-and-forget metrics, supported by the
+Java, Rust, C and C++ clients via the `udp` connect-string schema. It is
+configured through the [`qwp.udp.*` server
+settings](/docs/configuration/qwp/#udp-receiver) and is disabled by default;
+there is no separate byte-level specification page for it.
 
 See the [Wire Protocols reference](/docs/connect/wire-protocols/overview/).
 

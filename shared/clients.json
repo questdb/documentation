@@ -1,5 +1,53 @@
 [
   {
+    "href": "/docs/connect/clients/java",
+    "name": "Java",
+    "description":
+      "Reference QWP client. Pooled ingestion and streaming SQL over one connection.",
+    "logo": "/images/logos/java.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/c-and-cpp",
+    "name": "C & C++",
+    "description":
+      "Columnar QWP ingestion and streaming queries for systems and embedded code.",
+    "logo": "/images/logos/cplusplus.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/rust",
+    "name": "Rust",
+    "description":
+      "Thread-safe QWP pool with Buffer, Chunk, Arrow, and Polars ingestion.",
+    "logo": "/images/logos/rust.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/python",
+    "name": "Python",
+    "description":
+      "QWP row and DataFrame ingestion, plus SQL streaming into pandas, polars, or Arrow.",
+    "logo": "/images/logos/python.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/dotnet",
+    "name": ".NET",
+    "description":
+      "QWP sender and query client for .NET. Beta.",
+    "logo": "/images/logos/dotnet.svg",
+    "protocol": "QWP"
+  },
+  {
+    "href": "/docs/connect/clients/go",
+    "name": "Go",
+    "description":
+      "Pooled QWP ingestion and queries with store-and-forward durability. Beta.",
+    "logo": "/images/logos/go.svg",
+    "protocol": "QWP"
+  },
+  {
     "href": "/docs/connect/clients/c-and-cpp",
     "name": "C & C++",
     "description":
@@ -59,7 +107,7 @@
     "href": "/docs/connect/clients/nodejs",
     "name": "Node.js",
     "description":
-      "Node.js® is an open-source, cross-platform JavaScript runtime environment.",
+      "JavaScript runtime client. Ingests over ILP; QWP support is planned.",
     "logo": "/images/logos/nodejs-light.svg",
     "protocol": "ILP"
   },

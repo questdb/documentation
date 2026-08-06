@@ -681,7 +681,7 @@ List every node of one logical deployment in a single `addr` server list:
 import questdb
 
 db = questdb.connect(
-    "ws::addr=node-a:9000,node-b:9000,node-c:9000;target=primary;"
+    "wss::addr=node-a:9000,node-b:9000,node-c:9000;target=primary;"
 )
 ```
 

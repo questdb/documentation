@@ -4,7 +4,7 @@ sidebar_label: OPC-UA dense format
 description: Configure Telegraf to merge sparse OPC-UA metrics into dense rows for efficient storage and querying in QuestDB
 ---
 
-Configure Telegraf to collect OPC-UA industrial automation data and insert it into QuestDB in a dense format. By default, Telegraf creates one row per metric with sparse columns, but for QuestDB it's more efficient to merge all metrics from the same timestamp into a single dense row.
+Configure [Telegraf](/docs/connect/message-brokers/telegraf/) to collect OPC-UA industrial automation data and insert it into QuestDB in a dense format. By default, Telegraf creates one row per metric with sparse columns, but for QuestDB it's more efficient to merge all metrics from the same timestamp into a single dense row.
 
 ## Problem: Sparse data format
 
@@ -78,9 +78,17 @@ Configure Telegraf to merge metrics with matching timestamps and tags before sen
 # QuestDB Output via ILP
 [[outputs.influxdb_v2]]
   urls = ["${QUESTDB_HTTP_ENDPOINT}"]
+  # QuestDB Enterprise: a REST API token
   token = "${QUESTDB_HTTP_TOKEN}"
+  # QuestDB Open Source: base64-encoded "user:password" instead of a token
+  # http_headers = {"Authorization" = "Basic ${QUESTDB_BASIC_AUTH}"}
   content_encoding = "identity"
 ```
+
+The two credential lines are alternatives, so use whichever matches your
+edition. For how to generate a token or encode the basic credentials, see
+[authentication](/docs/connect/message-brokers/telegraf/#authentication) on
+the Telegraf page.
 
 ### Key configuration elements
 
@@ -298,8 +306,8 @@ OPC-UA timestamps may have different precision than QuestDB expects. Ensure:
 :::
 
 :::info Related Documentation
+- [Telegraf integration](/docs/connect/message-brokers/telegraf/)
 - [Telegraf OPC-UA plugin](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/opcua)
 - [Telegraf merge aggregator](https://github.com/influxdata/telegraf/tree/master/plugins/aggregators/merge)
 - [QuestDB ILP reference](/docs/connect/compatibility/ilp/overview/)
-- [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/)
 :::
