@@ -90,14 +90,14 @@ covers chart types and configuration.
 ## Notebooks and AI
 
 Coding agents connected through the
-**MCP bridge** can build and
+**QuestDB MCP server** can build and
 edit notebooks too. Agents work in the background without taking over your
 tab: when an agent changes a notebook you are not looking at, a notification
 appears above the MCP status pill with a **View** action that jumps to the
 change. Until you connect the bridge for the first time, new notebooks show a
 dismissible card prompting you to set it up.
 
-[Learn more about the MCP connection →](/docs/getting-started/web-console/mcp-connection)
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-connection)
 
 **Build with AI** on the toolbar opens an AI chat that knows this notebook: it
 can add cells, write queries, and configure charts in place. Each notebook has

@@ -1,10 +1,11 @@
 ---
-title: MCP connection
-sidebar_label: MCP connection
+title: QuestDB MCP Server
+sidebar_label: MCP server
 description:
-  Connect AI coding agents like Claude Code or OpenAI Codex to the QuestDB Web
-  Console with the MCP bridge. Covers setup, pairing, permission levels, and
-  the available tools.
+  The official QuestDB MCP server connects AI coding agents like Claude Code,
+  Codex, and Cursor to the QuestDB Web Console, where they explore schemas,
+  run SQL, and build notebooks and live dashboards. Covers setup, pairing,
+  permission levels, and the available tools.
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -15,13 +16,22 @@ import Tabs from "@theme/Tabs"
 
 import TabItem from "@theme/TabItem"
 
-The <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP bridge</a> (`@questdb/mcp-bridge`) is a local stdio MCP server that connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the bridge runs on your machine, listens on loopback only, and never handles credentials.
+The official **QuestDB MCP server** — the <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP Bridge</a> (`@questdb/mcp-bridge`) — connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the bridge runs locally on your machine, listens on loopback only, and never handles credentials.
 
 The setup wizard detects and configures Claude Code, Codex, Cursor, OpenCode, and Gemini CLI. Any other MCP client works with the manual configuration.
 
 :::tip
 No coding agent? The built-in [AI Assistant](/docs/getting-started/web-console/questdb-ai) has the same capabilities: it builds notebooks and dashboards from a prompt right inside the console, using your own API keys or a local model.
 :::
+
+## Do you need an MCP server to query QuestDB?
+
+Not for plain data access. QuestDB speaks HTTP natively, so any coding agent
+can [use the REST API out of the box](/docs/getting-started/ai-coding-agents/),
+with no MCP server in between. What the MCP server adds is the Web Console:
+the agent builds notebooks, charts, and live dashboards in the browser tab you
+are looking at, through your existing session. A direct HTTP connection cannot
+do that.
 
 ## Setup
 
@@ -181,7 +191,7 @@ click the notification when it is ready:
 
 ## Next steps
 
-- The bridge is open source at <a href="https://github.com/questdb/mcp-bridge" target="_blank">github.com/questdb/mcp-bridge</a>: issues and contributions welcome
+- The MCP server is open source at <a href="https://github.com/questdb/mcp-bridge" target="_blank">github.com/questdb/mcp-bridge</a>: issues and contributions welcome
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) covers agent skills and REST API access
 - [Live dashboards](/docs/getting-started/web-console/notebooks/live-dashboards) shows how to build the same dashboards by hand
 - [Web Console overview](/docs/getting-started/web-console/overview/) tours the console surfaces

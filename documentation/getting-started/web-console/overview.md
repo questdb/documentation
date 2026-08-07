@@ -2,8 +2,8 @@
 title: Web Console overview
 sidebar_label: Overview
 description: "Tour of the QuestDB Web Console: the SQL editor, notebooks with
-  charts and live dashboards, the AI Assistant, the MCP connection for coding
-  agents, and monitoring."
+  charts and live dashboards, the AI Assistant, the QuestDB MCP server for
+  coding agents, and monitoring."
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -50,15 +50,15 @@ The **Code Editor** is where you write and execute SQL queries with features lik
 
 [Learn more about Notebooks →](/docs/getting-started/web-console/notebooks/overview)
 
-## MCP Connection
+## QuestDB MCP Server
 
-The **MCP Connection** links AI coding agents such as Claude Code or Codex to your running Web Console through the MCP bridge. Agents explore schemas, run SQL, and build notebook dashboards through your browser session, with a four-level permission model controlling what they can see and do.
+The official **QuestDB MCP server** links AI coding agents such as Claude Code or Codex to your running Web Console. Agents explore schemas, run SQL, and build notebook dashboards through your browser session, with a four-level permission model controlling what they can see and do.
 
-[Learn more about the MCP connection →](/docs/getting-started/web-console/mcp-connection)
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-connection)
 
 ## AI Assistant
 
-The **AI Assistant** provides intelligent query assistance directly in the Web Console using AI-powered explanations and suggestions. It helps you write, understand, and fix SQL queries while maintaining complete control over your data and API keys through a Bring Your Own Key (BYOK) model.
+**QuestDB AI** is the AI assistant built into the Web Console. It generates, explains, and fixes SQL and builds notebooks from a prompt. It is bring-your-own-key: you use your own OpenAI or Anthropic key, or a local model, and your keys and data stay under your control.
 
 [Learn more about the AI Assistant →](/docs/getting-started/web-console/questdb-ai)
 

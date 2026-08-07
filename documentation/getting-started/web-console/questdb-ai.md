@@ -1,15 +1,18 @@
 ---
-title: QuestDB AI
+title: QuestDB AI Assistant (bring your own key)
 sidebar_label: QuestDB AI
 slug: /getting-started/web-console/questdb-ai
-description: Get intelligent SQL query assistance with QuestDB AI in the Web Console
+description:
+  QuestDB AI is the bring-your-own-key AI assistant built into the Web
+  Console. Generate, explain, and fix SQL and build notebooks with your own
+  OpenAI or Anthropic key, or a local model. No coding agent needed.
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-The **QuestDB AI Assistant** provides intelligent query assistance directly within the Web Console. You can generate, explain, and fix SQL queries, and ask questions about your schema and QuestDB using models from OpenAI, Anthropic, or a custom provider, all while maintaining complete control over your data and API keys.
+**QuestDB AI** is the AI assistant built into the Web Console. It generates, explains, and fixes SQL, answers questions about your schema, and builds notebooks and dashboards from a prompt. It is bring-your-own-key: you connect models from OpenAI, Anthropic, or a custom provider — including local models such as Ollama — and your keys and data stay in your browser, under your control.
 
-The Assistant matches everything a coding agent can do over the [MCP bridge](/docs/getting-started/web-console/mcp-connection): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, all without a coding agent. With a custom provider it works with local models too.
+The Assistant matches everything a coding agent can do over the [QuestDB MCP server](/docs/getting-started/web-console/mcp-connection): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, with no coding agent involved.
 
 <Screenshot
   alt="AI Assistant chat window in Web Console"

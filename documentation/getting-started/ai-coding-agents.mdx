@@ -1,9 +1,10 @@
 ---
-title: AI coding agents
+title: Using QuestDB with AI coding agents
 sidebar_label: AI coding agents
 description:
-  Use AI coding agents like Claude Code or OpenAI Codex to build applications,
-  write queries, and work with QuestDB using natural language.
+  How AI coding agents like Claude Code, Codex, and Cursor work with QuestDB.
+  The official QuestDB MCP server for the Web Console, the QuestDB skill for
+  time-series SQL, and the REST API that works out of the box.
 ---
 
 import Tabs from "@theme/Tabs"
@@ -15,23 +16,51 @@ Code</a> and
 <a href="https://openai.com/index/openai-codex/" target="_blank">OpenAI
 Codex</a> can help you build applications that use QuestDB.
 
-These agents work with QuestDB out of the box by reading the online
-documentation. For deeper integration, two options are available, and they
-work best together. The [QuestDB agent skill](#questdb-agent-skill) embeds
-QuestDB knowledge directly into the agent's context: SQL syntax, ingestion
-patterns, and analytics recipes, helping it use QuestDB-specific syntax and
-patterns more accurately. The
-[Web Console MCP bridge](#web-console-mcp-bridge) connects the agent to your running
-[Web Console](/docs/getting-started/web-console/overview/), where it explores
-schemas, runs SQL, and builds notebook dashboards through your browser
-session. Combined, the skill supplies the insight and the bridge turns it into
-live dashboards. Separately, the
+There are four options, depending on what you want the AI to do, and they
+combine well:
+
+| You want to                                                        | Use                                                                            | Requires                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Build notebooks and live dashboards in the Web Console from your agent | The official [QuestDB MCP server](#questdb-mcp-server)                         | Node.js and a coding agent                        |
+| Query and ingest data directly, no console involved                | The [REST API](#rest-api-no-setup-required): QuestDB speaks HTTP out of the box | Nothing to install                                |
+| Teach the agent QuestDB's time-series SQL and patterns             | The [QuestDB skill](#questdb-agent-skill)                                      | Claude Code or Codex                              |
+| AI help inside the console, without a coding agent                 | The [QuestDB AI Assistant](/docs/getting-started/web-console/questdb-ai)       | Your own OpenAI or Anthropic key, or a local model |
+
+The MCP server and the skill work best together: the skill supplies the
+time-series SQL knowledge, and the MCP server turns it into live dashboards in
+your console. Separately, the
 [TSBS Benchmark skill](#tsbs-benchmark-skill) automates end-to-end performance
 benchmarking.
 
-## Getting started
+## QuestDB MCP server
 
-No setup required. Use the public QuestDB demo with Claude Code:
+The official <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB
+MCP server</a> (the QuestDB MCP Bridge, `@questdb/mcp-bridge`) connects coding
+agents to a running
+[Web Console](/docs/getting-started/web-console/overview/). Every action
+executes in the browser through your already-authenticated console session, and
+a four-level permission model controls what the agent can see and do, from no
+data access up to DDL/DML execution.
+
+Once connected, the agent can:
+
+- **Build dashboards**: create and edit SQL and markdown cells, draw nine chart
+  types, arrange cells into live grid dashboards, and set chart auto-refresh.
+- **Explore schema and data**: list tables and materialized views, fetch DDL and
+  runtime statistics, and run ad-hoc queries with result rows returned to the
+  agent.
+- **Look up documentation**: built-in reference for QuestDB functions,
+  operators, and SQL keywords.
+- **Two-way handoff**: hand analysis back and forth with your agent; it
+  snapshots the workspace and tracks your edits, so you can both work on the
+  same notebook without conflicts.
+
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-connection)
+
+## REST API: no setup required
+
+QuestDB speaks HTTP natively, so agents can query it with no MCP server and
+nothing to install. Try the public QuestDB demo with Claude Code:
 
 ```
 You: "Use QuestDB's REST API at https://demo.questdb.io/ to list all tables"
@@ -63,30 +92,6 @@ You: "Connect to my QuestDB at localhost:9000 and show me what tables I have"
 Claude Code: I'll query the QuestDB REST API to list your tables.
 [Executes curl command and shows results]
 ```
-
-## Web Console MCP bridge
-
-The <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP
-bridge</a> connects coding agents to a running
-[Web Console](/docs/getting-started/web-console/overview/). Every action
-executes in the browser through your already-authenticated console session, and
-a four-level permission model controls what the agent can see and do, from no
-data access up to DDL/DML execution.
-
-Once connected, the agent can:
-
-- **Build dashboards**: create and edit SQL and markdown cells, draw nine chart
-  types, arrange cells into live grid dashboards, and set chart auto-refresh.
-- **Explore schema and data**: list tables and materialized views, fetch DDL and
-  runtime statistics, and run ad-hoc queries with result rows returned to the
-  agent.
-- **Look up documentation**: built-in reference for QuestDB functions,
-  operators, and SQL keywords.
-- **Two-way handoff**: hand analysis back and forth with your agent; it
-  snapshots the workspace and tracks your edits, so you can both work on the
-  same notebook without conflicts.
-
-[Learn more about the MCP connection →](/docs/getting-started/web-console/mcp-connection)
 
 ## QuestDB agent skill
 
