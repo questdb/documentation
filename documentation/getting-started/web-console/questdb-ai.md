@@ -3,14 +3,14 @@ title: AI Assistant (Bring Your Own Key)
 sidebar_label: AI Assistant
 slug: /getting-started/web-console/questdb-ai
 description:
-  QuestDB AI is the bring-your-own-key AI assistant built into the Web
-  Console. Generate, explain, and fix SQL and build notebooks with your own
+  The QuestDB Web Console includes a built-in, bring-your-own-key AI
+  assistant. Generate, explain, and fix SQL and build notebooks with your own
   OpenAI or Anthropic key, or a local model. No coding agent needed.
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-**QuestDB AI** is the AI assistant built into the Web Console. It generates, explains, and fixes SQL, answers questions about your schema, and builds notebooks and dashboards from a prompt. It is bring-your-own-key: you connect models from OpenAI, Anthropic, or a custom provider — including local models such as Ollama — and your keys and data stay in your browser, under your control.
+The Web Console includes a built-in **AI Assistant** that can generate, explain, and fix SQL, answer questions about your schema, and create notebooks and dashboards from natural-language prompts. It follows a bring-your-own-key (BYOK) model, letting you connect OpenAI, Anthropic, custom providers, or local models such as Ollama. Your API keys and data remain in your browser and under your control.
 
 The Assistant matches everything a coding agent can do over the [QuestDB MCP server](/docs/getting-started/web-console/mcp-server): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, with no coding agent involved.
 

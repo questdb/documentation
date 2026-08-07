@@ -58,7 +58,7 @@ The official **QuestDB MCP server** links AI coding agents such as Claude Code o
 
 ## AI Assistant
 
-**QuestDB AI** is the AI assistant built into the Web Console. It generates, explains, and fixes SQL and builds notebooks from a prompt. It is bring-your-own-key: you use your own OpenAI or Anthropic key, or a local model, and your keys and data stay under your control.
+The built-in **AI Assistant** generates, explains, and fixes SQL, answers questions about your schema, and creates notebooks and dashboards from natural-language prompts. It is bring-your-own-key: you connect OpenAI, Anthropic, custom providers, or local models such as Ollama, and your keys and data remain under your control.
 
 [Learn more about the AI Assistant →](/docs/getting-started/web-console/questdb-ai)
 
