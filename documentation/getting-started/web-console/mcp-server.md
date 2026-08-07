@@ -31,7 +31,9 @@ can [use the REST API out of the box](/docs/getting-started/ai-coding-agents/),
 with no MCP server in between. What the MCP server adds is the Web Console:
 the agent builds notebooks, charts, and live dashboards in the browser tab you
 are looking at, through your existing session. A direct HTTP connection cannot
-do that.
+do that. This also gives you SSO support: on QuestDB Enterprise, the agent
+works through your SSO-authenticated console session, with no credentials of
+its own.
 
 ## Setup
 
