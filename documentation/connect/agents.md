@@ -51,6 +51,18 @@ setup, no MCP server required — point them at a QuestDB endpoint and ask.
 See [AI Coding Agents](/docs/getting-started/ai-coding-agents/) for the
 quickstart, including the public demo at `https://demo.questdb.io/`.
 
+### QuestDB MCP server (Web Console)
+
+The official
+[QuestDB MCP server](/docs/getting-started/web-console/mcp-server/)
+connects Claude Code, Codex, Cursor, and any other MCP client to a running
+[Web Console](/docs/getting-started/web-console/overview/). The agent explores
+schemas, runs SQL, and builds notebook dashboards through your browser
+session, with a four-level permission model controlling what it can see and
+do. Use it when you want the agent working in the console alongside you;
+for direct data access from scripts and pipelines, the protocols above need
+no MCP at all.
+
 ### QuestDB agent skills (Claude)
 
 The

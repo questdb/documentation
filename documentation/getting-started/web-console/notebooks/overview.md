@@ -31,7 +31,7 @@ icon, and starts with a single empty SQL cell. Notebooks are named
 "Notebook 1", "Notebook 2", and so on until you [rename them](/docs/getting-started/web-console/notebooks/manage-share).
 
 The [AI Assistant](/docs/getting-started/web-console/questdb-ai) and coding
-agents connected over [MCP](/docs/getting-started/web-console/mcp-connection)
+agents connected over [MCP](/docs/getting-started/web-console/mcp-server)
 can also create notebooks for you. See [Notebooks and AI](#notebooks-and-ai).
 
 ## The notebook at a glance
@@ -90,14 +90,14 @@ covers chart types and configuration.
 ## Notebooks and AI
 
 Coding agents connected through the
-**MCP bridge** can build and
+**QuestDB MCP server** can build and
 edit notebooks too. Agents work in the background without taking over your
 tab: when an agent changes a notebook you are not looking at, a notification
 appears above the MCP status pill with a **View** action that jumps to the
-change. Until you connect the bridge for the first time, new notebooks show a
-dismissible card prompting you to set it up.
+change. Until you connect the MCP server for the first time, new notebooks
+show a dismissible card prompting you to set it up.
 
-[Learn more about the MCP connection →](/docs/getting-started/web-console/mcp-connection)
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-server)
 
 **Build with AI** on the toolbar opens an AI chat that knows this notebook: it
 can add cells, write queries, and configure charts in place. Each notebook has

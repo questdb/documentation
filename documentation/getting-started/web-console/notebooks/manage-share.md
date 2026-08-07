@@ -87,4 +87,4 @@ highlights the matching cell.
 
 - [Live dashboards](/docs/getting-started/web-console/notebooks/live-dashboards) covers turning a notebook into a shareable dashboard
 - [Notebooks overview](/docs/getting-started/web-console/notebooks/overview) covers creating notebooks and the toolbar
-- [MCP connection](/docs/getting-started/web-console/mcp-connection) lets coding agents build and edit notebooks
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server) lets coding agents build and edit notebooks
