@@ -287,46 +287,6 @@ strings in `columns` become `VARCHAR`. `DECIMAL` columns must be created
 ahead of time with `CREATE TABLE ... (price DECIMAL(18, 2), ...)`; the server
 does not auto-create them.
 
-#### Multi-dimensional arrays
-
-A numpy array keeps its shape on the wire, so an N-dimensional array lands in an
-N-dimensional QuestDB column. This is the natural fit for order book snapshots,
-where one row carries a whole book:
-
-```python
-import numpy as np
-import questdb
-from questdb import TimestampNanos
-
-# shape (2, N): row 0 = prices, row 1 = sizes
-bids = np.array([[64901.6, 64901.5], [3.02, 0.06]], dtype=np.float64)
-asks = np.array([[64901.7, 64901.8], [1.54, 0.21]], dtype=np.float64)
-
-with questdb.connect("ws::addr=localhost:9000;") as db:
-    with db.sender() as sender:
-        sender.row(
-            "order_book",
-            symbols={"symbol": "BTC-USDT"},
-            columns={"bids": bids, "asks": asks},
-            at=TimestampNanos.now(),
-        )
-        sender.flush(wait=True)
-```
-
-Auto-creation follows the shape you send: a 1D array creates `DOUBLE[]`, a 2D
-array `DOUBLE[][]`, a 3D array `DOUBLE[][][]`, and so on. Read the column back
-and you get a numpy array of the same shape.
-
-Only `float64` is accepted. Any other dtype is rejected before the row is sent:
-
-```python
-np.array([[1, 2], [3, 4]], dtype=np.int64)
-# QuestDBError: Only float64 numpy arrays are supported, got dtype: int64
-```
-
-Cast first with `arr.astype(np.float64)` when your source data is `float32` or
-an integer type.
-
 `UUID`, `IPv4`, `GEOHASH`, `LONG256`, `CHAR`, `DATE`, and `BINARY` columns
 have no `row()` value type. Route them through
 [`dataframe()`](#dataframe-ingestion), whose `schema_overrides` covers
@@ -375,6 +335,46 @@ rejections recorded since the lease was borrowed. FSNs are watermarks of
 the lease's pooled connection — use them while the lease is held; they are
 not portable across leases. Use `auto_flush=off` when
 `flush_and_get_fsn()` must define exact application batches.
+
+### Multi-dimensional arrays
+
+A numpy array keeps its shape on the wire, so an N-dimensional array lands in an
+N-dimensional QuestDB column. This is the natural fit for order book snapshots,
+where one row carries a whole book:
+
+```python
+import numpy as np
+import questdb
+from questdb import TimestampNanos
+
+# shape (2, N): row 0 = prices, row 1 = sizes
+bids = np.array([[64901.6, 64901.5], [3.02, 0.06]], dtype=np.float64)
+asks = np.array([[64901.7, 64901.8], [1.54, 0.21]], dtype=np.float64)
+
+with questdb.connect("ws::addr=localhost:9000;") as db:
+    with db.sender() as sender:
+        sender.row(
+            "order_book",
+            symbols={"symbol": "BTC-USDT"},
+            columns={"bids": bids, "asks": asks},
+            at=TimestampNanos.now(),
+        )
+        sender.flush(wait=True)
+```
+
+Auto-creation follows the shape you send: a 1D array creates `DOUBLE[]`, a 2D
+array `DOUBLE[][]`, a 3D array `DOUBLE[][][]`, and so on. Read the column back
+and you get a numpy array of the same shape.
+
+Only `float64` is accepted. Any other dtype is rejected before the row is sent:
+
+```python
+np.array([[1, 2], [3, 4]], dtype=np.int64)
+# QuestDBError: Only float64 numpy arrays are supported, got dtype: int64
+```
+
+Cast first with `arr.astype(np.float64)` when your source data is `float32` or
+an integer type.
 
 ## DataFrame ingestion
 
