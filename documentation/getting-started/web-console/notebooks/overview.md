@@ -94,8 +94,8 @@ Coding agents connected through the
 edit notebooks too. Agents work in the background without taking over your
 tab: when an agent changes a notebook you are not looking at, a notification
 appears above the MCP status pill with a **View** action that jumps to the
-change. Until you connect the bridge for the first time, new notebooks show a
-dismissible card prompting you to set it up.
+change. Until you connect the MCP server for the first time, new notebooks
+show a dismissible card prompting you to set it up.
 
 [Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-connection)
 

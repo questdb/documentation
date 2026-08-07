@@ -16,7 +16,7 @@ import Tabs from "@theme/Tabs"
 
 import TabItem from "@theme/TabItem"
 
-The official **QuestDB MCP server** — the <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP Bridge</a> (`@questdb/mcp-bridge`) — connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the bridge runs locally on your machine, listens on loopback only, and never handles credentials.
+The official <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP server</a> (`@questdb/mcp-bridge`) connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the server runs locally on your machine, listens on loopback only, and never handles credentials.
 
 The setup wizard detects and configures Claude Code, Codex, Cursor, OpenCode, and Gemini CLI. Any other MCP client works with the manual configuration.
 
@@ -33,9 +33,14 @@ the agent builds notebooks, charts, and live dashboards in the browser tab you
 are looking at, through your existing session. A direct HTTP connection cannot
 do that.
 
+The exception is QuestDB Enterprise with SSO. There the MCP server is also the
+way in: you sign in to the Web Console through your identity provider, and the
+agent works through that authenticated session, so it never needs database
+credentials of its own.
+
 ## Setup
 
-One command configures the bridge for every supported agent on your machine; the only prerequisite is Node.js, which provides `npx`. Each Web Console version expects a specific bridge version: click the **MCP status pill** at the bottom of the Web Console to see the setup command for your console, already pinned to the expected version.
+One command configures the MCP server for every supported agent on your machine; the only prerequisite is Node.js, which provides `npx`. Each Web Console version expects a specific server version: click the **MCP status pill** at the bottom of the Web Console to see the setup command for your console, already pinned to the expected version.
 
 <Tabs defaultValue="wizard" values={[
   { label: "Setup wizard (recommended)", value: "wizard" },
@@ -50,13 +55,13 @@ Copy the setup command from the MCP status pill and run it in your terminal:
 npx @questdb/mcp-bridge@<expected-version> setup
 ```
 
-The wizard detects your installed coding agents, lets you pick which ones to configure, and writes the bridge into each agent's MCP config, pinned to that version.
+The wizard detects your installed coding agents, lets you pick which ones to configure, and writes the server into each agent's MCP config, pinned to that version.
 
 </TabItem>
 
 <TabItem value="manual">
 
-Add the bridge to your MCP client's config file by hand, pinning the version shown in the MCP status pill. For Claude Code that file is `.mcp.json` in the project root; other clients name their own location:
+Add the server to your MCP client's config file by hand, pinning the version shown in the MCP status pill. For Claude Code that file is `.mcp.json` in the project root; other clients name their own location:
 
 ```json
 {
@@ -73,18 +78,18 @@ Add the bridge to your MCP client's config file by hand, pinning the version sho
 
 </Tabs>
 
-The bridge reads these environment variables:
+The server reads these environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
 | `CONSOLE_ORIGIN` | `http://127.0.0.1:9000` | Web Console origin to pair with. |
-| `MCP_BRIDGE_PORT` | auto-allocated | Fixed WebSocket port for the bridge. |
+| `MCP_BRIDGE_PORT` | auto-allocated | Fixed WebSocket port for the server. |
 | `LOG_PATH` | `/tmp/questdb-mcp-bridge/…` | Log file location. |
 | `LOG_LEVEL` | `INFO` | `DEBUG` adds heartbeats and full tool payloads. |
 
 ## Pairing
 
-Before any tool works, your browser has to pair with the bridge. The agent drives the flow, and you do not need the Web Console open beforehand: when the agent needs to pair, the bridge opens a pairing link in your default browser, and the Web Console shows a consent prompt where you review the connection, pick a permission level, and connect.
+Before any tool works, your browser has to pair with the MCP server. The agent drives the flow, and you do not need the Web Console open beforehand: when the agent needs to pair, the server opens a pairing link in your default browser, and the Web Console shows a consent prompt where you review the connection, pick a permission level, and connect.
 
 If the automatic open does not reach the right browser, the agent also shows the pairing credentials so you can pair yourself:
 
@@ -92,16 +97,16 @@ If the automatic open does not reach the right browser, the agent also shows the
 - Or paste the WebSocket URL and token into the MCP status pill at the bottom of the console.
 
 <Screenshot
-  alt="The MCP bridge pairing consent prompt in the Web Console"
+  alt="The QuestDB MCP server pairing consent prompt in the Web Console"
   src="images/docs/console/mcp-pairing-consent.webp"
   height={518}
   width={500}
 />
 
-Each bridge run generates a fresh pairing token, held only in memory. By
-default, the bridge also auto-allocates a port; when `MCP_BRIDGE_PORT` is set,
-it uses that fixed port instead. If the console and bridge versions do not
-match, the consent prompt tells you which bridge version to run.
+Each server run generates a fresh pairing token, held only in memory. By
+default, the server also auto-allocates a port; when `MCP_BRIDGE_PORT` is set,
+it uses that fixed port instead. If the console and server versions do not
+match, the consent prompt tells you which server version to run.
 
 ## Permission levels
 
@@ -115,13 +120,13 @@ You choose what the agent is allowed to see and do when you accept the pairing, 
 | Write | Read, plus DDL and DML execution (`CREATE`, `INSERT`, `UPDATE`, `DROP`). |
 
 <Screenshot
-  alt="The four MCP bridge permission levels in the pairing prompt"
+  alt="The four QuestDB MCP server permission levels in the pairing prompt"
   src="images/docs/console/mcp-permission-levels.webp"
   height={337}
   width={600}
 />
 
-Permissions are enforced by the Web Console, not by the bridge or the agent. The console classifies every SQL statement before execution and does not let DDL/DML run unless the Write permission is given.
+Permissions are enforced by the Web Console, not by the MCP server or the agent. The console classifies every SQL statement before execution and does not let DDL/DML run unless the Write permission is given.
 
 At every level, the agent can still run read-only cells inside a notebook. The results render in your console, but the rows are never returned to the agent.
 
@@ -148,8 +153,8 @@ The agent builds and edits notebooks without taking over the console. New notebo
 
 ## Example: An FX dashboard from one prompt
 
-With the bridge configured and QuestDB running, a single prompt is enough for
-a full technical-analysis dashboard:
+With the MCP server configured and QuestDB running, a single prompt is enough
+for a full technical-analysis dashboard:
 
 ```text
 Build an FX technical-analysis dashboard for FX symbols ('GBPUSD' by default) for the last 12 hours in my QuestDB Web Console.
