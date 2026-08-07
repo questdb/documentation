@@ -33,11 +33,6 @@ the agent builds notebooks, charts, and live dashboards in the browser tab you
 are looking at, through your existing session. A direct HTTP connection cannot
 do that.
 
-The exception is QuestDB Enterprise with SSO. There the MCP server is also the
-way in: you sign in to the Web Console through your identity provider, and the
-agent works through that authenticated session, so it never needs database
-credentials of its own.
-
 ## Setup
 
 One command configures the MCP server for every supported agent on your machine; the only prerequisite is Node.js, which provides `npx`. Each Web Console version expects a specific server version: click the **MCP status pill** at the bottom of the Web Console to see the setup command for your console, already pinned to the expected version.
