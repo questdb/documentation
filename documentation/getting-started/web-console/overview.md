@@ -54,7 +54,7 @@ The **Code Editor** is where you write and execute SQL queries with features lik
 
 The official **QuestDB MCP server** links AI coding agents such as Claude Code or Codex to your running Web Console. Agents explore schemas, run SQL, and build notebook dashboards through your browser session, with a four-level permission model controlling what they can see and do.
 
-[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-connection)
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-server)
 
 ## AI Assistant
 

@@ -12,7 +12,7 @@ import Screenshot from "@theme/Screenshot"
 
 **QuestDB AI** is the AI assistant built into the Web Console. It generates, explains, and fixes SQL, answers questions about your schema, and builds notebooks and dashboards from a prompt. It is bring-your-own-key: you connect models from OpenAI, Anthropic, or a custom provider — including local models such as Ollama — and your keys and data stay in your browser, under your control.
 
-The Assistant matches everything a coding agent can do over the [QuestDB MCP server](/docs/getting-started/web-console/mcp-connection): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, with no coding agent involved.
+The Assistant matches everything a coding agent can do over the [QuestDB MCP server](/docs/getting-started/web-console/mcp-server): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, with no coding agent involved.
 
 <Screenshot
   alt="AI Assistant chat window in Web Console"
@@ -63,7 +63,7 @@ After validating your API key, you can configure the provider settings:
 
 The permission level controls what the AI Assistant can access. The levels are
 the same as the
-[MCP permission levels](/docs/getting-started/web-console/mcp-connection#permission-levels):
+[MCP permission levels](/docs/getting-started/web-console/mcp-server#permission-levels):
 
 - **None**: Notebook, query-validation, and documentation tools. Direct database
   schema tools and query-result rows are unavailable; existing notebook SQL

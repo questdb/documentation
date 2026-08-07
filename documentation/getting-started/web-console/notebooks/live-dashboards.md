@@ -130,7 +130,7 @@ The dashboard pictured above, built on the demo `trades` table:
 
 :::tip
 A coding agent connected over
-[MCP](/docs/getting-started/web-console/mcp-connection) can build this whole
+[MCP](/docs/getting-started/web-console/mcp-server) can build this whole
 dashboard from a single prompt. So can the built-in
 [AI Assistant](/docs/getting-started/web-console/questdb-ai), with no coding
 agent needed.
@@ -138,7 +138,7 @@ agent needed.
 
 ## Next steps
 
-- [QuestDB MCP server](/docs/getting-started/web-console/mcp-connection) lets a coding agent build this whole dashboard from a
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server) lets a coding agent build this whole dashboard from a
   single prompt
 - [Notebook charts](/docs/getting-started/web-console/notebooks/charts) covers chart types, settings, and combining queries
 - [Managing and sharing notebooks](/docs/getting-started/web-console/notebooks/manage-share) covers exporting the dashboard to share it

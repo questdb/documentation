@@ -54,7 +54,7 @@ quickstart, including the public demo at `https://demo.questdb.io/`.
 ### QuestDB MCP server (Web Console)
 
 The official
-[QuestDB MCP server](/docs/getting-started/web-console/mcp-connection/)
+[QuestDB MCP server](/docs/getting-started/web-console/mcp-server/)
 connects Claude Code, Codex, Cursor, and any other MCP client to a running
 [Web Console](/docs/getting-started/web-console/overview/). The agent explores
 schemas, runs SQL, and builds notebook dashboards through your browser

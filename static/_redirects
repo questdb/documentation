@@ -11,3 +11,8 @@
 /docs/query/export-parquet/ /docs/concepts/parquet/ 301
 /docs/query/export-parquet /docs/concepts/parquet 301
 /docs/query/export-parquet/?* /docs/concepts/parquet/:splat 301
+
+# MCP page renamed: mcp-connection -> mcp-server (QuestDB MCP Server)
+/docs/getting-started/web-console/mcp-connection/ /docs/getting-started/web-console/mcp-server/ 301
+/docs/getting-started/web-console/mcp-connection /docs/getting-started/web-console/mcp-server/ 301
+/docs/getting-started/web-console/mcp-connection/?* /docs/getting-started/web-console/mcp-server/:splat 301
