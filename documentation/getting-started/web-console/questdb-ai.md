@@ -1,6 +1,6 @@
 ---
 title: QuestDB AI Assistant (bring your own key)
-sidebar_label: QuestDB AI
+sidebar_label: LLM BYOK
 slug: /getting-started/web-console/questdb-ai
 description:
   QuestDB AI is the bring-your-own-key AI assistant built into the Web
