@@ -575,7 +575,7 @@ module.exports = {
             "getting-started/web-console/notebooks/manage-share",
           ],
         },
-        "getting-started/web-console/mcp-connection",
+        "getting-started/web-console/mcp-server",
         "getting-started/web-console/questdb-ai",
         "getting-started/web-console/metrics-view",
         "getting-started/web-console/schema-explorer",

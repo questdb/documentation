@@ -1,15 +1,18 @@
 ---
-title: QuestDB AI
-sidebar_label: QuestDB AI
+title: AI Assistant (Bring Your Own Key)
+sidebar_label: AI Assistant
 slug: /getting-started/web-console/questdb-ai
-description: Get intelligent SQL query assistance with QuestDB AI in the Web Console
+description:
+  The QuestDB Web Console includes a built-in, bring-your-own-key AI
+  assistant. Generate, explain, and fix SQL and build notebooks with your own
+  OpenAI or Anthropic key, or a local model. No coding agent needed.
 ---
 
 import Screenshot from "@theme/Screenshot"
 
-The **QuestDB AI Assistant** provides intelligent query assistance directly within the Web Console. You can generate, explain, and fix SQL queries, and ask questions about your schema and QuestDB using models from OpenAI, Anthropic, or a custom provider, all while maintaining complete control over your data and API keys.
+The Web Console includes a built-in **AI Assistant** that can generate, explain, and fix SQL, answer questions about your schema, and create notebooks and dashboards from natural-language prompts. It follows a bring-your-own-key (BYOK) model, letting you connect OpenAI, Anthropic, custom providers, or local models such as Ollama. Your API keys and data remain in your browser and under your control.
 
-The Assistant matches everything a coding agent can do over the [MCP bridge](/docs/getting-started/web-console/mcp-connection): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, all without a coding agent. With a custom provider it works with local models too.
+The Assistant matches everything a coding agent can do over the [QuestDB MCP server](/docs/getting-started/web-console/mcp-server): it builds [notebooks](/docs/getting-started/web-console/notebooks/overview) and live dashboards, explores your schema, and runs queries, with no coding agent involved.
 
 <Screenshot
   alt="AI Assistant chat window in Web Console"
@@ -60,7 +63,7 @@ After validating your API key, you can configure the provider settings:
 
 The permission level controls what the AI Assistant can access. The levels are
 the same as the
-[MCP permission levels](/docs/getting-started/web-console/mcp-connection#permission-levels):
+[MCP permission levels](/docs/getting-started/web-console/mcp-server#permission-levels):
 
 - **None**: Notebook, query-validation, and documentation tools. Direct database
   schema tools and query-result rows are unavailable; existing notebook SQL
