@@ -309,7 +309,7 @@ Generates a `double` array with random elements.
 **Arguments:**
 
 - `nDims` is an `int` specifying the number of dimensions.
-- `nanRate` is an `int` defining the frequency of `NaN` values (default: `0`):
+- `nanRate` is an `int` defining the frequency of occurrence of `NaN` values:
   - `0`: No `NaN` will be returned.
   - `1`: Will only return `NaN`.
   - `N > 1`: On average, one in N generated values will be `NaN`.
