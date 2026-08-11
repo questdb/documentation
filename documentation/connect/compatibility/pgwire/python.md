@@ -1090,7 +1090,12 @@ pip install pandas sqlalchemy questdb-connect
 :::note
 
 This example shows how to use the SQLAlchemy engine with psycopg2 for querying QuestDB into a pandas DataFrame.
-For ingestion from Pandas to QuestDB see our [pandas ingestion guide](/docs/integrations/data-processing/pandas/).
+
+Since QuestDB 10.0 the [Python client](/docs/connect/clients/python/) reads
+query results straight into a DataFrame with `to_pandas()` over QWP, with no
+SQLAlchemy or driver layer. Use it unless you need PGWire for compatibility
+reasons. See the [pandas guide](/docs/integrations/data-processing/pandas/)
+for both directions.
 
 :::
 
@@ -1193,9 +1198,12 @@ time-series data:
 - **psycopg3**: Excellent balance of features and performance, supports both sync and async operations
 - **psycopg2**: Mature and stable client with wide compatibility, but slower than asyncpg and psycopg3
 
-For most use cases, we recommend using asyncpg or psycopg3 for better performance. For data ingestion, consider using
-QuestDB's first-party clients with the InfluxDB Line Protocol (ILP) for maximum throughput.
+Among these, we recommend asyncpg or psycopg3 for better performance. For
+ingestion, and for DataFrame results, the
+[QuestDB Python client](/docs/connect/clients/python/) speaks QWP and is
+faster than any PGWire driver in both directions.
 
 ## Additional Resources
-- [Polars Integration with QuestDB](/docs/integrations/data-processing/polars)
-- [QuestDB Client for fast ingestion](/docs/connect/clients/python/)
+- [Pandas Integration with QuestDB](/docs/integrations/data-processing/pandas/)
+- [Polars Integration with QuestDB](/docs/integrations/data-processing/polars/)
+- [QuestDB Python client](/docs/connect/clients/python/)

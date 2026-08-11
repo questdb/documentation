@@ -503,7 +503,7 @@ print(frame)
 The `to_*` methods materialize the complete result; prefer the `iter_*`
 variants for large results. The PyCapsule protocol lets Arrow consumers read
 the result directly without pyarrow installed, for example
-`polars.from_arrow(result)`. For what each consumption style observes when
+`polars.DataFrame(result)`. For what each consumption style observes when
 the connection fails over mid-result, see
 [Failover and errors](#failover-and-errors).
 
