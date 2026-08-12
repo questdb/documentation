@@ -498,13 +498,17 @@ print(frame)
 | `iter_pandas()` | Iterator of `pandas.DataFrame` batches | pandas |
 | `iter_polars()` | Iterator of `polars.DataFrame` batches | polars and pyarrow |
 | `iter_arrow()` | Iterator of `pyarrow.RecordBatch` | pyarrow |
-| `__arrow_c_stream__` | Arrow C stream PyCapsule | nothing (consumer-side) |
 
-The `to_*` methods materialize the complete result; prefer the `iter_*`
-variants for large results. The PyCapsule protocol lets Arrow consumers read
-the result directly without pyarrow installed, for example
-`polars.DataFrame(result)`. For what each consumption style observes when
-the connection fails over mid-result, see
+Use the `to_*` methods when the result fits in memory. For larger results, use
+the matching `iter_*` method to process one batch at a time.
+
+For Polars, use `result.to_polars()` by default. It requires pyarrow. If you
+need a pyarrow-free installation, `polars.DataFrame(result)` is supported, but
+it still materializes the complete result and can be slower for
+`SYMBOL`-heavy queries.
+
+For what each consumption style observes when the connection fails over
+mid-result, see
 [Failover and errors](#failover-and-errors).
 
 A `QueryResult` is single-use and must stay on the thread that created it.

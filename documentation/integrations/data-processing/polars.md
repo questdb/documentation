@@ -59,9 +59,8 @@ df = db.query(
 ).to_polars()
 ```
 
-`to_polars()` needs `pyarrow` installed. To skip that dependency, pass the
-result straight to the `pl.DataFrame` constructor, which reads it through the
-Arrow PyCapsule protocol:
+Use `to_polars()` by default. It requires `pyarrow`. If you need a
+pyarrow-free installation, pass the result to `pl.DataFrame` instead:
 
 ```python
 import polars as pl
@@ -69,6 +68,9 @@ import polars as pl
 with db.query("SELECT * FROM trades LIMIT 1000") as result:
     df = pl.DataFrame(result)
 ```
+
+This still materializes the complete result and can be slower for
+`SYMBOL`-heavy queries.
 
 ### Stream large results
 
