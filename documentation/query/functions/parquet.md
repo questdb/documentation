@@ -8,10 +8,6 @@ QuestDB can read and query external [Apache Parquet](/glossary/apache-parquet/) 
 
 To export data as Parquet, see [Parquet Export](/docs/concepts/parquet/).
 
-:::info
-Apache Parquet support is in **beta**. Please report issues via [email](mailto:support@questdb.io), [Slack](https://slack.questdb.com/), or [Discourse](https://community.questdb.com/).
-:::
-
 ## read_parquet
 
 Reads a parquet file as a table.
