@@ -18,7 +18,7 @@ QuestDB works with [Apache Parquet](https://parquet.apache.org/) in several ways
   via the REST `/exp` endpoint or `COPY`.
 
 Parquet partitions managed by QuestDB remain fully queryable with SQL, exactly
-like native partitions. To read external Parquet files, see the
+like native partitions. To read or import external Parquet files, see the
 [`read_parquet` function](/docs/query/functions/parquet/).
 
 ## Create a table as Parquet

@@ -2,9 +2,9 @@
 title: Query & SQL overview
 sidebar_label: Overview
 description:
-  "How to query QuestDB: run SQL in the Web Console, connect with PostgreSQL
-  clients, use the REST HTTP API, or read Parquet files, with time-series
-  extensions like SAMPLE BY."
+  "How to query QuestDB: run SQL in the Web Console, stream results with the
+  QWP client libraries, connect with PostgreSQL clients, use the REST HTTP API,
+  or read Parquet files, with time-series extensions like SAMPLE BY."
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -39,13 +39,15 @@ from"../partials/\_nodejs.exec.query.partial.mdx"
 import PythonExecQueryPartial from
 "../partials/\_python.exec.query.partial.mdx"
 
-You can query QuestDB in four ways:
+You can query QuestDB in five ways:
 
 1. Query via the
    [QuestDB Web Console](/docs/query/overview/#questdb-web-console)
-2. Query via [PostgreSQL](/docs/query/overview/#postgresql)
-3. Query via [REST HTTP API](/docs/query/overview/#rest-http-api)
-4. Query via [Apache Parquet](/docs/query/overview/#apache-parquet)
+2. Query via the
+   [QuestDB client libraries](/docs/query/overview/#questdb-client-libraries)
+3. Query via [PostgreSQL](/docs/query/overview/#postgresql)
+4. Query via [REST HTTP API](/docs/query/overview/#rest-http-api)
+5. Query via [Apache Parquet](/docs/query/overview/#apache-parquet)
 
 For efficient and clear querying, QuestDB provides SQL with enhanced time series
 extensions. This makes analyzing, downsampling, processing and reading time
@@ -54,8 +56,7 @@ series data an intuitive and flexible experience.
 Queries can be written into many applications using existing drivers and clients
 of the PostgreSQL or REST-ful ecosystems. However, querying is also leveraged
 heavily by third-party tools to provide visualizations, such as within
-[Grafana](/docs/integrations/visualization/grafana/), or for data analysis with dataframe
-libraries like [Polars](/docs/integrations/data-processing/polars/).
+[Grafana](/docs/integrations/visualization/grafana/).
 
 > Need to ingest data first? Check out our
 > [Ingestion overview](/docs/connect/overview/).
@@ -92,6 +93,32 @@ SAMPLE BY 15m;
 
 If you see _Demo this query_ on other snippets in this docs, they can be run
 against the demo instance.
+
+## QuestDB client libraries
+
+The official client libraries speak the QuestDB Wire Protocol (QWP), a binary
+protocol that carries both ingestion and query traffic over one connection and
+one configuration string. This is the fastest way to get data out of QuestDB
+from an application.
+
+Results stream rather than arriving in one block. The server sends batches as
+it produces them, so an application starts processing the head of a result
+while the tail is still being computed, and a result larger than memory never
+has to be materialized at all.
+
+Connections recover on their own. When a connection drops and replicas are
+available, the client reconnects and retries against another one without the
+application intervening. A query that fails over restarts from the beginning,
+which is transparent if you materialize the whole result.
+
+The Rust, C++, and Python clients hand back results as Arrow record batches.
+That is the native memory layout of
+[pandas](/docs/integrations/data-processing/pandas/),
+[Polars](/docs/integrations/data-processing/polars/), and DuckDB, so a query
+becomes a DataFrame with no row-by-row conversion in between.
+
+See the [Connect overview](/docs/connect/overview/) for the per-language
+guides and which clients ship QWP today.
 
 ## PostgreSQL
 
