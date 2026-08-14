@@ -403,8 +403,7 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
 
 `df` accepts pandas `DataFrame`, polars `DataFrame` and `LazyFrame`, pyarrow
 `Table`, `RecordBatch`, and `RecordBatchReader`, and any object exposing the
-Arrow C Data Interface (`__arrow_c_stream__` or `__arrow_c_array__`), such as
-DuckDB results:
+Arrow C Data Interface:
 
 ```python
 import polars as pl
@@ -445,9 +444,11 @@ is never bounded by it. What it does control:
   apply costs per batch.
 
 The default suits mixed workloads. Raise it for narrow numeric rows,
-lower it for very wide rows or tight memory budgets. Streaming Arrow
-input (`pa.RecordBatchReader`, capsule streams) is not re-batched — the
-producer's batch size governs; re-batch at the source if needed.
+lower it for very wide rows or tight memory budgets. This setting only
+applies to materialized frames. When you pass a streaming input such as
+`pa.RecordBatchReader`, the client sends each incoming batch as it
+arrives, keeping whatever batch size the stream already has. To change
+it, adjust the code that produces the stream.
 
 Numeric, string, timestamp, and decimal (`pyarrow.decimal32` through
 `decimal256`) column types map directly. Columns of `float64` numpy arrays or
@@ -498,13 +499,17 @@ print(frame)
 | `iter_pandas()` | Iterator of `pandas.DataFrame` batches | pandas |
 | `iter_polars()` | Iterator of `polars.DataFrame` batches | polars and pyarrow |
 | `iter_arrow()` | Iterator of `pyarrow.RecordBatch` | pyarrow |
-| `__arrow_c_stream__` | Arrow C stream PyCapsule | nothing (consumer-side) |
 
-The `to_*` methods materialize the complete result; prefer the `iter_*`
-variants for large results. The PyCapsule protocol lets Arrow consumers read
-the result directly without pyarrow installed, for example
-`polars.DataFrame(result)`. For what each consumption style observes when
-the connection fails over mid-result, see
+Use the `to_*` methods when the result fits in memory. For larger results, use
+the matching `iter_*` method to process one batch at a time.
+
+For Polars, use `result.to_polars()` by default. It requires pyarrow. If you
+need a pyarrow-free installation, `polars.DataFrame(result)` is supported, but
+it still materializes the complete result and can be slower for
+`SYMBOL`-heavy queries.
+
+For what each consumption style observes when the connection fails over
+mid-result, see
 [Failover and errors](#failover-and-errors).
 
 A `QueryResult` is single-use and must stay on the thread that created it.
@@ -827,7 +832,7 @@ depends on how you consume the result:
 
 - `to_pandas()`, `to_polars()`, and `to_arrow()` discard their partial
   accumulation and replay transparently; you receive one complete result.
-- `iter_pandas()`, `iter_polars()`, `iter_arrow()`, and the PyCapsule stream
+- `iter_pandas()`, `iter_polars()`, `iter_arrow()`, and `polars.DataFrame(result)`
   raise `QuestDBErrorCode.FailoverWouldDuplicate` instead of silently
   repeating batches you already consumed. Discard partial state and rerun the
   query. Failover before the first batch is always transparent.
@@ -851,7 +856,7 @@ Codes you will most often dispatch on:
 | `InvalidApiCall` | Client-side misuse: exhausted pool, a lease's previous result still undrained, a closed handle. | Fix the call pattern, or raise the pool caps. |
 | `InvalidTimestamp` | Bad `at` value (wrong type, `NaT`). | Pass `TimestampNanos`, a timezone-aware `datetime`, or `ServerTimestamp`. |
 | `FailoverRetry` | `flush(wait=True)` or `wait()` made no progress within the budget. | Retry the wait; do not re-send the rows. |
-| `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` or PyCapsule consumer. | Discard partial state and rerun the query. |
+| `FailoverWouldDuplicate` | Mid-stream failover on an `iter_*` consumer or `polars.DataFrame(result)`. | Discard partial state and rerun the query. |
 | `ServerRejection` | Terminal server rejection (schema mismatch, parse error, ...) latched by the connection; raised by the next call on the affected lease. Every rejection, terminal or retriable, is also delivered to the [rejection handler](#server-rejections). | Inspect `sender_error`; fix the data or the schema. |
 | `ProtocolVersionError` | The server lacks a negotiated capability (for example durable ACK). | Drop the option or upgrade the server. |
 
