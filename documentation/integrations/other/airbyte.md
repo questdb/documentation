@@ -189,7 +189,7 @@ SELECT * FROM cpu;
 ```
 
 3. **Inspect the Results**:
-   After running the query, the results should display columns for each metric collected by the [Telegraf](/docs/ingestion/message-brokers/telegraf/) plugin for monitoring CPU usage, such as:
+   After running the query, the results should display columns for each metric collected by the [Telegraf](/docs/connect/message-brokers/telegraf/) plugin for monitoring CPU usage, such as:
 
    - `usage_idle`
    - `usage_user`

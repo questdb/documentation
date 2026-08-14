@@ -313,18 +313,19 @@ SELECT table_name, table_type FROM tables()
 | `T` | Regular table |
 | `V` | View |
 | `M` | Materialized view |
+| `L` | [Live view](/docs/concepts/live-views/) |
 
-## Views vs materialized views
+## Views vs materialized views vs live views
 
 Understanding when to use each type is important for performance:
 
-| Feature | View | Materialized View |
-| ------- | ---- | ----------------- |
-| Data storage | None (virtual) | Physical storage |
-| Query execution | On every access | Pre-computed |
-| Data freshness | Always current | Depends on refresh |
-| Performance | Query-time cost | Read-time benefit |
-| Storage cost | Zero | Proportional to result size |
+| Feature | View | Materialized View | Live View |
+| ------- | ---- | ----------------- | --------- |
+| Data storage | None (virtual) | Physical storage | Memory + Physical |
+| Query execution | On every access | Pre-computed | Pre-computed |
+| Data freshness | Always current | Depends on refresh | Very low latency if query is served from the `IN MEMORY` tier, up to one `FLUSH EVERY` interval if from disk tier |
+| Performance | Query-time cost | Read-time benefit | Read-time benefit |
+| Storage cost | Zero | Proportional to result size | Memory + Proportional to result size |
 
 ### When to use views
 
@@ -341,8 +342,17 @@ Understanding when to use each type is important for performance:
 - Dashboard queries that run repeatedly
 - Historical summaries that don't need real-time accuracy
 
+
 For detailed comparisons and examples, see
 [Materialized Views](/docs/concepts/materialized-views/).
+
+### When to use live views
+
+Use a [live view](/docs/concepts/live-views/) instead when you need to
+incrementally maintain a row-per-input window computation, such as a moving
+average, running total, or ranking.
+
+The output of a live view is one row per base row.
 
 ## Security with views
 
@@ -460,7 +470,7 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
 - Use indexed columns in filters for best performance
 - Use parameterized views for common filter patterns
 - Avoid deeply nested view hierarchies (>3-4 levels) for maintainability
-- Consider materialized views for expensive aggregations that run frequently
+- Consider materialized views or live views for expensive aggregations that run frequently
 
 ## Limitations
 
@@ -483,5 +493,6 @@ EXPLAIN SELECT * FROM my_view WHERE symbol = 'AAPL'
   - [`DROP VIEW`](/docs/query/sql/drop-view/): Remove a view
 
 - **Related Concepts**
-  - [Materialized Views](/docs/concepts/materialized-views/): Pre-computed query results
+  - [Materialized Views](/docs/concepts/materialized-views/): Incrementally maintained `SAMPLE BY` aggregates
+  - [Live views](/docs/concepts/live-views/): Incrementally maintained row-per-input window-function results
   - [DECLARE](/docs/query/sql/declare/): Parameter declaration for views

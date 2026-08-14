@@ -66,8 +66,8 @@ This key replaces `query.timeout.sec`. When both are set, `query.timeout` takes
 precedence; when neither is set, queries time out after 60 seconds.
 
 Per-query overrides are available via the HTTP header
-[`Statement-Timeout`](/docs/query/rest-api/#headers) or the Postgres
-[`options`](/docs/query/pgwire/overview/)
+[`Statement-Timeout`](/docs/connect/compatibility/rest-api/#headers) or the
+Postgres [`options`](/docs/connect/compatibility/pgwire/overview/)
 connection property.
 
 ### query.timeout.sec

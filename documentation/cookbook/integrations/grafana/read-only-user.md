@@ -75,7 +75,7 @@ After enabling, you have two separate users:
 - Use for: Grafana dashboards, monitoring tools, analytics applications
 
 :::info Related Documentation
-- [PostgreSQL wire protocol](/docs/query/pgwire/overview/)
+- [PostgreSQL wire protocol](/docs/connect/compatibility/pgwire/overview/)
 - [QuestDB Enterprise RBAC](/docs/security/rbac/)
 - [Configuration reference](/docs/configuration/overview/)
 - [Grafana QuestDB data source](https://grafana.com/grafana/plugins/questdb-questdb-datasource/)

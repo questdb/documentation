@@ -1,10 +1,10 @@
 ---
-title: Query & SQL Overview
+title: Query & SQL overview
 sidebar_label: Overview
 description:
-  This document shows how to work with QuestDB as a time-series database by
-  generating dummy time-series data, inserting the data into a table, then
-  querying and cleaning up the example data set.
+  "How to query QuestDB: run SQL in the Web Console, stream results with the
+  QWP client libraries, connect with PostgreSQL clients, use the REST HTTP API,
+  or read Parquet files, with time-series extensions like SAMPLE BY."
 ---
 
 import Screenshot from "@theme/Screenshot"
@@ -39,13 +39,15 @@ from"../partials/\_nodejs.exec.query.partial.mdx"
 import PythonExecQueryPartial from
 "../partials/\_python.exec.query.partial.mdx"
 
-Querying - as a base action - is performed in three primary ways:
+You can query QuestDB in five ways:
 
 1. Query via the
    [QuestDB Web Console](/docs/query/overview/#questdb-web-console)
-2. Query via [PostgreSQL](/docs/query/overview/#postgresql)
-3. Query via [REST HTTP API](/docs/query/overview/#rest-http-api)
-4. Query via [Apache Parquet](/docs/query/overview/#apache-parquet)
+2. Query via the
+   [QuestDB client libraries](/docs/query/overview/#questdb-client-libraries)
+3. Query via [PostgreSQL](/docs/query/overview/#postgresql)
+4. Query via [REST HTTP API](/docs/query/overview/#rest-http-api)
+5. Query via [Apache Parquet](/docs/query/overview/#apache-parquet)
 
 For efficient and clear querying, QuestDB provides SQL with enhanced time series
 extensions. This makes analyzing, downsampling, processing and reading time
@@ -54,22 +56,21 @@ series data an intuitive and flexible experience.
 Queries can be written into many applications using existing drivers and clients
 of the PostgreSQL or REST-ful ecosystems. However, querying is also leveraged
 heavily by third-party tools to provide visualizations, such as within
-[Grafana](/docs/integrations/visualization/grafana/), or for data analysis with dataframe
-libraries like [Polars](/docs/integrations/data-processing/polars/).
+[Grafana](/docs/integrations/visualization/grafana/).
 
-> Need to ingest data first? Checkout our
-> [Ingestion overview](/docs/ingestion/overview/).
+> Need to ingest data first? Check out our
+> [Ingestion overview](/docs/connect/overview/).
 
 ## QuestDB Web Console
 
 The Web Console is available by default at
 `http://localhost:9000`. The GUI makes it easy to write, return
 and chart queries. There is autocomplete, syntax highlighting, errors, and more.
-If you want to test a query or interact direclty with your data in the cleanest
+If you want to test a query or interact directly with your data in the cleanest
 and simplest way, apply queries via the [Web Console](/docs/getting-started/web-console/overview/).
 
 <Screenshot
-  alt="A shot of the Web Console, showing auto complete and a colourful returned table."
+  alt="The Web Console showing the schema explorer and a live technical-analysis dashboard."
   src="images/docs/console/overview.webp"
   title="Click to zoom"
 />
@@ -93,11 +94,37 @@ SAMPLE BY 15m;
 If you see _Demo this query_ on other snippets in this docs, they can be run
 against the demo instance.
 
+## QuestDB client libraries
+
+The official client libraries speak the QuestDB Wire Protocol (QWP), a binary
+protocol that carries both ingestion and query traffic over one connection and
+one configuration string. This is the fastest way to get data out of QuestDB
+from an application.
+
+Results stream rather than arriving in one block. The server sends batches as
+it produces them, so an application starts processing the head of a result
+while the tail is still being computed, and a result larger than memory never
+has to be materialized at all.
+
+Connections recover on their own. When a connection drops and replicas are
+available, the client reconnects and retries against another one without the
+application intervening. A query that fails over restarts from the beginning,
+which is transparent if you materialize the whole result.
+
+The Rust, C++, and Python clients hand back results as Arrow record batches.
+That is the native memory layout of
+[pandas](/docs/integrations/data-processing/pandas/),
+[Polars](/docs/integrations/data-processing/polars/), and DuckDB, so a query
+becomes a DataFrame with no row-by-row conversion in between.
+
+See the [Connect overview](/docs/connect/overview/) for the per-language
+guides and which clients ship QWP today.
+
 ## PostgreSQL
 
 Query QuestDB using the PostgreSQL endpoint via the default port `8812`.
 
-See [PGWire Client overview](/docs/query/pgwire/overview/) for details on how to
+See [PGWire Client overview](/docs/connect/compatibility/pgwire/overview/) for details on how to
 connect to QuestDB using PostgreSQL clients.
 
 Brief examples in multiple languages are shown below.
@@ -144,7 +171,7 @@ Brief examples in multiple languages are shown below.
 
 #### Further Reading
 
-See the [PGWire Client overview](/docs/query/pgwire/overview/) for more details on how to use PostgreSQL
+See the [PGWire Client overview](/docs/connect/compatibility/pgwire/overview/) for more details on how to use PostgreSQL
 clients to connect to QuestDB.
 
 ## REST HTTP API
@@ -156,12 +183,12 @@ The REST API is accessible on port `9000` and has the following query-capable
 entrypoints:
 
 For details such as content type, query parameters and more, refer to the
-[REST HTTP API](/docs/query/rest-api/) reference.
+[REST HTTP API](/docs/connect/compatibility/rest-api/) reference.
 
 | Entrypoint                                  | HTTP Method | Description                             | REST HTTP API Reference                                       |
 | :------------------------------------------ | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
-| [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/query/rest-api/#exp---export-data)      |
-| [`/exec?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/query/rest-api/#exec---execute-queries) |
+| [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/connect/compatibility/rest-api/#exp---export-data)      |
+| [`/exec?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
 
 #### `/exp`: SQL Query to CSV
 
@@ -361,18 +388,6 @@ run_query("UPDATE trades SET value = 9876 WHERE name = 'abc'")
 </Tabs>
 
 ## Apache Parquet
-
-:::info
-
-Apache Parquet support is in **beta**. It may not be fit for production use.
-
-Please let us know if you run into issues. Either:
-
-1. Email us at [support@questdb.io](mailto:support@questdb.io)
-2. Join our [public Slack](https://slack.questdb.com/)
-3. Post on our [Discourse community](https://community.questdb.com/)
-
-:::
 
 Parquet files can be read and thus queried by QuestDB.
 

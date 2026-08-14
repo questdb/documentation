@@ -418,7 +418,7 @@ Invoking the method above will return one of the following:
 - `ColumnType.GEOLONG`
 
 For more information and detailed examples of using table readers and writers,
-see the [Java API documentation](/docs/ingestion/java-embedded/).
+see the [Java API documentation](/docs/connect/java-embedded/).
 
 ## InfluxDB Line Protocol
 
@@ -461,7 +461,7 @@ geo_data geohash="46swgj10"
 ## CSV import
 
 Geohashes may also be inserted via
-[REST API](/docs/ingestion/import-csv/#import-csv-via-rest). In order to perform
+[REST API](/docs/connect/compatibility/import-csv/#import-csv-via-rest). In order to perform
 inserts in this way;
 
 1. Create a table with columns of geohash type beforehand:
