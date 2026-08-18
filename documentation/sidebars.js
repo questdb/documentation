@@ -114,6 +114,20 @@ module.exports = {
         },
         {
           type: "category",
+          label: "REST API",
+          collapsed: true,
+          items: [
+            "connect/compatibility/rest-api",
+            "connect/compatibility/import-csv",
+            {
+              label: "Parquet Export",
+              type: "link",
+              href: "/docs/concepts/parquet/#export",
+            },
+          ],
+        },
+        {
+          type: "category",
           label: "Compatibility Protocols",
           items: [
             {
@@ -197,20 +211,6 @@ module.exports = {
                   id: "connect/compatibility/pgwire/c-and-cpp",
                   type: "doc",
                   label: "C/C++",
-                },
-              ],
-            },
-            {
-              type: "category",
-              label: "REST API",
-              collapsed: true,
-              items: [
-                "connect/compatibility/rest-api",
-                "connect/compatibility/import-csv",
-                {
-                  label: "Parquet Export",
-                  type: "link",
-                  href: "/docs/concepts/parquet/#export",
                 },
               ],
             },
