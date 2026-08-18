@@ -1014,6 +1014,7 @@ module.exports = {
                   items: [
                     "cookbook/sql/time-series/elapsed-time",
                     "cookbook/sql/time-series/force-designated-timestamp",
+                    "cookbook/sql/time-series/check-timestamp-order",
                     "cookbook/sql/time-series/latest-n-per-partition",
                     "cookbook/sql/time-series/session-windows",
                     "cookbook/sql/time-series/latest-activity-window",
@@ -1035,6 +1036,7 @@ module.exports = {
                   items: [
                     "cookbook/sql/advanced/rows-before-after-value-match",
                     "cookbook/sql/advanced/local-min-max",
+                    "cookbook/sql/advanced/check-column-sort-order",
                     "cookbook/sql/advanced/top-n-plus-others",
                     "cookbook/sql/advanced/pivot-with-others",
                     "cookbook/sql/advanced/unpivot-table",
