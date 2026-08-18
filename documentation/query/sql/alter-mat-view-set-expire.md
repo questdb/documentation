@@ -9,7 +9,8 @@ description:
 Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/)
 row-retention policy on a materialized view (designed for **passthrough**
 views — see the concept page). Expired rows are hidden from queries immediately
-and reclaimed on disk in the background.
+in every mode, and reclaimed on disk in the background under a monotonic `WHEN`
+predicate — the relative and window modes hide rows without freeing disk.
 
 ## Syntax
 

@@ -4,8 +4,8 @@ sidebar_label: Expiring rows
 description:
   EXPIRE ROWS is a row-level retention policy for passthrough materialized
   views. Keep the latest row per key, the top-N per group, or rows matching a
-  predicate — recomputed continuously, with expired rows hidden immediately and
-  reclaimed in the background.
+  predicate — recomputed continuously, with expired rows hidden immediately, and
+  reclaimed in the background under the modes that allow it.
 ---
 
 `EXPIRE ROWS` is a row-level retention policy for
@@ -15,8 +15,12 @@ ROWS` decides retention **row by row** — keep the latest row per key, the top-
 per group, rows matching a predicate, and so on — and recomputes the result
 continuously as the view refreshes.
 
-Expired rows disappear from query results **immediately**; their on-disk storage
-is reclaimed afterwards by a background job.
+Expired rows disappear from query results **immediately** in every mode. Their
+on-disk storage is reclaimed afterwards by a background job under a monotonic
+`WHEN` predicate; the relative modes (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`,
+`KEEP N`) and window predicates hide rows without freeing disk. See
+[The modes](#the-modes) and
+[Monotonicity and cleanup safety](#monotonicity-and-cleanup-safety).
 
 :::note
 
@@ -79,16 +83,26 @@ derive from — otherwise those views would copy expired rows on refresh.
 Every mode keeps a defined set of rows and expires the rest. A row is expired
 only when the rule selects it for removal.
 
-| Mode                  | What it keeps                                        | Syntax                                                          |
-| --------------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
-| Per-row predicate     | Rows for which the predicate is **not** `TRUE`       | `EXPIRE ROWS WHEN predicate`                                    |
-| Keep latest           | The latest row per key (current state per key)       | `EXPIRE ROWS KEEP LATEST [ON ts] PARTITION BY cols`            |
-| Keep highest / lowest | Rows tied at the group max / min of a column         | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`     |
-| Keep top-N            | The `N` highest / lowest rows per group              | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`   |
-| Window predicate      | Rows for which a window predicate is **not** `TRUE`  | `EXPIRE ROWS WHEN windowPredicate`                             |
+| Mode                  | What it keeps                                        | Syntax                                                          | Frees disk            |
+| --------------------- | ---------------------------------------------------- | --------------------------------------------------------------- | --------------------- |
+| Per-row predicate     | Rows for which the predicate is **not** `TRUE`       | `EXPIRE ROWS WHEN predicate`                                    | Yes, when monotonic   |
+| Keep latest           | The latest row per key (current state per key)       | `EXPIRE ROWS KEEP LATEST [ON ts] PARTITION BY cols`            | No — read filter only |
+| Keep highest / lowest | Rows tied at the group max / min of a column         | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`     | No — read filter only |
+| Keep top-N            | The `N` highest / lowest rows per group              | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`   | No — read filter only |
+| Window predicate      | Rows for which a window predicate is **not** `TRUE`  | `EXPIRE ROWS WHEN windowPredicate`                             | No — read filter only |
 
 `KEEP HIGHEST/LOWEST` and `KEEP N` are convenience forms that desugar to a
 window predicate, so the window `WHEN` is the general escape hatch.
+
+The **Frees disk** column is the difference between hiding a row and deleting
+it. Every mode hides expired rows from every read, immediately. Only a monotonic
+`WHEN` predicate also has those rows deleted from disk by the cleanup job: a
+mode whose keep-set depends on the other rows in the view keeps its expired rows
+on disk until a full refresh rebuilds the view. A `KEEP LATEST` view therefore
+holds a full copy of its base table unless the view's own
+[TTL](/docs/concepts/ttl/) bounds it.
+`materialized_views().expire_enforcement` reports which of the two a given view
+gets; see [Inspecting a policy](#inspecting-a-policy).
 
 The clause is attached to a passthrough `CREATE MATERIALIZED VIEW` (after the
 query, and after `PARTITION BY` if present), or set later with
@@ -295,13 +309,21 @@ survivors. It runs at the `CLEANUP EVERY` cadence (default `1h`) and is
 **best-effort** — the read filter is authoritative, so deferred or skipped
 reclamation only affects disk usage, never query results.
 
+The job runs only under a monotonic `WHEN` predicate. It skips `KEEP LATEST`,
+`KEEP HIGHEST/LOWEST`, `KEEP N` and window policies entirely: a later refresh
+can remove the row those modes currently keep, which promotes an older row back
+into the keep-set, and the job cannot reconstruct a row it has already deleted.
+Those views accumulate their expired rows on disk.
+
 On QuestDB Enterprise, cleanup runs on the **primary only**, but the reclamation
 still replicates: the compaction commits are ordinary WAL transactions, so
 replicas reclaim the identical rows by applying them. A read-only replica neither
-runs the job nor needs to. Disable the job with `cairo.row.expiry.enabled=false`
-in `server.conf` (reads stay filtered; only reclamation stops); the setting is
-read at startup, so changing it requires a restart. A failing sweep retries
-after one second, doubling the per-view retry gap up to a 10-minute cap.
+runs the job nor needs to. Disable the job with
+`cairo.row.expiry.cleanup.enabled=false` in `server.conf` (reads stay filtered;
+only reclamation stops — the setting does not disable `EXPIRE ROWS` itself); the
+setting is read at startup, so changing it requires a restart. A failing sweep
+retries after one second, doubling the per-view retry gap up to a 10-minute
+cap.
 
 To observe reclamation, compare the physical row count per partition before and
 after a sweep:
@@ -342,10 +364,17 @@ is not already unique).
 ### Monotonicity and cleanup safety
 
 Physical deletion is only safe when expiry is **monotonic**: a row that is
-expired now must stay expired forever. All the relative modes (`KEEP LATEST`,
-`KEEP HIGHEST/LOWEST`, `KEEP N`) are monotonic by construction. A scalar
-`WHEN predicate` is arbitrary SQL, so the cleanup job reclaims disk only for
-predicates it can **prove** monotonic:
+expired now must stay expired forever. Two separate things can break that.
+
+The relative and window modes (`KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N`,
+window `WHEN`) decide each row's fate by comparing it against the other rows in
+the view. A later refresh can remove or replace the row a key currently keeps,
+which promotes an older row back into the keep-set — so the cleanup job never
+deletes for these modes, whatever their predicate looks like.
+
+A scalar `WHEN predicate` judges each row on its own, so it is eligible. It is
+arbitrary SQL, so the cleanup job reclaims disk only for predicates it can
+**prove** monotonic:
 
 - clock-free predicates (`WHEN amount < 1.5`), and
 - designated-timestamp thresholds of a proven advancing-clock shape: a bare
@@ -382,19 +411,27 @@ SHOW CREATE MATERIALIZED VIEW trades_latest;
 ```
 
 The [`materialized_views()`](/docs/query/functions/meta/) function exposes the
-policy in the `expire_clause` and `expire_cleanup_every` columns (both
-`NULL` when no policy is set):
+policy in the `expire_clause`, `expire_cleanup_every` and `expire_enforcement`
+columns (all `NULL` when no policy is set):
 
 ```questdb-sql title="List EXPIRE ROWS policies"
-SELECT view_name, expire_clause, expire_cleanup_every
+SELECT view_name, expire_clause, expire_cleanup_every, expire_enforcement
 FROM materialized_views();
 ```
 
-| view_name     | expire_clause                   | expire_cleanup_every |
-| ------------- | ------------------------------- | -------------------- |
-| trades_sized  | amount < 1.5                    | 1h                   |
-| trades_latest | KEEP LATEST PARTITION BY symbol | 1h                   |
-| trades_top2   | KEEP 2 HIGHEST price ...        | 1h                   |
+| view_name     | expire_clause                   | expire_cleanup_every | expire_enforcement |
+| ------------- | ------------------------------- | -------------------- | ------------------ |
+| trades_sized  | amount < 1.5                    | 1h                   | FILTER_AND_RECLAIM |
+| trades_latest | KEEP LATEST PARTITION BY symbol | 1h                   | FILTER_ONLY        |
+| trades_top2   | KEEP 2 HIGHEST price ...        | 1h                   | FILTER_ONLY        |
+
+`expire_enforcement` is the verdict the cleanup job acts on:
+
+- `FILTER_AND_RECLAIM` — reads hide the expired rows and the job deletes them
+  from disk.
+- `FILTER_ONLY` — reads hide the expired rows and they stay on disk. Every
+  relative and window policy reports this, as does a `WHEN` predicate that
+  cannot be proven monotonic.
 
 ## Changing or removing a policy
 
@@ -427,8 +464,11 @@ rather than breaking subsequent reads.
 - **`KEEP LATEST [ON ts]`.** The optional `ON ts` is accepted for familiarity but
   the view's designated timestamp is always used; naming a different column is
   rejected.
-- **Non-monotonic `WHEN` predicates are unsupported for cleanup** — see
-  [monotonicity](#monotonicity-and-cleanup-safety) above.
+- **Only a monotonic `WHEN` predicate frees disk.** The relative and window
+  modes hide expired rows on every read but never delete them, and neither does
+  a `WHEN` predicate that cannot be proven monotonic — see
+  [monotonicity](#monotonicity-and-cleanup-safety) above. Check a view's verdict
+  with `materialized_views().expire_enforcement`.
 - **Reserved column name.** The window/keep modes compute the keep-set through a
   synthetic boolean column named `__qdb_re_keep`; a policy is rejected on a view
   that exposes a column with that name.

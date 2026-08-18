@@ -311,8 +311,11 @@ EXPIRE ROWS
   [ CLEANUP EVERY duration ]
 ```
 
-Expired rows are hidden from queries immediately and reclaimed on disk in the
-background (`CLEANUP EVERY`, default `1h`). Change or remove a policy with
+Expired rows are hidden from queries immediately in every mode. They are
+reclaimed on disk in the background (`CLEANUP EVERY`, default `1h`) under a
+monotonic `WHEN` predicate; `KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N` and
+window predicates hide rows without freeing disk. Change or remove a policy
+with
 [`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
 
 See the [Expiring rows](/docs/concepts/deep-dive/expire-rows/) concept page for
