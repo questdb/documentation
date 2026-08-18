@@ -290,8 +290,8 @@ does not auto-create them.
 `UUID`, `IPv4`, `GEOHASH`, `LONG256`, `CHAR`, `DATE`, and `BINARY` columns
 have no `row()` value type. Route them through
 [`dataframe()`](#dataframe-ingestion), whose `schema_overrides` covers
-`symbol`, `ipv4`, `char`, and `geohash`, or through a SQL `INSERT` via
-[`query()`](#querying).
+`symbol`, `ipv4`, `char`, `uuid`, `long256`, and `geohash`, or through a SQL
+`INSERT` via [`query()`](#querying).
 
 QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value
 in one of those columns is received as `false` or `0`; use a wider nullable
@@ -428,7 +428,7 @@ Parameters:
 | `symbols` | `"auto"` (default: categorical and dictionary columns become `SYMBOL`), a bool, or a list of column names or indices. |
 | `at` | The designated timestamp column (by name or index), a fixed `TimestampNanos` or `datetime` shared by every row, or `questdb.ServerTimestamp`. |
 | `max_rows_per_batch` | Rows per published batch, default 16384. Sets pipelining granularity, not a safety limit — see below. |
-| `schema_overrides` | Per-column wire-type overrides, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`; values are `symbol`, `ipv4`, `char`, or `geohash`. |
+| `schema_overrides` | Per-column wire-type overrides, e.g. `{"addr": "ipv4", "loc": ("geohash", 20)}`; values are `symbol`, `ipv4`, `char`, `uuid`, `long256`, or `("geohash", bits)`. An override wins over any Arrow field metadata on that column. |
 
 `max_rows_per_batch` decides how the frame is cut into published batches,
 and each batch is one unit of encoding, memory, and server-side apply.
@@ -458,6 +458,29 @@ stored as SQL nulls, with the same `BOOLEAN`, `BYTE`, and `SHORT` caveat as
 row ingestion. A frame the columnar path cannot express raises
 `UnsupportedDataFrameShapeError` with per-column failures in
 `column_failures`.
+
+Binary columns — `pyarrow.binary()`, `large_binary()`,
+`fixed_size_binary(n)`, and polars `Binary` — land as `BINARY` by default. A
+byte width claims nothing on its own, so a 16-byte column is opaque bytes
+rather than a UUID. To write `UUID` or `LONG256`, claim the column:
+
+```python
+db.dataframe(
+    df,
+    table_name="events",
+    at="ts",
+    schema_overrides={"event_id": "uuid", "hash": "long256"},
+)
+```
+
+Every non-null value must then be exactly 16 bytes for `uuid` or 32 for
+`long256`. UUID bytes are canonical RFC 4122 big-endian — what
+`uuid.UUID.bytes` gives you and what a `UUID` result column reads back — and
+the client byte-swaps them into wire order. LONG256 bytes are little-endian
+limbs, least-significant limb first, and go out verbatim. A pyarrow column
+already carrying the `arrow.uuid` extension type needs no override; the label
+is itself a claim. Simplest of all, an object column of `uuid.UUID` values
+needs neither, and `dataframe()` handles the byte order for you.
 
 Naive timestamps — DataFrame columns and the scalar `at` alike — are
 interpreted as UTC, matching the numpy `datetime64` convention. Prefer

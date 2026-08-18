@@ -255,6 +255,11 @@ QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value in
 one of those columns is received as `false` or `0`; use a wider nullable type
 when the distinction matters.
 
+`column_uuid` on the row buffer takes the two 64-bit halves of the QWP wire
+encoding, `(lo, hi)`. Everywhere else in the API a UUID is 16 canonical
+RFC 4122 big-endian bytes; pass `uuid.as_bytes()` to `Chunk::column_uuid` when
+you have a `Uuid` rather than splitting it into halves yourself.
+
 ## Chunk ingestion {#sending-data-column-major}
 
 Use a `Chunk` when values already live in column slices. All columns and the
@@ -340,8 +345,8 @@ needs an entry in `data`, which the encoder ignores.
 | `BOOLEAN` | `column_bool(name, bits, row_count, validity)` | LSB-first bit-packed values |
 | `TIMESTAMP`, `TIMESTAMP_NS` | `column_ts(name, data, TimestampUnit, validity)` | Epoch `i64` values |
 | `DATE` | `column_date` | Epoch milliseconds |
-| `UUID` | `column_uuid` | `&[[u8; 16]]` in QuestDB wire order |
-| `LONG256` | `column_long256` | `&[[u8; 32]]` in little-endian limb order |
+| `UUID` | `column_uuid` | `&[[u8; 16]]` in canonical RFC 4122 big-endian order, what `uuid::Uuid::as_bytes()` returns |
+| `LONG256` | `column_long256` | `&[[u8; 32]]` in little-endian limb order, least-significant limb first |
 | `IPv4` | `column_ipv4` | Host-order `u32` values |
 | `VARCHAR` | `column_str`, `column_str_large` | Arrow Utf8 offsets and bytes |
 | `BINARY` | `column_binary` | Arrow Binary offsets and bytes |
@@ -521,6 +526,10 @@ Available builders include:
 - `bind_geohash`
 - `bind_null` and the typed `bind_null_*` variants
 
+`bind_uuid` takes 16 canonical RFC 4122 big-endian bytes (`uuid.as_bytes()`)
+and `bind_long256` takes 32 little-endian limb bytes, low limb first — the same
+byte orders the matching result columns are read back in.
+
 ### Reading columns
 
 `BatchView::column(index)` returns a non-exhaustive `ColumnView`. Match the
@@ -533,7 +542,7 @@ variant before reading values:
 | `Symbol` | `resolve(row) -> Option<&str>` |
 | `Varchar` | `value(row) -> Option<&str>` |
 | `Binary` | `value(row) -> Option<&[u8]>` |
-| `Uuid`, `Long256` | Fixed-size byte-array reference |
+| `Uuid`, `Long256` | Fixed-size byte-array reference: `Uuid` yields 16 canonical RFC 4122 big-endian bytes, `Long256` 32 little-endian limb bytes, low limb first |
 | `Decimal64`, `Decimal128`, `Decimal256` | Integer value plus the column scale |
 | `Geohash` | Bits plus precision |
 | `DoubleArray`, `LongArray` | Per-row shape and element data |

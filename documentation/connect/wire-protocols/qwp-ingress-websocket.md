@@ -420,7 +420,7 @@ columns, which keeps every message self-contained for store-and-forward replay.
 | 9    | `0x09` | SYMBOL          | var     | Dictionary-encoded string          |
 | 10   | `0x0A` | TIMESTAMP       | 8       | Microseconds since Unix epoch      |
 | 11   | `0x0B` | DATE            | 8       | Milliseconds since Unix epoch      |
-| 12   | `0x0C` | UUID            | 16      | RFC 4122 UUID                      |
+| 12   | `0x0C` | UUID            | 16      | UUID, two LE int64 halves, lo first |
 | 13   | `0x0D` | LONG256         | 32      | 256-bit integer                    |
 | 14   | `0x0E` | GEOHASH         | var     | Geospatial hash                    |
 | 15   | `0x0F` | VARCHAR         | var     | Length-prefixed UTF-8              |
@@ -812,7 +812,10 @@ uncompressed mode.
 ### UUID
 
 16 bytes per value: 8 bytes for the low 64 bits, then 8 bytes for the high
-64 bits, both little-endian.
+64 bits, both little-endian. This is the canonical RFC 4122 byte order
+reversed, so a client whose API takes RFC 4122 bytes — as the C, C++, Rust,
+and Python clients do — reverses each value on the way to the wire and again
+on the way back.
 
 ### LONG256
 
