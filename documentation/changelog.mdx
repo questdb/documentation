@@ -30,6 +30,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - New reference page for rebuilding a suspended WAL table under a fresh sequencer, with its requirements and permission
 - [ALTER TABLE SET FORMAT](/docs/query/sql/alter-table-set-format/) - New reference page for switching a table's partition storage format between `NATIVE` and `PARQUET`
 - [QWP configuration](/docs/configuration/qwp/) - Server-side settings for the QWP ingestion (`/write/v4`) and query (`/read/v1`) endpoints
+- [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/) and [Check column sort order](/docs/cookbook/sql/advanced/check-column-sort-order/) - Two cookbook recipes that detect unsorted data with `lag()`: whether a table, CSV import or external Parquet file is ordered by its timestamp, and whether one column is sorted with respect to another
 
 ### Reference
 
@@ -46,6 +47,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [LIMIT](/docs/query/sql/limit/#null-bounds) - Documented null `LIMIT` bounds (supplied via bind variables) and their two-bound semantics
 - Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
 - Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
+- [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
 
 ### Updated
 
@@ -60,6 +62,10 @@ This page tracks significant updates to the QuestDB documentation.
 - [Time to live (TTL)](/docs/concepts/ttl/) - Documented TTL on materialized views, set with `CREATE MATERIALIZED VIEW ... TTL` or `ALTER MATERIALIZED VIEW ... SET TTL` and managed independently of the base table's TTL
 - [Result grid](/docs/getting-started/web-console/result-grid/) - Documented the Parquet and CSV download options in the web console result grid
 - [Docker Compose configuration](/docs/cookbook/operations/docker-compose-config/) - Reworked the volume-permission guidance and explained why `QDB_CAIRO_ROOT` should not be set in Docker
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Renamed from "MCP connection" and reworked around when an agent actually needs an MCP server, with [AI coding agents](/docs/getting-started/ai-coding-agents/) gaining a four-option matrix covering the MCP server, the REST API, the agent skill, and the [QuestDB AI Assistant](/docs/getting-started/web-console/questdb-ai/)
+- [pandas](/docs/integrations/data-processing/pandas/) and [Polars](/docs/integrations/data-processing/polars/) - Rewritten around the native QWP clients, keeping the previous ILP and ConnectorX approaches as legacy; Polars now also covers the Rust `polars-ingress` and `polars-egress` crate features
+- [Python client](/docs/connect/clients/python/) - Documented N-dimensional `float64` numpy arrays landing in matching N-dimensional column types (other dtypes are rejected), and clarified Polars consumption: prefer `to_polars()`, with `polars.DataFrame(result)` reserved for pyarrow-free installs
+- [Query overview](/docs/query/overview/) - Added a client libraries section ahead of PostgreSQL, and removed the stale notice describing Parquet support as beta
 
 ## July 2026
 
