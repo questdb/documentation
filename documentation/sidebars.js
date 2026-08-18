@@ -32,6 +32,54 @@ module.exports = {
         },
       ],
     },
+    {
+      type: "category",
+      label: "Kubernetes Operator",
+      collapsed: true,
+      link: {
+        type: "doc",
+        id: "operator/index",
+      },
+      items: [
+        {
+          type: "doc",
+          id: "operator/index",
+          label: "Overview",
+        },
+        {
+          type: "category",
+          label: "Start here",
+          items: [
+            "operator/getting-started/index",
+            "operator/installation",
+            "operator/getting-started/aws",
+            "operator/getting-started/azure",
+            "operator/configuration",
+          ],
+        },
+        {
+          type: "category",
+          label: "Day 2 operations",
+          items: [
+            "operator/operations/operator",
+            "operator/operations/database",
+            "operator/operations/backup-restore",
+            "operator/high-availability",
+            "operator/troubleshooting",
+          ],
+        },
+        {
+          type: "category",
+          label: "Reference",
+          items: [
+            "operator/known-limitations",
+            "operator/support",
+            "operator/releases",
+            "operator/reference/api",
+          ],
+        },
+      ],
+    },
 
     // ===================
     // CONNECT
