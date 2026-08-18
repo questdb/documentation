@@ -266,11 +266,11 @@ the server's certificate. For local testing with self-signed certificates, you c
 
 Connecting a client to ILP is a common path.
 
-However, you may use something like [Kafka](/docs/ingestion/message-brokers/kafka).
+However, you may use something like [Kafka](/docs/connect/message-brokers/kafka).
 
 For more on ILP ingestion, see:
-- [ILP Overview](/docs/ingestion/ilp/overview/) — Protocol details and configuration
-- [Ingestion Overview](/docs/ingestion/overview/) — Client libraries and ingestion methods
+- [ILP Overview](/docs/connect/compatibility/ilp/overview/) — Protocol details and configuration
+- [Ingestion Overview](/docs/connect/overview/) — Client libraries and ingestion methods
 
 ## 5. Ingest data, Kafka Connect (optional)
 
@@ -344,7 +344,7 @@ client.conf.string=https::addr=localhost:9000;token=qt1KAsf1U9YbUVAX1H2IahXEE3-4
 Once you deploy this configuration, the connector will start sending data from your Kafka topic to QuestDB. If you
 encounter any issues, check the logs for both your Kafka Connect worker and your QuestDB server for more details.
 
-See the [QuestDB Kafka Connector documentation](/docs/ingestion/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
+See the [QuestDB Kafka Connector documentation](/docs/connect/message-brokers/kafka/#questdb-kafka-connect-connector) for more details
 on the configuration options and how to set up the connector.
 
 ## 6. Query data, PostgreSQL query
@@ -404,7 +404,7 @@ This covers the very basics of user creation and service accounts.
 We have an `ingest` service account and a `dashboard` service account.
 
 For more on querying, see:
-- [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) — Connection details and compatibility
+- [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/) — Connection details and compatibility
 - [Query & SQL Overview](/docs/query/overview/) — SQL syntax and functions
 
 > For the full role-based access control docs, including group management, see
@@ -479,16 +479,16 @@ too — on a schedule you define. This supersedes plain TTL in Enterprise, where
 ### Migrating from TTL when upgrading from OSS
 
 Tables that were created in OSS keep their existing `TTL` setting after you
-upgrade to Enterprise — no data is lost at upgrade time. However, Enterprise
-rejects any **new** `TTL` changes on tables (both `CREATE TABLE ... TTL` and
-`ALTER TABLE SET TTL <non-zero>`) with:
+upgrade to Enterprise — no data is lost at upgrade time. On an existing table,
+`ALTER TABLE SET TTL` with a non-zero value is then rejected with:
 
 ```
-TTL settings are deprecated, please, create a storage policy instead
+TTL is not supported on Enterprise tables; use a storage policy instead
 ```
 
-Materialized views are not affected: they continue to use `TTL` for retention
-in Enterprise.
+(`CREATE TABLE ... TTL` is still accepted for backward compatibility: Enterprise
+translates it into a `STORAGE POLICY(DROP LOCAL ...)`.) Materialized views are
+not affected: they continue to use `TTL` for retention in Enterprise.
 
 To move a legacy table from `TTL` to a storage policy:
 
@@ -573,7 +573,7 @@ Enterprise.
 
 If you're new to QuestDB, consider checking out:
 
-- [Ingestion overview](/docs/ingestion/overview/): Learn the various ingestion
+- [Ingestion overview](/docs/connect/overview/): Learn the various ingestion
   methods and their benefits and tradeoffs, and pick a language client.
 - [Query & SQL overview](/docs/query/overview/): Learn how to query
   QuestDB.

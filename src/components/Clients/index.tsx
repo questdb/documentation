@@ -7,11 +7,11 @@ interface Client {
   name: string;
   description: string;
   logo: string;
-  protocol: 'ILP' | 'PGWire'; // Protocol type
+  protocol: 'QWP' | 'ILP' | 'PGWire'; // Protocol type
 }
 
 interface ClientDisplayProps {
-  showProtocol?: 'ILP' | 'PGWire';
+  showProtocol?: 'QWP' | 'ILP' | 'PGWire';
 }
 
 const clientsData = clients as Client[];
@@ -19,9 +19,24 @@ const clientsData = clients as Client[];
 export function Clients({ showProtocol }: ClientDisplayProps) {
   const protocolToDisplay = showProtocol || 'ILP';
 
-  const filteredClients = clientsData.filter(
+  // QWP is the recommended path, but not every language has a QWP client yet.
+  // In QWP mode, list the QWP clients first, then fall back to the ILP entry
+  // for any language that has no QWP client, so no language is missing.
+  const primaryClients = clientsData.filter(
     (client) => client.protocol === protocolToDisplay
   );
+
+  const filteredClients =
+    protocolToDisplay === 'QWP'
+      ? [
+          ...primaryClients,
+          ...clientsData.filter(
+            (client) =>
+              client.protocol === 'ILP' &&
+              !primaryClients.some((qwp) => qwp.name === client.name)
+          ),
+        ]
+      : primaryClients;
 
   if (filteredClients.length === 0) {
     return (

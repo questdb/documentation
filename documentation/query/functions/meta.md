@@ -134,6 +134,110 @@ If you want to re-read metadata for all user tables, simply use an asterisk:
 SELECT hydrate_table_metadata('*');
 ```
 
+## live_views
+
+`live_views()` returns the list of all [live views](/docs/concepts/live-views/)
+in the database, along with their status, refresh lag, in-memory footprint, and
+seed progress.
+
+**Arguments:**
+
+- `live_views()` does not require arguments.
+
+**Return value:**
+
+Returns a `table` with the following columns:
+
+| Column                                         | Type      | Description                                                                                                            |
+| ---------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `view_name`                                    | STRING    | Live view name                                                                                                         |
+| `view_table_dir_name`                          | STRING    | View directory name on disk                                                                                            |
+| `base_table_name`                              | STRING    | Base table name                                                                                                        |
+| `view_sql`                                     | STRING    | Query used to maintain the view                                                                                        |
+| `view_status`                                  | STRING    | Lifecycle status: `creating`, `active`, `seeding`, `invalid`, `dropping`, `version_unsupported`, or `state_unreadable` |
+| `invalidation_reason`                          | STRING    | Message explaining why the view was marked invalid                                                                     |
+| `flush_every_interval`                         | LONG      | `FLUSH EVERY` interval value                                                                                           |
+| `flush_every_interval_unit`                    | STRING    | `FLUSH EVERY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                |
+| `in_memory_interval`                           | LONG      | `IN MEMORY` interval value                                                                                             |
+| `in_memory_interval_unit`                      | STRING    | `IN MEMORY` unit: `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, or `DAY`                                                  |
+| `in_mem_bytes`                                 | LONG      | Native capacity of the in-memory tier; a peak-sticky high-water mark                                                   |
+| `in_mem_rows`                                  | LONG      | Live row count in the published in-memory tier                                                                         |
+| `o3_rejected_count`                            | LONG      | Late out-of-order rows rejected below the view lower bound; resets on restart                                          |
+| `below_lower_bound_count`                      | LONG      | In-order rows dropped below the view lower bound; resets on restart                                                    |
+| `lag_seqtxn`                                   | LONG      | Committed base WAL transactions beyond `last_processed_seqtxn`                                                         |
+| `lag_micros`                                   | LONG      | Microseconds since the last successful flush                                                                           |
+| `last_processed_seqtxn`                        | LONG      | Last base transaction processed by the refresh worker                                                                  |
+| `applied_watermark`                            | LONG      | Last base transaction durably applied to the view's disk tier                                                          |
+| `lv_consumed_seqtxn`                           | LONG      | Base WAL purge floor held by this view                                                                                 |
+| `view_lower_bound_timestamp`                   | TIMESTAMP | Resolved `START FROM` boundary; `NULL` for `BEGINNING`                                                                 |
+| `writer_stall_micros`                          | LONG      | Current uninterrupted flush-writer stall duration, or `0`                                                              |
+| `seed_target_seqtxn`                           | LONG      | Target base transaction during initial seeding; otherwise `NULL`                                                       |
+| `o3_resume_replay_rows`                        | LONG      | Rows emitted by repairs resumed from a checkpoint; resets on restart                                                   |
+| `o3_boundary_replay_rows`                      | LONG      | Rows emitted by rebuild repairs; resets on restart                                                                     |
+| `o3_replay_scan_rows`                          | LONG      | Base rows scanned by both repair paths; resets on restart                                                              |
+| `checkpoint_timeline_generation`               | LONG      | Current published checkpoint-timeline generation                                                                       |
+| `checkpoint_timeline_entries`                  | LONG      | Checkpoint roots in the current generation                                                                             |
+| `checkpoint_timeline_normalized_base_seqtxn`   | LONG      | Base transaction through which the timeline is normalized                                                              |
+| `checkpoint_timeline_logical_bytes`            | LONG      | Bytes the roots would use as independent complete state images                                                         |
+| `checkpoint_timeline_physical_bytes`           | LONG      | Bytes physically stored for the current timeline generation                                                            |
+| `checkpoint_timeline_shared_bytes`             | LONG      | Logical bytes avoided through state sharing                                                                            |
+| `checkpoint_timeline_sharing_ratio`            | DOUBLE    | Shared bytes divided by logical bytes                                                                                  |
+| `checkpoint_timeline_row_position_delta_bytes` | LONG      | Bytes used by the row-position delta index                                                                             |
+| `checkpoint_data_segment_count`                | LONG      | Data segments found by the latest checkpoint purge sweep                                                               |
+| `checkpoint_obsolete_segment_bytes`            | LONG      | Obsolete segment bytes found by the latest purge sweep                                                                 |
+| `checkpoint_oldest_pinned_generation`          | LONG      | Oldest checkpoint generation still retained                                                                            |
+| `checkpoint_gc_lag_generations`                | LONG      | Generations between the current and oldest retained generation                                                         |
+| `checkpoint_last_write_micros`                 | LONG      | Duration of the latest checkpoint write                                                                                |
+| `checkpoint_last_restore_micros`               | LONG      | Duration of the latest checkpoint restore                                                                              |
+| `checkpoint_last_write_new_bytes`              | LONG      | New bytes written by the latest checkpoint publication                                                                 |
+| `checkpoint_last_lookup_depth`                 | LONG      | Metadata-tree depth of the latest checkpoint lookup                                                                    |
+| `checkpoint_repair_in_progress`                | BOOLEAN   | Whether a localized repair is suspended across refresh turns                                                           |
+| `checkpoint_repair_correction_timestamp`       | TIMESTAMP | Earliest timestamp whose output may have changed in the active repair                                                  |
+| `checkpoint_repair_low_timestamp`              | TIMESTAMP | Inclusive base timestamp from which the active repair scans                                                            |
+| `checkpoint_repair_high_timestamp`             | TIMESTAMP | Repair convergence boundary; `NULL` when it runs to end of data                                                        |
+| `checkpoint_repair_roots_versioned`            | LONG      | Checkpoint roots versioned by repairs; resets on restart                                                               |
+| `checkpoint_repair_new_bytes`                  | LONG      | Bytes written by repairs; resets on restart                                                                            |
+| `checkpoint_repair_resumes`                    | LONG      | Times a repair resumed in a later refresh turn; resets on restart                                                      |
+| `checkpoint_repair_failures`                   | LONG      | Repair failures; resets on restart                                                                                     |
+| `checkpoint_repair_plan`                       | STRING    | Available localized plan: `range`, `rows`, `anchor`, a `+` combination, `none`, or `NULL` before compilation           |
+| `checkpoint_repair_last_disposition`           | STRING    | Last executor used: `localized rebuild`, `boundary rebuild`, or `resume from anchor`                                   |
+| `checkpoint_repair_last_denial`                | STRING    | Reason the last repair did not use a localized rebuild; otherwise `NULL`                                               |
+
+The `in_mem_bytes` and `in_mem_rows` columns are complementary. `in_mem_bytes`
+is the peak-sticky arena footprint that does not shrink after a burst, while
+`in_mem_rows` is the live row count that drops as rows age out of the
+`IN MEMORY` window. Together they distinguish a view actively buffering rows
+from one holding capacity retained from a past burst.
+
+`lag_seqtxn` counts transactions, not rows. A value of `0` means the durable
+tier is caught up; a temporary non-zero value is expected between `FLUSH EVERY`
+cycles. Alert on a value that remains above its normal flush-cycle baseline or
+keeps increasing across samples rather than on a universal fixed threshold.
+`lag_micros` measures flush activity and may grow while an idle view has
+`lag_seqtxn = 0`.
+
+The checkpoint columns describe the current persistent timeline, its storage and
+lookup cost, and out-of-order repair activity. Timeline fields are `NULL` before
+the first generation is published. The data-segment and obsolete-byte fields
+reflect the latest purge sweep and remain `NULL` until a sweep has run.
+`checkpoint_repair_plan` describes the query's available repair bounds, while
+the disposition and denial columns report what the most recent repair actually
+did.
+
+For operational guidance, see
+[Monitoring live views](/docs/concepts/live-views/#monitoring).
+
+**Examples:**
+
+```questdb-sql title="List all live views"
+SELECT view_name, base_table_name, view_status, lag_seqtxn, lag_micros
+FROM live_views();
+```
+
+| view_name | base_table_name | view_status | lag_seqtxn | lag_micros |
+| --------- | --------------- | ----------- | ---------- | ---------- |
+| trades_ma | trades          | active      | 0          | 0          |
+
 ## materialized_views
 
 `materialized_views()` returns the list of all materialized views in the
@@ -306,22 +410,23 @@ SELECT * FROM storage_policies;
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `table_dir_name` column in [`tables()`](#tables). |
-| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). Blank when the stage is not configured. |
-| `to_remote` | _STRING_ | Reserved — always blank in the current release. The `TO REMOTE` clause is rejected at SQL parse time with `'TO REMOTE' is not supported yet`. The column is kept for forward compatibility. |
-| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. Blank when the stage is not configured. |
-| `drop_remote` | _STRING_ | Reserved — always blank in the current release. The `DROP REMOTE` clause is rejected at SQL parse time with `'DROP REMOTE' is not supported yet`. The column is kept for forward compatibility. |
+| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `directoryName` column in [`tables()`](#tables). |
+| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). `0h` when the stage is not configured. |
+| `to_remote` | _STRING_ | TTL for the `TO REMOTE` stage. Accepted and stored but not yet enforced, so setting it has no effect for now. `0h` when not configured. |
+| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. `0h` when the stage is not configured. |
+| `drop_remote` | _STRING_ | Reserved for future object storage removal. `DROP REMOTE` is rejected at parse time with `'DROP REMOTE' is not supported yet`, so this column is always `0h`. |
 | `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
 | `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
 
 **Notes on TTL formatting:**
 
-- TTL values are rendered in just two units: `h` for hours and `m` for
-  **months**. Durations written in the DDL as days, weeks, or years are
-  normalized to hours when stored (e.g., `3 DAYS` → `72h`, `1 WEEK` →
-  `168h`). Month-based durations are stored and rendered with the lowercase
-  `m` suffix — despite the visual collision with "minute", `m` in this view
-  is **months**, and QuestDB's duration shorthand has no unit for minutes.
+- TTL values are rendered in two units: `h` for hours and `m` for **months**.
+  Hour-, day-, and week-based durations are stored as hours (e.g. `3 DAYS` →
+  `72h`, `1 WEEK` → `168h`). Month- and year-based durations are stored as
+  months (e.g. `1 MONTH` → `1m`, `1 YEAR` → `12m`). Despite the visual
+  collision with "minute", `m` in this view is **months**; QuestDB's duration
+  shorthand has no unit for minutes.
+- An unset stage renders as `0h`, not blank.
 
 **Example:**
 
@@ -331,13 +436,15 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
 |----------------|------------|-----------|------------|-------------|--------|--------------|
-| trades~12      | 72h        |           | 1m         |             | A      | 2025-01-15T10:30:00.000000Z |
-| metrics~18     | 168h       |           |            |             | D      | 2025-01-14T09:15:42.000000Z |
+| trades~12      | 72h        | 0h        | 1m         | 0h          | A      | 2025-01-15T10:30:00.000000Z |
+| metrics~18     | 168h       | 0h        | 0h         | 0h          | D      | 2025-01-14T09:15:42.000000Z |
 
 The first row is a policy with two active stages (3-day Parquet conversion and
 1-month local drop) and is currently enforced. The second row has only the
-`TO PARQUET` stage set and has been temporarily disabled. The `to_remote` and
-`drop_remote` columns are reserved and always blank in the current release.
+`TO PARQUET` stage set and has been temporarily disabled. Every unset stage
+renders as `0h`: here neither policy sets `TO REMOTE`, so `to_remote` is `0h`,
+and `drop_remote` is always `0h` because `DROP REMOTE` is rejected at parse
+time.
 
 ## table_columns
 
@@ -446,16 +553,15 @@ Returns a table with the following columns:
 - `attachable` - _BOOLEAN_, true if the partition is detached and can be
   attached (`name` of the partition will contain the `.attachable` extension)
 - `hasParquetGenerated` - _BOOLEAN_, true if a Parquet copy of the partition
-  has been produced alongside the native files. Set by either
-  [manual Parquet conversion](/docs/query/export-parquet/#in-place-conversion)
+  has been generated. Set by either
+  [manual Parquet conversion](/docs/concepts/parquet/#in-place-conversion)
   (`ALTER TABLE ... CONVERT PARTITION TO PARQUET`) or by a
   [storage policy](/docs/concepts/storage-policy/)'s `TO PARQUET` stage
-  (Enterprise). The partition is still served from native storage until it is
-  switched to Parquet-only format
-- `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format
-  (native files have been replaced). Set the same way as
-  `hasParquetGenerated` — either manually or by a storage policy's `DROP
-  NATIVE` stage
+  (Enterprise)
+- `isParquet` - _BOOLEAN_, true if the partition is stored in Parquet format:
+  the native files have been removed and reads are served from the Parquet
+  file. Set the same way as `hasParquetGenerated`: either manually or by a
+  storage policy's `TO PARQUET` stage
 - `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
   file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
 
@@ -616,7 +722,7 @@ Returns a `table` with the following columns:
 | Column | Type | Description |
 |--------|------|-------------|
 | `table_suspended` | BOOLEAN | Whether a WAL table is suspended (`false` for non-WAL tables) |
-| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view) |
+| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view), `L` (live view) |
 | `table_row_count` | LONG | Approximate row count at last tracked write |
 | `table_min_timestamp` | TIMESTAMP | Minimum timestamp of data in the table (updated on WAL merge) |
 | `table_max_timestamp` | TIMESTAMP | Maximum timestamp of data in the table (updated on WAL merge) |

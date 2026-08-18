@@ -1,21 +1,66 @@
 ---
-title: AI Coding Agents
-sidebar_label: AI Coding Agents
+title: Using QuestDB with AI coding agents
+sidebar_label: AI coding agents
 description:
-  Use AI coding agents like Claude Code or OpenAI Codex to build applications, write queries, and work with QuestDB using natural language.
+  How AI coding agents like Claude Code, Codex, and Cursor work with QuestDB.
+  The official QuestDB MCP server for the Web Console, the QuestDB skill for
+  time-series SQL, and the REST API that works out of the box.
 ---
 
-import Tabs from "@theme/Tabs";
+import Tabs from "@theme/Tabs"
 
-import TabItem from "@theme/TabItem";
+import TabItem from "@theme/TabItem"
 
-AI coding agents like <a href="https://claude.ai/code" target="_blank">Claude Code</a> and <a href="https://openai.com/index/openai-codex/" target="_blank">OpenAI Codex</a> can help you build applications that use QuestDB.
+AI coding agents like <a href="https://claude.ai/code" target="_blank">Claude
+Code</a> and
+<a href="https://openai.com/index/openai-codex/" target="_blank">OpenAI
+Codex</a> can help you build applications that use QuestDB.
 
-These agents work with QuestDB out of the box by reading the online documentation. For deeper integration, agent skills embed rich context directly into the agent so it can work faster and more accurately. The [QuestDB agent skill](#questdb-agent-skill) covers SQL, ingestion, and Grafana dashboards, while the [TSBS Benchmark skill](#tsbs-benchmark-skill) automates end-to-end performance benchmarking.
+There are four options, depending on what you want the AI to do, and they
+combine well:
 
-## Getting started
+| You want to                                                        | Use                                                                            | Requires                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Build notebooks and live dashboards in the Web Console from your agent, and query and ingest data through it | The official [QuestDB MCP server](#questdb-mcp-server)                         | Node.js and a coding agent                        |
+| Query and ingest data directly, no console involved                | The [REST API](#rest-api-no-setup-required): QuestDB speaks HTTP out of the box | Nothing to install                                |
+| Teach the agent QuestDB's time-series SQL and patterns             | The [QuestDB skill](#questdb-agent-skill)                                      | Claude Code or Codex                              |
+| AI help inside the console, without a coding agent                 | The built-in [AI Assistant](/docs/getting-started/web-console/questdb-ai)      | Your own OpenAI or Anthropic key, or a local model |
 
-No setup required. Use the public QuestDB demo with Claude Code:
+The MCP server and the skill work best together: the skill supplies the
+time-series SQL knowledge, and the MCP server turns it into live dashboards in
+your console. Separately, the
+[TSBS Benchmark skill](#tsbs-benchmark-skill) automates end-to-end performance
+benchmarking.
+
+## QuestDB MCP server
+
+The official <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB
+MCP server</a> (`@questdb/mcp-bridge`) connects coding
+agents to a running
+[Web Console](/docs/getting-started/web-console/overview/). Every action
+executes in the browser through your already-authenticated console session, and
+a four-level permission model controls what the agent can see and do, from no
+data access up to DDL/DML execution.
+
+Once connected, the agent can:
+
+- **Build dashboards**: create and edit SQL and markdown cells, draw nine chart
+  types, arrange cells into live grid dashboards, and set chart auto-refresh.
+- **Explore schema and data**: list tables and materialized views, fetch DDL and
+  runtime statistics, and run ad-hoc queries with result rows returned to the
+  agent.
+- **Look up documentation**: built-in reference for QuestDB functions,
+  operators, and SQL keywords.
+- **Two-way handoff**: hand analysis back and forth with your agent; it
+  snapshots the workspace and tracks your edits, so you can both work on the
+  same notebook without conflicts.
+
+[Learn more about the QuestDB MCP server →](/docs/getting-started/web-console/mcp-server)
+
+## REST API: no setup required
+
+QuestDB speaks HTTP natively, so agents can query it with no MCP server and
+nothing to install. Try the public QuestDB demo with Claude Code:
 
 ```
 You: "Use QuestDB's REST API at https://demo.questdb.io/ to list all tables"
@@ -50,7 +95,13 @@ Claude Code: I'll query the QuestDB REST API to list your tables.
 
 ## QuestDB agent skill
 
-The <a href="https://github.com/questdb/skills" target="_blank">QuestDB agent skill</a> is an experimental skill for Claude Code and Codex. It embeds QuestDB-specific knowledge directly into the agent's context - SQL syntax, common mistakes, ingestion patterns, Grafana templates, and financial indicator recipes - so the agent can build complete data pipelines without searching the docs for every step. For topics not covered by the skill, the agent falls back to the online documentation automatically.
+The <a href="https://github.com/questdb/skills" target="_blank">QuestDB agent
+skill</a> is an experimental skill for Claude Code and Codex. It embeds
+QuestDB-specific knowledge directly into the agent's context, covering SQL
+syntax, common mistakes, ingestion patterns, Grafana templates, and financial
+indicator recipes, so the agent can build complete data pipelines without
+searching the docs for every step. For topics not covered by the skill, the agent falls back
+to the online documentation automatically.
 
 ### Installation
 
@@ -65,21 +116,27 @@ The <a href="https://github.com/questdb/skills" target="_blank">QuestDB agent sk
 npx skills add questdb/skills
 ```
 
-This installs the skill globally for Claude Code. To install it for a specific project only, run the command from the project directory with the `--local` flag.
+This installs the skill globally for Claude Code. To install it for a specific
+project only, run the command from the project directory with the `--local`
+flag.
 
 </TabItem>
 
 <TabItem value="manual">
 
-Copy the `questdb/` folder from the <a href="https://github.com/questdb/skills" target="_blank">repository</a> into your skills directory:
+Copy the `questdb/` folder from the
+<a href="https://github.com/questdb/skills" target="_blank">repository</a> into
+your skills directory:
 
 **Claude Code:**
-- `~/.claude/skills/questdb/` - available in all projects
-- `<project>/.claude/skills/questdb/` - available in a specific project
+
+- `~/.claude/skills/questdb/`: available in all projects
+- `<project>/.claude/skills/questdb/`: available in a specific project
 
 **Codex:**
-- `~/.codex/skills/questdb/` - available in all projects
-- `<project>/.codex/skills/questdb/` - available in a specific project
+
+- `~/.codex/skills/questdb/`: available in all projects
+- `<project>/.codex/skills/questdb/`: available in a specific project
 
 The folder must contain `SKILL.md` and the `references/` directory.
 
@@ -89,12 +146,16 @@ The folder must contain `SKILL.md` and the `references/` directory.
 
 ### What's included
 
-- **SQL reference** - QuestDB-specific syntax including `SAMPLE BY`, `LATEST ON`, `ASOF JOIN`, window functions, and materialized views
-- **Common mistakes** - 50+ patterns to avoid when coming from PostgreSQL (e.g., `time_bucket()` does not exist, use `SAMPLE BY` instead)
-- **Ingestion patterns** - Python templates for ILP ingestion, including array support for order book data
-- **Grafana integration** - Dashboard deployment via API, datasource configuration, and ready-to-use panel queries
-- **Financial indicators** - 20+ indicator recipes ready for Grafana panels
-- **Enterprise authentication** - REST and ILP token configuration, ACL setup
+- **SQL reference**: QuestDB-specific syntax including `SAMPLE BY`,
+  `LATEST ON`, `ASOF JOIN`, window functions, and materialized views
+- **Common mistakes**: 50+ patterns to avoid when coming from PostgreSQL (e.g.,
+  `time_bucket()` does not exist, use `SAMPLE BY` instead)
+- **Ingestion patterns**: Python templates for ILP ingestion, including array
+  support for order book data
+- **Grafana integration**: Dashboard deployment via API, datasource
+  configuration, and ready-to-use panel queries
+- **Financial indicators**: 20+ indicator recipes ready for Grafana panels
+- **Enterprise authentication**: REST and ILP token configuration, ACL setup
 
 ### Example prompt
 
@@ -109,58 +170,90 @@ Then create a Grafana dashboard with OHLC candlesticks, VWAP,
 Bollinger Bands, and RSI panels, with a symbol dropdown.
 ```
 
-The agent will create the database schema, write the ingestion script, wait for data, and deploy a Grafana dashboard - all in a single pass.
+The agent will create the database schema, write the ingestion script, wait for
+data, and deploy a Grafana dashboard, all in a single pass.
 
-<video autoPlay muted loop playsInline width="100%"
-  src={require("/static/images/docs/ai-coding-agents/questdb-skill.mp4").default} />
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  width="100%"
+  src={
+    require("/static/images/docs/ai-coding-agents/questdb-skill.mp4").default
+  }
+/>
 
 ### Built-in indicators
 
-The following indicators are embedded in the skill and can be generated without online lookups:
+The following indicators are embedded in the skill and can be generated without
+online lookups:
 
-Aggressor imbalance, ATR, Bid-ask spread, Bollinger Bands, Bollinger BandWidth, Compound interest, Cumulative product, Donchian Channels, Keltner Channels, Liquidity comparison, MACD, Maximum drawdown, OBV, OHLC bars, Rate of Change, Realized volatility, Rolling std dev, RSI, Stochastic Oscillator, TICK & TRIN, Volume profile, Volume spikes, VWAP.
+Aggressor imbalance, ATR, Bid-ask spread, Bollinger Bands, Bollinger BandWidth,
+Compound interest, Cumulative product, Donchian Channels, Keltner Channels,
+Liquidity comparison, MACD, Maximum drawdown, OBV, OHLC bars, Rate of Change,
+Realized volatility, Rolling std dev, RSI, Stochastic Oscillator, TICK & TRIN,
+Volume profile, Volume spikes, VWAP.
 
 ## TSBS Benchmark skill
 
-The <a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">TSBS Benchmark skill</a> is a skill for Claude Code and Codex that runs end-to-end <a href="https://github.com/timescale/tsbs" target="_blank">Time Series Benchmark Suite</a> (TSBS) benchmarks against QuestDB. It installs prerequisites, spins up QuestDB in Docker, builds TSBS, generates data, loads it, runs all query benchmarks, and cleans up - all from a single prompt.
+The
+<a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">TSBS
+Benchmark skill</a> is a skill for Claude Code and Codex that runs end-to-end
+<a href="https://github.com/timescale/tsbs" target="_blank">Time Series
+Benchmark Suite</a> (TSBS) benchmarks against QuestDB. It installs
+prerequisites, spins up QuestDB in Docker, builds TSBS, generates data, loads
+it, runs all query benchmarks, and cleans up, all from a single prompt.
 
 ### Installation
 
-Copy `claude/SKILL.md` from the <a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">repository</a> into your skills directory:
+Copy `claude/SKILL.md` from the
+<a href="https://github.com/questdb/tsbs-benchmark-agent-skill" target="_blank">repository</a>
+into your skills directory:
 
 **Claude Code:**
-- `~/.claude/skills/tsbs-benchmark/SKILL.md` - available in all projects
-- `<project>/.claude/skills/tsbs-benchmark/SKILL.md` - available in a specific project
+
+- `~/.claude/skills/tsbs-benchmark/SKILL.md`: available in all projects
+- `<project>/.claude/skills/tsbs-benchmark/SKILL.md`: available in a specific
+  project
 
 **Codex:**
-- `~/.codex/skills/tsbs-benchmark/SKILL.md` - available in all projects
-- `<project>/.codex/skills/tsbs-benchmark/SKILL.md` - available in a specific project
+
+- `~/.codex/skills/tsbs-benchmark/SKILL.md`: available in all projects
+- `<project>/.codex/skills/tsbs-benchmark/SKILL.md`: available in a specific
+  project
 
 ### What it handles
 
 The skill orchestrates eight sequential steps:
 
-1. **Prerequisites** - validates and installs Docker, Go 1.22.5, and build tools (make, gcc, gzip)
-2. **QuestDB deployment** - launches the latest QuestDB container with ports 9000, 9009, 8812, and 9003
-3. **TSBS compilation** - clones and builds four QuestDB-specific binaries from the TSBS repository
-4. **Data generation** - creates ~12 GB of uncompressed benchmark data (34.5M rows, 345.6M metrics)
-5. **Data loading** - ingests via ILP with worker threads matching CPU cores (capped at 32)
-6. **Query generation** - produces 1,000 queries for each of the 16 query types
-7. **Benchmark execution** - runs all queries in single-worker mode so QuestDB's internal parallelization is measured accurately
-8. **Cleanup** - removes the Docker container and temporary files
+1. **Prerequisites**: validates and installs Docker, Go 1.22.5, and build tools
+   (make, gcc, gzip)
+2. **QuestDB deployment**: launches the latest QuestDB container with ports
+   9000, 9009, 8812, and 9003
+3. **TSBS compilation**: clones and builds four QuestDB-specific binaries from
+   the TSBS repository
+4. **Data generation**: creates ~12 GB of uncompressed benchmark data (34.5M
+   rows, 345.6M metrics)
+5. **Data loading**: ingests via ILP with worker threads matching CPU cores
+   (capped at 32)
+6. **Query generation**: produces 1,000 queries for each of the 16 query types
+7. **Benchmark execution**: runs all queries in single-worker mode so QuestDB's
+   internal parallelization is measured accurately
+8. **Cleanup**: removes the Docker container and temporary files
 
 ### Benchmark parameters
 
-| Parameter | Value |
-|-----------|-------|
-| Use case | `cpu-only` |
-| Scale | 4,000 hosts |
-| Time window | 1 day (2016-01-01 to 2016-01-02) |
-| Log interval | 10 seconds |
-| Rows generated | 34.5M |
-| Metrics generated | 345.6M |
-| Query types | 16 (cpu-max variants, single/double-groupby, high-cpu, lastpoint, groupby-orderby-limit) |
-| Queries per type | 1,000 |
+| Parameter         | Value                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| Use case          | `cpu-only`                                                                               |
+| Scale             | 4,000 hosts                                                                              |
+| Time window       | 1 day (2016-01-01 to 2016-01-02)                                                         |
+| Log interval      | 10 seconds                                                                               |
+| Rows generated    | 34.5M                                                                                    |
+| Metrics generated | 345.6M                                                                                   |
+| Query types       | 16 (cpu-max variants, single/double-groupby, high-cpu, lastpoint, groupby-orderby-limit) |
+| Queries per type  | 1,000                                                                                    |
 
 ### Example prompt
 
@@ -168,20 +261,21 @@ The skill orchestrates eight sequential steps:
 Run the full TSBS benchmark against QuestDB with the default cpu-only dataset.
 ```
 
-The agent will handle everything from installing prerequisites through reporting the final query-by-query results.
+The agent will handle everything from installing prerequisites through reporting
+the final query-by-query results.
 
 ## Tips
 
-- **Provide context** - Tell the agent about your use case, data volume, and
+- **Provide context**: Tell the agent about your use case, data volume, and
   requirements
-- **Ask follow-up questions** - Agents remember context within a session
-- **Request explanations** - Ask "why?" to understand recommendations
-- **Iterate on code** - Ask the agent to modify or improve generated code
+- **Ask follow-up questions**: Agents remember context within a session
+- **Request explanations**: Ask "why?" to understand recommendations
+- **Iterate on code**: Ask the agent to modify or improve generated code
 
 ## Next steps
 
-- [REST API reference](/docs/query/rest-api/) - API documentation
-- [SQL overview](/docs/query/overview/) - QuestDB SQL syntax
-- [Client libraries](/docs/ingestion/overview/) - Official client libraries
-- [Sample datasets](https://github.com/questdb/sample-datasets) - Example data
+- [REST API reference](/docs/connect/compatibility/rest-api/): API documentation
+- [SQL overview](/docs/query/overview/): QuestDB SQL syntax
+- [Client libraries](/docs/connect/overview/): Official client libraries
+- [Sample datasets](https://github.com/questdb/sample-datasets): Example data
   to try

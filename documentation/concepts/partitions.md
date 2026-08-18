@@ -151,6 +151,17 @@ db/trades/
 └── _txn                  # Transaction metadata
 ```
 
+## Partition storage format
+
+By default, each partition is stored in QuestDB's native column format (the
+`.d` files above). A partitioned WAL table can instead store its partitions as
+[Parquet](/docs/concepts/parquet/), set with the `FORMAT` clause on
+[`CREATE TABLE`](/docs/query/sql/create-table/#partition-format) or later with
+[`ALTER TABLE SET FORMAT`](/docs/query/sql/alter-table-set-format/). Individual
+existing partitions can also be converted in place; see
+[in-place Parquet conversion](/docs/concepts/parquet/#in-place-conversion).
+Parquet partitions remain fully queryable.
+
 ## Partition splitting and squashing
 
 When out-of-order data arrives for an existing partition, QuestDB may split that

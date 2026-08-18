@@ -26,209 +26,240 @@ module.exports = {
           label: "QuestDB Enterprise Quick Start",
         },
         {
-          type: "category",
-          label: "Web Console",
-          collapsed: true,
-          items: [
-            "getting-started/web-console/overview",
-            "getting-started/web-console/code-editor",
-            "getting-started/web-console/questdb-ai",
-            "getting-started/web-console/metrics-view",
-            "getting-started/web-console/schema-explorer",
-            "getting-started/web-console/table-details",
-            "getting-started/web-console/result-grid",
-            "getting-started/web-console/query-log",
-            "getting-started/web-console/import-csv",
-          ],
+          type: "link",
+          label: "Web Console overview",
+          href: "/docs/getting-started/web-console/overview/",
         },
       ],
     },
 
     // ===================
-    // INGESTION REFERENCE
+    // CONNECT
     // ===================
     {
       type: "category",
-      label: "Ingestion Reference",
+      label: "Connect",
       items: [
         {
-          id: "ingestion/overview",
+          id: "connect/overview",
           type: "doc",
           label: "Overview",
         },
         {
           type: "category",
-          label: "Language Clients",
-          collapsed: true,
+          label: "Client Libraries",
           items: [
             {
-              id: "ingestion/clients/configuration-string",
+              id: "connect/clients/connect-string",
               type: "doc",
-              label: "Configuration String",
+              label: "Connect string",
             },
             {
-              id: "ingestion/clients/python",
-              type: "doc",
-              label: "Python",
-            },
-            {
-              id: "ingestion/clients/go",
-              type: "doc",
-              label: "Go",
-            },
-            {
-              id: "ingestion/clients/java",
+              id: "connect/clients/java",
               type: "doc",
               label: "Java",
             },
             {
-              id: "ingestion/clients/rust",
+              id: "connect/clients/python",
+              type: "doc",
+              label: "Python",
+            },
+            {
+              id: "connect/clients/go",
+              type: "doc",
+              label: "Go",
+            },
+            {
+              id: "connect/clients/rust",
               type: "doc",
               label: "Rust",
             },
             {
-              id: "ingestion/clients/nodejs",
+              id: "connect/clients/nodejs",
               type: "doc",
               label: "Node.js",
             },
             {
-              id: "ingestion/clients/c-and-cpp",
+              id: "connect/clients/c-and-cpp",
               type: "doc",
               label: "C & C++",
             },
             {
-              id: "ingestion/clients/dotnet",
+              id: "connect/clients/dotnet",
               type: "doc",
               label: ".NET",
             },
             {
-              id: "ingestion/clients/date-to-timestamp-conversion",
+              id: "connect/clients/date-to-timestamp-conversion",
               type: "doc",
               label: "Date to Timestamp",
             },
           ],
         },
         {
+          id: "connect/agents",
+          type: "doc",
+          label: "Agents",
+        },
+        {
           type: "category",
           label: "Message Brokers",
           collapsed: true,
           items: [
-            "ingestion/message-brokers/kafka",
-            "ingestion/message-brokers/telegraf",
-            "ingestion/message-brokers/redpanda",
-            "ingestion/message-brokers/flink",
+            "connect/message-brokers/kafka",
+            "connect/message-brokers/telegraf",
+            "connect/message-brokers/redpanda",
+            "connect/message-brokers/flink",
           ],
         },
         {
           type: "category",
-          label: "Protocols",
-          collapsed: true,
+          label: "Compatibility Protocols",
           items: [
             {
               type: "category",
               label: "InfluxDB Line Protocol (ILP)",
+              collapsed: true,
               items: [
                 {
-                  id: "ingestion/ilp/overview",
+                  id: "connect/compatibility/ilp/overview",
                   type: "doc",
                   label: "Overview",
                 },
                 {
-                  id: "ingestion/ilp/columnset-types",
+                  id: "connect/compatibility/ilp/columnset-types",
                   type: "doc",
                   label: "Columnset Types",
                 },
                 {
-                  id: "ingestion/ilp/advanced-settings",
+                  id: "connect/compatibility/ilp/advanced-settings",
                   type: "doc",
                   label: "Advanced Settings",
                 },
               ],
             },
             {
-              id: "ingestion/java-embedded",
-              type: "doc",
-              label: "Java Embedded",
+              type: "category",
+              label: "PostgreSQL Wire Protocol (PGWire)",
+              collapsed: true,
+              items: [
+                {
+                  id: "connect/compatibility/pgwire/overview",
+                  type: "doc",
+                  label: "Overview",
+                },
+                {
+                  id: "connect/compatibility/pgwire/large-result-sets",
+                  type: "doc",
+                  label: "Large Result Sets",
+                },
+                {
+                  id: "connect/compatibility/pgwire/python",
+                  type: "doc",
+                  label: "Python",
+                },
+                {
+                  id: "connect/compatibility/pgwire/go",
+                  type: "doc",
+                  label: "Go",
+                },
+                {
+                  id: "connect/compatibility/pgwire/java",
+                  type: "doc",
+                  label: "Java",
+                },
+                {
+                  id: "connect/compatibility/pgwire/rust",
+                  type: "doc",
+                  label: "Rust",
+                },
+                {
+                  id: "connect/compatibility/pgwire/nodejs",
+                  type: "doc",
+                  label: "Node.js",
+                },
+                {
+                  id: "connect/compatibility/pgwire/dotnet",
+                  type: "doc",
+                  label: ".NET",
+                },
+                {
+                  id: "connect/compatibility/pgwire/php",
+                  type: "doc",
+                  label: "PHP",
+                },
+                {
+                  id: "connect/compatibility/pgwire/r",
+                  type: "doc",
+                  label: "R",
+                },
+                {
+                  id: "connect/compatibility/pgwire/c-and-cpp",
+                  type: "doc",
+                  label: "C/C++",
+                },
+              ],
+            },
+            {
+              type: "category",
+              label: "REST API",
+              collapsed: true,
+              items: [
+                "connect/compatibility/rest-api",
+                "connect/compatibility/import-csv",
+                {
+                  label: "Parquet Export",
+                  type: "link",
+                  href: "/docs/concepts/parquet/#export",
+                },
+              ],
             },
           ],
         },
-        "ingestion/import-csv",
-      ],
-    },
-
-    // ===================
-    // QUERY & SQL REFERENCE
-    // ===================
-    {
-      type: "category",
-      label: "Query & SQL Reference",
-      items: [
-        "query/overview",
-        "concepts/deep-dive/sql-extensions",
         {
+          id: "connect/java-embedded",
+          type: "doc",
+          label: "Java Embedded",
+        },
+        {
+          label: "Wire Protocols",
           type: "category",
-          label: "PostgreSQL Wire Protocol",
           collapsed: true,
           items: [
             {
-              id: "query/pgwire/overview",
+              id: "connect/wire-protocols/overview",
               type: "doc",
               label: "Overview",
             },
             {
-              id: "query/pgwire/large-result-sets",
+              id: "connect/wire-protocols/qwp-ingress-websocket",
               type: "doc",
-              label: "Large Result Sets",
+              label: "QWP Ingress (WebSocket)",
             },
             {
-              id: "query/pgwire/python",
+              id: "connect/wire-protocols/qwp-egress-websocket",
               type: "doc",
-              label: "Python",
+              label: "QWP Egress (WebSocket)",
             },
             {
-              id: "query/pgwire/go",
+              id: "connect/wire-protocols/qwp-client-behavior",
               type: "doc",
-              label: "Go",
-            },
-            {
-              id: "query/pgwire/java",
-              type: "doc",
-              label: "Java",
-            },
-            {
-              id: "query/pgwire/rust",
-              type: "doc",
-              label: "Rust",
-            },
-            {
-              id: "query/pgwire/nodejs",
-              type: "doc",
-              label: "Node.js",
-            },
-            {
-              id: "query/pgwire/dotnet",
-              type: "doc",
-              label: ".NET",
-            },
-            {
-              id: "query/pgwire/php",
-              type: "doc",
-              label: "PHP",
-            },
-            {
-              id: "query/pgwire/r",
-              type: "doc",
-              label: "R",
-            },
-            {
-              id: "query/pgwire/c-and-cpp",
-              type: "doc",
-              label: "C/C++",
+              label: "QWP Client Behaviour",
             },
           ],
         },
-        "query/rest-api",
-        "query/export-parquet",
+      ],
+    },
+
+    // ===================
+    // SQL REFERENCE
+    // ===================
+    {
+      type: "category",
+      label: "SQL Reference",
+      items: [
+        "query/overview",
+        "concepts/deep-dive/sql-extensions",
         {
           type: "category",
           label: "Data Types",
@@ -286,7 +317,9 @@ module.exports = {
                     "query/sql/alter-table-drop-column",
                     "query/sql/alter-table-drop-partition",
                     "query/sql/alter-table-rename-column",
+                    "query/sql/alter-table-rebase-wal",
                     "query/sql/alter-table-resume-wal",
+                    "query/sql/alter-table-set-format",
                     "query/sql/alter-table-set-param",
                     "query/sql/alter-table-set-storage-policy",
                     "query/sql/alter-table-set-ttl",
@@ -335,6 +368,7 @@ module.exports = {
                   id: "query/sql/acl/create-group",
                   type: "doc",
                         },
+                "query/sql/create-live-view",
                 "query/sql/create-mat-view",
                 {
                   id: "query/sql/acl/create-service-account",
@@ -356,6 +390,7 @@ module.exports = {
                   id: "query/sql/acl/drop-group",
                   type: "doc",
                         },
+                "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
                 {
                   id: "query/sql/acl/drop-service-account",
@@ -508,6 +543,51 @@ module.exports = {
     },
 
     // ===================
+    // WEB CONSOLE
+    // ===================
+    {
+      type: "category",
+      label: "Web Console",
+      collapsed: true,
+      link: {
+        type: "doc",
+        id: "getting-started/web-console/overview",
+      },
+      items: [
+        "getting-started/web-console/code-editor",
+        {
+          type: "category",
+          label: "Notebooks",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "getting-started/web-console/notebooks/overview",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "getting-started/web-console/notebooks/overview",
+              label: "Overview",
+            },
+            "getting-started/web-console/notebooks/cells",
+            "getting-started/web-console/notebooks/charts",
+            "getting-started/web-console/notebooks/variables",
+            "getting-started/web-console/notebooks/live-dashboards",
+            "getting-started/web-console/notebooks/manage-share",
+          ],
+        },
+        "getting-started/web-console/mcp-server",
+        "getting-started/web-console/questdb-ai",
+        "getting-started/web-console/metrics-view",
+        "getting-started/web-console/schema-explorer",
+        "getting-started/web-console/table-details",
+        "getting-started/web-console/result-grid",
+        "getting-started/web-console/query-log",
+        "getting-started/web-console/import-csv",
+      ],
+    },
+
+    // ===================
     // CONCEPTS
     // ===================
     {
@@ -523,6 +603,11 @@ module.exports = {
             "concepts/out-of-order-data",
             "concepts/timestamps-timezones",
             "concepts/partitions",
+            {
+              id: "concepts/parquet",
+              type: "doc",
+              label: "Parquet",
+            },
             "concepts/symbol",
             {
               id: "concepts/views",
@@ -534,7 +619,13 @@ module.exports = {
               type: "doc",
               label: "Materialized Views",
             },
+            {
+              id: "concepts/live-views",
+              type: "doc",
+              label: "Live Views",
+            },
             "concepts/deduplication",
+            "concepts/delivery-semantics",
             "concepts/ttl",
             "concepts/storage-policy",
             "concepts/write-ahead-log",
@@ -591,12 +682,14 @@ module.exports = {
         "configuration/http-server",
         "configuration/iam",
         "configuration/ingestion",
+        "configuration/live-views",
         "configuration/logging-metrics",
         "configuration/materialized-views",
         "configuration/http-min-server",
         "configuration/oidc",
         "configuration/parallel-sql-execution",
         "configuration/postgres-wire-protocol",
+        "configuration/qwp",
         "configuration/database-replication",
         "configuration/shared-workers",
         "configuration/storage-policy",
@@ -643,19 +736,31 @@ module.exports = {
           label: "Overview",
         },
         {
-          id: "high-availability/setup",
-          type: "doc",
-          label: "Setup Guide",
+          type: "category",
+          label: "Replication",
+          items: [
+            "high-availability/setup",
+            "high-availability/tuning",
+            "high-availability/wal-cleanup",
+          ],
         },
         {
-          id: "high-availability/tuning",
-          type: "doc",
-          label: "Tuning",
+          type: "category",
+          label: "Client Failover",
+          items: [
+            "high-availability/client-failover/concepts",
+            "high-availability/client-failover/configuration",
+          ],
         },
         {
-          id: "high-availability/wal-cleanup",
-          type: "doc",
-          label: "WAL Cleanup",
+          type: "category",
+          label: "Store-and-Forward",
+          items: [
+            "high-availability/store-and-forward/concepts",
+            "high-availability/store-and-forward/when-to-use",
+            "high-availability/store-and-forward/operating-and-tuning",
+            "high-availability/store-and-forward/configuration",
+          ],
         },
       ],
     },
@@ -719,6 +824,16 @@ module.exports = {
             "integrations/visualization/powerbi",
             "integrations/visualization/embeddable",
           ],
+        },
+        {
+          // Message brokers live under Ingestion. This is a cross-reference to
+          // the overview section that lists them. The fragment is deliberate:
+          // Docusaurus decides sidebar activeness by comparing normalized
+          // paths without stripping it, so this link never highlights and
+          // never auto-expands a second category.
+          type: "link",
+          label: "Data Ingestion",
+          href: "/docs/integrations/overview/#data-ingestion-and-streaming",
         },
         {
           type: "category",
@@ -930,6 +1045,7 @@ module.exports = {
                     "cookbook/sql/advanced/general-and-sampled-aggregates",
                     "cookbook/sql/advanced/consistent-histogram-buckets",
                     "cookbook/sql/advanced/array-from-string",
+                    "cookbook/sql/advanced/row-level-security",
                   ],
                 },
               ],
@@ -1004,6 +1120,11 @@ module.exports = {
         {
           id: "tutorials/order-book",
           label: "Order Book Analytics",
+          type: "doc",
+        },
+        {
+          id: "tutorials/questdb-to-iceberg",
+          label: "QuestDB to Iceberg",
           type: "doc",
         },
         {

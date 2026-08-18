@@ -21,30 +21,31 @@ The Result Grid provides several action buttons in the toolbar to help you work 
 - **Move selected column to the front**: Moves the currently selected column to the leftmost position for better visibility
 - **Reset grid layout**: Resets the grid to its default column arrangement and removes all customizations including frozen columns and column reordering
 - **Refresh**: Re-executes the last query to update the results with fresh data
-- **Download result as CSV**: Downloads all data in the current result set as a CSV file for external analysis
+- **Download result as Parquet**: Downloads all data in the current result set as a [Parquet](/docs/concepts/parquet/) file for external analysis
+- **Download result as CSV**: Available from the download dropdown next to the Parquet button; downloads the current result set as a CSV file for external analysis
 
 ## Grid
 
 The Result Grid utilizes vertical and horizontal virtualization to efficiently handle large datasets while providing comprehensive interaction capabilities.
 
-### Column Features
+### Column features
 
 - **Column headers**: Display both column names and [data types](/docs/query/datatypes/overview/)
-- **Column resizing**: Drag the column borders to adjust width for better readability
+- **Column sizing**: Columns are sized automatically based on their content. Drag the column borders to adjust width manually. You can limit the automatic width with the **Maximum column width** setting in [Editor settings](/docs/getting-started/web-console/code-editor/#editor-settings).
 - **Copying column name**: Click on any column header to copy the column name directly to the [Code Editor](/docs/getting-started/web-console/code-editor) for quick query building
 
-### Cell Interaction
+### Cell interaction
 
 - **Cell selection**: Click on any cell to select and highlight it
 - **Cell copying**: Select a cell and press `Ctrl+C` (or `Cmd+C` on Mac) to copy the cell value to your clipboard
+- **Full value on hover**: Hover over a truncated cell or column header to see the full value in a tooltip. The tooltip includes a copy button.
 - **Keyboard navigation**: The grid supports comprehensive keyboard navigation for efficient data exploration
   - **Arrow keys**: Navigate between cells in all directions
   - **Page Up/Page Down**: Focus the first/last cell in the view
   - **Home**: Jump to the first column of the current row
   - **End**: Jump to the last column of the current row
 
-
-### Performance Features
+### Performance features
 
 - **Virtual rendering**: The Result Grid only renders visible cells by using horizontal and vertical virtualization
 - **Lazy loading**: Data is loaded in pages of 1000 rows as you scroll to minimize memory usage

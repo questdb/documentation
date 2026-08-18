@@ -160,7 +160,7 @@ INSERT INTO my_table VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
 SELECT * FROM my_table WHERE id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 ```
 
-If you use the [PostgreSQL Wire Protocol](/docs/query/pgwire/overview/) then
+If you use the [PostgreSQL Wire Protocol](/docs/connect/compatibility/pgwire/overview/) then
 you can use the `uuid` type in your queries. The JDBC API does not distinguish
 the UUID type, but the Postgres JDBC driver supports it in prepared statements:
 
@@ -170,7 +170,7 @@ PreparedStatement ps = connection.prepareStatement("INSERT INTO my_table VALUES 
 ps.setObject(1, uuid);
 ```
 
-[QuestDB Client Libraries](/docs/ingestion/overview/#first-party-clients) can
+[QuestDB Client Libraries](/docs/connect/overview/#client-libraries) can
 send `UUIDs` as `strings` to be converted to UUIDs by the server.
 
 ## IPv4
