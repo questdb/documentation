@@ -1,7 +1,7 @@
 ---
 slug: /connect/compatibility/rest-api
 title: REST API
-sidebar_label: REST HTTP API
+sidebar_label: Overview
 description: REST API reference documentation.
 ---
 
