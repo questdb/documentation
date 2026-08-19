@@ -25,7 +25,6 @@ Resource Types:
 
 
 ## QuestDBCluster
-<sup><sup>[↩ Parent](#questdbiov1alpha1 )</sup></sup>
 
 
 
@@ -66,7 +65,7 @@ QuestDBCluster is the Schema for the questdbclusters API.
         <td>
           spec defines the desired state of QuestDBCluster<br/>
           <br/>
-            <i>Validations</i>:<li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li>
+            <i>Validations</i>:<ul><li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -125,7 +124,7 @@ bootstrap admin password into a Secret named &lt;cluster&gt;-admin.<br/>
           backup configures in-database object-store backups. Absent ⇒ no backups.
 When set and enabled, schedule must be non-empty.<br/>
           <br/>
-            <i>Validations</i>:<li>!has(self.enabled) || !self.enabled || (has(self.schedule) && self.schedule != ''): backup.schedule is required when backup.enabled is true</li>
+            <i>Validations</i>:<ul><li>!has(self.enabled) || !self.enabled || (has(self.schedule) && self.schedule != ''): backup.schedule is required when backup.enabled is true</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -136,7 +135,7 @@ When set and enabled, schedule must be non-empty.<br/>
 Immutable in presence as well as value: it cannot be added to, or removed from,
 an existing cluster (see the spec-level rules).<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: spec.bootstrap is immutable</li><li>!has(self.follow) || !has(self.recovery): spec.bootstrap.recovery and spec.bootstrap.follow are mutually exclusive: both initialize the genesis instances from the same store and they do it in incompatible ways. recovery restores a backup into a writable primary (the source must already be stopped); follow restores the same backup into replicas that keep consuming the source's WAL while it still serves</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: spec.bootstrap is immutable</li><li>!has(self.follow) || !has(self.recovery): spec.bootstrap.recovery and spec.bootstrap.follow are mutually exclusive: both initialize the genesis instances from the same store and they do it in incompatible ways. recovery restores a backup into a writable primary (the source must already be stopped); follow restores the same backup into replicas that keep consuming the source's WAL while it still serves</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -167,7 +166,7 @@ any EKS cluster whose node role lacks a cross-account ECR grant).
 Mutable: changing it rolls the pods, because a rotated pull secret must reach a
 pod that is restarted for an unrelated reason without a stale reference.<br/>
           <br/>
-            <i>Validations</i>:<li>self.all(s, s.name != ''): imagePullSecrets entries must have a non-empty name</li>
+            <i>Validations</i>:<ul><li>self.all(s, s.name != ''): imagePullSecrets entries must have a non-empty name</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -202,7 +201,7 @@ down to a single unreplicated primary and strand its backups. ADDING one to a
 cluster that never had it IS allowed: turning on backup/replication later is a
 legitimate day-2 operation that strands nothing (see the spec-level rules).<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: spec.objectStoreRef is immutable</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: spec.objectStoreRef is immutable</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -238,7 +237,7 @@ page cache. CPU is intentionally left flexible — a CPU limit is optional
 (CFS throttling can hurt tail latency; prefer pinning/dedicated nodes), so
 the pod may be Burstable rather than strictly Guaranteed.<br/>
           <br/>
-            <i>Validations</i>:<li>!has(self.requests) || !has(self.limits) || !('memory' in self.requests) || !('memory' in self.limits) || quantity(self.requests['memory']).compareTo(quantity(self.limits['memory'])) == 0: memory request and limit must be equal (firm memory limit for QuestDB)</li>
+            <i>Validations</i>:<ul><li>!has(self.requests) || !has(self.limits) || !('memory' in self.requests) || !('memory' in self.limits) || quantity(self.requests['memory']).compareTo(quantity(self.limits['memory'])) == 0: memory request and limit must be equal (firm memory limit for QuestDB)</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -276,7 +275,7 @@ storage describes the per-instance persistent volume.
           size is the requested volume size (e.g. 100Gi). Expand-only: it may grow
 (if the StorageClass allows expansion) but never shrink.<br/>
           <br/>
-            <i>Validations</i>:<li>quantity(self).compareTo(quantity(oldSelf)) &gt;= 0: storage size cannot be reduced (expand-only)</li>
+            <i>Validations</i>:<ul><li>quantity(self).compareTo(quantity(oldSelf)) &gt;= 0: storage size cannot be reduced (expand-only)</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -286,7 +285,7 @@ storage describes the per-instance persistent volume.
           storageClassName selects the StorageClass for the instance PVC. It is
 immutable: changing it would orphan the bound volume.<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: storageClassName is immutable</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: storageClassName is immutable</li></ul>
         </td>
         <td>true</td>
       </tr></tbody>
@@ -816,7 +815,7 @@ case): re-pointing live WAL shipping would diverge replicas from the primary
 identity-scoped default just as destructively. A deliberate migration must be an
 explicit gated flow (born-from-backup into a new cluster), not an in-place edit.<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: replication.root is immutable</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: replication.root is immutable</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3618,7 +3617,6 @@ tables and follower instances. It never decreases.<br/>
 </table>
 
 ## QuestDBObjectStore
-<sup><sup>[↩ Parent](#questdbiov1alpha1 )</sup></sup>
 
 
 
@@ -3659,7 +3657,7 @@ QuestDBObjectStore is the Schema for the questdbobjectstores API.
         <td>
           spec defines the desired state of QuestDBObjectStore<br/>
           <br/>
-            <i>Validations</i>:<li>self.provider != 'S3' || (has(self.s3) && !has(self.azure) && !has(self.gcs)): provider S3 requires the s3 block and no other provider block</li><li>self.provider != 'Azure' || (has(self.azure) && !has(self.s3) && !has(self.gcs)): provider Azure requires the azure block and no other provider block</li><li>self.provider != 'GCS' || (has(self.gcs) && !has(self.s3) && !has(self.azure)): provider GCS requires the gcs block and no other provider block</li><li>self.provider != 'GCS': provider GCS is not supported in this release; supported providers are S3 and Azure</li>
+            <i>Validations</i>:<ul><li>self.provider != 'S3' || (has(self.s3) && !has(self.azure) && !has(self.gcs)): provider S3 requires the s3 block and no other provider block</li><li>self.provider != 'Azure' || (has(self.azure) && !has(self.s3) && !has(self.gcs)): provider Azure requires the azure block and no other provider block</li><li>self.provider != 'GCS' || (has(self.gcs) && !has(self.s3) && !has(self.azure)): provider GCS requires the gcs block and no other provider block</li><li>self.provider != 'GCS': provider GCS is not supported in this release; supported providers are S3 and Azure</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -3697,7 +3695,7 @@ spec defines the desired state of QuestDBObjectStore
 live store would orphan every object (data + backups) written under the old
 backend while consumers silently re-point to an empty new one.<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: provider is immutable</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: provider is immutable</li></ul>
             <i>Enum</i>: S3, Azure, GCS<br/>
         </td>
         <td>true</td>
@@ -3707,7 +3705,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           azure configures an Azure Blob store. Set iff provider is Azure.<br/>
           <br/>
-            <i>Validations</i>:<li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['container','account_name','account_key','root','endpoint'])): extraOptions key is reserved; set it via the dedicated structured field</li>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['container','account_name','account_key','root','endpoint'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3716,7 +3714,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           gcs configures a Google Cloud Storage store. Set iff provider is GCS.<br/>
           <br/>
-            <i>Validations</i>:<li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','endpoint','credential','credential_path','token'])): extraOptions key is reserved; set it via the dedicated structured field</li>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','endpoint','credential','credential_path','token'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3725,7 +3723,7 @@ backend while consumers silently re-point to an empty new one.<br/>
         <td>
           s3 configures an AWS S3 (or S3-compatible) store. Set iff provider is S3.<br/>
           <br/>
-            <i>Validations</i>:<li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','region','endpoint','access_key_id','secret_access_key','session_token'])): extraOptions key is reserved; set it via the dedicated structured field</li>
+            <i>Validations</i>:<ul><li>!has(self.extraOptions) || self.extraOptions.all(k, !k.contains(';') && !k.contains('=') && !self.extraOptions[k].contains(';')): extraOptions keys must not contain ';' or '='; values must not contain ';'</li><li>!has(self.extraOptions) || self.extraOptions.all(k, !(k.lowerAscii() in ['bucket','root','region','endpoint','access_key_id','secret_access_key','session_token'])): extraOptions key is reserved; set it via the dedicated structured field</li></ul>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3793,7 +3791,7 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
 ca_builtin_roots). Keys must not contain ';' or '='; values must not
 contain ';'.<br/>
           <br/>
-            <i>Validations</i>:<li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li>
+            <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3903,7 +3901,7 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
 ca_builtin_roots). Keys must not contain ';' or '='; values must not
 contain ';'.<br/>
           <br/>
-            <i>Validations</i>:<li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li>
+            <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4013,7 +4011,7 @@ https://&lt;accountName&gt;.blob.core.windows.net.<br/>
 ca_builtin_roots). Keys must not contain ';' or '='; values must not
 contain ';'.<br/>
           <br/>
-            <i>Validations</i>:<li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li>
+            <i>Validations</i>:<ul><li>self.all(k, k.size() &lt;= 256): extraOptions keys must be at most 256 characters</li><li>self.all(k, self[k].size() &lt;= 256): extraOptions values must be at most 256 characters</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4106,7 +4104,6 @@ status defines the observed state of QuestDBObjectStore
 </table>
 
 ## QuestDBPromotion
-<sup><sup>[↩ Parent](#questdbiov1alpha1 )</sup></sup>
 
 
 
@@ -4185,7 +4182,7 @@ spec defines the desired state of QuestDBPromotion
 immutable: re-pointing a live cutover at a different cluster is never a coherent
 request.<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: clusterRef is immutable; create a new QuestDBPromotion instead</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: clusterRef is immutable; create a new QuestDBPromotion instead</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -4196,7 +4193,7 @@ request.<br/>
 escalation to mode: Emergency is structurally against the same cutover and cannot
 silently substitute a different node.<br/>
           <br/>
-            <i>Validations</i>:<li>self == oldSelf: target is immutable; create a new QuestDBPromotion instead</li>
+            <i>Validations</i>:<ul><li>self == oldSelf: target is immutable; create a new QuestDBPromotion instead</li></ul>
             <i>Format</i>: int32<br/>
             <i>Minimum</i>: 1<br/>
         </td>
@@ -4240,7 +4237,7 @@ It is the one field editable on a running cutover, and only in one direction:
 Planned may be escalated to Emergency, never the reverse, because a fence cannot be
 undone.<br/>
           <br/>
-            <i>Validations</i>:<li>oldSelf != 'Emergency' || self == 'Emergency': mode cannot be de-escalated from Emergency back to Planned: the old primary has already been fenced</li>
+            <i>Validations</i>:<ul><li>oldSelf != 'Emergency' || self == 'Emergency': mode cannot be de-escalated from Emergency back to Planned: the old primary has already been fenced</li></ul>
             <i>Enum</i>: Planned, Emergency<br/>
             <i>Default</i>: Planned<br/>
         </td>
