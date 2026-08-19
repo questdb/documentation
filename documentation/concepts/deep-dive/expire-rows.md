@@ -100,7 +100,8 @@ it. Every mode hides expired rows from every read, immediately. Only a monotonic
 mode whose keep-set depends on the other rows in the view keeps its expired rows
 on disk until a full refresh rebuilds the view. A `KEEP LATEST` view therefore
 holds a full copy of its base table unless the view's own
-[TTL](/docs/concepts/ttl/) bounds it.
+[TTL](/docs/concepts/ttl/) bounds it — see
+[Combining with TTL](#combining-with-ttl).
 `materialized_views().expire_enforcement` reports which of the two a given view
 gets; see [Inspecting a policy](#inspecting-a-policy).
 
@@ -360,6 +361,35 @@ construction. `KEEP N` makes the order total by appending the designated
 timestamp as a tiebreak, so the N-th boundary is deterministic (pair the base
 table with [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) if `(col, ts)`
 is not already unique).
+
+### Combining with TTL
+
+A view can carry a [TTL](/docs/concepts/ttl/) and an `EXPIRE ROWS` policy at the
+same time, and the order is fixed: **TTL removes rows from the view first, then
+the policy applies to the rows that stay.** TTL drops whole partitions from the
+view's own storage as they age out, and the keep-set is computed over what
+remains.
+
+```questdb-sql title="Highest price per symbol, over a 3-day window"
+CREATE MATERIALIZED VIEW trades_peak_3d AS (
+  SELECT * FROM trades
+) PARTITION BY DAY TTL 3 DAYS
+  EXPIRE ROWS KEEP HIGHEST price PARTITION BY symbol;
+```
+
+`TTL` goes before `EXPIRE ROWS` in the statement, as it does after any
+`PARTITION BY`.
+
+This view reports the highest price of the **last three days**, so its answer
+can go **down** as the window moves: when the day holding a symbol's maximum
+ages out, the next-highest price within the window takes over. That is what the
+two clauses ask for together — the view is no longer "the highest price ever",
+it is "the highest price still retained". The base table is unaffected; it keeps
+whatever its own retention settings keep.
+
+TTL is also the only control that bounds the size of a `KEEP LATEST`,
+`KEEP HIGHEST/LOWEST` or `KEEP N` view, since the cleanup job never reclaims
+disk for those modes.
 
 ### Monotonicity and cleanup safety
 

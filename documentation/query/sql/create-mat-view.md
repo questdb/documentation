@@ -318,6 +318,11 @@ window predicates hide rows without freeing disk. Change or remove a policy
 with
 [`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
 
+A view can carry both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the
+statement and first in effect: it removes rows from the view, and the
+`EXPIRE ROWS` policy then applies to the rows that stay — see
+[Combining with TTL](/docs/concepts/deep-dive/expire-rows/#combining-with-ttl).
+
 See the [Expiring rows](/docs/concepts/deep-dive/expire-rows/) concept page for
 all modes, worked examples, and semantics (NULLs, ties, monotonicity).
 
