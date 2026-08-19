@@ -7,6 +7,8 @@ description: Operate replication, planned promotion, emergency failover, and mig
 
 Store-backed replication has one primary and zero or more replicas. A new replica is born from a completed backup, then consumes the primary's object-store WAL.
 
+For more information about replication mechanics, please refer to the [official documentation](/docs/high-availability/overview/).
+
 Before running any command, replace every `<angle-bracket>` value; an unreplaced placeholder can be interpreted as shell redirection.
 
 `status.replication.replicas[].caughtUp` is a sticky "caught up at least once" latch used for read routing. `caughtUpNow` is the current observation used by lossless promotion: `true` means reachable, unsuspended, and at zero observed lag; `false` means behind; absent means the operator could not determine freshness. An absent value fails closed.
