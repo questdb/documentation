@@ -277,6 +277,13 @@ The Python value type selects the QuestDB column type:
 | `TimestampMicros`, `TimestampNanos`, `datetime.datetime` | `TIMESTAMP`, `TIMESTAMP_NS` |
 | `numpy.ndarray` of `float64`, any number of dimensions | `DOUBLE[]`, `DOUBLE[][]`, ... matching the array's shape. QuestDB 9.0.0 or later |
 | `decimal.Decimal` | `DECIMAL`, QuestDB 9.2.0 or later |
+| `uuid.UUID` | `UUID`, QWP only |
+| `ipaddress.IPv4Address` | `IPV4`, QWP only |
+| `bytes`, `bytearray`, `memoryview` | `BINARY`, QWP only |
+| `Char` | `CHAR`, QWP only |
+| `DateMillis` | `DATE`, QWP only |
+| `Long256` | `LONG256`, QWP only |
+| `Geohash` | `GEOHASH`, QWP only |
 | `None` | Column omitted for this row, stored as null |
 
 Nulls are written by omission: skip the key or pass `None`; there is no
@@ -287,11 +294,45 @@ strings in `columns` become `VARCHAR`. `DECIMAL` columns must be created
 ahead of time with `CREATE TABLE ... (price DECIMAL(18, 2), ...)`; the server
 does not auto-create them.
 
-`UUID`, `IPv4`, `GEOHASH`, `LONG256`, `CHAR`, `DATE`, and `BINARY` columns
-have no `row()` value type. Route them through
-[`dataframe()`](#dataframe-ingestion), whose `schema_overrides` covers
-`symbol`, `ipv4`, `char`, `uuid`, `long256`, and `geohash`, or through a SQL
-`INSERT` via [`query()`](#querying).
+The seven QWP-only types need QuestDB 10 or later and one of the `udp`, `ws`,
+or `wss` protocols. An ILP sender (`tcp`, `tcps`, `http`, `https`) rejects
+them with a `QuestDBError`. Four have no natural Python type, so the client
+provides wrappers: `Char(value)` takes a one-character string, `DateMillis`
+takes milliseconds since the Unix epoch, `Long256` takes an unsigned 256-bit
+`int`, and `Geohash(bits, precision)` takes the hash bits and their precision,
+or `Geohash.from_string("u33d8b12")` parses the textual form. A geohash
+column's precision is fixed by its first row; a later row with a different
+precision fails the flush.
+
+```python
+import uuid
+from questdb import Char, DateMillis, Geohash, Long256, TimestampNanos
+
+sender.row(
+    "events",
+    columns={
+        "id": uuid.UUID("123e4567-e89b-12d3-a456-426614174000"),
+        "payload": b"\x00\x01",
+        "grade": Char("A"),
+        "day": DateMillis(1735689600000),
+        "hash": Long256(0xdeadbeef),
+        "loc": Geohash.from_string("u33d8b12"),
+    },
+    at=TimestampNanos.now(),
+)
+```
+
+QuestDB reserves one value per type as a `NULL` sentinel, and the client
+writes them rather than rejecting them: `0.0.0.0` for `IPV4`, `INT64_MIN` for
+`DATE`, `80000000-0000-0000-8000-000000000000` for `UUID`, and a `LONG256`
+whose four 64-bit limbs are all `0x8000000000000000`. Each reads back as
+`NULL`. `CHAR` has no sentinel: `"\x00"` is stored as code unit 0, though some
+SQL operations treat that as absent. Empty `BINARY` (`b""`) is a real value,
+distinct from `NULL`.
+
+These types are also reachable through
+[`dataframe()`](#dataframe-ingestion) and through a SQL `INSERT` via
+[`query()`](#querying).
 
 QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value
 in one of those columns is received as `false` or `0`; use a wider nullable
