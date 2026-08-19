@@ -64,7 +64,7 @@ kubectl label namespace <scraper-namespace> metrics=enabled --overwrite
 
 With `prometheus.enable=true`, the beta/default ServiceMonitor uses `insecureSkipVerify: true`. Traffic is encrypted and authenticated, but the scraper does not verify the serving certificate.
 
-Chart-managed verified metrics TLS is [not operational in this beta](/docs/operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). Do **not** enable `certmanager.enable=true` as a verified-metrics solution. Customers requiring certificate verification should use a separately reviewed scraper/certificate integration with QuestDB support.
+Chart-managed verified metrics TLS is [not operational in this beta](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). Do **not** enable `certmanager.enable=true` as a verified-metrics solution. Customers requiring certificate verification should use a separately reviewed scraper/certificate integration with QuestDB support.
 
 Do not enable `prometheus.enable` until the ServiceMonitor CRD exists. The chart does not create Prometheus, a scraper ServiceAccount, dashboards, or alerts.
 
@@ -222,7 +222,7 @@ kubectl wait --for=delete questdbpromotion/<promotion-name> \
 kubectl get questdbpromotions -n <namespace>
 ```
 
-Then delete each `QuestDBCluster` and verify its pods are gone and its retained PVCs match the intended retention decision. See [Delete a database cluster](/docs/operator/operations/database/#delete-a-database-cluster). Stop on any deletion or verification failure; do not inspect or act on PVCs afterward.
+Then delete each `QuestDBCluster` and verify its pods are gone and its retained PVCs match the intended retention decision. See [Delete a database cluster](/docs/enterprise-kubernetes-operator/operations/database/#delete-a-database-cluster). Stop on any deletion or verification failure; do not inspect or act on PVCs afterward.
 
 ```sh
 CLUSTER_DELETE_ACCEPTED=false

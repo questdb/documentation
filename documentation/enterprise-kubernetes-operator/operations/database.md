@@ -114,7 +114,7 @@ kubectl wait questdbcluster/<name> -n <namespace> \
   --for=condition=Available --timeout=5m
 ```
 
-The `kubectl wait` above is only an availability gate. Before declaring the writer ready, re-read the current-generation conditions and require `Available=True/PrimaryReady`, `Progressing=False/Settled`, and `WriteHealthy=True/Healthy`. Then verify pod UIDs/restarts, connectivity, and the intended setting. If the change fails, inspect `ConfigRejected`, events, and pod logs. Recover by reverting the mutable spec to the saved value and repeat the bounded generation and full writer-health checks. Do not try to revert immutable fields; create a new cluster when required by the [API Reference](/docs/operator/reference/api/).
+The `kubectl wait` above is only an availability gate. Before declaring the writer ready, re-read the current-generation conditions and require `Available=True/PrimaryReady`, `Progressing=False/Settled`, and `WriteHealthy=True/Healthy`. Then verify pod UIDs/restarts, connectivity, and the intended setting. If the change fails, inspect `ConfigRejected`, events, and pod logs. Recover by reverting the mutable spec to the saved value and repeat the bounded generation and full writer-health checks. Do not try to revert immutable fields; create a new cluster when required by the [API Reference](/docs/enterprise-kubernetes-operator/reference/api/).
 
 ## Scale out
 
@@ -270,7 +270,7 @@ spec:
 
 Restore the normal PDB after maintenance and verify the current-generation writer contract: `Available=True/PrimaryReady`, `Progressing=False/Settled`, and `WriteHealthy=True/Healthy`.
 
-A PDB protects only voluntary disruption. On node loss, the operator reports `InstanceUnreachable` and does not automatically promote a replica. It avoids recreating a pod while the old pod may still run on an unreachable node. Restore the node/volume or follow the explicit [promotion and failover](/docs/operator/high-availability/#promotion-and-failover) procedure.
+A PDB protects only voluntary disruption. On node loss, the operator reports `InstanceUnreachable` and does not automatically promote a replica. It avoids recreating a pod while the old pod may still run on an unreachable node. Restore the node/volume or follow the explicit [promotion and failover](/docs/enterprise-kubernetes-operator/high-availability/#promotion-and-failover) procedure.
 
 ## Delete a database cluster
 

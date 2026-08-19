@@ -7,13 +7,15 @@ description: Configure backups and restore Operator-managed QuestDB clusters, in
 
 QuestDB Enterprise schedules and performs backups on the primary. The operator configures the engine and observes `backups()`; it does not upload data, create a Kubernetes CronJob, expose an on-demand backup API, or read the object store. Status can lag the database by roughly the manager's resync/observation interval (about two minutes).
 
+For more information about backup and restore mechanics, please refer to the [official documentation](/docs/operations/backup).
+
 Before running any command, replace every `<angle-bracket>` value; an unreplaced placeholder can be interpreted as shell redirection.
 
 ## Configure and verify backup
 
 ### Before you start
 
-Create and validate a same-namespace `QuestDBObjectStore` as described in [Configuration](/docs/operator/configuration/#object-storage). The object-store CR has no readiness status; proof comes from a consuming database.
+Create and validate a same-namespace `QuestDBObjectStore` as described in [Configuration](/docs/enterprise-kubernetes-operator/configuration/#object-storage). The object-store CR has no readiness status; proof comes from a consuming database.
 
 Use a prefix reserved for this cluster:
 

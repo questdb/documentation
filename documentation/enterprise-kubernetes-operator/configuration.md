@@ -6,7 +6,7 @@ description: Configure QuestDB clusters, object storage, backup, replication, st
 # Configuration
 
 Use this page for the common choices. The generated
-[API Reference](/docs/operator/reference/api/) is the source for every field, default,
+[API Reference](/docs/enterprise-kubernetes-operator/reference/api/) is the source for every field, default,
 validation, and status property.
 
 ## Object storage
@@ -109,8 +109,8 @@ spec:
 The operator creates `<name>-rw` for the current primary. For store-backed
 replication it also creates `<name>-ro` for read-eligible replicas; when none are
 eligible, `<name>-ro` falls back to the primary. Use the [database
-operations](/docs/operator/operations/database/#services-and-ports) and
-[high-availability](/docs/operator/high-availability/) runbooks for routing and failover.
+operations](/docs/enterprise-kubernetes-operator/operations/database/#services-and-ports) and
+[high-availability](/docs/enterprise-kubernetes-operator/high-availability/) runbooks for routing and failover.
 
 The WAL cleaner is enabled by default. Do not disable it unless another process
 owns replication-WAL retention; otherwise WAL grows without bound.
@@ -166,7 +166,7 @@ override, pods get soft hostname anti-affinity, soft zone spread, and a PDB with
 The single-instance default intentionally blocks voluntary eviction. Before a
 node drain, scale out, lower `spec.scheduling.podDisruptionBudget.minAvailable`,
 or disable the PDB after accepting the availability risk. Follow the [node
-maintenance runbook](/docs/operator/operations/database/#node-maintenance-and-disruption-budgets).
+maintenance runbook](/docs/enterprise-kubernetes-operator/operations/database/#node-maintenance-and-disruption-budgets).
 Custom affinity or topology spread replaces the corresponding default rather
 than merging with it.
 
@@ -203,5 +203,5 @@ Important immutable choices include:
 - `QuestDBObjectStore.spec.provider`.
 
 Storage size is expand-only. For exact transition rules and less common fields,
-use the [generated API Reference](/docs/operator/reference/api/) rather than copying the full
+use the [generated API Reference](/docs/enterprise-kubernetes-operator/reference/api/) rather than copying the full
 schema from this guide.

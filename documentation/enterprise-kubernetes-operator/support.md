@@ -10,7 +10,7 @@ Before running any command, replace every `<angle-bracket>` value; an unreplaced
 ## Beta support
 
 - `questdb.io/v1alpha1` may change incompatibly between beta releases.
-- Amazon EKS and Azure AKS are supported only on the [tested version matrix](/docs/operator/known-limitations/#supported-platforms-and-versions).
+- Amazon EKS and Azure AKS are supported only on the [tested version matrix](/docs/enterprise-kubernetes-operator/known-limitations/#supported-platforms-and-versions).
 - Only the latest beta receives fixes; there are no backports.
 - Beta response times have no contractual SLA.
 
@@ -102,7 +102,7 @@ rm -rf -- "$BUNDLE"
 unset BUNDLE
 ```
 
-For common triage, use the [Troubleshooting decision table](/docs/operator/troubleshooting/#decision-table).
+For common triage, use the [Troubleshooting decision table](/docs/enterprise-kubernetes-operator/troubleshooting/#decision-table).
 
 ## Report a security issue
 

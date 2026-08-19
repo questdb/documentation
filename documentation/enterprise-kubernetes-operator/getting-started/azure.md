@@ -33,8 +33,7 @@ Azure Disk.
 
 Azure may bill the 20 GiB request as a 32 GiB disk SKU.
 
-Each additional instance needs the same resources. For high availability, place
-worker nodes in more than one Availability Zone.
+For mitigation of a partial regional outage, place worker nodes in more than one Availability Zone. Cross-AZ connectivity is not required, since all database instances communicate over a shared Object Storage Bucket.
 
 QuestDB also needs these network paths:
 
@@ -64,7 +63,7 @@ the guide are reused later.
 ### Information from QuestDB
 
 QuestDB supplies access to the private images. In the shared design-partner
-channel described on the [Support](/docs/operator/support/) page, ask for:
+channel described on the [Support](/docs/enterprise-kubernetes-operator/support/) page, ask for:
 
 - the current operator version;
 - a username for `registry.distribution.questdb.io`; and

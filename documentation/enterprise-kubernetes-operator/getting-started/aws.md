@@ -34,7 +34,7 @@ You'll start with one QuestDB instance. It needs 1 CPU, 2 GiB of memory, and one
 
 Each additional instance needs the same resources.
 
-For high availability, place worker nodes in more than one Availability Zone.
+For mitigation of a partial regional outage, place worker nodes in more than one Availability Zone. Cross-AZ connectivity is not required, since all database instances communicate over a shared S3 Bucket.
 
 QuestDB also needs these network paths:
 
@@ -75,7 +75,7 @@ echo "AWS account: $AWS_ACCOUNT_ID"
 ```
 
 Send the ID through the shared design-partner channel described on the
-[Support](/docs/operator/support/) page. Ask QuestDB for:
+[Support](/docs/enterprise-kubernetes-operator/support/) page. Ask QuestDB for:
 
 - the current operator version; and
 - access to the QuestDB ECR repositories.

@@ -45,8 +45,8 @@ Check these prerequisites:
 
 Follow the complete cloud checklist before installing:
 
-- [Amazon EKS onboarding](/docs/operator/getting-started/aws/)
-- [Azure AKS onboarding](/docs/operator/getting-started/azure/)
+- [Amazon EKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/aws/)
+- [Azure AKS onboarding](/docs/enterprise-kubernetes-operator/getting-started/azure/)
 
 ## Canonical Helm install
 
@@ -101,9 +101,9 @@ CRDs are listed.
 | `webhook.failurePolicy` | `Ignore` | Fail-open avoids blocking cluster writes during a webhook outage. Use `Fail` only after accepting that availability trade-off. |
 | `metrics.enable` | `true` | Exposes authenticated HTTPS metrics on 8443. |
 | `prometheus.enable` | `false` | Requires Prometheus Operator `ServiceMonitor` CRDs. Bind the scraper identity to `questdb-operator-metrics-reader`. |
-| `certmanager.enable` | `false` | Does not provide working verified controller metrics TLS in this beta. Leave disabled unless QuestDB has reviewed a separate integration; see [Known Limitations](/docs/operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). |
+| `certmanager.enable` | `false` | Does not provide working verified controller metrics TLS in this beta. Leave disabled unless QuestDB has reviewed a separate integration; see [Known Limitations](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). |
 | `networkPolicy.enable` | `false` | Enable only after allowing the control-plane, operator, tenant, registry, identity, and object-store paths above. |
 
 Treat upgrades, rollback, and removal as separate lifecycle procedures; use the
-[operator operations runbook](/docs/operator/operations/operator/) rather than inferring them
+[operator operations runbook](/docs/enterprise-kubernetes-operator/operations/operator/) rather than inferring them
 from installation commands.
