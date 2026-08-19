@@ -32,55 +32,6 @@ module.exports = {
         },
       ],
     },
-    {
-      type: "category",
-      label: "Kubernetes Operator",
-      collapsed: true,
-      link: {
-        type: "doc",
-        id: "operator/index",
-      },
-      items: [
-        {
-          type: "doc",
-          id: "operator/index",
-          label: "Overview",
-        },
-        {
-          type: "category",
-          label: "Start here",
-          items: [
-            "operator/getting-started/index",
-            "operator/installation",
-            "operator/getting-started/aws",
-            "operator/getting-started/azure",
-            "operator/configuration",
-          ],
-        },
-        {
-          type: "category",
-          label: "Day 2 operations",
-          items: [
-            "operator/operations/operator",
-            "operator/operations/database",
-            "operator/operations/backup-restore",
-            "operator/high-availability",
-            "operator/troubleshooting",
-          ],
-        },
-        {
-          type: "category",
-          label: "Reference",
-          items: [
-            "operator/known-limitations",
-            "operator/support",
-            "operator/releases",
-            "operator/reference/api",
-          ],
-        },
-      ],
-    },
-
     // ===================
     // CONNECT
     // ===================
@@ -331,7 +282,7 @@ module.exports = {
             {
               id: "query/sql/acl/add-user",
               type: "doc",
-                },
+            },
             {
               type: "category",
               label: "ALTER",
@@ -339,7 +290,7 @@ module.exports = {
                 {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
-                        },
+                },
                 {
                   type: "category",
                   label: "ALTER TABLE",
@@ -397,7 +348,7 @@ module.exports = {
                 {
                   id: "query/sql/acl/alter-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/alter-view",
               ],
             },
@@ -414,18 +365,18 @@ module.exports = {
                 {
                   id: "query/sql/acl/create-group",
                   type: "doc",
-                        },
+                },
                 "query/sql/create-live-view",
                 "query/sql/create-mat-view",
                 {
                   id: "query/sql/acl/create-service-account",
                   type: "doc",
-                        },
+                },
                 "query/sql/create-table",
                 {
                   id: "query/sql/acl/create-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/create-view",
               ],
             },
@@ -436,30 +387,30 @@ module.exports = {
                 {
                   id: "query/sql/acl/drop-group",
                   type: "doc",
-                        },
+                },
                 "query/sql/drop-live-view",
                 "query/sql/drop-mat-view",
                 {
                   id: "query/sql/acl/drop-service-account",
                   type: "doc",
-                        },
+                },
                 "query/sql/drop",
                 {
                   id: "query/sql/acl/drop-user",
                   type: "doc",
-                        },
+                },
                 "query/sql/drop-view",
               ],
             },
             {
               id: "query/sql/acl/exit-service-account",
               type: "doc",
-                },
+            },
             "query/sql/explain",
             {
               type: "category",
               label: "GRANT",
-                  items: [
+              items: [
                 {
                   id: "query/sql/acl/grant",
                   type: "doc",
@@ -476,12 +427,12 @@ module.exports = {
             {
               id: "query/sql/acl/remove-user",
               type: "doc",
-                },
+            },
             "query/sql/rename",
             {
               type: "category",
               label: "REVOKE",
-                  items: [
+              items: [
                 {
                   id: "query/sql/acl/revoke",
                   type: "doc",
@@ -845,6 +796,62 @@ module.exports = {
         "deployment/digital-ocean",
         "deployment/hetzner",
         "deployment/compression-zfs",
+        {
+          type: "category",
+          label: "Kubernetes Operator",
+          collapsed: true,
+          link: {
+            type: "doc",
+            id: "operator/index",
+          },
+          items: [
+            {
+              type: "doc",
+              id: "operator/index",
+              label: "Overview",
+            },
+            "operator/installation",
+            {
+              type: "category",
+              label: "Getting Started",
+              collapsed: true,
+              items: [
+                {
+                  type: "doc",
+                  id: "operator/getting-started/aws",
+                  label: "Amazon EKS",
+                },
+                {
+                  type: "doc",
+                  id: "operator/getting-started/azure",
+                  label: "Azure AKS",
+                },
+              ],
+            },
+            "operator/configuration",
+            {
+              type: "category",
+              label: "Day 2 operations",
+              items: [
+                "operator/operations/operator",
+                "operator/operations/database",
+                "operator/operations/backup-restore",
+                "operator/high-availability",
+                "operator/troubleshooting",
+              ],
+            },
+            {
+              type: "category",
+              label: "Reference",
+              items: [
+                "operator/known-limitations",
+                "operator/support",
+                "operator/releases",
+                "operator/reference/api",
+              ],
+            },
+          ],
+        },
       ],
     },
 
@@ -1021,9 +1028,7 @@ module.exports = {
                       type: "category",
                       label: "Risk Metrics",
                       collapsed: true,
-                      items: [
-                        "cookbook/sql/finance/maximum-drawdown",
-                      ],
+                      items: ["cookbook/sql/finance/maximum-drawdown"],
                     },
                     {
                       type: "category",
@@ -1039,9 +1044,7 @@ module.exports = {
                       type: "category",
                       label: "Market Breadth",
                       collapsed: true,
-                      items: [
-                        "cookbook/sql/finance/tick-trin",
-                      ],
+                      items: ["cookbook/sql/finance/tick-trin"],
                     },
                     {
                       type: "category",
@@ -1127,23 +1130,17 @@ module.exports = {
                 {
                   type: "category",
                   label: "PHP",
-                  items: [
-                    "cookbook/programmatic/php/inserting-ilp",
-                  ],
+                  items: ["cookbook/programmatic/php/inserting-ilp"],
                 },
                 {
                   type: "category",
                   label: "Ruby",
-                  items: [
-                    "cookbook/programmatic/ruby/inserting-ilp",
-                  ],
+                  items: ["cookbook/programmatic/ruby/inserting-ilp"],
                 },
                 {
                   type: "category",
                   label: "C++",
-                  items: [
-                    "cookbook/programmatic/cpp/missing-columns",
-                  ],
+                  items: ["cookbook/programmatic/cpp/missing-columns"],
                 },
               ],
             },
