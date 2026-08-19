@@ -608,6 +608,7 @@ SAMPLE BY 1h;
 
 This section includes links to additional information such as tutorials:
 
+- [FILTER](/docs/query/sql/filter/) - Restrict the rows a single aggregate sees within each bucket
 - [PIVOT](/docs/query/sql/pivot/) - Transform SAMPLE BY results from rows to columns
 - [Materialized Views](/docs/concepts/materialized-views/) - Pre-compute SAMPLE BY queries for better performance
 - [SQL Extensions for Time-Series Data in QuestDB](/blog/2022/11/23/sql-extensions-time-series-data-questdb-part-ii/)
