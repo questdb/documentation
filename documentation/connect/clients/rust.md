@@ -415,7 +415,7 @@ db.flush_arrow_batch(
     "trades",
     &record_batch,
     None,                  // server-assigned designated timestamp
-    &[],                   // no Arrow column overrides
+    &[],                   // per-column wire-type overrides; see below
     Some(AckLevel::Ok),
 )?;
 ```
@@ -434,7 +434,10 @@ use questdb::ingress::{
     ColumnName,
 };
 
-let overrides: [ArrowColumnOverride<'_>; 0] = [];
+let overrides = [
+    ArrowColumnOverride::Uuid { column: "trade_id" },
+    ArrowColumnOverride::Long256 { column: "order_hash" },
+];
 let options = PolarsIngestOptions::new()
     .max_rows(50_000)
     .timestamp_column(ColumnName::new("timestamp")?)
@@ -444,8 +447,9 @@ let options = PolarsIngestOptions::new()
 db.flush_polars_dataframe("trades", &dataframe, &options)?;
 ```
 
-`max_rows(0)` uses the default batch size. Omitting `timestamp_column` asks the
-server to assign timestamps. Omitting `ack_level` uses the pool default.
+Pass `&[]` for `overrides` when no column needs one. `max_rows(0)` uses the
+default batch size. Omitting `timestamp_column` asks the server to assign
+timestamps. Omitting `ack_level` uses the pool default.
 
 `flush_polars_dataframe` checkpoints the frame and automatically retries the
 uncommitted tail after a transient failover. `flush_arrow_batch` returns a
@@ -454,6 +458,23 @@ batch. Polars replay is at-least-once, and retrying an Arrow batch after an
 uncertain failure can also duplicate rows. Use
 [deduplication](/docs/concepts/deduplication/) when duplicates would be
 harmful.
+
+### Binary columns: UUID, LONG256, and opaque bytes
+
+Binary columns land as `BINARY` unless the column claims a richer type, and a
+byte width claims nothing on its own: a bare `FixedSizeBinary(16)` is opaque
+bytes, not a UUID. A claim comes either from the Arrow schema — the
+`ARROW:extension:name = arrow.uuid` extension label on `FixedSizeBinary(16)`,
+or `questdb.column_type = uuid` / `= long256` field metadata — or from an
+`ArrowColumnOverride::Uuid` / `::Long256` entry as above, which wins over any
+metadata on that column.
+
+Polars needs the override: it has no fixed-size binary dtype, so UUID and
+LONG256 values arrive as variable-length `Binary`, where every non-null value
+must be exactly 16 or 32 bytes. UUID bytes are canonical RFC 4122 big-endian
+and the client byte-swaps them into wire order; LONG256 bytes are
+little-endian limbs, low limb first, and go out verbatim. A claim whose width
+doesn't match fails with `ErrorCode::ArrowIngest`.
 
 ## Querying
 

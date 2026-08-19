@@ -467,9 +467,9 @@ rather than a UUID. To write `UUID` or `LONG256`, claim the column:
 ```python
 db.dataframe(
     df,
-    table_name="events",
-    at="ts",
-    schema_overrides={"event_id": "uuid", "hash": "long256"},
+    table_name="trades",
+    at="timestamp",
+    schema_overrides={"trade_id": "uuid", "order_hash": "long256"},
 )
 ```
 
@@ -477,10 +477,39 @@ Every non-null value must then be exactly 16 bytes for `uuid` or 32 for
 `long256`. UUID bytes are canonical RFC 4122 big-endian — what
 `uuid.UUID.bytes` gives you and what a `UUID` result column reads back — and
 the client byte-swaps them into wire order. LONG256 bytes are little-endian
-limbs, least-significant limb first, and go out verbatim. A pyarrow column
-already carrying the `arrow.uuid` extension type needs no override; the label
-is itself a claim. Simplest of all, an object column of `uuid.UUID` values
-needs neither, and `dataframe()` handles the byte order for you.
+limbs, least-significant limb first, and go out verbatim.
+
+Two other routes claim a `UUID` column without `schema_overrides`. A pyarrow
+column carrying the `arrow.uuid` extension type is claimed by the label
+itself:
+
+```python
+import pyarrow as pa
+
+trade_ids = pa.ExtensionArray.from_storage(
+    pa.uuid(),
+    pa.array([u.bytes for u in trade_uuids], type=pa.binary(16)),
+)
+```
+
+Simplest of all, an object column of `uuid.UUID` values needs neither the
+extension type nor an override, and `dataframe()` handles the byte order for
+you:
+
+```python
+import uuid
+
+df = pd.DataFrame({
+    "trade_id": [uuid.uuid4(), uuid.uuid4()],
+    "price": [2615.54, 65432.10],
+    "timestamp": pd.to_datetime([
+        "2025-01-01T00:00:00Z",
+        "2025-01-01T00:00:01Z",
+    ]),
+})
+
+db.dataframe(df, table_name="trades", at="timestamp")
+```
 
 Naive timestamps — DataFrame columns and the scalar `at` alike — are
 interpreted as UTC, matching the numpy `datetime64` convention. Prefer

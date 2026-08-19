@@ -914,6 +914,83 @@ columns, where every non-null value must then be exactly 16 or 32 bytes. The
 claim whose width doesn't match fails with
 `line_sender_error_arrow_ingest`.
 
+#### Claiming in the schema
+
+Both metadata claims are attached to the Arrow `Field`, so you make them
+wherever the batch is built. In Arrow C++:
+
+```cpp
+// The standard Arrow extension label. FixedSizeBinary(16) only.
+auto trade_id = arrow::field("trade_id", arrow::fixed_size_binary(16))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"ARROW:extension:name"}, {"arrow.uuid"}));
+
+// The QuestDB claim, also valid on Binary / LargeBinary / BinaryView.
+auto order_hash = arrow::field("order_hash", arrow::fixed_size_binary(32))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"questdb.column_type"}, {"long256"}));
+
+auto batch_schema = arrow::schema({
+    arrow::field("ts", arrow::timestamp(arrow::TimeUnit::NANO)),
+    trade_id,
+    order_hash});
+```
+
+`questdb.column_type = uuid` has the same shape with `uuid` as the value. Use
+it in place of `arrow.uuid` when the bytes sit in a variable-length binary
+column, which the extension label doesn't allow.
+
+Export the batch built against that schema through `arrow::ExportRecordBatch`
+and flush it exactly as above — the claims travel with it, and the flush call
+needs no extra arguments.
+
+#### Claiming at the call site
+
+An override claims the type per flush and leaves the schema alone. Fill in a
+`qwp_arrow_override` per column and pass the array to any
+`flush_arrow_batch*` call, where the example above passes no overrides:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+using namespace questdb::ingress::literals;
+
+const ::qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+sender.flush_arrow_batch_and_wait(
+    "trades"_tn, array, schema, "ts"_cn,
+    overrides, std::size(overrides));
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+const qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+bool ok = qwp_sender_flush_arrow_batch_at_column_and_wait(
+    sender, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
+    QDB_COLUMN_NAME_LITERAL("ts"),
+    overrides, sizeof(overrides) / sizeof(overrides[0]),
+    qwpws_ack_level_ok, &err);
+```
+
+</TabItem>
+</Tabs>
+
+`arg` (the trailing `0`) carries the geohash precision for
+`qwp_arrow_override_geohash` and is unused by every other kind. An override
+that names a column the batch doesn't have, repeats another override's
+column, or carries an unknown kind fails with
+`line_sender_error_invalid_api_call`.
+
 ## Querying data
 
 Get a reader (QWP/WebSocket only), prepare/execute SQL, then stream batches and
