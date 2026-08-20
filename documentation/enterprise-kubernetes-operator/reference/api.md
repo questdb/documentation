@@ -3,8 +3,8 @@ title: Kubernetes Operator API reference
 description: Custom resources provided by the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.1.0 (db63afd4df91d1eed3af49eca809c99807453d5d).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.1.0 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.2.0 (8f7b6fbeebe98a9d26a676215fcf7369f8664536).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.0 -->
 # API Reference
 
 Packages:
@@ -202,6 +202,18 @@ cluster that never had it IS allowed: turning on backup/replication later is a
 legitimate day-2 operation that strands nothing (see the spec-level rules).<br/>
           <br/>
             <i>Validations</i>:<ul><li>self == oldSelf: spec.objectStoreRef is immutable</li></ul>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#questdbclusterspecprotocols">protocols</a></b></td>
+        <td>object</td>
+        <td>
+          protocols configures the optional client-facing wire protocols. Absent ⇒ the
+QWP UDP receiver is off.
+
+The always-on surface is not represented here and is not configurable:
+HTTP/REST and the Web Console (9000), PGWire (8812), ILP over TCP (9009), and
+the min server's health check and /metrics (9003) are served by every cluster.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -423,6 +435,19 @@ same low-risk operation the old mutable backup ref allowed).<br/>
         <td>
           schedule is a 5- or 6-field cron expression (backup.schedule.cron). Required
 when enabled.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>stalledAfterSeconds</b></td>
+        <td>integer</td>
+        <td>
+          stalledAfterSeconds is how long an in-progress backup may show no change in
+progressPercent before BackupHealthy becomes False/Stalled. The default is
+3600 seconds. 0 disables stall detection.<br/>
+          <br/>
+            <i>Format</i>: int32<br/>
+            <i>Default</i>: 3600<br/>
+            <i>Minimum</i>: 0<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -737,6 +762,109 @@ legitimate day-2 operation that strands nothing (see the spec-level rules).
 reference. Which kind is determined by the field: see its documentation.<br/>
         </td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols
+<sup><sup>[↩ Parent](#questdbclusterspec)</sup></sup>
+
+
+
+protocols configures the optional client-facing wire protocols. Absent ⇒ the
+QWP UDP receiver is off.
+
+The always-on surface is not represented here and is not configurable:
+HTTP/REST and the Web Console (9000), PGWire (8812), ILP over TCP (9009), and
+the min server's health check and /metrics (9003) are served by every cluster.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#questdbclusterspecprotocolsqwp">qwp</a></b></td>
+        <td>object</td>
+        <td>
+          qwp configures the QuestDB Wire Protocol (QWP).<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols.qwp
+<sup><sup>[↩ Parent](#questdbclusterspecprotocols)</sup></sup>
+
+
+
+qwp configures the QuestDB Wire Protocol (QWP).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#questdbclusterspecprotocolsqwpudp">udp</a></b></td>
+        <td>object</td>
+        <td>
+          udp configures the QWP UDP receiver.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols.qwp.udp
+<sup><sup>[↩ Parent](#questdbclusterspecprotocolsqwp)</sup></sup>
+
+
+
+udp configures the QWP UDP receiver.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>enabled</b></td>
+        <td>boolean</td>
+        <td>
+          enabled serves the QWP UDP receiver on port 9007, opened on the Pod and
+published on the cluster and -rw Services only while this is true. It is NOT
+published on -ro: the protocol is ingest-only, so a datagram aimed at a
+replica is discarded, and fire-and-forget means nothing is returned to say so.
+
+Defaults to false, matching the engine. UDP ingestion is fire-and-forget: it
+is intended for metrics workloads where occasional message loss is
+acceptable, and it neither acknowledges writes nor applies backpressure. Use
+the WebSocket transport for reliable ingestion.
+
+The receiver is UNAUTHENTICATED. QWP authenticates on the WebSocket upgrade
+request, and UDP has no upgrade, so there is no credential path on this port:
+anything that can reach it can write. Restrict it with a NetworkPolicy.
+
+Requires an engine that ships the QWP UDP receiver; QuestDB Enterprise 3.3.4
+and later do.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -3071,8 +3199,8 @@ status defines the observed state of QuestDBCluster
         <td>
           conditions represent the current state of the QuestDBCluster.
 Types: Available, Progressing, InstanceUnreachable, ConfigRejected,
-OperatorIdentityReady, BackupHealthy, ReplicationHealthy, PromotionRequired,
-Recovered, RecoveryFailed, StorageResizeBlocked.<br/>
+OperatorIdentityReady, BackupHealthy, WriteHealthy, ReplicationHealthy,
+PromotionRequired, Recovered, RecoveryFailed, StorageResizeBlocked.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3186,6 +3314,16 @@ backup reports observed backup configuration + the latest run.
         <td>object</td>
         <td>
           lastBackup is the most recent run observed via backups() (nil until one runs).<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>lastProgressAt</b></td>
+        <td>string</td>
+        <td>
+          lastProgressAt is when the operator first observed the current in-progress
+backup or most recently observed its progressPercent change.<br/>
+          <br/>
+            <i>Format</i>: date-time<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3473,8 +3611,13 @@ freshness; use caughtUpNow for that.<br/>
         <td>boolean</td>
         <td>
           caughtUpNow reports current observed freshness: true means the replica was reachable,
-had no suspended tables, and had zero lag; false means it was behind; absent means
-freshness was undetermined.<br/>
+had no suspended tables, and was either at zero end-to-end lag or bounded-streaming
+(applied everything the primary committed a short window ago, so its remaining lag
+is at most one window of writes); false means it was behind or stale; absent means
+freshness was undetermined.
+On a primaryless (follower) cluster the bounded-streaming reading is not available —
+there is no primary to reference — so this field carries the stricter zero-lag
+meaning there.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3482,7 +3625,8 @@ freshness was undetermined.<br/>
         <td>integer</td>
         <td>
           lagTxns is the replica's observed end-to-end transaction lag behind the primary.
-Zero means caught up; absent means lag was undetermined.<br/>
+A non-zero value does not by itself mean the replica is not caught up (see
+caughtUpNow); absent means lag was undetermined.<br/>
           <br/>
             <i>Format</i>: int64<br/>
         </td>

@@ -170,6 +170,47 @@ maintenance runbook](/docs/enterprise-kubernetes-operator/operations/database/#n
 Custom affinity or topology spread replaces the corresponding default rather
 than merging with it.
 
+## Wire protocols
+
+`spec.protocols` opts a cluster into the wire protocols that are not served by
+default. Omit it and the defaults apply.
+
+```yaml
+spec:
+  protocols:
+    qwp:
+      udp:
+        enabled: true
+```
+
+| Field | Default | Effect |
+| --- | --- | --- |
+| `spec.protocols.qwp.udp.enabled` | `false` | Serves the [QWP UDP receiver](/docs/configuration/qwp/#qwpudpbindto) on 9007/UDP. |
+
+Enabling it opens 9007/UDP on the pod and publishes it on `<name>` and
+`<name>-rw`. It is deliberately **not** published on `<name>-ro`: QWP UDP is
+ingest-only, so a datagram aimed at a replica is discarded, and because the
+transport is fire-and-forget nothing is returned to say so.
+
+Two properties are worth knowing before you enable it:
+
+- **The receiver is unauthenticated.** QWP authenticates on the WebSocket
+  upgrade request, and UDP has no upgrade, so anything that can reach 9007 can
+  write. Restrict it with a NetworkPolicy.
+- **Delivery is fire-and-forget.** It neither acknowledges writes nor applies
+  backpressure, and is intended for metrics workloads where occasional message
+  loss is acceptable. Use the WebSocket transport for reliable ingestion.
+
+It requires an engine that ships the QWP UDP receiver; QuestDB Enterprise 3.3.4
+and later do. The operator writes the `qwp.udp.*` keys only while the receiver is
+enabled, so a cluster that leaves it off carries no trace of it.
+
+There is no setting for QWP over WebSocket. Ingestion (`/write/v4`) and streaming
+query results (`/read/v1`) are served by the HTTP server on port 9000 and share
+its network settings, so they are available on every cluster.
+
+Changing `spec.protocols` rolls the affected pods.
+
 ## Extra engine options
 
 `spec.config` passes `server.conf` key/value strings to QuestDB. Operator-owned
@@ -184,13 +225,22 @@ Additional backup destinations (`backup.object.store.1` through `.9`) and
 `cold.storage.object.store` are suitable only for credential-free,
 ambient-identity settings until a Secret-backed mechanism is available.
 
+The `qwp.udp.*` receiver keys are also operator-owned: `qwp.udp.enabled` and
+`qwp.udp.bind.to` are set through
+[`spec.protocols.qwp.udp`](#wire-protocols), and `qwp.udp.unicast` and
+`qwp.udp.join` are rejected because multicast cannot be reached through the
+unicast `ClusterIP` the operator publishes. The remaining `qwp.udp.*` tuning
+keys — commit interval, buffer sizes, thread affinity — stay available.
+
 Use `spec.replication.config` for supported replication tuning. Values cannot
-contain line separators.
+contain line separators. It rejects the same operator-owned QWP keys as
+`spec.config`: both maps are merged into one `server.conf`, so a key owned in
+only one of them would not be owned at all.
 
 ## Changes and immutable fields
 
-Changes to the image, resources, engine configuration, image pull Secrets, or
-pod scheduling roll affected pods. A primary roll remains single-writer-safe but
+Changes to the image, resources, engine configuration, wire protocols, image
+pull Secrets, or pod scheduling roll affected pods. A primary roll remains single-writer-safe but
 briefly interrupts writes. Plan these as disruptive changes; do not combine an
 unrelated credential rotation with routine reconciliation.
 

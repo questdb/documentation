@@ -38,12 +38,22 @@ kubectl get pvc -n <namespace> -l questdb.io/cluster=<name> \
 | `<name>-ro` | Created for store-backed replication. Routes to qualified replicas, but falls back to the primary when no replica qualifies. It is **not** strict replica isolation. |
 | `<name>` | Headless, internal identity/DNS service. It publishes unready addresses and must not be used as a client availability endpoint. |
 
-| Port | Protocol |
-| --- | --- |
-| 9000 | HTTP and Web Console |
-| 8812 | PostgreSQL wire protocol |
-| 9009 | InfluxDB Line Protocol over TCP |
-| 9003 | Minimal HTTP server for health and database metrics |
+| Port | Protocol | Published |
+| --- | --- | --- |
+| 9000 | HTTP and Web Console, including [QWP](/docs/configuration/qwp/) over WebSocket | Always |
+| 8812 | PostgreSQL wire protocol | Always |
+| 9009 | [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over TCP | Always |
+| 9003 | Minimal HTTP server for health and database metrics | Always |
+| 9007/UDP | [QWP UDP receiver](/docs/configuration/qwp/#qwpudpbindto) | Only when enabled |
+
+QWP over WebSocket has no port of its own. Ingestion (`/write/v4`) and streaming
+query results (`/read/v1`) are served by the HTTP server on 9000 and share its
+network settings, so they are available wherever 9000 is.
+
+The QWP UDP receiver is off by default. Enable it with
+[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#wire-protocols);
+until then, port 9007 is neither opened on the pod nor published on any Service.
+It is the only port here that is not published on `<name>-ro`.
 
 The operator owns these Services and reconciles them as `ClusterIP` (the identity Service is headless). For temporary access, use port-forwarding. For durable external access, create a separate customer-managed Ingress, Gateway, or LoadBalancer that targets the operator Service. Do not mutate the operator-owned Service type.
 

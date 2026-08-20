@@ -43,6 +43,19 @@ QuestDB also needs these network paths:
 - worker nodes to pull images from QuestDB ECR in `eu-west-1`; and
 - QuestDB pods to reach S3 and AWS STS over HTTPS.
 
+Those are the paths the operator itself needs. Your ingestion and query clients
+reach QuestDB on a different set of ports, which the operator publishes on the
+cluster Services: 9000 for HTTP, the Web Console, and
+[QWP](/docs/configuration/qwp/) over WebSocket; 8812 for PostgreSQL wire; and
+9009 for [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over
+TCP. Allow whichever your clients use. The
+[QWP UDP receiver](/docs/configuration/qwp/#qwpudpbindto) on 9007/UDP is off
+unless you enable
+[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#wire-protocols),
+and it is unauthenticated when you do, so restrict it with a NetworkPolicy. See
+[Services and ports](/docs/enterprise-kubernetes-operator/operations/database/#services-and-ports)
+for the full table.
+
 The computer running Helm also needs HTTPS access to `ghcr.io`. For a private
 cluster, provide NAT or VPC endpoints for the AWS services above.
 
