@@ -13,11 +13,11 @@ import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
   [QuestDB Helm chart](/docs/deployment/kubernetes/).
 </EnterpriseNote>
 
-:::warning[Beta for design partners]
-The API is `questdb.io/v1alpha1` and may change between beta releases.
+:::warning[Supported platforms]
+The API is `questdb.io/v1alpha1` and may change between releases.
 Amazon EKS and Azure AKS are supported on the tested versions in the
 [support matrix](/docs/enterprise-kubernetes-operator/known-limitations/#supported-platforms-and-versions).
-See [Support](/docs/enterprise-kubernetes-operator/support/) for beta expectations.
+See [Support](/docs/enterprise-kubernetes-operator/support/) for support expectations.
 :::
 
 The QuestDB Enterprise Operator manages the Kubernetes lifecycle of QuestDB

@@ -58,7 +58,7 @@ Verify both the first successful run and continued recent successful runs. A fai
 
 A stalled run is deliberately different: the engine status remains `in_progress`, while `BackupHealthy=False/Stalled` reports that `progressPercent` has not changed for the configured threshold. `.status.backup.lastProgressAt` is when the operator first observed the current run or most recently observed its percentage change. `stalledAfterSeconds` defaults to 3600 seconds. Setting it explicitly to `0` disables stall detection; it does not cancel the backup, mark it failed, or bound how long `in_progress` can remain. Diagnose and remediate the engine/store path rather than editing status.
 
-There is no safe "force backup" command in this beta. Temporarily shortening `spec.backup.schedule` is a schedule/configuration change, **not** an on-demand backup. It can recreate pods and briefly interrupt writes; if used for a controlled test, restore the production schedule afterward.
+There is no safe "force backup" command. Temporarily shortening `spec.backup.schedule` is a schedule/configuration change, **not** an on-demand backup. It can recreate pods and briefly interrupt writes; if used for a controlled test, restore the production schedule afterward.
 
 ## Restore into a new cluster
 

@@ -5,7 +5,7 @@ description: Install the QuestDB Enterprise Kubernetes Operator from its support
 
 # Installation
 
-The QuestDB Enterprise Operator beta is for named design partners on these
+The QuestDB Enterprise Operator is available to named design partners on these
 tested combinations:
 
 | Platform | Kubernetes | QuestDB Enterprise |
@@ -13,8 +13,8 @@ tested combinations:
 | Amazon EKS | 1.31–1.36 | 3.3.4 |
 | Azure AKS | 1.33–1.36 | 3.3.4 |
 
-Other Kubernetes distributions and versions are untested. Only the latest beta
-receives fixes; obtain its `<operator-version>` and private registry credentials
+Other Kubernetes distributions and versions are untested. Only the latest
+release receives fixes; obtain its `<operator-version>` and private registry credentials
 or AWS account grant from your QuestDB design-partner contact.
 
 ## Before you install
@@ -51,7 +51,7 @@ Follow the complete cloud checklist before installing:
 ## Canonical Helm install
 
 The OCI chart on GHCR is public; its operator image is private. Replace the
-placeholders first. Your QuestDB contact supplies the current beta version and,
+placeholders first. Your QuestDB contact supplies the current operator version and,
 off AWS, static credentials for `registry.distribution.questdb.io`.
 
 ```bash
@@ -94,14 +94,14 @@ CRDs are listed.
 
 | Value | Default | Guidance |
 | --- | --- | --- |
-| `controllerManager.replicas` | `1` | Keep during beta unless QuestDB advises otherwise. |
+| `controllerManager.replicas` | `1` | Keep at `1` unless QuestDB advises otherwise. |
 | `crd.enable` / `crd.keep` | `true` / `true` | Install CRDs and retain them on Helm uninstall. |
 | `webhook.enable` | `true` | Keep admission validation enabled. Reconcile-time validation remains a backstop. |
 | `webhook.certMode` | `self-signed` | The operator creates and rotates its serving certificate; cert-manager is not required. |
 | `webhook.failurePolicy` | `Ignore` | Fail-open avoids blocking cluster writes during a webhook outage. Use `Fail` only after accepting that availability trade-off. |
 | `metrics.enable` | `true` | Exposes authenticated HTTPS metrics on 8443. |
 | `prometheus.enable` | `false` | Requires Prometheus Operator `ServiceMonitor` CRDs. Bind the scraper identity to `questdb-operator-metrics-reader`. |
-| `certmanager.enable` | `false` | Does not provide working verified controller metrics TLS in this beta. Leave disabled unless QuestDB has reviewed a separate integration; see [Known Limitations](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). |
+| `certmanager.enable` | `false` | Does not provide working verified controller metrics TLS. Leave disabled unless QuestDB has reviewed a separate integration; see [Known Limitations](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). |
 | `networkPolicy.enable` | `false` | Enable only after allowing the control-plane, operator, tenant, registry, identity, and object-store paths above. |
 
 Treat upgrades, rollback, and removal as separate lifecycle procedures; use the

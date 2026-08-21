@@ -5,7 +5,7 @@ description: Review supported platforms, versions, lifecycle constraints, and cu
 
 # Known limitations
 
-This beta supports design partners on a fixed matrix. These behaviors require operational planning.
+Support is limited to a fixed platform matrix. These behaviors require operational planning.
 
 ## Availability and promotion
 
@@ -53,7 +53,7 @@ The follower gate can observe that transactions stopped advancing, but an idle s
 
 ### Chart-managed verified controller metrics TLS is not operational
 
-The default beta `ServiceMonitor` uses authenticated HTTPS with `insecureSkipVerify: true`, so it does not verify the controller's serving certificate. Setting `certmanager.enable=true` is not a working verified-metrics path: the generated certificate names do not match the ServiceMonitor server name, and the manager is not configured to serve metrics with the mounted certificate.
+The default `ServiceMonitor` uses authenticated HTTPS with `insecureSkipVerify: true`, so it does not verify the controller's serving certificate. Setting `certmanager.enable=true` is not a working verified-metrics path: the generated certificate names do not match the ServiceMonitor server name, and the manager is not configured to serve metrics with the mounted certificate.
 
 Do not enable that value as a verified-metrics solution. Customers requiring certificate verification need a separately reviewed scraper/certificate integration with QuestDB support. See [Secure controller metrics](/docs/enterprise-kubernetes-operator/operations/operator/#secure-controller-metrics).
 
@@ -76,6 +76,6 @@ Other Kubernetes distributions, versions, CSI/fsGroup behavior, and QuestDB vers
 
 Google Cloud Storage is rejected in this release. `QuestDBObjectStore.spec.provider` supports the schema value `GCS`, but admission rejects it because only S3 on EKS and Azure Blob on AKS have been validated.
 
-## Beta lifecycle
+## API lifecycle
 
-The API is `questdb.io/v1alpha1` and can change incompatibly between beta releases. Read release notes and migration requirements before upgrades or rollback. Only the latest beta receives fixes; there are no backports. See [Operator upgrades](/docs/enterprise-kubernetes-operator/operations/operator/#upgrade-the-operator) and [Support](/docs/enterprise-kubernetes-operator/support/).
+The API is `questdb.io/v1alpha1` and can change incompatibly between releases. Read release notes and migration requirements before upgrades or rollback. Only the latest release receives fixes; there are no backports. See [Operator upgrades](/docs/enterprise-kubernetes-operator/operations/operator/#upgrade-the-operator) and [Support](/docs/enterprise-kubernetes-operator/support/).

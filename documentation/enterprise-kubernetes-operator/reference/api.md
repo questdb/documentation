@@ -3912,7 +3912,7 @@ Blob endpoint and provider configuration.<br/>
           credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.<br/>
@@ -3961,7 +3961,7 @@ instance-name key).<br/>
 credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.
@@ -4022,7 +4022,7 @@ gcs configures a Google Cloud Storage store. Set iff provider is GCS.
           credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.<br/>
@@ -4071,7 +4071,7 @@ instance-name key).<br/>
 credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.
@@ -4132,7 +4132,7 @@ s3 configures an AWS S3 (or S3-compatible) store. Set iff provider is S3.
           credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.<br/>
@@ -4188,7 +4188,7 @@ instance-name key).<br/>
 credentialsSecret holds static credentials. The operator never configures a
 ServiceAccount, pod identity label, or provider identity; omit this field only
 when the QuestDB pod already has provider-supported ambient identity. The
-beta-supported wiring is EKS IRSA through the tenant default ServiceAccount;
+supported wiring is EKS IRSA through the tenant default ServiceAccount;
 the AKS guide uses AZURE_STORAGE_KEY. Expected Secret keys: S3 —
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, optional AWS_SESSION_TOKEN; Azure —
 AZURE_STORAGE_KEY; GCS — GOOGLE_APPLICATION_CREDENTIALS_JSON.

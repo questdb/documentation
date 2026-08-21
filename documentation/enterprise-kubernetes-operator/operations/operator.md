@@ -50,7 +50,7 @@ Before enabling the chart's `ServiceMonitor`:
 
 1. Install a compatible Prometheus Operator and its `ServiceMonitor` CRD.
 2. Bind the scraper ServiceAccount to `questdb-operator-metrics-reader`.
-3. Accept the beta's default lack of certificate verification, or have QuestDB review a separate certificate/scraper integration.
+3. Accept the default lack of certificate verification, or have QuestDB review a separate certificate/scraper integration.
 4. If chart NetworkPolicies are enabled, label the **scraper's namespace** `metrics=enabled`.
 
 Example RBAC and namespace preparation:
@@ -62,15 +62,15 @@ kubectl create clusterrolebinding questdb-operator-prometheus-metrics \
 kubectl label namespace <scraper-namespace> metrics=enabled --overwrite
 ```
 
-With `prometheus.enable=true`, the beta/default ServiceMonitor uses `insecureSkipVerify: true`. Traffic is encrypted and authenticated, but the scraper does not verify the serving certificate.
+With `prometheus.enable=true`, the default ServiceMonitor uses `insecureSkipVerify: true`. Traffic is encrypted and authenticated, but the scraper does not verify the serving certificate.
 
-Chart-managed verified metrics TLS is [not operational in this beta](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). Do **not** enable `certmanager.enable=true` as a verified-metrics solution. Customers requiring certificate verification should use a separately reviewed scraper/certificate integration with QuestDB support.
+Chart-managed verified metrics TLS is [not operational](/docs/enterprise-kubernetes-operator/known-limitations/#chart-managed-verified-controller-metrics-tls-is-not-operational). Do **not** enable `certmanager.enable=true` as a verified-metrics solution. Customers requiring certificate verification should use a separately reviewed scraper/certificate integration with QuestDB support.
 
 Do not enable `prometheus.enable` until the ServiceMonitor CRD exists. The chart does not create Prometheus, a scraper ServiceAccount, dashboards, or alerts.
 
 ## Upgrade the operator
 
-Only the latest beta is supported. Read its release notes before changing the controller or CRDs; `questdb.io/v1alpha1` may have breaking changes.
+Only the latest release is supported. Read its release notes before changing the controller or CRDs; `questdb.io/v1alpha1` may have breaking changes.
 
 ### Before you start
 
@@ -171,7 +171,7 @@ kubectl logs -n questdb-operator-system \
 | --- | --- |
 | The new manager never became ready and release notes confirm API compatibility | Consider `helm rollback` to the last known-good revision. |
 | The manager is ready but a cluster is unhealthy | Diagnose the cluster first; controller rollback may not repair database or spec state. |
-| The release changed a beta schema or required object migration | Follow the release-specific recovery procedure or contact support. Do not blindly roll back. |
+| The release changed a CRD schema or required object migration | Follow the release-specific recovery procedure or contact support. Do not blindly roll back. |
 | Database pods or data changed | Stop and assess the database. A Helm rollback is not a data rollback. |
 
 ```sh
@@ -182,7 +182,7 @@ kubectl rollout status deployment/questdb-operator-controller-manager \
 ```
 
 :::warning
-Rolling back the Helm release or controller does **not** reverse CRD schemas already sent to the API server, mutations to custom resources, or database state. Never blindly cross a breaking beta schema change.
+Rolling back the Helm release or controller does **not** reverse CRD schemas already sent to the API server, mutations to custom resources, or database state. Never blindly cross a breaking schema change.
 :::
 
 ## Uninstall or remove the operator

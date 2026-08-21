@@ -1,18 +1,18 @@
 ---
 title: Kubernetes Operator support
-description: Understand beta support expectations and collect a safe support bundle.
+description: Understand support expectations and collect a safe support bundle.
 ---
 
-# Support and beta expectations
+# Support and expectations
 
 Before running any command, replace every `<angle-bracket>` value; an unreplaced placeholder can be interpreted as shell redirection.
 
-## Beta support
+## Support scope
 
-- `questdb.io/v1alpha1` may change incompatibly between beta releases.
+- `questdb.io/v1alpha1` may change incompatibly between releases.
 - Amazon EKS and Azure AKS are supported only on the [tested version matrix](/docs/enterprise-kubernetes-operator/known-limitations/#supported-platforms-and-versions).
-- Only the latest beta receives fixes; there are no backports.
-- Beta response times have no contractual SLA.
+- Only the latest release receives fixes; there are no backports.
+- Response times have no contractual SLA.
 
 Use the shared design-partner channel supplied during onboarding for questions and incidents.
 

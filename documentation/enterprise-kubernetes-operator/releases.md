@@ -82,7 +82,7 @@ helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
 
 ## [0.1.0] - 2026-08-13
 
-Initial beta release for named design partners, supporting QuestDB Enterprise
-clusters on Amazon EKS and Azure AKS. See the [installation guide](https://questdb.com/docs/enterprise-kubernetes-operator/installation/)
+Initial release, supporting QuestDB Enterprise clusters on Amazon EKS and Azure
+AKS. See the [installation guide](https://questdb.com/docs/enterprise-kubernetes-operator/installation/)
 and [known limitations](https://questdb.com/docs/enterprise-kubernetes-operator/known-limitations/)
 before deployment.
