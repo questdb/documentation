@@ -143,7 +143,9 @@ Supported methods:
   [HTTP basic authentication](/docs/connect/compatibility/rest-api/#http-basic-authentication).
 - **Token-based auth** (Enterprise only): see
   [Authentication via token in QuestDB Enterprise](/docs/connect/compatibility/rest-api/#authentication-via-token-in-questdb-enterprise).
-- **OIDC** (Enterprise only): see [OpenID Connect](/docs/security/oidc/).
+- **OIDC** (Enterprise only): see [OpenID Connect](/docs/security/oidc/). The
+  [settings endpoint](/docs/security/oidc/#settings-endpoint) publishes the
+  provider's authorization and token endpoints.
 
 A failed authentication results in a `401` or `403` HTTP response before the
 WebSocket connection is established. No QWP-level auth handshake exists.

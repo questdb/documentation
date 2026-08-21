@@ -362,6 +362,9 @@ the ingress and egress WebSocket upgrades. It is a **static credential**: the
 client sends exactly the string you pass and never refreshes or renews it.
 Acquire it out of band — QuestDB Enterprise issues bearer tokens through its
 [OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime yourself.
+QuestDB publishes the provider's authorization and token endpoints on its
+[settings endpoint](/docs/security/oidc/#settings-endpoint), so a client can
+discover them instead of hard coding them.
 When the token expires or is rotated, construct a new handle with the new token.
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive

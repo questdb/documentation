@@ -223,7 +223,7 @@ that purpose; left unset, it inherits `auth_timeout_ms`.
 
 | Path | Status | Workaround |
 |---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported by this client. It does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...` above, and rebuild the sender / query client when the token nears expiry. |
+| OIDC token acquisition or in-band refresh | Not supported by this client. It does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC — see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, discovering its authorization and token endpoints from QuestDB's [settings endpoint](/docs/security/oidc/#settings-endpoint), pass it via `token=...` above, and rebuild the sender / query client when the token nears expiry. |
 | Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss://`. See the connect-string reference for the canonical statement. |
 | Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, `await sender.DisposeAsync()` and build a fresh sender with the new token. The same applies to `QueryClient`. |
 
