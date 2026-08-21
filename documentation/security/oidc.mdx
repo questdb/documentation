@@ -829,10 +829,12 @@ claim called `groups`. Its name is set with
 [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim), which
 has no default and must be set whenever OIDC is enabled.
 
-If the groups claim is missing or it is an empty list, authentication fails and
-QuestDB replies with `401 Unauthorized`. The same happens when the claim named
-by [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) is missing
-or empty.
+If the groups claim is missing or it is an empty list, authentication fails. The
+same happens when the claim named by
+[`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) is missing or
+empty. Over HTTP QuestDB replies with `401 Unauthorized`, while on the PGWire
+endpoint the client receives an authentication error. Either way the reason is
+only visible in the server log.
 
 The user has to have at least the `HTTP` permission to be able to successfully
 login via the [Web Console](/docs/getting-started/web-console/overview/).
