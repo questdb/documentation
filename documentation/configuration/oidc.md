@@ -193,6 +193,11 @@ JSON Web Key Set (JWKS) Endpoint. Provides the list of public keys used to
 decode and validate ID tokens issued by the OIDC Provider. The default value
 should work for the Ping Identity Platform.
 
+The keys are only read when
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`.
+With the default user info flow QuestDB validates tokens by calling the user
+info endpoint instead.
+
 ### acl.oidc.token.endpoint
 
 - **Default**: `/as/token.oauth2`
@@ -307,9 +312,16 @@ Expiry of the cached JSON Web Key Set (JWKS) in milliseconds. Also accepts a
 duration, such as `2m` or `120s`.
 
 QuestDB caches the public keys used to validate tokens issued by the OIDC
-Provider, and reloads them from the public keys endpoint when the cache
-expires. Lower it if the OIDC Provider rotates its signing keys frequently, at
-the cost of more requests to the endpoint.
+Provider, and reloads them from the public keys endpoint when the cache expires.
+
+Key rotation does not depend on this setting: a token signed with a key QuestDB
+has not cached triggers an immediate reload. The expiry governs how long a key
+the provider has already withdrawn stays usable, so lower it if signing keys are
+revoked, at the cost of more requests to the endpoint.
+
+Only used when
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,
+which is the only case in which QuestDB validates token signatures itself.
 
 ### acl.oidc.response.buffer.size
 
