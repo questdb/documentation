@@ -160,29 +160,6 @@ sudo chown -R root:root /opt/questdb
 
 </Tabs>
 
-### Verify the installation
-
-Before writing the unit, confirm that the archive actually extracted. An empty
-or partial `/opt/questdb` is the most common cause of a service that fails at
-startup with `status=203/EXEC`.
-
-```shell
-ls /opt/questdb
-```
-
-A runtime (`rt-`) archive contains the `bin/java` that its unit runs directly:
-
-```shell
-ls -l /opt/questdb/bin/java
-```
-
-A no-JRE archive contains `questdb.jar` instead, and its unit runs your system
-Java:
-
-```shell
-ls -l /opt/questdb/questdb.jar
-```
-
 ### SELinux
 
 If you have SELinux enabled, apply the default SELinux labels after extracting
