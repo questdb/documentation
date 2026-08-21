@@ -600,22 +600,90 @@ device code, displays a short user code together with a verification URL, and
 polls the Token endpoint while the user completes the login in a browser on any
 device.
 
-QuestDB does not run the flow itself. It publishes the OIDC Provider's Device
-Authorization Endpoint to clients through its settings endpoint, so a client
-knows where to start:
+QuestDB does not run the flow itself, and there is no setting to switch it on.
+The client talks to the OIDC Provider directly. QuestDB only advertises the
+provider's Device Authorization Endpoint through its
+[settings endpoint](#settings-endpoint), so that a client knows where to start:
 
 - When `acl.oidc.configuration.url` is set, QuestDB takes the endpoint from the
   provider's configuration document, provided the provider advertises a
   `device_authorization_endpoint`.
 - When the provider is configured by host, set
   [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
-  explicitly. It is the only endpoint with no default value.
+  explicitly. It is the only endpoint with no default value, so take the path
+  from the OIDC Provider's documentation.
 
 If QuestDB does not advertise the endpoint, the client has to be given it
 directly, or resolve it from the OIDC Provider itself.
 
-Once the client holds an access token, it presents it to QuestDB the same way
-as any other token.
+The OIDC Provider has to support the flow too, with the device code grant
+enabled for the client.
+
+#### Run the flow
+
+First read the endpoints from QuestDB. The
+[settings endpoint](#settings-endpoint) carries both the Device Authorization
+Endpoint the flow starts at, and the Token endpoint it polls:
+
+```python title="Discover the endpoints"
+import requests
+import time
+
+settings = requests.get("https://questdb.host:9000/settings").json()["config"]
+device_endpoint = settings["acl.oidc.device.authorization.endpoint"]
+token_endpoint = settings["acl.oidc.token.endpoint"]
+client_id = settings["acl.oidc.client.id"]
+scope = settings["acl.oidc.scope"]
+```
+
+Then ask the OIDC Provider for a device code, and tell the user where to log in.
+The fields of the response are the ones defined by
+[RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2):
+
+```python title="Request a device code"
+device = requests.post(device_endpoint,
+                       data={"client_id": client_id,
+                             "scope": scope},
+                       headers={"Content-Type": "application/x-www-form-urlencoded"}).json()
+
+print(f"Open {device['verification_uri']} and enter the code {device['user_code']}")
+```
+
+Finally, poll the Token endpoint until the user completes the login. The error
+`authorization_pending` means the user has not finished yet, `slow_down` asks
+for a longer interval, and any other error ends the flow:
+
+```python title="Poll for the access token"
+interval = device.get("interval", 5)
+while True:
+    time.sleep(interval)
+    response = requests.post(token_endpoint,
+                             data={"grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                                   "device_code": device["device_code"],
+                                   "client_id": client_id},
+                             headers={"Content-Type": "application/x-www-form-urlencoded"}).json()
+    if "access_token" in response:
+        access_token = response["access_token"]
+        break
+    error = response.get("error")
+    if error == "slow_down":
+        interval += 5
+    elif error != "authorization_pending":
+        raise RuntimeError(response)
+```
+
+The client now holds a token, and presents it to QuestDB the same way as any
+other token, as shown in the [7th step](#7-database-access) of the Authorization
+Code Flow.
+
+:::note
+
+Take the ID token from the response instead of the access token when
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+is set to `true`. QuestDB then reads the group memberships from the token
+itself, and only the ID token carries them.
+
+:::
 
 ## Non-interactive clients
 
