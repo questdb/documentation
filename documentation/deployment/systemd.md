@@ -158,6 +158,29 @@ sudo chown -R root:root /opt/questdb
 
 </Tabs>
 
+### Verify the installation
+
+Before writing the unit, confirm that the archive actually extracted. An empty
+or partial `/opt/questdb` is the most common cause of a service that fails at
+startup with `status=203/EXEC`.
+
+```shell
+ls /opt/questdb
+```
+
+A runtime (`rt-`) archive contains the `bin/java` that its unit runs directly:
+
+```shell
+ls -l /opt/questdb/bin/java
+```
+
+A no-JRE archive contains `questdb.jar` instead, and its unit runs your system
+Java:
+
+```shell
+ls -l /opt/questdb/questdb.jar
+```
+
 ### SELinux
 
 If you have SELinux enabled, apply the default SELinux labels after extracting
@@ -431,9 +454,17 @@ sudo journalctl --unit=questdb.service --no-pager -n 20
 
 `status=203/EXEC`, alongside
 `Failed at step EXEC spawning /opt/questdb/bin/java: No such file or directory`,
-means the unit expects the runtime (`rt-`) archive, but `/opt/questdb` holds the
-no-JRE archive, which bundles no Java. Switch to the no-JRE `ExecStart` above,
-or install the runtime archive.
+means that path does not exist. Check what `/opt/questdb` actually holds:
+
+```shell
+ls /opt/questdb
+```
+
+An empty or partial directory means the archive never extracted; re-run the
+extraction commands from
+[Initial system configuration](#initial-system-configuration). A directory
+holding `questdb.jar` rather than `bin/` means the no-JRE archive is installed,
+so either use the no-JRE unit above or install the runtime archive instead.
 
 `java.lang.module.FindException: Module io.questdb not found` means `ExecStart`
 runs a system Java without a module path. Add `-p /opt/questdb/questdb.jar`
