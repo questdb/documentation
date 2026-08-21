@@ -42,6 +42,14 @@ enabled.
 URL where the OpenID Provider's configuration information can be loaded in
 JSON format. Should always end with `/.well-known/openid-configuration`.
 
+QuestDB downloads the document at startup and takes every endpoint from it,
+so the settings under [Endpoints](#endpoints) and `acl.oidc.port` are not
+used. The server does not start if the document cannot be downloaded or
+parsed, or if it is missing the authorization, token, user info or JWKS
+endpoint.
+
+Mutually exclusive with `acl.oidc.host`: setting both fails server startup.
+
 ### acl.oidc.enabled
 
 - **Default**: `false`
@@ -61,8 +69,8 @@ Setting both to `true` fails server startup.
 - **Reloadable**: no
 
 OIDC provider hostname. Required when OIDC is enabled, unless
-`acl.oidc.configuration.url` is set. The two are mutually exclusive, setting
-both of them fails server startup.
+`acl.oidc.configuration.url` is set. The two are mutually exclusive: setting
+both fails server startup.
 
 ### acl.oidc.http.timeout
 
@@ -76,7 +84,8 @@ OIDC provider HTTP request timeout in milliseconds.
 - **Default**: `443`
 - **Reloadable**: no
 
-OIDC provider port number.
+OIDC provider port number. Not used when `acl.oidc.configuration.url` is
+set, because the port is taken from the discovered endpoint URLs.
 
 ### acl.oidc.redirect.uri
 
@@ -133,6 +142,10 @@ together with the authorization code. Checking it protects against CSRF
 attacks. Enable it if the Identity Provider supports the `state` parameter.
 
 ## Endpoints
+
+These settings apply only when the OIDC Provider is configured by host. When
+`acl.oidc.configuration.url` is set, QuestDB takes every endpoint from the
+provider's configuration document and the settings below are not used.
 
 ### acl.oidc.authorization.endpoint
 
