@@ -533,6 +533,40 @@ testldap=>
 testldap=>
 ```
 
+:::tip
+
+The Resource Owner Password Credentials flow requires the client to handle the
+user's password. A client which is able to display a URL and poll for the
+result should use the [Device Code Flow](#device-code-flow) instead.
+
+:::
+
+### Device Code Flow
+
+The [Device Code Flow](https://datatracker.ietf.org/doc/html/rfc8628) is the
+standard way for a client with no browser of its own to obtain tokens without
+ever handling the user's password. The client asks the OIDC Provider for a
+device code, displays a short user code together with a verification URL, and
+polls the Token endpoint while the user completes the login in a browser on any
+device.
+
+QuestDB does not run the flow itself. It publishes the OIDC Provider's Device
+Authorization Endpoint to clients through its settings endpoint, so a client
+knows where to start:
+
+- When `acl.oidc.configuration.url` is set, QuestDB takes the endpoint from the
+  provider's configuration document, provided the provider advertises a
+  `device_authorization_endpoint`.
+- When the provider is configured by host, set
+  [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
+  explicitly. It is the only endpoint with no default value.
+
+If QuestDB does not advertise the endpoint, the client has to be given it
+directly, or resolve it from the OIDC Provider itself.
+
+Once the client holds an access token, it presents it to QuestDB the same way
+as any other token.
+
 ## Non-interactive clients
 
 Non-interactive clients are usually jobs or standalone applications, such as a

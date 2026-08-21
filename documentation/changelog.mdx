@@ -50,6 +50,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
 - Documented the OIDC configuration options that were missing from the [OIDC page](/docs/configuration/oidc/): `acl.oidc.state.required`, `acl.oidc.device.authorization.endpoint`, `acl.oidc.public.keys.expiry`, `acl.oidc.response.buffer.size`, and `acl.oidc.string.pool.capacity`; also corrected `acl.oidc.pkce.enabled` to its real name `acl.oidc.pkce.required`, and documented `acl.oidc.groups.claim` as mandatory with no default
 - [OpenID Connect (OIDC)](/docs/security/oidc/#1-secret-generation) - Noted that some Identity Providers require the `state` parameter in the authorization request, and that `acl.oidc.state.required` should be set to `true` for those providers
+- [OpenID Connect (OIDC)](/docs/security/oidc/#device-code-flow) - Documented the Device Code Flow for clients without a browser of their own, how QuestDB advertises the Device Authorization Endpoint to them, and why it is preferable to the Resource Owner Password Credentials flow
 
 ### Updated
 
