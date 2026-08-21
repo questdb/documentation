@@ -47,6 +47,10 @@ Enables or disables the built-in admin user.
 When enabled, the browser's basic auth popup window is used instead of the
 Web Console's login screen. Present for backwards compatibility only.
 
+Cannot be enabled together with
+[`acl.oidc.enabled`](/docs/configuration/oidc/#acloidcenabled). Setting both
+to `true` fails server startup.
+
 ### acl.enabled
 
 - **Default**: `true`

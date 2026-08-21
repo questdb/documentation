@@ -47,8 +47,13 @@ JSON format. Should always end with `/.well-known/openid-configuration`.
 - **Default**: `false`
 - **Reloadable**: no
 
-Enables or disables OIDC authentication. When enabled, several other
-configuration options must also be set.
+Enables or disables OIDC authentication. When enabled, `acl.oidc.client.id`
+and `acl.oidc.groups.claim` must also be set, along with either
+`acl.oidc.host` or `acl.oidc.configuration.url`.
+
+OIDC cannot be enabled together with
+[`acl.basic.auth.realm.enabled`](/docs/configuration/iam/#aclbasicauthrealmenabled).
+Setting both to `true` fails server startup.
 
 ### acl.oidc.host
 
@@ -189,13 +194,17 @@ Whether the OIDC provider requires a secure connection. If the OpenID
 Provider endpoints do not require TLS, this can be set to `false`. This is
 unlikely in production.
 
+This setting must match the scheme of every OIDC Provider URL QuestDB uses,
+including `acl.oidc.configuration.url` and each endpoint discovered from it.
+A URL whose scheme does not match fails server startup.
+
 ### acl.oidc.tls.keystore.password
 
 - **Default**: none
 - **Reloadable**: no
 
-Keystore password. Required if a keystore file is configured and is password
-protected.
+Keystore password. Must be set whenever `acl.oidc.tls.keystore.path` is set.
+Setting either one without the other fails server startup.
 
 ### acl.oidc.tls.keystore.path
 
