@@ -55,8 +55,9 @@ configuration options must also be set.
 - **Default**: none
 - **Reloadable**: no
 
-OIDC provider hostname. Required when OIDC is enabled, unless the OIDC
-configuration URL is set.
+OIDC provider hostname. Required when OIDC is enabled, unless
+`acl.oidc.configuration.url` is set. The two are mutually exclusive, setting
+both of them fails server startup.
 
 ### acl.oidc.http.timeout
 
@@ -100,7 +101,7 @@ When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2
 token should be sent in the password field, while the username field should
 contain the string `_sso`, or left empty if that is an option.
 
-### acl.oidc.pkce.enabled
+### acl.oidc.pkce.required
 
 - **Default**: `true`
 - **Reloadable**: no
@@ -116,6 +117,16 @@ be enabled in production. The Web Console is not fully secure without it.
 Enables or disables the Resource Owner Password Credentials flow. When
 enabled, this flow must also be configured in the OIDC Provider.
 
+### acl.oidc.state.required
+
+- **Default**: `false`
+- **Reloadable**: no
+
+Requires the `state` parameter in the Authorization Code Flow. The client
+generates a random state value, which the OIDC Provider returns unchanged
+together with the authorization code. Checking it protects against CSRF
+attacks. Enable it if the Identity Provider supports the `state` parameter.
+
 ## Endpoints
 
 ### acl.oidc.authorization.endpoint
@@ -125,6 +136,17 @@ enabled, this flow must also be configured in the OIDC Provider.
 
 OIDC Authorization Endpoint. The default value should work for the Ping
 Identity Platform.
+
+### acl.oidc.device.authorization.endpoint
+
+- **Default**: none
+- **Reloadable**: no
+
+OIDC Device Authorization Endpoint, used by clients which authenticate with
+the Device Code Flow. Unlike the other endpoints it has no default value. It
+is resolved automatically if `acl.oidc.configuration.url` is set and the
+OIDC Provider advertises a `device_authorization_endpoint`. The Device Code
+Flow is unavailable if the endpoint is neither configured nor discovered.
 
 ### acl.oidc.public.keys.endpoint
 
@@ -196,22 +218,13 @@ which it connects.
 
 ## User and group claims
 
-### acl.oidc.cache.ttl
-
-- **Default**: `30000`
-- **Reloadable**: no
-
-User info cache entry TTL in milliseconds. QuestDB caches user info responses
-for each valid access token. This setting controls how often the access token
-is validated and user info refreshed.
-
 ### acl.oidc.groups.claim
 
-- **Default**: `groups`
+- **Default**: none
 - **Reloadable**: no
 
 The name of the custom claim in the user information that contains the
-group memberships of the user.
+group memberships of the user. Required when OIDC is enabled.
 
 ### acl.oidc.groups.encoded.in.token
 
@@ -230,3 +243,40 @@ group memberships directly into the token.
 The name of the claim in the user information that contains the user's name.
 Could be a username, full name, or email. Displayed in the Web Console and
 logged for audit purposes.
+
+## Caching and buffers
+
+### acl.oidc.cache.ttl
+
+- **Default**: `30000`
+- **Reloadable**: no
+
+User info cache entry TTL in milliseconds. QuestDB caches user info responses
+for each valid access token. This setting controls how often the access token
+is validated and user info refreshed.
+
+### acl.oidc.public.keys.expiry
+
+- **Default**: `120000`
+- **Reloadable**: no
+
+Expiry of the cached JSON Web Key Set (JWKS) in milliseconds. QuestDB caches
+the public keys used to validate tokens issued by the OIDC Provider, and
+reloads them from the public keys endpoint when the cache expires.
+
+### acl.oidc.response.buffer.size
+
+- **Default**: `1M`
+- **Reloadable**: no
+
+Size of the buffer used to receive HTTP responses from the OIDC Provider.
+Increase it if the provider sends large responses, such as user info
+containing a long list of group memberships.
+
+### acl.oidc.string.pool.capacity
+
+- **Default**: `128`
+- **Reloadable**: no
+
+Initial capacity of the string pool used when parsing JSON responses received
+from the OIDC Provider.
