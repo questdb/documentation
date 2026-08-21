@@ -334,6 +334,7 @@ settings:
 ```json title="Settings response example"
 {
   "config": {
+    "acl.enabled": true,
     "acl.oidc.enabled": true,
     "acl.oidc.pkce.required": true,
     "acl.oidc.state.required": false,
@@ -357,6 +358,7 @@ hard coding the provider's details.
 
 | Key | Type | Present |
 | --- | --- | --- |
+| `acl.enabled` | boolean | always |
 | `acl.oidc.enabled` | boolean | always |
 | `acl.oidc.pkce.required` | boolean | always |
 | `acl.oidc.state.required` | boolean | always |
@@ -366,16 +368,22 @@ hard coding the provider's details.
 | `acl.oidc.scope` | string | always |
 | `acl.oidc.authorization.endpoint` | string | when the endpoint is resolved |
 | `acl.oidc.token.endpoint` | string | when the endpoint is resolved |
+| `acl.oidc.device.authorization.endpoint` | string | when the endpoint is configured or discovered |
 
 The endpoints are absolute URLs, resolved either from `acl.oidc.host` and the
 [endpoint settings](/docs/configuration/oidc/#endpoints), or from the provider's
-configuration document when `acl.oidc.configuration.url` is set. A provider
-which advertises a device authorization endpoint adds
-`acl.oidc.device.authorization.endpoint` to the response as well.
+configuration document when `acl.oidc.configuration.url` is set.
+`acl.oidc.device.authorization.endpoint` is present when a device authorization
+endpoint has been configured, or when the provider advertises one.
 
 `acl.oidc.redirect.uri` is `null` unless
 [`acl.oidc.redirect.uri`](/docs/configuration/oidc/#acloidcredirecturi) is set.
 A client should then fall back to its own location, as the Web Console does.
+
+QuestDB advertises `acl.oidc.pkce.required` and `acl.oidc.state.required`, and
+enforces neither. The client generates the code verifier and the `state` value;
+the provider checks the verifier, and the client checks the `state` value it
+gets back.
 
 :::note
 
@@ -384,8 +392,9 @@ are published whether or not OIDC is enabled, and with OIDC disabled the
 endpoint URLs are built from the defaults rather than from a real provider.
 
 OIDC also requires [`acl.enabled`](/docs/configuration/iam/#aclenabled) to be
-`true`. When access control is disabled, `acl.oidc.enabled` still reports the
-configured value while no OIDC authentication takes place.
+`true`, which the same response carries. When access control is disabled,
+`acl.oidc.enabled` still reports the configured value while no OIDC
+authentication takes place, so read both keys.
 
 :::
 
@@ -418,6 +427,10 @@ possible flows to request an access token.:
 
 2. [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth)
    flow
+
+The client can read the authorization and token endpoints, the client id and
+the scopes from the [settings endpoint](#settings-endpoint) instead of hard
+coding them.
 
 The Web Console implements the
 [Authorization Code Flow with PKCE](https://oauth.net/2/pkce), which is a
@@ -616,7 +629,9 @@ client for ingesting data. It is practical to manage their credentials via an
 OAuth2 provider too.
 
 As seen in the Jupyter notebook examples, the clients can request a token
-themselves and then use it to authorise data ingestion:
+themselves and then use it to authorise data ingestion. The token endpoint they
+post to is published on the [settings endpoint](#settings-endpoint), so it does
+not have to be hard coded:
 
 ```python
 import json
