@@ -355,13 +355,44 @@ Each key is the name of the
 its authorization request, and any other client can do the same instead of
 hard coding the provider's details.
 
+| Key | Type | Present |
+| --- | --- | --- |
+| `acl.oidc.enabled` | boolean | always |
+| `acl.oidc.pkce.required` | boolean | always |
+| `acl.oidc.state.required` | boolean | always |
+| `acl.oidc.groups.encoded.in.token` | boolean | always |
+| `acl.oidc.client.id` | string or `null` | always |
+| `acl.oidc.redirect.uri` | string or `null` | always |
+| `acl.oidc.scope` | string | always |
+| `acl.oidc.authorization.endpoint` | string | when the endpoint is resolved |
+| `acl.oidc.token.endpoint` | string | when the endpoint is resolved |
+
 The endpoints are absolute URLs, resolved either from `acl.oidc.host` and the
 [endpoint settings](/docs/configuration/oidc/#endpoints), or from the provider's
-configuration document when `acl.oidc.configuration.url` is set.
+configuration document when `acl.oidc.configuration.url` is set. A provider
+which advertises a device authorization endpoint adds
+`acl.oidc.device.authorization.endpoint` to the response as well.
+
+`acl.oidc.redirect.uri` is `null` unless
+[`acl.oidc.redirect.uri`](/docs/configuration/oidc/#acloidcredirecturi) is set.
+A client should then fall back to its own location, as the Web Console does.
+
+:::note
+
+Read `acl.oidc.enabled` before any of the other keys. The `acl.oidc.*` entries
+are published whether or not OIDC is enabled, and with OIDC disabled the
+endpoint URLs are built from the defaults rather than from a real provider.
+
+OIDC also requires [`acl.enabled`](/docs/configuration/iam/#aclenabled) to be
+`true`. When access control is disabled, `acl.oidc.enabled` still reports the
+configured value while no OIDC authentication takes place.
+
+:::
 
 The path of the endpoint is set by
 [`http.context.settings`](/docs/configuration/http-server/#httpcontextsettings),
-and defaults to `/settings`.
+and defaults to `/settings`. Leave it at the default: the Web Console requests
+`/settings` and does not read this setting.
 
 ## Interactive clients
 

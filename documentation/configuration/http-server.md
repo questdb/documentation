@@ -493,10 +493,13 @@ Context path for the file import service.
 - **Default**: `/settings`
 - **Reloadable**: no
 
-Context path for the service which provides server-side settings to clients. The
-[Web Console](/docs/getting-started/web-console/overview/) reads it, and so does
-any OIDC client which discovers the provider's endpoints from the
+Context path for the service that serves server-side settings to clients, such
+as an OIDC client discovering the provider's endpoints from the
 [settings endpoint](/docs/security/oidc/#settings-endpoint).
+
+Leave this at the default. The
+[Web Console](/docs/getting-started/web-console/overview/) requests `/settings`
+and does not read this setting, so changing the path stops it from loading.
 
 ### http.context.table.status
 
