@@ -16,6 +16,40 @@ Provider (IdP).
 For detailed information about OIDC, see the
 [OpenID Connect (OIDC) integration guide](/docs/security/oidc).
 
+## Minimum configuration
+
+OIDC requires [`acl.enabled`](/docs/configuration/iam/#aclenabled) to be `true`,
+which is the default. With access control disabled the OIDC settings are
+ignored, and no OIDC authentication takes place.
+
+A working setup against a Ping Identity provider needs four settings. Every
+other setting has a usable default:
+
+```shell
+acl.oidc.enabled=true
+acl.oidc.host=oidc.provider
+acl.oidc.client.id=questdb
+acl.oidc.groups.claim=groups
+```
+
+QuestDB refuses to start when the OIDC configuration is inconsistent. With
+`acl.oidc.enabled=true`:
+
+- [`acl.oidc.client.id`](#acloidcclientid) and
+  [`acl.oidc.groups.claim`](#acloidcgroupsclaim) must be set.
+- Exactly one of [`acl.oidc.host`](#acloidchost) and
+  [`acl.oidc.configuration.url`](#acloidcconfigurationurl) must be set.
+- [`acl.basic.auth.realm.enabled`](/docs/configuration/iam/#aclbasicauthrealmenabled)
+  must be `false`.
+- [`acl.oidc.tls.keystore.path`](#acloidctlskeystorepath) and
+  [`acl.oidc.tls.keystore.password`](#acloidctlskeystorepassword) must both be
+  set, or neither.
+- [`acl.oidc.tls.enabled`](#acloidctlsenabled) must match the scheme of every
+  OIDC Provider URL.
+- When [`acl.oidc.configuration.url`](#acloidcconfigurationurl) is set, the
+  document must be downloadable and parseable, and must name the authorization,
+  token, user info and JWKS endpoints.
+
 ## General
 
 ### acl.oidc.audience
@@ -57,7 +91,9 @@ Mutually exclusive with `acl.oidc.host`: setting both fails server startup.
 
 Enables or disables OIDC authentication. When enabled, `acl.oidc.client.id`
 and `acl.oidc.groups.claim` must also be set, along with either
-`acl.oidc.host` or `acl.oidc.configuration.url`.
+`acl.oidc.host` or `acl.oidc.configuration.url`. See
+[Minimum configuration](#minimum-configuration) for the full set of startup
+requirements.
 
 OIDC cannot be enabled together with
 [`acl.basic.auth.realm.enabled`](/docs/configuration/iam/#aclbasicauthrealmenabled).
@@ -107,6 +143,12 @@ scope `openid` is mandatory and must always be included.
 
 ## Authentication flows
 
+QuestDB publishes [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
+[`acl.oidc.state.required`](#acloidcstaterequired) to clients through the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), and enforces
+neither. The client generates the code verifier and the `state` value, and
+checks them.
+
 ### acl.oidc.pg.token.as.password.enabled
 
 - **Default**: `false`
@@ -121,8 +163,9 @@ contain the string `_sso`, or left empty if that is an option.
 - **Default**: `true`
 - **Reloadable**: no
 
-Enables or disables PKCE for the Authorization Code Flow. This should always
-be enabled in production. The Web Console is not fully secure without it.
+Tells clients that PKCE is required for the Authorization Code Flow. This
+should always be enabled in production. The Web Console is not fully secure
+without it.
 
 ### acl.oidc.ropc.flow.enabled
 
@@ -137,18 +180,14 @@ enabled, this flow must also be configured in the OIDC Provider.
 - **Default**: `false`
 - **Reloadable**: no
 
-Requires the `state` parameter in the Authorization Code Flow, which protects
-against CSRF attacks. QuestDB does not see the value itself. It publishes the
-setting to clients through the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), the same way it
-publishes `acl.oidc.pkce.required`, and the client is what generates and checks
-the value.
+Tells clients that the `state` parameter is required in the Authorization Code
+Flow, which protects against CSRF attacks. Enable it if the OIDC Provider
+requires the `state` parameter, or to add CSRF protection on top of PKCE.
 
-Enable it if the OIDC Provider requires the `state` parameter, or to add CSRF
-protection on top of PKCE. The
-[Web Console](/docs/security/oidc/#1-secret-generation) generates the value,
-sends it in the authorization request, and checks that the provider returns it
-unchanged.
+The [Web Console](/docs/getting-started/web-console/overview/) generates the
+value, sends it in the authorization request, and checks that the provider
+returns it unchanged. See
+[Secret generation](/docs/security/oidc/#1-secret-generation).
 
 ## Endpoints
 
@@ -224,7 +263,8 @@ A URL whose scheme does not match fails server startup.
 - **Reloadable**: no
 
 Keystore password. Must be set whenever `acl.oidc.tls.keystore.path` is set.
-Setting either one without the other fails server startup.
+When OIDC is enabled, setting either one without the other fails server
+startup.
 
 ### acl.oidc.tls.keystore.path
 
@@ -273,6 +313,10 @@ The name of the claim in the user information that contains the user's name.
 Could be a username, full name, or email. Displayed in the Web Console and
 logged for audit purposes.
 
+The claim must be present and non-empty, otherwise authentication fails, the
+same way it does when the groups claim is missing. See
+[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+
 ## Caching and buffers
 
 ### acl.oidc.cache.ttl
@@ -315,8 +359,11 @@ which is the only case in which QuestDB validates token signatures itself.
 - **Reloadable**: no
 
 Size of the buffer used to receive HTTP responses from the OIDC Provider.
-Increase it if the provider sends large responses, such as user info
-containing a long list of group memberships.
+Accepts a plain byte count, or a value with a `K` or `M` suffix, such as
+`512K`. There is no `G` suffix.
+
+If a response from the OIDC Provider does not fit, authentication fails and the
+reason is logged by the server.
 
 ### acl.oidc.string.pool.capacity
 
