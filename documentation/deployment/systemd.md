@@ -33,6 +33,18 @@ which one you extracted to `/opt/questdb`.
 
 ## Initial system configuration
 
+:::note
+
+The command blocks below are chained with `&&` so that each one pastes as a
+single command. Where `/etc/sudoers` sets `use_pty`, which is the default on
+Debian 13, Ubuntu 24.04 and RHEL 9, `sudo` runs its command in a new pty and
+consumes whatever is still buffered in the terminal. Pasting a block of separate
+`sudo` lines therefore runs the first line and silently discards the rest,
+leaving a half-finished install that only surfaces later as a `status=203/EXEC`
+failure.
+
+:::
+
 Create a dedicated system user and group. The unit will create and manage its
 QuestDB root directory at `/var/lib/questdb`. If the `questdb` user already
 exists, skip the `useradd` command.
@@ -64,10 +76,9 @@ Download the current Linux runtime and extract it to `/opt/questdb`:
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz -o questdb.tar.gz
-
-sudo install -d -o root -g root -m 0755 /opt/questdb
-sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1
+{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-rt-linux-x86-64.tar.gz -o questdb.tar.gz &&
+sudo install -d -o root -g root -m 0755 /opt/questdb &&
+sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1 &&
 sudo chown -R root:root /opt/questdb`}
 </CodeBlock>
 )}
@@ -96,16 +107,11 @@ manager, then download and extract QuestDB:
 <InterpolateReleaseData
 renderText={(release) => (
 <CodeBlock className="language-bash">
-{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz -o questdb.tar.gz
-
-sudo install -d -o root -g root -m 0755 /opt/questdb
-sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1
-sudo install -d -o root -g root -m 0755 /opt/questdb/lib
-
-sudo unzip -jo /opt/questdb/questdb.jar \
-  'io/questdb/bin/linux-aarch64/*.so' \
-  -d /opt/questdb/lib
-
+{`curl -fL https://github.com/questdb/questdb/releases/download/${release.name}/questdb-${release.name}-no-jre-bin.tar.gz -o questdb.tar.gz &&
+sudo install -d -o root -g root -m 0755 /opt/questdb &&
+sudo tar -xzf questdb.tar.gz -C /opt/questdb --strip-components 1 &&
+sudo install -d -o root -g root -m 0755 /opt/questdb/lib &&
+sudo unzip -jo /opt/questdb/questdb.jar 'io/questdb/bin/linux-aarch64/*.so' -d /opt/questdb/lib &&
 sudo chown -R root:root /opt/questdb`}
 </CodeBlock>
 )}
@@ -135,10 +141,8 @@ For QuestDB Enterprise, extract the runtime archive for your architecture to
 <TabItem value="x86-64">
 
 ```bash
-sudo install -d -o root -g root -m 0755 /opt/questdb
-sudo tar -xzf questdb-enterprise-*-rt-linux-amd64.tar.gz \
-  -C /opt/questdb \
-  --strip-components 1
+sudo install -d -o root -g root -m 0755 /opt/questdb &&
+sudo tar -xzf questdb-enterprise-*-rt-linux-amd64.tar.gz -C /opt/questdb --strip-components 1 &&
 sudo chown -R root:root /opt/questdb
 ```
 
@@ -147,10 +151,8 @@ sudo chown -R root:root /opt/questdb
 <TabItem value="arm64">
 
 ```bash
-sudo install -d -o root -g root -m 0755 /opt/questdb
-sudo tar -xzf questdb-enterprise-*-rt-linux-aarch64.tar.gz \
-  -C /opt/questdb \
-  --strip-components 1
+sudo install -d -o root -g root -m 0755 /opt/questdb &&
+sudo tar -xzf questdb-enterprise-*-rt-linux-aarch64.tar.gz -C /opt/questdb --strip-components 1 &&
 sudo chown -R root:root /opt/questdb
 ```
 
@@ -426,7 +428,7 @@ Configure `vm.max_map_count` and other recommended OS settings separately. See
 Reload systemd, enable QuestDB at boot, and start it now:
 
 ```shell
-sudo systemctl daemon-reload
+sudo systemctl daemon-reload &&
 sudo systemctl enable --now questdb.service
 ```
 
