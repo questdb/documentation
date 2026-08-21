@@ -391,8 +391,8 @@ configured value while no OIDC authentication takes place.
 
 The path of the endpoint is set by
 [`http.context.settings`](/docs/configuration/http-server/#httpcontextsettings),
-and defaults to `/settings`. Leave it at the default: the Web Console requests
-`/settings` and does not read this setting.
+and defaults to `/settings`. Setting it adds paths rather than moving the
+endpoint, so `/settings` keeps working whatever else is configured.
 
 ## Interactive clients
 

@@ -497,9 +497,10 @@ Context path for the service that serves server-side settings to clients, such
 as an OIDC client discovering the provider's endpoints from the
 [settings endpoint](/docs/security/oidc/#settings-endpoint).
 
-Leave this at the default. The
-[Web Console](/docs/getting-started/web-console/overview/) requests `/settings`
-and does not read this setting, so changing the path stops it from loading.
+Accepts a comma-separated list of paths. Setting it adds paths rather than
+moving the service: QuestDB keeps serving the default path as well, so the
+[Web Console](/docs/getting-started/web-console/overview/), which requests
+`/settings` and does not read this setting, keeps working.
 
 ### http.context.table.status
 
