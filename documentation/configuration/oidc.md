@@ -173,10 +173,14 @@ JSON Web Key Set (JWKS) Endpoint. Provides the list of public keys used to
 decode and validate ID tokens issued by the OIDC Provider. The default value
 should work for the Ping Identity Platform.
 
-The keys are only read when
+The keys are only used to validate tokens when
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`.
 With the default user info flow QuestDB validates tokens by calling the user
 info endpoint instead.
+
+QuestDB downloads the keys from this endpoint at startup either way, so that the
+cache is never empty. A failure to download them is logged, and does not stop
+the server.
 
 ### acl.oidc.token.endpoint
 
