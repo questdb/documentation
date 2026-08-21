@@ -77,7 +77,8 @@ both fails server startup.
 - **Default**: `30000`
 - **Reloadable**: no
 
-OIDC provider HTTP request timeout in milliseconds.
+OIDC provider HTTP request timeout in milliseconds. Accepts a plain integer
+only.
 
 ### acl.oidc.port
 
@@ -276,18 +277,25 @@ logged for audit purposes.
 - **Default**: `30000`
 - **Reloadable**: no
 
-User info cache entry TTL in milliseconds. QuestDB caches user info responses
-for each valid access token. This setting controls how often the access token
-is validated and user info refreshed.
+User info cache entry TTL in milliseconds, as a plain integer only. QuestDB
+caches user info responses for each valid access token. This setting controls
+how often the access token is validated and user info refreshed.
+
+Set it to `0` to disable the cache, so that every request is validated against
+the OIDC Provider.
 
 ### acl.oidc.public.keys.expiry
 
 - **Default**: `120000`
 - **Reloadable**: no
 
-Expiry of the cached JSON Web Key Set (JWKS) in milliseconds. QuestDB caches
-the public keys used to validate tokens issued by the OIDC Provider, and
-reloads them from the public keys endpoint when the cache expires.
+Expiry of the cached JSON Web Key Set (JWKS) in milliseconds. Also accepts a
+duration, such as `2m` or `120s`.
+
+QuestDB caches the public keys used to validate tokens issued by the OIDC
+Provider, and reloads them from the public keys endpoint when the cache
+expires. Lower it if the OIDC Provider rotates its signing keys frequently, at
+the cost of more requests to the endpoint.
 
 ### acl.oidc.response.buffer.size
 
