@@ -164,26 +164,6 @@ provider's configuration document and the settings below are not used.
 OIDC Authorization Endpoint. The default value should work for the Ping
 Identity Platform.
 
-### acl.oidc.device.authorization.endpoint
-
-- **Default**: none
-- **Reloadable**: no
-
-OIDC Device Authorization Endpoint, used by clients which authenticate with
-the [Device Code Flow](/docs/security/oidc/#device-code-flow). Unlike the
-other endpoints, it has no default value.
-
-QuestDB does not run the Device Code Flow itself. It publishes this endpoint to
-clients through the
-[settings endpoint](/docs/security/oidc/#settings-endpoint), so that a client
-knows where to start the flow. A client which does not receive it has to be
-given the endpoint directly, or resolve it from the OIDC Provider itself.
-
-When `acl.oidc.configuration.url` is set, QuestDB takes this endpoint from the
-provider's configuration document instead, if the provider advertises a
-`device_authorization_endpoint`. It is the only endpoint discovery is allowed to
-omit.
-
 ### acl.oidc.public.keys.endpoint
 
 - **Default**: `/pf/JWKS`
