@@ -22,9 +22,14 @@ Enterprise.
 The prerequisites for deploying QuestDB with systemd are:
 
 - A 64-bit Linux system (x86-64 or ARM64) running systemd
-- The QuestDB archive for your edition and architecture. Runtime archives
-  include Java. QuestDB Open Source on ARM64 uses the no-JRE archive and also
-  requires Java 25 and `unzip`.
+- The QuestDB archive for your edition and architecture. Runtime (`rt-`)
+  archives bundle their own Java and install it at `/opt/questdb/bin/java`. The
+  no-JRE archive ships `questdb.jar` alone and runs on your system Java, so it
+  also requires Java 25 and `unzip`. QuestDB Open Source on ARM64 is only
+  distributed as the no-JRE archive.
+
+The archive you install determines the `ExecStart` directive of your unit, so
+keep track of which one you extracted to `/opt/questdb`.
 
 ## Initial system configuration
 
@@ -69,6 +74,15 @@ sudo chown -R root:root /opt/questdb`}
 />
 
 <!-- prettier-ignore-end -->
+
+:::note
+
+The no-JRE archive also runs on x86-64, if you would rather use your own Java 25
+installation than the bundled runtime. Follow the ARM64 steps, but extract the
+`linux-x86-64` native libraries instead of the `linux-aarch64` ones, and use the
+no-JRE `ExecStart` from [Example questdb.service](#example-questdbservice).
+
+:::
 
 </TabItem>
 
@@ -227,8 +241,11 @@ SyslogIdentifier=questdb
 WantedBy=multi-user.target
 ```
 
-The unit above uses the bundled x86-64 runtime. On ARM64, replace its
-`ExecStart` directive with the following one:
+The unit above runs the Java bundled in the runtime (`rt-`) archive at
+`/opt/questdb/bin/java`. That path does not exist if you installed the no-JRE
+archive, which is always the case on ARM64 and is an option on x86-64. Replace
+the `ExecStart` directive with the following one, which runs your system Java
+and puts `questdb.jar` on the module path:
 
 ```shell
 ExecStart=/usr/bin/java \
@@ -251,6 +268,14 @@ ExecStart=/usr/bin/java \
     -m io.questdb/io.questdb.ServerMain \
     -d ${QDB_ROOT}
 ```
+
+`questdb.jar` is not on the default module path, so
+`-p /opt/questdb/questdb.jar` is required to resolve the `io.questdb` module.
+
+Point `-Dquestdb.libs.dir` at the directory you extracted the native libraries
+into, which holds the `linux-x86-64` set on x86-64 rather than the
+`linux-aarch64` one. Omit the flag to let QuestDB unpack the libraries to the
+system temporary directory instead.
 
 </TabItem>
 
@@ -345,6 +370,27 @@ View its journal:
 ```shell
 sudo journalctl --unit=questdb.service --follow
 ```
+
+## Startup failures
+
+If the service fails immediately, check the journal for either of the following
+errors. Both mean the `ExecStart` directive does not match the archive installed
+at `/opt/questdb`.
+
+```shell
+sudo journalctl --unit=questdb.service --no-pager -n 20
+```
+
+`status=203/EXEC`, alongside
+`Failed at step EXEC spawning /opt/questdb/bin/java: No such file or directory`,
+means the unit expects the runtime (`rt-`) archive, but `/opt/questdb` holds the
+no-JRE archive, which bundles no Java. Switch to the no-JRE `ExecStart` above,
+or install the runtime archive.
+
+`java.lang.module.FindException: Module io.questdb not found` means `ExecStart`
+runs a system Java without a module path. Add `-p /opt/questdb/questdb.jar`
+before the `-m io.questdb/io.questdb.ServerMain` argument, as the no-JRE
+`ExecStart` above does.
 
 ## Unexpected restarts
 
