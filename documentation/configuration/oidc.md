@@ -138,9 +138,11 @@ enabled, this flow must also be configured in the OIDC Provider.
 - **Reloadable**: no
 
 Requires the `state` parameter in the Authorization Code Flow, which protects
-against CSRF attacks. QuestDB does not see the value itself; it publishes the
-setting to clients through the settings endpoint, the same way it publishes
-`acl.oidc.pkce.required`.
+against CSRF attacks. QuestDB does not see the value itself. It publishes the
+setting to clients through the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), the same way it
+publishes `acl.oidc.pkce.required`, and the client is what generates and checks
+the value.
 
 Enable it if the OIDC Provider requires the `state` parameter, or to add CSRF
 protection on top of PKCE. The
@@ -171,10 +173,16 @@ OIDC Device Authorization Endpoint, used by clients which authenticate with
 the [Device Code Flow](/docs/security/oidc/#device-code-flow). Unlike the
 other endpoints, it has no default value.
 
-QuestDB does not run the Device Code Flow itself. It publishes this endpoint
-to clients through the settings endpoint, so that a client knows where to
-start the flow. A client which does not receive it has to be given the
-endpoint directly, or resolve it from the OIDC Provider itself.
+QuestDB does not run the Device Code Flow itself. It publishes this endpoint to
+clients through the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), so that a client
+knows where to start the flow. A client which does not receive it has to be
+given the endpoint directly, or resolve it from the OIDC Provider itself.
+
+When `acl.oidc.configuration.url` is set, QuestDB takes this endpoint from the
+provider's configuration document instead, if the provider advertises a
+`device_authorization_endpoint`. It is the only endpoint discovery is allowed to
+omit.
 
 ### acl.oidc.public.keys.endpoint
 

@@ -318,6 +318,56 @@ and then sends the results back:
 }
 ```
 
+## Settings endpoint
+
+QuestDB publishes the parts of its OIDC configuration that a client needs in
+order to start an authentication flow. Any client can read them from the
+settings endpoint, which requires no authentication:
+
+```bash title="Settings request example"
+curl https://questdb.host:9000/settings
+```
+
+The OIDC-related entries of the response look like this, alongside other server
+settings:
+
+```json title="Settings response example"
+{
+  "config": {
+    "acl.oidc.enabled": true,
+    "acl.oidc.pkce.required": true,
+    "acl.oidc.state.required": false,
+    "acl.oidc.groups.encoded.in.token": false,
+    "acl.oidc.client.id": "questdb",
+    "acl.oidc.redirect.uri": "https://questdb.host:9000",
+    "acl.oidc.scope": "openid",
+    "acl.oidc.authorization.endpoint": "https://oidc.provider:443/as/authorization.oauth2",
+    "acl.oidc.token.endpoint": "https://oidc.provider:443/as/token.oauth2",
+    "acl.oidc.device.authorization.endpoint": "https://oidc.provider:443/as/device_authz.oauth2"
+  },
+  "preferences.version": 0,
+  "preferences": {}
+}
+```
+
+Each key is the name of the
+[configuration option](/docs/configuration/oidc/) it carries. The
+[Web Console](/docs/getting-started/web-console/overview/) reads them to build
+its authorization request, and any other client can do the same instead of
+hard coding the provider's details.
+
+The endpoints are absolute URLs, resolved either from `acl.oidc.host` and the
+[endpoint settings](/docs/configuration/oidc/#endpoints), or from the provider's
+configuration document when `acl.oidc.configuration.url` is set.
+`acl.oidc.device.authorization.endpoint` is the only one which may be absent,
+because it is the only one QuestDB can run without, and the only one with no
+default: the value above is whatever the operator configured or discovery
+returned.
+
+The path of the endpoint is set by
+[`http.context.settings`](/docs/configuration/http-server/#httpcontextsettings),
+and defaults to `/settings`.
+
 ## Interactive clients
 
 Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an
