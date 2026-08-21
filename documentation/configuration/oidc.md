@@ -137,10 +137,16 @@ enabled, this flow must also be configured in the OIDC Provider.
 - **Default**: `false`
 - **Reloadable**: no
 
-Requires the `state` parameter in the Authorization Code Flow. The client
-generates a random state value, which the OIDC Provider returns unchanged
-together with the authorization code. Checking it protects against CSRF
-attacks. Enable it if the Identity Provider supports the `state` parameter.
+Requires the `state` parameter in the Authorization Code Flow, as a defence
+against CSRF attacks. QuestDB does not see the value itself; it publishes the
+setting to clients through the settings endpoint, the same way it publishes
+`acl.oidc.pkce.required`.
+
+Enable it if the OIDC Provider requires the `state` parameter, or to add CSRF
+protection on top of PKCE. The
+[Web Console](/docs/security/oidc/#1-secret-generation) generates the value,
+sends it in the authorization request, and checks that the provider returns it
+unchanged.
 
 ## Endpoints
 
