@@ -284,8 +284,10 @@ User info cache entry TTL in milliseconds, as a plain integer only. QuestDB
 caches user info responses for each valid access token. This setting controls
 how often the access token is validated and user info refreshed.
 
-Set it to `0` to disable the cache, so that every request is validated against
-the OIDC Provider.
+Set it to `0` to disable the cache, so that every request is revalidated. In the
+default user info flow that means a call to the OIDC Provider on every request.
+When [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is
+`true` the token is revalidated locally, and the provider is not contacted.
 
 ### acl.oidc.public.keys.expiry
 
