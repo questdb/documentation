@@ -31,6 +31,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [ALTER TABLE SET FORMAT](/docs/query/sql/alter-table-set-format/) - New reference page for switching a table's partition storage format between `NATIVE` and `PARQUET`
 - [QWP configuration](/docs/configuration/qwp/) - Server-side settings for the QWP ingestion (`/write/v4`) and query (`/read/v1`) endpoints
 - [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/) and [Check column sort order](/docs/cookbook/sql/advanced/check-column-sort-order/) - Two cookbook recipes that detect unsorted data with `lag()`: whether a table, CSV import or external Parquet file is ordered by its timestamp, and whether one column is sorted with respect to another
+- [OIDC settings endpoint](/docs/security/oidc/#settings-endpoint) - How a client reads QuestDB's OIDC configuration from `/settings` to discover the authorization and token endpoints, and whether PKCE and the `state` parameter are required
 
 ### Reference
 
@@ -48,9 +49,12 @@ This page tracks significant updates to the QuestDB documentation.
 - Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
 - Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
 - [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
+- Documented the OIDC configuration options that were missing from the [OIDC page](/docs/configuration/oidc/): `acl.oidc.state.required`, `acl.oidc.public.keys.expiry`, `acl.oidc.response.buffer.size`, and `acl.oidc.string.pool.capacity`; also corrected `acl.oidc.pkce.enabled` to its real name `acl.oidc.pkce.required`, and documented `acl.oidc.groups.claim` as mandatory with no default
 
 ### Updated
 
+- [OpenID Connect (OIDC)](/docs/security/oidc/#1-secret-generation) - Noted that some Identity Providers require the `state` parameter in the authorization request, and that `acl.oidc.state.required` should be set to `true` for those providers
+- [PingFederate SSO](/docs/security/oidc/#questdb-configuration-for-pingfederate) - Added the missing QuestDB `server.conf` block to the walkthrough, which relied on defaults for settings that have none
 - Client libraries rewritten for the QWP binary protocol, unifying ingestion and streaming SQL queries under one handle: [Java](/docs/connect/clients/java/), [Python](/docs/connect/clients/python/), [Go](/docs/connect/clients/go/), [C & C++](/docs/connect/clients/c-and-cpp/), [Rust](/docs/connect/clients/rust/), and [.NET](/docs/connect/clients/dotnet/)
 - [Web Console](/docs/getting-started/web-console/overview/) - Documented query sharing by link and tab import/export in the [code editor](/docs/getting-started/web-console/code-editor/), custom AI providers and per-provider permission levels in [QuestDB AI](/docs/getting-started/web-console/questdb-ai/), automatic column sizing in the [result grid](/docs/getting-started/web-console/result-grid/), and the storage policy section in [table details](/docs/getting-started/web-console/table-details/)
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) - Repositioned around the agent skill and the Web Console MCP bridge together

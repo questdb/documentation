@@ -493,8 +493,14 @@ Context path for the file import service.
 - **Default**: `/settings`
 - **Reloadable**: no
 
-Context path for the service which provides server-side settings to the Web
-Console.
+Context path for the service that serves server-side settings to clients, such
+as an OIDC client discovering the provider's endpoints from the
+[settings endpoint](/docs/security/oidc/#settings-endpoint).
+
+Accepts a comma-separated list of paths. Setting it adds paths rather than
+moving the service: QuestDB keeps serving the default path as well, so the
+[Web Console](/docs/getting-started/web-console/overview/), which requests
+`/settings` and does not read this setting, keeps working.
 
 ### http.context.table.status
 
