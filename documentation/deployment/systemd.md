@@ -28,8 +28,8 @@ The prerequisites for deploying QuestDB with systemd are:
   also requires Java 25 and `unzip`. QuestDB Open Source on ARM64 is only
   distributed as the no-JRE archive.
 
-The archive you install determines the `ExecStart` directive of your unit, so
-keep track of which one you extracted to `/opt/questdb`.
+The archive you install determines which unit to use below, so keep track of
+which one you extracted to `/opt/questdb`.
 
 ## Initial system configuration
 
@@ -80,7 +80,7 @@ sudo chown -R root:root /opt/questdb`}
 The no-JRE archive also runs on x86-64, if you would rather use your own Java 25
 installation than the bundled runtime. Follow the ARM64 steps, but extract the
 `linux-x86-64` native libraries instead of the `linux-aarch64` ones, and use the
-no-JRE `ExecStart` from [Example questdb.service](#example-questdbservice).
+"No-JRE archive" unit in [Example questdb.service](#example-questdbservice).
 
 :::
 
@@ -175,10 +175,11 @@ settings on first start. See the
 
 ## Example questdb.service
 
-Create `/etc/systemd/system/questdb.service` using the configuration for your
-edition. The examples set `QDB_ROOT` to `/var/lib/questdb`; QuestDB stores its
+Write the unit for your edition to `/etc/systemd/system/questdb.service`. Each
+command below creates that file in place, so it can be pasted into a terminal as
+it stands. The examples set `QDB_ROOT` to `/var/lib/questdb`; QuestDB stores its
 `conf`, `db`, `log`, and `public` directories beneath it. Adjust the
-installation paths if necessary.
+installation paths if necessary, then paste the block.
 
 <!-- prettier-ignore-start -->
 
@@ -191,7 +192,21 @@ installation paths if necessary.
 
 <TabItem value="oss">
 
+<!-- prettier-ignore-start -->
+
+<Tabs groupId="questdb-archive" defaultValue="rt" values={[
+  { label: "Runtime archive", value: "rt" },
+  { label: "No-JRE archive", value: "no-jre" },
+]}>
+
+<!-- prettier-ignore-end -->
+
+<TabItem value="rt">
+
+The runtime (`rt-`) archive bundles its own Java at `/opt/questdb/bin/java`:
+
 ```shell
+sudo tee /etc/systemd/system/questdb.service > /dev/null <<'EOF'
 [Unit]
 Description=QuestDB
 Documentation=https://questdb.com/docs/deployment/systemd/
@@ -239,15 +254,38 @@ SyslogIdentifier=questdb
 
 [Install]
 WantedBy=multi-user.target
+EOF
 ```
 
-The unit above runs the Java bundled in the runtime (`rt-`) archive at
-`/opt/questdb/bin/java`. That path does not exist if you installed the no-JRE
-archive, which is always the case on ARM64 and is an option on x86-64. Replace
-the `ExecStart` directive with the following one, which runs your system Java
-and puts `questdb.jar` on the module path:
+</TabItem>
+
+<TabItem value="no-jre">
+
+The no-JRE archive has no bundled Java, so this unit runs your system Java and
+puts `questdb.jar` on the module path. Use it on ARM64, and on x86-64 whenever
+you installed the no-JRE archive:
 
 ```shell
+sudo tee /etc/systemd/system/questdb.service > /dev/null <<'EOF'
+[Unit]
+Description=QuestDB
+Documentation=https://questdb.com/docs/deployment/systemd/
+
+[Service]
+Type=exec
+User=questdb
+Group=questdb
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+SuccessExitStatus=143
+
+# QuestDB root directory
+Environment=QDB_ROOT=/var/lib/questdb
+StateDirectory=questdb
+StateDirectoryMode=0750
+ExecStartPre=/usr/bin/mkdir -p ${QDB_ROOT}/db
+
 ExecStart=/usr/bin/java \
     -DQuestDB-Runtime-66535 \
     -Dcontainerized=false \
@@ -267,6 +305,18 @@ ExecStart=/usr/bin/java \
     -p /opt/questdb/questdb.jar \
     -m io.questdb/io.questdb.ServerMain \
     -d ${QDB_ROOT}
+
+# Raise the open-files limit to QuestDB's recommended value
+LimitNOFILE=1048576
+
+ProtectSystem=full
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=questdb
+
+[Install]
+WantedBy=multi-user.target
+EOF
 ```
 
 `questdb.jar` is not on the default module path, so
@@ -279,9 +329,14 @@ system temporary directory instead.
 
 </TabItem>
 
+</Tabs>
+
+</TabItem>
+
 <TabItem value="enterprise">
 
 ```shell
+sudo tee /etc/systemd/system/questdb.service > /dev/null <<'EOF'
 [Unit]
 Description=QuestDB Enterprise
 Documentation=https://questdb.com/docs/deployment/systemd/
@@ -329,6 +384,7 @@ SyslogIdentifier=questdb
 
 [Install]
 WantedBy=multi-user.target
+EOF
 ```
 
 </TabItem>
@@ -343,13 +399,6 @@ shutdown.
 
 Configure `vm.max_map_count` and other recommended OS settings separately. See
 [OS configuration](/docs/getting-started/capacity-planning/#os-configuration).
-
-Confirm that systemd can read the unit:
-
-```shell
-sudo chown root:root /etc/systemd/system/questdb.service
-sudo chmod 0644 /etc/systemd/system/questdb.service
-```
 
 Reload systemd, enable QuestDB at boot, and start it now:
 
