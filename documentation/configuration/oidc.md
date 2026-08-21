@@ -137,7 +137,7 @@ enabled, this flow must also be configured in the OIDC Provider.
 - **Default**: `false`
 - **Reloadable**: no
 
-Requires the `state` parameter in the Authorization Code Flow, as a defence
+Requires the `state` parameter in the Authorization Code Flow, which protects
 against CSRF attacks. QuestDB does not see the value itself; it publishes the
 setting to clients through the settings endpoint, the same way it publishes
 `acl.oidc.pkce.required`.
