@@ -707,12 +707,14 @@ QuestDB works the list of external groups out from the User Info response
 message.
 
 If we take the example used earlier, we will see that the message contains a
-claim called `groups`. This name is configurable in QuestDB.
+claim called `groups`. Its name is set with
+[`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim), which
+has no default and must be set whenever OIDC is enabled.
 
-If the groups claim is missing or it is an empty list, the user cannot access
-the database.
-
-Although the user is authenticated, they have no permissions at all.
+If the groups claim is missing or it is an empty list, authentication fails and
+QuestDB replies with `401 Unauthorized`. The same happens when the claim named
+by [`acl.oidc.sub.claim`](/docs/configuration/oidc/#acloidcsubclaim) is missing
+or empty.
 
 The user has to have at least the `HTTP` permission to be able to successfully
 login via the [Web Console](/docs/getting-started/web-console/overview/).
