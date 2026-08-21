@@ -1101,6 +1101,37 @@ to the existing PCV.
 
 Then select the `username` attribute of the PCV as `USER_KEY`.
 
+#### QuestDB configuration
+
+The below should be set in QuestDB's `server.conf`:
+
+```shell
+# enable OIDC
+acl.oidc.enabled=true
+
+# hostname of the PingFederate server
+acl.oidc.host=pingfederate.host
+
+# the client id picked when setting up the client above
+acl.oidc.client.id=questdb
+
+# the claim which contains the user's group memberships
+acl.oidc.groups.claim=groups
+
+# enable ROPC flow
+# optional, required only if ROPC is enabled in PingFederate
+acl.oidc.ropc.flow.enabled=true
+```
+
+The endpoint defaults listed under
+[Endpoints](/docs/configuration/oidc/#endpoints) already match the PingFederate
+paths, so they do not have to be set.
+
+Alternatively, set `acl.oidc.configuration.url` instead of `acl.oidc.host` and
+let QuestDB discover the endpoints from PingFederate. The two are mutually
+exclusive, and the endpoint settings are not used when the configuration URL is
+set.
+
 #### Confirm QuestDB mappings and login
 
 QuestDB requires a mapping, as laid out in the
