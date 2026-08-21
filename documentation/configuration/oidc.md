@@ -1,6 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
-description: Configuration settings for OpenID Connect integration in QuestDB Enterprise.
+description: "QuestDB Enterprise acl.oidc.* settings reference: minimum configuration and startup rules, endpoints, TLS, user and group claims, caching and buffers."
 ---
 
 :::note
@@ -146,8 +146,9 @@ scope `openid` is mandatory and must always be included.
 QuestDB publishes [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
 [`acl.oidc.state.required`](#acloidcstaterequired) to clients through the
 [settings endpoint](/docs/security/oidc/#settings-endpoint), and enforces
-neither. The client generates the code verifier and the `state` value, and
-checks them.
+neither. The client generates the code verifier and the `state` value; the
+provider checks the verifier, and the client checks the `state` value it gets
+back.
 
 ### acl.oidc.pg.token.as.password.enabled
 
@@ -295,6 +296,10 @@ which it connects.
 The name of the custom claim in the user information that contains the
 group memberships of the user. Required when OIDC is enabled.
 
+If the claim is missing from the user information, or it is an empty list,
+authentication fails. See
+[Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
+
 ### acl.oidc.groups.encoded.in.token
 
 - **Default**: `false`
@@ -313,8 +318,9 @@ The name of the claim in the user information that contains the user's name.
 Could be a username, full name, or email. Displayed in the Web Console and
 logged for audit purposes.
 
-The claim must be present and non-empty, otherwise authentication fails, the
-same way it does when the groups claim is missing. See
+If the claim is missing from the user information, or empty, authentication
+fails. The same applies to the claim named by
+[`acl.oidc.groups.claim`](#acloidcgroupsclaim). See
 [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
 
 ## Caching and buffers
@@ -328,10 +334,13 @@ User info cache entry TTL in milliseconds, as a plain integer only. QuestDB
 caches user info responses for each valid access token. This setting controls
 how often the access token is validated and user info refreshed.
 
-Set it to `0` to disable the cache, so that every request is revalidated. In the
-default user info flow that means a call to the OIDC Provider on every request.
-When [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is
-`true` the token is revalidated locally, and the provider is not contacted.
+Set it to `0` to disable the cache, so that every request is checked again. In
+the default user info flow that means a call to the OIDC Provider on every
+request. When
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`
+QuestDB checks the token's signature and audience locally instead, and contacts
+the provider only when the public keys have to be reloaded. The local check
+does not test the token's expiry.
 
 ### acl.oidc.public.keys.expiry
 
@@ -358,11 +367,11 @@ which is the only case in which QuestDB validates token signatures itself.
 - **Default**: `1M`
 - **Reloadable**: no
 
-Size of the buffer used to receive HTTP responses from the OIDC Provider.
-Accepts a plain byte count, or a value with a `K` or `M` suffix, such as
-`512K`. There is no `G` suffix.
+Size of the buffer used to receive and parse HTTP responses from the OIDC
+Provider. Accepts a plain byte count, or a value with a `K` or `M` suffix, such
+as `512K`. There is no `G` suffix.
 
-If a response from the OIDC Provider does not fit, authentication fails and the
+When a request to the OIDC Provider fails, authentication fails with it and the
 reason is logged by the server.
 
 ### acl.oidc.string.pool.capacity
