@@ -175,10 +175,10 @@ settings on first start. See the
 
 ## Example questdb.service
 
-Create a file named `questdb.service` using the configuration for your edition.
-The examples set `QDB_ROOT` to `/var/lib/questdb`; QuestDB stores its `conf`,
-`db`, `log`, and `public` directories beneath it. Adjust the installation paths
-if necessary.
+Create `/etc/systemd/system/questdb.service` using the configuration for your
+edition. The examples set `QDB_ROOT` to `/var/lib/questdb`; QuestDB stores its
+`conf`, `db`, `log`, and `public` directories beneath it. Adjust the
+installation paths if necessary.
 
 <!-- prettier-ignore-start -->
 
@@ -344,12 +344,11 @@ shutdown.
 Configure `vm.max_map_count` and other recommended OS settings separately. See
 [OS configuration](/docs/getting-started/capacity-planning/#os-configuration).
 
-Install the unit:
+Confirm that systemd can read the unit:
 
 ```shell
-sudo install -o root -g root -m 0644 \
-  questdb.service \
-  /etc/systemd/system/questdb.service
+sudo chown root:root /etc/systemd/system/questdb.service
+sudo chmod 0644 /etc/systemd/system/questdb.service
 ```
 
 Reload systemd, enable QuestDB at boot, and start it now:
