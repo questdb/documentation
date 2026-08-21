@@ -161,10 +161,13 @@ Identity Platform.
 - **Reloadable**: no
 
 OIDC Device Authorization Endpoint, used by clients which authenticate with
-the Device Code Flow. Unlike the other endpoints it has no default value. It
-is resolved automatically if `acl.oidc.configuration.url` is set and the
-OIDC Provider advertises a `device_authorization_endpoint`. The Device Code
-Flow is unavailable if the endpoint is neither configured nor discovered.
+the [Device Code Flow](/docs/security/oidc/#device-code-flow). Unlike the
+other endpoints, it has no default value.
+
+QuestDB does not run the Device Code Flow itself. It publishes this endpoint
+to clients through the settings endpoint, so that a client knows where to
+start the flow. A client which does not receive it has to be given the
+endpoint directly, or resolve it from the OIDC Provider itself.
 
 ### acl.oidc.public.keys.endpoint
 
