@@ -812,10 +812,15 @@ uncompressed mode.
 ### UUID
 
 16 bytes per value: 8 bytes for the low 64 bits, then 8 bytes for the high
-64 bits, both little-endian. This is the canonical RFC 4122 byte order
-reversed, so a client whose API takes RFC 4122 bytes — as the C, C++, Rust,
-and Python clients do — reverses each value on the way to the wire and again
-on the way back.
+64 bits, both little-endian. Reverse all 16 bytes and you get the canonical
+RFC 4122 order.
+
+The C, C++, Rust, and Python clients take RFC 4122 bytes in their APIs, so
+they reverse each value on the way to the wire and again on the way back. The
+one exception is the row-buffer call that takes the two 64-bit halves
+directly — `line_sender_buffer_column_uuid(buffer, name, lo, hi, err)` and
+its Rust equivalent — which is already in wire order and is passed through
+unchanged.
 
 ### LONG256
 
