@@ -776,12 +776,17 @@ See `qwp_sender.h` for the exact signatures. Complete list:
 | `column_bool` | LSB-first packed bitmap | `BOOLEAN` |
 | `column_ts` + `qwp_ts_unit` (`_micros` / `_nanos`) | int64 since epoch | `TIMESTAMP` / `TIMESTAMP_NS` |
 | `column_date` | int64 millis since epoch | `DATE` |
-| `column_uuid` | 16 bytes | `UUID` |
-| `column_long256` | 32 bytes (4 LE limbs) | `LONG256` |
+| `column_uuid` | 16 bytes, canonical RFC 4122 big-endian | `UUID` |
+| `column_long256` | 32 bytes (4 LE limbs, low limb first) | `LONG256` |
 | `column_ipv4` | uint32 | `IPV4` |
 | `column_str` | Arrow Utf8 offsets + bytes | `VARCHAR` |
 | `column_binary` | Arrow Binary offsets + bytes | `BINARY` |
 | `symbol_i8` / `_i16` / `_i32` | dict codes + Utf8 dictionary | `SYMBOL` |
+
+`column_uuid` takes the UUID's canonical RFC 4122 bytes, exactly as they are
+written in the textual form, and byte-swaps them into QWP wire order for you.
+The row-oriented `line_sender_buffer_column_uuid` is the exception: it takes
+the two 64-bit wire halves, `(lo, hi)`.
 
 Designated timestamp (exactly once per chunk, before flush):
 `at_nanos` / `at_micros` / `at_millis` / `at_seconds` (millis and
@@ -873,16 +878,136 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
   caller keeps `schema`. On failure check `array->release != NULL` before
   invoking it.
 - Per-column wire-type hints (`qwp_arrow_override`: force
-  SYMBOL/VARCHAR, IPv4, char, geohash precision) steer encoding without
-  touching the Arrow schema.
+  SYMBOL/VARCHAR, IPv4, char, geohash precision, UUID, LONG256) choose the
+  wire type without touching the Arrow schema. An override wins for its
+  column over any field metadata the schema carries.
 - To append Arrow **columns** into a chunk alongside hand-built ones, use
   `qwp_chunk_append_arrow_column`, or
   `qwp_arrow_import_new` + `..._append_arrow_import` to import once
-  and slice across many chunks.
+  and slice across many chunks. Neither takes an overrides array, so an
+  IPv4, char, geohash, UUID, or LONG256 column has to carry its claim as
+  field metadata instead. The SYMBOL choice is still available on the import
+  path: `qwp_arrow_import_new` takes a `symbol_mode` argument
+  (`qwp_symbol_mode_auto`, `_symbol`, `_not_symbol`).
 - Dictionary-encoded string columns map to `SYMBOL` by default; plain Utf8 to
   `VARCHAR`. `qwp_sender.h` lists every Arrow type the client accepts, and
   the kinds it rejects (`Struct`, `Map`, `Interval`, ...); a rejected type
   fails with `line_sender_error_arrow_unsupported_column_kind`.
+
+### Binary columns: UUID, LONG256, and opaque bytes
+
+Binary Arrow columns land as `BINARY` unless the column *claims* a richer
+type. The width of a column claims nothing on its own: a bare
+`FixedSizeBinary(16)` is opaque bytes, not a UUID. A claim comes from the
+schema or from an override:
+
+| Claim | Lands as |
+| --- | --- |
+| `ARROW:extension:name = arrow.uuid` on `FixedSizeBinary(16)` | `UUID` |
+| `questdb.column_type = uuid` field metadata | `UUID` |
+| `questdb.column_type = long256` field metadata | `LONG256` |
+| `qwp_arrow_override_uuid` / `qwp_arrow_override_long256` | `UUID` / `LONG256` |
+
+UUID bytes are canonical RFC 4122 big-endian and the client byte-swaps them
+into QWP wire order; LONG256 bytes are little-endian limbs, low limb first,
+and go out verbatim. The `questdb.column_type` claims and the two overrides
+also apply to variable-length `Binary` / `LargeBinary` / `BinaryView`
+columns, where every non-null value must then be exactly 16 or 32 bytes. The
+`arrow.uuid` extension is the exception: the Arrow spec fixes its storage to
+`FixedSizeBinary(16)`, so the client rejects the label on any other type. A
+claim whose width doesn't match fails with
+`line_sender_error_arrow_ingest`.
+
+:::caution Behaviour change
+
+Before client 7.0.0 a bare `FixedSizeBinary(16)` or `(32)` column became
+`UUID` or `LONG256` on width alone, with no claim needed. It is now `BINARY`
+unless the column carries one of the claims above, so a batch that used to
+produce a `UUID` column now produces a `BINARY` one and reports no error.
+
+The UUID byte order at the API boundary changed in the same release. Code
+written against an earlier version passed QWP wire-order bytes to
+`qwp_chunk_column_uuid` and `qwp_reader_query_bind_uuid`; those values are
+now stored with their bytes reversed, also with no error.
+
+:::
+
+#### Claiming in the schema
+
+Both metadata claims are attached to the Arrow `Field`, so you make them
+wherever the batch is built. In Arrow C++:
+
+```cpp
+// The standard Arrow extension label. FixedSizeBinary(16) only.
+auto trade_id = arrow::field("trade_id", arrow::fixed_size_binary(16))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"ARROW:extension:name"}, {"arrow.uuid"}));
+
+// The QuestDB claim, also valid on Binary / LargeBinary / BinaryView.
+auto order_hash = arrow::field("order_hash", arrow::fixed_size_binary(32))
+    ->WithMetadata(arrow::key_value_metadata(
+        {"questdb.column_type"}, {"long256"}));
+
+auto batch_schema = arrow::schema({
+    arrow::field("ts", arrow::timestamp(arrow::TimeUnit::NANO)),
+    trade_id,
+    order_hash});
+```
+
+`questdb.column_type = uuid` has the same shape with `uuid` as the value. Use
+it in place of `arrow.uuid` when the bytes sit in a variable-length binary
+column, which the extension label doesn't allow.
+
+Export the batch built against that schema through `arrow::ExportRecordBatch`
+and flush it exactly as above — the claims travel with it, and the flush call
+needs no extra arguments.
+
+#### Claiming at the call site
+
+An override claims the type per flush and leaves the schema alone. Fill in a
+`qwp_arrow_override` per column and pass the array to any
+`flush_arrow_batch*` call, where the example above passes no overrides:
+
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+```cpp
+using namespace questdb::ingress::literals;
+
+const ::qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+sender.flush_arrow_batch_and_wait(
+    "trades"_tn, array, schema, "ts"_cn,
+    overrides, std::size(overrides));
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+const qwp_arrow_override overrides[] = {
+    {"trade_id",   sizeof("trade_id") - 1,   qwp_arrow_override_uuid,    0},
+    {"order_hash", sizeof("order_hash") - 1, qwp_arrow_override_long256, 0},
+};
+
+bool ok = qwp_sender_flush_arrow_batch_at_column_and_wait(
+    sender, QDB_TABLE_NAME_LITERAL("trades"), array, schema,
+    QDB_COLUMN_NAME_LITERAL("ts"),
+    overrides, sizeof(overrides) / sizeof(overrides[0]),
+    qwpws_ack_level_ok, &err);
+```
+
+</TabItem>
+</Tabs>
+
+`arg` (the trailing `0`) carries the geohash precision for
+`qwp_arrow_override_geohash` and is unused by every other kind. An override
+that names a column the batch doesn't have, repeats another override's
+column, or carries an unknown kind fails with
+`line_sender_error_invalid_api_call`.
 
 ## Querying data
 
@@ -1084,6 +1209,12 @@ For width-independent access, use `column::visit` and
 mantissa as little-endian two's-complement bytes. Check for null before
 decoding it.
 
+`qwp_reader_column_data_get_bytes` also serves `UUID` and `LONG256`. It hands
+back UUID values as 16 canonical RFC 4122 big-endian bytes — the decoder has
+already reversed them out of wire order, so they match what
+`qwp_chunk_column_uuid` and `bind_uuid` take — and LONG256 values as 32
+little-endian limb bytes, low limb first, verbatim from the wire.
+
 ### Parameterised queries
 
 Prepare then bind: C `qwp_reader_prepare` + `qwp_reader_query_bind_*` +
@@ -1103,8 +1234,8 @@ outlive any cursor it produces. The complete bind surface (C
 | `bind_decimal64` / `bind_decimal128` / `bind_decimal256` | unscaled value + scale | `DECIMAL` |
 | `bind_geohash` | bits + precision | `GEOHASH` |
 | `bind_varchar` | UTF-8 string | `VARCHAR` |
-| `bind_uuid` | 16 bytes | `UUID` |
-| `bind_long256` | 32 bytes | `LONG256` |
+| `bind_uuid` | 16 bytes, canonical RFC 4122 big-endian | `UUID` |
+| `bind_long256` | 32 bytes (4 LE limbs, low limb first) | `LONG256` |
 | `bind_binary` | bytes + length | `BINARY` (not yet accepted server-side) |
 | `bind_ipv4` | uint32, host order | `IPV4` (not yet accepted server-side) |
 

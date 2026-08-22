@@ -255,6 +255,18 @@ QWP cannot preserve nulls for `BOOLEAN`, `BYTE`, or `SHORT`. An absent value in
 one of those columns is received as `false` or `0`; use a wider nullable type
 when the distinction matters.
 
+Everywhere in the API a UUID is 16 canonical RFC 4122 big-endian bytes — the
+bytes `uuid::Uuid::as_bytes()` gives you — with one exception. `column_uuid`
+on the row buffer takes the two 64-bit halves of the QWP wire encoding,
+`(lo, hi)`, and is the only place you have to think about wire order.
+
+`Chunk::column_uuid` takes one 16-byte array per row, so wrap a single value
+rather than splitting it yourself:
+
+```rust
+chunk.column_uuid("trade_id", std::slice::from_ref(u.as_bytes()), None)?;
+```
+
 ## Chunk ingestion {#sending-data-column-major}
 
 Use a `Chunk` when values already live in column slices. All columns and the
@@ -340,8 +352,8 @@ needs an entry in `data`, which the encoder ignores.
 | `BOOLEAN` | `column_bool(name, bits, row_count, validity)` | LSB-first bit-packed values |
 | `TIMESTAMP`, `TIMESTAMP_NS` | `column_ts(name, data, TimestampUnit, validity)` | Epoch `i64` values |
 | `DATE` | `column_date` | Epoch milliseconds |
-| `UUID` | `column_uuid` | `&[[u8; 16]]` in QuestDB wire order |
-| `LONG256` | `column_long256` | `&[[u8; 32]]` in little-endian limb order |
+| `UUID` | `column_uuid` | `&[[u8; 16]]`, one 16-byte value per row, in canonical RFC 4122 big-endian order — each element is what `uuid::Uuid::as_bytes()` gives you |
+| `LONG256` | `column_long256` | `&[[u8; 32]]` in little-endian limb order, least-significant limb first |
 | `IPv4` | `column_ipv4` | Host-order `u32` values |
 | `VARCHAR` | `column_str`, `column_str_large` | Arrow Utf8 offsets and bytes |
 | `BINARY` | `column_binary` | Arrow Binary offsets and bytes |
@@ -410,7 +422,7 @@ db.flush_arrow_batch(
     "trades",
     &record_batch,
     None,                  // server-assigned designated timestamp
-    &[],                   // no Arrow column overrides
+    &[],                   // per-column wire-type overrides; see below
     Some(AckLevel::Ok),
 )?;
 ```
@@ -429,7 +441,10 @@ use questdb::ingress::{
     ColumnName,
 };
 
-let overrides: [ArrowColumnOverride<'_>; 0] = [];
+let overrides = [
+    ArrowColumnOverride::Uuid { column: "trade_id" },
+    ArrowColumnOverride::Long256 { column: "order_hash" },
+];
 let options = PolarsIngestOptions::new()
     .max_rows(50_000)
     .timestamp_column(ColumnName::new("timestamp")?)
@@ -439,8 +454,9 @@ let options = PolarsIngestOptions::new()
 db.flush_polars_dataframe("trades", &dataframe, &options)?;
 ```
 
-`max_rows(0)` uses the default batch size. Omitting `timestamp_column` asks the
-server to assign timestamps. Omitting `ack_level` uses the pool default.
+Pass `&[]` for `overrides` when no column needs one. `max_rows(0)` uses the
+default batch size. Omitting `timestamp_column` asks the server to assign
+timestamps. Omitting `ack_level` uses the pool default.
 
 `flush_polars_dataframe` checkpoints the frame and automatically retries the
 uncommitted tail after a transient failover. `flush_arrow_batch` returns a
@@ -449,6 +465,43 @@ batch. Polars replay is at-least-once, and retrying an Arrow batch after an
 uncertain failure can also duplicate rows. Use
 [deduplication](/docs/concepts/deduplication/) when duplicates would be
 harmful.
+
+### Binary columns: UUID, LONG256, and opaque bytes
+
+Binary columns land as `BINARY` unless the column claims a richer type, and a
+byte width claims nothing on its own: a bare `FixedSizeBinary(16)` is opaque
+bytes, not a UUID. A claim comes either from the Arrow schema — the
+`ARROW:extension:name = arrow.uuid` extension label on `FixedSizeBinary(16)`,
+or `questdb.column_type = uuid` / `= long256` field metadata — or from an
+`ArrowColumnOverride::Uuid` / `::Long256` entry as above, which wins over any
+metadata on that column.
+
+Polars has no fixed-size binary dtype, so it needs the override. Its `Binary`
+columns export as Arrow `BinaryView`, and every non-null value must then be
+exactly 16 or 32 bytes. UUID bytes are canonical RFC 4122 big-endian, and the
+client byte-swaps them into wire order for you; LONG256 bytes are
+little-endian limbs, low limb first, and are sent unchanged. A value of the
+wrong width fails with `ErrorCode::ArrowIngest`.
+
+Polars `Object` columns are rejected outright. They export as
+`FixedSizeBinary(8)` holding in-process handles, which is indistinguishable
+from ordinary opaque binary once converted, so the client refuses them rather
+than storing meaningless addresses. Cast the column to a supported dtype
+first.
+
+:::caution Behaviour change
+
+Before client 7.0.0 a bare `FixedSizeBinary(16)` or `(32)` column became
+`UUID` or `LONG256` on width alone. It is now `BINARY` unless the column
+carries one of the claims above. A batch that used to produce a `UUID` column
+now produces a `BINARY` one, with no error.
+
+The UUID byte order at the API boundary changed in the same release. Code
+written against an earlier version passed wire-order bytes to
+`Chunk::column_uuid` and `bind_uuid`; those values are now stored reversed,
+also with no error.
+
+:::
 
 ## Querying
 
@@ -521,6 +574,11 @@ Available builders include:
 - `bind_geohash`
 - `bind_null` and the typed `bind_null_*` variants
 
+`bind_uuid` takes 16 canonical RFC 4122 big-endian bytes by value, so pass
+`*u.as_bytes()` or `u.into_bytes()`. `bind_long256` takes 32 little-endian
+limb bytes, low limb first. Both are the byte orders the matching result
+columns are read back in.
+
 ### Reading columns
 
 `BatchView::column(index)` returns a non-exhaustive `ColumnView`. Match the
@@ -533,7 +591,7 @@ variant before reading values:
 | `Symbol` | `resolve(row) -> Option<&str>` |
 | `Varchar` | `value(row) -> Option<&str>` |
 | `Binary` | `value(row) -> Option<&[u8]>` |
-| `Uuid`, `Long256` | Fixed-size byte-array reference |
+| `Uuid`, `Long256` | Fixed-size byte-array reference: `Uuid` yields 16 canonical RFC 4122 big-endian bytes, `Long256` 32 little-endian limb bytes, low limb first |
 | `Decimal64`, `Decimal128`, `Decimal256` | Integer value plus the column scale |
 | `Geohash` | Bits plus precision |
 | `DoubleArray`, `LongArray` | Per-row shape and element data |
