@@ -884,8 +884,11 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
 - To append Arrow **columns** into a chunk alongside hand-built ones, use
   `qwp_chunk_append_arrow_column`, or
   `qwp_arrow_import_new` + `..._append_arrow_import` to import once
-  and slice across many chunks. These take no overrides, so a column that
-  needs one has to carry its claim as field metadata instead.
+  and slice across many chunks. Neither takes an overrides array, so an
+  IPv4, char, geohash, UUID, or LONG256 column has to carry its claim as
+  field metadata instead. The SYMBOL choice is still available on the import
+  path: `qwp_arrow_import_new` takes a `symbol_mode` argument
+  (`qwp_symbol_mode_auto`, `_symbol`, `_not_symbol`).
 - Dictionary-encoded string columns map to `SYMBOL` by default; plain Utf8 to
   `VARCHAR`. `qwp_sender.h` lists every Arrow type the client accepts, and
   the kinds it rejects (`Struct`, `Map`, `Interval`, ...); a rejected type
@@ -894,8 +897,9 @@ bool ingest(questdb_db* db, struct ArrowArray* array,
 ### Binary columns: UUID, LONG256, and opaque bytes
 
 Binary Arrow columns land as `BINARY` unless the column *claims* a richer
-type. A width alone claims nothing: a bare `FixedSizeBinary(16)` is opaque
-bytes, not a UUID. A claim comes from the schema or from an override:
+type. The width of a column claims nothing on its own: a bare
+`FixedSizeBinary(16)` is opaque bytes, not a UUID. A claim comes from the
+schema or from an override:
 
 | Claim | Lands as |
 | --- | --- |
@@ -913,6 +917,20 @@ columns, where every non-null value must then be exactly 16 or 32 bytes. The
 `FixedSizeBinary(16)`, so the client rejects the label on any other type. A
 claim whose width doesn't match fails with
 `line_sender_error_arrow_ingest`.
+
+:::caution Behaviour change
+
+Before client 7.0.0 a bare `FixedSizeBinary(16)` or `(32)` column became
+`UUID` or `LONG256` on width alone, with no claim needed. It is now `BINARY`
+unless the column carries one of the claims above, so a batch that used to
+produce a `UUID` column now produces a `BINARY` one and reports no error.
+
+The UUID byte order at the API boundary changed in the same release. Code
+written against an earlier version passed QWP wire-order bytes to
+`qwp_chunk_column_uuid` and `qwp_reader_query_bind_uuid`; those values are
+now stored with their bytes reversed, also with no error.
+
+:::
 
 #### Claiming in the schema
 
