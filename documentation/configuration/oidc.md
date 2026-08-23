@@ -19,8 +19,12 @@ For detailed information about OIDC, see the
 ## Minimum configuration
 
 OIDC requires [`acl.enabled`](/docs/configuration/iam/#aclenabled) to be `true`,
-which is the default. With access control disabled the OIDC settings are
-ignored, and no OIDC authentication takes place.
+which is the default. With access control disabled no OIDC authentication takes
+place, but the OIDC settings are still validated at startup: with
+`acl.oidc.enabled=true` the server enforces every rule below and downloads the
+provider's configuration document, so an inconsistent OIDC configuration still
+prevents it from starting. Set `acl.oidc.enabled=false` to take the settings out
+of play entirely.
 
 A working setup against a Ping Identity provider needs four settings. Every
 other setting has a usable default:
@@ -204,6 +208,20 @@ provider's configuration document and the settings below are not used.
 OIDC Authorization Endpoint. The default value should work for the Ping
 Identity Platform.
 
+### acl.oidc.device.authorization.endpoint
+
+- **Default**: none
+- **Reloadable**: no
+
+OIDC Device Authorization Endpoint. Unlike the other endpoint settings this one
+has no default, and QuestDB never calls it. QuestDB resolves the endpoint and
+publishes it on the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), for clients which
+implement the Device Authorization Flow themselves.
+
+Left unset, and absent from the provider's configuration document, the endpoint
+stays unresolved and the key is omitted from the settings response.
+
 ### acl.oidc.public.keys.endpoint
 
 - **Default**: `/pf/JWKS`
@@ -308,6 +326,12 @@ authentication fails. See
 When `true`, QuestDB looks for group memberships in the ID token instead of
 calling the User Info endpoint. Set to `true` if the OIDC Provider encodes
 group memberships directly into the token.
+
+This also changes which token the client has to send: the ID token when the
+setting is `true`, the access token when it is `false`. QuestDB publishes the
+setting on the
+[settings endpoint](/docs/security/oidc/#settings-endpoint) so that clients can
+[pick the right one](/docs/security/oidc/#which-token-to-send).
 
 ### acl.oidc.sub.claim
 

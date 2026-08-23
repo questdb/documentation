@@ -240,10 +240,14 @@ The validity of the tokens are configurable inside the OIDC Provider.
 
 With the tokens, the Web Console can interact with the database.
 
-The access token is in the header of every request sent to QuestDB.
+A token is in the header of every request sent to QuestDB. Which of the two goes
+there depends on where QuestDB reads the group memberships from, see
+[Which token to send](#which-token-to-send).
 
-> **Worried about exposing the token?** It is rather opaque and does not contain
-> user details.
+> **Worried about exposing the token?** The access token is rather opaque and
+> does not contain user details. The ID token does: it is a JWT whose payload is
+> base64 encoded, not encrypted, so treat it as you would the user's directory
+> record.
 
 To carry out permission checks, the database has to know more about the user.
 
@@ -373,8 +377,10 @@ hard coding the provider's details.
 The endpoints are absolute URLs, resolved either from `acl.oidc.host` and the
 [endpoint settings](/docs/configuration/oidc/#endpoints), or from the provider's
 configuration document when `acl.oidc.configuration.url` is set.
-`acl.oidc.device.authorization.endpoint` is present when a device authorization
-endpoint has been configured, or when the provider advertises one.
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
+is present when a device authorization endpoint has been configured, or when the
+provider advertises one. QuestDB publishes it without using it, for clients
+which implement the Device Authorization Flow themselves.
 
 `acl.oidc.redirect.uri` is `null` unless
 [`acl.oidc.redirect.uri`](/docs/configuration/oidc/#acloidcredirecturi) is set.
@@ -384,6 +390,24 @@ QuestDB advertises `acl.oidc.pkce.required` and `acl.oidc.state.required`, and
 enforces neither. The client generates the code verifier and the `state` value;
 the provider checks the verifier, and the client checks the `state` value it
 gets back.
+
+### Which token to send
+
+`acl.oidc.groups.encoded.in.token` tells the client which of the tokens returned
+by the provider belongs in the `Authorization: Bearer` header:
+
+| Value | Token to send | How QuestDB validates it |
+| --- | --- | --- |
+| `false`, the default | the access token | by calling the user info endpoint |
+| `true` | the ID token | locally, by checking its signature and audience |
+
+Sending the wrong one fails authentication with `401 Unauthorized` and the
+reason in the server log. With
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+enabled the token has to be a JWT, because QuestDB reads the group memberships
+straight out of its payload. The
+[Web Console](/docs/getting-started/web-console/overview/) picks the token this
+way, and so should any other client.
 
 :::note
 
@@ -399,9 +423,13 @@ authentication takes place, so read both keys.
 :::
 
 The path of the endpoint is set by
-[`http.context.settings`](/docs/configuration/http-server/#httpcontextsettings),
-and defaults to `/settings`. Setting it adds paths rather than moving the
-endpoint, so `/settings` keeps working whatever else is configured.
+[`http.context.settings`](/docs/configuration/http-server/#httpcontextsettings).
+Setting it adds paths rather than moving the endpoint, so the default path keeps
+working too. That default is `/settings` only while
+[`http.context.web.console`](/docs/configuration/http-server/#httpcontextwebconsole)
+is at its default, as the settings path follows the Web Console context path.
+A client which cannot assume both are at their defaults should make the path
+configurable.
 
 ## Interactive clients
 
@@ -630,8 +658,10 @@ OAuth2 provider too.
 
 As seen in the Jupyter notebook examples, the clients can request a token
 themselves and then use it to authorise data ingestion. The token endpoint they
-post to is published on the [settings endpoint](#settings-endpoint), so it does
-not have to be hard coded:
+post to, the client id and the scopes are all published on the
+[settings endpoint](#settings-endpoint), so none of them have to be hard coded.
+The same response also tells the client
+[which token to send](#which-token-to-send):
 
 ```python
 import json
@@ -645,20 +675,22 @@ load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
-token_endpoint = "https://oidc.provider:443/as/token.oauth2"
-response = requests.post(token_endpoint,
+settings = requests.get("http://localhost:9000/settings").json()["config"]
+
+response = requests.post(settings["acl.oidc.token.endpoint"],
                          data={"grant_type": "password",
-                               "client_id": "testclient",
+                               "client_id": settings["acl.oidc.client.id"],
                                "username": user,
                                "password": pwd,
-                               "scope": "openid"},
+                               "scope": settings["acl.oidc.scope"]},
                          headers={"Content-Type": "application/x-www-form-urlencoded"})
 
 response_body = response.content.decode("utf-8")
 tokens = json.loads(response_body)
-access_token = tokens["access_token"]
+groups_in_token = settings["acl.oidc.groups.encoded.in.token"]
+token = tokens["id_token"] if groups_in_token else tokens["access_token"]
 
-conf = f"http::addr=localhost:9000;token={access_token};"
+conf = f"http::addr=localhost:9000;token={token};"
 with Sender.from_conf(conf) as sender:
     df = pd.read_csv("data.csv")
     df["ts"] = pd.to_datetime(df["ts"])

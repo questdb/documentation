@@ -499,8 +499,15 @@ as an OIDC client discovering the provider's endpoints from the
 
 Accepts a comma-separated list of paths. Setting it adds paths rather than
 moving the service: QuestDB keeps serving the default path as well, so the
-[Web Console](/docs/getting-started/web-console/overview/), which requests
-`/settings` and does not read this setting, keeps working.
+[Web Console](/docs/getting-started/web-console/overview/), which does not read
+this setting, keeps working.
+
+The default path follows
+[`http.context.web.console`](#httpcontextwebconsole), so it is `/settings` only
+while that setting is at its default. Setting
+`http.context.web.console=/console` makes the preserved path
+`/console/settings`, and bare `/settings` is then served only if it is listed
+here explicitly.
 
 ### http.context.table.status
 
