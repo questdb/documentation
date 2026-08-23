@@ -64,6 +64,12 @@ QuestDB refuses to start when the OIDC configuration is inconsistent. With
 OAuth2 audience as set on the tokens issued by the OIDC Provider. Defaults
 to the client ID if not set.
 
+Only used when
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,
+which is the only case in which QuestDB validates tokens itself. In the default
+user info flow the OIDC Provider decides whether the token is valid, and
+QuestDB does not check the audience at all.
+
 ### acl.oidc.client.id
 
 - **Default**: none
@@ -143,7 +149,15 @@ location where it was loaded from (`window.location.href`).
 - **Reloadable**: no
 
 The OIDC server asks consent for the scopes listed in this property. The
-scope `openid` is mandatory and must always be included.
+scope `openid` is mandatory and must always be included. That is an OIDC
+protocol requirement enforced by the provider, not a QuestDB startup check:
+QuestDB passes the value on without inspecting it, so leaving `openid` out
+fails at the provider rather than at startup.
+
+QuestDB uses the scopes in the requests it makes itself, in the
+[ROPC flow](#acloidcropcflowenabled), and publishes them on the
+[settings endpoint](/docs/security/oidc/#settings-endpoint) for clients which
+run the flow themselves.
 
 ## Authentication flows
 
@@ -179,6 +193,22 @@ without it.
 
 Enables or disables the Resource Owner Password Credentials flow. When
 enabled, this flow must also be configured in the OIDC Provider.
+
+With it enabled QuestDB runs the flow itself: a username and password arriving
+over HTTP basic authentication or PGWire that match no local user are sent on to
+the OIDC Provider's token endpoint as a password grant, and the user is logged
+in if the provider issues a token. This lets clients which cannot follow a
+browser redirect, such as `psql`, authenticate with their SSO credentials.
+
+Local users are matched first, so a QuestDB user whose name also exists in the
+Identity Provider is authenticated against its local password, without involving
+the provider.
+
+Unlike [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
+[`acl.oidc.state.required`](#acloidcstaterequired), this setting is not
+published on the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), so a client cannot
+discover whether the flow is available.
 
 ### acl.oidc.state.required
 
