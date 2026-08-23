@@ -657,14 +657,19 @@ client for ingesting data. It is practical to manage their credentials via an
 OAuth2 provider too.
 
 As seen in the Jupyter notebook examples, the clients can request a token
-themselves and then use it to authorise data ingestion. The token endpoint they
-post to, the client id and the scopes are all published on the
-[settings endpoint](#settings-endpoint), so none of them have to be hard coded.
-The same response also tells the client
-[which token to send](#which-token-to-send):
+themselves and then use it to authorise data ingestion. QuestDB publishes the
+provider's token endpoint on the [settings endpoint](#settings-endpoint), so it
+does not have to be hard coded, and the same response tells the client
+[which token to send](#which-token-to-send).
+
+The client id and the scopes stay the client's own. `acl.oidc.client.id` and
+`acl.oidc.scope` describe QuestDB's registration with the provider, not the
+job's. As noted in [Architecture overview](#architecture-overview), each
+application which integrates via OIDC should be given a different Client Id, so
+that the two can be told apart in the provider's audit log and given different
+policies.
 
 ```python
-import json
 import os
 import requests
 import pandas as pd
@@ -675,20 +680,30 @@ load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
+# this job's own registration in the OIDC Provider, not QuestDB's;
+# the openid scope is what makes the provider issue an ID token
+client_id = os.environ.get("client_id")
+scope = "openid"
+
 settings = requests.get("http://localhost:9000/settings").json()["config"]
+if not settings.get("acl.oidc.enabled"):
+    raise SystemExit("OIDC is not enabled on this QuestDB instance")
 
 response = requests.post(settings["acl.oidc.token.endpoint"],
                          data={"grant_type": "password",
-                               "client_id": settings["acl.oidc.client.id"],
+                               "client_id": client_id,
                                "username": user,
                                "password": pwd,
-                               "scope": settings["acl.oidc.scope"]},
+                               "scope": scope},
                          headers={"Content-Type": "application/x-www-form-urlencoded"})
+response.raise_for_status()
+tokens = response.json()
 
-response_body = response.content.decode("utf-8")
-tokens = json.loads(response_body)
-groups_in_token = settings["acl.oidc.groups.encoded.in.token"]
-token = tokens["id_token"] if groups_in_token else tokens["access_token"]
+# QuestDB reads the group memberships from the ID token when this is enabled
+token_key = "id_token" if settings["acl.oidc.groups.encoded.in.token"] else "access_token"
+if token_key not in tokens:
+    raise SystemExit(f"the provider did not issue an {token_key} for the password grant")
+token = tokens[token_key]
 
 conf = f"http::addr=localhost:9000;token={token};"
 with Sender.from_conf(conf) as sender:
@@ -696,6 +711,16 @@ with Sender.from_conf(conf) as sender:
     df["ts"] = pd.to_datetime(df["ts"])
     sender.dataframe(df, table_name="foo", at="ts")
 ```
+
+:::note
+
+The Resource Owner Password Credentials flow returns an ID token only if the
+provider issues one for the password grant, and only when `openid` is among the
+requested scopes. Check that the provider does before relying on
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+with a non-interactive client.
+
+:::
 
 Alternatively, a user may rely on QuestDB to authenticate them via the OAuth2
 provider when the Resource Owner Password Credentials flow is enabled on the
