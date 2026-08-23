@@ -333,6 +333,31 @@ setting on the
 [settings endpoint](/docs/security/oidc/#settings-endpoint) so that clients can
 [pick the right one](/docs/security/oidc/#which-token-to-send).
 
+It changes how tokens are validated too. In the default user info flow QuestDB
+hands the token to the OIDC Provider on every cache miss, so the provider
+decides whether it is still valid. With this setting enabled QuestDB validates
+the token itself and never asks the provider about it:
+
+| Checked | Not checked |
+| --- | --- |
+| the signature, against the public key named by the token's `kid` | `exp`, the expiry |
+| `aud`, against [`acl.oidc.audience`](#acloidcaudience) | `nbf`, the not-before time |
+| that `sub` and the group memberships are present | `iss`, the issuer |
+
+:::caution
+
+An expired token is therefore still accepted. Once issued, a token stays valid
+for as long as the key that signed it is in QuestDB's cache, which is governed
+by [`acl.oidc.public.keys.expiry`](#acloidcpublickeysexpiry) and by how long the
+provider publishes the key. Neither
+[`acl.oidc.cache.ttl`](#acloidccachettl) nor a shorter token lifetime in the
+provider shortens it.
+
+Do not enable this setting where you rely on being able to revoke a token, or on
+the provider's token lifetimes being enforced.
+
+:::
+
 ### acl.oidc.sub.claim
 
 - **Default**: `sub`
@@ -362,9 +387,13 @@ Set it to `0` to disable the cache, so that every request is checked again. In
 the default user info flow that means a call to the OIDC Provider on every
 request. When
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`
-QuestDB checks the token's signature and audience locally instead, and contacts
-the provider only when the public keys have to be reloaded. The local check
-does not test the token's expiry.
+QuestDB checks the token locally instead, and contacts the provider only when
+the public keys have to be reloaded.
+
+That local check does not test the token's expiry, so shortening this TTL does
+not shorten how long an issued token is accepted. See
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) for what is
+and is not validated.
 
 ### acl.oidc.public.keys.expiry
 

@@ -1465,6 +1465,19 @@ title="Application overview"
 width={600}
 />
 
+:::caution
+
+This setup relies on
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken),
+because Entra ID cannot serve the group memberships from its User Info
+endpoint. QuestDB then validates the ID token itself and never asks Entra ID
+about it, which means it does not check the token's expiry: an issued token is
+accepted for as long as the key that signed it stays in QuestDB's cache. Read
+that option before going to production, and note that clients must send the ID
+token here, not the access token.
+
+:::
+
 #### Map groups and grant permissions
 
 Now we can start QuestDB, and login with the built-in admin to create
