@@ -29,8 +29,10 @@ AS [ ( ] query [ ) ]
 Where:
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY` (except for the
-  passthrough views used by `EXPIRE ROWS` — see below)
+- `query`: Either an aggregating query with `SAMPLE BY` or a time-based
+  `GROUP BY`, or a
+  [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection
+  over a single table
 - `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]` — designed for passthrough views (see below)
 
 ## Parameters
@@ -42,7 +44,7 @@ Where:
 | `WITH BASE` | Specify base table (required for JOINs) |
 | `REFRESH` | Refresh strategy (default: `IMMEDIATE`) |
 | `DEFERRED` | Skip initial refresh on creation |
-| `query` | A `SAMPLE BY` or time-based `GROUP BY` query |
+| `query` | An aggregating (`SAMPLE BY` / time-based `GROUP BY`) or [passthrough](/docs/concepts/materialized-views/#passthrough-views) query |
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
@@ -53,7 +55,7 @@ Where:
 
 | Rule | Description |
 | ---- | ----------- |
-| Query must aggregate | Requires `SAMPLE BY` or `GROUP BY` with designated timestamp |
+| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a 1:1 [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection over a single table |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
@@ -289,11 +291,12 @@ whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows — the late
 per key, the top-N per group, or rows matching a predicate — recomputed
 continuously as the view refreshes.
 
-`EXPIRE ROWS` is designed for **passthrough (non-aggregating) views** — the
-query is `SELECT * FROM base` with no `SAMPLE BY` / `GROUP BY`. An aggregating
-view is accepted with a logged advisory (a later refresh can regenerate
-reclaimed rows). The defining query must not read another policied view, as its
-base or in a join:
+`EXPIRE ROWS` is designed for
+[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views)
+— a projection over a single table, with no `SAMPLE BY` / `GROUP BY`, whose rows
+stay 1:1 with the base. An aggregating view is accepted with a logged advisory
+(a later refresh can regenerate reclaimed rows). The defining query must not
+read another policied view, as its base or in a join:
 
 ```questdb-sql title="Passthrough view that keeps the latest row per symbol"
 CREATE MATERIALIZED VIEW trades_latest AS (

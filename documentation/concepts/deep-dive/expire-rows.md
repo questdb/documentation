@@ -57,11 +57,13 @@ requirement.
 
 `EXPIRE ROWS` is designed for a **passthrough materialized view**:
 
-- The view query is `SELECT * FROM base`. A column subset and a `WHERE` filter
-  keep the view passthrough; aggregation, `SAMPLE BY`, `GROUP BY`, `LATEST ON`,
-  `DISTINCT`, `UNION`, and `JOIN` make it non-passthrough.
+- The view query keeps view rows 1:1 with base rows — a projection over a single
+  table, with or without a `WHERE` filter. See
+  [which queries are passthrough](/docs/concepts/materialized-views/#which-queries-are-passthrough)
+  for the full rules.
 - The view inherits the base table's
-  [designated timestamp](/docs/concepts/designated-timestamp/) and partitioning.
+  [designated timestamp](/docs/concepts/designated-timestamp/), partitioning and
+  symbol indexes.
 
 A passthrough view mirrors its base table 1:1 and refreshes incrementally, so it
 is effectively a continuously-maintained replica. `EXPIRE ROWS` prunes that
@@ -77,6 +79,67 @@ A policied view must also stand alone: `CREATE MATERIALIZED VIEW` rejects a
 defining query that reads a policied view (as its base or in a join), and
 `ALTER ... SET EXPIRE` is rejected on a view that other materialized views
 derive from — otherwise those views would copy expired rows on refresh.
+
+## `WHERE` filter or `EXPIRE ROWS`?
+
+A passthrough view can exclude rows in two places: a `WHERE` clause in its
+defining query, or an `EXPIRE ROWS WHEN` predicate. For a deterministic,
+row-local predicate the two describe the same set of surviving rows, so the
+choice is not about what the view contains — it is about whether the rule is
+part of the view's *definition* or a *knob you expect to turn*.
+
+**Default to `WHERE`.** A row a `WHERE` clause excludes is never written, so it
+costs nothing at any stage:
+
+| | `WHERE` in the query | `EXPIRE ROWS WHEN` |
+| --- | --- | --- |
+| Storage | Row is never written | Row is written, and occupies disk until a sweep reclaims it |
+| Read cost | None | The keep-set filter is applied on every read of the view |
+| Write cost | None | The cleanup job rewrites partitions on the `CLEANUP EVERY` cadence |
+| After a full refresh | Still excluded | Re-materialized from the base, then hidden and swept again |
+| Can be another view's base | Yes | No — a policied view is rejected as a base |
+
+That last row is a hard constraint rather than a preference. If any other view
+will read this one, the policy is not available and the predicate has to go in
+the `WHERE` clause.
+
+**Reach for `EXPIRE ROWS` when the cutoff is a knob.** There is no
+`ALTER MATERIALIZED VIEW ... AS <new query>`, so changing a `WHERE` clause means
+dropping the view and re-creating it, which re-materializes it from the base.
+Changing a policy is a metadata operation:
+
+```questdb-sql title="Retuning a retention horizon without a rebuild"
+ALTER MATERIALIZED VIEW trades_recent SET EXPIRE ROWS WHEN ts < '2024-06-01T00:00:00.000000Z';
+ALTER MATERIALIZED VIEW trades_recent SET EXPIRE ROWS WHEN ts < '2024-07-01T00:00:00.000000Z';
+ALTER MATERIALIZED VIEW trades_recent DROP EXPIRE;
+```
+
+The rebuild a `WHERE` change forces is not only slow, it can lose data: if the
+base table has its own [TTL](/docs/concepts/ttl/), re-creating the view reads a
+base that no longer holds everything the view held. A view whose retention
+horizon is longer than its base table's cannot afford to be rebuilt, so its
+cutoff belongs in a policy.
+
+Two things only `EXPIRE ROWS` can express at all, whichever way you lean:
+
+- **Rules that move with the clock.** A view's defining query rejects
+  non-deterministic functions, so `WHERE ts > dateadd('d', -7, now())` is not
+  accepted. `EXPIRE ROWS WHEN ts < dateadd('d', -7, now())` is the supported way
+  to write a rolling window.
+- **Rules that compare rows against each other.** `KEEP LATEST`,
+  `KEEP N HIGHEST/LOWEST` and window predicates have no `WHERE` equivalent — a
+  `LATEST ON` or a window function in the defining query makes the view
+  non-passthrough.
+
+In practice the two compose, and on a passthrough view that is usually the right
+shape: the `WHERE` clause fixes what the view is about, and the policy fixes how
+long it keeps what it has.
+
+```questdb-sql title="A filter for the subject, a policy for the horizon"
+CREATE MATERIALIZED VIEW trades_btc_recent AS (
+  SELECT * FROM trades WHERE symbol = 'BTC'
+) EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 1h;
+```
 
 ## The modes
 
@@ -514,6 +577,8 @@ rather than breaking subsequent reads.
 
 - [Materialized views](/docs/concepts/materialized-views/) — the view type
   `EXPIRE ROWS` runs on
+- [Passthrough views](/docs/concepts/materialized-views/#passthrough-views) —
+  the non-aggregating view shape `EXPIRE ROWS` is designed for
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/) — full create
   syntax, including the `EXPIRE ROWS` clause
 - [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/)
