@@ -45,9 +45,15 @@ continuously-maintained, pruned copy of a base table:
   symbol, or session (`KEEP LATEST`).
 - **Per-group extremes or leaderboards** — keep the highest/lowest value per
   group, or the top-N (`KEEP HIGHEST/LOWEST`, `KEEP N`).
-- **Rolling row-level windows** — keep rows newer than a cutoff, or matching any
-  predicate, at finer granularity than TTL's whole-partition drops
+- **Rolling row-level windows** — keep rows newer than a moving cutoff such as
+  `now() - 7d`, at finer granularity than TTL's whole-partition drops
   (`WHEN predicate`).
+
+The `WHEN` form earns its keep on predicates that involve **wall-clock time**. A
+deterministic predicate — one that depends only on the row's own values —
+selects the same rows more cheaply as a `WHERE` clause in the view's defining
+query, which never copies the excluded rows into the view at all. See
+[`WHERE` filter or `EXPIRE ROWS`?](#where-filter-or-expire-rows).
 
 Use [TTL](/docs/concepts/ttl/) instead when partition-granularity, age-based
 retention on a base table is enough — it is cheaper and has no passthrough-view
@@ -83,13 +89,22 @@ derive from — otherwise those views would copy expired rows on refresh.
 ## `WHERE` filter or `EXPIRE ROWS`?
 
 A passthrough view can exclude rows in two places: a `WHERE` clause in its
-defining query, or an `EXPIRE ROWS WHEN` predicate. For a deterministic,
-row-local predicate the two describe the same set of surviving rows, so the
-choice is not about what the view contains — it is about whether the rule is
-part of the view's *definition* or a *knob you expect to turn*.
+defining query, or an `EXPIRE ROWS WHEN` predicate. The dividing line is the
+clock.
 
-**Default to `WHERE`.** A row a `WHERE` clause excludes is never written, so it
-costs nothing at any stage:
+**Use `EXPIRE ROWS WHEN` for rules that move with wall-clock time.** A rolling
+window cannot be written as a `WHERE` clause at all: a view's defining query
+rejects non-deterministic functions, so `WHERE ts > dateadd('d', -7, now())` is
+not accepted. `EXPIRE ROWS WHEN ts < dateadd('d', -7, now())` is the supported
+way to say "keep the last 7 days" — the read filter re-evaluates `now()` on
+every read, so the window rolls forward on its own and the cleanup job reclaims
+the disk behind it. This is what the `WHEN` form is for.
+
+**Put a deterministic predicate in the `WHERE` clause.** A predicate that
+depends only on the row's own values — `symbol = 'BTC'`, `amount >= 1.5` —
+describes the same surviving rows either way, so the two are near-equivalent in
+what the view contains, and `WHERE` is the cheaper of the two at every stage. A
+row the `WHERE` clause excludes is never copied into the view:
 
 | | `WHERE` in the query | `EXPIRE ROWS WHEN` |
 | --- | --- | --- |
@@ -103,7 +118,25 @@ That last row is a hard constraint rather than a preference. If any other view
 will read this one, the policy is not available and the predicate has to go in
 the `WHERE` clause.
 
-**Reach for `EXPIRE ROWS` when the cutoff is a knob.** There is no
+The two forms are not exact negations of each other on `NULL`s: `WHERE` keeps a
+row only when the predicate is `TRUE`, while `EXPIRE ROWS WHEN` expires a row
+only when it is `TRUE`. A `NULL` amount is dropped by `WHERE amount >= 1.5` and
+kept by `EXPIRE ROWS WHEN amount < 1.5` — see [NULLs](#nulls).
+
+The two compose, and on a passthrough view that combination is usually the right
+shape: the `WHERE` clause fixes what the view is about, and the `WHEN` policy
+fixes how long it keeps what it has.
+
+```questdb-sql title="A filter for the subject, a policy for the horizon"
+CREATE MATERIALIZED VIEW trades_btc_recent AS (
+  SELECT * FROM trades WHERE symbol = 'BTC'
+) EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 1h;
+```
+
+### When a deterministic cutoff still belongs in a policy
+
+One case pulls a deterministic predicate back into `EXPIRE ROWS`: a fixed
+threshold you expect to advance by hand. There is no
 `ALTER MATERIALIZED VIEW ... AS <new query>`, so changing a `WHERE` clause means
 dropping the view and re-creating it, which re-materializes it from the base.
 Changing a policy is a metadata operation:
@@ -120,26 +153,10 @@ base that no longer holds everything the view held. A view whose retention
 horizon is longer than its base table's cannot afford to be rebuilt, so its
 cutoff belongs in a policy.
 
-Two things only `EXPIRE ROWS` can express at all, whichever way you lean:
-
-- **Rules that move with the clock.** A view's defining query rejects
-  non-deterministic functions, so `WHERE ts > dateadd('d', -7, now())` is not
-  accepted. `EXPIRE ROWS WHEN ts < dateadd('d', -7, now())` is the supported way
-  to write a rolling window.
-- **Rules that compare rows against each other.** `KEEP LATEST`,
-  `KEEP N HIGHEST/LOWEST` and window predicates have no `WHERE` equivalent — a
-  `LATEST ON` or a window function in the defining query makes the view
-  non-passthrough.
-
-In practice the two compose, and on a passthrough view that is usually the right
-shape: the `WHERE` clause fixes what the view is about, and the policy fixes how
-long it keeps what it has.
-
-```questdb-sql title="A filter for the subject, a policy for the horizon"
-CREATE MATERIALIZED VIEW trades_btc_recent AS (
-  SELECT * FROM trades WHERE symbol = 'BTC'
-) EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 1h;
-```
+A rule that compares rows against each other has no `WHERE` equivalent either:
+`KEEP LATEST`, `KEEP N HIGHEST/LOWEST` and window predicates cannot be expressed
+in the defining query, because a `LATEST ON` or a window function there makes
+the view non-passthrough.
 
 ## The modes
 
@@ -223,8 +240,12 @@ this small dataset that is effectively instant.
 
 ### Per-row predicate: `WHEN`
 
-A per-row predicate expires a row when it evaluates `TRUE`. Here, expire small
-trades (`amount < 1.5`):
+A per-row predicate expires a row when it evaluates `TRUE`. The example below
+uses a deterministic predicate — expire small trades (`amount < 1.5`) —
+because it makes the keep-set easy to read off the sample data. In production
+that rule belongs in the view's `WHERE` clause (`WHERE amount >= 1.5`), which
+keeps those rows out of the view entirely; the rolling window further down is
+the case `WHEN` exists for.
 
 ```questdb-sql title="Expire rows where amount < 1.5"
 CREATE MATERIALIZED VIEW trades_sized AS (
@@ -244,8 +265,10 @@ The two `amount = 1.0` rows are expired. `amount = 1.5` is kept (`1.5 < 1.5` is
 `FALSE`), and any `NULL` amount would be kept too (the comparison is `UNKNOWN`,
 not `TRUE` — see [NULLs](#nulls)).
 
-A predicate on the designated timestamp gives a **rolling retention window**,
-re-evaluated on every read so the visible set rolls forward with the clock:
+A predicate on the designated timestamp gives a **rolling retention window** —
+the main use for `WHEN`. It is re-evaluated on every read, so the visible set
+rolls forward with the clock, and no `WHERE` clause can express it because the
+defining query rejects `now()`:
 
 ```questdb-sql title="Keep the last 1 day"
 CREATE MATERIALIZED VIEW trades_recent AS (
@@ -578,7 +601,7 @@ rather than breaking subsequent reads.
 - [Materialized views](/docs/concepts/materialized-views/) — the view type
   `EXPIRE ROWS` runs on
 - [Passthrough views](/docs/concepts/materialized-views/#passthrough-views) —
-  the non-aggregating view shape `EXPIRE ROWS` is designed for
+  the non-aggregating views `EXPIRE ROWS` applies to
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/) — full create
   syntax, including the `EXPIRE ROWS` clause
 - [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/)

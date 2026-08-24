@@ -185,9 +185,10 @@ summary of it:
 - **A narrowed replica** — one symbol, one tenant, one region, or a handful of
   columns out of a wide table, kept current automatically and queried without
   the base table's scan cost.
-- **A row-level retention target** — a passthrough view is the shape
-  [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) is built for. Its rows
-  *are* base rows, so reclaiming one is permanent.
+- **A row-level retention target** — attach an
+  [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy to keep only
+  some of the view's rows: the latest per key, the top-N per group, or rows
+  inside a rolling time window. The base table is left alone.
 
 Passthrough views refresh incrementally like any other materialized view, and
 accept the same `REFRESH IMMEDIATE` (the default), `REFRESH MANUAL` and

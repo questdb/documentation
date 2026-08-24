@@ -304,6 +304,13 @@ CREATE MATERIALIZED VIEW trades_latest AS (
 ) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
 ```
 
+A `WHEN` predicate is for rules that move with **wall-clock time**, such as a
+rolling `ts < dateadd('d', -7, now())` window — the defining query cannot
+express those, because it rejects non-deterministic functions. A predicate that
+depends only on the row's own values belongs in the query's `WHERE` clause
+instead, which keeps those rows out of the view entirely; see
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/deep-dive/expire-rows/#where-filter-or-expire-rows).
+
 The clause goes after the query (and after `PARTITION BY` if present):
 
 ```

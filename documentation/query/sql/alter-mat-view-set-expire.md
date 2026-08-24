@@ -55,10 +55,16 @@ reclamation follows in the background. See
 
 ## Examples
 
-```questdb-sql title="Per-row predicate, with a tighter cleanup cadence"
+```questdb-sql title="Rolling 7-day window, with a tighter cleanup cadence"
 ALTER MATERIALIZED VIEW trades_mirror
-  SET EXPIRE ROWS WHEN amount < 1.5 CLEANUP EVERY 30m;
+  SET EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 30m;
 ```
+
+A `WHEN` predicate is the right tool for a cutoff that moves with the clock like
+this one. A deterministic predicate such as `amount < 1.5` is accepted too, but
+it selects the same rows more cheaply as a `WHERE` clause in the view's defining
+query — see
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/deep-dive/expire-rows/#where-filter-or-expire-rows).
 
 ```questdb-sql title="Keep the latest row per symbol"
 ALTER MATERIALIZED VIEW trades_mirror
