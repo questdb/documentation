@@ -13,6 +13,16 @@ and a
 We distribute QuestDB via [Helm](https://helm.sh) on
 [ArtifactHub](https://artifacthub.io/packages/helm/questdb/questdb).
 
+:::tip
+
+This page covers the self-managed Helm chart. QuestDB Enterprise users can
+instead run the
+[Enterprise Kubernetes Operator](/docs/enterprise-kubernetes-operator/), which
+manages the full cluster lifecycle: pods and storage, configuration, backup and
+restore, replication, and promotion.
+
+:::
+
 ## Prerequisites
 
 - [Helm](https://helm.sh/docs/intro/install/)
