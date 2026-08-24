@@ -31,7 +31,7 @@ A `QuestDBPromotion` records one explicit, one-shot cutover and remains as its a
 | Mode | Use | Data effect |
 | --- | --- | --- |
 | `Planned` | Healthy primary and live replica | Drains the old primary and verifies the target before promotion. Fails rather than becoming lossy. |
-| `Emergency` | Primary is lost/wedged and service restoration outweighs data loss | Skips the drain. Unreplicated writes are lost. |
+| `Emergency` | Primary is lost/wedged and service restoration outweighs data loss | Skips the drain. Unreplicated writes may be lost, but QWP clients using [durable acknowledgements](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) retain and retry writes that were not durably acknowledged. |
 
 ### Planned prechecks
 
@@ -113,7 +113,7 @@ Confirm `status.currentPrimary` names the target and require current-generation 
 Use the same object shape with `mode: Emergency` only after selecting a live target and accepting data loss.
 
 :::danger
-Emergency promotion permanently loses writes that the old primary had not replicated. Clients connected directly to the old pod can briefly receive acknowledgements for writes that will be discarded while it detects loss of store ownership. Stop/repoint writers and use the stable `<name>-rw` Service, not pod addresses.
+Emergency promotion may lose writes that the old primary had not replicated. QWP clients configured with [durable acknowledgements](/docs/high-availability/store-and-forward/when-to-use/#durable-ack-when-to-opt-in) retain writes until object-store durability is confirmed and retry unacknowledged writes after connecting to the new primary. Clients connected directly to the old pod can briefly receive acknowledgements for writes that will be discarded while it detects loss of store ownership. Stop/repoint writers and use the stable `<name>-rw` Service, not pod addresses.
 :::
 
 ```sh
