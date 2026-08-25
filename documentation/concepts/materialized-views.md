@@ -187,13 +187,106 @@ summary of it:
   the base table's scan cost.
 - **A row-level retention target** — attach an
   [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy to keep only
-  some of the view's rows: the latest per key, the top-N per group, or rows
-  inside a rolling time window. The base table is left alone.
+  some of the view's rows. The base table is left alone.
 
 Passthrough views refresh incrementally like any other materialized view, and
 accept the same `REFRESH IMMEDIATE` (the default), `REFRESH MANUAL` and
 `REFRESH EVERY` strategies. `REFRESH PERIOD` is rejected: there are no buckets
 for a period to align to.
+
+### Use cases
+
+On its own, a passthrough view is a maintained copy of the base table. Add an
+[`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy and it becomes a
+maintained *subset*: you describe which rows are worth keeping, and QuestDB
+keeps that set current as new data arrives. The three examples below are drawn
+from sensor telemetry and from capital markets, and each keeps a different kind
+of subset.
+
+#### IoT: The current reading from every sensor
+
+A building management platform records temperature and humidity from tens of
+thousands of sensors, and its operations screen shows the newest reading from
+each one.
+
+Sensors report at their own pace. Some send a reading every second, others go
+quiet for days. Against the base table that screen runs
+`LATEST ON ts PARTITION BY sensor_id`, which reads backwards until it has found
+a row for even the quietest sensor, and over a long history that is most of the
+table.
+
+A view that keeps only the newest row per sensor answers the same question from
+a handful of rows:
+
+```questdb-sql title="Latest reading per sensor"
+CREATE MATERIALIZED VIEW sensor_current AS (
+  SELECT * FROM sensor_readings
+) EXPIRE ROWS KEEP LATEST PARTITION BY sensor_id;
+```
+
+`sensor_current` holds one row per `sensor_id` and moves forward on its own as
+readings arrive. Superseded rows stop appearing in queries but stay on disk, so
+the view keeps growing at the same rate as the base table. Give it a
+[TTL](/docs/concepts/ttl/) to cap its size.
+
+#### Finance: Options that have not expired yet
+
+A market maker quotes an options chain where contracts expire every Friday, and
+the pricing screen must never show a contract that has already expired.
+
+That rule cannot live in the view's query. The query runs when rows are written
+into the view, and it may not call `now()`, so there is no way to say "expiry is
+still in the future" in a `WHERE` clause. An `EXPIRE ROWS WHEN` predicate is
+evaluated on every read, which is what this case needs:
+
+```questdb-sql title="Options that have not expired yet"
+CREATE MATERIALIZED VIEW options_live AS (
+  SELECT * FROM options_quotes
+) EXPIRE ROWS WHEN expiry < now();
+```
+
+Contracts leave `options_live` as their expiry passes. There is no job to
+schedule and nothing to re-create.
+
+One caveat, about disk rather than about results. QuestDB deletes expired rows
+only when it can tell that a row, once expired, can never qualify again. It can
+tell that for a cutoff on the view's designated timestamp, which only moves
+forward. `expiry` is a different column, so QuestDB takes the safe route:
+expired contracts stop appearing in queries straight away, but their rows stay
+on disk. Add a [TTL](/docs/concepts/ttl/) if you want that space back, and see
+[when expired rows are deleted from disk](/docs/concepts/deep-dive/expire-rows/#monotonicity-and-cleanup-safety).
+
+#### Finance: The largest trades per symbol
+
+A surveillance desk watches for block trades and wants the ten biggest prints
+for every instrument on hand at all times.
+
+A trade is a fact that does not change once it has happened, so "the ten biggest
+so far" is a set that only gets refined as larger trades arrive. That is what a
+top-N policy maintains:
+
+```questdb-sql title="Ten largest trades per symbol"
+CREATE MATERIALIZED VIEW trades_largest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP 10 HIGHEST amount PARTITION BY symbol;
+```
+
+`trades_largest` holds ten rows per symbol however far the base table grows, and
+the desk reads it directly instead of ranking the base table on every query.
+When an eleventh large trade arrives, the smallest of the ten drops out. Trades
+tied on `amount` at the tenth place are separated by the designated timestamp,
+with the newer one staying.
+
+Ten rows per symbol are visible, but the view still stores every base row it has
+taken in, because a top-N policy never frees disk. A [TTL](/docs/concepts/ttl/)
+is what bounds that, at the price of changing the question the view answers from
+"the biggest so far" to "the biggest still retained". See
+[combining with TTL](/docs/concepts/deep-dive/expire-rows/#combining-with-ttl).
+
+The ranking covers everything the view holds rather than a recent window, so
+`KEEP N` fits records that stay true once written. For a value that gets
+superseded later, such as a resting order that is then cancelled, `KEEP LATEST`
+is the mode that tracks the current version.
 
 ### What a passthrough view inherits
 
