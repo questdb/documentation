@@ -20,7 +20,7 @@ Partitioning provides significant benefits for time-series workloads:
   one partition, not the entire table.
 - **Data lifecycle**: Drop old data instantly with
   [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) - no expensive
-  DELETE operations. Detach partitions to cold storage, reattach when needed.
+  DELETE operations. Detach partitions to archive storage, reattach when needed.
 - **Write efficiency**: Out-of-order data only rewrites affected partitions, not
   the entire table. Smaller partitions mean less write amplification.
 - **Concurrent access**: Different partitions can be written and read
@@ -54,13 +54,13 @@ go higher.
 
 Choose your interval based on how much data you ingest:
 
-| Your data volume | Recommended interval |
-|------------------|---------------------|
-| >1 billion rows/day | `HOUR` |
-| 30-500 million rows/day | `DAY` |
-| 5-30 million rows/day | `WEEK` |
-| 1-5 million rows/day | `MONTH` |
-| \<1 million rows/day | `YEAR` |
+| Your data volume        | Recommended interval |
+| ----------------------- | -------------------- |
+| >1 billion rows/day     | `HOUR`               |
+| 30-500 million rows/day | `DAY`                |
+| 5-30 million rows/day   | `WEEK`               |
+| 1-5 million rows/day    | `MONTH`              |
+| \<1 million rows/day    | `YEAR`               |
 
 **Why this matters:**
 
@@ -94,21 +94,21 @@ CREATE TABLE trades (
 
 ### Default behavior by creation method
 
-| Creation method | Default partition |
-|-----------------|-------------------|
-| SQL `CREATE TABLE` (no `PARTITION BY`) | `NONE` |
-| SQL `CREATE TABLE` (with `PARTITION BY`) | As specified |
-| ILP auto-created tables | `DAY` |
+| Creation method                          | Default partition |
+| ---------------------------------------- | ----------------- |
+| SQL `CREATE TABLE` (no `PARTITION BY`)   | `NONE`            |
+| SQL `CREATE TABLE` (with `PARTITION BY`) | As specified      |
+| ILP auto-created tables                  | `DAY`             |
 
 ### Partition directory naming
 
-| Interval | Directory format | Example |
-|----------|------------------|---------|
-| `HOUR` | `YYYY-MM-DDTHH` | `2026-01-15T09` |
-| `DAY` | `YYYY-MM-DD` | `2026-01-15` |
-| `WEEK` | `YYYY-Www` | `2026-W03` |
-| `MONTH` | `YYYY-MM` | `2026-01` |
-| `YEAR` | `YYYY` | `2026` |
+| Interval | Directory format | Example         |
+| -------- | ---------------- | --------------- |
+| `HOUR`   | `YYYY-MM-DDTHH`  | `2026-01-15T09` |
+| `DAY`    | `YYYY-MM-DD`     | `2026-01-15`    |
+| `WEEK`   | `YYYY-Www`       | `2026-W03`      |
+| `MONTH`  | `YYYY-MM`        | `2026-01`       |
+| `YEAR`   | `YYYY`           | `2026`          |
 
 ## Inspecting partitions
 
@@ -118,10 +118,10 @@ Use `SHOW PARTITIONS` or the `table_partitions()` function:
 SHOW PARTITIONS FROM trades;
 ```
 
-| index | partitionBy | name | minTimestamp | maxTimestamp | numRows | diskSizeHuman |
-|-------|-------------|------|--------------|--------------|---------|---------------|
-| 0 | DAY | 2026-01-15 | 2026-01-15T00:00:00Z | 2026-01-15T23:59:59Z | 1440000 | 68.0 MiB |
-| 1 | DAY | 2026-01-16 | 2026-01-16T00:00:00Z | 2026-01-16T12:30:00Z | 750000 | 35.2 MiB |
+| index | partitionBy | name       | minTimestamp         | maxTimestamp         | numRows | diskSizeHuman |
+| ----- | ----------- | ---------- | -------------------- | -------------------- | ------- | ------------- |
+| 0     | DAY         | 2026-01-15 | 2026-01-15T00:00:00Z | 2026-01-15T23:59:59Z | 1440000 | 68.0 MiB      |
+| 1     | DAY         | 2026-01-16 | 2026-01-16T00:00:00Z | 2026-01-16T12:30:00Z | 750000  | 35.2 MiB      |
 
 The `table_partitions()` function returns the same data and can be used in
 queries with `WHERE`, `JOIN`, or `UNION`:
@@ -176,10 +176,10 @@ A split occurs when:
 
 Split partitions appear with timestamp suffixes in `SHOW PARTITIONS`:
 
-| name | numRows |
-|------|---------|
-| 2026-01-15 | 1259999 |
-| 2026-01-15T205959-880001 | 60002 |
+| name                     | numRows |
+| ------------------------ | ------- |
+| 2026-01-15               | 1259999 |
+| 2026-01-15T205959-880001 | 60002   |
 
 QuestDB automatically squashes splits:
 - Non-active partitions: squashed at end of each commit
@@ -199,8 +199,8 @@ partition as a single unit.
 
 - [Designated timestamp](/docs/concepts/designated-timestamp/) — Required for partitioning
 - [DROP PARTITION](/docs/query/sql/alter-table-drop-partition/) — Remove old partitions
-- [DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/) — Move to cold storage
+- [DETACH PARTITION](/docs/query/sql/alter-table-detach-partition/) — Move to archive storage
 - [ATTACH PARTITION](/docs/query/sql/alter-table-attach-partition/) — Restore detached data
 - [TTL](/docs/concepts/ttl/) — Automatic partition cleanup by age
-- [Storage Policy](/docs/concepts/storage-policy/) — Graduated partition
-  lifecycle (convert to Parquet, then drop) in QuestDB Enterprise
+- [Storage Policy](/docs/concepts/storage-policy/) — Graduated partition lifecycle (convert to Parquet, upload, then drop) in QuestDB Enterprise
+- [Cold storage](/docs/concepts/cold-storage/) — Keep historical partitions queryable from object storage in QuestDB Enterprise

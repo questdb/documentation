@@ -79,10 +79,7 @@ deployments), reducing the local storage footprint. These remote partitions
 remain directly queryable from QuestDB with SQL, exactly as if they were stored
 locally, and the primary and all replicas share the same object storage.
 
-In QuestDB Enterprise this is automated through
-[storage policies](/docs/concepts/storage-policy/), which control when partitions
-are converted to Parquet and when they are uploaded to and dropped from object
-storage (the `TO REMOTE` and `DROP REMOTE` policy stages).
+In QuestDB Enterprise this is automated through [cold storage](/docs/concepts/cold-storage/), driven by the `TO REMOTE` and `DROP REMOTE` stages of a [storage policy](/docs/concepts/storage-policy/). A partition is uploaded as Parquet, sealed as read-only, and then evicted from local disk, keeping only its metadata and symbol indexes locally so that queries fetch just the column chunks they need.
 
 Once partitions are in object storage, they can be catalogued into data lakes,
 for example through Hive partition registration, an Iceberg catalog, or a

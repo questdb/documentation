@@ -22,9 +22,7 @@ Iceberg registers files that already live in an object store (S3, GCS, Azure
 Blob, MinIO, and so on). How the Parquet gets there, and whether it arrives laid
 out one folder per partition, depends on your edition:
 
-- **QuestDB Enterprise** tiers partitions to object storage automatically through
-  [storage policies](/docs/concepts/storage-policy/). The data lands as Hive-style
-  partitioned Parquet, one folder per partition, for example:
+- **QuestDB Enterprise** tiers partitions to object storage automatically through [cold storage](/docs/concepts/cold-storage/), configured with the `TO REMOTE` stage of a [storage policy](/docs/concepts/storage-policy/). The data lands as Hive-style partitioned Parquet, one folder per partition, for example:
 
   ```text
   fx_trades/year=2026/month=02/day=10/hour=08/data.parquet
@@ -32,6 +30,12 @@ out one folder per partition, depends on your edition:
   ```
 
   so only the Iceberg registration is left to do.
+
+  :::warning
+
+  QuestDB must remain the only writer to that prefix. Registering the files with Iceberg is safe because it only writes metadata, but nothing outside QuestDB may rewrite, replace, or expire a `data.parquet` object once cold storage owns it. Write Iceberg metadata to a separate prefix, and do not point object store lifecycle rules at the QuestDB root.
+
+  :::
 
 - **QuestDB open source** is manual end to end. First produce Parquet, by
   [converting partitions in place or exporting](/docs/concepts/parquet/)
@@ -142,10 +146,10 @@ QuestDB's Parquet is otherwise Iceberg-friendly out of the box (canonically name
 list elements, no conflicting field IDs, and column statistics), so registration
 needs no workarounds. Only two types differ by path:
 
-| QuestDB type        | PyIceberg (format-version 2) | JVM (format-version 3) |
-| ------------------- | ---------------------------- | ---------------------- |
+| QuestDB type         | PyIceberg (format-version 2) | JVM (format-version 3) |
+| -------------------- | ---------------------------- | ---------------------- |
 | nanosecond timestamp | downcast to microseconds     | native `timestamp_ns`  |
-| `uuid`              | stored as `fixed[16]`        | native `uuid`          |
+| `uuid`               | stored as `fixed[16]`        | native `uuid`          |
 
 The UUID difference is cosmetic, not a data loss: a UUID is 16 bytes either way,
 so the values are identical and complete. With the native `uuid` type, query

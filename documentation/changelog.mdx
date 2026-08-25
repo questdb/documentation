@@ -16,6 +16,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
+- [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
+- [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts
+- [SWITCH COLD STORAGE ROLE](/docs/query/sql/switch-cold-storage-role/) - New reference page for moving the cold storage manager role between instances at runtime, with `SWITCH COLD STORAGE STATUS`, the `FORCE` break-glass path, and the timeout semantics
 - [Connect](/docs/connect/overview/) - New top-level Connect section that gathers the native client libraries, the compatibility protocols (ILP, PGWire, REST), and the wire-protocol specifications under one home, with a decision table for picking a path and a per-language QWP support matrix
 - [Connect string reference](/docs/connect/clients/connect-string/) - Every configuration key for the native clients, with worked connect strings for common setups, a goal-to-keys recipe table, sender restart and replay semantics, and an alphabetical key index
 - [Wire protocols](/docs/connect/wire-protocols/overview/) - QWP specifications for client implementers, covering [ingress over WebSocket](/docs/connect/wire-protocols/qwp-ingress-websocket/), [egress over WebSocket](/docs/connect/wire-protocols/qwp-egress-websocket/), and [expected client behavior](/docs/connect/wire-protocols/qwp-client-behavior/)
@@ -34,6 +38,13 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- [Storage Policy](/docs/concepts/storage-policy/) - The `TO REMOTE` and `DROP REMOTE` stages are now enforced. Documented what each does, the requirement for a WAL table with cold storage enabled, and the warning that `DROP LOCAL` makes a partition read-only for good
+- Added the [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) function, which returns the remote state of every partition in a table's manifest as it walks `pending`, `live`, `sealed`, and `deleting`
+- [SHOW PARTITIONS](/docs/query/sql/show/#show-partitions) - Two trailing columns, `seqTxn` and `isRemotelyServed`, are appended to the result set. Tools binding columns by position must be updated
+- [Backup and restore](/docs/operations/backup/#cold-storage-partitions) - Documented that a backup of a database using cold storage does not contain the `data.parquet` bytes, so the backup and the object store prefix are one recovery set
+- [Replication overview](/docs/high-availability/overview/#cold-storage-in-a-replicated-cluster) - Documented that the cold storage manager role is independent of the primary and replica roles, that partition bytes never traverse replication, and that replicas must be upgraded first
+- [Cold storage read metrics](/docs/operations/logging-metrics/#cold-storage-read-metrics) - Added the fifteen `questdb_cold_chunk_*` Prometheus metrics
+- Added the [`storage.policy.recheck.drain.interval`](/docs/configuration/storage-policy/) configuration property
 - [CREATE TABLE](/docs/query/sql/create-table/#partition-format) - Added the `FORMAT { NATIVE | PARQUET }` clause to store partitions as Parquet by default on partitioned WAL tables
 - [REST API](/docs/connect/compatibility/rest-api/#authentication) - Merged the overlapping authentication sections into one, with basic auth (including building the `Authorization` header by hand) and Enterprise token auth
 - [SHOW CREATE LIVE VIEW](/docs/query/sql/show/#show-create-live-view) - Documented retrieving a live view's `CREATE` statement, alongside the `CREATE LIVE VIEW` and `DROP LIVE VIEW` [permissions](/docs/security/rbac/)

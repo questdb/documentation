@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 420" width="660" height="420" role="img" aria-label="Three QuestDB instances keep recent partitions on local disk while a single shared object store holds historical Parquet partitions that every instance reads directly">
+  <defs>
+    <style>
+      .eyebrow    { font: 600 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; letter-spacing: 0.07em; }
+      .card       { fill: #1b1c26; stroke: #51535f; stroke-width: 1; }
+      .card-head  { fill: #32343e; }
+      .card-title { font: 600 12px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .card-role  { font: 11px "IBM Plex Mono", Menlo, monospace; fill: #0cc0df; }
+      .note-sm    { font: 10px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .hot-block  { fill: rgba(12, 192, 223, 0.16); stroke: #0cc0df; stroke-width: 1.2; }
+      .hot-label  { font: 9px "IBM Plex Mono", Menlo, monospace; fill: #0cc0df; }
+
+      .store      { fill: #1b1c26; stroke: #0cc0df; stroke-width: 1.5; stroke-opacity: 0.7; }
+      .store-head { fill: #32343e; }
+      .store-title{ font: 600 12px "IBM Plex Mono", Menlo, monospace; fill: #ffffff; }
+      .cold-block { fill: rgba(226, 137, 164, 0.13); stroke: #e289a4; stroke-width: 1.2; }
+      .cold-label { font: 11px "IBM Plex Mono", Menlo, monospace; fill: #e289a4; }
+      .cold-sub   { font: 8px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #888888; }
+      .path-hint  { font: 9px "IBM Plex Mono", Menlo, monospace; fill: #888888; }
+
+      .guide      { stroke: #3b3d4a; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+      .legend     { font: 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .caption    { font: 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #b1b5d3; }
+      .caption-em { font: 600 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; fill: #0cc0df; }
+
+      @keyframes read-rise {
+        0%   { transform: translateY(0px);         opacity: 0; }
+        12%  { opacity: 1; }
+        78%  { opacity: 1; }
+        100% { transform: translateY(-74px);   opacity: 0; }
+      }
+      @keyframes upload-fall {
+        0%   { transform: translateY(0px);         opacity: 0; }
+        12%  { opacity: 1; }
+        78%  { opacity: 1; }
+        100% { transform: translateY(74px);    opacity: 0; }
+      }
+      @keyframes store-glow {
+        0%, 100% { stroke-opacity: 0.45; }
+        50%      { stroke-opacity: 0.95; }
+      }
+
+      .read-dot   { fill: #0cc0df; animation: read-rise 2.4s linear infinite; }
+      .upload-dot { fill: #e289a4; animation: upload-fall 3.2s linear infinite; }
+      .store      { animation: store-glow 3.2s ease-in-out infinite; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .read-dot, .upload-dot, .store { animation: none; }
+        .read-dot, .upload-dot { opacity: 1; }
+      }
+    </style>
+    <marker id="cs-arrow-read" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7"
+            refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#0cc0df"/>
+    </marker>
+    <marker id="cs-arrow-upload" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7"
+            refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#e289a4"/>
+    </marker>
+  </defs>
+
+  <text class="eyebrow" x="35" y="22">QUESTDB ENTERPRISE CLUSTER</text>
+
+  <!-- instance questdb-1 -->
+  <rect class="card" x="35" y="34" width="180" height="110" rx="6"/>
+  <rect class="card-head" x="35" y="34" width="180" height="26" rx="6"/>
+  <rect class="card-head" x="35" y="48" width="180" height="12"/>
+  <line class="card" x1="35" y1="60" x2="215" y2="60"/>
+  <text class="card-title" x="47" y="52">questdb-1</text>
+  <text class="card-role" x="203" y="52" text-anchor="end">manager</text>
+  <rect class="hot-block" x="47" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="69" y="96" text-anchor="middle">-2d</text>
+  <rect class="hot-block" x="99" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="121" y="96" text-anchor="middle">-1d</text>
+  <rect class="hot-block" x="151" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="173" y="96" text-anchor="middle">now</text>
+  <text class="note-sm" x="47" y="132">hot partitions · local disk</text>
+
+  <!-- instance questdb-2 -->
+  <rect class="card" x="240" y="34" width="180" height="110" rx="6"/>
+  <rect class="card-head" x="240" y="34" width="180" height="26" rx="6"/>
+  <rect class="card-head" x="240" y="48" width="180" height="12"/>
+  <line class="card" x1="240" y1="60" x2="420" y2="60"/>
+  <text class="card-title" x="252" y="52">questdb-2</text>
+  <text class="card-role" x="408" y="52" text-anchor="end">refresher</text>
+  <rect class="hot-block" x="252" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="274" y="96" text-anchor="middle">-2d</text>
+  <rect class="hot-block" x="304" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="326" y="96" text-anchor="middle">-1d</text>
+  <rect class="hot-block" x="356" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="378" y="96" text-anchor="middle">now</text>
+  <text class="note-sm" x="252" y="132">hot partitions · local disk</text>
+
+  <!-- instance questdb-3 -->
+  <rect class="card" x="445" y="34" width="180" height="110" rx="6"/>
+  <rect class="card-head" x="445" y="34" width="180" height="26" rx="6"/>
+  <rect class="card-head" x="445" y="48" width="180" height="12"/>
+  <line class="card" x1="445" y1="60" x2="625" y2="60"/>
+  <text class="card-title" x="457" y="52">questdb-3</text>
+  <text class="card-role" x="613" y="52" text-anchor="end">refresher</text>
+  <rect class="hot-block" x="457" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="479" y="96" text-anchor="middle">-2d</text>
+  <rect class="hot-block" x="509" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="531" y="96" text-anchor="middle">-1d</text>
+  <rect class="hot-block" x="561" y="78" width="44" height="30" rx="3"/>
+  <text class="hot-label" x="583" y="96" text-anchor="middle">now</text>
+  <text class="note-sm" x="457" y="132">hot partitions · local disk</text>
+
+  <!-- range reads rising to every instance -->
+  <line class="guide" x1="100" y1="230" x2="100" y2="148" marker-end="url(#cs-arrow-read)"/>
+  <circle class="read-dot" cx="100" cy="226" r="3.5" style="animation-delay: 0s"/>
+  <line class="guide" x1="330" y1="230" x2="330" y2="148" marker-end="url(#cs-arrow-read)"/>
+  <circle class="read-dot" cx="330" cy="226" r="3.5" style="animation-delay: 0.6s"/>
+  <line class="guide" x1="535" y1="230" x2="535" y2="148" marker-end="url(#cs-arrow-read)"/>
+  <circle class="read-dot" cx="535" cy="226" r="3.5" style="animation-delay: 1.2s"/>
+  <!-- upload leaves the manager only -->
+  <line class="guide" x1="150" y1="148" x2="150" y2="230" marker-end="url(#cs-arrow-upload)"/>
+  <circle class="upload-dot" cx="150" cy="152" r="3.5"/>
+
+  <!-- shared object store -->
+  <rect class="store" x="35" y="234" width="590" height="112" rx="6"/>
+  <rect class="store-head" x="35" y="234" width="590" height="26" rx="6"/>
+  <rect class="store-head" x="35" y="248" width="590" height="12"/>
+  <text class="store-title" x="49" y="252">Object store · S3 · GCS · Azure Blob · NFS</text>
+  <text class="note-sm" x="611" y="252" text-anchor="end">one shared copy of history</text>
+  <rect class="cold-block" x="65" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="105" y="297" text-anchor="middle">02-05</text>
+  <text class="cold-sub" x="105" y="310" text-anchor="middle">parquet</text>
+  <rect class="cold-block" x="155" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="195" y="297" text-anchor="middle">02-06</text>
+  <text class="cold-sub" x="195" y="310" text-anchor="middle">parquet</text>
+  <rect class="cold-block" x="245" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="285" y="297" text-anchor="middle">02-07</text>
+  <text class="cold-sub" x="285" y="310" text-anchor="middle">parquet</text>
+  <rect class="cold-block" x="335" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="375" y="297" text-anchor="middle">02-08</text>
+  <text class="cold-sub" x="375" y="310" text-anchor="middle">parquet</text>
+  <rect class="cold-block" x="425" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="465" y="297" text-anchor="middle">02-09</text>
+  <text class="cold-sub" x="465" y="310" text-anchor="middle">parquet</text>
+  <rect class="cold-block" x="515" y="278" width="80" height="42" rx="3"/>
+  <text class="cold-label" x="555" y="297" text-anchor="middle">02-10</text>
+  <text class="cold-sub" x="555" y="310" text-anchor="middle">parquet</text>
+  <text class="path-hint" x="330" y="338" text-anchor="middle">trades~5/year=2026/month=02/day=10/data.parquet</text>
+
+  <!-- legend -->
+  <circle cx="150" cy="368" r="3.5" fill="#0cc0df"/>
+  <text class="legend" x="162" y="372">range read · every instance</text>
+  <circle cx="370" cy="368" r="3.5" fill="#e289a4"/>
+  <text class="legend" x="382" y="372">upload · manager only</text>
+  <!-- caption -->
+  <text class="caption-em" x="330" y="396" text-anchor="middle">History is stored once and read directly by every instance.</text>
+  <text class="caption" x="330" y="412" text-anchor="middle">Partition bytes never travel through replication.</text>
+</svg>
