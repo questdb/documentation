@@ -72,7 +72,7 @@ dotnet add package net-questdb-client
 `net-questdb-client` has no zstd dependency. To use `compression=zstd` on the
 `QueryClient` egress path, also add the optional
 [`net-questdb-client-zstd`](https://www.nuget.org/packages/net-questdb-client-zstd/)
-package. See [Compression](#compression).
+plugin package. See [Compression](#compression).
 
 ## Quick start
 
@@ -863,6 +863,7 @@ rejections). They are thrown directly from the call site:
 | Site | Throws when |
 |---|---|
 | `Sender.New(...)` / `Sender.NewQwp(...)` / `QueryClient.New(...)` | The connect string is malformed (missing `::`, unknown key, invalid value), required fields are absent, or mutually exclusive auth modes are combined. `Sender.NewQwp` additionally rejects non-`ws::` / `wss::` schemes. |
+| `QueryClient.New(...)` / `QueryClient.NewAsync(...)` with `compression=zstd` | Connecting throws `IngressError(ErrorCode.ConfigError)` if the [zstd plugin](#compression) is absent or unusable — thrown once connecting starts, not during connect-string parsing. |
 | `Sender.FromEnv()` / `QueryClient.FromEnv()` | `QDB_CLIENT_CONF` is unset or blank. |
 | `Column(...)` / `Symbol(...)` before `Table(...)` | The row has not been started; the builder requires `Table(...)` first. |
 | Array `Column(...)` overloads | The `shape` does not match the element count, dimensionality exceeds 32, or the element type is not `double` / `long`. |
@@ -1426,20 +1427,28 @@ await using var client = await QueryClient.NewAsync(
 `net-questdb-client` decodes zstd-compressed `RESULT_BATCH` payloads through
 the optional
 [`net-questdb-client-zstd`](https://www.nuget.org/packages/net-questdb-client-zstd/)
-package rather than a hard dependency, so add a reference to it before relying
-on `compression=zstd`. The package targets `net7.0` and up, matching the QWP
-transport's own [.NET requirement](#requirements).
+plugin package rather than a hard dependency, so add a reference to it before
+relying on `compression=zstd`. The plugin targets `net7.0` and up, matching
+the QWP transport's own [.NET requirement](#requirements). This is a breaking
+change from earlier `4.0.0-beta.*` releases, which bundled the zstd codec
+directly: an app upgrading to `4.0.0` that already uses `compression=zstd`
+must add this reference, or connecting will throw `ConfigError`.
 
-| Value | Behaviour with the plugin referenced | Behaviour with the plugin absent |
+| Value | Behaviour with the plugin available | Behaviour with the plugin absent or unusable |
 |---|---|---|
 | `raw` (default) | No compression — sent as `raw` in the upgrade header. | Unaffected. |
 | `zstd` | Demand zstd; the server falls back to raw per-batch when raw is smaller. | Throws `IngressError(ErrorCode.ConfigError)` before connecting. |
 | `auto` | Advertise both; the server picks zstd if it supports it, else raw. | Silently sends no compression header and connects as `raw`. |
 
-Explicit `compression=zstd` fails fast, before any address is even dialled,
-so the plugin requirement is never hidden behind a generic connection error or
+"Absent or unusable" covers both a missing package reference and a partially
+deployed one — the plugin assembly loads and its type resolves, but it fails
+to construct (for example, its own `ZstdSharp.Port` dependency is missing at
+runtime). Both fail the same way, at the same point: explicit
+`compression=zstd` fails fast, before any address is even dialled, so the
+plugin requirement is never hidden behind a generic connection error or
 retried across every `addr=` candidate. `compression=auto` never throws for a
-missing plugin: treat it as "use zstd when available", not "require zstd".
+missing or unusable plugin: treat it as "use zstd when available", not
+"require zstd".
 
 `compression_level` accepts the full zstd range `[1, 22]`; the server clamps it
 to its maximum of `9`, so levels above 9 are accepted for connect-string parity
@@ -1449,12 +1458,21 @@ chose. Batches decompress transparently — your read loop is unchanged.
 
 :::note Trimmed and Native AOT publishes
 
-The plugin loads via reflection (`Assembly.Load`), so a trimmed,
-self-contained, or Native AOT publish can strip it even when it's referenced,
-unless the app's trimmer roots keep it. If `compression=zstd`/`auto` stops
-finding the plugin only after publishing, add a trimmer root descriptor (or
-`<TrimmerRootAssembly Include="net-questdb-client-zstd" />`) for the plugin
-assembly.
+The plugin loads via reflection (`Assembly.Load`), so `net-questdb-client`
+marks that load site with `[DynamicDependency]`. That tells the trimmer the
+referenced-but-unused-looking `net-questdb-client-zstd` assembly is actually
+reached via reflection, so a trimmed, self-contained, or Native AOT publish
+keeps it instead of stripping it — no extra configuration is needed in the
+common case.
+
+If `compression=zstd`/`auto` still stops finding the plugin only after
+publishing, add a trimmer root as a fallback:
+
+```xml
+<ItemGroup>
+  <TrimmerRootAssembly Include="net-questdb-client-zstd" />
+</ItemGroup>
+```
 
 :::
 
