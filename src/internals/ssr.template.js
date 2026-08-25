@@ -47,13 +47,23 @@ const CONSENT_HEAD = `
       (function () {
         function apply(c) {
           if (c && c.statistics) {
-            posthog.opt_in_capturing();
+            posthog.opt_in_capturing({ captureEventName: null });
           } else {
             posthog.opt_out_capturing();
-            posthog.reset();
           }
         }
-        apply((window.Cookiebot && window.Cookiebot.consent) || null);
+        var initial = window.Cookiebot && window.Cookiebot.consent;
+        if (initial) {
+          apply(initial);
+        } else {
+          var optedIn = false;
+          try {
+            optedIn = localStorage.getItem('__ph_opt_in_out_phc_GnFGGyhLRvRDKO6iN6eJRAypiKymw9LGf7GlAtZnaKx') === '1';
+          } catch (e) {}
+          if (!optedIn) {
+            posthog.opt_out_capturing();
+          }
+        }
         window.addEventListener('questdb:consent', function (e) {
           apply(e.detail || {});
         });
