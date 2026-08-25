@@ -463,6 +463,23 @@ Parameters:
 Use `backup.restore.timestamp` to restore to a specific point in time. QuestDB
 finds the most recent successful backup at or before the specified timestamp.
 
+:::warning
+
+Point-in-time recovery does not bring cold data back on its own. A backup carries the local metadata for [cold storage partitions](#cold-storage-partitions), but not their `data.parquet` bytes, which exist only in the object store.
+
+This matters most in the situation point-in-time recovery is usually reached for: undoing an accidental drop. Dropping a table or partition also hands its remote objects to garbage collection, which holds them for a grace period and then reclaims them:
+
+| What was dropped | Objects are reclaimed after              | Default    |
+| ---------------- | ---------------------------------------- | ---------- |
+| A partition      | `cold.storage.gc.partition.grace.period` | 30 minutes |
+| A whole table    | `cold.storage.gc.table.grace.period`     | 60 minutes |
+
+Restoring to a point before the drop recovers that data only while those objects still exist. **The grace period, not your backup retention, is the deadline for recovering cold data after a drop.**
+
+If a drop touched cold partitions, stop reclamation before the grace period expires: run [`SWITCH COLD STORAGE ROLE TO REFRESHER`](/docs/query/sql/switch-cold-storage-role/) on the cold storage manager. That halts garbage collection immediately and needs no restart. Restore, then promote a manager again once the data is back.
+
+:::
+
 To find available backup timestamps, query the source instance:
 
 ```questdb-sql

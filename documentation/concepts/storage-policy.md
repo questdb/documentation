@@ -271,13 +271,12 @@ partitions have been converted to Parquet or dropped, depending on when each
 node's storage policy [check interval](#configuration) last fired. The state
 converges as each instance processes its own queue.
 
-The remote stages behave differently. Only the designated cold storage manager
-uploads objects and writes manifests, and the seal that makes a partition
-read-only replicates through the WAL, so every instance reaches the same
-boundary. Partition bytes are never sent through the replication stream: each
-instance reads the shared object itself. See
+The remote stages behave differently: one designated instance does the uploading,
+and partition bytes never travel through the replication stream. See
+[Cold storage roles](/docs/concepts/cold-storage/#roles) for how that is divided,
+and
 [Replication overview](/docs/high-availability/overview/#storage-policies-in-a-replicated-cluster)
-for details.
+for how both kinds of stage behave in a cluster.
 
 ## Configuration
 

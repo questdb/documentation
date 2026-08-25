@@ -23,7 +23,6 @@ uploaded. Adding instances therefore adds query capacity over the history withou
 adding storage.
 
 Cold storage is driven by a [storage policy](/docs/concepts/storage-policy/).
-Four independent age thresholds control local Parquet conversion, upload to the object store, local eviction, and final remote retention.
 
 :::note
 
@@ -33,18 +32,22 @@ Cold storage is available in **QuestDB Enterprise** only, and is disabled by def
 
 ## Requirements
 
-- QuestDB Enterprise, with `cold.storage.enabled=true` on every instance
-- A [WAL-enabled table](/docs/concepts/write-ahead-log/) with a [designated timestamp](/docs/concepts/designated-timestamp/) and [partitioning](/docs/concepts/partitions/)
-- A [storage policy](/docs/concepts/storage-policy/) carrying a `TO REMOTE` stage
+Cold storage runs on top of a [storage policy](/docs/concepts/storage-policy/), so a table must first meet that page's [requirements](/docs/concepts/storage-policy/#requirements). The remote stages then add:
+
+- `cold.storage.enabled=true` on every instance
+- A [WAL-enabled](/docs/concepts/write-ahead-log/) table, since remote stages are rejected on non-WAL tables
+- A policy carrying a `TO REMOTE` stage
 - An object store prefix that every instance can read and exactly one instance can write
 
-Remote stages are rejected on non-WAL tables. Materialized views accept no storage policy at all, so they cannot be tiered to object storage. The active partition is never eligible.
+The active partition is never eligible.
 
 For the configuration keys and the setup procedure, see [Cold storage configuration](/docs/configuration/cold-storage/) and [Operating cold storage](/docs/operations/cold-storage/).
 
 ## Partition lifecycle
 
 Cold storage is a lifecycle for whole time partitions, not a whole-table migration and not a local cache of remote data. The unit of movement is always a complete partition.
+
+The [storage policy](/docs/concepts/storage-policy/) stages decide when each transition fires. What they mean for the data is:
 
 | Phase              | Where the data is                                    | Behaviour                                     |
 | ------------------ | ---------------------------------------------------- | --------------------------------------------- |
@@ -53,25 +56,7 @@ Cold storage is a lifecycle for whole time partitions, not a whole-table migrati
 | **Cold**           | Object store, with metadata and symbol indexes local | Read-only, served by range reads              |
 | **Expired**        | Removed from the table                               | Objects reclaimed after the grace period      |
 
-Each transition is triggered by one storage policy stage:
-
-```text
-             TO PARQUET        TO REMOTE         DROP LOCAL       DROP REMOTE
-   Native ───────┬───────────────────┬───────────────┬─────────────────┬──────
-                 ▼                   ▼               ▼                 ▼
-          Local Parquet      Uploaded, still    Sealed, served    Removed and
-                             served locally     from the store    reclaimed
-```
-
-`TO PARQUET` and `TO REMOTE` are independent of each other. QuestDB can upload a compact Parquet snapshot while continuing to serve a native local partition, and it can convert to local Parquet without ever uploading.
-
-Retaining data after local eviction requires **both** `TO REMOTE` and `DROP LOCAL`.
-
-:::warning
-
-`DROP LOCAL` without `TO REMOTE` is plain local retention: the partition is deleted and nothing queryable is left behind. Include `TO REMOTE` whenever the partition must stay online after local eviction.
-
-:::
+Retaining data after local eviction requires **both** `TO REMOTE` and `DROP LOCAL`. Which stage fires when, and how the four relate, is covered under [storage policy](/docs/concepts/storage-policy/#partition-lifecycle).
 
 ## Reads
 
@@ -182,6 +167,7 @@ A legitimate change of version, after restoring onto a different host or migrati
 - **No downgrade after the first upload.** Enabling remote upload is a one-way version change.
 - **Upgrade replicas first.** Older instances and open source nodes do not understand the seal event and suspend WAL apply rather than skipping it.
 - **Operator-driven manager failover.** The manager role moves at runtime, but nothing detects manager death or elects a replacement, and a hot-switched role does not survive a restart.
+- **Backups do not contain cold data.** A backup captures a cold partition's local metadata and symbol indexes, but not its `data.parquet` bytes, which exist only in the object store. The database backup and the object store prefix have to be kept, and recovered, as one set. See [Backup and restore](/docs/operations/backup/#cold-storage-partitions).
 - **No idle warm cache.** Chunks are shared only while an active read holds a lease.
 - **Fixed key layout.** Object key templates are not configurable.
 - **`SHOW PARTITIONS` gained two columns.** `seqTxn` and `isRemotelyServed` are appended, so tools binding result columns by position must be updated.
@@ -193,3 +179,4 @@ A legitimate change of version, after restoring onto a different host or migrati
 - [Cold storage configuration](/docs/configuration/cold-storage/) for every `cold.storage.*` key
 - [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) for moving the manager role
 - [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) for per-partition remote state
+- [Backup and restore](/docs/operations/backup/#cold-storage-partitions) for what a backup does and does not contain
