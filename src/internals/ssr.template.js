@@ -92,11 +92,12 @@ const CONSENT_HEAD = `
           watchdog = setInterval(function () {
             ticks++;
             var c = window.Cookiebot && window.Cookiebot.consent;
-            if (overrides(c)) denyAds();
             if ((c && c.method === 'explicit') || ticks >= 30) {
               clearInterval(watchdog);
               watchdog = -1;
+              return;
             }
+            if (overrides(c)) denyAds();
           }, 500);
         }
         function sync() {
@@ -109,7 +110,8 @@ const CONSENT_HEAD = `
           try {
             if (gpcApplied) {
               denyAds();
-              if (watchdog === null) startWatchdog();
+              if (watchdog === -1) watchdog = null;
+              startWatchdog();
             } else if (wiped) {
               denyAll();
             }
