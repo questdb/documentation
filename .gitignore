@@ -48,3 +48,6 @@ src/css/infima.css
 .ignore
 
 .yarn/sdks
+
+# Local agent scratch artifacts (transcripts/outputs, not shared)
+.pi/subagents/

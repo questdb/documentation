@@ -77,6 +77,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [pandas](/docs/integrations/data-processing/pandas/) and [Polars](/docs/integrations/data-processing/polars/) - Rewritten around the native QWP clients, keeping the previous ILP and ConnectorX approaches as legacy; Polars now also covers the Rust `polars-ingress` and `polars-egress` crate features
 - [Python client](/docs/connect/clients/python/) - Documented N-dimensional `float64` numpy arrays landing in matching N-dimensional column types (other dtypes are rejected), and clarified Polars consumption: prefer `to_polars()`, with `polars.DataFrame(result)` reserved for pyarrow-free installs
 - [Query overview](/docs/query/overview/) - Added a client libraries section ahead of PostgreSQL, and removed the stale notice describing Parquet support as beta
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Updated for the renamed MCP server: the npm package is now `@questdb/mcp-server-questdb` (previously `@questdb/mcp-bridge`) and the repository is now `questdb/mcp-server-questdb`, also reflected in [AI coding agents](/docs/getting-started/ai-coding-agents/)
 
 ## July 2026
 
