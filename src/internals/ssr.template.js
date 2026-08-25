@@ -7,7 +7,7 @@
  * There is deliberately no gtag('consent','update') here: Cookiebot sends
  * that to Google itself on every consent submission.
  */
-const POSTHOG_TOKEN = 'phc_GnFGGyhLRvRDKO6iN6eJRAypiKymw9LGf7GlAtZnaKx'
+const POSTHOG_TOKEN = 'phc_GnFGGyhLRvRDKO6iN6eJRAypiKymw9LGf7GlAtZnaKx' // gitleaks:allow — public client key
 
 const CONSENT_HEAD = `
     <script data-cookieconsent="ignore">
