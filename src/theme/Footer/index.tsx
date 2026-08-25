@@ -33,6 +33,16 @@ const Footer = () => {
             <a className={styles.link} href="/terms/">
               Terms
             </a>
+            <button
+              className={styles.linkButton}
+              type="button"
+              onClick={() =>
+                (window as unknown as { Cookiebot?: { renew?: () => void } })
+                  .Cookiebot?.renew?.()
+              }
+            >
+              Cookie settings
+            </button>
           </div>
         </div>
       </div>
