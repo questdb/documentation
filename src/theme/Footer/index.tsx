@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import customFields from "../../config/customFields"
 import styles from "./styles.module.css"
 
@@ -8,6 +9,17 @@ type Props = {
 }
 
 const Footer = () => {
+  const [cmpReady, setCmpReady] = useState(false)
+  useEffect(() => {
+    const check = () => {
+      if ((window as unknown as { Cookiebot?: unknown }).Cookiebot) {
+        setCmpReady(true)
+      }
+    }
+    check()
+    window.addEventListener("questdb:consent", check)
+    return () => window.removeEventListener("questdb:consent", check)
+  }, [])
   return (
     <footer className={styles.root}>
       <div className={styles.border}>
@@ -33,16 +45,18 @@ const Footer = () => {
             <a className={styles.link} href="/terms/">
               Terms
             </a>
-            <button
-              className={styles.linkButton}
-              type="button"
-              onClick={() =>
-                (window as unknown as { Cookiebot?: { renew?: () => void } })
-                  .Cookiebot?.renew?.()
-              }
-            >
-              Cookie settings
-            </button>
+            {cmpReady && (
+              <button
+                className={styles.linkButton}
+                type="button"
+                onClick={() =>
+                  (window as unknown as { Cookiebot?: { renew?: () => void } })
+                    .Cookiebot?.renew?.()
+                }
+              >
+                Cookie settings
+              </button>
+            )}
           </div>
         </div>
       </div>

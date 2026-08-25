@@ -19,12 +19,12 @@ const CONSENT_HEAD = `
         'functionality_storage': 'denied',
         'personalization_storage': 'denied',
         'security_storage': 'granted',
-        'wait_for_update': 500
+        'wait_for_update': 2000
       });
       gtag('set', 'ads_data_redaction', true);
       gtag('set', 'url_passthrough', false);
     </script>
-    <script id="Cookiebot" src="https://consent.cookiebot.com/uc.js" data-cbid="947be9a7-2d22-4dbf-8964-1b1a954da422" data-blockingmode="manual"></script>
+    <script id="Cookiebot" async src="https://consent.cookiebot.com/uc.js" data-cbid="947be9a7-2d22-4dbf-8964-1b1a954da422" data-blockingmode="manual"></script>
     <script>
       (function () {
         function broadcast(c) {
@@ -52,9 +52,9 @@ const CONSENT_HEAD = `
             posthog.opt_out_capturing();
           }
         }
-        var initial = window.Cookiebot && window.Cookiebot.consent;
-        if (initial) {
-          apply(initial);
+        var cb = window.Cookiebot;
+        if (cb && cb.hasResponse) {
+          apply(cb.consent);
         } else {
           var optedIn = false;
           try {
