@@ -113,6 +113,7 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 | `invalid EXPIRE ROWS KEEP LATEST column: ...` | A `PARTITION BY` key column does not exist |
 | `EXPIRE ROWS KEEP / window retention cannot be used on a view with a column named '__qdb_re_keep'` | The view exposes a column named like the reserved keep column |
 | `invalid EXPIRE ROWS predicate: ...` | The predicate does not parse, bind, or type-check against the view's columns |
+| `invalid EXPIRE ROWS predicate: the threshold is NULL, so no row can ever expire` | A `WHEN` threshold that is constant at definition time evaluates to `NULL`, e.g. `CAST(NULL AS TIMESTAMP)` or arithmetic that overflows |
 | `permission denied` | Missing `ALTER MATERIALIZED VIEW` permission (Enterprise) |
 
 ## See also

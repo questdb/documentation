@@ -321,6 +321,12 @@ EXPIRE ROWS
   [ CLEANUP EVERY duration ]
 ```
 
+A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
+is rejected, since it would expire nothing. That covers the explicit
+`ts < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the reserved
+`NULL` value, such as `ts < 2147483647 + 1` — see
+[A `NULL` threshold is rejected](/docs/concepts/deep-dive/expire-rows/#a-null-threshold-is-rejected).
+
 Expired rows are hidden from queries immediately in every mode. They are
 reclaimed on disk in the background (`CLEANUP EVERY`, default `1h`) under a
 monotonic `WHEN` predicate; `KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N` and

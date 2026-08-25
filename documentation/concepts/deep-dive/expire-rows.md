@@ -279,6 +279,13 @@ CREATE MATERIALIZED VIEW trades_recent AS (
 (With the 2024 sample timestamps above, every row is already older than a day
 and would be hidden; use recent data to see rows retained.)
 
+Write the offset with `dateadd`, as above, rather than as clock arithmetic.
+`WHEN ts < dateadd('d', -1, now())` and `WHEN ts < now() - 86400000000` retain
+the same rows, but only the `dateadd` form reduces to a timestamp range that the
+scan can use to skip partitions. The arithmetic form is evaluated row by row
+across the whole view on every read. Both forms reclaim disk — the cleanup job
+proves either monotonic — so the difference is read cost alone.
+
 ### Keep latest per key: `KEEP LATEST`
 
 Keep only the most recent row per key — turning the passthrough view into a
@@ -439,6 +446,41 @@ Therefore:
   `N`), while an integer/timestamp `NULL` sorts last (expired first). Use
   `KEEP HIGHEST/LOWEST` (no `N`) when every `NULL` must be kept regardless of
   type.
+
+### A `NULL` threshold is rejected
+
+A `WHEN` threshold that evaluates to a constant `NULL` expires nothing —
+`ts < NULL` is never `TRUE` — so the policy would be inert. QuestDB refuses it at
+`CREATE` and `ALTER` time rather than storing a view that silently never
+reclaims:
+
+```questdb-sql title="Rejected: the threshold is NULL"
+CREATE MATERIALIZED VIEW trades_recent AS (
+  SELECT * FROM trades
+) EXPIRE ROWS WHEN ts < CAST(NULL AS TIMESTAMP);
+-- invalid EXPIRE ROWS predicate: the threshold is NULL, so no row can ever expire
+```
+
+The check matters most where the `NULL` is not written down. QuestDB stores a
+`NULL` `TIMESTAMP`, `LONG` or `INT` as a reserved value at the bottom of the
+type's range, and integer arithmetic wraps silently when it overflows, so an
+arithmetic threshold can land on that value:
+
+```questdb-sql title="Also rejected: arithmetic that overflows onto NULL"
+-- LONG overflow
+CREATE MATERIALIZED VIEW trades_recent AS (
+  SELECT * FROM trades
+) EXPIRE ROWS WHEN ts < 4611686018427387904 * 2;
+
+-- INT overflow, reached three orders of magnitude sooner
+CREATE MATERIALIZED VIEW trades_recent AS (
+  SELECT * FROM trades
+) EXPIRE ROWS WHEN ts < 2147483647 + 1;
+```
+
+Only thresholds that are constant at definition time are checked this way. One
+built from a clock, such as `ts < now() - 3600000000`, is evaluated per read and
+cannot be checked in advance.
 
 ### Ties and determinism
 
