@@ -75,13 +75,13 @@ WAL files when needed. Slower recovery, lower cost.
 
 ## Supported object stores
 
-| Store | Status |
-|-------|--------|
-| AWS S3 | Supported |
-| Azure Blob Storage | Supported |
+| Store                | Status    |
+| -------------------- | --------- |
+| AWS S3               | Supported |
+| Azure Blob Storage   | Supported |
 | Google Cloud Storage | Supported |
-| NFS filesystem | Supported |
-| HDFS | Planned |
+| NFS filesystem       | Supported |
+| HDFS                 | Planned   |
 
 Need something else? [Contact us](/enterprise/contact/).
 
@@ -116,6 +116,17 @@ work against its local data. As a result:
   (`storage.policy.check.interval`) or worker count
   (`storage.policy.worker.count`) per instance lets you trade conversion
   latency against background load on that node.
+
+### Cold storage in a replicated cluster
+
+The remote stages behave differently from the local ones. [Cold storage](/docs/concepts/cold-storage/) designates a single **manager** instance that uploads partitions, writes manifests, and runs remote garbage collection. Every other instance is a **refresher** and mirrors that state read-only.
+
+- The manager role is **independent of the primary and replica roles**. All four combinations are valid, and running the manager on a replica moves upload and garbage-collection work off the primary.
+- Promoting a replica to primary does not move the manager role, and moving the manager role does not affect replication. Each is switched separately, with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) for the manager.
+- **Partition bytes never travel through the replication stream.** The seal that makes a partition read-only replicates as a WAL event, and each instance then reads the shared object itself and installs its own local metadata. Every replica therefore needs read access to the object store.
+- **Upgrade replicas before enabling a remote stage.** Older instances and open source nodes do not understand the partition seal event and suspend WAL apply rather than skipping it.
+
+See [Operating cold storage](/docs/operations/cold-storage/) for the manager handoff procedure and its preconditions.
 
 ## Bring Your Own Cloud (BYOC)
 

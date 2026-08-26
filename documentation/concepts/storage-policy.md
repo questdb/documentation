@@ -11,22 +11,16 @@ Storage policies are available in **QuestDB Enterprise** only.
 :::
 
 A storage policy automates the lifecycle of table partitions. It defines when
-partitions are converted to Parquet and when local copies are dropped.
-Converting a partition to Parquet removes its native files and serves reads directly from the Parquet file. This replaces the need for manual partition management or external scheduling.
+partitions are converted to Parquet, when they are uploaded to object storage,
+when local copies are dropped, and when the remote copies are finally reclaimed.
+Converting a partition to Parquet removes its native files and serves reads
+directly from the Parquet file. This replaces the need for manual partition
+management or external scheduling.
 
-:::info
-
-Storage policies currently operate **locally only**. `TO PARQUET` and
-`DROP LOCAL` are the enforced stages. `TO REMOTE` is accepted and stored but
-not yet enforced, so setting it has no effect for now: no upload to object
-storage happens yet. `DROP REMOTE` is not yet supported and is rejected at SQL
-parse time with `'DROP REMOTE' is not supported yet`. In the
-[`storage_policies`](/docs/query/functions/meta/#storage_policies) view the
-`drop_remote` column is therefore always `0h`, and `to_remote` reads `0h`
-unless you set a `TO REMOTE` value (which is stored but has no effect yet).
-Object storage integration will be added in a future release.
-
-:::
+The two remote stages, `TO REMOTE` and `DROP REMOTE`, drive
+[cold storage](/docs/concepts/cold-storage/): partitions move to S3, Google
+Cloud Storage, Azure Blob Storage, or a filesystem store and stay queryable with
+normal SQL.
 
 ## Requirements
 
@@ -36,17 +30,30 @@ Storage policies require:
 - [Partitioning](/docs/concepts/partitions/) enabled
 - QuestDB Enterprise
 
+The two remote stages additionally require:
+
+- [Cold storage](/docs/concepts/cold-storage/) enabled and configured on every instance
+- A [WAL-enabled](/docs/concepts/write-ahead-log/) table
+
+Remote stages are rejected on non-WAL tables.
+
+:::note
+
+Storage policies do not apply to materialized views at all, local stages included. `SET STORAGE POLICY` on one is rejected with `storage policy is not supported for materialized views`. Materialized views use [TTL](/docs/query/sql/alter-mat-view-set-ttl/) for retention in Enterprise.
+
+:::
+
 ## How it works
 
 A storage policy consists of up to four TTL settings. Each setting controls a
 stage in the partition lifecycle:
 
-| Setting       | Description                                                                                                                         |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `TO PARQUET`  | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file |
-| `TO REMOTE`   | Accepted and stored but **not yet enforced**; no upload happens yet. Reserved for future object storage upload                                          |
-| `DROP LOCAL`  | Remove all local data (native or Parquet)                                                                                           |
-| `DROP REMOTE` | _Not yet supported._ Rejected at parse time with `'DROP REMOTE' is not supported yet`. Reserved for future object storage removal                                        |
+| Setting       | Description                                                                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TO PARQUET`  | Convert the partition from native binary format to Parquet. The native files are removed and reads are served from the Parquet file            |
+| `TO REMOTE`   | Upload a compact Parquet snapshot of the partition to object storage. The local partition remains writable and is still the serving copy       |
+| `DROP LOCAL`  | Seal the partition as read-only and remove its local data. With `TO REMOTE` set, reads switch to the remote copy; without it, the data is gone |
+| `DROP REMOTE` | Remove the partition from the table and reclaim its remote objects after a grace period                                                        |
 
 All settings are optional. Use only the ones relevant to your use case. All TTL
 values must be **positive**; `0` is rejected.
@@ -57,12 +64,29 @@ As time passes, each partition progresses through the stages defined by the
 policy:
 
 ```text
-                       TO PARQUET                 DROP LOCAL
-   [Native] ───────────────┬──────────────────────────┬───────
-                           │                          │
-                           ▼                          ▼
-                    Parquet only (local)         Data removed
+             TO PARQUET        TO REMOTE         DROP LOCAL       DROP REMOTE
+   Native ───────┬───────────────────┬───────────────┬─────────────────┬──────
+                 ▼                   ▼               ▼                 ▼
+          Local Parquet      Uploaded, still    Sealed, served    Removed and
+                             served locally     from the store    reclaimed
 ```
+
+`TO PARQUET` and `TO REMOTE` are independent: a partition can be uploaded while
+still being served from native local files, and can be converted locally without
+ever being uploaded.
+
+:::warning
+
+`DROP LOCAL` without `TO REMOTE` is plain local retention: the partition is
+deleted and nothing queryable is left behind. Include `TO REMOTE` whenever the
+partition must stay online after local eviction.
+
+`DROP LOCAL` is also the point at which a partition becomes read-only. Writes
+that arrive for it afterwards are skipped, so set it beyond the longest
+late-arrival, replay, and correction window for the table. See
+[Cold storage](/docs/concepts/cold-storage/#immutability-after-drop-local).
+
+:::
 
 ### TTL evaluation
 
@@ -75,10 +99,10 @@ eligible when: partition_end_time < reference_time - TTL
 ```
 
 **This rule is applied independently for each stage's TTL.** A partition can
-be eligible for `TO PARQUET` long before it is eligible for `DROP LOCAL` (or,
-once remote upload is enforced, the `TO REMOTE` and `DROP REMOTE` stages).
-Each stage uses its own `TTL` in the formula above; the stages share only the
-reference time and the [ordering constraints](#ordering-constraint).
+be eligible for `TO PARQUET` long before it is eligible for `TO REMOTE`,
+`DROP LOCAL`, or `DROP REMOTE`. Each stage uses its own `TTL` in the formula
+above; the stages share only the reference time and the
+[ordering constraints](#ordering-constraint).
 
 The reference time is `min(wall_clock_time, latest_timestamp)` by default —
 the same formula used by TTL. The
@@ -180,10 +204,10 @@ TO REMOTE  <= DROP LOCAL <= DROP REMOTE
 ```
 
 `TO PARQUET` and `TO REMOTE` are **independent**: neither has to precede the
-other. Once remote upload is enforced, a `TO REMOTE` that runs before
-`TO PARQUET` would keep both the native and Parquet copies on local disk, with
-reads served from the native format until `TO PARQUET` removes the native
-files. All TTL values must be positive; `0` is rejected.
+other. A `TO REMOTE` that runs before `TO PARQUET` uploads a compact Parquet
+snapshot while the local partition stays in native format, with reads served
+locally from native files until `TO PARQUET` converts them. All TTL values must
+be positive; `0` is rejected.
 
 ## Disabling and enabling
 
@@ -220,7 +244,7 @@ SELECT * FROM storage_policies;
 
 | table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated                |
 | -------------- | ---------- | --------- | ---------- | ----------- | ------ | --------------------------- |
-| trades~12      | 72h        | 0h        | 1m         | 0h          | A      | 2025-01-15T10:30:00.000000Z |
+| trades~12      | 72h        | 336h      | 1m         | 12m         | A      | 2025-01-15T10:30:00.000000Z |
 
 - TTL values are rendered in two units: `h` for hours and `m` for **months**.
   Hour-, day-, and week-based durations are stored as hours, so a `3 DAYS` TTL
@@ -230,9 +254,7 @@ SELECT * FROM storage_policies;
   unit for minutes
 - Status `A` means active; `D` means disabled (see
   [Disabling and enabling](#disabling-and-enabling))
-- An unset stage renders as `0h`, not blank. Because `DROP REMOTE` is rejected
-  at parse time, `drop_remote` is always `0h`; `to_remote` reads `0h` unless a
-  `TO REMOTE` value is set (stored, but not yet enforced)
+- An unset stage renders as `0h`, not blank
 
 For the full column reference and types, see
 [`storage_policies`](/docs/query/functions/meta/#storage_policies).
@@ -240,16 +262,21 @@ For the full column reference and types, see
 ## Replication
 
 Storage policy definitions are persisted in WAL-backed system tables, so the
-policy itself is replicated to every instance in the cluster. Enforcement runs
-**independently on each instance** — Parquet files are produced locally and
+policy itself is replicated to every instance in the cluster. Local enforcement
+runs **independently on each instance**: Parquet files are produced locally and
 are not replicated.
 
 This means the primary and its replicas can temporarily disagree on which
 partitions have been converted to Parquet or dropped, depending on when each
 node's storage policy [check interval](#configuration) last fired. The state
-converges as each instance processes its own queue. See
+converges as each instance processes its own queue.
+
+The remote stages behave differently: one designated instance does the uploading,
+and partition bytes never travel through the replication stream. See
+[Cold storage roles](/docs/concepts/cold-storage/#roles) for how that is divided,
+and
 [Replication overview](/docs/high-availability/overview/#storage-policies-in-a-replicated-cluster)
-for details.
+for how both kinds of stage behave in a cluster.
 
 ## Configuration
 
@@ -348,16 +375,20 @@ ALTER TABLE trades DROP STORAGE POLICY;
 
 ## Guidelines
 
-| Use case          | Suggested policy                | Rationale                                                        |
-| ----------------- | ------------------------------- | ---------------------------------------------------------------- |
-| Real-time metrics | `TO PARQUET 1d, DROP LOCAL 30d` | Keep recent data fast, drop old data automatically               |
-| Trading data      | `TO PARQUET 7d`                 | Keep Parquet locally for long-term queries                       |
-| IoT telemetry     | `TO PARQUET 1d, DROP LOCAL 90d` | High volume, convert early to save disk before dropping the data |
-| Aggregated views  | `TO PARQUET 30d`                | Low volume, keep locally in Parquet                              |
+| Use case           | Suggested policy                               | Rationale                                                        |
+| ------------------ | ---------------------------------------------- | ---------------------------------------------------------------- |
+| Real-time metrics  | `TO PARQUET 1d, DROP LOCAL 30d`                | Keep recent data fast, drop old data automatically               |
+| Trading data       | `TO PARQUET 7d`                                | Keep Parquet locally for long-term queries                       |
+| Regulatory history | `TO PARQUET 7d, TO REMOTE 14d, DROP LOCAL 90d` | Keep years of queryable history without keeping it on local disk |
+| IoT telemetry      | `TO PARQUET 1d, DROP LOCAL 90d`                | High volume, convert early to save disk before dropping the data |
+| Aggregated views   | `TO PARQUET 30d`                               | Low volume, keep locally in Parquet                              |
 
 **Tips:**
 
 - Start with `TO PARQUET` to reduce local disk usage while keeping data
   queryable in Parquet format
-- Use `DROP LOCAL` with care as it permanently removes data from the local disk
+- Use `DROP LOCAL` with care. Without `TO REMOTE` it permanently removes the
+  data; with `TO REMOTE` it makes the partition read-only for good
+- Add `DROP REMOTE` only once remote retention is a deliberate decision: it is
+  the only stage that physically deletes data with no local copy left
 - TTL values should be significantly larger than the partition interval

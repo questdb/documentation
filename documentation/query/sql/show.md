@@ -115,14 +115,14 @@ per row. Run against a database holding the
 [demo](https://demo.questdb.io) tables and materialized views, it returns one
 row per object:
 
-| ddl |
-| --- |
-| CREATE TABLE 'market_data' ( timestamp TIMESTAMP, symbol SYMBOL, bids DOUBLE[][], asks DOUBLE[][], best_bid DOUBLE, best_ask DOUBLE ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS; |
-| CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS ( SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s ) PARTITION BY DAY; |
-| CREATE MATERIALIZED VIEW 'bbo_1m' WITH BASE 'bbo_1s' REFRESH EVERY 1m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1s SAMPLE BY 1m ) PARTITION BY DAY; |
-| CREATE MATERIALIZED VIEW 'bbo_1h' WITH BASE 'bbo_1m' REFRESH EVERY 10m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1m SAMPLE BY 1h ) PARTITION BY MONTH; |
-| CREATE MATERIALIZED VIEW 'bbo_1d' WITH BASE 'bbo_1h' REFRESH EVERY 1h DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1h SAMPLE BY 1d ) PARTITION BY YEAR; |
-| ... |
+| ddl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CREATE TABLE 'market_data' ( timestamp TIMESTAMP, symbol SYMBOL, bids DOUBLE[][], asks DOUBLE[][], best_bid DOUBLE, best_ask DOUBLE ) timestamp(timestamp) PARTITION BY HOUR TTL 3 DAYS;                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS ( SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s ) PARTITION BY DAY;                                                                                                                                                                                                                                                                                                                                                                                                            |
+| CREATE MATERIALIZED VIEW 'bbo_1m' WITH BASE 'bbo_1s' REFRESH EVERY 1m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1s SAMPLE BY 1m ) PARTITION BY DAY;                                                                                                                                                                                                                                                                                                                                                                                          |
+| CREATE MATERIALIZED VIEW 'bbo_1h' WITH BASE 'bbo_1m' REFRESH EVERY 10m DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1m SAMPLE BY 1h ) PARTITION BY MONTH;                                                                                                                                                                                                                                                                                                                                                                                       |
+| CREATE MATERIALIZED VIEW 'bbo_1d' WITH BASE 'bbo_1h' REFRESH EVERY 1h DEFERRED START '2025-06-01T00:00:00.000000Z' AS ( SELECT timestamp, symbol, max(bid) AS bid, min(ask) AS ask FROM bbo_1h SAMPLE BY 1d ) PARTITION BY YEAR;                                                                                                                                                                                                                                                                                                                                                                                         |
+| ...                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | CREATE TABLE 'trips' ( cab_type SYMBOL, vendor_id SYMBOL, pickup_datetime TIMESTAMP, dropoff_datetime TIMESTAMP, rate_code_id SYMBOL, pickup_latitude DOUBLE, pickup_longitude DOUBLE, dropoff_latitude DOUBLE, dropoff_longitude DOUBLE, passenger_count INT, trip_distance DOUBLE, fare_amount DOUBLE, extra DOUBLE, mta_tax DOUBLE, tip_amount DOUBLE, tolls_amount DOUBLE, ehail_fee DOUBLE, improvement_surcharge DOUBLE, congestion_surcharge DOUBLE, total_amount DOUBLE, payment_type SYMBOL, trip_type SYMBOL, pickup_location_id INT, dropoff_location_id INT ) timestamp(pickup_datetime) PARTITION BY MONTH; |
 
 Each `ddl` value is stored with formatting characters, so pasting a row into a
@@ -205,8 +205,8 @@ command degrades to a schema-only dump.
 SHOW CREATE LIVE VIEW trades_ma;
 ```
 
-| ddl |
-| --- |
+| ddl                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CREATE LIVE VIEW 'trades_ma' FLUSH EVERY 1s IN MEMORY 5s PARTITION BY DAY START FROM NOW AS (<br/>SELECT timestamp, symbol, avg(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS 300 PRECEDING) AS moving_avg FROM trades<br/>); |
 
 This returns the `CREATE LIVE VIEW` statement that would recreate the
@@ -220,8 +220,8 @@ output also carries an `OWNED BY` clause identifying the view's owner.
 SHOW CREATE MATERIALIZED VIEW bbo_1s;
 ```
 
-| ddl |
-| --- |
+| ddl                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS (SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s) PARTITION BY DAY; |
 
 This returns the `CREATE MATERIALIZED VIEW` statement that would recreate the
@@ -234,7 +234,7 @@ SHOW CREATE TABLE trades;
 ```
 
 | ddl                                                                                                                                                                                                                                      |
-|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CREATE TABLE trades (symbol SYMBOL CAPACITY 256 CACHE, side SYMBOL CAPACITY 256 CACHE, price DOUBLE, amount DOUBLE, timestamp TIMESTAMP) timestamp(timestamp) PARTITION BY DAY WAL WITH maxUncommittedRows=500000, o3MaxLag=600000000us; |
 
 This is printed with formatting, so when pasted into a text editor that support formatting characters, you will see:
@@ -336,9 +336,9 @@ please modify this clause appropriately.
 SHOW CREATE VIEW my_view;
 ```
 
-| ddl                                                                |
-| ------------------------------------------------------------------ |
-| CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades);   |
+| ddl                                                              |
+| ---------------------------------------------------------------- |
+| CREATE VIEW 'my_view' AS (SELECT ts, symbol, price FROM trades); |
 
 This returns the `CREATE VIEW` statement that would recreate the view,
 including any `DECLARE` parameters if the view is parameterized.
@@ -376,15 +376,15 @@ The output demonstrates:
 - `sensitive`: if it is a sensitive value (passwords)
 - `reloadable`: if the value can be [reloaded without a server restart](/docs/configuration/overview/#reloadable-settings)
 
-| property_path                                   | env_var_name                                        | value                       | value_source | sensitive | reloadable |
-| ----------------------------------------------- | --------------------------------------------------- | --------------------------- | ------------ | --------- | ---------- |
-| http.min.net.connection.limit                   | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                   | 64                          | default      | false     | false      |
-| line.http.enabled                               | QDB_LINE_HTTP_ENABLED                               | true                        | default      | false     | false      |
-| cairo.parquet.export.row.group.size             | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE             | 100000                      | default      | false     | false      |
-| http.security.interrupt.on.closed.connection    | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION    | true                        | conf         | false     | false      |
-| pg.readonly.user.enabled                        | QDB_PG_READONLY_USER_ENABLED                        | true                        | conf         | false     | true       |
-| pg.readonly.password                            | QDB_PG_READONLY_PASSWORD                            | ****                        | default      | true      | true       |
-| http.password                                   | QDB_HTTP_PASSWORD                                   | ****                        | default      | true      | false      |
+| property_path                                | env_var_name                                     | value  | value_source | sensitive | reloadable |
+| -------------------------------------------- | ------------------------------------------------ | ------ | ------------ | --------- | ---------- |
+| http.min.net.connection.limit                | QDB_HTTP_MIN_NET_CONNECTION_LIMIT                | 64     | default      | false     | false      |
+| line.http.enabled                            | QDB_LINE_HTTP_ENABLED                            | true   | default      | false     | false      |
+| cairo.parquet.export.row.group.size          | QDB_CAIRO_PARQUET_EXPORT_ROW_GROUP_SIZE          | 100000 | default      | false     | false      |
+| http.security.interrupt.on.closed.connection | QDB_HTTP_SECURITY_INTERRUPT_ON_CLOSED_CONNECTION | true   | conf         | false     | false      |
+| pg.readonly.user.enabled                     | QDB_PG_READONLY_USER_ENABLED                     | true   | conf         | false     | true       |
+| pg.readonly.password                         | QDB_PG_READONLY_PASSWORD                         | ****   | default      | true      | true       |
+| http.password                                | QDB_HTTP_PASSWORD                                | ****   | default      | true      | false      |
 
 
 You can optionally chain `SHOW PARAMETERS` with other clauses:
@@ -409,16 +409,24 @@ You can optionally chain `SHOW PARAMETERS` with other clauses:
 SHOW PARTITIONS FROM my_table;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 34     | false            |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 56     | false            |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
 
 See [`table_partitions()`](/docs/query/functions/meta/#table_partitions) for the
-full column list, including `hasParquetGenerated`, `isParquet`, and
-`parquetFileSize`.
+full column list, including `hasParquetGenerated`, `isParquet`,
+`parquetFileSize`, `seqTxn`, and `isRemotelyServed`.
+
+`isRemotelyServed` is `true` when the partition's data lives in object storage and is fetched with range reads. See [cold storage](/docs/concepts/cold-storage/) (Enterprise).
+
+:::note
+
+`seqTxn` and `isRemotelyServed` are appended at the end of the result set. Tools that bind `SHOW PARTITIONS` columns by position rather than by name must account for the two new trailing columns.
+
+:::
 
 ### SHOW PERMISSIONS FOR CURRENT USER
 
@@ -539,13 +547,13 @@ SHOW SERVICE ACCOUNTS admin_group;
 SHOW TABLES;
 ```
 
-| table_name      |
-| --------------- |
-| ethblocks_json  |
-| trades          |
-| weather         |
-| AAPL_orderbook  |
-| trips           |
+| table_name     |
+| -------------- |
+| ethblocks_json |
+| trades         |
+| weather        |
+| AAPL_orderbook |
+| trips          |
 
 ### SHOW USER
 

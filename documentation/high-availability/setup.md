@@ -154,7 +154,8 @@ replication.object.store=s3::bucket=${BUCKET_NAME};root=${DB_INSTANCE_NAME};regi
 
 Both parameters are valid only for the HTTP-based backends (`s3`, `azblob`,
 `gcs`) and are rejected for `fs` (NFS). They belong to the object store
-connection string, so they work the same way in `backup.object.store`. The file
+connection string, so they work the same way in `backup.object.store` and
+`cold.storage.object.store`. The file
 is read and parsed at startup, so a missing or malformed PEM fails fast with an
 `InvalidObjectStoreConfigurationException`.
 
@@ -184,11 +185,11 @@ is read and parsed at startup, so a missing or malformed PEM fails fast with an
 
 Add to `server.conf`:
 
-| Setting | Value |
-|---------|-------|
-| `replication.role` | `primary` |
-| `replication.object.store` | Your connection string from step 1 |
-| `cairo.snapshot.instance.id` | Unique UUID for this node |
+| Setting                      | Value                              |
+| ---------------------------- | ---------------------------------- |
+| `replication.role`           | `primary`                          |
+| `replication.object.store`   | Your connection string from step 1 |
+| `cairo.snapshot.instance.id` | Unique UUID for this node          |
 
 Restart QuestDB.
 
@@ -208,11 +209,11 @@ Set up regular snapshots (daily or weekly).
 
 Create a new QuestDB instance. Add to `server.conf`:
 
-| Setting | Value |
-|---------|-------|
-| `replication.role` | `replica` |
-| `replication.object.store` | Same connection string as primary |
-| `cairo.snapshot.instance.id` | Unique UUID for this replica |
+| Setting                      | Value                             |
+| ---------------------------- | --------------------------------- |
+| `replication.role`           | `replica`                         |
+| `replication.object.store`   | Same connection string as primary |
+| `cairo.snapshot.instance.id` | Unique UUID for this replica      |
 
 :::warning
 Do not copy `server.conf` from the primary. Two nodes configured as primary
@@ -256,10 +257,10 @@ configuration options, tuning, and troubleshooting.
 
 ### Failure scenarios
 
-| Node | Recoverable | Unrecoverable |
-|------|-------------|---------------|
-| Primary | Restart | Promote replica, create new replica |
-| Replica | Restart | Destroy and recreate |
+| Node    | Recoverable | Unrecoverable                       |
+| ------- | ----------- | ----------------------------------- |
+| Primary | Restart     | Promote replica, create new replica |
+| Replica | Restart     | Destroy and recreate                |
 
 ### Network partitions
 
@@ -280,6 +281,12 @@ Symptoms: high latency, unmounted disk, suspended tables. Follow the emergency
 migration flow to move to new storage.
 
 ## Migration procedures
+
+:::note
+
+If the cluster uses [cold storage](/docs/concepts/cold-storage/), the manager role does not move with the primary role. Migrating the primary leaves the cold storage manager where it was. Move it separately with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) if the instance holding it is being retired.
+
+:::
 
 ### Planned primary migration
 
