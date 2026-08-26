@@ -2,9 +2,10 @@ import ExecutionEnvironment from "@docusaurus/ExecutionEnvironment"
 import type { ClientModule } from "@docusaurus/types"
 import posthog from "posthog-js"
 
-import { POSTHOG_TOKEN } from "./config"
+import { GOOGLE_ADS_ID, POSTHOG_TOKEN } from "./config"
 
 type CookiebotConsent = {
+  marketing?: boolean
   statistics?: boolean
 }
 
@@ -12,6 +13,8 @@ type ConsentWindow = Window & {
   Cookiebot?: {
     consent?: CookiebotConsent
   }
+  dataLayer?: unknown[]
+  gtag?: (...args: unknown[]) => void
   posthog?: typeof posthog
 }
 
@@ -20,6 +23,32 @@ let currentPageCaptured = false
 
 if (ExecutionEnvironment.canUseDOM) {
   const consentWindow = window as ConsentWindow
+
+  const applyGoogleAdsConsent = () => {
+    if (
+      (navigator as Navigator & { globalPrivacyControl?: boolean })
+        .globalPrivacyControl === true ||
+      consentWindow.Cookiebot?.consent?.marketing !== true ||
+      document.querySelector("script[data-qdb-google-ads]")
+    ) {
+      return
+    }
+
+    consentWindow.dataLayer = consentWindow.dataLayer || []
+    consentWindow.gtag =
+      consentWindow.gtag ||
+      function (...args: unknown[]) {
+        consentWindow.dataLayer?.push(args)
+      }
+    consentWindow.gtag("js", new Date())
+    consentWindow.gtag("config", GOOGLE_ADS_ID)
+
+    const googleAdsScript = document.createElement("script")
+    googleAdsScript.async = true
+    googleAdsScript.src = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`
+    googleAdsScript.setAttribute("data-qdb-google-ads", "")
+    document.head.appendChild(googleAdsScript)
+  }
 
   const initialize = () => {
     if (!postHogInitialized) {
@@ -36,6 +65,9 @@ if (ExecutionEnvironment.canUseDOM) {
   const applyCookiebotConsent = () => {
     const cookiebot = consentWindow.Cookiebot
     const statistics = cookiebot?.consent?.statistics
+
+    applyGoogleAdsConsent()
+
     if (typeof statistics !== "boolean") return
 
     initialize()

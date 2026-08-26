@@ -1,8 +1,5 @@
 const path = require("path")
-const {
-  COOKIEBOT_CBID,
-  GOOGLE_ADS_LOADER,
-} = require("./config")
+const { COOKIEBOT_CBID } = require("./config")
 
 module.exports = () => ({
   name: "questdb-consent",
@@ -23,14 +20,6 @@ module.exports = () => ({
             "data-cbid": COOKIEBOT_CBID,
             "data-blockingmode": "manual",
           },
-        },
-        {
-          tagName: "script",
-          attributes: {
-            type: "text/plain",
-            "data-cookieconsent": "marketing",
-          },
-          innerHTML: GOOGLE_ADS_LOADER,
         },
       ],
     }
