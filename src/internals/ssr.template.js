@@ -1,13 +1,18 @@
 /*
  * Consent stack, mirrored from questdb.io (src/lib/consent.ts). Order is
- * load-bearing: Consent Mode defaults, then the Cookiebot CMP, then the
- * bridge event, then the Google Ads tag. /docs is served same-origin under
- * questdb.com via a proxy rewrite, so the consent cookie is shared with the
- * main site and one banner covers both.
- * There is deliberately no gtag('consent','update') here: Cookiebot sends
- * that to Google itself on every consent submission.
+ * load-bearing: Consent Mode defaults, the global GPC advertising guard,
+ * Cookiebot, PostHog, then Google Ads. /docs is served same-origin under
+ * questdb.com, so Cookiebot's consent cookie and regional configuration are
+ * shared with the main site.
+ *
+ * Cookiebot owns normal consent updates. The only custom update keeps Google
+ * advertising denied while the browser sends GPC, including over an older
+ * stored marketing grant.
  */
 const POSTHOG_TOKEN = 'phc_GnFGGyhLRvRDKO6iN6eJRAypiKymw9LGf7GlAtZnaKx' // gitleaks:allow — public client key
+const COOKIEBOT_CBID = '947be9a7-2d22-4dbf-8964-1b1a954da422'
+const COOKIEBOT_CALIFORNIA_CBID = '202f9bab-f372-498e-ad9c-338a60d68efd'
+const COOKIEBOT_GEOREGIONS = `{'region':'US-06','cbid':'${COOKIEBOT_CALIFORNIA_CBID}'}`
 
 const CONSENT_HEAD = `
     <script data-cookieconsent="ignore">
@@ -28,105 +33,26 @@ const CONSENT_HEAD = `
     </script>
     <script>
       (function () {
-        function isGpc() {
+        function gpcActive() {
           return typeof navigator !== 'undefined' && navigator.globalPrivacyControl === true;
         }
-        function expireAdCookies() {
-          var host = location.hostname.replace(/^www\\./, '');
-          var cookies = document.cookie ? document.cookie.split(';') : [];
-          for (var i = 0; i < cookies.length; i++) {
-            var name = cookies[i].split('=')[0].trim();
-            if (name.indexOf('_gcl') === 0 || name.indexOf('_gac') === 0) {
-              document.cookie = name + '=; Max-Age=0; path=/';
-              document.cookie = name + '=; Max-Age=0; path=/; domain=.' + host;
-            }
-          }
+        function denyAdvertising() {
+          if (!gpcActive() || typeof window.gtag !== 'function') return;
+          window.gtag('consent', 'update', {
+            'ad_storage': 'denied',
+            'ad_user_data': 'denied',
+            'ad_personalization': 'denied'
+          });
+          window.gtag('set', 'ads_data_redaction', true);
         }
-        function gtagFn() {
-          return typeof window.gtag === 'function' ? window.gtag : null;
-        }
-        function denyAds() {
-          var f = gtagFn();
-          if (f) {
-            f('consent', 'update', {
-              'ad_storage': 'denied',
-              'ad_user_data': 'denied',
-              'ad_personalization': 'denied'
-            });
-            f('set', 'ads_data_redaction', true);
-          }
-          expireAdCookies();
-        }
-        function denyAll() {
-          var f = gtagFn();
-          if (f) {
-            f('consent', 'update', {
-              'ad_storage': 'denied',
-              'ad_user_data': 'denied',
-              'ad_personalization': 'denied',
-              'analytics_storage': 'denied',
-              'functionality_storage': 'denied',
-              'personalization_storage': 'denied'
-            });
-            f('set', 'ads_data_redaction', true);
-          }
-          expireAdCookies();
-        }
-        function overrides(c) {
-          return isGpc() && !!c && c.method === 'implied';
-        }
-        function snapshot(c, gpcApplied) {
-          return {
-            necessary: !!c.necessary,
-            preferences: !!c.preferences,
-            statistics: !!c.statistics,
-            marketing: gpcApplied ? false : !!c.marketing,
-            method: c.method || null,
-            gpcApplied: !!gpcApplied
-          };
-        }
-        var watchdog = null;
-        function startWatchdog() {
-          if (watchdog !== null || !isGpc()) return;
-          var ticks = 0;
-          watchdog = setInterval(function () {
-            ticks++;
-            var c = window.Cookiebot && window.Cookiebot.consent;
-            if ((c && c.method === 'explicit') || ticks >= 30) {
-              clearInterval(watchdog);
-              watchdog = -1;
-              return;
-            }
-            if (overrides(c)) denyAds();
-          }, 500);
-        }
-        function sync() {
-          var c = (window.Cookiebot && window.Cookiebot.consent) || {};
-          var gpcApplied = overrides(c);
-          var wiped = !c.method && window.Cookiebot && window.Cookiebot.hasResponse === false;
-          var detail = wiped
-            ? { necessary: !!c.necessary, preferences: false, statistics: false, marketing: false, method: null, gpcApplied: false }
-            : snapshot(c, gpcApplied);
-          try {
-            if (gpcApplied) {
-              denyAds();
-              if (watchdog === -1) watchdog = null;
-              startWatchdog();
-            } else if (wiped) {
-              denyAll();
-            }
-          } finally {
-            window.dispatchEvent(new CustomEvent('questdb:consent', { detail: detail }));
-          }
-        }
-        window.addEventListener('CookiebotOnConsentReady', sync);
-        window.addEventListener('CookiebotOnAccept', sync);
-        window.addEventListener('CookiebotOnDecline', sync);
-        window.addEventListener('CookiebotOnDialogDisplay', sync);
-        startWatchdog();
+
+        window.addEventListener('CookiebotOnConsentReady', denyAdvertising);
+        window.addEventListener('CookiebotOnAccept', denyAdvertising);
+        window.addEventListener('CookiebotOnDecline', denyAdvertising);
+        denyAdvertising();
       })();
     </script>
-    <script id="Cookiebot" async src="https://consent.cookiebot.com/uc.js" data-cbid="947be9a7-2d22-4dbf-8964-1b1a954da422" data-blockingmode="manual"></script>
+    <script id="Cookiebot" async src="https://consent.cookiebot.com/uc.js" data-cbid="${COOKIEBOT_CBID}" data-georegions="${COOKIEBOT_GEOREGIONS}" data-blockingmode="manual"></script>
     <script>
       !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys getNextSurveyStep onSessionId setPersonProperties".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
       posthog.init('${POSTHOG_TOKEN}', {
@@ -141,9 +67,11 @@ const CONSENT_HEAD = `
             posthog.opt_out_capturing();
           }
         }
-        var cb = window.Cookiebot;
-        if (cb && cb.hasResponse) {
-          apply(cb.consent);
+        function applyCookiebotConsent() {
+          apply(window.Cookiebot && window.Cookiebot.consent);
+        }
+        if (window.Cookiebot) {
+          applyCookiebotConsent();
         } else {
           var optedIn = false;
           try {
@@ -153,8 +81,8 @@ const CONSENT_HEAD = `
             posthog.opt_out_capturing();
           }
         }
-        window.addEventListener('questdb:consent', function (e) {
-          apply(e.detail || {});
+        ['CookiebotOnConsentReady', 'CookiebotOnAccept', 'CookiebotOnDecline'].forEach(function (event) {
+          window.addEventListener(event, applyCookiebotConsent);
         });
       })();
     </script>

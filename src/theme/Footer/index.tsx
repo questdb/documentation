@@ -17,8 +17,10 @@ const Footer = () => {
       }
     }
     check()
-    window.addEventListener("questdb:consent", check)
-    return () => window.removeEventListener("questdb:consent", check)
+    const events = ["CookiebotOnLoad", "CookiebotOnConsentReady"]
+    events.forEach((event) => window.addEventListener(event, check))
+    return () =>
+      events.forEach((event) => window.removeEventListener(event, check))
   }, [])
   return (
     <footer className={styles.root}>
