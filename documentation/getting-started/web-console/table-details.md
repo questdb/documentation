@@ -135,7 +135,7 @@ A grid displaying key storage configuration:
 
 ### Storage policy
 
-For tables with a [storage policy](/docs/concepts/storage-policy/), this section lists the configured stages, such as "To Parquet", "To Remote", "Drop Local", and "Drop Remote", along with their schedules.
+For tables with a [storage policy](/docs/concepts/storage-policy/), this section lists the configured stages, such as "To Parquet", "To Remote", "Drop Local", and "Drop Remote", along with their schedules. The two remote stages drive [cold storage](/docs/concepts/cold-storage/).
 
 :::note
 Storage policy is [Enterprise](/enterprise/) only.

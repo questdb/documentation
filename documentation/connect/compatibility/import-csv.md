@@ -262,6 +262,11 @@ the schema as required.
    ) TIMESTAMP (timestamp) partition by DAY;
    ```
 
+   To confirm the data you imported is ordered before recreating the table with
+   a designated timestamp, see the
+   [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
+   cookbook recipe.
+
 9. Ready for import: Create an empty table using the final schema.
 
 ### Import CSV

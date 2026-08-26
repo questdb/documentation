@@ -86,6 +86,8 @@ The TTL unit cannot be finer than the table's partition size (`market_data` is
 partitioned by hour). See the [Storage Policy](/docs/concepts/storage-policy/)
 concept guide for the full partition lifecycle, including `DROP LOCAL`.
 
+A policy can also move Parquet partitions off local disk entirely. The `TO REMOTE` and `DROP REMOTE` stages upload them to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store, where they remain queryable with normal SQL. See [cold storage](/docs/concepts/cold-storage/).
+
 ### Converting to Parquet
 
 On all editions, partitions can be converted manually with `ALTER TABLE`. You

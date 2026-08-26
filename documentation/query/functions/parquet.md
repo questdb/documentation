@@ -124,6 +124,10 @@ FROM (
 SAMPLE BY 1h;
 ```
 
+To find out whether a file needs that `ORDER BY` in the first place, see the
+[Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
+cookbook recipe.
+
 :::
 
 ### Importing a Parquet file into a table
@@ -250,5 +254,8 @@ Only a single file can be read per `read_parquet` call.
   to store a table's partitions as Parquet with `FORMAT PARQUET`.
 - [Designated timestamp](/docs/concepts/designated-timestamp/) explains what the
   designated timestamp is and what it enables.
+- [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
+  is a cookbook recipe that tests whether a file is already sorted before you
+  nominate its timestamp.
 - [INSERT](/docs/query/sql/insert/) documents `INSERT INTO ... SELECT`,
   including the `ATOMIC` and `BATCH` keywords.

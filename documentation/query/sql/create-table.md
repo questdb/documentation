@@ -345,10 +345,9 @@ A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
 positive. A drop stage may not precede the write it depends on (`TO PARQUET`
 and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
 `TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
-removes its native files and serves reads from the Parquet file. Storage
-policies currently operate locally only: `TO REMOTE` is accepted and stored but
-not yet enforced, and `DROP REMOTE` is rejected at SQL parse time with
-`'DROP REMOTE' is not supported yet`.
+removes its native files and serves reads from the Parquet file.
+
+`TO REMOTE` and `DROP REMOTE` drive [cold storage](/docs/concepts/cold-storage/): they upload the partition to object storage, where it stays queryable, and later reclaim it. Both require cold storage to be enabled and a WAL table.
 
 To modify a storage policy after table creation, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).

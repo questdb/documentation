@@ -4,8 +4,8 @@ title: Connect to QuestDB
 sidebar_label: Overview
 description:
   How to send data to QuestDB and run queries. Choose between native client
-  libraries, compatibility protocols (ILP, PGWire, REST), or the wire-protocol
-  specifications.
+  libraries, the REST API, compatibility protocols (ILP, PGWire), or the
+  wire-protocol specifications.
 ---
 
 import { Clients } from "../../src/components/Clients"
@@ -18,9 +18,12 @@ Pick the path that matches your environment.
 | Your situation                                                          | Use                                                              |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Greenfield app — want the best throughput, durability, and feature set  | [**Client Libraries**](#client-libraries)                        |
-| Existing InfluxDB collectors, Telegraf, or Kafka / Flink pipelines      | [Compatibility → ILP](/docs/connect/compatibility/ilp/overview/)             |
+| An AI agent or MCP tooling driving the database                         | [Agents](/docs/connect/agents/)                                  |
+| Kafka, Flink, Redpanda, or Telegraf pipelines                           | [Message brokers](/docs/integrations/overview/#data-ingestion-and-streaming) |
+| HTTP scripts, ad-hoc `curl`, or CSV imports                             | [REST API](#rest-api)                                            |
+| Existing InfluxDB collectors, or anything that already emits ILP        | [Compatibility → ILP](/docs/connect/compatibility/ilp/overview/)             |
 | Postgres-shaped data layer, BI tools, ORMs                              | [Compatibility → PGWire](/docs/connect/compatibility/pgwire/overview/)           |
-| HTTP scripts, ad-hoc `curl`, or CSV imports                             | [Compatibility → REST API](/docs/connect/compatibility/rest-api/)                |
+| Embedding QuestDB inside a JVM application                              | [Java (embedded)](/docs/connect/java-embedded/)                  |
 | Building a new QuestDB client library (QWP spec)                        | [Wire Protocols](/docs/connect/wire-protocols/overview/)                      |
 
 ## Client Libraries
@@ -65,6 +68,20 @@ Pick a language:
 
 <Clients showProtocol="QWP" />
 
+## REST API
+
+HTTP / JSON endpoints on port `9000`, understood by any off-the-shelf HTTP
+client. Reach for it when you want a `curl` one-liner, a shell script, a health
+check, or a bulk file load without pulling in a client library. It is not
+superseded by QWP.
+
+- **[REST API](/docs/connect/compatibility/rest-api/)**: `/exec` runs SQL and
+  returns JSON, `/imp` uploads CSV, `/exp` exports results as CSV or Parquet.
+- **[CSV import](/docs/connect/compatibility/import-csv/)**: bulk loading a CSV
+  file, over HTTP or with `COPY`.
+- **[Parquet export](/docs/concepts/parquet/#export)**: writing query results to
+  Parquet.
+
 ## Compatibility protocols
 
 Use these if you have existing tooling that speaks them, or if a native client
@@ -76,8 +93,6 @@ library isn't a fit for your environment.
 - **[PostgreSQL Wire Protocol (PGWire)](/docs/connect/compatibility/pgwire/overview/)** — query
   QuestDB from any Postgres-compatible driver (psycopg, JDBC, pgx, …), BI
   tools (Tableau, Grafana, Metabase), and ORMs.
-- **[REST API](/docs/connect/compatibility/rest-api/)** — HTTP / JSON endpoints for ad-hoc
-  queries, scripting, and bulk [CSV import](/docs/connect/compatibility/import-csv/).
 
 These remain fully supported. They are grouped as *compatibility* because they
 predate QWP and exist primarily to integrate with tooling that already speaks

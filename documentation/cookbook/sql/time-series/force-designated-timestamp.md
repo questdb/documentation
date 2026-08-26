@@ -82,9 +82,12 @@ This query reads from a parquet file, applies ordering, forces the designated ti
 
 :::warning Order is Required
 The `TIMESTAMP()` keyword requires that the data is already sorted by the timestamp column. If the data is not in order, the query will fail. Always include `ORDER BY` before applying `TIMESTAMP()`.
+
+To test whether a source is already sorted, see [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/).
 :::
 
 :::info Related Documentation
+- [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/)
 - [Designated Timestamp concept](/docs/concepts/designated-timestamp/)
 - [TIMESTAMP keyword reference](/docs/query/sql/select/#timestamp)
 - [SAMPLE BY aggregation](/docs/query/sql/sample-by/)

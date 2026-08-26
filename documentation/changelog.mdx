@@ -16,6 +16,10 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
+- [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
+- [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts
+- [SWITCH COLD STORAGE ROLE](/docs/query/sql/switch-cold-storage-role/) - New reference page for moving the cold storage manager role between instances at runtime, with `SWITCH COLD STORAGE STATUS`, the `FORCE` break-glass path, and the timeout semantics
 - [Connect](/docs/connect/overview/) - New top-level Connect section that gathers the native client libraries, the compatibility protocols (ILP, PGWire, REST), and the wire-protocol specifications under one home, with a decision table for picking a path and a per-language QWP support matrix
 - [Connect string reference](/docs/connect/clients/connect-string/) - Every configuration key for the native clients, with worked connect strings for common setups, a goal-to-keys recipe table, sender restart and replay semantics, and an alphabetical key index
 - [Wire protocols](/docs/connect/wire-protocols/overview/) - QWP specifications for client implementers, covering [ingress over WebSocket](/docs/connect/wire-protocols/qwp-ingress-websocket/), [egress over WebSocket](/docs/connect/wire-protocols/qwp-egress-websocket/), and [expected client behavior](/docs/connect/wire-protocols/qwp-client-behavior/)
@@ -30,9 +34,17 @@ This page tracks significant updates to the QuestDB documentation.
 - [ALTER TABLE REBASE WAL](/docs/query/sql/alter-table-rebase-wal/) - New reference page for rebuilding a suspended WAL table under a fresh sequencer, with its requirements and permission
 - [ALTER TABLE SET FORMAT](/docs/query/sql/alter-table-set-format/) - New reference page for switching a table's partition storage format between `NATIVE` and `PARQUET`
 - [QWP configuration](/docs/configuration/qwp/) - Server-side settings for the QWP ingestion (`/write/v4`) and query (`/read/v1`) endpoints
+- [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/) and [Check column sort order](/docs/cookbook/sql/advanced/check-column-sort-order/) - Two cookbook recipes that detect unsorted data with `lag()`: whether a table, CSV import or external Parquet file is ordered by its timestamp, and whether one column is sorted with respect to another
 
 ### Reference
 
+- [Storage Policy](/docs/concepts/storage-policy/) - The `TO REMOTE` and `DROP REMOTE` stages are now enforced. Documented what each does, the requirement for a WAL table with cold storage enabled, and the warning that `DROP LOCAL` makes a partition read-only for good
+- Added the [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) function, which returns the remote state of every partition in a table's manifest as it walks `pending`, `live`, `sealed`, and `deleting`
+- [SHOW PARTITIONS](/docs/query/sql/show/#show-partitions) - Two trailing columns, `seqTxn` and `isRemotelyServed`, are appended to the result set. Tools binding columns by position must be updated
+- [Backup and restore](/docs/operations/backup/#cold-storage-partitions) - Documented that a backup of a database using cold storage does not contain the `data.parquet` bytes, so the backup and the object store prefix are one recovery set
+- [Replication overview](/docs/high-availability/overview/#cold-storage-in-a-replicated-cluster) - Documented that the cold storage manager role is independent of the primary and replica roles, that partition bytes never traverse replication, and that replicas must be upgraded first
+- [Cold storage read metrics](/docs/operations/logging-metrics/#cold-storage-read-metrics) - Added the fifteen `questdb_cold_chunk_*` Prometheus metrics
+- Added the [`storage.policy.recheck.drain.interval`](/docs/configuration/storage-policy/) configuration property
 - [CREATE TABLE](/docs/query/sql/create-table/#partition-format) - Added the `FORMAT { NATIVE | PARQUET }` clause to store partitions as Parquet by default on partitioned WAL tables
 - [REST API](/docs/connect/compatibility/rest-api/#authentication) - Merged the overlapping authentication sections into one, with basic auth (including building the `Authorization` header by hand) and Enterprise token auth
 - [SHOW CREATE LIVE VIEW](/docs/query/sql/show/#show-create-live-view) - Documented retrieving a live view's `CREATE` statement, alongside the `CREATE LIVE VIEW` and `DROP LIVE VIEW` [permissions](/docs/security/rbac/)
@@ -46,6 +58,7 @@ This page tracks significant updates to the QuestDB documentation.
 - [LIMIT](/docs/query/sql/limit/#null-bounds) - Documented null `LIMIT` bounds (supplied via bind variables) and their two-bound semantics
 - Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
 - Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
+- [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
 
 ### Updated
 
@@ -60,6 +73,11 @@ This page tracks significant updates to the QuestDB documentation.
 - [Time to live (TTL)](/docs/concepts/ttl/) - Documented TTL on materialized views, set with `CREATE MATERIALIZED VIEW ... TTL` or `ALTER MATERIALIZED VIEW ... SET TTL` and managed independently of the base table's TTL
 - [Result grid](/docs/getting-started/web-console/result-grid/) - Documented the Parquet and CSV download options in the web console result grid
 - [Docker Compose configuration](/docs/cookbook/operations/docker-compose-config/) - Reworked the volume-permission guidance and explained why `QDB_CAIRO_ROOT` should not be set in Docker
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Renamed from "MCP connection" and reworked around when an agent actually needs an MCP server, with [AI coding agents](/docs/getting-started/ai-coding-agents/) gaining a four-option matrix covering the MCP server, the REST API, the agent skill, and the [QuestDB AI Assistant](/docs/getting-started/web-console/questdb-ai/)
+- [pandas](/docs/integrations/data-processing/pandas/) and [Polars](/docs/integrations/data-processing/polars/) - Rewritten around the native QWP clients, keeping the previous ILP and ConnectorX approaches as legacy; Polars now also covers the Rust `polars-ingress` and `polars-egress` crate features
+- [Python client](/docs/connect/clients/python/) - Documented N-dimensional `float64` numpy arrays landing in matching N-dimensional column types (other dtypes are rejected), and clarified Polars consumption: prefer `to_polars()`, with `polars.DataFrame(result)` reserved for pyarrow-free installs
+- [Query overview](/docs/query/overview/) - Added a client libraries section ahead of PostgreSQL, and removed the stale notice describing Parquet support as beta
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Updated for the renamed MCP server: the npm package is now `@questdb/mcp-server-questdb` (previously `@questdb/mcp-bridge`) and the repository is now `questdb/mcp-server-questdb`, also reflected in [AI coding agents](/docs/getting-started/ai-coding-agents/)
 
 ## July 2026
 

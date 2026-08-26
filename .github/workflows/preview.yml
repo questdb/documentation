@@ -17,9 +17,14 @@ on:
 permissions:
   contents: read
 
+# Successive pushes supersede each other, but a label event must never cancel an
+# in-flight build. Concurrency is evaluated before the job's `if`, so a label
+# other than "preview" (one attached as the PR is opened, say) would otherwise
+# cancel the build started by the "opened" event and then skip itself, leaving
+# the PR with no preview and no artifact for the deploy half to pick up.
 concurrency:
   group: preview-build-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event.action != 'labeled' }}
 
 jobs:
   pr-preview:
