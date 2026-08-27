@@ -174,6 +174,12 @@ only when the rule selects it for removal.
 `KEEP HIGHEST/LOWEST` and `KEEP N` are convenience forms that desugar to a
 window predicate, so the window `WHEN` is the general escape hatch.
 
+The bare `KEEP HIGHEST/LOWEST` form accepts `BYTE`, `SHORT`, `INT`, `LONG`,
+`FLOAT`, `DOUBLE`, `DATE`, `TIMESTAMP` and `DECIMAL` columns. The top-N form has
+a broader type surface: `KEEP N HIGHEST/LOWEST` ranks with `ORDER BY`, so it
+accepts any orderable column type. For example, use `KEEP 1 HIGHEST symbol`, not
+`KEEP HIGHEST symbol`, to rank a `SYMBOL` column.
+
 The **Frees disk** column is the difference between hiding a row and deleting
 it. Every mode hides expired rows from every read, immediately. Only a monotonic
 `WHEN` predicate also has those rows deleted from disk by the cleanup job: a
@@ -252,14 +258,14 @@ CREATE MATERIALIZED VIEW trades_sized AS (
   SELECT * FROM trades
 ) EXPIRE ROWS WHEN amount < 1.5;
 
-SELECT * FROM trades_sized;
+SELECT * FROM trades_sized ORDER BY ts;
 ```
 
 | symbol | price | amount | ts                          |
 | ------ | ----- | ------ | --------------------------- |
+| ETH    | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
 | BTC    | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
 | BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
-| ETH    | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
 
 The two `amount = 1.0` rows are expired. `amount = 1.5` is kept (`1.5 < 1.5` is
 `FALSE`), and any `NULL` amount would be kept too (the comparison is `UNKNOWN`,
@@ -279,12 +285,8 @@ CREATE MATERIALIZED VIEW trades_recent AS (
 (With the 2024 sample timestamps above, every row is already older than a day
 and would be hidden; use recent data to see rows retained.)
 
-Write the offset with `dateadd`, as above, rather than as clock arithmetic.
 `WHEN ts < dateadd('d', -1, now())` and `WHEN ts < now() - 86400000000` retain
-the same rows, but only the `dateadd` form reduces to a timestamp range that the
-scan can use to skip partitions. The arithmetic form is evaluated row by row
-across the whole view on every read. Both forms reclaim disk — the cleanup job
-proves either monotonic — so the difference is read cost alone.
+the same rows and both reclaim disk — the cleanup job proves either monotonic.
 
 ### Keep latest per key: `KEEP LATEST`
 
@@ -296,13 +298,13 @@ CREATE MATERIALIZED VIEW trades_latest AS (
   SELECT * FROM trades
 ) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
 
-SELECT * FROM trades_latest;
+SELECT * FROM trades_latest ORDER BY ts;
 ```
 
 | symbol | price | amount | ts                          |
 | ------ | ----- | ------ | --------------------------- |
-| BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
 | ETH    | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
+| BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
 
 One row per symbol — the latest by the designated timestamp `ts`. As new trades
 arrive, the kept row advances automatically. `PARTITION BY` may list multiple key
@@ -397,11 +399,19 @@ time-based predicate) reappears on the next read.
 
 ### Physical cleanup (best-effort)
 
-A background job reclaims disk for non-active partitions: a fully-expired
-partition is removed, and a partially-expired one is compacted down to its
-survivors. It runs at the `CLEANUP EVERY` cadence (default `1h`) and is
-**best-effort** — the read filter is authoritative, so deferred or skipped
-reclamation only affects disk usage, never query results.
+A background job reclaims disk for non-active partitions. A fully-expired
+partition is removed. Under a rolling clock-based predicate, a partially-expired
+partition is compacted down to its survivors only when the expired-row fraction
+reaches `cairo.mat.view.row.expiry.cleanup.min.expired.fraction`, which defaults
+to `0.5`. This avoids repeatedly rewriting a boundary partition as the cutoff
+moves through it. Set the property to `0` to compact on the first expired row,
+or to `1` to disable partial-partition compaction; fully-expired partitions are
+still removed. The threshold does not delay a fixed, deterministic predicate,
+whose expired-row verdicts cannot change with time.
+
+The job runs at the `CLEANUP EVERY` cadence (default `1h`) and is **best-effort**
+— the read filter is authoritative, so deferred or skipped reclamation only
+affects disk usage, never query results.
 
 The job runs only under a monotonic `WHEN` predicate. It skips `KEEP LATEST`,
 `KEEP HIGHEST/LOWEST`, `KEEP N` and window policies entirely: a later refresh
@@ -413,11 +423,11 @@ On QuestDB Enterprise, cleanup runs on the **primary only**, but the reclamation
 still replicates: the compaction commits are ordinary WAL transactions, so
 replicas reclaim the identical rows by applying them. A read-only replica neither
 runs the job nor needs to. Disable the job with
-`cairo.row.expiry.cleanup.enabled=false` in `server.conf` (reads stay filtered;
-only reclamation stops — the setting does not disable `EXPIRE ROWS` itself); the
-setting is read at startup, so changing it requires a restart. A failing sweep
-retries after one second, doubling the per-view retry gap up to a 10-minute
-cap.
+`cairo.mat.view.row.expiry.cleanup.enabled=false` in `server.conf` (reads stay
+filtered; only reclamation stops — the setting does not disable `EXPIRE ROWS`
+itself). Cleanup settings are read at startup, so changing this property or the
+minimum expired fraction requires a restart. A failing sweep retries after one
+second, doubling the per-view retry gap up to a 10-minute cap.
 
 To observe reclamation, compare the physical row count per partition before and
 after a sweep:
