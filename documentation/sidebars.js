@@ -831,6 +831,11 @@ module.exports = {
                   id: "enterprise-kubernetes-operator/getting-started/azure",
                   label: "Azure AKS",
                 },
+                {
+                  type: "doc",
+                  id: "enterprise-kubernetes-operator/getting-started/restore-and-migrate",
+                  label: "Restore or migrate",
+                },
               ],
             },
             "enterprise-kubernetes-operator/configuration",
