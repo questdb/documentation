@@ -16,6 +16,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [Expiring rows (`EXPIRE ROWS`)](/docs/concepts/expire-rows/) and [ALTER MATERIALIZED VIEW SET EXPIRE](/docs/query/sql/alter-mat-view-set-expire/) - New row-level retention for materialized views, with creation syntax in [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/), immediate read filtering, and background reclamation for eligible policies
 - [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
 - [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
 - [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts

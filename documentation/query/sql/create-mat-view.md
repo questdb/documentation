@@ -18,22 +18,31 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ START timestamp ] [ TIME ZONE timezone ]
            [ PERIOD ( LENGTH length [ TIME ZONE tz ] [ DELAY delay ] ) ]
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
-AS [ ( ] query [ ) ]
-[ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
-      [ TTL n timeUnit ] ]
-[ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
-[ OWNED BY ownerName ]
+AS
+{ query
+| ( query )
+  [ TIMESTAMP ( columnRef ) ]
+  [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+        [ TTL n timeUnit ] ]
+  [ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
+  [ OWNED BY ownerName ]
+}
 ```
 
+Parentheses around `query` are optional only when the query ends the statement.
+They are required when any trailing clause follows the query, including
+`TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
+
 Where:
+
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
 - `query`: Either an aggregating query with `SAMPLE BY` or a time-based
   `GROUP BY`, or a
   [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection
   over a single table
-- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]` — designed for passthrough views (see below)
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
+  This policy is designed for passthrough views (see below).
 
 ## Parameters
 
@@ -287,14 +296,14 @@ The view's TTL is independent of the base table's TTL. See
 ## EXPIRE ROWS
 
 Attach a row-level retention policy with `EXPIRE ROWS`. Unlike `TTL` (which drops
-whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows — the latest
-per key, the top-N per group, or rows matching a predicate — recomputed
-continuously as the view refreshes.
+whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows: the latest
+per key, the top-N per group, or rows matching a predicate. It recomputes that
+set continuously as the view refreshes.
 
 `EXPIRE ROWS` is designed for
 [**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views)
-— a projection over a single table, with no `SAMPLE BY` / `GROUP BY`, whose rows
-stay 1:1 with the base. An aggregating view is accepted with a logged advisory
+(a projection over a single table with no `SAMPLE BY` / `GROUP BY`, whose rows
+stay 1:1 with the base). An aggregating view is accepted with a logged advisory
 (a later refresh can regenerate reclaimed rows). The defining query must not
 read another policied view, as its base or in a join:
 
@@ -305,7 +314,7 @@ CREATE MATERIALIZED VIEW trades_latest AS (
 ```
 
 A `WHEN` predicate is for rules that move with **wall-clock time**, such as a
-rolling `ts < dateadd('d', -7, now())` window — the defining query cannot
+rolling `ts < dateadd('d', -7, now())` window. The defining query cannot
 express those, because it rejects non-deterministic functions. A predicate that
 depends only on the row's own values belongs in the query's `WHERE` clause
 instead, which keeps those rows out of the view entirely; see
@@ -324,7 +333,7 @@ EXPIRE ROWS
 A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
 is rejected, since it would expire nothing. That covers the explicit
 `ts < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the reserved
-`NULL` value, such as `ts < 2147483647 + 1` — see
+`NULL` value, such as `ts < 2147483647 + 1`. See
 [A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
 
 For filtering and disk-reclamation behavior, see
@@ -334,7 +343,7 @@ remove a policy with
 
 A view can carry both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the
 statement and first in effect: it removes rows from the view, and the
-`EXPIRE ROWS` policy then applies to the rows that stay — see
+`EXPIRE ROWS` policy then applies to the rows that stay. See
 [Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
 
 See the [Expiring rows](/docs/concepts/expire-rows/) concept page for

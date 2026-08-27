@@ -7,8 +7,9 @@ description:
 ---
 
 Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/expire-rows/)
-row-retention policy on a materialized view (designed for **passthrough**
-views — see the concept page). For filtering and disk-reclamation behavior, see
+row-retention policy on a materialized view. It is designed for
+**passthrough views**; see the concept page. For filtering and disk-reclamation
+behavior, see
 [How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works).
 
 ## Syntax
@@ -65,7 +66,7 @@ ALTER MATERIALIZED VIEW trades_mirror
 A `WHEN` predicate is the right tool for a cutoff that moves with the clock like
 this one. A deterministic predicate such as `amount < 1.5` is accepted too, but
 it selects the same rows more cheaply as a `WHERE` clause in the view's defining
-query — see
+query. See
 [`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ```questdb-sql title="Keep the latest row per symbol"

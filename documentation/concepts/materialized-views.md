@@ -182,10 +182,10 @@ CREATE MATERIALIZED VIEW trades_btc AS (
 Reach for one when you want a maintained *subset* of a large table rather than a
 summary of it:
 
-- **A narrowed replica** — one symbol, one tenant, one region, or a handful of
+- **A narrowed replica**: one symbol, one tenant, one region, or a handful of
   columns out of a wide table, kept current automatically and queried without
   the base table's scan cost.
-- **A row-level retention target** — attach an
+- **A row-level retention target**: attach an
   [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy to keep only
   some of the view's rows. The base table is left alone.
 
@@ -310,21 +310,21 @@ table qualifies, with or without a filter:
 | Query | |
 | ----- | --- |
 | `SELECT * FROM trades` | Passthrough |
-| `SELECT timestamp, symbol, price FROM trades` | Passthrough — column subset |
-| `SELECT timestamp, symbol AS ticker FROM trades` | Passthrough — aliases are fine |
-| `SELECT timestamp, price * amount AS notional FROM trades` | Passthrough — a row-local expression |
-| `SELECT * FROM trades WHERE symbol = 'BTC'` | Passthrough — a filter only removes rows |
+| `SELECT timestamp, symbol, price FROM trades` | Passthrough: column subset |
+| `SELECT timestamp, symbol AS ticker FROM trades` | Passthrough: aliases are fine |
+| `SELECT timestamp, price * amount AS notional FROM trades` | Passthrough: a row-local expression |
+| `SELECT * FROM trades WHERE symbol = 'BTC'` | Passthrough: a filter only removes rows |
 | `... SAMPLE BY 1h`, or `GROUP BY` on a timestamp | Aggregating view |
 | `SELECT DISTINCT ...` | Rejected |
 | `... LATEST ON timestamp PARTITION BY symbol` | Rejected |
 | `JOIN`, `UNION` | Rejected |
 | `row_number() OVER (...)` and other window functions | Rejected |
 | `LIMIT` | Rejected |
-| `ORDER BY` a non-timestamp column | Rejected — the view loses its designated timestamp |
+| `ORDER BY` a non-timestamp column | Rejected: the view loses its designated timestamp |
 
 Everything in the rejected group produces output that depends on rows *other
 than* the one being emitted. An incremental refresh sees only the newly-arrived
-slice of the base table, so it cannot compute those correctly — a `LIMIT 100`
+slice of the base table, so it cannot compute those correctly. A `LIMIT 100`
 would admit 100 rows per refresh rather than 100 in total, and a `row_number()`
 would restart within each slice.
 
@@ -334,8 +334,8 @@ SAMPLE BY or GROUP BY timestamp_floor()`: the query looked like it meant to
 aggregate but named no bucket. `LIMIT` and window functions have their own
 messages.
 
-To keep only some of a passthrough view's rows over time — the latest per key,
-the top-N per group, or rows matching a predicate — attach an
+To keep only some of a passthrough view's rows over time, such as the latest per
+key, the top-N per group, or rows matching a predicate, attach an
 [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. That page also
 covers
 [when to put a predicate in the view's `WHERE` clause instead](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
