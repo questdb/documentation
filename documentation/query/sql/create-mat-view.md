@@ -309,7 +309,7 @@ rolling `ts < dateadd('d', -7, now())` window — the defining query cannot
 express those, because it rejects non-deterministic functions. A predicate that
 depends only on the row's own values belongs in the query's `WHERE` clause
 instead, which keeps those rows out of the view entirely; see
-[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/deep-dive/expire-rows/#where-filter-or-expire-rows).
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 The clause goes after the query (and after `PARTITION BY` if present):
 
@@ -325,21 +325,19 @@ A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
 is rejected, since it would expire nothing. That covers the explicit
 `ts < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the reserved
 `NULL` value, such as `ts < 2147483647 + 1` — see
-[A `NULL` threshold is rejected](/docs/concepts/deep-dive/expire-rows/#a-null-threshold-is-rejected).
+[A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
 
-Expired rows are hidden from queries immediately in every mode. They are
-reclaimed on disk in the background (`CLEANUP EVERY`, default `1h`) under a
-monotonic `WHEN` predicate; `KEEP LATEST`, `KEEP HIGHEST/LOWEST`, `KEEP N` and
-window predicates hide rows without freeing disk. Change or remove a policy
-with
+For filtering and disk-reclamation behavior, see
+[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works). Change or
+remove a policy with
 [`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
 
 A view can carry both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the
 statement and first in effect: it removes rows from the view, and the
 `EXPIRE ROWS` policy then applies to the rows that stay — see
-[Combining with TTL](/docs/concepts/deep-dive/expire-rows/#combining-with-ttl).
+[Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
 
-See the [Expiring rows](/docs/concepts/deep-dive/expire-rows/) concept page for
+See the [Expiring rows](/docs/concepts/expire-rows/) concept page for
 all modes, worked examples, and semantics (NULLs, ties, monotonicity).
 
 ## Complete example

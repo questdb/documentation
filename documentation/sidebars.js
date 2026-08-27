@@ -627,6 +627,7 @@ module.exports = {
             "concepts/deduplication",
             "concepts/delivery-semantics",
             "concepts/ttl",
+            "concepts/expire-rows",
             "concepts/storage-policy",
             {
               id: "concepts/cold-storage",
@@ -643,7 +644,6 @@ module.exports = {
           items: [
             "concepts/deep-dive/indexes",
             "concepts/deep-dive/posting-index",
-            "concepts/deep-dive/expire-rows",
             "concepts/deep-dive/interval-scan",
             "concepts/deep-dive/jit-compiler",
             "concepts/deep-dive/query-tracing",

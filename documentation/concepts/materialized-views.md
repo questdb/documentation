@@ -186,7 +186,7 @@ summary of it:
   columns out of a wide table, kept current automatically and queried without
   the base table's scan cost.
 - **A row-level retention target** — attach an
-  [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy to keep only
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy to keep only
   some of the view's rows. The base table is left alone.
 
 Passthrough views refresh incrementally like any other materialized view, and
@@ -197,7 +197,7 @@ for a period to align to.
 ### Use cases
 
 On its own, a passthrough view is a maintained copy of the base table. Add an
-[`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy and it becomes a
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy and it becomes a
 maintained *subset*: you describe which rows are worth keeping, and QuestDB
 keeps that set current as new data arrives. The three examples below are drawn
 from sensor telemetry and from capital markets, and each keeps a different kind
@@ -254,7 +254,7 @@ tell that for a cutoff on the view's designated timestamp, which only moves
 forward. `expiry` is a different column, so QuestDB takes the safe route:
 expired contracts stop appearing in queries straight away, but their rows stay
 on disk. Add a [TTL](/docs/concepts/ttl/) if you want that space back, and see
-[when expired rows are deleted from disk](/docs/concepts/deep-dive/expire-rows/#monotonicity-and-cleanup-safety).
+[when expired rows are deleted from disk](/docs/concepts/expire-rows/#monotonicity-and-cleanup-safety).
 
 #### Finance: The largest trades per symbol
 
@@ -281,7 +281,7 @@ Ten rows per symbol are visible, but the view still stores every base row it has
 taken in, because a top-N policy never frees disk. A [TTL](/docs/concepts/ttl/)
 is what bounds that, at the price of changing the question the view answers from
 "the biggest so far" to "the biggest still retained". See
-[combining with TTL](/docs/concepts/deep-dive/expire-rows/#combining-with-ttl).
+[combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
 
 The ranking covers everything the view holds rather than a recent window, so
 `KEEP N` fits records that stay true once written. For a value that gets
@@ -336,9 +336,9 @@ messages.
 
 To keep only some of a passthrough view's rows over time — the latest per key,
 the top-N per group, or rows matching a predicate — attach an
-[`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy. That page also
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. That page also
 covers
-[when to put a predicate in the view's `WHERE` clause instead](/docs/concepts/deep-dive/expire-rows/#where-filter-or-expire-rows).
+[when to put a predicate in the view's `WHERE` clause instead](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ## Creating a materialized view
 

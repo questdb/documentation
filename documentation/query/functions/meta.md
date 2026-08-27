@@ -288,7 +288,7 @@ Returns a `table` including the following information:
   merges two adjacent intervals instead of paying for a second commit. `0` means
   merging is disabled
 - `expire_clause` - the view's
-  [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy as written, or
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy as written, or
   `NULL` when the view has no policy
 - `expire_cleanup_every` - how often the cleanup job runs for the policy, or
   `NULL`
@@ -301,7 +301,7 @@ Returns a `table` including the following information:
 `materialized_views()` on its own returns every column listed above. The example
 below projects a readable subset over three views: an aggregating one with no
 retention policy, and two passthrough views with an
-[`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/) policy.
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy.
 
 ```questdb-sql title="List all materialized views"
 SELECT view_name, view_status, base_table_name, refresh_base_table_txn,
@@ -790,20 +790,20 @@ Returns a `table` with the following columns:
 
 ### Basic table information
 
-| Column                | Type    | Description                                                        |
-| --------------------- | ------- | ------------------------------------------------------------------ |
-| `id`                  | INT     | Internal table ID                                                  |
-| `table_name`          | STRING  | Table name                                                         |
-| `designatedTimestamp` | STRING  | Name of the designated timestamp column, or `null`                 |
-| `partitionBy`         | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `walEnabled`          | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`               | BOOLEAN | Whether deduplication is enabled                                   |
-| `ttlValue`            | INT     | TTL (Time-To-Live) value                                           |
-| `ttlUnit`             | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
-| `matView`             | BOOLEAN | Whether this is a materialized view                                |
-| `directoryName`       | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
-| `maxUncommittedRows`  | INT     | Table's `maxUncommittedRows` setting                               |
-| `o3MaxLag`            | LONG    | Table's `o3MaxLag` setting in microseconds                         |
+| Column                 | Type    | Description                                                        |
+| ---------------------- | ------- | ------------------------------------------------------------------ |
+| `id`                   | INT     | Internal table ID                                                  |
+| `table_name`           | STRING  | Table name                                                         |
+| `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
+| `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
+| `dedup`                | BOOLEAN | Whether deduplication is enabled                                   |
+| `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
+| `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
+| `matView`              | BOOLEAN | Whether this is a materialized view                                |
+| `directoryName`        | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
+| `maxUncommittedRows`   | INT     | Table's `maxUncommittedRows` setting                               |
+| `o3MaxLag`             | LONG    | Table's `o3MaxLag` setting in microseconds                         |
 
 :::note
 
@@ -872,6 +872,17 @@ These columns are populated on **replicas only** via replication download tracki
 | `replica_more_pending`   | BOOLEAN | `true` if the last download batch was limited and more data is available |
 
 On primary instances, these columns will be `0` or `false`.
+
+### Row-expiry policy
+
+| Column                 | Type   | Description                                                    |
+| ---------------------- | ------ | -------------------------------------------------------------- |
+| `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy as written, or `null` |
+| `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                      |
+
+Unlike `materialized_views()`, `tables()` does not expose
+`expire_enforcement`; use `materialized_views()` to inspect whether a policy is
+`FILTER_AND_RECLAIM` or `FILTER_ONLY`.
 
 ### Data precision and limitations
 

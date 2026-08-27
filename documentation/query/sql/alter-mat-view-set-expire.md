@@ -6,11 +6,10 @@ description:
   documentation.
 ---
 
-Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/deep-dive/expire-rows/)
+Sets, replaces, or removes an [`EXPIRE ROWS`](/docs/concepts/expire-rows/)
 row-retention policy on a materialized view (designed for **passthrough**
-views — see the concept page). Expired rows are hidden from queries immediately
-in every mode, and reclaimed on disk in the background under a monotonic `WHEN`
-predicate — the relative and window modes hide rows without freeing disk.
+views — see the concept page). For filtering and disk-reclamation behavior, see
+[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works).
 
 ## Syntax
 
@@ -39,7 +38,7 @@ Without `N`, the keep column must be `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`,
 `ORDER BY` and accepts any orderable column type.
 
 For the full description of each mode and its semantics, see the
-[Expiring rows](/docs/concepts/deep-dive/expire-rows/) concept page.
+[Expiring rows](/docs/concepts/expire-rows/) concept page.
 
 ## When to use
 
@@ -53,9 +52,8 @@ For the full description of each mode and its semantics, see the
 `SET EXPIRE ROWS` validates the new policy against the view's columns first
 (compiling the predicate / checking the key columns), so an invalid predicate or
 an unknown column is rejected immediately rather than breaking later reads. Once
-set, queries against the view are filtered to the kept rows immediately; physical
-reclamation follows in the background. See
-[How it works](/docs/concepts/deep-dive/expire-rows/#how-it-works).
+set, the policy takes effect without rebuilding the view. See
+[How it works](/docs/concepts/expire-rows/#how-it-works).
 
 ## Examples
 
@@ -68,7 +66,7 @@ A `WHEN` predicate is the right tool for a cutoff that moves with the clock like
 this one. A deterministic predicate such as `amount < 1.5` is accepted too, but
 it selects the same rows more cheaply as a `WHERE` clause in the view's defining
 query — see
-[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/deep-dive/expire-rows/#where-filter-or-expire-rows).
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ```questdb-sql title="Keep the latest row per symbol"
 ALTER MATERIALIZED VIEW trades_mirror
@@ -96,7 +94,6 @@ ALTER MATERIALIZED VIEW trades_mirror DROP EXPIRE;
 | Passthrough recommended | An aggregating view is accepted with a logged advisory: a later refresh can regenerate reclaimed rows, so align base-table retention with the expiry horizon |
 | No dependent views      | Rejected when other materialized views derive from this view (they would copy expired rows on refresh) |
 | Validation              | The policy is checked against the view's columns before it is applied        |
-| Immediate effect        | Reads are filtered to the kept rows as soon as the policy is set             |
 | Replication             | The policy and the reclamation it drives replicate as normal WAL traffic     |
 
 ## Permissions (Enterprise)
@@ -123,7 +120,7 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 
 ## See also
 
-- [Expiring rows (EXPIRE ROWS) concept](/docs/concepts/deep-dive/expire-rows/)
+- [Expiring rows (EXPIRE ROWS) concept](/docs/concepts/expire-rows/)
 - [CREATE MATERIALIZED VIEW](/docs/query/sql/create-mat-view/)
 - [Materialized views concept](/docs/concepts/materialized-views/)
 - [ALTER MATERIALIZED VIEW SET TTL](/docs/query/sql/alter-mat-view-set-ttl/)
