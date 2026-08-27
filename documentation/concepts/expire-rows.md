@@ -193,8 +193,8 @@ SELECT * FROM trades_sized ORDER BY ts;
 | BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
 
 The two `amount = 1.0` rows are expired. `amount = 1.5` is kept (`1.5 < 1.5` is
-`FALSE`), and any `NULL` amount would be kept too (the comparison is `UNKNOWN`,
-not `TRUE`). See [NULLs](#nulls).
+`FALSE`), and any `NULL` amount would be kept too because a comparison against
+`NULL` evaluates to `FALSE` in QuestDB. See [NULLs](#nulls).
 
 A predicate on the designated timestamp gives a **rolling retention window**,
 which is the main use for `WHEN`. It is re-evaluated on every read, so the
@@ -322,10 +322,10 @@ at every stage. A row the `WHERE` clause excludes is never copied into the view:
 
 | | `WHERE` in the query | `EXPIRE ROWS WHEN` |
 | --- | --- | --- |
-| Storage | Row is never written | Row is written, and occupies disk until a sweep reclaims it |
+| Storage | Row is never written | Row is written; only a `FILTER_AND_RECLAIM` policy can reclaim it later |
 | Read cost | None | The keep-set filter is applied on every read of the view |
-| Write cost | None | The cleanup job rewrites partitions on the `CLEANUP EVERY` cadence |
-| After a full refresh | Still excluded | Re-materialized from the base, then hidden and swept again |
+| Write cost | None | Cleanup can rewrite partitions for `FILTER_AND_RECLAIM` policies |
+| After a full refresh | Still excluded | Re-materialized from the base, then hidden; eligible policies sweep it again |
 | Can be another view's base | Yes | No (a policied view is rejected as a base) |
 
 That last row is a hard constraint rather than a preference. If any other view
@@ -384,8 +384,9 @@ kept rows are visible **immediately, regardless of whether cleanup has run**.
 This is what makes results correct at all times:
 
 - **Per-row `WHEN`** keeps rows where the predicate is not `TRUE`. QuestDB
-  filtering is three-valued, so `FALSE` **and** `NULL` are kept (see
-  [NULLs](#nulls)).
+  comparisons use two-valued boolean semantics, so a comparison against `NULL`
+  is `FALSE`. Whether the complete predicate keeps or expires a `NULL` row
+  depends on operators such as `NOT`, `!=`, and `IS NULL` (see [NULLs](#nulls)).
 - **`KEEP LATEST`** returns the latest row per key using the designated
   timestamp.
 - **`KEEP HIGHEST/LOWEST/N` and window `WHEN`** compute the keep-set with a
@@ -397,15 +398,21 @@ time-based predicate) reappears on the next read.
 
 ### Physical cleanup (best-effort)
 
-A background job reclaims disk for non-active partitions. A fully-expired
-partition is removed. Under a rolling clock-based predicate, a partially-expired
-partition is compacted down to its survivors only when the expired-row fraction
-reaches `cairo.mat.view.row.expiry.cleanup.min.expired.fraction`, which defaults
-to `0.5`. This avoids repeatedly rewriting a boundary partition as the cutoff
-moves through it. Set the property to `0` to compact on the first expired row,
-or to `1` to disable partial-partition compaction; fully-expired partitions are
-still removed. The threshold does not delay a fixed, deterministic predicate,
-whose expired-row verdicts cannot change with time.
+A background job reclaims disk for non-active partitions. It never rewrites the
+active logical partition that receives new rows. A young view with only one
+partition therefore reclaims no disk yet, even when its policy reports
+`FILTER_AND_RECLAIM`. Once data creates a newer active partition, the older one
+becomes eligible for cleanup. Read filtering remains effective throughout.
+
+A fully-expired eligible partition is removed. Under a rolling clock-based
+predicate, a partially-expired partition is compacted down to its survivors only
+when the expired-row fraction reaches
+`cairo.mat.view.row.expiry.cleanup.min.expired.fraction`, which defaults to
+`0.5`. This avoids repeatedly rewriting a boundary partition as the cutoff moves
+through it. Set the property to `0` to compact on the first expired row, or to
+`1` to disable partial-partition compaction; fully-expired partitions are still
+removed. The threshold does not delay a fixed, deterministic predicate, whose
+expired-row verdicts cannot change with time.
 
 The job runs at the `CLEANUP EVERY` cadence (default `1h`) and is **best-effort**.
 The read filter is authoritative, so deferred or skipped reclamation only
@@ -431,8 +438,13 @@ To observe reclamation, compare the physical row count per partition before and
 after a sweep:
 
 ```questdb-sql title="Physical rows still on disk per partition"
-SELECT name, numRows FROM table_partitions('trades_latest');
+SELECT name, numRows FROM table_partitions('trades_recent');
 ```
+
+Use a view whose `expire_enforcement` is `FILTER_AND_RECLAIM`, such as
+`trades_recent`, for this check. Its active partition remains unchanged after a
+sweep. Insert data into a newer partition before expecting the current active
+partition to become eligible for reclamation.
 
 Reclamation **defers while a view is being refreshed continuously** and resumes
 on a quiet sweep.
@@ -441,12 +453,20 @@ on a quiet sweep.
 
 ### NULLs
 
-The keep-set is computed with three-valued logic, so a `NULL` value is never
-*less than* a group maximum (the comparison is `UNKNOWN`, not `TRUE`).
-Therefore:
+QuestDB comparisons use two-valued boolean semantics: a comparison against
+`NULL` evaluates to `FALSE`, not `UNKNOWN`, and `EXPIRE ROWS WHEN` expires a row
+only when the complete predicate evaluates to `TRUE`. The complete predicate
+therefore determines whether a `NULL` row survives:
 
-- **`KEEP HIGHEST/LOWEST` and value-based `WHEN`** predicates **keep** rows whose
-  value is `NULL`.
+- **A direct comparison such as `amount < 1.5`** is `FALSE` for a `NULL` amount,
+  so the policy keeps the row.
+- **`NOT (amount >= 1.5)`** is `TRUE` for a `NULL` amount because the inner
+  comparison is `FALSE`, so the policy expires the row. Although this predicate
+  resembles `amount < 1.5`, the two differ for `NULL` values.
+- **`amount != 1.5` and `amount IS NULL`** are also `TRUE` for a `NULL` amount,
+  so both expire the row.
+- **`KEEP HIGHEST/LOWEST`** keeps a `NULL` because its comparison against the
+  group extreme is `FALSE`.
 - **`KEEP LATEST`** uses the designated timestamp, which is never `NULL`.
 - **`KEEP N` is the exception.** It ranks rows with `row_number()`, and QuestDB
   has no `NULLS LAST`, so where a `NULL` lands is **type-dependent**: under
@@ -625,8 +645,12 @@ rather than breaking subsequent reads.
 - **Reads recompute the keep-set.** A relative/window policy computes its
   keep-set over the whole physical view on every read. `KEEP LATEST` on an
   [indexed](/docs/concepts/deep-dive/indexes/) symbol key is cheap; the window
-  modes (and non-indexed keep-latest) scan the view. A tighter `CLEANUP EVERY`
-  keeps the physical residue, and therefore the read cost, small.
+  modes (and non-indexed keep-latest) scan the view.
+- **Cleanup tuning applies only to reclaiming policies.** For a monotonic scalar
+  `WHEN` policy that reports `FILTER_AND_RECLAIM`, a tighter `CLEANUP EVERY`
+  reduces how long expired rows remain in eligible non-active partitions. It has
+  no reclamation effect on relative or window policies that report
+  `FILTER_ONLY`.
 - **Cleanup defers under continuous refresh.** Reclamation only proceeds when the
   view is quiescent and fully applied, so a view being refreshed continuously
   defers reclamation to a quiet sweep. The read filter stays authoritative
