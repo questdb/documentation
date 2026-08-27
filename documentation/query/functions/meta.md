@@ -312,7 +312,7 @@ FROM materialized_views();
 | view_name       | view_status | base_table_name | refresh_base_table_txn | base_table_txn | expire_clause                       | expire_cleanup_every | expire_enforcement |
 | --------------- | ----------- | --------------- | ---------------------- | -------------- | ----------------------------------- | -------------------- | ------------------ |
 | trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                | null                 | null               |
-| trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now()) | 30m                  | FILTER_AND_RECLAIM |
+| trades_recent   | valid       | trades          | 1                      | 1              | ts < dateadd('d', -7, now())        | 30m                  | FILTER_AND_RECLAIM |
 | trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST PARTITION BY symbol     | 1h                   | FILTER_ONLY        |
 
 ## memory_metrics

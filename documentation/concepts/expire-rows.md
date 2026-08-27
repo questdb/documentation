@@ -42,7 +42,11 @@ The bare `KEEP HIGHEST/LOWEST` form accepts `BYTE`, `SHORT`, `INT`, `LONG`,
 `FLOAT`, `DOUBLE`, `DATE`, `TIMESTAMP` and `DECIMAL` columns. The top-N form has
 a broader type surface: `KEEP N HIGHEST/LOWEST` ranks with `ORDER BY`, so it
 accepts any orderable column type. For example, use `KEEP 1 HIGHEST symbol`, not
-`KEEP HIGHEST symbol`, to rank a `SYMBOL` column.
+`KEEP HIGHEST symbol`, to rank a `SYMBOL` column. This changes tie and `NULL`
+behavior: the top-N form keeps exactly one row per group using the designated
+timestamp as a descending tiebreaker. An integer or timestamp `NULL` sorts last
+and is expired, while a floating-point `NULL` sorts first. The bare form keeps
+every row tied at the extreme and every `NULL`.
 
 For how read filtering and physical reclamation differ between modes, see
 [How it works](#how-it-works). You can inspect the behavior selected for a view
@@ -535,14 +539,17 @@ which promotes an older row back into the keep-set. For this reason, the cleanup
 job never deletes for these modes, whatever their predicate looks like.
 
 A scalar `WHEN predicate` judges each row on its own, so it is eligible. It is
-arbitrary SQL, so the cleanup job reclaims disk only for predicates it can
-**prove** monotonic:
+arbitrary SQL. QuestDB recognizes `now()`, `now_ns()`, `sysdate()`,
+`systimestamp()` and `systimestamp_ns()` as wall-clock functions, and gives each
+the same monotonicity proof. The cleanup job reclaims disk only for predicates
+it can **prove** monotonic:
 
 - clock-free predicates (`WHEN amount < 1.5`), and
 - designated-timestamp thresholds of a proven advancing-clock shape: a bare
-  clock (`ts < now()`), a bare clock minus a non-negative constant
-  (`ts < now() - 7200000000`), or a fixed-unit look-back `dateadd` on a bare
-  clock (`ts < dateadd('d', -1, now())`, units `s`/`m`/`h`/`d`/`w` and finer).
+  clock (for example, `ts < now()`), a bare clock minus a non-negative constant
+  (for example, `ts < now() - 7200000000`), or a fixed-unit look-back `dateadd`
+  on a bare clock (for example, `ts < dateadd('d', -1, now())`, with units
+  `s`/`m`/`h`/`d`/`w` and finer).
 
 Anything else **skips cleanup**: calendar units such as
 `dateadd('M', -1, now())` (a month is a variable amount), look-forward offsets

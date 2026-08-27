@@ -32,7 +32,7 @@ ALTER MATERIALIZED VIEW viewName DROP EXPIRE
 | `WHEN predicate` | Per-row (or window) predicate; a row expires when it evaluates `TRUE`             |
 | `KEEP LATEST`    | Keep the latest row per `PARTITION BY` key, by the designated timestamp           |
 | `KEEP [N] HIGHEST\|LOWEST col` | Keep the rows at the max/min of `col` per group, or the top `N`     |
-| `CLEANUP EVERY`  | Background reclamation cadence (e.g. `30m`, `1h`). Defaults to `1h` if omitted     |
+| `CLEANUP EVERY`  | Background reclamation cadence as `<number><unit>`, where `unit` is `s`, `m`, `h`, `d`, or `w`. Defaults to `1h` if omitted |
 
 Without `N`, the keep column must be `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`,
 `DOUBLE`, `DATE`, `TIMESTAMP` or `DECIMAL`. `KEEP N HIGHEST/LOWEST` ranks with
@@ -110,10 +110,11 @@ GRANT ALTER MATERIALIZED VIEW ON trades_mirror TO user1;
 | Error | Cause |
 | ----- | ----- |
 | `materialized view does not exist` | View with the specified name doesn't exist |
-| `cannot set an EXPIRE ROWS policy on '...': it is the base of N materialized view(s), which would copy expired rows on refresh` | Other materialized views derive from this view |
+| `cannot set an EXPIRE ROWS policy on '...': it is the base of N view(s), including '<name>', which would copy expired rows on refresh` | Other views derive from this view; the message names the first dependent |
 | `EXPIRE ROWS KEEP LATEST ON must name the designated timestamp ...` | `ON` names a column other than the designated timestamp |
-| `invalid EXPIRE ROWS KEEP LATEST column: ...` | A `PARTITION BY` key column does not exist |
+| `invalid EXPIRE ROWS KEEP LATEST PARTITION BY column: ...` | A `PARTITION BY` key column does not exist |
 | `EXPIRE ROWS KEEP HIGHEST/LOWEST requires a BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, DATE, TIMESTAMP or DECIMAL column, but '<col>' is <type>; use KEEP <N> HIGHEST/LOWEST to rank an orderable column of any type` | The bare `KEEP HIGHEST/LOWEST` form was given an unsupported column type; use a supported numeric/date type or the top-N form |
+| `EXPIRE ROWS KEEP <N> HIGHEST/LOWEST requires an orderable column, but '<col>' is <type>` | The top-N form was given a column type that cannot be ordered |
 | `EXPIRE ROWS KEEP / window retention cannot be used on a view with a column named '__qdb_re_keep'` | The view exposes a column named like the reserved keep column |
 | `invalid EXPIRE ROWS predicate: ...` | The predicate does not parse, bind, or type-check against the view's columns |
 | `invalid EXPIRE ROWS predicate: the threshold is NULL, so no row can ever expire` | A `WHEN` threshold that is constant at definition time evaluates to `NULL`, e.g. `CAST(NULL AS TIMESTAMP)` or arithmetic that overflows |
