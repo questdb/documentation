@@ -7,11 +7,13 @@ import { GOOGLE_ADS_ID, POSTHOG_TOKEN } from "./config"
 type CookiebotConsent = {
   marketing?: boolean
   statistics?: boolean
+  method?: "explicit" | "implied" | null
 }
 
 type ConsentWindow = Window & {
   Cookiebot?: {
     consent?: CookiebotConsent
+    hasResponse?: boolean
   }
   dataLayer?: unknown[]
   gtag?: (...args: unknown[]) => void
@@ -62,14 +64,23 @@ if (ExecutionEnvironment.canUseDOM) {
     }
   }
 
-  const applyCookiebotConsent = () => {
+  const applyCookiebotConsent = (fromCookiebotEvent = false) => {
     const cookiebot = consentWindow.Cookiebot
     const statistics = cookiebot?.consent?.statistics
 
-    applyGoogleAdsConsent()
+    // Cookiebot's category values default to false before its stored state is
+    // ready. Trust a mount-time snapshot only when Cookiebot marks it as a
+    // response (including a stored rejection) or as implied consent. Its
+    // lifecycle events are authoritative even when no response was required.
+    const hasSettledConsent =
+      fromCookiebotEvent ||
+      cookiebot?.hasResponse === true ||
+      cookiebot?.consent?.method === "implied"
+    if (!hasSettledConsent) return
 
     if (typeof statistics !== "boolean") return
 
+    applyGoogleAdsConsent()
     initialize()
     consentWindow.posthog = posthog
     if (statistics) {
@@ -87,7 +98,7 @@ if (ExecutionEnvironment.canUseDOM) {
     }
   }
 
-  applyCookiebotConsent()
+  const handleCookiebotEvent = () => applyCookiebotConsent(true)
 
   const cookiebotEvents = [
     "CookiebotOnConsentReady",
@@ -95,8 +106,9 @@ if (ExecutionEnvironment.canUseDOM) {
     "CookiebotOnDecline",
   ]
   cookiebotEvents.forEach((event) =>
-    window.addEventListener(event, applyCookiebotConsent),
+    window.addEventListener(event, handleCookiebotEvent),
   )
+  applyCookiebotConsent()
 }
 
 const clientModule: ClientModule = {
