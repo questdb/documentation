@@ -58,9 +58,17 @@ set, the policy takes effect without rebuilding the view. See
 
 ## Examples
 
+These examples use `trades_mirror`, a passthrough materialized view over a
+`trades` table with `symbol`, `side`, `price`, `amount`, and designated
+`timestamp` columns:
+
+```questdb-sql title="Create the passthrough view"
+CREATE MATERIALIZED VIEW trades_mirror AS (SELECT * FROM trades);
+```
+
 ```questdb-sql title="Rolling 7-day window, with a tighter cleanup cadence"
 ALTER MATERIALIZED VIEW trades_mirror
-  SET EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 30m;
+  SET EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now()) CLEANUP EVERY 30m;
 ```
 
 A `WHEN` predicate is the right tool for a cutoff that moves with the clock like

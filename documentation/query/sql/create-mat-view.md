@@ -41,7 +41,7 @@ Where:
   `GROUP BY`, or a
   [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection
   over a single table
-- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON ts] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
   This policy is designed for passthrough views (see below).
 
 ## Parameters
@@ -84,10 +84,11 @@ Where:
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
-  timestamp TIMESTAMP,
   symbol SYMBOL,
+  side SYMBOL,
   price DOUBLE,
-  amount DOUBLE
+  amount DOUBLE,
+  timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -314,7 +315,7 @@ CREATE MATERIALIZED VIEW trades_latest AS (
 ```
 
 A `WHEN` predicate is for rules that move with **wall-clock time**, such as a
-rolling `ts < dateadd('d', -7, now())` window. The defining query cannot
+rolling `timestamp < dateadd('d', -7, now())` window. The defining query cannot
 express those, because it rejects non-deterministic functions. A predicate that
 depends only on the row's own values belongs in the query's `WHERE` clause
 instead, which keeps those rows out of the view entirely; see
@@ -332,8 +333,8 @@ EXPIRE ROWS
 
 A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
 is rejected, since it would expire nothing. That covers the explicit
-`ts < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the reserved
-`NULL` value, such as `ts < 2147483647 + 1`. See
+`timestamp < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the
+reserved `NULL` value, such as `timestamp < 2147483647 + 1`. See
 [A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
 
 For filtering and disk-reclamation behavior, see

@@ -226,8 +226,8 @@ SHOW CREATE MATERIALIZED VIEW bbo_1s;
 
 This returns the `CREATE MATERIALIZED VIEW` statement that would recreate the
 materialized view, including its base table, refresh strategy, partitioning,
-`TTL`, and `EXPIRE ROWS` policy. When the policy specifies `CLEANUP EVERY`, the
-output includes that cadence as well, so the DDL preserves the complete policy.
+`TTL`, and `EXPIRE ROWS` policy. The output includes `CLEANUP EVERY` only when
+the cadence differs from the default `1h`.
 
 ### SHOW CREATE TABLE
 

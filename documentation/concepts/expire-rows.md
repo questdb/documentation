@@ -27,13 +27,13 @@ on-disk storage is reclaimed afterwards by a background job under a monotonic
 Every mode keeps a defined set of rows and expires the rest. A row is expired
 only when the rule selects it for removal.
 
-| Mode                  | What it keeps                                        | Syntax                                                          | Frees disk            |
-| --------------------- | ---------------------------------------------------- | --------------------------------------------------------------- | --------------------- |
-| Per-row predicate     | Rows for which the predicate is **not** `TRUE`       | `EXPIRE ROWS WHEN predicate`                                    | Yes, when monotonic   |
-| Keep latest           | The latest row per key (current state per key)       | `EXPIRE ROWS KEEP LATEST [ON ts] PARTITION BY cols`             | No (read filter only) |
-| Keep highest / lowest | Rows tied at the group max / min of a column         | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`      | No (read filter only) |
-| Keep top-N            | The `N` highest / lowest rows per group              | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`    | No (read filter only) |
-| Window predicate      | Rows for which a window predicate is **not** `TRUE`  | `EXPIRE ROWS WHEN windowPredicate`                              | No (read filter only) |
+| Mode                  | What it keeps                                       | Syntax                                                              | Frees disk            |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------------------- | --------------------- |
+| Per-row predicate     | Rows for which the predicate is **not** `TRUE`      | `EXPIRE ROWS WHEN predicate`                                        | Yes, when monotonic   |
+| Keep latest           | The latest row per key (current state per key)      | `EXPIRE ROWS KEEP LATEST [ON timestamp] PARTITION BY cols`           | No (read filter only) |
+| Keep highest / lowest | Rows tied at the group max / min of a column        | `EXPIRE ROWS KEEP HIGHEST\|LOWEST col [PARTITION BY cols]`          | No (read filter only) |
+| Keep top-N            | The `N` highest / lowest rows per group             | `EXPIRE ROWS KEEP N HIGHEST\|LOWEST col [PARTITION BY cols]`        | No (read filter only) |
+| Window predicate      | Rows for which a window predicate is **not** `TRUE` | `EXPIRE ROWS WHEN windowPredicate`                                  | No (read filter only) |
 
 `KEEP HIGHEST/LOWEST` and `KEEP N` are convenience forms that desugar to a
 window predicate, so the window `WHEN` is the general escape hatch.
@@ -146,17 +146,18 @@ exactly which rows each policy keeps.
 ```questdb-sql title="Base table and sample data"
 CREATE TABLE trades (
   symbol SYMBOL,
+  side   SYMBOL,
   price  DOUBLE,
   amount DOUBLE,
-  ts     TIMESTAMP
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+  timestamp TIMESTAMP
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
 
 INSERT INTO trades VALUES
-  ('BTC', 100.0, 1.0, '2024-01-01T10:00:00.000000Z'),
-  ('BTC', 105.0, 2.0, '2024-01-01T11:00:00.000000Z'),
-  ('BTC', 102.0, 1.5, '2024-01-02T09:00:00.000000Z'),
-  ('ETH',  50.0, 3.0, '2024-01-01T10:30:00.000000Z'),
-  ('ETH',  55.0, 1.0, '2024-01-02T08:00:00.000000Z');
+  ('BTC', 'buy',  100.0, 1.0, '2024-01-01T10:00:00.000000Z'),
+  ('BTC', 'sell', 105.0, 2.0, '2024-01-01T11:00:00.000000Z'),
+  ('BTC', 'buy',  102.0, 1.5, '2024-01-02T09:00:00.000000Z'),
+  ('ETH', 'sell',  50.0, 3.0, '2024-01-01T10:30:00.000000Z'),
+  ('ETH', 'buy',   55.0, 1.0, '2024-01-02T08:00:00.000000Z');
 ```
 
 :::note
@@ -183,14 +184,14 @@ CREATE MATERIALIZED VIEW trades_sized AS (
   SELECT * FROM trades
 ) EXPIRE ROWS WHEN amount < 1.5;
 
-SELECT * FROM trades_sized ORDER BY ts;
+SELECT * FROM trades_sized ORDER BY timestamp;
 ```
 
-| symbol | price | amount | ts                          |
-| ------ | ----- | ------ | --------------------------- |
-| ETH    | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
-| BTC    | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
+| symbol | side | price | amount | timestamp                   |
+| ------ | ---- | ----- | ------ | --------------------------- |
+| ETH    | sell | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
+| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
 
 The two `amount = 1.0` rows are expired. `amount = 1.5` is kept (`1.5 < 1.5` is
 `FALSE`), and any `NULL` amount would be kept too because a comparison against
@@ -204,15 +205,15 @@ because the defining query rejects `now()`:
 ```questdb-sql title="Keep the last 1 day"
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
-) EXPIRE ROWS WHEN ts < dateadd('d', -1, now());
+) EXPIRE ROWS WHEN timestamp < dateadd('d', -1, now());
 ```
 
 (With the 2024 sample timestamps above, every row is already older than a day
 and would be hidden; use recent data to see rows retained.)
 
-`WHEN ts < dateadd('d', -1, now())` and `WHEN ts < now() - 86400000000` retain
-the same rows and both reclaim disk because the cleanup job proves either form
-monotonic.
+`WHEN timestamp < dateadd('d', -1, now())` and
+`WHEN timestamp < now() - 86400000000` retain the same rows and both reclaim
+disk because the cleanup job proves either form monotonic.
 
 ### Keep latest per key: `KEEP LATEST`
 
@@ -224,18 +225,19 @@ CREATE MATERIALIZED VIEW trades_latest AS (
   SELECT * FROM trades
 ) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
 
-SELECT * FROM trades_latest ORDER BY ts;
+SELECT * FROM trades_latest ORDER BY timestamp;
 ```
 
-| symbol | price | amount | ts                          |
-| ------ | ----- | ------ | --------------------------- |
-| ETH    | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
-| BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
+| symbol | side | price | amount | timestamp                   |
+| ------ | ---- | ----- | ------ | --------------------------- |
+| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
 
-The designated timestamp `ts` determines the latest row for each symbol. As new
-trades arrive, the kept row advances automatically. `PARTITION BY` may list
-multiple key columns. You may write `KEEP LATEST ON ts PARTITION BY symbol`, but
-the `ON` column must be the view's designated timestamp.
+The designated `timestamp` column determines the latest row for each symbol. As
+new trades arrive, the kept row advances automatically. `PARTITION BY` may list
+multiple key columns. You may write
+`KEEP LATEST ON timestamp PARTITION BY symbol`, but the `ON` column must be the
+view's designated timestamp.
 
 ### Keep extremes per group: `KEEP HIGHEST` / `KEEP LOWEST`
 
@@ -249,10 +251,10 @@ CREATE MATERIALIZED VIEW trades_peak AS (
 SELECT * FROM trades_peak;
 ```
 
-| symbol | price | amount | ts                          |
-| ------ | ----- | ------ | --------------------------- |
-| BTC    | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| ETH    | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
+| symbol | side | price | amount | timestamp                   |
+| ------ | ---- | ----- | ------ | --------------------------- |
+| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
+| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
 
 `KEEP LOWEST price PARTITION BY symbol` keeps the cheapest instead (BTC `100.0`,
 ETH `50.0`). All rows **tied** at the extreme are kept, and `NULL`-valued rows
@@ -270,12 +272,12 @@ CREATE MATERIALIZED VIEW trades_top2 AS (
 SELECT * FROM trades_top2 ORDER BY symbol, price DESC;
 ```
 
-| symbol | price | amount | ts                          |
-| ------ | ----- | ------ | --------------------------- |
-| BTC    | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
-| BTC    | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
-| ETH    | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
-| ETH    | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
+| symbol | side | price | amount | timestamp                   |
+| ------ | ---- | ----- | ------ | --------------------------- |
+| BTC    | sell | 105.0 | 2.0    | 2024-01-01T11:00:00.000000Z |
+| BTC    | buy  | 102.0 | 1.5    | 2024-01-02T09:00:00.000000Z |
+| ETH    | buy  | 55.0  | 1.0    | 2024-01-02T08:00:00.000000Z |
+| ETH    | sell | 50.0  | 3.0    | 2024-01-01T10:30:00.000000Z |
 
 BTC keeps its two highest (`105`, `102`) and drops `100`; ETH has only two rows,
 so both survive. Ties are broken by the designated timestamp, so the N-th
@@ -298,7 +300,7 @@ A row expires when its price is below its symbol's maximum, so only the peak per
 symbol survives. This produces the same result as `trades_peak` above. From here
 you can express richer rules, for example keeping rows within 5% of the peak
 (`WHEN price < 0.95 * max(price) OVER (PARTITION BY symbol)`) or a ranked window
-(`WHEN row_number() OVER (PARTITION BY symbol ORDER BY ts DESC) > 100`).
+(`WHEN row_number() OVER (PARTITION BY symbol ORDER BY timestamp DESC) > 100`).
 
 ## `WHERE` filter or `EXPIRE ROWS`?
 
@@ -308,11 +310,12 @@ clock.
 
 **Use `EXPIRE ROWS WHEN` for rules that move with wall-clock time.** A rolling
 window cannot be written as a `WHERE` clause at all: a view's defining query
-rejects non-deterministic functions, so `WHERE ts > dateadd('d', -7, now())` is
-not accepted. `EXPIRE ROWS WHEN ts < dateadd('d', -7, now())` is the supported
-way to say "keep the last 7 days". The read filter re-evaluates `now()` on
-every read, so the window rolls forward on its own and the cleanup job reclaims
-the disk behind it. This is what the `WHEN` form is for.
+rejects non-deterministic functions, so
+`WHERE timestamp > dateadd('d', -7, now())` is not accepted.
+`EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now())` is the supported way to
+say "keep the last 7 days". The read filter re-evaluates `now()` on every read,
+so the window rolls forward on its own and the cleanup job reclaims the disk
+behind it. This is what the `WHEN` form is for.
 
 **Put a deterministic predicate in the `WHERE` clause.** A predicate that
 depends only on the row's own values, such as `symbol = 'BTC'` or
@@ -344,7 +347,7 @@ fixes how long it keeps what it has.
 ```questdb-sql title="A filter for the subject, a policy for the horizon"
 CREATE MATERIALIZED VIEW trades_btc_recent AS (
   SELECT * FROM trades WHERE symbol = 'BTC'
-) EXPIRE ROWS WHEN ts < dateadd('d', -7, now()) CLEANUP EVERY 1h;
+) EXPIRE ROWS WHEN timestamp < dateadd('d', -7, now()) CLEANUP EVERY 1h;
 ```
 
 ### When a deterministic cutoff still belongs in a policy
@@ -356,8 +359,10 @@ dropping the view and re-creating it, which re-materializes it from the base.
 Changing a policy is a metadata operation:
 
 ```questdb-sql title="Retuning a retention horizon without a rebuild"
-ALTER MATERIALIZED VIEW trades_recent SET EXPIRE ROWS WHEN ts < '2024-06-01T00:00:00.000000Z';
-ALTER MATERIALIZED VIEW trades_recent SET EXPIRE ROWS WHEN ts < '2024-07-01T00:00:00.000000Z';
+ALTER MATERIALIZED VIEW trades_recent
+  SET EXPIRE ROWS WHEN timestamp < '2024-06-01T00:00:00.000000Z';
+ALTER MATERIALIZED VIEW trades_recent
+  SET EXPIRE ROWS WHEN timestamp < '2024-07-01T00:00:00.000000Z';
 ALTER MATERIALIZED VIEW trades_recent DROP EXPIRE;
 ```
 
@@ -478,14 +483,14 @@ therefore determines whether a `NULL` row survives:
 ### A `NULL` threshold is rejected
 
 A `WHEN` threshold that evaluates to a constant `NULL` expires nothing because
-`ts < NULL` is never `TRUE`, so the policy would be inert. QuestDB refuses it at
-`CREATE` and `ALTER` time rather than storing a view that silently never
-reclaims:
+`timestamp < NULL` is never `TRUE`, so the policy would be inert. QuestDB
+refuses it at `CREATE` and `ALTER` time rather than storing a view that silently
+never reclaims:
 
 ```questdb-sql title="Rejected: the threshold is NULL"
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
-) EXPIRE ROWS WHEN ts < CAST(NULL AS TIMESTAMP);
+) EXPIRE ROWS WHEN timestamp < CAST(NULL AS TIMESTAMP);
 -- invalid EXPIRE ROWS predicate: the threshold is NULL, so no row can ever expire
 ```
 
@@ -498,17 +503,17 @@ arithmetic threshold can land on that value:
 -- LONG overflow
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
-) EXPIRE ROWS WHEN ts < 4611686018427387904 * 2;
+) EXPIRE ROWS WHEN timestamp < 4611686018427387904 * 2;
 
 -- INT overflow, reached three orders of magnitude sooner
 CREATE MATERIALIZED VIEW trades_recent AS (
   SELECT * FROM trades
-) EXPIRE ROWS WHEN ts < 2147483647 + 1;
+) EXPIRE ROWS WHEN timestamp < 2147483647 + 1;
 ```
 
 Only thresholds that are constant at definition time are checked this way. One
-built from a clock, such as `ts < now() - 3600000000`, is evaluated per read and
-cannot be checked in advance.
+built from a clock, such as `timestamp < now() - 3600000000`, is evaluated per
+read and cannot be checked in advance.
 
 ### Ties and determinism
 
@@ -516,7 +521,7 @@ cannot be checked in advance.
 deterministic by construction. `KEEP N` makes the order total by appending the
 designated timestamp as a tiebreak, so the N-th boundary is deterministic (pair
 the base table with [`DEDUP UPSERT KEYS`](/docs/concepts/deduplication/) if
-`(col, ts)` is not already unique).
+`(col, timestamp)` is not already unique).
 
 ### Combining with TTL
 
@@ -566,10 +571,11 @@ it can **prove** monotonic:
 
 - clock-free predicates (`WHEN amount < 1.5`), and
 - designated-timestamp thresholds of a proven advancing-clock shape: a bare
-  clock (for example, `ts < now()`), a bare clock minus a non-negative constant
-  (for example, `ts < now() - 7200000000`), or a fixed-unit look-back `dateadd`
-  on a bare clock (for example, `ts < dateadd('d', -1, now())`, with units
-  `s`/`m`/`h`/`d`/`w` and finer).
+  clock (for example, `timestamp < now()`), a bare clock minus a non-negative
+  constant (for example, `timestamp < now() - 7200000000`), or a fixed-unit
+  look-back `dateadd` on a bare clock (for example,
+  `timestamp < dateadd('d', -1, now())`, with units `s`/`m`/`h`/`d`/`w` and
+  finer).
 
 Anything else **skips cleanup**: calendar units such as
 `dateadd('M', -1, now())` (a month is a variable amount), look-forward offsets
@@ -581,11 +587,11 @@ proven shape.
 
 :::warning
 
-A non-monotonic predicate such as `WHEN ts > now()` expires *future* rows that
-**un-expire** as `now()` advances. The read filter recomputes `now()` on every
-read and stays correct, and the cleanup job skips such a policy rather than
-risk physically deleting a row a later read must show. The tradeoff is that its
-disk is never reclaimed. Write `WHEN` predicates that expire things in the
+A non-monotonic predicate such as `WHEN timestamp > now()` expires *future*
+rows that **un-expire** as `now()` advances. The read filter recomputes `now()`
+on every read and stays correct, and the cleanup job skips such a policy rather
+than risk physically deleting a row a later read must show. The tradeoff is that
+its disk is never reclaimed. Write `WHEN` predicates that expire things in the
 **past** or against fixed thresholds, never rows that the passage of time will
 later keep.
 
@@ -593,7 +599,9 @@ later keep.
 
 ## Inspecting a policy
 
-`SHOW CREATE MATERIALIZED VIEW` renders the clause as written:
+`SHOW CREATE MATERIALIZED VIEW` renders the policy in replayable DDL. It omits
+`CLEANUP EVERY` when the cadence is the default `1h` and includes it for a
+non-default cadence:
 
 ```questdb-sql
 SHOW CREATE MATERIALIZED VIEW trades_latest;
@@ -655,9 +663,9 @@ rather than breaking subsequent reads.
   view is quiescent and fully applied, so a view being refreshed continuously
   defers reclamation to a quiet sweep. The read filter stays authoritative
   meanwhile.
-- **`KEEP LATEST [ON ts]`.** The optional `ON ts` is accepted for familiarity but
-  the view's designated timestamp is always used; naming a different column is
-  rejected.
+- **`KEEP LATEST [ON timestamp]`.** The optional `ON timestamp` is accepted for
+  familiarity, but the view's designated timestamp is always used; naming a
+  different column is rejected.
 - **Cleanup eligibility.** See
   [monotonicity and cleanup safety](#monotonicity-and-cleanup-safety), and check
   a view's verdict with `materialized_views().expire_enforcement`.
