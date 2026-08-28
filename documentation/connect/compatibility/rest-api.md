@@ -26,9 +26,9 @@ The [Web Console](/docs/getting-started/web-console/overview/) is the official W
 **Available methods**
 
 - [`/imp`](#imp---import-data) for importing data from `.CSV` files
-- [`/api/v1/sql/execute`](#execute) to execute a SQL
+- [`/execute`](#execute) to execute a SQL
   statement, previously named `/exec`
-- [`/api/v1/sql/validate`](#validate) to compile a
+- [`/validate`](#validate) to compile a
   SQL statement without running it
 - [`/exp`](#exp---export-data) to export data
 
@@ -41,7 +41,7 @@ insert-capable entrypoints:
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
-| `/api/v1/sql/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
+| `/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/connect/compatibility/rest-api/) docs.
@@ -110,9 +110,9 @@ explicitly. See the second example in Python for these features.
 
 </Tabs>
 
-### `/api/v1/sql/execute`: SQL `INSERT` Query
+### `/execute`: SQL `INSERT` Query
 
-The `/api/v1/sql/execute` entrypoint takes a SQL query and returns results as
+The `/execute` entrypoint takes a SQL query and returns results as
 JSON.
 
 We can use this for quick SQL inserts too, but note that there's no support for
@@ -148,19 +148,20 @@ need high-performance inserts.
 
 :::caution Deprecated
 
-`/exec` is the older name for
-[`/api/v1/sql/execute`](#execute), documented
-immediately below. It is still supported and takes the same parameters and
-returns the same response, so an existing integration keeps working unchanged.
-Use `/api/v1/sql/execute` for new work.
+`/exec` is the older name for [`/execute`](#execute), documented immediately
+below. It is still supported and takes the same parameters and returns the same
+response, so an existing integration keeps working unchanged. Use `/execute` for
+new work.
 
 :::
 
 ## /execute - Execute queries {#execute}
 
-`/api/v1/sql/execute` compiles and executes the SQL query supplied as a
-parameter and returns a JSON response. It was previously named
+`/execute` compiles and executes the SQL query supplied as a parameter and
+returns a JSON response. It was previously named
 [`/exec`](#exec---execute-queries).
+
+Its full path is `/api/v1/sql/execute`.
 
 :::note
 
@@ -173,7 +174,7 @@ closed.
 
 #### Parameters
 
-`/api/v1/sql/execute` expects an HTTP GET request with the following query
+`/execute` expects an HTTP GET request with the following query
 parameters. `POST` is not supported and returns `405`.
 
 | Parameter       | Required | Default | Description                                                                                                                                                                            |
@@ -720,13 +721,14 @@ Here is an example with column-level errors due to unsuccessful casts:
 
 ## /validate - Validate queries {#validate}
 
-`/api/v1/sql/validate` compiles a SQL query and returns the metadata of the
-result set it would produce, without executing it. Use it to check that a
-statement parses and to discover its column names and types up front, without
-paying the cost of running the query.
+`/validate` compiles a SQL query and returns the metadata of the result set it
+would produce, without executing it. Use it to check that a statement parses and
+to discover its column names and types up front, without paying the cost of
+running the query.
 
-It takes the same `query` parameter as
-[`/api/v1/sql/execute`](#execute) and returns the
+Its full path is `/api/v1/sql/validate`.
+
+It takes the same `query` parameter as [`/execute`](#execute) and returns the
 same response, minus the `dataset` and `count` fields:
 
 ```shell
@@ -758,7 +760,7 @@ and the character `position` at which compilation failed:
 
 ### Malformed queries
 
-A successful call to `/api/v1/sql/execute` or `/exp` which also contains a
+A successful call to `/execute` or `/exp` which also contains a
 malformed query will return response bodies with the following format:
 
 ```json

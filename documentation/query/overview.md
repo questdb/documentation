@@ -188,14 +188,14 @@ For details such as content type, query parameters and more, refer to the
 | Entrypoint                                  | HTTP Method | Description                             | REST HTTP API Reference                                       |
 | :------------------------------------------ | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
 | [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/connect/compatibility/rest-api/#exp---export-data)      |
-| [`/api/v1/sql/execute?query=..`](#execute) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
+| [`/execute?query=..`](#execute) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 #### `/exp`: SQL Query to CSV
 
 The `/exp` entrypoint allows querying the database with a SQL select query and
 obtaining the results as CSV.
 
-For obtaining results in JSON, use `/api/v1/sql/execute` instead, documented
+For obtaining results in JSON, use `/execute` instead, documented
 next.
 
 <Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
@@ -245,7 +245,7 @@ print(resp.text)
 
 #### `/execute`: SQL Query to JSON {#execute}
 
-The `/api/v1/sql/execute` entrypoint takes a SQL query and returns results as
+The `/execute` entrypoint takes a SQL query and returns results as
 JSON. It was previously named `/exec`, which is deprecated but still works.
 
 This is similar to the `/exp` entry point which returns results as CSV.
