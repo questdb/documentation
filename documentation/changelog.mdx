@@ -65,6 +65,7 @@ This page tracks significant updates to the QuestDB documentation.
 - Added the [`cairo.sql.parquet.cache.memory.size`](/docs/configuration/cairo-engine/) configuration property (256 MB default), deprecating the slot-based `cairo.sql.parquet.frame.cache.capacity`
 - Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
 - [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
+- [SAMPLE BY](/docs/query/sql/sample-by/#sample-units) - Documented that the count is optional and defaults to `1`, so `SAMPLE BY h` is the same as `SAMPLE BY 1h`, and that it must be a positive integer written with no space before the unit
 
 ### Updated
 
