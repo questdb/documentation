@@ -285,7 +285,7 @@ Consider a table `trades` with the following data spanning three calendar days:
 CREATE TABLE trades (
   ts TIMESTAMP,
   price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 
 INSERT INTO trades (ts, price) VALUES
   ('2021-05-31T23:10:00.000000Z', 100.5),
