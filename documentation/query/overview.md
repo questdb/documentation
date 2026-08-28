@@ -188,7 +188,7 @@ For details such as content type, query parameters and more, refer to the
 | Entrypoint                                  | HTTP Method | Description                             | REST HTTP API Reference                                       |
 | :------------------------------------------ | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
 | [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/connect/compatibility/rest-api/#exp---export-data)      |
-| [`/exec?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
+| [`/api/v1/sql/execute?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#apiv1sqlexecute---execute-queries) |
 
 #### `/exp`: SQL Query to CSV
 

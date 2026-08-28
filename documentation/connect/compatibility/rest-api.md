@@ -26,8 +26,13 @@ The [Web Console](/docs/getting-started/web-console/overview/) is the official W
 **Available methods**
 
 - [`/imp`](#imp---import-data) for importing data from `.CSV` files
-- [`/exec`](#exec---execute-queries) to execute a SQL statement
+- [`/api/v1/sql/execute`](#apiv1sqlexecute---execute-queries) to execute a SQL
+  statement
+- [`/api/v1/sql/validate`](#apiv1sqlvalidate---validate-queries) to compile a
+  SQL statement without running it
 - [`/exp`](#exp---export-data) to export data
+- [`/exec`](#exec---execute-queries) to execute a SQL statement, deprecated in
+  favour of `/api/v1/sql/execute`
 
 ## Examples
 
@@ -38,7 +43,7 @@ insert-capable entrypoints:
 | Entrypoint                                 | HTTP Method | Description                             | API Docs                                                  |
 | :----------------------------------------- | :---------- | :-------------------------------------- | :-------------------------------------------------------- |
 | [`/imp`](#imp-uploading-tabular-data)      | POST        | Import CSV data                         | [Reference](/docs/connect/compatibility/rest-api/#imp---import-data)      |
-| [`/exec?query=..`](#exec-sql-insert-query) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#exec---execute-queries) |
+| `/api/v1/sql/execute?query=..`             | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#apiv1sqlexecute---execute-queries) |
 
 For details such as content type, query parameters and more, refer to the
 [REST API](/docs/connect/compatibility/rest-api/) docs.
@@ -453,7 +458,115 @@ Here is an example with column-level errors due to unsuccessful casts:
 }
 ```
 
+## /api/v1/sql/execute - Execute queries
+
+`/api/v1/sql/execute` compiles and executes the SQL query supplied as a
+parameter and returns a JSON response. It is the recommended endpoint for
+running SQL over HTTP, and replaces [`/exec`](#exec---execute-queries).
+
+:::note
+
+The query execution terminates automatically when the socket connection is
+closed.
+
+:::
+
+### Overview
+
+#### Parameters
+
+`/api/v1/sql/execute` expects an HTTP GET request with the following query
+parameters. `POST` is not supported and returns `405`.
+
+| Parameter       | Required | Default | Description                                                                                                                                                                            |
+| --------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `count`         | No       | `false` | `true` or `false`. Counts the number of rows and returns this value.                                                                                                                   |
+| `limit`         | No       |         | Allows limiting the number of rows to return. `limit=10` will return the first 10 rows (equivalent to `limit=1,10`), `limit=10,20` will return row numbers 10 through to 20 inclusive. |
+| `nm`            | No       | `false` | `true` or `false`. Skips the metadata section of the response when set to `true`.                                                                                                      |
+| `query`         | Yes      |         | URL encoded query text. It can be multi-line.                                                                                                                                          |
+| `timings`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include a `timings` property in the response which gives details about the execution times.                                   |
+| `explain`       | No       | `false` | `true` or `false`. When set to `true`, QuestDB will also include an `explain` property in the response which gives details about the execution plan.                                   |
+| `quoteLargeNum` | No       | `false` | `true` or `false`. When set to `true`, QuestDB will surround `LONG` type numbers with double quotation marks that will make them parsed as strings.                                    |
+
+The parameters must be URL encoded.
+
+#### Headers
+
+Supported HTTP headers:
+
+| Header              | Required | Description                                                               |
+| ------------------- | -------- | ------------------------------------------------------------------------- |
+| `Statement-Timeout` | No       | Query timeout in milliseconds, overrides default timeout from server.conf |
+
+### Examples
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT x FROM long_sequence(5);" \
+  --data-urlencode "limit=2" \
+  --data-urlencode "count=true" \
+  http://localhost:9000/api/v1/sql/execute
+```
+
+```json
+{
+  "query": "SELECT x FROM long_sequence(5)",
+  "columns": [{ "name": "x", "type": "LONG" }],
+  "timestamp": -1,
+  "dataset": [[1], [2]],
+  "count": 5
+}
+```
+
+`limit` bounds the rows returned in `dataset`, while `count` reports how many
+rows the query matched in total.
+
+## /api/v1/sql/validate - Validate queries
+
+`/api/v1/sql/validate` compiles a SQL query and returns the metadata of the
+result set it would produce, without executing it. Use it to check that a
+statement parses and to discover its column names and types up front, without
+paying the cost of running the query.
+
+It takes the same `query` parameter as
+[`/api/v1/sql/execute`](#apiv1sqlexecute---execute-queries) and returns the
+same response, minus the `dataset` and `count` fields:
+
+```shell
+curl -G \
+  --data-urlencode "query=SELECT 1 AS n" \
+  http://localhost:9000/api/v1/sql/validate
+```
+
+```json
+{
+  "query": "SELECT 1 AS n",
+  "columns": [{ "name": "n", "type": "INT" }],
+  "timestamp": -1
+}
+```
+
+A statement that fails to compile returns HTTP `400` with an `error` message
+and the character `position` at which compilation failed:
+
+```json
+{
+  "query": "SELECT nonexistent_col FROM nothing_here",
+  "error": "table does not exist [table=nothing_here]",
+  "position": 28
+}
+```
+
 ## /exec - Execute queries
+
+:::caution Deprecated
+
+`/exec` is deprecated in favour of
+[`/api/v1/sql/execute`](#apiv1sqlexecute---execute-queries), which takes the
+same parameters and returns the same response. `/exec` continues to work, but
+new integrations should use `/api/v1/sql/execute`.
+
+:::
 
 `/exec` compiles and executes the SQL query supplied as a parameter and returns
 a JSON response.

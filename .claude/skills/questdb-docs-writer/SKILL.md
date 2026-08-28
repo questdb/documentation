@@ -19,7 +19,6 @@ same regardless of how the repo is checked out.
 ├── documentation/             # Main content (markdown/MDX)
 │   ├── concepts/              # Conceptual docs
 │   ├── configuration/         # Config reference
-│   │   └── configuration-utils/  # Config JSON files
 │   ├── cookbook/              # Recipes and how-tos
 │   ├── guides/                # User guides and tutorials
 │   ├── ingestion/             # Ingestion methods
@@ -543,22 +542,6 @@ auto-expands:
 
 Prefer this, or a plain link in the overview body, over duplicating an entry.
 
-## Configuration property sync
-
-When documenting a feature that introduces a new server configuration property
-(e.g., `cairo.sql.subsample.max.rows`), add it to the configuration reference
-JSON at `documentation/configuration/configuration-utils/_cairo.config.json`.
-Properties are grouped by prefix and sorted alphabetically within each group.
-
-Each entry follows this format:
-
-```json
-"cairo.sql.example.property": {
-  "default": "value",
-  "description": "What this property controls."
-}
-```
-
 ## Configuration page format
 
 Configuration pages live under `documentation/configuration/`. Each subsystem
@@ -596,8 +579,19 @@ notes, examples, or warnings as needed.
 
 ### Adding a new property
 
-1. Add the property to the appropriate JSON file in
-   `configuration/configuration-utils/`.
+Configuration pages are plain markdown. There is no JSON file to keep in
+sync, so the page is the only place a property is defined.
+
+1. Get the real default and reloadability from a running server rather than
+   from the PR description, which is often out of date:
+
+   ```
+   SHOW PARAMETERS
+   ```
+
+   The result has `property_path`, `env_var_name`, `value`, `value_source`,
+   `sensitive` and `reloadable`. A property missing from `SHOW PARAMETERS` no
+   longer exists on that build, which is worth knowing before documenting it.
 2. Add the property as an H3 entry on the appropriate configuration page,
    in alphabetical order within its section.
 3. If no existing section fits, create a new H2 section in the logical
@@ -605,6 +599,11 @@ notes, examples, or warnings as needed.
 4. If the property belongs to a new subsystem, create a new page, add it
    to `sidebars.js` in alphabetical order, and add a row to the index
    table in `overview.md`.
+
+Only document a property you can describe. A default without an explanation of
+when to change it and what the trade-off is adds noise. If the PR gives no
+semantics, ask the author rather than paraphrasing the property name back at
+the reader.
 
 ### Property metadata
 
@@ -806,7 +805,8 @@ When reviewing a documentation page, check:
 - [ ] Section overview page updated for any added, removed, or renamed page,
       with section and item order matching `sidebars.js`
 - [ ] No overview heading renamed without checking inbound anchors first
-- [ ] New config properties added to `configuration/configuration-utils/_cairo.config.json`
+- [ ] New config properties carry a real **Default** and **Reloadable** value,
+      confirmed against `SHOW PARAMETERS` on a running server
 - [ ] New keywords/functions/types checked against `questdb/sql-parser` repo
       (default branch and open PRs)
 
