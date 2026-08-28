@@ -21,6 +21,8 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### New
 
+- [SWITCH ROLE](/docs/query/sql/switch-role/) - New reference page for switching a QuestDB Enterprise node between the primary and replica roles in place, with `SWITCH STATUS`, the timeout semantics, the statement errors, and the `SWITCH ROLE` permission
+- [Failover and role switch](/docs/high-availability/failover/) - Operator guide for planned switchovers and promotions without a restart: prerequisites, the timeout budget, refusals and the `UNKNOWN` state, what each client protocol sees during a demote, the restart hazard, and the `GET /lifecycle` and `POST /lifecycle/switch` endpoints
 - [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
 - [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
 - [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts
@@ -45,6 +47,11 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Reference
 
+- Added the [`node_role()`](/docs/query/functions/meta/#node_role) function, which reports the replication role of the instance to any authenticated session
+- [RBAC](/docs/security/rbac/#failover-operator) - Added the `SWITCH ROLE` permission to the permissions table, a failover operator scenario, and the built-in admin's break-glass role in a replicated cluster
+- [Minimal HTTP server](/docs/operations/logging-metrics/#lifecycle-endpoint) - Documented the `GET /lifecycle` component snapshot and the [`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired) setting
+- [Replication metrics](/docs/operations/logging-metrics/#replication-metrics) - Added `questdb_replication_pending_upload_txn` and `questdb_backup_active_at_last_demote`
+- [Replication configuration](/docs/configuration/database-replication/#replicationrole) - Documented that `replication.role` is the boot role, the `primary-catchup-uploads` value, and the restart hazard after an in-place switch
 - [Storage Policy](/docs/concepts/storage-policy/) - The `TO REMOTE` and `DROP REMOTE` stages are now enforced. Documented what each does, the requirement for a WAL table with cold storage enabled, and the warning that `DROP LOCAL` makes a partition read-only for good
 - Added the [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) function, which returns the remote state of every partition in a table's manifest as it walks `pending`, `live`, `sealed`, and `deleting`
 - [SHOW PARTITIONS](/docs/query/sql/show/#show-partitions) - Two trailing columns, `seqTxn` and `isRemotelyServed`, are appended to the result set. Tools binding columns by position must be updated
@@ -80,6 +87,8 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- [Replication setup guide](/docs/high-availability/setup/#migration-procedures) - Planned primary migration now points at the in-place switch; the restart-based flow is kept for older versions and the emergency migration is marked as the lossy path
+- [Error codes](/docs/troubleshooting/error-codes/#er005) - ER005 now covers the refusal of an in-place promotion, and ER006 the restart of a demoted node with a stale `replication.role`
 - Client libraries rewritten for the QWP binary protocol, unifying ingestion and streaming SQL queries under one handle: [Java](/docs/connect/clients/java/), [Python](/docs/connect/clients/python/), [Go](/docs/connect/clients/go/), [C & C++](/docs/connect/clients/c-and-cpp/), [Rust](/docs/connect/clients/rust/), and [.NET](/docs/connect/clients/dotnet/)
 - [Web Console](/docs/getting-started/web-console/overview/) - Documented query sharing by link and tab import/export in the [code editor](/docs/getting-started/web-console/code-editor/), custom AI providers and per-provider permission levels in [QuestDB AI](/docs/getting-started/web-console/questdb-ai/), automatic column sizing in the [result grid](/docs/getting-started/web-console/result-grid/), and the storage policy section in [table details](/docs/getting-started/web-console/table-details/)
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) - Repositioned around the agent skill and the Web Console MCP bridge together

@@ -320,6 +320,11 @@ Limit the number of response rows over HTTP.
 Forces HTTP read-only mode when `true`, disabling commands which modify data
 or data structure (e.g. INSERT, UPDATE, CREATE TABLE).
 
+Read-only mode is a data boundary, not an administrative lockdown. With access
+control disabled, functions such as `reload_config()` and, in QuestDB
+Enterprise, the [role switch](/docs/high-availability/failover/) statements and
+endpoint stay available on a read-only interface.
+
 ## Query cache
 
 ### http.query.cache.block.count

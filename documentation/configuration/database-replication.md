@@ -55,7 +55,28 @@ accepts the `ca_cert_file` and `ca_builtin_roots` TLS parameters. See
 - **Reloadable**: no
 
 Defaults to `none` for stand-alone instances. To enable replication, set to
-one of: `primary`, `replica`.
+one of: `primary`, `replica`. Values are case-insensitive.
+
+This is the role the instance boots into. Since QuestDB Enterprise 3.3.3 the
+role can also be switched at runtime with
+[`SWITCH ROLE`](/docs/query/sql/switch-role/), which does not update this
+setting.
+
+:::danger
+
+After a runtime switch, set `replication.role` to the new role on both nodes
+before either of them restarts. A demoted node that restarts with
+`replication.role=primary` can come back as a second primary on the same object
+store, and a promoted node that restarts with `replication.role=replica`
+silently demotes itself. See
+[Restarts](/docs/high-availability/failover/#restarts).
+
+:::
+
+`primary-catchup-uploads` is a one-shot maintenance value: the instance starts
+as a primary, uploads every pending transaction, and exits. It is used by the
+restart-based
+[planned primary migration](/docs/high-availability/setup/#planned-primary-migration).
 
 ### replication.summary.interval
 

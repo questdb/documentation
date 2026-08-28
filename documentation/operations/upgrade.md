@@ -92,6 +92,13 @@ store. If a replica running an older version encounters metadata it does not
 recognize, it will error. Upgrading replicas first ensures they can handle any
 new metadata the primary produces after its upgrade.
 
+When upgrading to 4.0.0 or later, grant the `SWITCH ROLE` permission only after
+every node runs the new version. The permission is stored in a form older
+versions cannot read, and a `GRANT ALL` issued before the upgrade does not
+include it. Accounts that triggered role switches through `SYSTEM ADMIN` on
+3.3.x need an explicit `GRANT SWITCH ROLE`. See
+[Failover operator](/docs/security/rbac/#failover-operator).
+
 ### QuestDB Enterprise BYOC
 
 For QuestDB Enterprise BYOC customers, QuestDB manages the upgrade process. The

@@ -28,6 +28,17 @@ A `QuestDBPromotion` records one explicit, one-shot cutover and remains as its a
 
 ## Promotion and failover
 
+:::note
+
+The operator performs a cutover by changing configuration and re-rolling pods.
+It does not use the database's in-place
+[role switch](/docs/high-availability/failover/) (`SWITCH ROLE`,
+`POST /lifecycle/switch`). Do not run those against instances managed by the
+operator: `status.currentPrimary` and the PVC role labels would no longer
+describe the cluster.
+
+:::
+
 | Mode | Use | Data effect |
 | --- | --- | --- |
 | `Planned` | Healthy primary and live replica | Drains the old primary and verifies the target before promotion. Fails rather than becoming lossy. |
