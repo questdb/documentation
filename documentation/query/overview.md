@@ -188,14 +188,15 @@ For details such as content type, query parameters and more, refer to the
 | Entrypoint                                  | HTTP Method | Description                             | REST HTTP API Reference                                       |
 | :------------------------------------------ | :---------- | :-------------------------------------- | :------------------------------------------------------------ |
 | [`/exp?query=..`](#exp-sql-query-to-csv)    | GET         | Export SQL Query as CSV                 | [Reference](/docs/connect/compatibility/rest-api/#exp---export-data)      |
-| [`/api/v1/sql/execute?query=..`](#exec-sql-query-to-json) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#apiv1sqlexecute---execute-queries) |
+| [`/api/v1/sql/execute?query=..`](#execute) | GET         | Run SQL Query returning JSON result set | [Reference](/docs/connect/compatibility/rest-api/#execute) |
 
 #### `/exp`: SQL Query to CSV
 
 The `/exp` entrypoint allows querying the database with a SQL select query and
 obtaining the results as CSV.
 
-For obtaining results in JSON, use `/exec` instead, documented next.
+For obtaining results in JSON, use `/api/v1/sql/execute` instead, documented
+next.
 
 <Tabs defaultValue="curl" values={[ { label: "cURL", value: "curl" }, { label:
 "Python", value: "python" }, ]}>
@@ -242,9 +243,10 @@ print(resp.text)
 
 </Tabs>
 
-#### `/exec`: SQL Query to JSON
+#### `/execute`: SQL Query to JSON {#execute}
 
-The `/exec` entrypoint takes a SQL query and returns results as JSON.
+The `/api/v1/sql/execute` entrypoint takes a SQL query and returns results as
+JSON. It was previously named `/exec`, which is deprecated but still works.
 
 This is similar to the `/exp` entry point which returns results as CSV.
 
@@ -284,17 +286,17 @@ Alternatively, the `/exec` endpoint can be used to create a table and the
 # Create Table
 curl -G \
   --data-urlencode "query=CREATE TABLE IF NOT EXISTS trades(name VARCHAR, value INT)" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 
 # Insert a row
 curl -G \
   --data-urlencode "query=INSERT INTO trades VALUES('abc', 123456)" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 
 # Update a row
 curl -G \
   --data-urlencode "query=UPDATE trades SET value = 9876 WHERE name = 'abc'" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 ```
 
 </TabItem>

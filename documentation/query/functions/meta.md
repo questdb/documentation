@@ -83,8 +83,8 @@ Each of these functions returns a single value, so you can use them in a SELECT
 statement without any arguments.
 
 `current_user()` and `session_user()` both return the authenticated principal
-and are interchangeable in QuestDB. Both report the user who authenticated,
-whether over HTTP, PGWire, or ILP over TCP.
+and are interchangeable in QuestDB. Both report the user that authenticated on
+the current connection, whichever protocol it arrived on.
 
 ## flush_query_cache()
 
