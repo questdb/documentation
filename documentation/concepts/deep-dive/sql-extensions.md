@@ -367,9 +367,12 @@ QuestDB also adds groups not typically found in general-purpose databases:
 - **[Meta functions](/docs/query/functions/meta/)**. `tables()`,
   `table_partitions()`, `table_storage()`, `materialized_views()`,
   `query_activity()`, and so on, for inspecting database state from SQL.
-  Only a small subset of PostgreSQL's `pg_catalog` is implemented (enough
+  Only a small subset of PostgreSQL's `pg_catalog` is implemented: enough
   for client tools to identify the server, for example
-  `pg_catalog.version()`); use the QuestDB meta functions for actual
+  `pg_catalog.version()`, and to categorise objects, since `pg_class.relkind`
+  and `information_schema.tables.table_type` distinguish tables (`r` /
+  `BASE TABLE`) from views (`v` / `VIEW`) and materialized views (`m` /
+  `MATERIALIZED_VIEW`). Use the QuestDB meta functions for actual
   introspection.
 - **[Array functions](/docs/query/functions/array/)** for n-dimensional
   numeric arrays.
