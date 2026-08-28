@@ -325,6 +325,39 @@ WHERE timestamp IN today()
 WHERE timestamp > dateadd('h', -1, now())
 ```
 
+### Omit the WAL keyword
+
+`WAL` has long been the default for partitioned tables, so `CREATE TABLE`
+examples must not pass it explicitly. Spelling it out adds noise and implies
+the keyword is required.
+
+```sql
+-- Preferred
+CREATE TABLE trades (
+  timestamp TIMESTAMP,
+  symbol SYMBOL,
+  price DOUBLE
+) TIMESTAMP(timestamp) PARTITION BY DAY;
+
+-- Avoid
+) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+```
+
+This holds for every clause combination. `FORMAT PARQUET`, `STORAGE POLICY`,
+`DEDUP UPSERT KEYS`, `TTL`, and posting indexes all produce a WAL table
+without the keyword.
+
+Keep `WAL` only where it is the subject of the example:
+
+- The [write-ahead log](/docs/concepts/write-ahead-log/) page, which teaches
+  the keyword and shows the plain form first
+- Syntax blocks presenting the grammar, such as `[BYPASS WAL | WAL]`
+- Examples that deliberately contrast a WAL table against a `BYPASS WAL` one
+- `BYPASS WAL` itself, which is never redundant
+
+`SHOW CREATE TABLE` no longer emits `WAL` either, so any documented output
+sample must match what the server actually returns.
+
 ### Finance-friendly examples
 
 - Use realistic table and column names from the finance domain
@@ -759,6 +792,8 @@ When reviewing a documentation page, check:
 - [ ] Examples use demo datasets where possible (`fx_trades`, `core_price`, etc.)
 - [ ] Demoable queries marked with `demo` tag
 - [ ] TICK syntax used for date filtering (`'$today'`, `'$now-1h..$now'`)
+- [ ] No redundant `WAL` keyword in `CREATE TABLE` examples, and any
+      `SHOW CREATE TABLE` output sample matches what the server emits
 - [ ] Both `!=` and `<>` shown where inequality is documented
 - [ ] No horizontal scrolling in code blocks
 - [ ] Links use correct paths (`/docs/query/...` not `/docs/reference/...`)
