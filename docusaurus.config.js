@@ -90,6 +90,32 @@ const config = {
         }
       },
     }),
+    // Agent-facing directive pointing at the documentation index. Agents that
+    // fetch HTML have no other signal that llms.txt exists, or that every page
+    // can be had as markdown. Visually hidden, so it costs nothing on screen.
+    () => ({
+      name: "agent-llms-directive",
+      injectHtmlTags() {
+        return {
+          preBodyTags: [
+            {
+              tagName: "div",
+              attributes: {
+                "data-agent-directive": "llms-txt",
+                style:
+                  "position:absolute;width:1px;height:1px;padding:0;margin:-1px;" +
+                  "overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0",
+              },
+              innerHTML:
+                'For AI agents: the complete documentation index is at ' +
+                '<a href="https://questdb.com/docs/llms.txt">llms.txt</a>. ' +
+                'Every page is also available as markdown by appending .md to ' +
+                'its URL, or by sending an Accept: text/markdown request header.',
+            },
+          ],
+        }
+      },
+    }),
     require.resolve("./plugins/fetch-latest-release/index"),
     require.resolve("./plugins/fetch-java-client-release/index"),
     require.resolve("./plugins/fetch-repo/index"),
