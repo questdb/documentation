@@ -285,7 +285,7 @@ CREATE TABLE trades (
     symbol SYMBOL INDEX TYPE POSTING INCLUDE (price, amount),
     price DOUBLE,
     amount DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 ```
 
 ## PIVOT

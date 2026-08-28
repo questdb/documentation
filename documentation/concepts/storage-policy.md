@@ -161,8 +161,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-    WAL;
+    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 ### On existing tables
@@ -327,8 +326,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-    WAL;
+    STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 ```questdb-sql title="2. Verify via the system view"

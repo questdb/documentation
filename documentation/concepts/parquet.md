@@ -35,8 +35,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-FORMAT PARQUET
-WAL;
+FORMAT PARQUET;
 ```
 
 See [CREATE TABLE — Partition format](/docs/query/sql/create-table/#partition-format)

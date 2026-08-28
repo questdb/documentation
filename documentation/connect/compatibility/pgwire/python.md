@@ -425,10 +425,10 @@ async def batch_insert_l3_order_book_arrays():
     await conn.execute("""
                        CREATE TABLE IF NOT EXISTS l3_order_book
                        (
-                           bid DOUBLE [][],
-                           ask DOUBLE [][],
+                           bid DOUBLE[][],
+                           ask DOUBLE[][],
                            timestamp TIMESTAMP
-                       ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+                       ) TIMESTAMP(timestamp) PARTITION BY DAY;
                        """)
 
     # Prepare a list of L3 order book snapshots for batch insertion
@@ -739,10 +739,10 @@ async def batch_insert_l3_order_book_arrays():
             await cur.execute("""
                               CREATE TABLE IF NOT EXISTS l3_order_book
                               (
-                                  bid DOUBLE [][],
-                                  ask DOUBLE [][],
+                                  bid DOUBLE[][],
+                                  ask DOUBLE[][],
                                   timestamp TIMESTAMP
-                              ) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+                              ) TIMESTAMP(timestamp) PARTITION BY DAY;
                               """)
             print("Table 'l3_order_book' is ready.")
 
