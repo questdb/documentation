@@ -460,6 +460,18 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
     db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
 ```
 
+The first successful batch on a fresh direct connection is already a commit
+boundary. Later batches are pipelined until an explicit checkpoint or the final
+commit. If a transient failure occurs before any batch is successfully
+published, the client can replay a materialized source in full. Once any batch
+may have committed, it raises instead of replaying from row zero and reports
+`in_doubt=True` for the whole DataFrame call, even if the final native write
+alone was provably not delivered. An application-level retry can then duplicate
+an already committed prefix unless the table uses suitable `DEDUP UPSERT KEYS`.
+A consumed one-shot Arrow stream can also be impossible to replay; when no
+batch could have landed, that separate error has `in_doubt=False` and asks for
+a fresh reader.
+
 `df` accepts pandas `DataFrame`, polars `DataFrame` and `LazyFrame`, pyarrow
 `Table`, `RecordBatch`, and `RecordBatchReader`, and any object exposing the
 Arrow C Data Interface:
@@ -496,9 +508,10 @@ negotiated per-batch byte cap regardless of this setting, and a single row
 is never bounded by it. What it does control:
 
 - Peak client memory: each batch is encoded and held as one frame.
-- Recovery quantum: a commit checkpoint fires every 100 batches, so
-  `max_rows_per_batch × 100` rows is the replay window on a transient
-  failover.
+- Checkpoint spacing: sliceable Arrow inputs add a commit checkpoint about
+  every 100 batches. `max_rows_per_batch × 100` approximates the maximum
+  periodic uncommitted tail, not a safe whole-source replay window; the first
+  successful batch on a fresh connection is already a commit boundary.
 - Per-batch overhead: very small batches pay framing and server-side
   apply costs per batch.
 
