@@ -83,3 +83,13 @@
   color: var(--palette-pink);
   text-decoration: none;
 }
+
+/* Consent withdrawal path; a button because it reopens the banner in place. */
+.linkButton {
+  composes: link;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}

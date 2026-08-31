@@ -77,6 +77,7 @@ const config = {
   themes: ["@docusaurus/theme-mermaid"],
 
   plugins: [
+    require.resolve("./plugins/consent/index"),
     () => ({
       name: "resolve-react",
       configureWebpack() {
