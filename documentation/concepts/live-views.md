@@ -53,7 +53,7 @@ CREATE TABLE trades (
   price DOUBLE,
   amount DOUBLE,
   timestamp TIMESTAMP
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Create a live view that keeps a 300-row moving average of price per symbol:

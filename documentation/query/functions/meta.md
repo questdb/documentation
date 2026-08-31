@@ -34,11 +34,36 @@ SELECT build();
 | ---------------------------------------------------------------------------------------------- |
 | Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
 
+## current_data_id()
+
+Returns the data ID: a UUID that identifies this database, generated on first
+start and stored in the database root. Replication and restore use it to tell
+one database apart from another, so a backup cannot be restored over an
+unrelated instance by accident.
+
+**Arguments:**
+
+- `current_data_id()` does not require arguments.
+
+**Return value:**
+
+Returns a `uuid`.
+
+**Examples:**
+
+```questdb-sql
+SELECT current_data_id();
+```
+
+| current_data_id                      |
+| ------------------------------------ |
+| 75f5a084-7a53-5d7f-941a-c2b4c4c6f127 |
+
 ## current database, schema, or user
 
-`current_database()`, `current_schema()`, and `current_user()` are standard SQL
-functions that return information about the current database, schema, schemas,
-and user, respectively.
+`current_database()`, `current_schema()`, `current_user()`, and
+`session_user()` are standard SQL functions that return information about the
+current database, schema, and user.
 
 ```questdb-sql
 -- Get the current database
@@ -49,10 +74,17 @@ SELECT current_schema();
 
 -- Get the current user
 SELECT current_user();
+
+-- Get the authenticated user of the current session
+SELECT session_user();
 ```
 
 Each of these functions returns a single value, so you can use them in a SELECT
 statement without any arguments.
+
+`current_user()` and `session_user()` both return the authenticated principal
+and are interchangeable in QuestDB. Both report the user that authenticated on
+the current connection, whichever protocol it arrived on.
 
 ## flush_query_cache()
 
@@ -388,6 +420,34 @@ Edit `server.conf` and run `reload_config`:
 ```questdb-sql title="Reload server configuration"
 SELECT reload_config();
 ```
+
+## sleep()
+
+Pauses the query for the given number of seconds, then returns the timestamp
+at which it resumed. Intended for testing and demonstration, for example to
+hold a query open while inspecting
+[`query_activity()`](#query_activity) from another session.
+
+`sleep()` does not hold a worker thread while it waits, so many concurrent
+calls can be parked at once without exhausting the shared worker pool.
+
+**Arguments:**
+
+- `seconds` is the number of seconds to pause for.
+
+**Return value:**
+
+Returns a `timestamp`: the moment the call resumed.
+
+**Examples:**
+
+```questdb-sql title="Pause for one second"
+SELECT * FROM sleep(1);
+```
+
+| sleep                       |
+| --------------------------- |
+| 2026-08-28T11:52:41.614549Z |
 
 ## storage_policies
 
@@ -1079,6 +1139,55 @@ WHERE view_status = 'invalid';
 
 ```questdb-sql title="List views ordered by name"
 SELECT * FROM views() ORDER BY view_name;
+```
+
+## wait_wal_table()
+
+Blocks until the WAL writer for a table has applied its transactions up to a
+target sequencer transaction, then returns `true`.
+
+Writes to a [WAL table](/docs/concepts/write-ahead-log/) are committed to the
+sequencer first and applied to the table afterwards, so a read issued
+immediately after a write may not see it yet. `wait_wal_table()` closes that
+window: call it between the write and the read when the read depends on the
+write having landed.
+
+The call does not hold a worker thread while it waits, so the number of
+concurrent waiters is not bounded by the shared worker pool.
+
+**Arguments:**
+
+- `tableName` (`string`): name of the table to wait for. Must be a constant,
+  not a column reference. On a non-WAL table the call returns `true`
+  immediately.
+- `seqTxn` (optional, `long`): the sequencer transaction to wait for. When
+  omitted, the call captures the table's current `seqTxn` when it starts and
+  waits for that, which is what you want after your own write.
+
+**Return value:**
+
+Returns `boolean`. `true` once the writer has caught up.
+
+Throws if the table is dropped while the call is waiting, and if the table
+becomes [suspended](/docs/query/sql/alter-table-resume-wal/), since a
+suspended table would otherwise never catch up.
+
+**Examples:**
+
+```questdb-sql title="Wait for a table's pending writes to be applied"
+SELECT wait_wal_table('trades');
+```
+
+| wait_wal_table |
+| -------------- |
+| true           |
+
+Wait for one specific transaction. `seqTxn` values are visible in
+[`wal_tables()`](#wal_tables), where `sequencerTxn` is the last committed
+transaction and `writerTxn` the last applied one:
+
+```questdb-sql title="Wait for a specific transaction"
+SELECT wait_wal_table('trades', 42);
 ```
 
 ## wal_tables

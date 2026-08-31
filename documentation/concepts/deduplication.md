@@ -40,7 +40,7 @@ CREATE TABLE prices (
     ts TIMESTAMP,
     ticker SYMBOL,
     price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL
+) TIMESTAMP(ts) PARTITION BY DAY
 DEDUP UPSERT KEYS(ts, ticker);
 ```
 
@@ -96,7 +96,7 @@ CREATE TABLE prices (
     ts TIMESTAMP,
     ticker SYMBOL,
     price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL
+) TIMESTAMP(ts) PARTITION BY DAY
 DEDUP UPSERT KEYS(ts, ticker);
 ```
 

@@ -531,8 +531,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-  WAL;
+  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 Or attach a policy to an existing table:
