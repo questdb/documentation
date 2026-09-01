@@ -21,6 +21,9 @@ const Footer = () => {
         <div className={styles.bottom}>
           <span>{customFields.copyright}</span>
           <div className={styles.rightLinks}>
+            <span className={styles.certificationText}>
+              SOC 2 Type 1 Compliant
+            </span>
             <a className={styles.link} href="/privacy-notice/">
               Privacy
             </a>
