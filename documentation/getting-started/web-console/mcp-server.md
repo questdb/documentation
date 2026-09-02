@@ -16,7 +16,7 @@ import Tabs from "@theme/Tabs"
 
 import TabItem from "@theme/TabItem"
 
-The official <a href="https://github.com/questdb/mcp-bridge" target="_blank">QuestDB MCP server</a> (`@questdb/mcp-bridge`) connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the server runs locally on your machine, listens on loopback only, and never handles credentials.
+The official <a href="https://github.com/questdb/mcp-server-questdb" target="_blank">QuestDB MCP server</a> (`@questdb/mcp-server-questdb`) connects coding agents to a running Web Console. The agent gets tools to explore your database schema, run SQL, and build [notebooks](/docs/getting-started/web-console/notebooks/overview) with charts and live dashboards. Every action executes in the browser through your already-authenticated console session: the server runs locally on your machine, listens on loopback only, and never handles credentials.
 
 The setup wizard detects and configures Claude Code, Codex, Cursor, OpenCode, and Gemini CLI. Any other MCP client works with the manual configuration.
 
@@ -49,7 +49,7 @@ One command configures the MCP server for every supported agent on your machine;
 Copy the setup command from the MCP status pill and run it in your terminal:
 
 ```shell
-npx @questdb/mcp-bridge@<expected-version> setup
+npx @questdb/mcp-server-questdb@<expected-version> setup
 ```
 
 The wizard detects your installed coding agents, lets you pick which ones to configure, and writes the server into each agent's MCP config, pinned to that version.
@@ -65,7 +65,7 @@ Add the server to your MCP client's config file by hand, pinning the version sho
   "mcpServers": {
     "questdb": {
       "command": "npx",
-      "args": ["-y", "@questdb/mcp-bridge@<expected-version>"]
+      "args": ["-y", "@questdb/mcp-server-questdb@<expected-version>"]
     }
   }
 }
@@ -193,7 +193,7 @@ click the notification when it is ready:
 
 ## Next steps
 
-- The MCP server is open source at <a href="https://github.com/questdb/mcp-bridge" target="_blank">github.com/questdb/mcp-bridge</a>: issues and contributions welcome
+- The MCP server is open source at <a href="https://github.com/questdb/mcp-server-questdb" target="_blank">github.com/questdb/mcp-server-questdb</a>: issues and contributions welcome
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) covers agent skills and REST API access
 - [Live dashboards](/docs/getting-started/web-console/notebooks/live-dashboards) shows how to build the same dashboards by hand
 - [Web Console overview](/docs/getting-started/web-console/overview/) tours the console surfaces

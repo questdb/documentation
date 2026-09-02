@@ -98,7 +98,7 @@ CREATE TABLE trades (
     ts TIMESTAMP,
     symbol SYMBOL INDEX,
     price DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 
 -- Posting index with covering columns — best for read-heavy, selective queries
 CREATE TABLE trades (
@@ -106,7 +106,7 @@ CREATE TABLE trades (
     symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
     price DOUBLE,
     raw_data VARCHAR  -- not in INCLUDE, read from column files
-) TIMESTAMP(ts) PARTITION BY DAY WAL;
+) TIMESTAMP(ts) PARTITION BY DAY;
 -- The designated timestamp (ts) is automatically included in the covering index.
 ```
 

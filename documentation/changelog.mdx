@@ -12,10 +12,21 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Releases
 
+- [10.0.1](https://questdb.com/release-notes/) - Released August 24, 2026
 - [10.0.0](https://questdb.com/release-notes/) - Released August 6, 2026
+
+### QuestDB Enterprise Releases
+
+- [4.0.0](https://questdb.com/release-notes/) - Released August 25, 2026
 
 ### New
 
+- [SWITCH ROLE](/docs/query/sql/switch-role/) - New reference page for switching a QuestDB Enterprise node between the primary and replica roles in place, with `SWITCH STATUS`, the timeout semantics, the statement errors, and the `SWITCH ROLE` permission
+- [Failover and role switch](/docs/high-availability/failover/) - Operator guide for planned switchovers and promotions without a restart: prerequisites, the timeout budget, refusals and the `UNKNOWN` state, what each client protocol sees during a demote, the restart hazard, and the `GET /lifecycle` and `POST /lifecycle/switch` endpoints
+- [Cold storage](/docs/concepts/cold-storage/) - Historical partitions move to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store as Parquet and stay queryable with normal SQL, covering the partition lifecycle, the range-read path, the immutability boundary at `DROP LOCAL`, and the manager and refresher roles
+- [Operating cold storage](/docs/operations/cold-storage/) - Setup guide and runbook: preparing the object store prefix, configuring the cluster, the two-step manager handoff, remote garbage collection, cold-read metrics, backup interaction, and a troubleshooting table
+- [Cold storage configuration](/docs/configuration/cold-storage/) - Every `cold.storage.*` setting, covering the store connection, roles, upload, read path, garbage collection, and request timeouts
+- [SWITCH COLD STORAGE ROLE](/docs/query/sql/switch-cold-storage-role/) - New reference page for moving the cold storage manager role between instances at runtime, with `SWITCH COLD STORAGE STATUS`, the `FORCE` break-glass path, and the timeout semantics
 - [Connect](/docs/connect/overview/) - New top-level Connect section that gathers the native client libraries, the compatibility protocols (ILP, PGWire, REST), and the wire-protocol specifications under one home, with a decision table for picking a path and a per-language QWP support matrix
 - [Connect string reference](/docs/connect/clients/connect-string/) - Every configuration key for the native clients, with worked connect strings for common setups, a goal-to-keys recipe table, sender restart and replay semantics, and an alphabetical key index
 - [Wire protocols](/docs/connect/wire-protocols/overview/) - QWP specifications for client implementers, covering [ingress over WebSocket](/docs/connect/wire-protocols/qwp-ingress-websocket/), [egress over WebSocket](/docs/connect/wire-protocols/qwp-egress-websocket/), and [expected client behavior](/docs/connect/wire-protocols/qwp-client-behavior/)
@@ -32,9 +43,23 @@ This page tracks significant updates to the QuestDB documentation.
 - [QWP configuration](/docs/configuration/qwp/) - Server-side settings for the QWP ingestion (`/write/v4`) and query (`/read/v1`) endpoints
 - [Check timestamp order](/docs/cookbook/sql/time-series/check-timestamp-order/) and [Check column sort order](/docs/cookbook/sql/advanced/check-column-sort-order/) - Two cookbook recipes that detect unsorted data with `lag()`: whether a table, CSV import or external Parquet file is ordered by its timestamp, and whether one column is sorted with respect to another
 - [OIDC settings endpoint](/docs/security/oidc/#settings-endpoint) - How a client reads QuestDB's OIDC configuration from `/settings` to discover the authorization and token endpoints, and whether PKCE and the `state` parameter are required
+- [Kubernetes Operator](/docs/enterprise-kubernetes-operator/) - New manual for running QuestDB Enterprise clusters on Kubernetes, covering [installation](/docs/enterprise-kubernetes-operator/installation/), getting started on [AWS](/docs/enterprise-kubernetes-operator/getting-started/aws/) and [Azure](/docs/enterprise-kubernetes-operator/getting-started/azure/), [configuration](/docs/enterprise-kubernetes-operator/configuration/), [day-to-day operations](/docs/enterprise-kubernetes-operator/operations/operator/), [high availability](/docs/enterprise-kubernetes-operator/high-availability/), [known limitations](/docs/enterprise-kubernetes-operator/known-limitations/), and the full [API reference](/docs/enterprise-kubernetes-operator/reference/api/)
+- [ALTER TABLE SUSPEND WAL](/docs/query/sql/alter-table-suspend-wal/) - New reference page for deliberately stopping the WAL apply job, covering the quiescent-table use case that `REBASE WAL` requires, and the trap that writes to a suspended table succeed while staying invisible to queries until `RESUME WAL`
 
 ### Reference
 
+- Added the [`node_role()`](/docs/query/functions/meta/#node_role) function, which reports the replication role of the instance to any authenticated session
+- [RBAC](/docs/security/rbac/#failover-operator) - Added the `SWITCH ROLE` permission to the permissions table, a failover operator scenario, and the built-in admin's break-glass role in a replicated cluster
+- [Minimal HTTP server](/docs/operations/logging-metrics/#lifecycle-endpoint) - Documented the `GET /lifecycle` component snapshot and the [`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired) setting
+- [Replication metrics](/docs/operations/logging-metrics/#replication-metrics) - Added `questdb_replication_pending_upload_txn` and `questdb_backup_active_at_last_demote`
+- [Replication configuration](/docs/configuration/database-replication/#replicationrole) - Documented that `replication.role` is the boot role, the `primary-catchup-uploads` value, and the restart hazard after an in-place switch
+- [Storage Policy](/docs/concepts/storage-policy/) - The `TO REMOTE` and `DROP REMOTE` stages are now enforced. Documented what each does, the requirement for a WAL table with cold storage enabled, and the warning that `DROP LOCAL` makes a partition read-only for good
+- Added the [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) function, which returns the remote state of every partition in a table's manifest as it walks `pending`, `live`, `sealed`, and `deleting`
+- [SHOW PARTITIONS](/docs/query/sql/show/#show-partitions) - Two trailing columns, `seqTxn` and `isRemotelyServed`, are appended to the result set. Tools binding columns by position must be updated
+- [Backup and restore](/docs/operations/backup/#cold-storage-partitions) - Documented that a backup of a database using cold storage does not contain the `data.parquet` bytes, so the backup and the object store prefix are one recovery set
+- [Replication overview](/docs/high-availability/overview/#cold-storage-in-a-replicated-cluster) - Documented that the cold storage manager role is independent of the primary and replica roles, that partition bytes never traverse replication, and that replicas must be upgraded first
+- [Cold storage read metrics](/docs/operations/logging-metrics/#cold-storage-read-metrics) - Added the fifteen `questdb_cold_chunk_*` Prometheus metrics
+- Added the [`storage.policy.recheck.drain.interval`](/docs/configuration/storage-policy/) configuration property
 - [CREATE TABLE](/docs/query/sql/create-table/#partition-format) - Added the `FORMAT { NATIVE | PARQUET }` clause to store partitions as Parquet by default on partitioned WAL tables
 - [REST API](/docs/connect/compatibility/rest-api/#authentication) - Merged the overlapping authentication sections into one, with basic auth (including building the `Authorization` header by hand) and Enterprise token auth
 - [SHOW CREATE LIVE VIEW](/docs/query/sql/show/#show-create-live-view) - Documented retrieving a live view's `CREATE` statement, alongside the `CREATE LIVE VIEW` and `DROP LIVE VIEW` [permissions](/docs/security/rbac/)
@@ -50,6 +75,17 @@ This page tracks significant updates to the QuestDB documentation.
 - Documented [`cairo.root`](/docs/configuration/cairo-engine/) absolute-path behavior: the `conf`, `import`, `export`, `tmp`, and `.checkpoint` directories become siblings of the specified directory rather than children of the server root, so leave it at the default under Docker
 - [read_parquet](/docs/query/functions/parquet/#designated-timestamp) - Documented nominating a designated timestamp on a Parquet file with `TIMESTAMP()` (applied directly, on a sub-query, or on a CTE), and importing a file into a table with `INSERT INTO ... SELECT` or `CREATE TABLE AS`
 - Documented the OIDC configuration options that were missing from the [OIDC configuration page](/docs/configuration/oidc/): `acl.oidc.state.required`, `acl.oidc.public.keys.expiry`, `acl.oidc.response.buffer.size`, `acl.oidc.string.pool.capacity`, and `acl.oidc.device.authorization.endpoint`; also corrected `acl.oidc.pkce.enabled` to its real name `acl.oidc.pkce.required`, and documented `acl.oidc.groups.claim` as mandatory with no default
+- [SAMPLE BY](/docs/query/sql/sample-by/#sample-units) - Documented that the count is optional and defaults to `1`, so `SAMPLE BY h` is the same as `SAMPLE BY 1h`, and that it must be a positive integer written with no space before the unit
+- [REST API](/docs/connect/compatibility/rest-api/#execute) - Documented `/execute` and `/validate`, which compiles a query and returns its column metadata without running it. `/exec` is now marked deprecated in favour of `/execute`
+- [HTTP server configuration](/docs/configuration/http-server/#circuitbreakerbuffersize) - Flagged `circuit.breaker.buffer.size` as unsupported since QuestDB 10.0.0; a config that still sets it logs an advisory, or fails to start under `config.validation.strict`
+- [Meta functions](/docs/query/functions/meta/#wait_wal_table) - Documented [`wait_wal_table()`](/docs/query/functions/meta/#wait_wal_table), which blocks until a WAL table's pending writes have been applied so a following read sees them, plus [`sleep()`](/docs/query/functions/meta/#sleep), [`current_data_id()`](/docs/query/functions/meta/#current_data_id) and `session_user()`
+- [UNION, EXCEPT, INTERSECT](/docs/query/sql/union-except-intersect/#result-column-types) - Documented result column types: a column that is `SYMBOL` on every branch stays `SYMBOL` instead of widening, which also changes the type materialized by `CREATE TABLE AS` and reported in REST response metadata
+- [HTTP server configuration](/docs/configuration/http-server/#httpuser) - Documented that QuestDB Enterprise fails to start when `http.user`, `http.password` or `http.password.file` is set, since those Open Source settings were never enforced by Enterprise
+- [markout_horizon hint](/docs/concepts/deep-dive/sql-optimizer-hints/#markout_horizon) - Documented the optimizer hint that stops a markout-curve `CROSS JOIN` from materializing and sorting its whole output
+- [Column alias configuration](/docs/configuration/cairo-engine/#column-aliases) - Documented `cairo.sql.column.alias.expression.enabled`, the opt-out restoring pre-9.0.0 column naming, and `cairo.sql.column.alias.generated.max.size`
+- [Replication configuration](/docs/configuration/database-replication/#replicationdisabledtables) - Documented `replication.disabled.tables`, a reloadable list excluding tables from replication
+- [IAM configuration](/docs/configuration/iam/#aclpermissionscompactionrowthreshold) - Documented the two `acl.permissions.compaction.*` settings that keep `sys.acl_permissions` from growing until replica logins slow down
+- [SQL extensions](/docs/concepts/deep-dive/sql-extensions/) - Recorded that `pg_class.relkind` and `information_schema.tables.table_type` distinguish tables, views and materialized views, so PostgreSQL client tools can categorise objects
 
 ### Updated
 
@@ -58,6 +94,8 @@ This page tracks significant updates to the QuestDB documentation.
 - [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken) - Documented what QuestDB validates when it checks a token itself: the signature, the audience and the presence of the claims, but not `exp`, `nbf` or `iss`, so an expired token is still accepted
 - Scoped three [OIDC options](/docs/configuration/oidc/) to what the server actually does: `acl.oidc.audience` is only checked when the groups are encoded in the token, the mandatory `openid` in `acl.oidc.scope` is enforced by the provider rather than at startup, and `acl.oidc.ropc.flow.enabled` makes QuestDB itself exchange HTTP basic and PGWire credentials for a token at the provider
 - [PingFederate SSO](/docs/security/oidc/#questdb-configuration-for-pingfederate) - Added the missing QuestDB `server.conf` block to the walkthrough, which relied on defaults for settings that have none
+- [Replication setup guide](/docs/high-availability/setup/#migration-procedures) - Planned primary migration now points at the in-place switch; the restart-based flow is kept for older versions and the emergency migration is marked as the lossy path
+- [Error codes](/docs/troubleshooting/error-codes/#er005) - ER005 now covers the refusal of an in-place promotion, and ER006 the restart of a demoted node with a stale `replication.role`
 - Client libraries rewritten for the QWP binary protocol, unifying ingestion and streaming SQL queries under one handle: [Java](/docs/connect/clients/java/), [Python](/docs/connect/clients/python/), [Go](/docs/connect/clients/go/), [C & C++](/docs/connect/clients/c-and-cpp/), [Rust](/docs/connect/clients/rust/), and [.NET](/docs/connect/clients/dotnet/)
 - [Web Console](/docs/getting-started/web-console/overview/) - Documented query sharing by link and tab import/export in the [code editor](/docs/getting-started/web-console/code-editor/), custom AI providers and per-provider permission levels in [QuestDB AI](/docs/getting-started/web-console/questdb-ai/), automatic column sizing in the [result grid](/docs/getting-started/web-console/result-grid/), and the storage policy section in [table details](/docs/getting-started/web-console/table-details/)
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) - Repositioned around the agent skill and the Web Console MCP bridge together
@@ -73,6 +111,10 @@ This page tracks significant updates to the QuestDB documentation.
 - [pandas](/docs/integrations/data-processing/pandas/) and [Polars](/docs/integrations/data-processing/polars/) - Rewritten around the native QWP clients, keeping the previous ILP and ConnectorX approaches as legacy; Polars now also covers the Rust `polars-ingress` and `polars-egress` crate features
 - [Python client](/docs/connect/clients/python/) - Documented N-dimensional `float64` numpy arrays landing in matching N-dimensional column types (other dtypes are rejected), and clarified Polars consumption: prefer `to_polars()`, with `polars.DataFrame(result)` reserved for pyarrow-free installs
 - [Query overview](/docs/query/overview/) - Added a client libraries section ahead of PostgreSQL, and removed the stale notice describing Parquet support as beta
+- [QuestDB MCP server](/docs/getting-started/web-console/mcp-server/) - Updated for the renamed MCP server: the npm package is now `@questdb/mcp-server-questdb` (previously `@questdb/mcp-bridge`) and the repository is now `questdb/mcp-server-questdb`, also reflected in [AI coding agents](/docs/getting-started/ai-coding-agents/)
+- [.NET client](/docs/connect/clients/dotnet/) - Documented the optional `net-questdb-client-zstd` package for `QueryClient` egress compression: the fail-fast `ConfigError` raised when `compression=zstd` is requested without it, `compression=auto` degrading silently to raw, and the trimmed and Native AOT reflection caveat. The beta notice now refers to 4.0.0
+- [systemd deployment](/docs/deployment/systemd/) - `ExecStart` now depends on which archive you extracted rather than on CPU architecture, because only the `rt-` archive bundles Java while the no-JRE archive runs on system Java and needs `-p /opt/questdb/questdb.jar`. A new Startup failures section maps both common boot errors to their cause and fix
+- [CREATE TABLE](/docs/query/sql/create-table/#write-ahead-log-wal-settings) - Dropped the redundant `WAL` keyword from `CREATE TABLE` examples across the documentation. Partitioned tables have been WAL-enabled by default for a long time, and [SHOW CREATE TABLE](/docs/query/sql/show/#show-create-table) no longer emits the keyword either, so the documented output now matches what the server returns
 
 ## July 2026
 

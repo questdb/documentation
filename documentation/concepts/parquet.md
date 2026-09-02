@@ -35,8 +35,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-FORMAT PARQUET
-WAL;
+FORMAT PARQUET;
 ```
 
 See [CREATE TABLE — Partition format](/docs/query/sql/create-table/#partition-format)
@@ -85,6 +84,8 @@ ALTER TABLE market_data SET STORAGE POLICY(TO PARQUET 1h);
 The TTL unit cannot be finer than the table's partition size (`market_data` is
 partitioned by hour). See the [Storage Policy](/docs/concepts/storage-policy/)
 concept guide for the full partition lifecycle, including `DROP LOCAL`.
+
+A policy can also move Parquet partitions off local disk entirely. The `TO REMOTE` and `DROP REMOTE` stages upload them to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store, where they remain queryable with normal SQL. See [cold storage](/docs/concepts/cold-storage/).
 
 ### Converting to Parquet
 
@@ -286,7 +287,7 @@ See also the [COPY-TO documentation](/docs/query/sql/copy).
 :::
 
 You can use the `COPY` command from the web console, from any pgwire-compliant client,
-or using the [`exec` endpoint](/docs/connect/compatibility/rest-api/#exec---execute-queries) of the REST API.
+or using the [`/execute` endpoint](/docs/connect/compatibility/rest-api/#execute) of the REST API.
 
 You can export a query:
 

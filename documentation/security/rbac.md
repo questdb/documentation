@@ -47,22 +47,22 @@ QuestDB's access control operates across two dimensions:
 
 Control *what data* users can access:
 
-| Level | What you can control | Example |
-|-------|---------------------|---------|
-| **Database** | All tables, global operations | `GRANT SELECT ON ALL TABLES TO user` |
-| **Table** | Specific tables | `GRANT SELECT ON trades TO user` |
-| **Column** | Specific columns within a table | `GRANT SELECT ON trades(ts, price) TO user` |
-| **Row** | Specific rows via views | Create a view with WHERE clause, grant access to view |
+| Level        | What you can control            | Example                                               |
+| ------------ | ------------------------------- | ----------------------------------------------------- |
+| **Database** | All tables, global operations   | `GRANT SELECT ON ALL TABLES TO user`                  |
+| **Table**    | Specific tables                 | `GRANT SELECT ON trades TO user`                      |
+| **Column**   | Specific columns within a table | `GRANT SELECT ON trades(ts, price) TO user`           |
+| **Row**      | Specific rows via views         | Create a view with WHERE clause, grant access to view |
 
 ### Connection access granularity
 
 Control *how* users can connect:
 
-| Permission | Protocol | Use case |
-|------------|----------|----------|
-| `HTTP` | REST API, Web Console, ILP/HTTP | Interactive users, web applications |
-| `PGWIRE` | PostgreSQL Wire Protocol | SQL clients, BI tools, programmatic access |
-| `ILP` | InfluxDB Line Protocol (TCP) | High-throughput data ingestion |
+| Permission | Protocol                        | Use case                                   |
+| ---------- | ------------------------------- | ------------------------------------------ |
+| `HTTP`     | REST API, Web Console, ILP/HTTP | Interactive users, web applications        |
+| `PGWIRE`   | PostgreSQL Wire Protocol        | SQL clients, BI tools, programmatic access |
+| `ILP`      | InfluxDB Line Protocol (TCP)    | High-throughput data ingestion             |
 
 ```questdb-sql
 -- User can connect via PostgreSQL protocol only (not web console)
@@ -211,6 +211,22 @@ GRANT DATABASE ADMIN TO dba;
 
 :::
 
+### Failover operator
+
+A service account that can move the primary role between nodes, for an external
+coordinator or a runbook, without any other administrative right:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT failover_bot WITH PASSWORD 'pwd';
+GRANT HTTP TO failover_bot;         -- POST /lifecycle/switch on port 9003
+GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
+```
+
+`SYSTEM ADMIN` is neither required nor sufficient for a role switch, and
+`DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
+`node_role()` and `GET /lifecycle` are open to any authenticated principal. See
+[Failover and role switch](/docs/high-availability/failover/).
+
 ## Core concepts
 
 <Screenshot
@@ -241,12 +257,12 @@ Names must be unique across all users, service accounts, and groups.
 
 Service accounts provide **clean, testable application access**:
 
-| Aspect | User | Service Account |
-|--------|------|-----------------|
-| Permission source | Direct + inherited from groups | Direct only |
-| Can belong to groups | Yes | No |
-| Can be assumed (SU) | No | Yes |
-| Typical use | Human individuals | Applications, services |
+| Aspect               | User                           | Service Account        |
+| -------------------- | ------------------------------ | ---------------------- |
+| Permission source    | Direct + inherited from groups | Direct only            |
+| Can belong to groups | Yes                            | No                     |
+| Can be assumed (SU)  | No                             | Yes                    |
+| Typical use          | Human individuals              | Applications, services |
 
 Because service accounts have no inherited permissions, their access is fully
 explicit and predictable. Combined with the ability to assume them, this makes
@@ -300,11 +316,11 @@ dropped, all members lose the permissions they inherited from that group.
 
 QuestDB supports three authentication methods:
 
-| Method | Use case | Endpoints |
-|--------|----------|-----------|
-| **Password** | Interactive users | REST API, PostgreSQL Wire |
-| **JWK Token** | ILP ingestion | InfluxDB Line Protocol |
-| **REST API Token** | Programmatic REST access | REST API |
+| Method             | Use case                 | Endpoints                 |
+| ------------------ | ------------------------ | ------------------------- |
+| **Password**       | Interactive users        | REST API, PostgreSQL Wire |
+| **JWK Token**      | ILP ingestion            | InfluxDB Line Protocol    |
+| **REST API Token** | Programmatic REST access | REST API                  |
 
 Users can have multiple authentication methods enabled simultaneously:
 
@@ -334,11 +350,11 @@ to protect credentials in transit.
 
 Before a user can connect, they need endpoint permissions:
 
-| Permission | Allows access to |
-|------------|------------------|
-| `HTTP` | REST API, Web Console, ILP over HTTP |
-| `PGWIRE` | PostgreSQL Wire Protocol (port 8812) |
-| `ILP` | InfluxDB Line Protocol TCP (port 9009) |
+| Permission | Allows access to                       |
+| ---------- | -------------------------------------- |
+| `HTTP`     | REST API, Web Console, ILP over HTTP   |
+| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)   |
+| `ILP`      | InfluxDB Line Protocol TCP (port 9009) |
 
 ```questdb-sql
 -- Typical setup for an interactive user
@@ -369,15 +385,21 @@ users, disable it:
 acl.admin.user.enabled=false
 ```
 
+In a replicated cluster, keep in mind that the built-in admin authorizes a
+[role switch](/docs/high-availability/failover/) from its own credentials,
+independently of the replicated access lists. It is the break-glass account
+when a `SWITCH ROLE` grant has not yet replicated to the node you need to
+promote.
+
 ## Permission levels
 
 Permissions have different granularities determining where they can be applied:
 
-| Granularity | Can be granted at |
-|-------------|-------------------|
-| Database | Database only |
-| Table | Database or specific tables |
-| Column | Database, tables, or specific columns |
+| Granularity | Can be granted at                     |
+| ----------- | ------------------------------------- |
+| Database    | Database only                         |
+| Table       | Database or specific tables           |
+| Column      | Database, tables, or specific columns |
 
 Examples:
 
@@ -569,79 +591,90 @@ SELECT * FROM all_permissions();
 
 ### Database permissions
 
-| Permission | Level | Description |
-|-----------|-------|-------------|
-| ADD COLUMN | Database &#124; Table | Add columns to tables |
-| ADD INDEX | Database &#124; Table &#124; Column | Add index on symbol columns |
-| ALTER COLUMN CACHE | Database &#124; Table &#124; Column | Enable/disable symbol caching |
-| ALTER COLUMN TYPE | Database &#124; Table &#124; Column | Change column types |
-| ATTACH PARTITION | Database &#124; Table | Attach partitions |
-| BACKUP DATABASE | Database | Create database backups |
-| CANCEL ANY COPY | Database | Cancel COPY operations |
-| CREATE TABLE | Database | Create tables |
-| CREATE MATERIALIZED VIEW | Database | Create materialized views |
-| CREATE LIVE VIEW | Database | Create live views |
-| DEDUP ENABLE | Database &#124; Table | Enable deduplication |
-| DEDUP DISABLE | Database &#124; Table | Disable deduplication |
-| DETACH PARTITION | Database &#124; Table | Detach partitions |
-| DISABLE STORAGE POLICY | Database &#124; Table | Disable storage policies |
-| DROP COLUMN | Database &#124; Table &#124; Column | Drop columns |
-| DROP INDEX | Database &#124; Table &#124; Column | Drop indexes |
-| DROP PARTITION | Database &#124; Table | Drop partitions |
-| DROP TABLE | Database &#124; Table | Drop tables |
-| DROP MATERIALIZED VIEW | Database &#124; Table | Drop materialized views |
-| DROP LIVE VIEW | Database &#124; Table | Drop live views |
-| ENABLE STORAGE POLICY | Database &#124; Table | Enable storage policies |
-| INSERT | Database &#124; Table | Insert data |
-| REFRESH MATERIALIZED VIEW | Database &#124; Table | Refresh materialized views |
-| REINDEX | Database &#124; Table &#124; Column | Reindex columns |
-| REMOVE STORAGE POLICY | Database &#124; Table | Remove storage policies |
-| RENAME COLUMN | Database &#124; Table &#124; Column | Rename columns |
-| RENAME TABLE | Database &#124; Table | Rename tables |
-| RESUME WAL | Database &#124; Table | Resume WAL processing |
-| SELECT | Database &#124; Table &#124; Column | Read data |
-| SET STORAGE POLICY | Database &#124; Table | Set storage policies |
-| SET TABLE PARAM | Database &#124; Table | Set table parameters |
-| SET TABLE TYPE | Database &#124; Table | Change table type |
-| SETTINGS | Database | Change instance settings in Web Console |
-| SNAPSHOT | Database | Create snapshots |
-| SQL ENGINE ADMIN | Database | List/cancel running queries |
-| SYSTEM ADMIN | Database | System functions (reload_tls, etc.) |
-| TRUNCATE TABLE | Database &#124; Table | Truncate tables |
-| UPDATE | Database &#124; Table &#124; Column | Update data |
-| VACUUM TABLE | Database &#124; Table | Reclaim storage |
+| Permission                | Level                               | Description                             |
+| ------------------------- | ----------------------------------- | --------------------------------------- |
+| ADD COLUMN                | Database &#124; Table               | Add columns to tables                   |
+| ADD INDEX                 | Database &#124; Table &#124; Column | Add index on symbol columns             |
+| ALTER COLUMN CACHE        | Database &#124; Table &#124; Column | Enable/disable symbol caching           |
+| ALTER COLUMN TYPE         | Database &#124; Table &#124; Column | Change column types                     |
+| ATTACH PARTITION          | Database &#124; Table               | Attach partitions                       |
+| BACKUP DATABASE           | Database                            | Create database backups                 |
+| CANCEL ANY COPY           | Database                            | Cancel COPY operations                  |
+| CREATE TABLE              | Database                            | Create tables                           |
+| CREATE MATERIALIZED VIEW  | Database                            | Create materialized views               |
+| CREATE LIVE VIEW          | Database                            | Create live views                       |
+| DEDUP ENABLE              | Database &#124; Table               | Enable deduplication                    |
+| DEDUP DISABLE             | Database &#124; Table               | Disable deduplication                   |
+| DETACH PARTITION          | Database &#124; Table               | Detach partitions                       |
+| DISABLE STORAGE POLICY    | Database &#124; Table               | Disable storage policies                |
+| DROP COLUMN               | Database &#124; Table &#124; Column | Drop columns                            |
+| DROP INDEX                | Database &#124; Table &#124; Column | Drop indexes                            |
+| DROP PARTITION            | Database &#124; Table               | Drop partitions                         |
+| DROP TABLE                | Database &#124; Table               | Drop tables                             |
+| DROP MATERIALIZED VIEW    | Database &#124; Table               | Drop materialized views                 |
+| DROP LIVE VIEW            | Database &#124; Table               | Drop live views                         |
+| ENABLE STORAGE POLICY     | Database &#124; Table               | Enable storage policies                 |
+| INSERT                    | Database &#124; Table               | Insert data                             |
+| REFRESH MATERIALIZED VIEW | Database &#124; Table               | Refresh materialized views              |
+| REINDEX                   | Database &#124; Table &#124; Column | Reindex columns                         |
+| REMOVE STORAGE POLICY     | Database &#124; Table               | Remove storage policies                 |
+| RENAME COLUMN             | Database &#124; Table &#124; Column | Rename columns                          |
+| RENAME TABLE              | Database &#124; Table               | Rename tables                           |
+| RESUME WAL                | Database &#124; Table               | Resume WAL processing                   |
+| SELECT                    | Database &#124; Table &#124; Column | Read data                               |
+| SET STORAGE POLICY        | Database &#124; Table               | Set storage policies                    |
+| SET TABLE PARAM           | Database &#124; Table               | Set table parameters                    |
+| SET TABLE TYPE            | Database &#124; Table               | Change table type                       |
+| SETTINGS                  | Database                            | Change instance settings in Web Console |
+| SNAPSHOT                  | Database                            | Create snapshots                        |
+| SQL ENGINE ADMIN          | Database                            | List/cancel running queries             |
+| SWITCH ROLE               | Database                            | Switch the replication role, read SWITCH STATUS |
+| SYSTEM ADMIN              | Database                            | System functions (reload_tls, etc.)     |
+| TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
+| UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
+| VACUUM TABLE              | Database &#124; Table               | Reclaim storage                         |
 
 ### User management permissions
 
-| Permission | Description |
-|-----------|-------------|
-| ADD EXTERNAL ALIAS | Create external group mappings |
-| ADD PASSWORD | Set user passwords |
-| ADD USER | Add users to groups |
-| CREATE GROUP | Create groups |
-| CREATE JWK | Create JWK tokens |
-| CREATE REST TOKEN | Create REST API tokens |
-| CREATE SERVICE ACCOUNT | Create service accounts |
-| CREATE USER | Create users |
-| DISABLE USER | Disable users |
-| DROP GROUP | Drop groups |
-| DROP JWK | Drop JWK tokens |
-| DROP REST TOKEN | Drop REST API tokens |
-| DROP SERVICE ACCOUNT | Drop service accounts |
-| DROP USER | Drop users |
-| ENABLE USER | Enable users |
-| LIST USERS | List users/groups/service accounts |
-| REMOVE EXTERNAL ALIAS | Remove external group mappings |
-| REMOVE PASSWORD | Remove passwords |
-| REMOVE USER | Remove users from groups |
-| USER DETAILS | View user/group/service account details |
+| Permission             | Description                             |
+| ---------------------- | --------------------------------------- |
+| ADD EXTERNAL ALIAS     | Create external group mappings          |
+| ADD PASSWORD           | Set user passwords                      |
+| ADD USER               | Add users to groups                     |
+| CREATE GROUP           | Create groups                           |
+| CREATE JWK             | Create JWK tokens                       |
+| CREATE REST TOKEN      | Create REST API tokens                  |
+| CREATE SERVICE ACCOUNT | Create service accounts                 |
+| CREATE USER            | Create users                            |
+| DISABLE USER           | Disable users                           |
+| DROP GROUP             | Drop groups                             |
+| DROP JWK               | Drop JWK tokens                         |
+| DROP REST TOKEN        | Drop REST API tokens                    |
+| DROP SERVICE ACCOUNT   | Drop service accounts                   |
+| DROP USER              | Drop users                              |
+| ENABLE USER            | Enable users                            |
+| LIST USERS             | List users/groups/service accounts      |
+| REMOVE EXTERNAL ALIAS  | Remove external group mappings          |
+| REMOVE PASSWORD        | Remove passwords                        |
+| REMOVE USER            | Remove users from groups                |
+| USER DETAILS           | View user/group/service account details |
 
 ### Special permissions
 
-| Permission | Description |
-|-----------|-------------|
-| ALL | All permissions at the granted level (database/table/column) |
+| Permission     | Description                                                           |
+| -------------- | --------------------------------------------------------------------- |
+| ALL            | All permissions at the granted level (database/table/column)          |
 | DATABASE ADMIN | All permissions including future ones; can assume any service account |
+
+A few operations are reserved for database administrators and are not grantable as permissions at all:
+
+| Operation                                                               | Notes                                                                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/)     | Rebuilds a suspended WAL table under a fresh sequencer                                      |
+| [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) | Moves the [cold storage](/docs/concepts/cold-storage/) manager role, including with `FORCE` |
+
+By contrast, [`SWITCH ROLE`](/docs/query/sql/switch-role/), which moves the
+replication role, is an ordinary grantable permission.
 
 </details>
 

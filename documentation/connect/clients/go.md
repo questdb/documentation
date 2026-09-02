@@ -115,7 +115,7 @@ func main() {
 	if _, err := query.Exec(ctx,
 		"CREATE TABLE IF NOT EXISTS trades "+
 			"(ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE) "+
-			"TIMESTAMP(ts) PARTITION BY DAY WAL"); err != nil {
+			"TIMESTAMP(ts) PARTITION BY DAY"); err != nil {
 		panic(err)
 	}
 
@@ -996,7 +996,7 @@ Non-SELECT statements run through `Exec`, which returns an `ExecResult`:
 ```go
 res, err := query.Exec(ctx,
 	"CREATE TABLE trades (ts TIMESTAMP, symbol SYMBOL, side SYMBOL, "+
-		"price DOUBLE, amount DOUBLE) TIMESTAMP(ts) PARTITION BY DAY WAL")
+		"price DOUBLE, amount DOUBLE) TIMESTAMP(ts) PARTITION BY DAY")
 if err != nil {
 	return err
 }
@@ -1625,7 +1625,7 @@ func main() {
 	if _, err := query.Exec(ctx,
 		"CREATE TABLE IF NOT EXISTS trades "+
 			"(ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE) "+
-			"TIMESTAMP(ts) PARTITION BY DAY WAL "+
+			"TIMESTAMP(ts) PARTITION BY DAY "+
 			"DEDUP UPSERT KEYS(ts, symbol, side)"); err != nil {
 		panic(err)
 	}

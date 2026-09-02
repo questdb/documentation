@@ -53,22 +53,20 @@ This permanently removes the storage policy from the table.
 A storage policy defines up to four TTL-based stages that control how partitions
 transition from native format to Parquet and eventually get removed:
 
-| Setting | Effect |
-|---------|--------|
-| `TO PARQUET <ttl>` | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file |
-| `TO REMOTE <ttl>` | Accepted and stored but not yet enforced; no upload happens yet. Reserved for future object storage upload |
-| `DROP LOCAL <ttl>` | Remove all local copies of the partition |
-| `DROP REMOTE <ttl>` | _Not yet supported._ Rejected at parse time with `'DROP REMOTE' is not supported yet`. Reserved for future object storage removal |
+| Setting             | Effect                                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `TO PARQUET <ttl>`  | Convert partition from native format to Parquet locally. The native files are removed and reads are served from the Parquet file |
+| `TO REMOTE <ttl>`   | Upload a compact Parquet snapshot to object storage. The local partition stays writable and is still the serving copy            |
+| `DROP LOCAL <ttl>`  | Seal the partition as read-only and remove its local copies. With `TO REMOTE` set, reads switch to the remote copy               |
+| `DROP REMOTE <ttl>` | Remove the partition from the table and reclaim its remote objects after a grace period                                          |
 
-:::info
+The two remote stages drive [cold storage](/docs/concepts/cold-storage/) and require it to be enabled and configured on every instance.
 
-Storage policies operate locally only for now. `TO REMOTE` is accepted and
-stored but not yet enforced: no upload to object storage happens yet.
-`DROP REMOTE` is not yet supported and is rejected at parse time with
-`'DROP REMOTE' is not supported yet`. In the
-[`storage_policies`](/docs/query/functions/meta/#storage_policies) view,
-`drop_remote` is therefore always `0h`, and `to_remote` reads `0h` unless a
-`TO REMOTE` value is set (stored, but not yet enforced).
+:::warning
+
+`DROP LOCAL` without `TO REMOTE` permanently deletes the partition. With `TO REMOTE` it makes the partition read-only for good: later writes targeting it are skipped, and there is no way to unseal it.
+
+`DROP REMOTE` is the only stage that physically deletes data with no local copy left behind.
 
 :::
 
@@ -95,6 +93,8 @@ Both singular and plural forms are accepted.
   units such as `DROP LOCAL 1 MONTH`
 - Each setting can only appear once per statement
 - The table must have a designated timestamp and partitioning enabled
+- `TO REMOTE` and `DROP REMOTE` additionally require [cold storage](/docs/concepts/cold-storage/) to be enabled and a WAL-enabled table. They are rejected on non-WAL tables
+- Storage policies do not apply to materialized views at all, local stages included. `SET STORAGE POLICY` on one is rejected with `storage policy is not supported for materialized views`
 - If the table has a TTL set, clear it with `ALTER TABLE SET TTL 0` first;
   otherwise `SET STORAGE POLICY` is rejected with `Cannot set storage policy,
   please, remove TTL settings`. On Enterprise tables, any non-zero `SET TTL`
@@ -107,21 +107,42 @@ Both singular and plural forms are accepted.
 
 Each operation requires a specific permission:
 
-| SQL command | Required permission |
-|-------------|-------------------|
-| `SET STORAGE POLICY` | `SET STORAGE POLICY` |
-| `DROP STORAGE POLICY` | `REMOVE STORAGE POLICY` |
-| `ENABLE STORAGE POLICY` | `ENABLE STORAGE POLICY` |
+| SQL command              | Required permission      |
+| ------------------------ | ------------------------ |
+| `SET STORAGE POLICY`     | `SET STORAGE POLICY`     |
+| `DROP STORAGE POLICY`    | `REMOVE STORAGE POLICY`  |
+| `ENABLE STORAGE POLICY`  | `ENABLE STORAGE POLICY`  |
 | `DISABLE STORAGE POLICY` | `DISABLE STORAGE POLICY` |
 
 ## Examples
 
-Set a storage policy with both currently-supported stages:
+Set a local-only storage policy:
 
 ```questdb-sql
 ALTER TABLE sensor_data SET STORAGE POLICY(
     TO PARQUET 3 DAYS,
     DROP LOCAL 1 MONTH
+);
+```
+
+Tier partitions to object storage, keeping them queryable after local eviction:
+
+```questdb-sql
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS
+);
+```
+
+Add a remote retention boundary, after which the partition is removed and its objects are reclaimed:
+
+```questdb-sql
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS,
+    DROP REMOTE 7 YEARS
 );
 ```
 
@@ -175,6 +196,8 @@ Stages that are not set are omitted from the output.
 ## See also
 
 - [Storage Policy concept](/docs/concepts/storage-policy/)
+- [Cold storage](/docs/concepts/cold-storage/) — what the `TO REMOTE` and `DROP REMOTE` stages do
+- [`table_cold_partitions()`](/docs/query/functions/meta/#table_cold_partitions) — per-partition remote state
 - [CREATE TABLE](/docs/query/sql/create-table/) — `STORAGE POLICY` clause at
   table creation
 - [ALTER TABLE SET TTL](/docs/query/sql/alter-table-set-ttl/) — the TTL

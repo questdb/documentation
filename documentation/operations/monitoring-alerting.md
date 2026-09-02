@@ -145,6 +145,32 @@ this may take significant time.
 See [Materialized view invalidation](/docs/concepts/materialized-views/#view-invalidation)
 for more details on causes and prevention.
 
+### Detect stalled cold storage uploads
+
+_Enterprise only._
+
+A [cold storage](/docs/concepts/cold-storage/) partition that stays in the `pending` state is registered for upload but has no durable object yet. A few minutes is normal; hours are not, and usually mean the manager cannot write to the object store.
+
+**Detection:**
+
+```questdb-sql
+SELECT timestamp, state, partition_path
+FROM table_cold_partitions('trades')
+WHERE state = 'pending';
+```
+
+**Resolution:**
+
+Confirm this instance actually holds the manager role, since a refresher does not upload:
+
+```questdb-sql
+SWITCH COLD STORAGE STATUS;
+```
+
+If the role is correct, check credentials, network reachability, and quota against the object store, and confirm `storage.policy.worker.count` is greater than zero. Do not edit the manifest by hand.
+
+See [Operating cold storage](/docs/operations/cold-storage/#troubleshooting) for the full symptom table.
+
 ### Detect memory pressure
 
 Memory pressure indicates the system is running low on memory for out-of-order
@@ -213,12 +239,12 @@ A value of 1.0 is ideal, meaning each row is written exactly once. Higher values
 indicate O3 merge overhead from out-of-order data being merged into existing
 partitions.
 
-| Value | Interpretation |
-|-------|----------------|
-| 1.0 – 1.5 | Excellent – minimal rewrites |
-| 1.5 – 3.0 | Normal for moderate out-of-order data |
-| 3.0 – 5.0 | Consider reducing partition size |
-| > 5.0 | High – reduce partition size or investigate ingestion patterns |
+| Value     | Interpretation                                                 |
+| --------- | -------------------------------------------------------------- |
+| 1.0 – 1.5 | Excellent – minimal rewrites                                   |
+| 1.5 – 3.0 | Normal for moderate out-of-order data                          |
+| 3.0 – 5.0 | Consider reducing partition size                               |
+| > 5.0     | High – reduce partition size or investigate ingestion patterns |
 
 **Detection:**
 

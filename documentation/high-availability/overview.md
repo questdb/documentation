@@ -64,24 +64,28 @@ This decoupled architecture means:
 - Add or remove replicas without touching the primary
 - Replicas can be in different regions or availability zones
 - Object store provides durability and point-in-time recovery
+- The primary role moves between nodes at runtime, see
+  [Failover and role switch](/docs/high-availability/failover/)
 
 ## Availability strategies
 
 **Hot availability** - Run replicas continuously alongside the primary for
-instant failover. Faster recovery, higher cost.
+instant failover. Faster recovery, higher cost. A replica is promoted in place
+with [`SWITCH ROLE`](/docs/query/sql/switch-role/), without restarting either
+node.
 
 **Cold availability** - Reconstruct a new primary from the latest snapshot and
 WAL files when needed. Slower recovery, lower cost.
 
 ## Supported object stores
 
-| Store | Status |
-|-------|--------|
-| AWS S3 | Supported |
-| Azure Blob Storage | Supported |
+| Store                | Status    |
+| -------------------- | --------- |
+| AWS S3               | Supported |
+| Azure Blob Storage   | Supported |
 | Google Cloud Storage | Supported |
-| NFS filesystem | Supported |
-| HDFS | Planned |
+| NFS filesystem       | Supported |
+| HDFS                 | Planned   |
 
 Need something else? [Contact us](/enterprise/contact/).
 
@@ -117,6 +121,17 @@ work against its local data. As a result:
   (`storage.policy.worker.count`) per instance lets you trade conversion
   latency against background load on that node.
 
+### Cold storage in a replicated cluster
+
+The remote stages behave differently from the local ones. [Cold storage](/docs/concepts/cold-storage/) designates a single **manager** instance that uploads partitions, writes manifests, and runs remote garbage collection. Every other instance is a **refresher** and mirrors that state read-only.
+
+- The manager role is **independent of the primary and replica roles**. All four combinations are valid, and running the manager on a replica moves upload and garbage-collection work off the primary.
+- Promoting a replica to primary does not move the manager role, and moving the manager role does not affect replication. Each is switched separately, with [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) for the manager.
+- **Partition bytes never travel through the replication stream.** The seal that makes a partition read-only replicates as a WAL event, and each instance then reads the shared object itself and installs its own local metadata. Every replica therefore needs read access to the object store.
+- **Upgrade replicas before enabling a remote stage.** Older instances and open source nodes do not understand the partition seal event and suspend WAL apply rather than skipping it.
+
+See [Operating cold storage](/docs/operations/cold-storage/) for the manager handoff procedure and its preconditions.
+
 ## Bring Your Own Cloud (BYOC)
 
 QuestDB Enterprise can be self-managed or operated by QuestDB's team under the
@@ -131,6 +146,8 @@ by you.
 
 - [Setup Guide](/docs/high-availability/setup/) — configure object storage, the
   primary, and replica nodes.
+- [Failover and role switch](/docs/high-availability/failover/) — switch roles
+  in place, promote a replica, and recover from a refused switch.
 - [Client failover](/docs/high-availability/client-failover/concepts/) —
   configure your applications to follow a primary promotion automatically.
 - [Store-and-forward](/docs/high-availability/store-and-forward/concepts/) —

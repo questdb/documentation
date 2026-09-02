@@ -10,7 +10,7 @@ over time. If stale data is no longer required, users can delete old data from
 QuestDB to either save disk space or adhere to a data retention policy. This is
 achieved in QuestDB by removing data partitions from a table.
 
-QuestDB offers three approaches for data retention:
+QuestDB offers four approaches for data retention:
 
 - **TTL** _(automatic, open source)_: Use
   [Time To Live (TTL)](/docs/concepts/ttl/) to automatically drop partitions when
@@ -21,6 +21,12 @@ QuestDB offers three approaches for data retention:
   lifecycle — convert to Parquet locally and drop old data on a schedule. This is
   the recommended approach for QuestDB Enterprise users who need graduated data
   tiering beyond simple deletion.
+- **Cold storage** _(automatic, Enterprise only)_: Add the `TO REMOTE` stage to a
+  storage policy to move historical partitions to object storage as Parquet
+  instead of deleting them. They stay queryable with normal SQL while leaving
+  local disk. Use this when retention is driven by cost or compliance rather
+  than by the data no longer being useful. See
+  [cold storage](/docs/concepts/cold-storage/).
 - **Manual**: Use `DROP PARTITION` commands as described on this page for
   explicit control over which partitions to remove and when.
 
