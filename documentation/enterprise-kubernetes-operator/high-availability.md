@@ -321,9 +321,9 @@ fi
 
 1. Stop application writes to the source, then stop the source database.
 2. Restart the source once with `replication.role=primary-catchup-uploads`.
-3. Wait for `CLOSE_REASON_UPLOADS_COMPLETE_SUCCESS` in the **source** logs, then
-   stop it again. This final upload may itself be unbounded; supervise it at the
-   source. A normal shutdown does not prove the tail reached object storage.
+3. Wait for the source process to exit with code `0`, then prevent it from
+   restarting. This final upload may itself be unbounded; supervise it at the
+   source. A non-zero exit means the tail was not safely uploaded; do not promote.
 4. Create a `Planned` `QuestDBPromotion` for a healthy follower instance and use
    the bounded watcher above.
 

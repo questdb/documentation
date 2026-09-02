@@ -281,9 +281,9 @@ runtime:
 3. Configure the source to start once with
    `replication.role=primary-catchup-uploads`.
 4. Start the source and watch its logs.
-5. Wait for `CLOSE_REASON_UPLOADS_COMPLETE_SUCCESS`. A normal shutdown without
-   this close reason does not prove that the final WAL reached object storage.
-6. Confirm the source process has exited, and disable automatic restarts.
+5. Wait for the source process to exit with code `0`. A non-zero exit means the
+   final WAL upload did not complete; do not promote.
+6. Disable automatic restarts.
 
 The final upload has no safe fixed timeout. Supervise it at the source until it
 succeeds.
