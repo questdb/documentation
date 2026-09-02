@@ -262,6 +262,9 @@ const config = {
       indexName: "questdb",
       searchPagePath: false,
       contextualSearch: false,
+      searchParameters: {
+        optionalFilters: ["version:current"],
+      },
     },
   },
   presets: [
