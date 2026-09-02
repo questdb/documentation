@@ -424,18 +424,27 @@ try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
 
 Pass `auth::getToken` as a provider instead of putting the current token in the
 connect string. Every new connection and reconnect then receives the cached or
-silently refreshed token. A transport call never starts an interactive flow;
-if user approval is needed again, call `signIn()` explicitly on the main or UI
-thread.
+silently refreshed token. Silent refresh needs a refresh token, which most
+providers issue only when `offline_access` is among the scopes in
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
+own `scope` override. A transport call never starts an interactive flow; it
+throws `OidcAuthException`, which carries no distinct interaction-required type,
+so call `signIn()` again on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an
-override, QuestDB must publish its
-[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
-otherwise pin the provider with `DiscoveryOptions.issuer(...)` or configure the
-client explicitly.
-Tokens stay in memory by default; see the [OIDC guide's client
-examples](/docs/security/oidc/#official-client-examples) for endpoint pinning,
-explicit configuration, and opt-in persistence across process restarts.
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise pin the provider by passing
+`new OidcDeviceAuth.DiscoveryOptions().issuer("https://idp")` as the second
+argument to `fromQuestDB`, or set the client ID, scope and endpoints yourself
+with `OidcDeviceAuth.builder()`.
+
+Tokens stay in memory until a store is attached with
+`DiscoveryOptions.tokenStore(FileTokenStore.atDefaultLocation())`, which writes
+a long-lived refresh token to disk as plaintext. See the [OIDC guide's client
+examples](/docs/security/oidc/#official-client-examples) for the sign-in prompt,
+explicit configuration, and the token store's location and permissions.
 
 ### HTTP basic auth
 

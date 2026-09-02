@@ -190,17 +190,27 @@ fn main() -> questdb::Result<()> {
 
 Pass the closure as a provider instead of putting the current token in the
 connect string. Every new connection and reconnect then receives the cached or
-silently refreshed token. A transport call never starts an interactive flow;
-if it returns `OidcErrorKind::InteractionRequired`, call `sign_in()` explicitly
-on the main or UI thread.
+silently refreshed token. Silent refresh needs a refresh token, which most
+providers issue only when `offline_access` is among the scopes in
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
+own `scope` override. A transport call never starts an interactive flow; it
+returns a `questdb::Error` with `ErrorCode::AuthError`, whose `err.oidc_error()`
+reports `OidcErrorKind::InteractionRequired` when a new sign-in is needed. Call
+`sign_in()` explicitly on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an
-override, QuestDB must publish its
-[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
-otherwise add `.issuer(...)` to the builder or configure the client explicitly.
-Tokens stay in memory by default; see the [OIDC client
-examples](/docs/security/oidc/#official-client-examples) for endpoint pinning
-and opt-in persistence across process restarts.
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise add `.issuer(...)` to the builder, or set `.client_id()`, `.scope()`,
+`.audience()`, `.token_endpoint()` and `.device_authorization_endpoint()`
+yourself.
+
+Tokens stay in memory until
+`.token_store(FileTokenStore::at_default_location()?)` is added, which writes a
+long-lived refresh token to disk as plaintext. See the [OIDC client
+examples](/docs/security/oidc/#official-client-examples) for the sign-in prompt,
+explicit configuration, and the store's location and permissions.
 
 With the default crate features, the TLS root set is `webpki_roots`. Other
 choices have feature requirements:

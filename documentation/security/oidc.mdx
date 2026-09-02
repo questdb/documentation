@@ -694,18 +694,105 @@ fail:
 The authentication object owns the token state. Pass it as a rotating provider,
 as shown above, instead of copying the current token into the connection string;
 otherwise a reconnect after token expiry will keep sending the stale value.
-Interactive sign-in belongs on the main or UI thread. Transport operations may
-refresh silently, but return an interaction-required error when a new user
-authorization is necessary.
-
-Tokens remain in memory by default. Java, Python, Rust, C, and C++ also offer an
-opt-in file token store for avoiding a new prompt after process restarts. The
-store contains a long-lived refresh token as plaintext protected by filesystem
-permissions; enable it only when that tradeoff is acceptable.
 
 Device flow always requires a person to approve the sign-in. For unattended
 services, scheduled jobs, or CI, use a service-account token or a provider flow
 intended for machine identities instead.
+
+#### The sign-in prompt
+
+Signing in renders the verification URL and the user code, then blocks until the
+user approves or the device code expires. Where that text goes, and whether the
+call runs at all without a terminal, differs by client:
+
+| Client | Default prompt | Without a terminal |
+| --- | --- | --- |
+| Java | prints to `System.out`, then tries to open a browser | runs anyway; the client performs no terminal check |
+| Python | prints to stderr, or to the frontend inside an IPython kernel | fails, unless the kernel accepts stdin |
+| Rust, C, C++ | prints to stderr | fails with an interaction-required error |
+
+Redirecting output therefore hides the code in Java, while a container with no
+TTY fails outright in the other four. Override the default to render the
+challenge elsewhere, or to declare the process interactive anyway:
+
+| Client | Custom prompt | Force interactive |
+| --- | --- | --- |
+| Java | `prompt(...)`, or `DeviceCodePrompt.SYSTEM_OUT` to skip the browser launch | not applicable |
+| Python | `renderer=` | `interactive=True` |
+| Rust | `.renderer(...)` | `.interactive(true)` |
+| C | `questdb_oidc_builder_event_handler()` | `questdb_oidc_builder_interactive()` |
+| C++ | `.event_handler(...)` | `.interactive(true)` |
+
+The prompt's text fields are display-safe. Where a client opens the URL or makes
+it clickable, use the separately vetted browser target instead: `browser_target`
+on the C event struct, `event_view::browser_target()` in C++.
+
+#### Explicit configuration and endpoint pinning
+
+Discovery supplies the client ID, scope, audience, token-selection mode, and
+endpoints. Set any of them explicitly when the application has its own
+registration with the provider, or when QuestDB does not publish what the client
+needs:
+
+| Setting | Set it when |
+| --- | --- |
+| `client_id` | the application has its own registration, which is the recommended setup |
+| `scope` | the provider requires `offline_access` before it issues a refresh token |
+| `audience` | the provider requires one, or QuestDB validates `aud` against a non-default [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
+| `issuer` | QuestDB publishes no device authorization endpoint, so the client reads the provider's `/.well-known/openid-configuration` instead |
+| `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
+| `groups_in_token` | overriding which of the two tokens the client selects |
+
+Java exposes `issuer`, `prompt`, `tokenStore`, `tlsConfig` and
+`allowInsecureTransport` on `OidcDeviceAuth.DiscoveryOptions`, and the full set
+on `OidcDeviceAuth.builder()`, in camel case. Python passes them as keyword
+arguments to `from_questdb`. Rust and C++ are builder methods in snake case, and
+C prefixes the same names with `questdb_oidc_builder_`.
+
+#### Token persistence
+
+Tokens stay in memory unless a file token store is enabled. The store writes the
+access, ID and long-lived refresh tokens as unencrypted JSON, so turn it on only
+where that at-rest exposure is acceptable:
+
+| Client | Default location | A directory you choose |
+| --- | --- | --- |
+| Java | `FileTokenStore.atDefaultLocation()` | `FileTokenStore.at(path)` |
+| Python | `FileTokenStore.at_default_location()` | `FileTokenStore.at(path)` |
+| Rust | `FileTokenStore::at_default_location()?` | `FileTokenStore::at(path)` |
+| C | `questdb_oidc_builder_default_file_token_store()` | `questdb_oidc_builder_file_token_store()` |
+| C++ | `.default_file_token_store()` | `.file_token_store(directory)` |
+
+Java, Python and Rust attach the store with `tokenStore(...)`, `token_store=`
+and `.token_store(...)` respectively; the C and C++ calls above are builder
+methods and attach it themselves.
+
+The default directory is `$HOME/.questdb/oidc-tokens/`, overridden by the
+`questdb.client.oidc.token.store.dir` environment variable. Java reads that same
+name as a JVM system property rather than an environment variable, and falls
+back to `${user.home}/.questdb/oidc-tokens/`. On Unix the clients create token
+files with mode `0600` and the store directory with `0700`; on other platforms
+the directory's existing ACL governs access, so restrict it before enabling the
+store.
+
+#### Interaction-required errors
+
+A transport call never prompts. When the cached token cannot be refreshed
+silently, the call fails instead, and the application has to sign in again on
+the main or UI thread:
+
+| Client | How it surfaces |
+| --- | --- |
+| Python | `OidcInteractionRequired`, importable from `questdb.auth` |
+| Rust | a `questdb::Error` carrying `ErrorCode::AuthError`; read `err.oidc_error()` and match on `OidcErrorKind::InteractionRequired` |
+| C | error kind `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` |
+| C++ | `questdb::error_kind::interaction_required` |
+| Java | `OidcAuthException`, with no distinct interaction-required type to match on |
+
+In C++ a failure raised through an attached sender arrives as
+`questdb::ingress::line_sender_error` carrying `oidc_diagnostic()`, not as
+`questdb::oidc::error`, so catch the common base `const questdb::error&` to
+handle both.
 
 ## Interactive clients
 

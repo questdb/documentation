@@ -410,17 +410,27 @@ done:
 </Tabs>
 
 The pool retains the auth state and gets a cached or silently refreshed token
-for every connection and reconnect. Those transport operations never prompt;
-when another user approval is needed, call `sign_in()` /
-`questdb_oidc_auth_sign_in()` explicitly on the main or UI thread.
+for every connection and reconnect. Silent refresh needs a refresh token, which
+most providers issue only when `offline_access` is among the scopes in
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
+own `scope` override. Those transport operations never prompt; they fail with
+`QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` in C, or
+`questdb::error_kind::interaction_required` in C++, and the application calls
+`sign_in()` / `questdb_oidc_auth_sign_in()` explicitly on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an
-override, QuestDB must publish its
-[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
-otherwise set the builder's issuer or configure the client explicitly.
-Tokens stay in memory by default; see the [complete client
-examples](/docs/security/oidc/#official-client-examples) for error handling,
-endpoint pinning, and opt-in persistence across process restarts.
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise set the builder's `issuer`, or set `client_id`, `scope`, `audience`,
+`token_endpoint` and `device_authorization_endpoint` yourself; in C the same
+names are prefixed with `questdb_oidc_builder_`.
+
+Tokens stay in memory until `.default_file_token_store()` in C++, or
+`questdb_oidc_builder_default_file_token_store()` in C, writes a long-lived
+refresh token to disk as plaintext. See the [complete client
+examples](/docs/security/oidc/#official-client-examples) for error handling, the
+sign-in prompt, and the store's location and permissions.
 
 ### Other authentication limitations
 
