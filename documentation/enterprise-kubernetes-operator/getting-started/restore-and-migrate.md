@@ -18,8 +18,10 @@ Both paths use the same Kubernetes resources on every supported cloud. The
 provider-specific bucket or container, credentials, and pod identity are kept in
 an existing `QuestDBObjectStore`.
 
+:::warning
 Before running a command, replace every `<angle-bracket>` value. An unreplaced
 placeholder can be interpreted as shell redirection.
+:::
 
 ## Before you start
 
