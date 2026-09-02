@@ -134,7 +134,7 @@ CREATE TABLE trades (
     timestamp TIMESTAMP,
     symbol SYMBOL INDEX TYPE POSTING INCLUDE (price),
     price DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 Or add an index later:

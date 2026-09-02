@@ -308,23 +308,25 @@ module.exports = {
                         "query/sql/alter-table-change-symbol-capacity",
                       ],
                     },
-                    "query/sql/alter-table-attach-partition",
-                    "query/sql/alter-table-change-column-type",
-                    "query/sql/alter-table-enable-deduplication",
-                    "query/sql/alter-table-disable-deduplication",
-                    "query/sql/alter-table-detach-partition",
-                    "query/sql/alter-table-drop-column",
-                    "query/sql/alter-table-drop-partition",
-                    "query/sql/alter-table-rename-column",
-                    "query/sql/alter-table-rebase-wal",
-                    "query/sql/alter-table-resume-wal",
-                    "query/sql/alter-table-set-format",
-                    "query/sql/alter-table-set-param",
-                    "query/sql/alter-table-set-storage-policy",
-                    "query/sql/alter-table-set-ttl",
-                    "query/sql/alter-table-set-type",
-                    "query/sql/alter-table-squash-partitions",
-                    "query/sql/alter-table-change-symbol-capacity",
+                    // Ordered by the label the sidebar renders, not the doc id
+                    "query/sql/alter-table-attach-partition", // ATTACH PARTITION
+                    "query/sql/alter-table-change-column-type", // COLUMN TYPE
+                    "query/sql/alter-table-disable-deduplication", // DEDUP DISABLE
+                    "query/sql/alter-table-enable-deduplication", // DEDUP ENABLE
+                    "query/sql/alter-table-detach-partition", // DETACH PARTITION
+                    "query/sql/alter-table-drop-column", // DROP COLUMN
+                    "query/sql/alter-table-drop-partition", // DROP PARTITION
+                    "query/sql/alter-table-rebase-wal", // REBASE WAL
+                    "query/sql/alter-table-rename-column", // RENAME COLUMN
+                    "query/sql/alter-table-resume-wal", // RESUME WAL
+                    "query/sql/alter-table-set-format", // SET FORMAT
+                    "query/sql/alter-table-set-param", // SET PARAM
+                    "query/sql/alter-table-set-storage-policy", // SET STORAGE POLICY
+                    "query/sql/alter-table-set-ttl", // SET TTL
+                    "query/sql/alter-table-set-type", // SET TYPE
+                    "query/sql/alter-table-squash-partitions", // SQUASH PARTITIONS
+                    "query/sql/alter-table-suspend-wal", // SUSPEND WAL
+                    "query/sql/alter-table-change-symbol-capacity", // SYMBOL CAPACITY
                   ],
                 },
                 {
@@ -472,6 +474,7 @@ module.exports = {
             "query/sql/show",
             "query/sql/snapshot",
             "query/sql/switch-cold-storage-role",
+            "query/sql/switch-role",
             "query/sql/truncate",
             "query/sql/union-except-intersect",
             "query/sql/update",
@@ -744,6 +747,7 @@ module.exports = {
           label: "Replication",
           items: [
             "high-availability/setup",
+            "high-availability/failover",
             "high-availability/tuning",
             "high-availability/wal-cleanup",
           ],

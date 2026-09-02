@@ -1160,7 +1160,7 @@ callback:
 try (Query q = db.borrowQuery()) {
     q.sql("CREATE TABLE trades ("
           + "ts TIMESTAMP, symbol SYMBOL, side SYMBOL, price DOUBLE, amount DOUBLE"
-          + ") TIMESTAMP(ts) PARTITION BY DAY WAL")
+          + ") TIMESTAMP(ts) PARTITION BY DAY")
      .handler(new QwpColumnBatchHandler() {
          @Override public void onBatch(QwpColumnBatch batch) {}
          @Override public void onEnd(long totalRows) {}

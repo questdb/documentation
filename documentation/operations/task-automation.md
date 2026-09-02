@@ -27,7 +27,7 @@ The following example demonstrates how to execute a query using the HTTP API:
 #!/bin/bash
 
 # QuestDB API URL
-QUESTDB_URL="http://localhost:9000/exec"
+QUESTDB_URL="http://localhost:9000/api/v1/sql/execute"
 
 # Query: Drop partitions older than 30 days
 QUERY="ALTER TABLE my_table DROP PARTITION WHERE timestamp < dateadd('d', -30, now());"

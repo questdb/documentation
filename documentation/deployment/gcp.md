@@ -341,7 +341,7 @@ You can also send a request to the REST API on port 9000:
 ```bash
 curl -G \
   --data-urlencode "query=SELECT * FROM telemetry_config" \
-  "http://<external-ip>:9000/exec"
+  "http://<external-ip>:9000/api/v1/sql/execute"
 ```
 
 The deployment is working when:

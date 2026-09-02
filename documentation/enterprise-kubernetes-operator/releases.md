@@ -3,8 +3,8 @@ title: Kubernetes Operator releases
 description: Release history for the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.2.0 (8f7b6fbeebe98a9d26a676215fcf7369f8664536).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.0 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.2.1 (82c604c305719b83151ecfca7b54f13d8f803b14).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.1 -->
 # Changelog
 
 Notable changes to the QuestDB Enterprise Operator are documented here.
@@ -12,20 +12,20 @@ Notable changes to the QuestDB Enterprise Operator are documented here.
 <!-- generated latest operator artifacts: start -->
 ## Latest operator artifacts
 
-Latest stable release: **0.2.0**
+Latest stable release: **0.2.1**
 
 ### Operator images
 
 **AWS ECR**
 
 ```text
-695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.2.0
+695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb-enterprise-operator:0.2.1
 ```
 
 **Non-AWS mirror**
 
 ```text
-registry.distribution.questdb.io/questdb-enterprise-operator:0.2.0
+registry.distribution.questdb.io/questdb-enterprise-operator:0.2.1
 ```
 
 Both references require the registry access supplied by QuestDB.
@@ -37,10 +37,39 @@ Both references require the registry access supplied by QuestDB.
 ```sh
 helm install questdb-operator oci://ghcr.io/questdb/charts/questdb-operator \
   --namespace questdb-operator-system --create-namespace \
-  --version 0.2.0
+  --version 0.2.1
 ```
 
 <!-- generated latest operator artifacts: end -->
+## [Unreleased]
+
+## [0.2.1] - 2026-09-02
+
+An earlier source-only `v0.2.1` tag was deleted before any image, chart, or GitHub
+Release was published. This is the official 0.2.1 release.
+
+### Added
+
+- Verified Secret-backed PGWire TLS for new clusters.
+- Manager scheduling, metadata, environment, replica, and PodDisruptionBudget chart values.
+- Chart-managed verified controller metrics TLS.
+- Opt-in per-cluster database ingress policy example.
+
+### Changed
+
+- QuestDB Enterprise 4.0.0 canonical certification.
+- PGWire TLS block presence is creation-time immutable while certificate and verification fields remain mutable.
+- Port 9003 is Pod-only.
+- Strict config-key and source-instance validation.
+
+### Fixed
+
+- Updated the bundled gRPC dependency to 1.83.1 to address CVE-2026-84304.
+- Serialized replica-first rollout/read-route overlap and terminal Pod replacement.
+- Filtered-cache live-object confirmation.
+- Per-table follower progress/quiet evidence and oversized metrics rejection.
+- Backup phase/stall, PITR normalization/fail-closed restore, promotion fencing diagnostics, terminating-cluster behavior, chart typing/webhook/PDB validation.
+
 ## [0.2.0] - 2026-08-20
 
 ### Fixed
