@@ -63,19 +63,138 @@ Those steps remain your responsibility.
 
 ### 1. Prepare the source
 
-Before creating the follower, confirm that the external source:
+The source must run a QuestDB Enterprise version compatible with the destination
+image. Replication only carries changes to WAL-enabled tables. Inventory the
+source before enabling replication:
 
-- runs a QuestDB Enterprise version compatible with the destination image;
-- has a completed backup under a known backup prefix;
-- uploads replication WAL under a known WAL prefix in the same object store;
-- retains WAL back to the seed backup;
-- returns an exact, non-empty value from `SELECT backup_instance_name();`; and
-- can be stopped and restarted once with
-  `replication.role=primary-catchup-uploads` during cutover.
+```questdb-sql title="Check source tables"
+SELECT table_name, walEnabled
+FROM tables()
+ORDER BY table_name;
+```
 
-The backup instance name must match `^[a-z0-9]+(-[a-z0-9]+)*$`. Confirm the
-backup prefix, WAL prefix, and instance name against the source configuration;
-they become immutable on the follower.
+Data already present in a non-WAL table is included in the seed backup, but
+later changes to that table are not replicated. Stop writes to non-WAL tables
+before the seed backup and keep them stopped through cutover, or arrange to
+synchronize them separately.
+
+Choose a backup prefix and a replication WAL prefix in the **same bucket**. The
+follower has one `QuestDBObjectStore` for both uses, so separate source buckets
+cannot be represented by the follower specification. The roots must be distinct,
+stable prefixes with a trailing `/`. No other live primary may write to the WAL
+prefix.
+
+The following S3 example uses ambient AWS credentials from an EC2 instance
+profile. Add it to the source's `server.conf`, replacing every placeholder:
+
+```ini title="server.conf on the external source"
+backup.enabled=true
+backup.object.store=s3::bucket=<source-bucket>;root=<source-backup-root>;region=<aws-region>;
+backup.schedule.cron=0 * * * *
+backup.schedule.tz=UTC
+backup.cleanup.keep.latest.n=5
+
+replication.role=primary
+replication.object.store=s3::bucket=<source-bucket>;root=<source-wal-root>;region=<aws-region>;
+replication.primary.cleaner.enabled=false
+```
+
+The example temporarily disables the source WAL cleaner so it cannot delete WAL
+needed by the follower. This increases object-storage usage until cutover, so
+keep the migration bounded. Backup retention is entry-count based, and the WAL
+cleaner can merge backup and checkpoint history; do not treat a retention count
+as a guaranteed time window. Keep at least one completed backup available until
+the follower has restored it.
+
+:::note Other object-store providers
+The backup and replication mechanics are provider-independent. For another
+provider supported by your Operator release, replace the two S3 connection
+strings with that provider's
+[object-store connection strings](/docs/high-availability/setup/#1-configure-object-storage).
+Keep the backup and WAL roots distinct, and configure the destination
+`QuestDBObjectStore` for the same underlying store.
+:::
+
+If the source runs in Docker, use the equivalent environment variables in its
+existing container definition. File-backed object-store values keep static
+credentials, when required, out of the container specification:
+
+```text title="backup-object-store"
+s3::bucket=<source-bucket>;root=<source-backup-root>;region=<aws-region>;
+```
+
+```text title="replication-object-store"
+s3::bucket=<source-bucket>;root=<source-wal-root>;region=<aws-region>;
+```
+
+```yaml title="Docker Compose service excerpt"
+services:
+  questdb:
+    environment:
+      QDB_BACKUP_ENABLED: "true"
+      QDB_BACKUP_OBJECT_STORE_FILE: /run/secrets/backup-object-store
+      QDB_BACKUP_SCHEDULE_CRON: "0 * * * *"
+      QDB_BACKUP_SCHEDULE_TZ: UTC
+      QDB_BACKUP_CLEANUP_KEEP_LATEST_N: "5"
+      QDB_REPLICATION_ROLE: primary
+      QDB_REPLICATION_OBJECT_STORE_FILE: /run/secrets/replication-object-store
+      QDB_REPLICATION_PRIMARY_CLEANER_ENABLED: "false"
+    volumes:
+      - /secure/backup-object-store:/run/secrets/backup-object-store:ro
+      - /secure/replication-object-store:/run/secrets/replication-object-store:ro
+```
+
+Ensure that only the QuestDB runtime account can read the mounted files. Do not
+put long-lived access keys in the Compose file or commit them to source control.
+When ambient credentials are unavailable, add the provider credentials to the
+protected object-store files.
+
+The object-store and replication-role settings are not reloadable. Restart the
+source with its normal service manager or container runtime, then trigger the
+seed backup:
+
+```questdb-sql title="Take the seed backup"
+BACKUP DATABASE;
+```
+
+`BACKUP DATABASE` starts the backup asynchronously. Poll its latest record until
+it reports `backup complete`:
+
+```questdb-sql title="Check the seed backup"
+SELECT status, progress_percent, start_ts, end_ts, backup_error
+FROM backups()
+ORDER BY start_ts DESC
+LIMIT 1;
+```
+
+After the backup completes, record the source's exact backup instance name:
+
+```questdb-sql title="Get the source backup instance name"
+SELECT backup_instance_name();
+```
+
+The value must be non-empty and match `^[a-z0-9]+(-[a-z0-9]+)*$`. Finally,
+confirm that both prefixes contain objects:
+
+```bash title="Check the S3 source prefixes"
+aws s3api list-objects-v2 \
+  --region '<aws-region>' \
+  --bucket '<source-bucket>' \
+  --prefix '<source-backup-root>' \
+  --max-keys 5
+aws s3api list-objects-v2 \
+  --region '<aws-region>' \
+  --bucket '<source-bucket>' \
+  --prefix '<source-wal-root>' \
+  --max-keys 5
+```
+
+Do not create the follower unless the seed backup is complete, both commands
+return objects, the source WAL cleaner remains disabled, all source selectors
+match the intended store, and the source can later be stopped and restarted once
+with `replication.role=primary-catchup-uploads`. Copy the backup prefix, WAL
+prefix, and backup instance name exactly into the follower specification; those
+source selectors are immutable.
 
 ### 2. Create a replica-only follower
 
