@@ -193,7 +193,7 @@ click the notification when it is ready:
 
 ## Next steps
 
-- The MCP server is open source at <a href="https://github.com/questdb/mcp-server-questdb" target="_blank">github.com/questdb/mcp-server-questdb</a>: issues and contributions welcome
+- The MCP server is open source at <a href="https://github.com/questdb/mcp-server-questdb" target="_blank">github.com/questdb/mcp-server-questdb</a> and published on npm as <a href="https://www.npmjs.com/package/@questdb/mcp-server-questdb" target="_blank">@questdb/mcp-server-questdb</a>: issues and contributions welcome
 - [AI coding agents](/docs/getting-started/ai-coding-agents/) covers agent skills and REST API access
 - [Live dashboards](/docs/getting-started/web-console/notebooks/live-dashboards) shows how to build the same dashboards by hand
 - [Web Console overview](/docs/getting-started/web-console/overview/) tours the console surfaces
