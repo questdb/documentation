@@ -345,6 +345,7 @@ module.exports = {
                     "query/sql/alter-mat-view-set-refresh",
                     "query/sql/alter-mat-view-set-refresh-limit",
                     "query/sql/alter-mat-view-set-ttl",
+                    "query/sql/alter-mat-view-set-expire",
                   ],
                 },
                 {
@@ -628,6 +629,7 @@ module.exports = {
             "concepts/deduplication",
             "concepts/delivery-semantics",
             "concepts/ttl",
+            "concepts/expire-rows",
             "concepts/storage-policy",
             {
               id: "concepts/cold-storage",

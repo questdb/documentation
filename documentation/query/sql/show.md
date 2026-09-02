@@ -41,7 +41,7 @@ SHOW { COLUMNS FROM tableName
 - `SHOW CREATE LIVE VIEW` returns a DDL query that allows you to recreate a live
   view.
 - `SHOW CREATE MATERIALIZED VIEW` returns a DDL query that allows you to
-  recreate a materialized view.
+  recreate a materialized view, including its retention clauses.
 - `SHOW CREATE TABLE` returns a DDL query that allows you to recreate the table.
 - `SHOW CREATE VIEW` returns a DDL query that allows you to recreate a view.
 - `SHOW GROUPS` shows all groups the user belongs or all groups in the system
@@ -225,7 +225,9 @@ SHOW CREATE MATERIALIZED VIEW bbo_1s;
 | CREATE MATERIALIZED VIEW 'bbo_1s' WITH BASE 'market_data' REFRESH IMMEDIATE AS (SELECT timestamp, symbol, last(bids[1][1]) AS bid, last(asks[1][1]) AS ask FROM market_data SAMPLE BY 1s) PARTITION BY DAY; |
 
 This returns the `CREATE MATERIALIZED VIEW` statement that would recreate the
-materialized view, including its base table, refresh strategy, and partitioning.
+materialized view, including its base table, refresh strategy, partitioning,
+`TTL`, and `EXPIRE ROWS` policy. The output includes `CLEANUP EVERY` only when
+the cadence differs from the default `1h`.
 
 ### SHOW CREATE TABLE
 

@@ -18,17 +18,31 @@ CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] viewName
            [ START timestamp ] [ TIME ZONE timezone ]
            [ PERIOD ( LENGTH length [ TIME ZONE tz ] [ DELAY delay ] ) ]
            [ PERIOD ( SAMPLE BY INTERVAL ) ] ]
-AS [ ( ] query [ ) ]
-[ TIMESTAMP ( columnRef ) ]
-[ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
-      [ TTL n timeUnit ] ]
-[ OWNED BY ownerName ]
+AS
+{ query
+| ( query )
+  [ TIMESTAMP ( columnRef ) ]
+  [ PARTITION BY ( YEAR | MONTH | WEEK | DAY | HOUR )
+        [ TTL n timeUnit ] ]
+  [ EXPIRE ROWS expirePolicy [ CLEANUP EVERY duration ] ]
+  [ OWNED BY ownerName ]
+}
 ```
 
+Parentheses around `query` are optional only when the query ends the statement.
+They are required when any trailing clause follows the query, including
+`TIMESTAMP`, `PARTITION BY`, `TTL`, `EXPIRE ROWS`, or `OWNED BY`.
+
 Where:
+
 - `interval`: Duration like `1m`, `10m`, `1h`, `1d`
 - `timeUnit`: `HOURS | DAYS | WEEKS | MONTHS | YEARS`
-- `query`: Must contain `SAMPLE BY` or time-based `GROUP BY`
+- `query`: Either an aggregating query with `SAMPLE BY` or a time-based
+  `GROUP BY`, or a
+  [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection
+  over a single table
+- `expirePolicy`: `WHEN predicate | KEEP LATEST [ON timestamp] PARTITION BY cols | KEEP [N] (HIGHEST|LOWEST) col [PARTITION BY cols]`.
+  This policy is designed for passthrough views (see below).
 
 ## Parameters
 
@@ -39,17 +53,18 @@ Where:
 | `WITH BASE` | Specify base table (required for JOINs) |
 | `REFRESH` | Refresh strategy (default: `IMMEDIATE`) |
 | `DEFERRED` | Skip initial refresh on creation |
-| `query` | A `SAMPLE BY` or time-based `GROUP BY` query |
+| `query` | An aggregating (`SAMPLE BY` / time-based `GROUP BY`) or [passthrough](/docs/concepts/materialized-views/#passthrough-views) query |
 | `TIMESTAMP` | Designate timestamp column for the view |
 | `PARTITION BY` | Partitioning unit for view storage |
 | `TTL` | Retention period for view data |
+| `EXPIRE ROWS` | Row-level retention for passthrough views (see below) |
 | `OWNED BY` | Assign ownership (Enterprise) |
 
 ## Rules and defaults
 
 | Rule | Description |
 | ---- | ----------- |
-| Query must aggregate | Requires `SAMPLE BY` or `GROUP BY` with designated timestamp |
+| Query must aggregate or be passthrough | Either `SAMPLE BY` / `GROUP BY` with a designated timestamp, or a 1:1 [passthrough](/docs/concepts/materialized-views/#passthrough-views) projection over a single table |
 | Default refresh | `IMMEDIATE` (refreshes after each base table transaction) |
 | WITH BASE required | Must specify when query contains JOINs |
 | PARTITION BY sizing | Should be larger than or equal to `SAMPLE BY` interval |
@@ -69,10 +84,11 @@ Where:
 
 ```questdb-sql title="Base table"
 CREATE TABLE trades (
-  timestamp TIMESTAMP,
   symbol SYMBOL,
+  side SYMBOL,
   price DOUBLE,
-  amount DOUBLE
+  amount DOUBLE,
+  timestamp TIMESTAMP
 ) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
@@ -277,6 +293,62 @@ Time units: `HOURS`, `DAYS`, `WEEKS`, `MONTHS`, `YEARS`
 
 The view's TTL is independent of the base table's TTL. See
 [TTL documentation](/docs/concepts/ttl/) for details.
+
+## EXPIRE ROWS
+
+Attach a row-level retention policy with `EXPIRE ROWS`. Unlike `TTL` (which drops
+whole partitions by age), `EXPIRE ROWS` keeps a defined set of rows: the latest
+per key, the top-N per group, or rows matching a predicate. It recomputes that
+set continuously as the view refreshes.
+
+`EXPIRE ROWS` is designed for
+[**passthrough (non-aggregating) views**](/docs/concepts/materialized-views/#passthrough-views)
+(a projection over a single table with no `SAMPLE BY` / `GROUP BY`, whose rows
+stay 1:1 with the base). An aggregating view is accepted with a logged advisory
+(a later refresh can regenerate reclaimed rows). The defining query must not
+read another policied view, as its base or in a join:
+
+```questdb-sql title="Passthrough view that keeps the latest row per symbol"
+CREATE MATERIALIZED VIEW trades_latest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP LATEST PARTITION BY symbol;
+```
+
+A `WHEN` predicate is for rules that move with **wall-clock time**, such as a
+rolling `timestamp < dateadd('d', -7, now())` window. The defining query cannot
+express those, because it rejects non-deterministic functions. A predicate that
+depends only on the row's own values belongs in the query's `WHERE` clause
+instead, which keeps those rows out of the view entirely; see
+[`WHERE` filter or `EXPIRE ROWS`?](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
+
+The clause goes after the query (and after `PARTITION BY` if present):
+
+```
+EXPIRE ROWS
+  { WHEN predicate
+  | KEEP LATEST [ ON timestampColumn ] PARTITION BY col [, col ...]
+  | KEEP [ N ] ( HIGHEST | LOWEST ) col [ PARTITION BY col [, col ...] ] }
+  [ CLEANUP EVERY duration ]
+```
+
+A `WHEN` threshold that is constant at definition time and evaluates to `NULL`
+is rejected, since it would expire nothing. That covers the explicit
+`timestamp < CAST(NULL AS TIMESTAMP)` and arithmetic that overflows onto the
+reserved `NULL` value, such as `timestamp < 2147483647 + 1`. See
+[A `NULL` threshold is rejected](/docs/concepts/expire-rows/#a-null-threshold-is-rejected).
+
+For filtering and disk-reclamation behavior, see
+[How `EXPIRE ROWS` works](/docs/concepts/expire-rows/#how-it-works). Change or
+remove a policy with
+[`ALTER MATERIALIZED VIEW SET EXPIRE`](/docs/query/sql/alter-mat-view-set-expire/).
+
+A view can carry both `TTL` and `EXPIRE ROWS`. `TTL` comes first in the
+statement and first in effect: it removes rows from the view, and the
+`EXPIRE ROWS` policy then applies to the rows that stay. See
+[Combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
+
+See the [Expiring rows](/docs/concepts/expire-rows/) concept page for
+all modes, worked examples, and semantics (NULLs, ties, monotonicity).
 
 ## Complete example
 

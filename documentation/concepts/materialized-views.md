@@ -12,6 +12,11 @@ their results at query time, materialized views persist their data to disk,
 making them particularly efficient for expensive aggregate queries that are run
 frequently.
 
+Most materialized views aggregate, bucketing base rows with `SAMPLE BY` or a
+time-based `GROUP BY`. A view can also be a
+[passthrough view](#passthrough-views), which projects base rows one-for-one
+instead of summarising them.
+
 ## What are materialized views for?
 
 Let's say your application ingests trade data into a table like this:
@@ -116,9 +121,10 @@ reads on a smaller, pre-aggregated dataset.
 
 ### Not suited for: data enrichment
 
-Materialized views support JOINs, but `SAMPLE BY` (aggregation) is mandatory.
-This means you can enrich aggregated results with data from other tables, but
-you cannot keep raw (non-aggregated) rows while adding enrichment columns.
+Materialized views support JOINs only in an aggregating query. A
+[passthrough view](#passthrough-views) keeps raw rows, but it must read a single
+table. So neither shape lets you keep raw rows while adding columns from another
+table.
 
 For example, joining aggregated trades with instrument metadata works:
 
@@ -156,6 +162,183 @@ refresh. Changes to joined tables do not trigger updates.
 
 **Coming soon**: We are actively developing a new type of materialized view that
 will support data enrichment use cases. Stay tuned for updates.
+
+## Passthrough views
+
+Not every materialized view aggregates. A **passthrough view** projects base
+rows one-for-one instead of bucketing them, so the view is a
+continuously-maintained copy of its base table, optionally narrowed to a subset
+of columns, a subset of rows, or both. Its query has no `SAMPLE BY` and no
+time-based `GROUP BY`:
+
+```questdb-sql title="Passthrough view: a maintained, filtered copy of trades"
+CREATE MATERIALIZED VIEW trades_btc AS (
+  SELECT timestamp, symbol, price, amount
+  FROM trades
+  WHERE symbol = 'BTC'
+);
+```
+
+Reach for one when you want a maintained *subset* of a large table rather than a
+summary of it:
+
+- **A narrowed replica**: one symbol, one tenant, one region, or a handful of
+  columns out of a wide table, kept current automatically and queried without
+  the base table's scan cost.
+- **A row-level retention target**: attach an
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy to keep only
+  some of the view's rows. The base table is left alone.
+
+Passthrough views refresh incrementally like any other materialized view, and
+accept the same `REFRESH IMMEDIATE` (the default), `REFRESH MANUAL` and
+`REFRESH EVERY` strategies. `REFRESH PERIOD` is rejected: there are no buckets
+for a period to align to.
+
+### Use cases
+
+On its own, a passthrough view is a maintained copy of the base table. Add an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy and it becomes a
+maintained *subset*: you describe which rows are worth keeping, and QuestDB
+keeps that set current as new data arrives. The three examples below are drawn
+from sensor telemetry and from capital markets, and each keeps a different kind
+of subset.
+
+#### IoT: The current reading from every sensor
+
+A building management platform records temperature and humidity from tens of
+thousands of sensors, and its operations screen shows the newest reading from
+each one.
+
+Sensors report at their own pace. Some send a reading every second, others go
+quiet for days. Against the base table that screen runs
+`LATEST ON ts PARTITION BY sensor_id`, which reads backwards until it has found
+a row for even the quietest sensor, and over a long history that is most of the
+table.
+
+A view that keeps only the newest row per sensor answers the same question from
+a handful of rows:
+
+```questdb-sql title="Latest reading per sensor"
+CREATE MATERIALIZED VIEW sensor_current AS (
+  SELECT * FROM sensor_readings
+) EXPIRE ROWS KEEP LATEST PARTITION BY sensor_id;
+```
+
+`sensor_current` holds one row per `sensor_id` and moves forward on its own as
+readings arrive. Superseded rows stop appearing in queries but stay on disk, so
+the view keeps growing at the same rate as the base table. Give it a
+[TTL](/docs/concepts/ttl/) to cap its size.
+
+#### Finance: Options that have not expired yet
+
+A market maker quotes an options chain where contracts expire every Friday, and
+the pricing screen must never show a contract that has already expired.
+
+That rule cannot live in the view's query. The query runs when rows are written
+into the view, and it may not call `now()`, so there is no way to say "expiry is
+still in the future" in a `WHERE` clause. An `EXPIRE ROWS WHEN` predicate is
+evaluated on every read, which is what this case needs:
+
+```questdb-sql title="Options that have not expired yet"
+CREATE MATERIALIZED VIEW options_live AS (
+  SELECT * FROM options_quotes
+) EXPIRE ROWS WHEN expiry < now();
+```
+
+Contracts leave `options_live` as their expiry passes. There is no job to
+schedule and nothing to re-create.
+
+One caveat, about disk rather than about results. QuestDB deletes expired rows
+only when it can tell that a row, once expired, can never qualify again. It can
+tell that for a cutoff on the view's designated timestamp, which only moves
+forward. `expiry` is a different column, so QuestDB takes the safe route:
+expired contracts stop appearing in queries straight away, but their rows stay
+on disk. Add a [TTL](/docs/concepts/ttl/) if you want that space back, and see
+[when expired rows are deleted from disk](/docs/concepts/expire-rows/#monotonicity-and-cleanup-safety).
+
+#### Finance: The largest trades per symbol
+
+A surveillance desk watches for block trades and wants the ten biggest prints
+for every instrument on hand at all times.
+
+A trade is a fact that does not change once it has happened, so "the ten biggest
+so far" is a set that only gets refined as larger trades arrive. That is what a
+top-N policy maintains:
+
+```questdb-sql title="Ten largest trades per symbol"
+CREATE MATERIALIZED VIEW trades_largest AS (
+  SELECT * FROM trades
+) EXPIRE ROWS KEEP 10 HIGHEST amount PARTITION BY symbol;
+```
+
+`trades_largest` holds ten rows per symbol however far the base table grows, and
+the desk reads it directly instead of ranking the base table on every query.
+When an eleventh large trade arrives, the smallest of the ten drops out. Trades
+tied on `amount` at the tenth place are separated by the designated timestamp,
+with the newer one staying.
+
+Ten rows per symbol are visible, but the view still stores every base row it has
+taken in, because a top-N policy never frees disk. A [TTL](/docs/concepts/ttl/)
+is what bounds that, at the price of changing the question the view answers from
+"the biggest so far" to "the biggest still retained". See
+[combining with TTL](/docs/concepts/expire-rows/#combining-with-ttl).
+
+The ranking covers everything the view holds rather than a recent window, so
+`KEEP N` fits records that stay true once written. For a value that gets
+superseded later, such as a resting order that is then cancelled, `KEEP LATEST`
+is the mode that tracks the current version.
+
+### What a passthrough view inherits
+
+A passthrough view takes its shape from the base table instead of from a
+`SAMPLE BY` clause:
+
+- **Designated timestamp and partitioning** come from the base table. The
+  projection has to keep the designated timestamp; a query that drops it is
+  rejected with `materialized view query is required to have designated
+  timestamp`. `PARTITION BY` and `TTL` can still be stated explicitly.
+- **Symbol indexes are inherited.** A base column declared `SYMBOL INDEX` stays
+  indexed in the view, under whatever alias the projection gives it, so an
+  indexed lookup on the view costs what it costs on the base. An aggregating
+  view never inherits an index, because its rows are not base rows.
+
+### Which queries are passthrough
+
+The rule is that view rows stay 1:1 with base rows. A projection over a single
+table qualifies, with or without a filter:
+
+| Query | |
+| ----- | --- |
+| `SELECT * FROM trades` | Passthrough |
+| `SELECT timestamp, symbol, price FROM trades` | Passthrough: column subset |
+| `SELECT timestamp, symbol AS ticker FROM trades` | Passthrough: aliases are fine |
+| `SELECT timestamp, price * amount AS notional FROM trades` | Passthrough: a row-local expression |
+| `SELECT * FROM trades WHERE symbol = 'BTC'` | Passthrough: a filter only removes rows |
+| `... SAMPLE BY 1h`, or `GROUP BY` on a timestamp | Aggregating view |
+| `SELECT DISTINCT ...` | Rejected |
+| `... LATEST ON timestamp PARTITION BY symbol` | Rejected |
+| `JOIN`, `UNION` | Rejected |
+| `row_number() OVER (...)` and other window functions | Rejected |
+| `LIMIT` | Rejected |
+| `ORDER BY` a non-timestamp column | Rejected: the view loses its designated timestamp |
+
+Everything in the rejected group produces output that depends on rows *other
+than* the one being emitted. An incremental refresh sees only the newly-arrived
+slice of the base table, so it cannot compute those correctly. A `LIMIT 100`
+would admit 100 rows per refresh rather than 100 in total, and a `row_number()`
+would restart within each slice.
+
+A query that is neither passthrough nor aggregating is rejected at creation
+time. Most report `materialized view query requires a sampling interval, use
+SAMPLE BY or GROUP BY timestamp_floor()`: the query looked like it meant to
+aggregate but named no bucket. `LIMIT` and window functions have their own
+messages.
+
+To keep only some of a passthrough view's rows over time, such as the latest per
+key, the top-N per group, or rows matching a predicate, attach an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy. That page also
+covers
+[when to put a predicate in the view's `WHERE` clause instead](/docs/concepts/expire-rows/#where-filter-or-expire-rows).
 
 ## Creating a materialized view
 
@@ -214,7 +397,9 @@ interval:
 
 ### The query
 
-Materialized views require a `SAMPLE BY` or time-based `GROUP BY` query.
+An aggregating materialized view uses a `SAMPLE BY` or time-based `GROUP BY`
+query. (The other shape is a [passthrough view](#passthrough-views), which does
+not aggregate; the rules below apply to aggregating views.)
 
 **Supported:**
 
@@ -526,7 +711,9 @@ rows.
 
 Materialized view queries:
 
-- Must use `SAMPLE BY` or `GROUP BY` with a designated timestamp column
+- Must either aggregate with `SAMPLE BY` / `GROUP BY` on a designated timestamp
+  column, or be a [passthrough](#passthrough-views) projection over a single
+  table
 - Must not use `FROM-TO`, `FILL`, or `ALIGN TO FIRST OBSERVATION`
 - Must not use non-deterministic functions (`now()`, `rnd_uuid4()`)
 - Must use join conditions compatible with incremental refresh

@@ -294,26 +294,58 @@ Returns a `table` including the following information:
 - `view_table_dir_name` - view directory name
 - `invalidation_reason` - message explaining why the view was marked as invalid
 - `view_status` - view status: 'valid', 'refreshing', or 'invalid'
+- `refresh_period_hi` - end of the last refreshed period, for a view defined
+  with a `REFRESH PERIOD`
 - `refresh_base_table_txn` - the last base table transaction used to refresh the
   materialized view
 - `base_table_txn` - the last committed transaction in the base table
-- `refresh_limit_value` - how many units back in time the refresh limit goes
+- `refresh_limit` - how many units back in time the refresh limit goes
 - `refresh_limit_unit` - how long each unit is
+- `timer_time_zone` - time zone the refresh timer and period boundaries use
 - `timer_start` - start date for the scheduled refresh timer
-- `timer_interval_value` - how many interval units between each refresh
+- `timer_interval` - how many interval units between each refresh
 - `timer_interval_unit` - how long each unit is
+- `period_length` - length of one refresh period (`PERIOD (LENGTH ...)`)
+- `period_length_unit` - how long each period-length unit is
+- `period_delay` - delay before a completed period is refreshed
+  (`PERIOD (DELAY ...)`)
+- `period_delay_unit` - how long each period-delay unit is
+- `refresh_avg_commit_nanos` - moving average of one refresh commit, in
+  nanoseconds. Held in memory only, so it resets on restart
+- `refresh_avg_scan_sample_nanos` - moving average of one refresh iteration's
+  base-table scan, in nanoseconds. In memory only
+- `refresh_avg_scan_range_ts_units` - moving average of the timestamp range one
+  refresh iteration covers, in the base table's timestamp unit. In memory only
+- `refresh_gap_threshold_ts_units` - timestamp gap below which the refresh job
+  merges two adjacent intervals instead of paying for a second commit. `0` means
+  merging is disabled
+- `expire_clause` - the view's
+  [`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy as written, or
+  `NULL` when the view has no policy
+- `expire_cleanup_every` - how often the cleanup job runs for the policy, or
+  `NULL`
+- `expire_enforcement` - `FILTER_AND_RECLAIM` when the cleanup job frees disk
+  for the policy, `FILTER_ONLY` when reads hide the expired rows but they stay
+  on disk, `NULL` when the view has no policy
 
 **Examples:**
 
+`materialized_views()` on its own returns every column listed above. The example
+below projects a readable subset over three views: an aggregating one with no
+retention policy, and two passthrough views with an
+[`EXPIRE ROWS`](/docs/concepts/expire-rows/) policy.
+
 ```questdb-sql title="List all materialized views"
-materialized_views();
+SELECT view_name, view_status, base_table_name, refresh_base_table_txn,
+       base_table_txn, expire_clause, expire_cleanup_every, expire_enforcement
+FROM materialized_views();
 ```
 
-| view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
-| ---------------- | ------------ | --------------- | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- | ------------------- | ----------- | ---------------------- | -------------- | ------------------- | ------------------ | ----------- | -------------------- | ------------------- |
-| trades_OHLC_15m  | immediate    | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-| trades_latest_1d | immediate    | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-
+| view_name       | view_status | base_table_name | refresh_base_table_txn | base_table_txn | expire_clause                       | expire_cleanup_every | expire_enforcement |
+| --------------- | ----------- | --------------- | ---------------------- | -------------- | ----------------------------------- | -------------------- | ------------------ |
+| trades_OHLC_15m | valid       | trades          | 1                      | 1              | null                                | null                 | null               |
+| trades_recent   | valid       | trades          | 1                      | 1              | timestamp < dateadd('d', -7, now()) | 30m                  | FILTER_AND_RECLAIM |
+| trades_latest   | valid       | trades          | 1                      | 1              | KEEP LATEST PARTITION BY symbol     | 1h                   | FILTER_ONLY        |
 
 ## memory_metrics
 
@@ -818,20 +850,20 @@ Returns a `table` with the following columns:
 
 ### Basic table information
 
-| Column                | Type    | Description                                                        |
-| --------------------- | ------- | ------------------------------------------------------------------ |
-| `id`                  | INT     | Internal table ID                                                  |
-| `table_name`          | STRING  | Table name                                                         |
-| `designatedTimestamp` | STRING  | Name of the designated timestamp column, or `null`                 |
-| `partitionBy`         | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `walEnabled`          | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
-| `dedup`               | BOOLEAN | Whether deduplication is enabled                                   |
-| `ttlValue`            | INT     | TTL (Time-To-Live) value                                           |
-| `ttlUnit`             | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
-| `matView`             | BOOLEAN | Whether this is a materialized view                                |
-| `directoryName`       | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
-| `maxUncommittedRows`  | INT     | Table's `maxUncommittedRows` setting                               |
-| `o3MaxLag`            | LONG    | Table's `o3MaxLag` setting in microseconds                         |
+| Column                 | Type    | Description                                                        |
+| ---------------------- | ------- | ------------------------------------------------------------------ |
+| `id`                   | INT     | Internal table ID                                                  |
+| `table_name`           | STRING  | Table name                                                         |
+| `designatedTimestamp`  | STRING  | Name of the designated timestamp column, or `null`                 |
+| `partitionBy`          | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `walEnabled`           | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
+| `dedup`                | BOOLEAN | Whether deduplication is enabled                                   |
+| `ttlValue`             | INT     | TTL (Time-To-Live) value                                           |
+| `ttlUnit`              | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
+| `matView`              | BOOLEAN | Whether this is a materialized view                                |
+| `directoryName`        | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
+| `maxUncommittedRows`   | INT     | Table's `maxUncommittedRows` setting                               |
+| `o3MaxLag`             | LONG    | Table's `o3MaxLag` setting in microseconds                         |
 
 :::note
 
@@ -900,6 +932,17 @@ These columns are populated on **replicas only** via replication download tracki
 | `replica_more_pending`   | BOOLEAN | `true` if the last download batch was limited and more data is available |
 
 On primary instances, these columns will be `0` or `false`.
+
+### Row-expiry policy
+
+| Column                 | Type   | Description                                                    |
+| ---------------------- | ------ | -------------------------------------------------------------- |
+| `expire_clause`        | STRING | Materialized view's `EXPIRE ROWS` policy as written, or `null` |
+| `expire_cleanup_every` | STRING | Cleanup cadence for the policy, or `null`                      |
+
+Unlike `materialized_views()`, `tables()` does not expose
+`expire_enforcement`; use `materialized_views()` to inspect whether a policy is
+`FILTER_AND_RECLAIM` or `FILTER_ONLY`.
 
 ### Data precision and limitations
 
