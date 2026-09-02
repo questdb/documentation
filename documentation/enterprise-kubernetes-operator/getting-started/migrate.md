@@ -367,11 +367,20 @@ for the adopted WAL stream.
 
 ### 8. Verify the first post-cutover backup
 
-The WAL cleaner remains held until the promoted cluster completes its own first
-backup. With the hourly schedule in this guide, allow one schedule interval plus
-the operator's roughly two-minute observation delay:
+The new primary inherits the source's backup and WAL history but initially has
+no backup under its own backup-instance name. The operator therefore keeps the
+WAL cleaner disabled until the new primary completes its first backup and
+establishes its own retention point.
 
-First, record the primary pod's current UID:
+After that backup, the operator restores the configured WAL-cleaner setting.
+Because `replication.primary.cleaner.enabled` is not reloadable, applying the
+setting recreates the primary pod once. The replacement reuses the same PVC, but
+expect a brief interruption to writes. With the hourly schedule in this guide,
+allow one schedule interval plus the operator's roughly two-minute observation
+delay.
+
+First, record the primary pod's current UID. The replacement keeps the same pod
+name, so the UID is how you distinguish it from the original pod:
 
 ```sh
 kubectl get pod <follower-cluster>-1 -n <namespace> \
@@ -390,8 +399,8 @@ kubectl get questdbcluster <follower-cluster> -n <namespace> \
 Confirm that the completion time is later than the cutover start time recorded
 in step 5.
 
-Releasing the WAL cleaner rolls the primary once. Watch the pod until it has a
-new UID and is ready, then press Control-C:
+After the backup completes, watch the pod until it has a new UID and is ready,
+then press Control-C:
 
 ```sh
 kubectl get pod <follower-cluster>-1 -n <namespace> --watch \
@@ -401,6 +410,8 @@ kubectl get pod <follower-cluster>-1 -n <namespace> --watch \
 After the new pod appears, repeat the writer-health check from the previous step
 and require it to settle before declaring the migration complete.
 
-For emergency source loss, multiple followers, or detailed failure handling, use
-the full
-[high-availability migration runbook](/docs/enterprise-kubernetes-operator/high-availability/#migrate-an-existing-questdb-onto-the-operator).
+With multiple follower instances, promote the healthy instance you verified in
+step 4. For source loss, see
+[Emergency promotion](/docs/enterprise-kubernetes-operator/high-availability/#emergency-promotion).
+For cutover problems, see
+[If promotion stalls or fails](/docs/enterprise-kubernetes-operator/high-availability/#if-promotion-stalls-or-fails).
