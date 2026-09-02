@@ -224,23 +224,9 @@ kubectl apply -f follower.yaml
 
 Wait until the replica has restored its baseline and reconciliation is settled:
 
-```bash
-for _ in $(seq 1 180); do
-  STATE="$(kubectl get questdbcluster <follower-cluster> -n <namespace> \
-    -o jsonpath='{.status.replication.following}{"|"}{.status.readyInstances}{"|"}{range .status.conditions[?(@.type=="Available")]}{.status}{"/"}{.reason}{end}{"|"}{range .status.conditions[?(@.type=="Progressing")]}{.status}{"/"}{.reason}{end}')"
-  IFS='|' read -r FOLLOWING READY AVAILABLE PROGRESSING <<< "$STATE"
-  if [ "$FOLLOWING" = "true" ] && [ "$READY" = "1" ] && \
-     [ "$AVAILABLE" = "True/Following" ] && \
-     [ "$PROGRESSING" = "False/Settled" ]; then
-    break
-  fi
-  sleep 10
-done
-printf 'following=%s ready=%s available=%s progressing=%s\n' \
-  "$FOLLOWING" "$READY" "$AVAILABLE" "$PROGRESSING"
-[ "$FOLLOWING" = "true" ] && [ "$READY" = "1" ] && \
-[ "$AVAILABLE" = "True/Following" ] && \
-[ "$PROGRESSING" = "False/Settled" ]
+```sh
+kubectl wait questdbcluster/<follower-cluster> -n <namespace> \
+  --for=jsonpath='{.status.phase}'=Following --timeout=30m
 ```
 
 A healthy follower deliberately has no current primary and no RW endpoint.
@@ -278,21 +264,14 @@ promotion performs a final fail-closed check after the source is drained.
 
 ### 5. Stop writes and drain the source
 
-Record the start of cutover in the Bash shell you will keep open:
+Record the UTC cutover start time:
 
-```bash
-CUTOVER_TIME_CAPTURED=false
-CUTOVER_STARTED_AT=""
-if CUTOVER_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" && \
-   [ -n "$CUTOVER_STARTED_AT" ]; then
-  CUTOVER_TIME_CAPTURED=true
-fi
-[ "$CUTOVER_TIME_CAPTURED" = true ] && \
-  printf 'Cutover started at %s\n' "$CUTOVER_STARTED_AT"
+```sh
+date -u +%FT%TZ
 ```
 
-Continue in this shell only if `CUTOVER_TIME_CAPTURED=true`; the final backup
-check rejects a missing timestamp.
+Keep this timestamp so you can confirm that the first completed backup happened
+after cutover began.
 
 Then perform these steps with the external source's service manager or container
 runtime:
@@ -367,33 +346,12 @@ new promotion object. Do not remove the promotion finalizer. See
 
 ### 7. Verify the new primary
 
-Wait for the promoted cluster's writer-health contract:
+Wait for the promoted cluster to report `Running`:
 
-```bash
-GENERATION="$(kubectl get questdbcluster <follower-cluster> -n <namespace> \
-  -o jsonpath='{.metadata.generation}')"
-for _ in $(seq 1 120); do
-  STATE="$(kubectl get questdbcluster <follower-cluster> -n <namespace> \
-    -o jsonpath='{.status.observedGeneration}{"|"}{.status.currentPrimary}{"|"}{.status.replication.following}{"|"}{range .status.conditions[?(@.type=="Available")]}{.status}{"/"}{.reason}{end}{"|"}{range .status.conditions[?(@.type=="Progressing")]}{.status}{"/"}{.reason}{end}{"|"}{range .status.conditions[?(@.type=="WriteHealthy")]}{.status}{"/"}{.reason}{end}')"
-  IFS='|' read -r OBSERVED PRIMARY FOLLOWING AVAILABLE PROGRESSING WRITE_HEALTHY <<< "$STATE"
-  if [ "$OBSERVED" = "$GENERATION" ] && \
-     [ "$PRIMARY" = "<follower-cluster>-1" ] && \
-     [ "$FOLLOWING" != "true" ] && \
-     [ "$AVAILABLE" = "True/PrimaryReady" ] && \
-     [ "$PROGRESSING" = "False/Settled" ] && \
-     [ "$WRITE_HEALTHY" = "True/Healthy" ]; then
-    break
-  fi
-  sleep 10
-done
-printf 'observed=%s primary=%s following=%s available=%s progressing=%s writeHealthy=%s\n' \
-  "$OBSERVED" "$PRIMARY" "$FOLLOWING" "$AVAILABLE" "$PROGRESSING" "$WRITE_HEALTHY"
-[ "$OBSERVED" = "$GENERATION" ] && \
-[ "$PRIMARY" = "<follower-cluster>-1" ] && \
-[ "$FOLLOWING" != "true" ] && \
-[ "$AVAILABLE" = "True/PrimaryReady" ] && \
-[ "$PROGRESSING" = "False/Settled" ] && \
-[ "$WRITE_HEALTHY" = "True/Healthy" ]
+```sh
+kubectl wait questdbcluster/<follower-cluster> -n <namespace> \
+  --for=jsonpath='{.status.phase}'=Running --timeout=20m
+kubectl get questdbcluster <follower-cluster> -n <namespace> -o wide
 ```
 
 Confirm that `<follower-cluster>-rw` now has an endpoint, then connect through
@@ -413,59 +371,31 @@ The WAL cleaner remains held until the promoted cluster completes its own first
 backup. With the hourly schedule in this guide, allow one schedule interval plus
 the operator's roughly two-minute observation delay:
 
-```bash
-PRIMARY_UID_CAPTURED=false
-PRIMARY_UID_BEFORE_BACKUP=""
-if PRIMARY_UID_BEFORE_BACKUP="$(kubectl get pod <follower-cluster>-1 \
-     -n <namespace> -o jsonpath='{.metadata.uid}')" && \
-   [ -n "$PRIMARY_UID_BEFORE_BACKUP" ]; then
-  PRIMARY_UID_CAPTURED=true
-fi
+First, record the primary pod's current UID:
 
-BACKUP_VERIFIED=false
-STATUS=""
-END_TIME=""
-for _ in $(seq 1 450); do
-  STATUS="$(kubectl get questdbcluster <follower-cluster> -n <namespace> \
-    -o jsonpath='{.status.backup.lastBackup.status}')"
-  END_TIME="$(kubectl get questdbcluster <follower-cluster> -n <namespace> \
-    -o jsonpath='{.status.backup.lastBackup.endTime}')"
-  if [ "${CUTOVER_TIME_CAPTURED:-false}" = true ] && \
-     [ -n "$CUTOVER_STARTED_AT" ] && \
-     [ "$STATUS" = "completed" ] && [ -n "$END_TIME" ] && \
-     [[ "$END_TIME" > "$CUTOVER_STARTED_AT" ]]; then
-    BACKUP_VERIFIED=true
-    break
-  fi
-  [ "$STATUS" = "failed" ] && break
-  sleep 10
-done
-printf 'status=%s endTime=%s cutoverStartedAt=%s\n' \
-  "$STATUS" "$END_TIME" "$CUTOVER_STARTED_AT"
-[ "${CUTOVER_TIME_CAPTURED:-false}" = true ] && \
-[ -n "$CUTOVER_STARTED_AT" ] && [ "$BACKUP_VERIFIED" = true ]
+```sh
+kubectl get pod <follower-cluster>-1 -n <namespace> \
+  -o custom-columns='NAME:.metadata.name,UID:.metadata.uid'
 ```
 
-Releasing the WAL cleaner rolls the primary once. Prove that the asynchronous
-roll occurred by waiting for the pod UID to change:
+Then wait for the first backup to complete and print its completion time:
 
-```bash
-PRIMARY_ROLLED=false
-PRIMARY_UID_AFTER_BACKUP=""
-for _ in $(seq 1 120); do
-  if PRIMARY_UID_AFTER_BACKUP="$(kubectl get pod <follower-cluster>-1 \
-       -n <namespace> -o jsonpath='{.metadata.uid}' 2>/dev/null)" && \
-     [ "$PRIMARY_UID_CAPTURED" = true ] && \
-     [ -n "$PRIMARY_UID_AFTER_BACKUP" ] && \
-     [ "$PRIMARY_UID_AFTER_BACKUP" != "$PRIMARY_UID_BEFORE_BACKUP" ]; then
-    PRIMARY_ROLLED=true
-    break
-  fi
-  sleep 10
-done
-printf 'before=%s after=%s rolled=%s\n' \
-  "$PRIMARY_UID_BEFORE_BACKUP" "$PRIMARY_UID_AFTER_BACKUP" "$PRIMARY_ROLLED"
-[ "$PRIMARY_UID_CAPTURED" = true ] && [ "$PRIMARY_ROLLED" = true ]
+```sh
+kubectl wait questdbcluster/<follower-cluster> -n <namespace> \
+  --for=jsonpath='{.status.backup.lastBackup.status}'=completed --timeout=75m
+kubectl get questdbcluster <follower-cluster> -n <namespace> \
+  -o jsonpath='{.status.backup.lastBackup.endTime}{" completed\n"}'
+```
+
+Confirm that the completion time is later than the cutover start time recorded
+in step 5.
+
+Releasing the WAL cleaner rolls the primary once. Watch the pod until it has a
+new UID and is ready, then press Control-C:
+
+```sh
+kubectl get pod <follower-cluster>-1 -n <namespace> --watch \
+  -o custom-columns='NAME:.metadata.name,UID:.metadata.uid,READY:.status.containerStatuses[0].ready,PHASE:.status.phase'
 ```
 
 After the new pod appears, repeat the writer-health check from the previous step
