@@ -211,6 +211,22 @@ GRANT DATABASE ADMIN TO dba;
 
 :::
 
+### Failover operator
+
+A service account that can move the primary role between nodes, for an external
+coordinator or a runbook, without any other administrative right:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT failover_bot WITH PASSWORD 'pwd';
+GRANT HTTP TO failover_bot;         -- POST /lifecycle/switch on port 9003
+GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
+```
+
+`SYSTEM ADMIN` is neither required nor sufficient for a role switch, and
+`DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
+`node_role()` and `GET /lifecycle` are open to any authenticated principal. See
+[Failover and role switch](/docs/high-availability/failover/).
+
 ## Core concepts
 
 <Screenshot
@@ -368,6 +384,12 @@ users, disable it:
 ```ini
 acl.admin.user.enabled=false
 ```
+
+In a replicated cluster, keep in mind that the built-in admin authorizes a
+[role switch](/docs/high-availability/failover/) from its own credentials,
+independently of the replicated access lists. It is the break-glass account
+when a `SWITCH ROLE` grant has not yet replicated to the node you need to
+promote.
 
 ## Permission levels
 
@@ -606,6 +628,7 @@ SELECT * FROM all_permissions();
 | SETTINGS                  | Database                            | Change instance settings in Web Console |
 | SNAPSHOT                  | Database                            | Create snapshots                        |
 | SQL ENGINE ADMIN          | Database                            | List/cancel running queries             |
+| SWITCH ROLE               | Database                            | Switch the replication role, read SWITCH STATUS |
 | SYSTEM ADMIN              | Database                            | System functions (reload_tls, etc.)     |
 | TRUNCATE TABLE            | Database &#124; Table               | Truncate tables                         |
 | UPDATE                    | Database &#124; Table &#124; Column | Update data                             |
@@ -649,6 +672,9 @@ A few operations are reserved for database administrators and are not grantable 
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [`ALTER TABLE REBASE WAL`](/docs/query/sql/alter-table-rebase-wal/)     | Rebuilds a suspended WAL table under a fresh sequencer                                      |
 | [`SWITCH COLD STORAGE ROLE`](/docs/query/sql/switch-cold-storage-role/) | Moves the [cold storage](/docs/concepts/cold-storage/) manager role, including with `FORCE` |
+
+By contrast, [`SWITCH ROLE`](/docs/query/sql/switch-role/), which moves the
+replication role, is an ordinary grantable permission.
 
 </details>
 

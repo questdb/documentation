@@ -232,6 +232,14 @@ SELECT reload_config();
 
 You can also use this to enable and disable the schedule by adding or commenting out the `backup.schedule.cron` config setting.
 
+#### Schedules on a replica
+
+Scheduled backups run on the primary only. When a node is demoted with
+[`SWITCH ROLE`](/docs/query/sql/switch-role/) its schedule pauses, and it
+resumes when the node is promoted again. A backup that was still running at the
+moment of a demote is reported by the `questdb_backup_active_at_last_demote`
+metric, see [Replication metrics](/docs/operations/logging-metrics/#replication-metrics).
+
 
 ### Backup instance name
 
