@@ -3,8 +3,8 @@ title: Kubernetes Operator API reference
 description: Custom resources provided by the QuestDB Enterprise Kubernetes Operator.
 ---
 
-<!-- Generated from questdb/questdb-enterprise-operator v0.2.0 (8f7b6fbeebe98a9d26a676215fcf7369f8664536).
-     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.0 -->
+<!-- Generated from questdb/questdb-enterprise-operator v0.2.1 (82c604c305719b83151ecfca7b54f13d8f803b14).
+     Do not edit directly. Run: make docs-sync DOCS_REPO=/path/to/documentation RELEASE_TAG=v0.2.1 -->
 # API Reference
 
 Packages:
@@ -65,7 +65,7 @@ QuestDBCluster is the Schema for the questdbclusters API.
         <td>
           spec defines the desired state of QuestDBCluster<br/>
           <br/>
-            <i>Validations</i>:<ul><li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li></ul>
+            <i>Validations</i>:<ul><li>self.instances &lt;= 1 || (has(self.backup) && has(self.backup.enabled) && self.backup.enabled): instances &gt; 1 requires an enabled spec.backup (replicas seed from a backup)</li><li>!((has(self.backup) && has(self.backup.enabled) && self.backup.enabled) || self.instances &gt; 1) || has(self.objectStoreRef): spec.objectStoreRef is required when backup is enabled or instances &gt; 1</li><li>(has(oldSelf.replication) && has(oldSelf.replication.root) && size(oldSelf.replication.root) &gt; 0) == (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.replication.root is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. Omitted, the replication WAL root is the per-cluster default db/&#123;namespace&#125;/&#123;name&#125;/, so setting or clearing it re-points live WAL shipping at a different stream. To run against a different root, create a new cluster with it set (born-from-backup)</li><li>has(oldSelf.bootstrap) == has(self.bootstrap): spec.bootstrap is immutable in presence as well as value: it cannot be added to, or removed from, an existing cluster. It only initializes the genesis primary, so adding it later restores nothing and would only make status.recovery lie. To restore from a backup, create a NEW cluster with spec.bootstrap.recovery</li><li>!has(oldSelf.objectStoreRef) || has(self.objectStoreRef): spec.objectStoreRef cannot be removed once set: it backs this cluster's replication WAL and backup history, so dropping it converges a replicated cluster down to a single unreplicated primary and strands its backups. Adding a store to a cluster that never had one is allowed</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.objectStoreRef) && has(self.backup) && has(self.backup.enabled) && self.backup.enabled): spec.bootstrap.follow requires spec.objectStoreRef and an enabled spec.backup, whatever spec.instances is: a follower has no primary of its own, so it restores its baseline from the external source's backup and then follows that source's WAL — both through the shared store. Without them a single-instance follower would be admitted and silently come up as an ordinary standalone primary</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.replication) && has(self.replication.root) && size(self.replication.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.replication.root naming the external source's WAL prefix. Omitted, the root defaults to this cluster's own identity-scoped db/&#123;namespace&#125;/&#123;name&#125;/, which is a stream nothing is writing to — the follower would restore and then never advance</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || (has(self.backup) && has(self.backup.root) && size(self.backup.root) &gt; 0): spec.bootstrap.follow requires an explicit spec.backup.root naming the external source's backup prefix. Omitted, it defaults to a bare 'backup/' that is not scoped to any cluster, so the follower would look for its baseline wherever that happens to point</li><li>!has(self.bootstrap) || !has(self.bootstrap.follow) || !has(self.replication) || !has(self.replication.seedFrom): spec.replication.seedFrom is meaningless under spec.bootstrap.follow: a follower's replicas seed from the external source's backup named by follow.sourceInstanceName, not from an instance of this cluster. Remove seedFrom</li><li>(has(oldSelf.protocols) && has(oldSelf.protocols.pgwire) && has(oldSelf.protocols.pgwire.tls)) == (has(self.protocols) && has(self.protocols.pgwire) && has(self.protocols.pgwire.tls)): spec.protocols.pgwire.tls cannot be added or removed after cluster creation</li></ul>
         </td>
         <td>true</td>
       </tr><tr>
@@ -150,7 +150,15 @@ The object-store keys are NOT rejected, and setting backup.object.store or
 replication.object.store here has no effect: the operator supplies both through
 the engine's _FILE mechanism, which takes precedence over server.conf. The
 additional backup destinations (backup.object.store.1 … .9) and
-cold.storage.object.store are yours to set.<br/>
+cold.storage.object.store are yours to set. Keys must match the server.conf
+allow-list below (letters, digits, '.', '_', '-'). This is an ALLOW-LIST, not a
+delimiter blocklist, on purpose: QuestDB re-parses server.conf with
+java.util.Properties, which decodes \uXXXX escapes and treats ':'/whitespace as
+separators, so a blocklist of only "\n\r=" let a reserved key be smuggled past
+the forbidden-key checks (issue #276). The Go backstop
+(questdb.ServerConfKeyPattern) uses this identical pattern.<br/>
+          <br/>
+            <i>Validations</i>:<ul><li>self.all(k, k.matches('^[A-Za-z0-9._-]+$')): server.conf config keys must match ^[A-Za-z0-9._-]+$ (letters, digits, '.', '_', '-')</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -208,12 +216,19 @@ legitimate day-2 operation that strands nothing (see the spec-level rules).<br/>
         <td><b><a href="#questdbclusterspecprotocols">protocols</a></b></td>
         <td>object</td>
         <td>
-          protocols configures the optional client-facing wire protocols. Absent ⇒ the
-QWP UDP receiver is off.
+          protocols configures optional behavior for client-facing wire protocols.
+Absent ⇒ the QWP UDP receiver is off and PGWire remains plaintext. PGWire TLS
+mode is selected at cluster creation: the tls block may not be added or removed
+later, while its Secret and verification fields remain mutable.
 
-The always-on surface is not represented here and is not configurable:
-HTTP/REST and the Web Console (9000), PGWire (8812), ILP over TCP (9009), and
-the min server's health check and /metrics (9003) are served by every cluster.<br/>
+The always-on client Service surface is not represented here and is not configurable:
+HTTP/REST and the Web Console (9000), PGWire (8812), and ILP over TCP (9009)
+are served by every cluster. The min server's unauthenticated health check and
+/metrics (9003) are always on but deliberately Pod-only: they are omitted from the
+headless, -rw, and -ro Services. Cluster owners may opt in to per-cluster
+NetworkPolicy isolation for direct Pod access; the operator applies no policy
+automatically. This block configures only optional behavior such as PGWire TLS;
+it does not disable those listeners.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -683,7 +698,9 @@ timestamp (granularity = the source's backup cadence; not continuous PITR).
         <td><b>timestamp</b></td>
         <td>string</td>
         <td>
-          timestamp is an RFC3339 instant. Restore selects the latest backup at-or-before it.<br/>
+          timestamp is an RFC3339 instant. Before restore, the operator converts it to UTC
+and truncates fractional seconds to the engine's microsecond precision. Restore
+selects the latest backup at-or-before that instant.<br/>
           <br/>
             <i>Format</i>: date-time<br/>
         </td>
@@ -771,12 +788,19 @@ reference. Which kind is determined by the field: see its documentation.<br/>
 
 
 
-protocols configures the optional client-facing wire protocols. Absent ⇒ the
-QWP UDP receiver is off.
+protocols configures optional behavior for client-facing wire protocols.
+Absent ⇒ the QWP UDP receiver is off and PGWire remains plaintext. PGWire TLS
+mode is selected at cluster creation: the tls block may not be added or removed
+later, while its Secret and verification fields remain mutable.
 
-The always-on surface is not represented here and is not configurable:
-HTTP/REST and the Web Console (9000), PGWire (8812), ILP over TCP (9009), and
-the min server's health check and /metrics (9003) are served by every cluster.
+The always-on client Service surface is not represented here and is not configurable:
+HTTP/REST and the Web Console (9000), PGWire (8812), and ILP over TCP (9009)
+are served by every cluster. The min server's unauthenticated health check and
+/metrics (9003) are always on but deliberately Pod-only: they are omitted from the
+headless, -rw, and -ro Services. Cluster owners may opt in to per-cluster
+NetworkPolicy isolation for direct Pod access; the operator applies no policy
+automatically. This block configures only optional behavior such as PGWire TLS;
+it does not disable those listeners.
 
 <table>
     <thead>
@@ -788,10 +812,132 @@ the min server's health check and /metrics (9003) are served by every cluster.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b><a href="#questdbclusterspecprotocolspgwire">pgwire</a></b></td>
+        <td>object</td>
+        <td>
+          pgwire configures the PostgreSQL wire protocol.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#questdbclusterspecprotocolsqwp">qwp</a></b></td>
         <td>object</td>
         <td>
           qwp configures the QuestDB Wire Protocol (QWP).<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols.pgwire
+<sup><sup>[↩ Parent](#questdbclusterspecprotocols)</sup></sup>
+
+
+
+pgwire configures the PostgreSQL wire protocol.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#questdbclusterspecprotocolspgwiretls">tls</a></b></td>
+        <td>object</td>
+        <td>
+          tls enables TLS on PGWire when present. The operator uses the same
+configuration for its own SQL connections and never falls back to plaintext.
+Presence is creation-time immutable: the block may not be added or removed
+after cluster creation, but certificateSecret, serverName, and
+insecureSkipVerify may be changed while TLS remains enabled.<br/>
+          <br/>
+            <i>Validations</i>:<ul><li>self.certificateSecret.name.size() &gt; 0: certificateSecret.name is required when PGWire TLS is configured</li></ul>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols.pgwire.tls
+<sup><sup>[↩ Parent](#questdbclusterspecprotocolspgwire)</sup></sup>
+
+
+
+tls enables TLS on PGWire when present. The operator uses the same
+configuration for its own SQL connections and never falls back to plaintext.
+Presence is creation-time immutable: the block may not be added or removed
+after cluster creation, but certificateSecret, serverName, and
+insecureSkipVerify may be changed while TLS remains enabled.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#questdbclusterspecprotocolspgwiretlscertificatesecret">certificateSecret</a></b></td>
+        <td>object</td>
+        <td>
+          certificateSecret names a Secret in this namespace containing tls.crt,
+tls.key, and optionally ca.crt.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>insecureSkipVerify</b></td>
+        <td>boolean</td>
+        <td>
+          insecureSkipVerify encrypts operator PGWire traffic without authenticating
+the server certificate or hostname. Development use only.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>serverName</b></td>
+        <td>string</td>
+        <td>
+          serverName is the certificate DNS identity used by the operator. It defaults
+to &lt;cluster&gt;-rw.&lt;namespace&gt;.svc.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### QuestDBCluster.spec.protocols.pgwire.tls.certificateSecret
+<sup><sup>[↩ Parent](#questdbclusterspecprotocolspgwiretls)</sup></sup>
+
+
+
+certificateSecret names a Secret in this namespace containing tls.crt,
+tls.key, and optionally ca.crt.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name of the referent.
+This field is effectively required, but due to backwards compatibility is
+allowed to be empty. Instances of this type with an empty value here are
+almost certainly wrong.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
+          <br/>
+            <i>Default</i>: <br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -859,7 +1005,7 @@ The receiver is UNAUTHENTICATED. QWP authenticates on the WebSocket upgrade
 request, and UDP has no upgrade, so there is no credential path on this port:
 anything that can reach it can write. Restrict it with a NetworkPolicy.
 
-Requires an engine that ships the QWP UDP receiver; QuestDB Enterprise 3.3.4
+Requires an engine that ships the QWP UDP receiver; QuestDB Enterprise 4.0.0
 and later do.<br/>
           <br/>
             <i>Default</i>: false<br/>
@@ -893,11 +1039,16 @@ scheduled backup, not this block.
         <td>
           config is replication tuning passthrough (replication.primary.* /
 replication.requests.*). Operator-owned keys (replication.role,
-replication.object.store, the structured walCleaner keys) are rejected.
+replication.object.store, the structured walCleaner keys, and all *.tls.* /
+*.tls keys owned by structured protocol blocks) are rejected.
 replication.object.store stays rejected HERE (unlike in spec.config) because
 this block is specifically about replication: silently ignoring a store
 re-point written into the replication config would be the most misleading
-possible place to ignore it.<br/>
+possible place to ignore it. Keys must match the server.conf allow-list
+(letters, digits, '.', '_', '-'); see the spec.config rule for why an allow-list
+rather than a delimiter blocklist is what makes the forbidden-key filter sound.<br/>
+          <br/>
+            <i>Validations</i>:<ul><li>self.all(k, k.matches('^[A-Za-z0-9._-]+$')): server.conf config keys must match ^[A-Za-z0-9._-]+$ (letters, digits, '.', '_', '-')</li></ul>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3199,7 +3350,7 @@ status defines the observed state of QuestDBCluster
         <td>
           conditions represent the current state of the QuestDBCluster.
 Types: Available, Progressing, InstanceUnreachable, ConfigRejected,
-OperatorIdentityReady, BackupHealthy, WriteHealthy, ReplicationHealthy,
+OperatorIdentityReady, TLSReady, BackupHealthy, WriteHealthy, ReplicationHealthy,
 PromotionRequired, Recovered, RecoveryFailed, StorageResizeBlocked.<br/>
         </td>
         <td>false</td>
@@ -3720,8 +3871,8 @@ stream reports the observed follower and source WAL progress over time.
         <td><b>advancedAt</b></td>
         <td>string</td>
         <td>
-          advancedAt is when writtenTxn last increased, or when observation began if no
-increase has been observed.<br/>
+          advancedAt is when any sampled table's applied high-water position last advanced,
+or when the current observation window began if no advance has been observed.<br/>
           <br/>
             <i>Format</i>: date-time<br/>
         </td>
@@ -3730,9 +3881,9 @@ increase has been observed.<br/>
         <td><b>receivedAdvancedAt</b></td>
         <td>string</td>
         <td>
-          receivedAdvancedAt is when receivedTxn last increased, or when observation began
-if no increase has been observed. A quiet value does not prove the source process
-has stopped.<br/>
+          receivedAdvancedAt is when any sampled table's source high-water position last
+advanced, or when the current observation window began if no advance has been
+observed. A quiet value does not prove the source process has stopped.<br/>
           <br/>
             <i>Format</i>: date-time<br/>
         </td>
@@ -4477,8 +4628,8 @@ status defines the observed state of QuestDBPromotion
         <td><b><a href="#questdbpromotionstatusconditionsindex">conditions</a></b></td>
         <td>[]object</td>
         <td>
-          conditions carries Succeeded: Unknown while running, True on Completed, False on
-Failed.<br/>
+          conditions carries Succeeded (Unknown while running, True on Completed, False on
+Failed) and Stalled (True after Promoting waits five minutes, otherwise False).<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4520,6 +4671,16 @@ drain was still running.<br/>
           phase is the saga phase. Completed and Failed are terminal.<br/>
           <br/>
             <i>Enum</i>: Pending, Validating, Draining, Promoting, Completed, Failed<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>promotingAt</b></td>
+        <td>string</td>
+        <td>
+          promotingAt is when the cutover entered Promoting. It is the clock behind the
+non-terminal Stalled condition and remains available on the completed audit object.<br/>
+          <br/>
+            <i>Format</i>: date-time<br/>
         </td>
         <td>false</td>
       </tr><tr>

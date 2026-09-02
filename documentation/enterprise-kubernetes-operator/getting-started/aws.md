@@ -1,12 +1,13 @@
 ---
 title: Get started on Amazon EKS
-description: Prepare Amazon EKS and deploy QuestDB Enterprise with the Kubernetes Operator.
+description:
+  Prepare Amazon EKS and deploy QuestDB Enterprise with the Kubernetes Operator.
 ---
 
 # Get Started on Amazon EKS
 
-By the end of this guide, you'll have QuestDB running on EKS and sending
-backups to Amazon S3.
+By the end of this guide, you'll have QuestDB running on EKS and sending backups
+to Amazon S3.
 
 You'll use an EKS cluster you already have. QuestDB will grant your AWS account
 access to the private operator and database images.
@@ -26,20 +27,22 @@ Before you start, make sure your EKS cluster has:
 - at least 1 CPU and 2 GiB of available memory for the QuestDB pod; and
 - capacity for one 20 GiB EBS volume.
 
-This guide covers managed Linux node groups. It does not cover Windows,
-Fargate, Hybrid Nodes, EKS Auto Mode, Karpenter, or self-managed node groups.
+This guide covers managed Linux node groups. It does not cover Windows, Fargate,
+Hybrid Nodes, EKS Auto Mode, Karpenter, or self-managed node groups.
 
 You'll start with one QuestDB instance. It needs 1 CPU, 2 GiB of memory, and one
 20 GiB EBS volume.
 
 Each additional instance needs the same resources.
 
-For mitigation of a partial regional outage, place worker nodes in more than one Availability Zone. Cross-AZ connectivity is not required, since all database instances communicate over a shared S3 Bucket.
+For mitigation of a partial regional outage, place worker nodes in more than one
+Availability Zone. Cross-AZ connectivity is not required, since all database
+instances communicate over a shared S3 Bucket.
 
 QuestDB also needs these network paths:
 
 - the Kubernetes API server to reach the operator webhook on TCP 9443;
-- the operator to reach QuestDB pods on TCP 9000, 8812, and 9003;
+- the operator to reach QuestDB pods on TCP 8812 and 9003;
 - worker nodes to pull images from QuestDB ECR in `eu-west-1`; and
 - QuestDB pods to reach S3 and AWS STS over HTTPS.
 
@@ -47,14 +50,18 @@ Those are the paths the operator itself needs. Your ingestion and query clients
 reach QuestDB on a different set of ports, which the operator publishes on the
 cluster Services: 9000 for HTTP, the Web Console, and
 [QWP](/docs/configuration/qwp/) over WebSocket; 8812 for PostgreSQL wire; and
-9009 for [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/) over
-TCP. Allow whichever your clients use. The
+9009 for [InfluxDB Line Protocol](/docs/connect/compatibility/ilp/overview/)
+over TCP. Allow whichever your clients use. The
 [QWP UDP receiver](/docs/configuration/qwp/#qwpudpbindto) on 9007/UDP is off
 unless you enable
-[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#wire-protocols),
+[`spec.protocols.qwp.udp.enabled`](/docs/enterprise-kubernetes-operator/configuration/#qwp-udp),
 and it is unauthenticated when you do, so restrict it with a NetworkPolicy. See
 [Services and ports](/docs/enterprise-kubernetes-operator/operations/database/#services-and-ports)
-for the full table.
+for the full table, and
+[Configuration](/docs/enterprise-kubernetes-operator/configuration/#database-ingress-isolation)
+for optional network isolation. PGWire TLS must be chosen at cluster creation;
+see
+[PGWire TLS](/docs/enterprise-kubernetes-operator/configuration/#pgwire-tls).
 
 The computer running Helm also needs HTTPS access to `ghcr.io`. For a private
 cluster, provide NAT or VPC endpoints for the AWS services above.
@@ -73,8 +80,8 @@ Before you continue, make sure you have:
 - Helm 3.10 or later; and
 - the PostgreSQL `psql` client.
 
-Keep one Bash shell open and run the steps in order. Values you set early in
-the guide are reused later.
+Keep one Bash shell open and run the steps in order. Values you set early in the
+guide are reused later.
 
 ### Information from QuestDB
 
@@ -141,8 +148,8 @@ aws eks describe-addon \
 kubectl get csidriver ebs.csi.aws.com
 ```
 
-Continue if the Kubernetes version is between 1.31 and 1.36. You should also
-see `ACTIVE` and the `ebs.csi.aws.com` driver.
+Continue if the Kubernetes version is between 1.31 and 1.36. You should also see
+`ACTIVE` and the `ebs.csi.aws.com` driver.
 
 The driver still needs permission to create volumes. Confirm that its controller
 role has `AmazonEBSCSIDriverPolicyV2`.
@@ -176,6 +183,7 @@ Now make sure the driver can create a volume. This quick check creates a
 temporary PVC and removes it afterward.
 
 ```sh
+(
 kubectl create namespace questdb-storage-check
 
 cat <<'EOF' | kubectl apply -f -
@@ -220,6 +228,7 @@ kubectl wait pvc/questdb-storage-check \
 }
 
 kubectl delete namespace questdb-storage-check --wait=true
+)
 ```
 
 When the PVC reaches `Bound`, storage is ready. If it does not, fix the EBS CSI
@@ -327,8 +336,8 @@ aws s3 mb "s3://$S3_BUCKET" --region "$AWS_REGION"
 S3 bucket names are global. If that name is unavailable, add a short suffix to
 `S3_BUCKET` and try again.
 
-Now create a policy that limits QuestDB to its backup and replication paths.
-IAM policy names are account-wide, so change this name if it is already in use.
+Now create a policy that limits QuestDB to its backup and replication paths. IAM
+policy names are account-wide, so change this name if it is already in use.
 
 ```sh
 S3_POLICY_NAME='QuestDBS3'
@@ -482,8 +491,8 @@ kubectl annotate serviceaccount default \
 The manifest below connects QuestDB to your S3 bucket and starts one instance
 with a backup every five minutes.
 
-Keep the QuestDB ECR account ID unchanged. The tested image tag is
-`3.3.4-enterprise`; change it only when QuestDB provides another one.
+Keep the QuestDB ECR account ID unchanged. The tested image tag for v0.2.1 is
+`4.0.0-enterprise`; change it only when QuestDB provides another one.
 
 ```sh
 cat <<EOF | kubectl apply -f -
@@ -504,7 +513,7 @@ metadata:
   name: questdb
   namespace: $QDB_NAMESPACE
 spec:
-  image: 695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb:3.3.4-enterprise
+  image: 695242380269.dkr.ecr.eu-west-1.amazonaws.com/questdb:4.0.0-enterprise
   instances: 1
   storage:
     storageClassName: gp3
@@ -534,6 +543,7 @@ QuestDB may take a few minutes to start. Wait until the operator has processed
 the configuration and the primary is ready with observed healthy WAL writes:
 
 ```sh
+(
 generation="$(kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
   -o jsonpath='{.metadata.generation}')"
@@ -570,11 +580,13 @@ while true; do
 done
 
 echo 'QuestDB is ready'
+)
 ```
 
 Once QuestDB is ready, wait for its first scheduled backup:
 
 ```sh
+(
 deadline=$(($(date +%s) + 1200))
 until [ "$(kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
@@ -591,14 +603,15 @@ done
 kubectl get questdbcluster questdb \
   --namespace "$QDB_NAMESPACE" \
   -o jsonpath='{.status.backup.lastBackup.endTime}{" completed\n"}'
+)
 ```
 
 A timestamp followed by `completed` confirms the backup worked.
 
 ## 8. Connect to QuestDB
 
-Your QuestDB instance is ready. In one terminal, forward its PostgreSQL wire
-and HTTP ports.
+Your QuestDB instance is ready. In one terminal, forward its PostgreSQL wire and
+HTTP ports.
 
 If you chose another namespace in step 4, use it here.
 
