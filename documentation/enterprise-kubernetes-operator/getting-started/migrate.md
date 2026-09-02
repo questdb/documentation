@@ -73,10 +73,12 @@ FROM tables()
 ORDER BY table_name;
 ```
 
+:::warning[Non-WAL tables do not replicate]
 Data already present in a non-WAL table is included in the seed backup, but
 later changes to that table are not replicated. Stop writes to non-WAL tables
 before the seed backup and keep them stopped through cutover, or arrange to
 synchronize them separately.
+:::
 
 Choose a backup prefix and a replication WAL prefix in the **same bucket**. The
 follower has one `QuestDBObjectStore` for both uses, so separate source buckets
