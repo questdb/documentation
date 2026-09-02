@@ -101,12 +101,13 @@ replication.object.store=s3::bucket=<source-bucket>;root=<source-wal-root>;regio
 replication.primary.cleaner.enabled=false
 ```
 
-The example temporarily disables the source WAL cleaner so it cannot delete WAL
-needed by the follower. This increases object-storage usage until cutover, so
-keep the migration bounded. Backup retention is entry-count based, and the WAL
-cleaner can merge backup and checkpoint history; do not treat a retention count
-as a guaranteed time window. Keep at least one completed backup available until
-the follower has restored it.
+The example disables WAL cleanup on the source for the rest of the migration.
+WAL objects will accumulate in object storage, but QuestDB will not delete them
+before the follower consumes them.
+
+Separately, `backup.cleanup.keep.latest.n=5` retains the five most recent
+completed backups—not five hours of backups. Before creating the follower,
+confirm that at least one completed backup is still available.
 
 :::note Other object-store providers
 The backup and replication mechanics are provider-independent. For another
