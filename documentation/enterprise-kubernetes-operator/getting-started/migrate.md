@@ -118,39 +118,11 @@ Keep the backup and WAL roots distinct, and configure the destination
 `QuestDBObjectStore` for the same underlying store.
 :::
 
-If the source runs in Docker, use the equivalent environment variables in its
-existing container definition. File-backed object-store values keep static
-credentials, when required, out of the container specification:
-
-```text title="backup-object-store"
-s3::bucket=<source-bucket>;root=<source-backup-root>;region=<aws-region>;
-```
-
-```text title="replication-object-store"
-s3::bucket=<source-bucket>;root=<source-wal-root>;region=<aws-region>;
-```
-
-```yaml title="Docker Compose service excerpt"
-services:
-  questdb:
-    environment:
-      QDB_BACKUP_ENABLED: "true"
-      QDB_BACKUP_OBJECT_STORE_FILE: /run/secrets/backup-object-store
-      QDB_BACKUP_SCHEDULE_CRON: "0 * * * *"
-      QDB_BACKUP_SCHEDULE_TZ: UTC
-      QDB_BACKUP_CLEANUP_KEEP_LATEST_N: "5"
-      QDB_REPLICATION_ROLE: primary
-      QDB_REPLICATION_OBJECT_STORE_FILE: /run/secrets/replication-object-store
-      QDB_REPLICATION_PRIMARY_CLEANER_ENABLED: "false"
-    volumes:
-      - /secure/backup-object-store:/run/secrets/backup-object-store:ro
-      - /secure/replication-object-store:/run/secrets/replication-object-store:ro
-```
-
-Ensure that only the QuestDB runtime account can read the mounted files. Do not
-put long-lived access keys in the Compose file or commit them to source control.
-When ambient credentials are unavailable, add the provider credentials to the
-protected object-store files.
+Every `server.conf` setting can instead be supplied as an environment variable.
+See [Environment variables](/docs/configuration/overview/#environment-variables)
+for the naming convention. If an object-store string contains static
+credentials, load it from a protected file as described in
+[Secrets from files](/docs/configuration/overview/#secrets-from-files).
 
 The object-store and replication-role settings are not reloadable. Restart the
 source with its normal service manager or container runtime, then trigger the
