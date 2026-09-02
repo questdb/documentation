@@ -474,6 +474,7 @@ module.exports = {
             "query/sql/show",
             "query/sql/snapshot",
             "query/sql/switch-cold-storage-role",
+            "query/sql/switch-role",
             "query/sql/truncate",
             "query/sql/union-except-intersect",
             "query/sql/update",
@@ -746,6 +747,7 @@ module.exports = {
           label: "Replication",
           items: [
             "high-availability/setup",
+            "high-availability/failover",
             "high-availability/tuning",
             "high-availability/wal-cleanup",
           ],

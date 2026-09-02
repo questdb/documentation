@@ -259,7 +259,7 @@ configuration options, tuning, and troubleshooting.
 
 | Node    | Recoverable | Unrecoverable                       |
 | ------- | ----------- | ----------------------------------- |
-| Primary | Restart     | Promote replica, create new replica |
+| Primary | Restart     | [Promote a replica](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss), create new replica |
 | Replica | Restart     | Destroy and recreate                |
 
 ### Network partitions
@@ -290,7 +290,14 @@ If the cluster uses [cold storage](/docs/concepts/cold-storage/), the manager ro
 
 ### Planned primary migration
 
-Use when the current primary is healthy but you want to switch to a new one.
+Since QuestDB Enterprise 3.3.3, the primary role moves without stopping either
+node: demote the primary with `SWITCH ROLE TO REPLICA`, then promote the
+replica with `SWITCH ROLE TO PRIMARY`. Clients stay connected and no data is
+lost. The procedure, its timeout, and what to do when a switch is refused are in
+[Failover and role switch](/docs/high-availability/failover/).
+
+On older versions, or when the object store changes at the same time, use the
+restart-based flow:
 
 1. Stop the primary
 2. Restart with `replication.role=primary-catchup-uploads`
@@ -299,7 +306,11 @@ Use when the current primary is healthy but you want to switch to a new one.
 
 ### Emergency primary migration
 
-Use when the primary has failed.
+Use when the primary has failed and a replica cannot be promoted in place: the
+surviving replica is behind the object store and you accept losing the
+transactions that never reached it. If a caught-up replica exists,
+[promote it in place](/docs/high-availability/failover/#promote-a-replica-after-a-primary-loss)
+instead; that path refuses rather than losing data.
 
 1. Stop the failed primary (ensure it cannot restart)
 2. Stop the replica

@@ -214,6 +214,47 @@ for the health check service. To do so, increase `http.min.worker.count` to `1`.
 
 :::
 
+#### Lifecycle endpoint
+
+`GET /lifecycle` on the same port returns the startup and shutdown state of
+every server component as JSON, for probes and coordinators that need more
+than the `200` of the health check:
+
+```shell
+curl http://127.0.0.1:9003/lifecycle
+```
+
+```json
+{
+  "capturedAtMicros": 1756380000123456,
+  "components": [
+    {
+      "name": "engine",
+      "state": "READY",
+      "lastTransitionMicros": 1756379991204000,
+      "latestProgress": null,
+      "hardRequiredDependencies": ["factory-provider"],
+      "softDependencies": []
+    }
+  ]
+}
+```
+
+- `capturedAtMicros` and `lastTransitionMicros` are epoch microseconds.
+- `state` is one of `INIT`, `STARTING`, `DEGRADED`, `READY`, `SWITCHING`,
+  `STOPPING`, `STOPPED`, `FAILED`.
+- `latestProgress` is `null`, or a progress object while a component is
+  restoring data.
+- The dependency lists name the components a component waits for.
+
+The response is chunked and lists every component in registration order. Like
+the health check, the endpoint follows
+[`http.health.check.authentication.required`](/docs/configuration/http-min-server/#httphealthcheckauthenticationrequired).
+
+In QuestDB Enterprise the response also carries `currentRole`, `switchInFlight`,
+and `ready`, and the port accepts `POST /lifecycle/switch`. See
+[Failover and role switch](/docs/high-availability/failover/#lifecycle-api).
+
 ### Environment variables
 
 Values in the log configuration file can be overridden with environment
@@ -320,6 +361,18 @@ Watch rates and ratios rather than raw totals. Sustained
 `pinned_bytes` staying non-zero after query traffic stops are all worth
 investigating. See
 [Operating cold storage](/docs/operations/cold-storage/#cold-read-metrics).
+
+### Replication metrics
+
+_Enterprise only._
+
+Two gauges describe the state of an in-place
+[role switch](/docs/high-availability/failover/):
+
+| Metric | Type | Description |
+| ------ | ---- | ----------- |
+| `questdb_replication_pending_upload_txn` | gauge | Committed transactions not yet uploaded to the object store, summed over the replicated tables. Poll it before demoting a primary: a demote that cannot bring it to zero within its timeout is not completed |
+| `questdb_backup_active_at_last_demote` | gauge | `1` if a backup was still running when the node was last demoted, `0` otherwise. Cleared by the next promotion |
 
 ### Prometheus Alertmanager
 

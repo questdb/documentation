@@ -340,6 +340,55 @@ memory_metrics();
 | MMAP_O3        | 0         |
 | NATIVE_O3      | 96        |
 
+## node_role
+
+:::note
+
+Replication and the `node_role()` function are available in **QuestDB
+Enterprise** only, since version 4.0.0.
+
+:::
+
+`node_role()` returns the [replication](/docs/high-availability/overview/) role
+the instance currently holds, so a session can tell whether it is connected to
+the primary or to a replica. Any authenticated session can call it; unlike
+`SWITCH STATUS`, it needs no permission.
+
+**Arguments:**
+
+- `node_role()` does not require arguments.
+
+**Return value:**
+
+Returns a string: `PRIMARY`, `REPLICA`, or `UNKNOWN` while an in-place role
+switch has been aborted part-way, see
+[Failover and role switch](/docs/high-availability/failover/#refusals-and-the-torn-state).
+On an instance without replication it returns the role derived from
+`replication.role`, which is `PRIMARY` for a standalone instance.
+
+The value is read once per statement execution, so a cached plan or a prepared
+statement observes a role change on its next execution.
+
+**Examples:**
+
+```questdb-sql
+SELECT node_role();
+```
+
+| node_role |
+| --------- |
+| PRIMARY   |
+
+:::warning
+
+`node_role()` cannot be used in a materialized view or a live view. Avoid it in
+`UPDATE` on a WAL table as well: the statement is re-executed on every node of
+a replicated cluster and each node evaluates its own role, so the primary and
+its replicas would write different values. Tagging rows on `INSERT` is safe,
+because inserted rows replicate as data.
+
+:::
+
 ## query_activity
 
 **Arguments:**
