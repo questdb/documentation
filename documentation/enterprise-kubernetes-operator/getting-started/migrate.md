@@ -148,8 +148,9 @@ After the backup completes, record the source's exact backup instance name:
 SELECT backup_instance_name();
 ```
 
-The value must be non-empty and match `^[a-z0-9]+(-[a-z0-9]+)*$`. Finally,
-confirm that both prefixes contain objects:
+QuestDB generates the name as three random lowercase words separated by hyphens,
+for example `happy-green-turtle`. Copy the entire value exactly. Then confirm
+that both prefixes contain objects:
 
 ```bash title="Check the S3 source prefixes"
 aws s3api list-objects-v2 \
