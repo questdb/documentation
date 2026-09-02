@@ -837,8 +837,8 @@ module.exports = {
                 },
                 {
                   type: "doc",
-                  id: "enterprise-kubernetes-operator/getting-started/restore-and-migrate",
-                  label: "Restore or migrate",
+                  id: "enterprise-kubernetes-operator/getting-started/migrate",
+                  label: "Migrate existing QuestDB",
                 },
               ],
             },

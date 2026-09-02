@@ -1,22 +1,18 @@
 ---
-title: Restore or migrate QuestDB
+title: Migrate QuestDB onto the Kubernetes Operator
 description:
-  Restore QuestDB from an object-store backup or migrate an existing QuestDB
-  onto the Kubernetes Operator with a replica-first cutover.
+  Migrate an existing QuestDB Enterprise deployment onto the Kubernetes
+  Operator with a replica-first cutover.
 ---
 
-# Restore or migrate QuestDB
+# Migrate QuestDB onto the Kubernetes Operator
 
-This guide covers two cloud-neutral ways to create a QuestDB Enterprise cluster
-with existing data:
+This guide creates an operator-managed, replica-only follower of an external
+QuestDB Enterprise deployment, lets it restore the source backup and consume
+replication WAL, then promotes it after a controlled source drain.
 
-1. **Restore:** create a new writable cluster from an object-store backup.
-2. **Migrate:** create a replica-only follower of an external QuestDB, let it
-   catch up, and promote it after a controlled source drain.
-
-Both paths use the same Kubernetes resources on every supported cloud. The
-provider-specific bucket or container, credentials, and pod identity are kept in
-an existing `QuestDBObjectStore`.
+The workflow is cloud-neutral. The provider-specific bucket or container,
+credentials, and pod identity are kept in an existing `QuestDBObjectStore`.
 
 :::warning
 Before running a command, replace every `<angle-bracket>` value. An unreplaced
@@ -34,8 +30,7 @@ This guide assumes that:
 - a `ReadWriteOnce` StorageClass with `fsGroup` support is available;
 - a same-namespace `QuestDBObjectStore` and any referenced credential Secret
   already provide access to the source object store; and
-- you know the source backup prefix and, for migration, the source replication
-  WAL prefix.
+- you know the source backup and replication WAL prefixes.
 
 See
 [Configuration](/docs/enterprise-kubernetes-operator/configuration/#object-storage)
@@ -56,177 +51,7 @@ Copy the exact QuestDB Enterprise image and `imagePullSecrets` from a working
 cluster when possible. Remove the `imagePullSecrets` block from the examples
 only when every destination node has ambient pull access.
 
-## Scenario 1: Restore from an object-store backup
-
-A restore always creates a **new** `QuestDBCluster` and a new PVC. It never
-restores over a running cluster or an existing volume.
-
-### 1. Collect the source details
-
-Record:
-
-- the source `QuestDBObjectStore` name;
-- the backup prefix under that store;
-- the source's backup instance name; and
-- the desired namespace, cluster name, image, StorageClass, and volume size.
-
-For a running source, get its backup instance name directly from QuestDB:
-
-```sql
-SELECT backup_instance_name();
-```
-
-For an operator-managed source, it is also normally available in status:
-
-```sh
-kubectl get questdbcluster <source-cluster> -n <namespace> \
-  -o jsonpath='{.status.replication.seed.backupInstanceName}{"\n"}'
-```
-
-Copy the value exactly. Set `sourceInstanceName` whenever the backup prefix
-contains more than one backup instance. If the value is omitted, the engine can
-select the source only when the prefix contains exactly one instance.
-
-### 2. Choose destination prefixes
-
-The restored cluster must not write backups or replication WAL into another live
-cluster's prefixes. In this example:
-
-- `<source-backup-root>` remains the read-only restore source;
-- `backup/<namespace>/<restored-cluster>/` is the restored cluster's new backup
-  prefix; and
-- the omitted replication root defaults to the identity-scoped
-  `db/<namespace>/<restored-cluster>/`.
-
-The example reuses the source `QuestDBObjectStore` for the restored cluster's
-own backup and replication writes. To use a different object store, replace the
-top-level `objectStoreRef` with another existing, writable store in the same
-namespace. Keep `bootstrap.recovery.source.objectStoreRef` pointed at the source
-store, and keep all destination prefixes distinct from live source prefixes.
-
-### 3. Create the restored cluster
-
-Save the following as `restore.yaml`:
-
-```yaml
-apiVersion: questdb.io/v1alpha1
-kind: QuestDBCluster
-metadata:
-  name: <restored-cluster>
-  namespace: <namespace>
-spec:
-  image: <questdb-enterprise-image>
-  imagePullSecrets:
-    - name: <tenant-image-pull-secret>
-  storage:
-    storageClassName: <storage-class>
-    size: 100Gi
-  resources:
-    requests:
-      memory: 4Gi
-    limits:
-      memory: 4Gi
-  objectStoreRef:
-    name: <source-store>
-  bootstrap:
-    recovery:
-      source:
-        objectStoreRef:
-          name: <source-store>
-          root: <source-backup-root>
-      sourceInstanceName: <source-backup-instance-name>
-  backup:
-    enabled: true
-    schedule: "0 * * * *"
-    timezone: UTC
-    retention: 5
-    root: backup/<namespace>/<restored-cluster>/
-```
-
-`spec.bootstrap` is immutable. Review the store, prefix, and instance name
-before applying the file:
-
-```sh
-kubectl apply -f restore.yaml
-```
-
-The operator withholds the genesis pod until it can resolve the source store.
-The QuestDB recovery init container then restores and validates the backup. The
-operator never reads the backup itself.
-
-### 4. Watch the restore
-
-Use a bounded loop that stops on success or terminal recovery failure:
-
-```bash
-RECOVERED=""
-FAILED=""
-for _ in $(seq 1 180); do
-  RECOVERED="$(kubectl get questdbcluster <restored-cluster> -n <namespace> \
-    -o jsonpath='{.status.conditions[?(@.type=="Recovered")].status}')"
-  FAILED="$(kubectl get questdbcluster <restored-cluster> -n <namespace> \
-    -o jsonpath='{.status.conditions[?(@.type=="RecoveryFailed")].status}')"
-  [ "$RECOVERED" = "True" ] && break
-  [ "$FAILED" = "True" ] && break
-  sleep 10
-done
-kubectl get questdbcluster <restored-cluster> -n <namespace> \
-  -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"/"}{.reason}{" "}{.message}{"\n"}{end}'
-[ "$RECOVERED" = "True" ] && [ "$FAILED" != "True" ]
-```
-
-If the final command fails, do not patch `spec.bootstrap` or reuse the PVC.
-Follow
-[restore failure cleanup](/docs/enterprise-kubernetes-operator/operations/backup-restore/#if-it-fails)
-and create a fresh cluster with corrected immutable values.
-
-### 5. Verify the restored writer and data
-
-`Recovered=True` proves that the engine completed recovery. Also require the
-current writer-health contract:
-
-```bash
-GENERATION="$(kubectl get questdbcluster <restored-cluster> -n <namespace> \
-  -o jsonpath='{.metadata.generation}')"
-for _ in $(seq 1 120); do
-  STATE="$(kubectl get questdbcluster <restored-cluster> -n <namespace> \
-    -o jsonpath='{.status.observedGeneration}{"|"}{range .status.conditions[?(@.type=="Available")]}{.status}{"/"}{.reason}{end}{"|"}{range .status.conditions[?(@.type=="Progressing")]}{.status}{"/"}{.reason}{end}{"|"}{range .status.conditions[?(@.type=="WriteHealthy")]}{.status}{"/"}{.reason}{end}')"
-  IFS='|' read -r OBSERVED AVAILABLE PROGRESSING WRITE_HEALTHY <<< "$STATE"
-  if [ "$OBSERVED" = "$GENERATION" ] && \
-     [ "$AVAILABLE" = "True/PrimaryReady" ] && \
-     [ "$PROGRESSING" = "False/Settled" ] && \
-     [ "$WRITE_HEALTHY" = "True/Healthy" ]; then
-    break
-  fi
-  sleep 10
-done
-printf 'observed=%s available=%s progressing=%s writeHealthy=%s\n' \
-  "$OBSERVED" "$AVAILABLE" "$PROGRESSING" "$WRITE_HEALTHY"
-[ "$OBSERVED" = "$GENERATION" ] && \
-[ "$AVAILABLE" = "True/PrimaryReady" ] && \
-[ "$PROGRESSING" = "False/Settled" ] && \
-[ "$WRITE_HEALTHY" = "True/Healthy" ]
-```
-
-Confirm that the RW Service has an endpoint:
-
-```sh
-kubectl get endpointslice -n <namespace> \
-  -l kubernetes.io/service-name=<restored-cluster>-rw
-```
-
-Before sending application traffic, connect through `<restored-cluster>-rw` and
-validate critical tables, expected row counts, minimum and maximum timestamps,
-application invariants, and free storage. See
-[Connect to a database](/docs/enterprise-kubernetes-operator/operations/database/#connect)
-for a temporary PGWire connection.
-
-For a point-in-time restore, add `bootstrap.recovery.recoveryTarget` when the
-cluster is first created. See
-[Point-in-time recovery](/docs/enterprise-kubernetes-operator/operations/backup-restore/#point-in-time-recovery-pitr)
-for its retained-window and timestamp rules.
-
-## Scenario 2: Migrate an external QuestDB with a follower
+## Migration workflow
 
 This path keeps the external source writable while an operator-managed replica
 restores its backup and consumes its replication WAL. Cutover downtime is
@@ -389,10 +214,12 @@ runtime:
 The final upload has no safe fixed timeout. Supervise it at the source until it
 succeeds.
 
-:::danger Do not promote while the external source may still be running as a
-primary. The operator cannot fence an unmanaged process. Keep the old data
-available for rollback investigation, but ensure the process and its supervisor
-cannot restart it. :::
+:::danger
+Do not promote while the external source may still be running as a primary. The
+operator cannot fence an unmanaged process. Keep the old data available for
+rollback investigation, but ensure the process and its supervisor cannot restart
+it.
+:::
 
 ### 6. Promote the follower
 
