@@ -1,9 +1,11 @@
 ---
 title: OpenID Connect (OIDC) Integration
-description: Integrate QuestDB Enterprise with an external OIDC Identity Provider for Web Console SSO, PGWire token authentication, group mapping, and the settings endpoint.
+description: Integrate QuestDB Enterprise with an external OIDC Identity Provider for Web Console SSO, device-flow client authentication, PGWire token authentication, and group mapping.
 ---
 
 import Screenshot from "@theme/Screenshot";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
@@ -74,7 +76,9 @@ endpoints.
 The database, in OAuth2/OIDC terms the _protected resource_ or _resource
 server_.
 
-Only processes requests which contain a valid access token.
+Only processes requests which contain the bearer token selected by its OIDC
+configuration: normally the access token, or the ID token when group memberships
+are encoded in it.
 
 ## Authentication and Authorization Flow
 
@@ -347,7 +351,8 @@ settings:
     "acl.oidc.redirect.uri": "https://questdb.host:9000",
     "acl.oidc.scope": "openid",
     "acl.oidc.authorization.endpoint": "https://oidc.provider:443/as/authorization.oauth2",
-    "acl.oidc.token.endpoint": "https://oidc.provider:443/as/token.oauth2"
+    "acl.oidc.token.endpoint": "https://oidc.provider:443/as/token.oauth2",
+    "acl.oidc.device.authorization.endpoint": "https://oidc.provider:443/as/device_authz.oauth2"
   },
   "preferences.version": 0,
   "preferences": {}
@@ -380,7 +385,8 @@ configuration document when `acl.oidc.configuration.url` is set.
 [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
 is present when a device authorization endpoint has been configured, or when the
 provider advertises one. QuestDB publishes it without using it, for clients
-which implement the Device Authorization Flow themselves.
+which implement the [Device Authorization Flow](#device-authorization-flow)
+themselves.
 
 `acl.oidc.redirect.uri` is `null` unless
 [`acl.oidc.redirect.uri`](/docs/configuration/oidc/#acloidcredirecturi) is set.
@@ -431,6 +437,256 @@ is at its default, as the settings path follows the Web Console context path.
 A client which cannot assume both are at their defaults should make the path
 configurable.
 
+## Device Authorization Flow
+
+The [OAuth 2.0 Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628)
+signs in a person without redirecting a browser back to the client. It is a good
+fit for command-line applications, containers, and remote notebook kernels: the
+client displays a verification URL and short code, and the user can authorize
+from a browser on any laptop or phone.
+
+QuestDB does not run the device flow. The client communicates directly with the
+Identity Provider, then presents the resulting bearer token to QuestDB:
+
+```mermaid
+sequenceDiagram
+    participant Client as QuestDB client
+    participant QDB as QuestDB
+    participant IdP as Identity Provider
+    participant User
+    Client->>QDB: GET /settings
+    QDB-->>Client: client ID, scope, endpoints, token mode
+    Client->>IdP: Request device and user codes
+    IdP-->>Client: device_code, user_code, verification URI
+    Client-->>User: Display URL and code
+    User->>IdP: Sign in and approve in a browser
+    loop Until approved or expired
+        Client->>IdP: Poll token endpoint
+        IdP-->>Client: authorization_pending / tokens
+    end
+    Client->>QDB: Authorization: Bearer selected token
+```
+
+The client must respect the polling interval, `slow_down` responses, and the
+device code's expiry. The official clients handle those protocol details,
+choose the access or ID token according to
+[`acl.oidc.groups.encoded.in.token`](#which-token-to-send), cache it in memory,
+and refresh it silently when the provider issues a refresh token. They never
+send the device code or the user's Identity Provider password to QuestDB.
+
+### Configure the provider and QuestDB
+
+Before using the flow:
+
+1. Enable the device authorization grant for the public client registered with
+   the Identity Provider. The discovery examples below use the client ID in
+   `acl.oidc.client.id`; configure the client explicitly when an application
+   has its own registration.
+2. Make the device authorization endpoint available to clients. For the
+   zero-configuration examples below, `acl.oidc.configuration.url` must resolve
+   a provider document containing `device_authorization_endpoint`, or the
+   host-based configuration must set
+   [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+3. Keep `openid` in `acl.oidc.scope`. Add `offline_access` if your provider
+   requires that scope before issuing a refresh token to a device-flow client.
+
+For example, a host-based configuration can add:
+
+```ini title="server.conf"
+acl.oidc.scope=openid offline_access
+acl.oidc.device.authorization.endpoint=/as/device_authz.oauth2
+```
+
+The exact endpoint path and refresh-token scope are provider-specific. With
+configuration-document discovery, do not set the endpoint property: all
+individual endpoint settings are ignored in that mode.
+
+If QuestDB does not publish the device authorization endpoint, pin the provider
+with the client's `issuer` option so the client can fetch the provider's
+`/.well-known/openid-configuration` document, or configure the client ID and
+both endpoints explicitly.
+
+### Official client examples
+
+Each example discovers the OIDC client ID, scope, token-selection mode, and
+provider endpoints from QuestDB's [settings endpoint](#settings-endpoint), then
+signs in before opening the database connection. Use an `https` QuestDB URL for
+discovery so an attacker cannot replace the advertised Identity Provider
+endpoints.
+
+<Tabs defaultValue="java" groupId="oidc-device-client">
+<TabItem value="java" label="Java">
+
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.cutlass.auth.OidcDeviceAuth;
+
+try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+        "https://questdb.example.com:9000")) {
+    auth.signIn(); // the only call which may prompt or open a browser
+
+    try (QuestDB db = QuestDB.connect(
+            "wss::addr=questdb.example.com:9000;",
+            auth::getToken)) {
+        // db.borrowSender() and db.borrowQuery() use the rotating token.
+    }
+}
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+import questdb
+from questdb.auth import OidcDeviceAuth
+
+with OidcDeviceAuth.from_questdb(
+        "https://questdb.example.com:9000") as auth:
+    auth.sign_in()  # the only call which may prompt or open a browser
+
+    with questdb.connect(
+            "wss::addr=questdb.example.com:9000;",
+            oidc_auth=auth) as db:
+        # db.sender(), db.dataframe(), and db.query() use the rotating token.
+        pass
+```
+
+</TabItem>
+<TabItem value="rust" label="Rust">
+
+Enable the `oidc` crate feature:
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7", features = ["oidc"] }
+```
+
+```rust
+use std::sync::Arc;
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
+            .build()?,
+    );
+    auth.sign_in()?; // the only call which may prompt or open a browser
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    // db.borrow_sender() and db.borrow_reader() use the rotating token.
+    Ok(())
+}
+```
+
+</TabItem>
+<TabItem value="cpp" label="C++">
+
+```cpp
+#include <questdb/ingress/qwp_sender.hpp>
+#include <questdb/oidc.hpp>
+#include <iostream>
+
+int main() {
+    auto auth = questdb::oidc::builder::from_questdb(
+            "https://questdb.example.com:9000")
+        .event_handler([](const questdb::oidc::event_view& event) {
+            if (event.kind() == questdb::oidc::event_kind::prompt)
+                std::cerr << "Open " << event.verification_uri()
+                          << " and enter " << event.user_code() << '\n';
+        })
+        .build();
+
+    auth.sign_in(); // the only call which may prompt or open a browser
+    questdb::pool pool{"wss::addr=questdb.example.com:9000;", auth};
+    // pool.borrow_sender() and pool.borrow_reader() use the rotating token.
+}
+```
+
+</TabItem>
+<TabItem value="c" label="C">
+
+```c
+#include <questdb/client.h>
+#include <questdb/oidc.h>
+#include <stdio.h>
+#include <string.h>
+
+static void show_prompt(void *data, const questdb_oidc_event *event) {
+    (void)data;
+    if (event->kind == QUESTDB_OIDC_EVENT_PROMPT)
+        fprintf(stderr, "Open %.*s and enter %.*s\n",
+                (int)event->verification_uri_len, event->verification_uri,
+                (int)event->user_code_len, event->user_code);
+}
+
+int main(void) {
+    questdb_error *error = NULL;
+    questdb_oidc_auth *auth = NULL;
+    const char *url = "https://questdb.example.com:9000";
+    questdb_oidc_builder *builder =
+        questdb_oidc_builder_from_questdb(url, strlen(url), &error);
+    if (!builder || !questdb_oidc_builder_event_handler(
+            builder, show_prompt, NULL, NULL, &error))
+        goto fail;
+
+    auth = questdb_oidc_builder_build(builder, &error);
+    if (!auth || !questdb_oidc_auth_sign_in(auth, &error))
+        goto fail;
+
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.oidc_auth = auth;
+
+    const char *conf = "wss::addr=questdb.example.com:9000;";
+    questdb_db *db = questdb_db_connect_ex(
+        conf, strlen(conf), &options, &error);
+    if (!db)
+        goto fail;
+
+    /* Sender and reader borrows use the rotating token. */
+    questdb_db_close(db);
+    questdb_oidc_auth_free(auth);
+    questdb_oidc_builder_free(builder);
+    return 0;
+
+fail:
+    if (error) {
+        size_t len = 0;
+        const char *message = questdb_error_msg(error, &len);
+        fprintf(stderr, "OIDC sign-in failed: %.*s\n", (int)len, message);
+    }
+    questdb_error_free(error);
+    questdb_oidc_auth_free(auth);
+    questdb_oidc_builder_free(builder);
+    return 1;
+}
+```
+
+</TabItem>
+</Tabs>
+
+The authentication object owns the token state. Pass it as a rotating provider,
+as shown above, instead of copying the current token into the connection string;
+otherwise a reconnect after token expiry will keep sending the stale value.
+Interactive sign-in belongs on the main or UI thread. Transport operations may
+refresh silently, but return an interaction-required error when a new user
+authorization is necessary.
+
+Tokens remain in memory by default. Java, Python, Rust, C, and C++ also offer an
+opt-in file token store for avoiding a new prompt after process restarts. The
+store contains a long-lived refresh token as plaintext protected by filesystem
+permissions; enable it only when that tradeoff is acceptable.
+
+Device flow always requires a person to approve the sign-in. For unattended
+services, scheduled jobs, or CI, use a service-account token or a provider flow
+intended for machine identities instead.
+
 ## Interactive clients
 
 Any interactive client - a UI, Jupyter notebook, CLI - can integrate with an
@@ -466,8 +722,9 @@ special version of the Authorization Code flow designed for mobile apps and
 single page applications.
 
 Regardless of which flow is used by the web or mobile application, the requested
-access token can be used for authentication and authorization when communicating
-with QuestDB as explained in the [above 7th step](#7-database-access).
+token can be used for authentication and authorization when communicating with
+QuestDB. Select the access or ID token as described in
+[Which token to send](#which-token-to-send).
 
 ### Jupyter notebook
 
@@ -478,11 +735,14 @@ The OAuthenticator documentation also contains
 [examples](https://oauthenticator.readthedocs.io/en/latest/tutorials/provider-specific-setup/index.html)
 using different identity providers.
 
-If Jupyter notebooks are used without JupyterHub, one option for OAuth2
-integration is to use the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
-Resource Owner Password Credentials (ROPC) </a> flow.
-It is likely that enabling this flow in your OAuth2 provider will require
-additional setup.
+If Jupyter notebooks are used without JupyterHub, use the official Python
+client's [Device Authorization Flow](#device-authorization-flow). It works when
+the browser and notebook kernel are on different machines and does not put the
+user's password in the notebook.
+
+For tooling without device-flow support, a last-resort option is the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
+Resource Owner Password Credentials (ROPC) </a> flow. Enabling it usually
+requires additional provider configuration.
 
 :::caution
 
@@ -490,7 +750,13 @@ The Resource Owner Password Credentials flow is legacy, and should be used as a 
 
 :::
 
-We can use the code below to acquire an access token in our notebook:
+The ROPC snippets below assume
+`acl.oidc.groups.encoded.in.token=false` and therefore send the access token. If
+the setting is `true`, the client must send the ID token instead, and the
+provider must issue one for the password grant. The official device-flow client
+selects the correct token automatically.
+
+As a fallback, the code below acquires an access token with ROPC:
 
 ```python
 from urllib import request, parse
@@ -634,8 +900,12 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 ### CLI, standalone applications
 
-When using CLI tools, such as `psql`, or standalone applications like Microsoft
-Access, the best option may be the Resource Owner Password Credentials flow.
+For a CLI or standalone application built with an official Java, Rust, C, or
+C++ client, use the [Device Authorization Flow](#device-authorization-flow).
+Tools such as `psql` and Microsoft Access cannot run the flow themselves; for
+those tools, acquire a token separately and use
+[PGWire token authentication](#oidc-for-the-pgwire-endpoint), or enable the
+legacy Resource Owner Password Credentials flow.
 
 The user logs in with their SSO credentials, and the server validates the
 details with the OAuth2 provider:

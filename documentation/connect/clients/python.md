@@ -142,6 +142,45 @@ token = questdb.connect(
 )
 ```
 
+### OIDC device flow (Enterprise)
+
+`OidcDeviceAuth` signs in an interactive user with the
+[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow).
+It discovers the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public `/settings` endpoint. The default prompt works
+in terminals and remote Jupyter kernels:
+
+```python
+import questdb
+from questdb.auth import OidcDeviceAuth
+
+with OidcDeviceAuth.from_questdb(
+        "https://questdb.example.com:9000") as auth:
+    auth.sign_in()  # the only call which may prompt or open a browser
+
+    with questdb.connect(
+            "wss::addr=questdb.example.com:9000;",
+            oidc_auth=auth) as db:
+        # sender(), dataframe(), and query() share the rotating token provider.
+        pass
+```
+
+`oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
+or silently refreshed token for every connection and reconnect. It is mutually
+exclusive with a fixed `token=` setting. Transport operations never prompt; if
+they raise `OidcInteractionRequired`, call `auth.sign_in()` explicitly on the
+main or UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish its
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
+otherwise pass `issuer=...` or configure the client explicitly.
+Tokens stay in memory by default. `FileTokenStore.at_default_location()` enables
+opt-in persistence across restarts, but writes the refresh token as plaintext
+protected by filesystem permissions. See the [OIDC client
+examples](/docs/security/oidc/#official-client-examples) for the full lifecycle
+and security considerations.
+
 Authentication happens during the WebSocket upgrade, before any data frames
 are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
 first operation that needs the connection, not from `connect()`. Queries and
@@ -164,16 +203,13 @@ operating-system certificate store. Override it with configuration keys:
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
 
-### Unsupported auth paths
+### Other authentication limitations
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
-
-| Path | Status | Workaround |
-| --- | --- | --- |
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire a token out-of-band from your IdP, using QuestDB's [settings endpoint](/docs/security/oidc/#settings-endpoint) to discover the provider's authorization and token endpoints and [which token to send](/docs/security/oidc/#which-token-to-send), pass it via `token=...`, and rebuild the handle when the token nears expiry. |
-| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | On token expiry, close the handle and build a fresh one with the new token. |
+- Mutual TLS client certificates are not supported because the QuestDB server
+  does not negotiate them. Use bearer-token authentication over `wss`.
+- A token supplied directly through `token=...` remains fixed. Use
+  `oidc_auth=...` for device-flow token refresh, or close the handle and build a
+  new one when an externally acquired token rotates.
 
 ## The pool
 

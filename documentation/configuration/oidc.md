@@ -159,6 +159,11 @@ QuestDB uses the scopes in the requests it makes itself, in the
 [settings endpoint](/docs/security/oidc/#settings-endpoint) for clients which
 run the flow themselves.
 
+For the [Device Authorization Flow](/docs/security/oidc/#device-authorization-flow),
+add `offline_access` when the provider requires that scope before issuing a
+refresh token. Without a refresh token, a client must ask the user to sign in
+again after the current token expires.
+
 ## Authentication flows
 
 QuestDB publishes [`acl.oidc.pkce.required`](#acloidcpkcerequired) and
@@ -247,7 +252,10 @@ OIDC Device Authorization Endpoint. Unlike the other endpoint settings this one
 has no default, and QuestDB never calls it. QuestDB resolves the endpoint and
 publishes it on the
 [settings endpoint](/docs/security/oidc/#settings-endpoint), for clients which
-implement the Device Authorization Flow themselves.
+implement the
+[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow)
+themselves. The official Java, Python, Rust, C, and C++ clients can discover and
+use the published endpoint.
 
 Left unset, and absent from the provider's configuration document, the endpoint
 stays unresolved and the key is omitted from the settings response.

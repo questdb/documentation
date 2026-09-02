@@ -152,6 +152,56 @@ let token = QuestDb::connect(
 )?;
 ```
 
+### OIDC device flow (Enterprise)
+
+Enable the `oidc` feature to sign in an interactive user with the
+[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow):
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7", features = ["oidc"] }
+```
+
+`OidcDeviceAuth::from_questdb` discovers the provider endpoints, client ID,
+scope, and the token QuestDB expects from the public `/settings` endpoint:
+
+```rust
+use std::sync::Arc;
+use questdb::{oidc::OidcDeviceAuth, QuestDb};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
+            .build()?,
+    );
+    auth.sign_in()?; // the only call which may prompt or open a browser
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+    // Sender and reader connections share the rotating token provider.
+    Ok(())
+}
+```
+
+Pass the closure as a provider instead of putting the current token in the
+connect string. Every new connection and reconnect then receives the cached or
+silently refreshed token. A transport call never starts an interactive flow;
+if it returns `OidcErrorKind::InteractionRequired`, call `sign_in()` explicitly
+on the main or UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish its
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
+otherwise add `.issuer(...)` to the builder or configure the client explicitly.
+Tokens stay in memory by default; see the [OIDC client
+examples](/docs/security/oidc/#official-client-examples) for endpoint pinning
+and opt-in persistence across process restarts.
+
 With the default crate features, the TLS root set is `webpki_roots`. Other
 choices have feature requirements:
 

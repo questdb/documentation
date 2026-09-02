@@ -397,6 +397,46 @@ The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on
 both the ingress and egress WebSocket upgrades. It is mutually exclusive with
 `username`/`password`.
 
+### OIDC device flow (Enterprise)
+
+`OidcDeviceAuth` signs in an interactive user with the
+[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow).
+It discovers the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public `/settings` endpoint. The user can approve the
+sign-in from a browser on any device, so this also works from a container or
+remote notebook kernel:
+
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.cutlass.auth.OidcDeviceAuth;
+
+try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+        "https://questdb.example.com:9000")) {
+    auth.signIn(); // the only call which may prompt or open a browser
+
+    try (QuestDB db = QuestDB.connect(
+            "wss::addr=questdb.example.com:9000;",
+            auth::getToken)) {
+        // Ingestion and query connections share the rotating token provider.
+    }
+}
+```
+
+Pass `auth::getToken` as a provider instead of putting the current token in the
+connect string. Every new connection and reconnect then receives the cached or
+silently refreshed token. A transport call never starts an interactive flow;
+if user approval is needed again, call `signIn()` explicitly on the main or UI
+thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish its
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint);
+otherwise pin the provider with `DiscoveryOptions.issuer(...)` or configure the
+client explicitly.
+Tokens stay in memory by default; see the [OIDC guide's client
+examples](/docs/security/oidc/#official-client-examples) for endpoint pinning,
+explicit configuration, and opt-in persistence across process restarts.
+
 ### HTTP basic auth
 
 ```java
