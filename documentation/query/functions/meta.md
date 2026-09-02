@@ -30,15 +30,40 @@ Returns a string with the current QuestDB version and hash.
 SELECT build();
 ```
 
-| build                                                                                              |
-| -------------------------------------------------------------------------------------------------- |
+| build                                                                                          |
+| ---------------------------------------------------------------------------------------------- |
 | Build Information: QuestDB 9.0.0, JDK 25, Commit Hash 460b817b0a3705c5633619a8ef9efb5163f1569c |
+
+## current_data_id()
+
+Returns the data ID: a UUID that identifies this database, generated on first
+start and stored in the database root. Replication and restore use it to tell
+one database apart from another, so a backup cannot be restored over an
+unrelated instance by accident.
+
+**Arguments:**
+
+- `current_data_id()` does not require arguments.
+
+**Return value:**
+
+Returns a `uuid`.
+
+**Examples:**
+
+```questdb-sql
+SELECT current_data_id();
+```
+
+| current_data_id                      |
+| ------------------------------------ |
+| 75f5a084-7a53-5d7f-941a-c2b4c4c6f127 |
 
 ## current database, schema, or user
 
-`current_database()`, `current_schema()`, and `current_user()` are standard SQL
-functions that return information about the current database, schema, schemas,
-and user, respectively.
+`current_database()`, `current_schema()`, `current_user()`, and
+`session_user()` are standard SQL functions that return information about the
+current database, schema, and user.
 
 ```questdb-sql
 -- Get the current database
@@ -49,10 +74,17 @@ SELECT current_schema();
 
 -- Get the current user
 SELECT current_user();
+
+-- Get the authenticated user of the current session
+SELECT session_user();
 ```
 
 Each of these functions returns a single value, so you can use them in a SELECT
 statement without any arguments.
+
+`current_user()` and `session_user()` both return the authenticated principal
+and are interchangeable in QuestDB. Both report the user that authenticated on
+the current connection, whichever protocol it arrived on.
 
 ## flush_query_cache()
 
@@ -278,9 +310,9 @@ materialized_views();
 ```
 
 | view_name        | refresh_type | base_table_name | last_refresh_start_timestamp | last_refresh_finish_timestamp | view_sql                                                                                                                                                     | view_table_dir_name | invalidation_reason | view_status | refresh_base_table_txn | base_table_txn | refresh_limit_value | refresh_limit_unit | timer_start | timer_interval_value | timer_interval_unit |
-|------------------|--------------|-----------------|------------------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------------------|-------------|------------------------|----------------|---------------------|--------------------|-------------|----------------------|---------------------|
-| trades_OHLC_15m  | immediate   | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
-| trades_latest_1d | immediate   | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+| ---------------- | ------------ | --------------- | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- | ------------------- | ----------- | ---------------------- | -------------- | ------------------- | ------------------ | ----------- | -------------------- | ------------------- |
+| trades_OHLC_15m  | immediate    | trades          | 2025-05-30T16:40:37.562421Z  | 2025-05-30T16:40:37.568800Z   | SELECT timestamp, symbol, first(price) AS open, max(price) as high, min(price) as low, last(price) AS close, sum(amount) AS volume FROM trades SAMPLE BY 15m | trades_OHLC_15m~27  | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
+| trades_latest_1d | immediate    | trades          | 2025-05-30T16:40:37.554274Z  | 2025-05-30T16:40:37.562049Z   | SELECT timestamp, symbol, side, last(price) AS price, last(amount) AS amount, last(timestamp) as latest FROM trades SAMPLE BY 1d                             | trades_latest_1d~28 | null                | valid       | 55141609               | 55141609       | 0                   | null               | null        | 0                    | null                |
 
 
 ## memory_metrics
@@ -389,6 +421,34 @@ Edit `server.conf` and run `reload_config`:
 SELECT reload_config();
 ```
 
+## sleep()
+
+Pauses the query for the given number of seconds, then returns the timestamp
+at which it resumed. Intended for testing and demonstration, for example to
+hold a query open while inspecting
+[`query_activity()`](#query_activity) from another session.
+
+`sleep()` does not hold a worker thread while it waits, so many concurrent
+calls can be parked at once without exhausting the shared worker pool.
+
+**Arguments:**
+
+- `seconds` is the number of seconds to pause for.
+
+**Return value:**
+
+Returns a `timestamp`: the moment the call resumed.
+
+**Examples:**
+
+```questdb-sql title="Pause for one second"
+SELECT * FROM sleep(1);
+```
+
+| sleep                       |
+| --------------------------- |
+| 2026-08-28T11:52:41.614549Z |
+
 ## storage_policies
 
 :::note
@@ -408,15 +468,15 @@ SELECT * FROM storage_policies;
 
 **Columns:**
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `table_dir_name` | _STRING_ | Directory name of the table the policy is attached to. Matches the `directoryName` column in [`tables()`](#tables). |
-| `to_parquet` | _STRING_ | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). `0h` when the stage is not configured. |
-| `to_remote` | _STRING_ | TTL for the `TO REMOTE` stage. Accepted and stored but not yet enforced, so setting it has no effect for now. `0h` when not configured. |
-| `drop_local` | _STRING_ | TTL for the `DROP LOCAL` stage. `0h` when the stage is not configured. |
-| `drop_remote` | _STRING_ | Reserved for future object storage removal. `DROP REMOTE` is rejected at parse time with `'DROP REMOTE' is not supported yet`, so this column is always `0h`. |
-| `status` | _CHAR_ | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
-| `last_updated` | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed). |
+| Column           | Type        | Description                                                                                                                                                               |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `table_dir_name` | _STRING_    | Directory name of the table the policy is attached to. Matches the `directoryName` column in [`tables()`](#tables).                                                       |
+| `to_parquet`     | _STRING_    | TTL for the `TO PARQUET` stage (e.g. `72h`, `1m`). `0h` when the stage is not configured.                                                                                 |
+| `to_remote`      | _STRING_    | TTL for the `TO REMOTE` stage, which uploads the partition to object storage. `0h` when the stage is not configured.                                                      |
+| `drop_local`     | _STRING_    | TTL for the `DROP LOCAL` stage. `0h` when the stage is not configured.                                                                                                    |
+| `drop_remote`    | _STRING_    | TTL for the `DROP REMOTE` stage, which removes the partition and reclaims its remote objects. `0h` when the stage is not configured.                                      |
+| `status`         | _CHAR_      | Policy status. `A` = active (the policy is being enforced), `D` = disabled (via [`ALTER TABLE DISABLE STORAGE POLICY`](/docs/query/sql/alter-table-set-storage-policy/)). |
+| `last_updated`   | _TIMESTAMP_ | Timestamp of the most recent change to the policy definition (not the last time partitions were processed).                                                               |
 
 **Notes on TTL formatting:**
 
@@ -434,17 +494,75 @@ SELECT * FROM storage_policies;
 SELECT * FROM storage_policies;
 ```
 
-| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated |
-|----------------|------------|-----------|------------|-------------|--------|--------------|
-| trades~12      | 72h        | 0h        | 1m         | 0h          | A      | 2025-01-15T10:30:00.000000Z |
+| table_dir_name | to_parquet | to_remote | drop_local | drop_remote | status | last_updated                |
+| -------------- | ---------- | --------- | ---------- | ----------- | ------ | --------------------------- |
+| trades~12      | 168h       | 336h      | 1m         | 84m         | A      | 2025-01-15T10:30:00.000000Z |
 | metrics~18     | 168h       | 0h        | 0h         | 0h          | D      | 2025-01-14T09:15:42.000000Z |
 
-The first row is a policy with two active stages (3-day Parquet conversion and
-1-month local drop) and is currently enforced. The second row has only the
-`TO PARQUET` stage set and has been temporarily disabled. Every unset stage
-renders as `0h`: here neither policy sets `TO REMOTE`, so `to_remote` is `0h`,
-and `drop_remote` is always `0h` because `DROP REMOTE` is rejected at parse
-time.
+The first row is a full four-stage policy and is currently enforced: convert to
+Parquet at 7 days, upload to object storage at 14 days, evict locally at 1
+month, and drop remotely at 7 years. The second row has only the `TO PARQUET`
+stage set and has been temporarily disabled. Every unset stage renders as `0h`.
+
+## table_cold_partitions
+
+:::note
+
+[Cold storage](/docs/concepts/cold-storage/) and the `table_cold_partitions()` function are available in **QuestDB Enterprise** only.
+
+:::
+
+`table_cold_partitions('tableName')` returns one row per partition in the table's remote manifest, with the state of its object in the store. Use it to follow a partition through upload and sealing, and to find partitions that are not progressing.
+
+**Arguments:**
+
+- `tableName` (`string`): the name of an existing table.
+
+**Columns:**
+
+| Column           | Type        | Description                                                                                     |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `timestamp`      | _TIMESTAMP_ | Lower bound of the partition.                                                                   |
+| `state`          | _STRING_    | `pending`, `live`, `sealed`, or `deleting`. See below.                                          |
+| `seq_txn`        | _LONG_      | WAL transaction version the uploaded object was built from. `NULL` until the object is durable. |
+| `size`           | _LONG_      | Size of the uploaded object in bytes. `NULL` until the object is durable.                       |
+| `last_modified`  | _TIMESTAMP_ | When the object was last written. `NULL` until the object is durable.                           |
+| `deleting_since` | _TIMESTAMP_ | When the garbage-collection grace timer started. `NULL` unless the state is `deleting`.         |
+| `partition_path` | _STRING_    | Object key of the partition's `data.parquet`.                                                   |
+
+**Partition states:**
+
+| State      | Meaning                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| `pending`  | Upload work is registered, but the object is not yet durable. The object-fact columns are `NULL`.       |
+| `live`     | The uploaded snapshot is durable. The partition is still served locally and can still accept late data. |
+| `sealed`   | The partition is read-only and approved for remote service.                                             |
+| `deleting` | The table no longer references the partition. Its objects are reclaimed once the grace period elapses.  |
+
+**Example:**
+
+```questdb-sql title="Remote state of every partition"
+SELECT * FROM table_cold_partitions('trades');
+```
+
+| timestamp                   | state    | seq_txn | size    | last_modified               | deleting_since              | partition_path                                  |
+| --------------------------- | -------- | ------- | ------- | --------------------------- | --------------------------- | ----------------------------------------------- |
+| 2026-02-08T00:00:00.000000Z | deleting | 152300  | 5318144 | 2026-02-15T01:30:11.482000Z | 2026-03-11T08:32:50.000000Z | trades~5/year=2026/month=02/day=08/data.parquet |
+| 2026-02-09T00:00:00.000000Z | sealed   | 153118  | 5290992 | 2026-02-16T01:30:09.044000Z | null                        | trades~5/year=2026/month=02/day=09/data.parquet |
+| 2026-02-10T00:00:00.000000Z | live     | 198404  | 5275600 | 2026-02-17T01:30:14.210000Z | null                        | trades~5/year=2026/month=02/day=10/data.parquet |
+| 2026-02-11T00:00:00.000000Z | pending  | null    | null    | null                        | null                        | trades~5/year=2026/month=02/day=11/data.parquet |
+
+```questdb-sql title="Partitions that are not yet durable"
+SELECT timestamp, state, partition_path
+FROM table_cold_partitions('trades')
+WHERE state = 'pending';
+```
+
+**Notes:**
+
+- The cold storage manager answers from its own in-memory view. A refresher answers from its mirrored copy, which it updates when the catalog generation changes, so the two can differ briefly.
+- While an instance is transitioning between the manager and refresher roles, the function returns zero rows rather than blocking. Check the live role with [`SWITCH COLD STORAGE STATUS`](/docs/query/sql/switch-cold-storage-role/).
+- The function reflects the remote manifest, not local partition state. Use [`SHOW PARTITIONS`](/docs/query/sql/show/#show-partitions) or [`table_partitions()`](#table_partitions) to see whether a partition is actually being served remotely.
 
 ## table_columns
 
@@ -564,6 +682,11 @@ Returns a table with the following columns:
   storage policy's `TO PARQUET` stage
 - `parquetFileSize` - _LONG_, size in bytes of the partition's `data.parquet`
   file when `hasParquetGenerated` or `isParquet` is true; `-1` otherwise
+- `seqTxn` - _LONG_, WAL transaction version the partition was last written at
+- `isRemotelyServed` - _BOOLEAN_, true if the partition's data lives in object
+  storage and is fetched with range reads. Only local Parquet metadata and
+  symbol indexes remain on disk. A remotely served partition is always
+  read-only. See [cold storage](/docs/concepts/cold-storage/) (Enterprise)
 
 **Examples:**
 
@@ -582,12 +705,12 @@ CREATE TABLE my_table AS (
 table_partitions('my_table');
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
-| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
+| 0     | WEEK        | 2022-W52 | 2023-01-01 00:36:00.0 | 2023-01-01 23:24:00.0 | 39      | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 12     | false            |
+| 1     | WEEK        | 2023-W01 | 2023-01-02 00:00:00.0 | 2023-01-08 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 34     | false            |
+| 2     | WEEK        | 2023-W02 | 2023-01-09 00:00:00.0 | 2023-01-15 23:24:00.0 | 280     | 98304    | 96.0 KiB      | false    | false  | true     | false    | false      | false               | false     | -1              | 56     | false            |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
 
 ```questdb-sql title="Get size of a table in disk"
 SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
@@ -601,9 +724,9 @@ SELECT size_pretty(sum(diskSize)) FROM table_partitions('my_table');
 SELECT * FROM table_partitions('my_table') WHERE active = true;
 ```
 
-| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize |
-| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- |
-| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              |
+| index | partitionBy | name     | minTimestamp          | maxTimestamp          | numRows | diskSize | diskSizeHuman | readOnly | active | attached | detached | attachable | hasParquetGenerated | isParquet | parquetFileSize | seqTxn | isRemotelyServed |
+| ----- | ----------- | -------- | --------------------- | --------------------- | ------- | -------- | ------------- | -------- | ------ | -------- | -------- | ---------- | ------------------- | --------- | --------------- | ------ | ---------------- |
+| 3     | WEEK        | 2023-W03 | 2023-01-16 00:00:00.0 | 2023-01-18 12:00:00.0 | 101     | 83902464 | 80.0 MiB      | false    | true   | true     | false    | false      | false               | false     | -1              | 78     | false            |
 
 ## table_storage
 
@@ -695,20 +818,20 @@ Returns a `table` with the following columns:
 
 ### Basic table information
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INT | Internal table ID |
-| `table_name` | STRING | Table name |
-| `designatedTimestamp` | STRING | Name of the designated timestamp column, or `null` |
-| `partitionBy` | STRING | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `walEnabled` | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled |
-| `dedup` | BOOLEAN | Whether deduplication is enabled |
-| `ttlValue` | INT | TTL (Time-To-Live) value |
-| `ttlUnit` | STRING | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
-| `matView` | BOOLEAN | Whether this is a materialized view |
-| `directoryName` | STRING | Directory name on disk (includes ` (->)` suffix for symlinks) |
-| `maxUncommittedRows` | INT | Table's `maxUncommittedRows` setting |
-| `o3MaxLag` | LONG | Table's `o3MaxLag` setting in microseconds |
+| Column                | Type    | Description                                                        |
+| --------------------- | ------- | ------------------------------------------------------------------ |
+| `id`                  | INT     | Internal table ID                                                  |
+| `table_name`          | STRING  | Table name                                                         |
+| `designatedTimestamp` | STRING  | Name of the designated timestamp column, or `null`                 |
+| `partitionBy`         | STRING  | Partition strategy: `NONE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR` |
+| `walEnabled`          | BOOLEAN | Whether WAL (Write-Ahead Log) is enabled                           |
+| `dedup`               | BOOLEAN | Whether deduplication is enabled                                   |
+| `ttlValue`            | INT     | TTL (Time-To-Live) value                                           |
+| `ttlUnit`             | STRING  | TTL unit: `HOUR`, `DAY`, `WEEK`, `MONTH`, `YEAR`                   |
+| `matView`             | BOOLEAN | Whether this is a materialized view                                |
+| `directoryName`       | STRING  | Directory name on disk (includes ` (->)` suffix for symlinks)      |
+| `maxUncommittedRows`  | INT     | Table's `maxUncommittedRows` setting                               |
+| `o3MaxLag`            | LONG    | Table's `o3MaxLag` setting in microseconds                         |
 
 :::note
 
@@ -719,26 +842,26 @@ Returns a `table` with the following columns:
 
 ### Table metrics (table_* prefix)
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `table_suspended` | BOOLEAN | Whether a WAL table is suspended (`false` for non-WAL tables) |
-| `table_type` | CHAR | Table type: `T` (table), `M` (materialized view), `V` (view), `L` (live view) |
-| `table_row_count` | LONG | Approximate row count at last tracked write |
-| `table_min_timestamp` | TIMESTAMP | Minimum timestamp of data in the table (updated on WAL merge) |
-| `table_max_timestamp` | TIMESTAMP | Maximum timestamp of data in the table (updated on WAL merge) |
-| `table_last_write_timestamp` | TIMESTAMP | Approximate timestamp of last TableWriter commit |
-| `table_txn` | LONG | TableWriter transaction number at last tracked write |
-| `table_memory_pressure_level` | INT | Memory pressure: `0` (none), `1` (reduced parallelism), `2` (backoff). `null` for non-WAL |
-| `table_write_amp_count` | LONG | Total write amplification samples recorded |
-| `table_write_amp_p50` | DOUBLE | Median write amplification ratio |
-| `table_write_amp_p90` | DOUBLE | 90th percentile ratio |
-| `table_write_amp_p99` | DOUBLE | 99th percentile ratio |
-| `table_write_amp_max` | DOUBLE | Maximum ratio |
-| `table_merge_rate_count` | LONG | Total merge throughput samples recorded |
-| `table_merge_rate_p50` | LONG | Median throughput in rows/second |
-| `table_merge_rate_p90` | LONG | Throughput that 90% of jobs **exceeded** (slowest 10%) |
-| `table_merge_rate_p99` | LONG | Throughput that 99% of jobs **exceeded** (slowest 1%) |
-| `table_merge_rate_max` | LONG | Maximum throughput in rows/second |
+| Column                        | Type      | Description                                                                               |
+| ----------------------------- | --------- | ----------------------------------------------------------------------------------------- |
+| `table_suspended`             | BOOLEAN   | Whether a WAL table is suspended (`false` for non-WAL tables)                             |
+| `table_type`                  | CHAR      | Table type: `T` (table), `M` (materialized view), `V` (view), `L` (live view)             |
+| `table_row_count`             | LONG      | Approximate row count at last tracked write                                               |
+| `table_min_timestamp`         | TIMESTAMP | Minimum timestamp of data in the table (updated on WAL merge)                             |
+| `table_max_timestamp`         | TIMESTAMP | Maximum timestamp of data in the table (updated on WAL merge)                             |
+| `table_last_write_timestamp`  | TIMESTAMP | Approximate timestamp of last TableWriter commit                                          |
+| `table_txn`                   | LONG      | TableWriter transaction number at last tracked write                                      |
+| `table_memory_pressure_level` | INT       | Memory pressure: `0` (none), `1` (reduced parallelism), `2` (backoff). `null` for non-WAL |
+| `table_write_amp_count`       | LONG      | Total write amplification samples recorded                                                |
+| `table_write_amp_p50`         | DOUBLE    | Median write amplification ratio                                                          |
+| `table_write_amp_p90`         | DOUBLE    | 90th percentile ratio                                                                     |
+| `table_write_amp_p99`         | DOUBLE    | 99th percentile ratio                                                                     |
+| `table_write_amp_max`         | DOUBLE    | Maximum ratio                                                                             |
+| `table_merge_rate_count`      | LONG      | Total merge throughput samples recorded                                                   |
+| `table_merge_rate_p50`        | LONG      | Median throughput in rows/second                                                          |
+| `table_merge_rate_p90`        | LONG      | Throughput that 90% of jobs **exceeded** (slowest 10%)                                    |
+| `table_merge_rate_p99`        | LONG      | Throughput that 99% of jobs **exceeded** (slowest 1%)                                     |
+| `table_merge_rate_max`        | LONG      | Maximum throughput in rows/second                                                         |
 
 Write amplification measures O3 (out-of-order) merge overhead as `physicalRowsWritten / logicalRows`.
 A ratio of `1.0` means no amplification. Higher values indicate O3 merge overhead.
@@ -751,30 +874,30 @@ Merge rate P99 shows the *lowest* throughput (worst performance), not the highes
 
 ### WAL metrics (wal_* prefix)
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `wal_pending_row_count` | LONG | Rows written to WAL but not yet applied to table |
-| `wal_dedup_row_count_since_start` | LONG | Cumulative rows removed by deduplication (since server start) |
-| `wal_txn` | LONG | WAL sequencer transaction number (WAL tables only) |
-| `wal_max_timestamp` | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only) |
-| `wal_tx_count` | LONG | Total WAL transactions recorded (since server start) |
-| `wal_tx_size_p50` | LONG | Median transaction size in rows |
-| `wal_tx_size_p90` | LONG | 90th percentile transaction size in rows |
-| `wal_tx_size_p99` | LONG | 99th percentile transaction size in rows |
-| `wal_tx_size_max` | LONG | Maximum transaction size in rows |
+| Column                            | Type      | Description                                                   |
+| --------------------------------- | --------- | ------------------------------------------------------------- |
+| `wal_pending_row_count`           | LONG      | Rows written to WAL but not yet applied to table              |
+| `wal_dedup_row_count_since_start` | LONG      | Cumulative rows removed by deduplication (since server start) |
+| `wal_txn`                         | LONG      | WAL sequencer transaction number (WAL tables only)            |
+| `wal_max_timestamp`               | TIMESTAMP | Max data timestamp from last WAL commit (WAL tables only)     |
+| `wal_tx_count`                    | LONG      | Total WAL transactions recorded (since server start)          |
+| `wal_tx_size_p50`                 | LONG      | Median transaction size in rows                               |
+| `wal_tx_size_p90`                 | LONG      | 90th percentile transaction size in rows                      |
+| `wal_tx_size_p99`                 | LONG      | 99th percentile transaction size in rows                      |
+| `wal_tx_size_max`                 | LONG      | Maximum transaction size in rows                              |
 
 ### Replica metrics (replica_* prefix)
 
 These columns are populated on **replicas only** via replication download tracking:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `replica_batch_count` | LONG | Total download batches recorded |
-| `replica_batch_size_p50` | LONG | Median batch size in rows |
-| `replica_batch_size_p90` | LONG | 90th percentile batch size |
-| `replica_batch_size_p99` | LONG | 99th percentile batch size |
-| `replica_batch_size_max` | LONG | Maximum batch size |
-| `replica_more_pending` | BOOLEAN | `true` if the last download batch was limited and more data is available |
+| Column                   | Type    | Description                                                              |
+| ------------------------ | ------- | ------------------------------------------------------------------------ |
+| `replica_batch_count`    | LONG    | Total download batches recorded                                          |
+| `replica_batch_size_p50` | LONG    | Median batch size in rows                                                |
+| `replica_batch_size_p90` | LONG    | 90th percentile batch size                                               |
+| `replica_batch_size_p99` | LONG    | 99th percentile batch size                                               |
+| `replica_batch_size_max` | LONG    | Maximum batch size                                                       |
+| `replica_more_pending`   | BOOLEAN | `true` if the last download batch was limited and more data is available |
 
 On primary instances, these columns will be `0` or `false`.
 
@@ -796,9 +919,9 @@ These values are approximations, not precise real-time metrics:
 
 ### Configuration
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `cairo.recent.write.tracker.capacity` | 1000 | Maximum number of tables tracked |
+| Property                              | Default | Description                      |
+| ------------------------------------- | ------- | -------------------------------- |
+| `cairo.recent.write.tracker.capacity` | 1000    | Maximum number of tables tracked |
 
 Tables exceeding this capacity are evicted based on least recent write activity.
 
@@ -1003,10 +1126,10 @@ Returns a `table` including the following information:
 views();
 ```
 
-| view_name      | view_sql                                              | view_table_dir_name | invalidation_reason | view_status | view_status_update_time     |
-| -------------- | ----------------------------------------------------- | ------------------- | ------------------- | ----------- | --------------------------- |
-| hourly_summary | SELECT ts, symbol, sum(qty) FROM trades SAMPLE BY 1h  | hourly_summary~1    |                     | valid       | 2025-05-30T10:15:00.000000Z |
-| price_view     | SELECT symbol, last(price) FROM trades SAMPLE BY 1d   | price_view~2        |                     | valid       | 2025-05-30T10:20:00.000000Z |
+| view_name      | view_sql                                             | view_table_dir_name | invalidation_reason | view_status | view_status_update_time     |
+| -------------- | ---------------------------------------------------- | ------------------- | ------------------- | ----------- | --------------------------- |
+| hourly_summary | SELECT ts, symbol, sum(qty) FROM trades SAMPLE BY 1h | hourly_summary~1    |                     | valid       | 2025-05-30T10:15:00.000000Z |
+| price_view     | SELECT symbol, last(price) FROM trades SAMPLE BY 1d  | price_view~2        |                     | valid       | 2025-05-30T10:20:00.000000Z |
 
 ```questdb-sql title="Find invalid views"
 SELECT view_name, invalidation_reason
@@ -1016,6 +1139,55 @@ WHERE view_status = 'invalid';
 
 ```questdb-sql title="List views ordered by name"
 SELECT * FROM views() ORDER BY view_name;
+```
+
+## wait_wal_table()
+
+Blocks until the WAL writer for a table has applied its transactions up to a
+target sequencer transaction, then returns `true`.
+
+Writes to a [WAL table](/docs/concepts/write-ahead-log/) are committed to the
+sequencer first and applied to the table afterwards, so a read issued
+immediately after a write may not see it yet. `wait_wal_table()` closes that
+window: call it between the write and the read when the read depends on the
+write having landed.
+
+The call does not hold a worker thread while it waits, so the number of
+concurrent waiters is not bounded by the shared worker pool.
+
+**Arguments:**
+
+- `tableName` (`string`): name of the table to wait for. Must be a constant,
+  not a column reference. On a non-WAL table the call returns `true`
+  immediately.
+- `seqTxn` (optional, `long`): the sequencer transaction to wait for. When
+  omitted, the call captures the table's current `seqTxn` when it starts and
+  waits for that, which is what you want after your own write.
+
+**Return value:**
+
+Returns `boolean`. `true` once the writer has caught up.
+
+Throws if the table is dropped while the call is waiting, and if the table
+becomes [suspended](/docs/query/sql/alter-table-resume-wal/), since a
+suspended table would otherwise never catch up.
+
+**Examples:**
+
+```questdb-sql title="Wait for a table's pending writes to be applied"
+SELECT wait_wal_table('trades');
+```
+
+| wait_wal_table |
+| -------------- |
+| true           |
+
+Wait for one specific transaction. `seqTxn` values are visible in
+[`wal_tables()`](#wal_tables), where `sequencerTxn` is the last committed
+transaction and `writerTxn` the last applied one:
+
+```questdb-sql title="Wait for a specific transaction"
+SELECT wait_wal_table('trades', 42);
 ```
 
 ## wal_tables

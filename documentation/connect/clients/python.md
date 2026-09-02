@@ -818,7 +818,7 @@ with questdb.connect("ws::addr=localhost:9000;") as db:
         "CREATE TABLE IF NOT EXISTS trades ("
         "  timestamp TIMESTAMP, symbol SYMBOL,"
         "  price DOUBLE, amount DOUBLE"
-        ") TIMESTAMP(timestamp) PARTITION BY DAY WAL"
+        ") TIMESTAMP(timestamp) PARTITION BY DAY"
     )
 ```
 

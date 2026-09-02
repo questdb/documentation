@@ -221,8 +221,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-FORMAT PARQUET
-WAL;
+FORMAT PARQUET;
 ```
 
 `FORMAT` accepts one of:
@@ -336,8 +335,7 @@ CREATE TABLE trades (
   amount DOUBLE
 ) TIMESTAMP(timestamp)
 PARTITION BY DAY
-STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-WAL;
+STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
@@ -345,10 +343,9 @@ A storage policy supports up to four settings: `TO PARQUET`, `TO REMOTE`,
 positive. A drop stage may not precede the write it depends on (`TO PARQUET`
 and `TO REMOTE` before `DROP LOCAL`; `DROP LOCAL` before `DROP REMOTE`), while
 `TO PARQUET` and `TO REMOTE` are independent. Converting a partition to Parquet
-removes its native files and serves reads from the Parquet file. Storage
-policies currently operate locally only: `TO REMOTE` is accepted and stored but
-not yet enforced, and `DROP REMOTE` is rejected at SQL parse time with
-`'DROP REMOTE' is not supported yet`.
+removes its native files and serves reads from the Parquet file.
+
+`TO REMOTE` and `DROP REMOTE` drive [cold storage](/docs/concepts/cold-storage/): they upload the partition to object storage, where it stays queryable, and later reclaim it. Both require cold storage to be enabled and a WAL table.
 
 To modify a storage policy after table creation, see
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
@@ -749,7 +746,7 @@ CREATE TABLE trades (
   symbol SYMBOL INDEX TYPE POSTING,
   price DOUBLE,
   amount DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 
 -- Out-of-line syntax
 CREATE TABLE trades (
@@ -758,7 +755,7 @@ CREATE TABLE trades (
   price DOUBLE,
   amount DOUBLE
 ), INDEX(symbol TYPE POSTING)
-TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 ### Posting index with covering columns (INCLUDE)
@@ -775,7 +772,7 @@ CREATE TABLE trades (
   exchange SYMBOL,
   price DOUBLE,
   amount DOUBLE
-) TIMESTAMP(timestamp) PARTITION BY DAY WAL;
+) TIMESTAMP(timestamp) PARTITION BY DAY;
 ```
 
 The designated timestamp column is automatically included — you do not need
@@ -797,8 +794,7 @@ table.
 :::tip
 
 Posting indexes (with or without `INCLUDE`) work on both WAL and `BYPASS WAL`
-tables. The examples above use `WAL` because it is the recommended default,
-but `BYPASS WAL` tables can declare posting indexes in exactly the same way.
+tables.
 
 :::
 

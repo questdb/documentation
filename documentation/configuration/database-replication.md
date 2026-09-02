@@ -25,6 +25,18 @@ For a tuning guide, see the
 
 ## General
 
+### replication.disabled.tables
+
+- **Default**: none
+- **Reloadable**: yes
+
+Comma-separated list of table names to exclude from replication. Listed tables
+stay local to the node: the primary does not upload their WAL, and replicas do
+not download it. Everything else replicates as usual.
+
+Because the setting is reloadable, a table can be taken out of replication, or
+put back, without restarting the instance.
+
 ### replication.object.store
 
 - **Default**: none

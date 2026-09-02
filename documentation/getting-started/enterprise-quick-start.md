@@ -234,7 +234,7 @@ ALTER SERVICE ACCOUNT ingest_ilp CREATE TOKEN TYPE REST WITH TTL '3000d' REFRESH
 This command returns a token. **Copy it immediately**, as it's shown only once.
 
 | name       | token                                          | expires_at                  | refresh |
-|------------|------------------------------------------------|-----------------------------|---------|
+| ---------- | ---------------------------------------------- | --------------------------- | ------- |
 | ingest_ilp | qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY | 2033-09-19T15:32:51.628453Z | true    |
 
 ### Step 3: Use the Token in Your Client
@@ -312,7 +312,7 @@ ALTER SERVICE ACCOUNT kafka CREATE TOKEN TYPE REST WITH TTL '365d';
 The command returns a token. **Copy it immediately**, as it will not be shown again.
 
 | name  | token                                            | expires\_at                   |
-|-------|--------------------------------------------------|-------------------------------|
+| ----- | ------------------------------------------------ | ----------------------------- |
 | kafka | `qt1KAsf1U9YbUVAX1H2IahXEE3-4qBcK-zx_jsZUzV9bLY` | `2026-07-03T18:05:00.000000Z` |
 
 Save the private key in a secure location!
@@ -531,8 +531,7 @@ CREATE TABLE trades (
     symbol SYMBOL,
     price DOUBLE
 ) TIMESTAMP(ts) PARTITION BY DAY
-  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M)
-  WAL;
+  STORAGE POLICY(TO PARQUET 3d, DROP LOCAL 1M);
 ```
 
 Or attach a policy to an existing table:
@@ -554,6 +553,20 @@ For the full concept, including the stage model, timing, and replication
 behavior, see
 [Storage Policy](/docs/concepts/storage-policy/) and
 [ALTER TABLE SET STORAGE POLICY](/docs/query/sql/alter-table-set-storage-policy/).
+
+### Tiering partitions to object storage
+
+The policies above keep everything on local disk. To keep historical partitions queryable without keeping them on local disk, add the `TO REMOTE` stage. It uploads a Parquet copy to S3, Google Cloud Storage, Azure Blob Storage, or a filesystem store, and `DROP LOCAL` then evicts the local copy while queries keep working:
+
+```questdb-sql title="Web Console - Tier partitions to object storage"
+ALTER TABLE trades SET STORAGE POLICY(
+    TO PARQUET 7 DAYS,
+    TO REMOTE 14 DAYS,
+    DROP LOCAL 30 DAYS
+);
+```
+
+This requires [cold storage](/docs/concepts/cold-storage/) to be enabled and an object store prefix to be configured first. See [Operating cold storage](/docs/operations/cold-storage/) for the setup procedure.
 
 ## 10. Double-check kernel limits
 

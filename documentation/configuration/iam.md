@@ -54,6 +54,30 @@ Web Console's login screen. Present for backwards compatibility only.
 
 Enables or disables Identity and Access Management.
 
+### acl.permissions.compaction.row.threshold
+
+- **Default**: `10000`
+- **Reloadable**: no
+
+Number of rows in `sys.acl_permissions` above which the table is compacted.
+Set to `0` or below to disable compaction.
+
+`sys.acl_permissions` is an append-only log of grants and revokes, collapsed
+at read time to give each entity its current permissions. A deployment that
+re-grants on a schedule accumulates rows indefinitely, and past a certain size
+every replicated `GRANT` makes a replica reload a progressively larger access
+list, slowing logins. Compaction rewrites the log to keep only the rows that
+still matter.
+
+### acl.permissions.compaction.startup.delay
+
+- **Default**: `300000`
+- **Reloadable**: no
+
+Grace period in milliseconds before the backlog check runs after a boot or a
+promotion. The delay keeps compaction from competing with a node that is still
+starting up or taking over as primary.
+
 ### acl.entity.name.max.length
 
 - **Default**: `255`

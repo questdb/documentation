@@ -98,7 +98,7 @@ CREATE TABLE trades (
     side SYMBOL,
     price DOUBLE,
     qty DOUBLE
-) TIMESTAMP(ts) PARTITION BY DAY WAL
+) TIMESTAMP(ts) PARTITION BY DAY
 DEDUP UPSERT KEYS(ts, symbol, side);
 ```
 

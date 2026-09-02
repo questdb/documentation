@@ -2,10 +2,10 @@
 # Create Table
 curl -G \
   --data-urlencode "query=CREATE TABLE IF NOT EXISTS trades(name STRING, value INT)" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 
 # Insert a row
 curl -G \
   --data-urlencode "query=INSERT INTO trades VALUES('abc', 123456)" \
-  http://localhost:9000/exec
+  http://localhost:9000/api/v1/sql/execute
 ```
