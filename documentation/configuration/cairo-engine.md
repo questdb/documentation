@@ -281,6 +281,32 @@ Estimated partition size on disk. This is one of the conditions that triggers
 
 ## Symbol and indexing
 
+### cairo.auto.scale.symbol.capacity
+
+- **Default**: `true`
+- **Reloadable**: no
+
+Enables symbol capacity auto-scaling, which resizes the symbol table data
+structures as the number of symbols in a table grows. Keeping these structures
+optimally sized is what makes
+[symbol capacity automatic](/docs/concepts/symbol/) from QuestDB 9.0.0 onwards,
+and it is the recommended setting. Disable it only to work around a problem
+with auto-scaling itself.
+
+Changing this setting requires a database restart.
+
+### cairo.auto.scale.symbol.capacity.threshold
+
+- **Default**: `0.8`
+- **Reloadable**: no
+
+Fraction of the symbol table capacity at which the table is resized. With the
+default of `0.8`, the symbol table is resized as soon as the symbol count goes
+over 80% of the current capacity.
+
+Must be a positive, non-zero, finite number. Any other value stops the server
+from starting.
+
 ### cairo.default.symbol.cache.flag
 
 - **Default**: `true`
