@@ -405,7 +405,7 @@ by the provider belongs in the `Authorization: Bearer` header:
 | Value | Token to send | How QuestDB validates it |
 | --- | --- | --- |
 | `false`, the default | the access token | by calling the user info endpoint |
-| `true` | the ID token | locally, by checking its signature and audience |
+| `true` | the ID token | locally, by checking its signature, audience, and claims |
 
 Sending the wrong one fails authentication with `401 Unauthorized` and the
 reason in the server log. With
@@ -414,6 +414,18 @@ enabled the token has to be a JWT, because QuestDB reads the group memberships
 straight out of its payload. The
 [Web Console](/docs/getting-started/web-console/overview/) picks the token this
 way, and so should any other client.
+
+:::caution
+
+With `acl.oidc.groups.encoded.in.token` enabled, QuestDB checks the token's
+signature, its `aud` claim, and that `sub` and the group memberships are
+present. It does not check `exp`, `nbf` or `iss`, so an expired token is still
+accepted, and the provider's token lifetimes are not enforced. Do not enable the
+setting where you rely on being able to revoke a token. See
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+for the full list of what is and is not validated.
+
+:::
 
 :::note
 
@@ -510,9 +522,17 @@ both endpoints explicitly.
 
 Each example discovers the OIDC client ID, scope, token-selection mode, and
 provider endpoints from QuestDB's [settings endpoint](#settings-endpoint), then
-signs in before opening the database connection. Use an `https` QuestDB URL for
-discovery so an attacker cannot replace the advertised Identity Provider
-endpoints.
+signs in before opening the database connection.
+
+The discovery URL must use `https`: reaching QuestDB over plaintext would let an
+attacker replace the advertised Identity Provider endpoints and redirect the
+device code and the refresh token, so the clients reject it rather than warn.
+The Rust, C, C++ and Python clients accept loopback `http` for local
+development; the Java client does not. To use a plaintext non-loopback host
+anyway, opt in with `allowInsecureTransport(true)` (Java),
+`.allow_insecure_transport(true)` (Rust),
+`questdb_oidc_builder_allow_insecure_transport()` (C),
+`allow_insecure_transport()` (C++) or `insecure=True` (Python).
 
 <Tabs defaultValue="java" groupId="oidc-device-client">
 <TabItem value="java" label="Java">
@@ -939,6 +959,15 @@ application which integrates via OIDC should be given a different Client Id, so
 that the two can be told apart in the provider's audit log and given different
 policies.
 
+:::caution
+
+Both requests must go over `https`. The settings response names the URL this
+code posts the user's password to, so anyone able to tamper with a plaintext
+response can redirect the password grant to a host of their choosing. The same
+applies to the connection below, which carries the resulting token.
+
+:::
+
 ```python
 import os
 import requests
@@ -955,7 +984,7 @@ pwd = os.environ.get("password")
 client_id = os.environ.get("client_id")
 scope = "openid"
 
-settings = requests.get("http://localhost:9000/settings").json()["config"]
+settings = requests.get("https://questdb.example.com:9000/settings").json()["config"]
 if not settings.get("acl.oidc.enabled"):
     raise SystemExit("OIDC is not enabled on this QuestDB instance")
 
@@ -975,7 +1004,7 @@ if token_key not in tokens:
     raise SystemExit(f"the provider did not issue an {token_key} for the password grant")
 token = tokens[token_key]
 
-conf = f"http::addr=localhost:9000;token={token};"
+conf = f"https::addr=questdb.example.com:9000;token={token};"
 with Sender.from_conf(conf) as sender:
     df = pd.read_csv("data.csv")
     df["ts"] = pd.to_datetime(df["ts"])
@@ -1006,7 +1035,7 @@ load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
-conf = f"http::addr=localhost:9000;username={user};password={pwd};"
+conf = f"https::addr=questdb.example.com:9000;username={user};password={pwd};"
 with Sender.from_conf(conf) as sender:
     df = pd.read_csv("data.csv")
     df["ts"] = pd.to_datetime(df["ts"])
