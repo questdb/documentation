@@ -76,8 +76,9 @@ Before using the flow:
    a provider document containing `device_authorization_endpoint`, or the
    host-based configuration must set
    [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
-3. Keep `openid` in `acl.oidc.scope`. Add `offline_access` if your provider
-   requires that scope before issuing a refresh token to a device-flow client.
+3. Keep `openid` in [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope),
+   and add `offline_access` so the provider issues a refresh token. Without one
+   the client must make the user sign in again at every token expiry.
 
 For example, a host-based configuration can add:
 
@@ -182,7 +183,7 @@ Device flow always requires a person to approve the sign-in. For unattended
 services, scheduled jobs, or CI, use a service-account token or a provider flow
 intended for machine identities instead.
 
-### The sign-in prompt
+## The sign-in prompt
 
 Signing in renders the verification URL and the user code, then blocks until the
 user approves or the device code expires. Where that text goes, and whether the
@@ -242,7 +243,7 @@ clickable, use the separately vetted browser target instead: `browser_target` on
 the C event struct, `event_view::browser_target()` in C++, `browser_target()` on
 the Rust challenge, and the `browser_target` key on the Python prompt event.
 
-### Explicit configuration and endpoint pinning
+## Explicit configuration and endpoint pinning
 
 Discovery supplies the client ID, scope, audience, token-selection mode, and
 endpoints. Set any of them explicitly when the application has its own
@@ -252,7 +253,7 @@ needs:
 | Setting | Set it when |
 | --- | --- |
 | `client_id` | the application has its own registration, which is the recommended setup |
-| `scope` | the provider requires `offline_access` before it issues a refresh token |
+| `scope` | requesting `offline_access` for this application alone, rather than server-wide |
 | `audience` | the provider requires one, or QuestDB checks `aud` against [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
 | `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads the provider's `/.well-known/openid-configuration` instead |
 | `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
@@ -325,7 +326,7 @@ client rejects it. An endpoint the client reads from the provider's own
 with providers that host their endpoints outside the issuer, such as Microsoft
 Entra ID and Google.
 
-### Token persistence
+## Token persistence
 
 Tokens stay in memory unless a file token store is enabled. The store writes the
 access, ID and long-lived refresh tokens as unencrypted JSON, so turn it on only
@@ -389,7 +390,7 @@ files with mode `0600` and the store directory with `0700`; on other platforms
 the directory's existing ACL governs access, so restrict it before enabling the
 store.
 
-### Interaction-required errors
+## Interaction-required errors
 
 A transport call never prompts. When the cached token cannot be refreshed
 silently, the call fails instead, and the application has to sign in again on
@@ -449,6 +450,48 @@ if let Err(err) = sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok) {
 Java has no distinct type to match on, so an application that must recover
 automatically has to treat any `OidcAuthException` from a transport call as a
 prompt to call `signIn()` again.
+
+## Implementing the flow yourself
+
+The Go, Node.js and .NET clients do not run an OIDC flow, and neither does a
+tool built directly on the REST API. Acquire the token out of band, with an
+OAuth2 library that implements RFC 8628 or by making the two requests yourself,
+then pass it as a static bearer token and replace it before it expires.
+
+Read the client ID, the scope, and the endpoints from the
+[settings endpoint](/docs/security/oidc/#settings-endpoint), including
+`acl.oidc.device.authorization.endpoint`, which QuestDB publishes without using.
+
+**Request a device code**, by posting `client_id` and `scope` as
+`application/x-www-form-urlencoded` to the device authorization endpoint. The
+response carries `device_code`, `user_code`, `verification_uri`, `expires_in`,
+an optional `verification_uri_complete` with the code already embedded, and an
+optional `interval` which defaults to 5 seconds. Show the URL and the user code,
+sanitized, and treat them as untrusted text.
+
+**Poll the token endpoint** with
+`grant_type=urn:ietf:params:oauth:grant-type:device_code`, the `device_code` and
+the `client_id`, waiting `interval` seconds between attempts. Four error codes
+decide what happens next:
+
+| `error` | What to do |
+| --- | --- |
+| `authorization_pending` | the user has not finished; poll again after `interval` |
+| `slow_down` | polling too fast; add 5 seconds to `interval`, then poll again |
+| `access_denied` | the user refused; stop |
+| `expired_token` | `expires_in` elapsed; start a new device authorization request |
+
+Polling faster than `interval`, or ignoring `slow_down`, gets the client rate
+limited or blocked by the provider.
+
+Send the token your configuration calls for, per
+[which token to send](/docs/security/oidc/#which-token-to-send): the access
+token, or the ID token where group memberships are encoded in it. Keep the
+`refresh_token` if the provider issues one, and redeem it with
+`grant_type=refresh_token` rather than making the user sign in again.
+
+[RFC 8628](https://www.rfc-editor.org/rfc/rfc8628) sections 3.1 to 3.5 give the
+full request and response grammar.
 
 For the per-language API surface, the connection options, and the rest of each
 client's behaviour, see the client pages:

@@ -360,8 +360,9 @@ db, err := qdb.Connect(ctx,
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on both
 the ingress and egress WebSocket upgrades. It is a **static credential**: the
 client sends exactly the string you pass and never refreshes or renews it.
-Acquire it out of band — QuestDB Enterprise issues bearer tokens through its
-[OpenID Connect flow](/docs/security/oidc/) — and manage its lifetime yourself.
+Acquire it out of band, since QuestDB Enterprise issues bearer tokens through
+its [OpenID Connect flow](/docs/security/oidc/), and manage its lifetime
+yourself.
 QuestDB publishes the provider's authorization and token endpoints on its
 [settings endpoint](/docs/security/oidc/#settings-endpoint), so a client can
 discover them instead of hard coding them. The same response tells the client
@@ -370,9 +371,9 @@ token, or the ID token when QuestDB reads group memberships from the token.
 This client does not run an OIDC flow, so acquire the token with an OAuth2
 library: `golang.org/x/oauth2` implements the device grant, and QuestDB
 publishes the device authorization endpoint on the same settings response. The
-[OIDC device flow](/docs/security/oidc-device-flow/)
-describes the protocol, including the polling interval, `slow_down`, and the
-device code's expiry.
+[OIDC device flow](/docs/security/oidc-device-flow/#implementing-the-flow-yourself)
+sets out the two requests, the polling interval, `slow_down`, and the device
+code's expiry.
 When the token expires or is rotated, construct a new handle with the new token.
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive

@@ -179,11 +179,10 @@ in terminals and remote Jupyter kernels:
 `oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
 or silently refreshed token for every connection and reconnect. It is mutually
 exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
-which most providers issue only when `offline_access` is among the scopes in
-[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
-own `scope` override. Transport operations never prompt; if they raise
-`OidcInteractionRequired`, importable from `questdb.auth`, call `auth.sign_in()`
-explicitly on the main or UI thread.
+which the provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Transport operations
+never prompt; if they raise `OidcInteractionRequired`, importable from
+`questdb.auth`, call `auth.sign_in()` explicitly on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an
 override, QuestDB must publish a device authorization endpoint, either from the

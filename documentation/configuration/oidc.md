@@ -162,10 +162,14 @@ QuestDB uses the scopes in the requests it makes itself, in the
 [settings endpoint](/docs/security/oidc/#settings-endpoint) for clients which
 run the flow themselves.
 
-For the [OIDC device flow](/docs/security/oidc-device-flow/),
-add `offline_access` when the provider requires that scope before issuing a
-refresh token. Without a refresh token, a client must ask the user to sign in
-again after the current token expires.
+For the [OIDC device flow](/docs/security/oidc-device-flow/), add
+`offline_access`. Most providers, Microsoft Entra ID among them, issue a
+refresh token only when that scope was requested, and without one the client
+has to make the user sign in again as soon as the current token expires.
+Providers which issue refresh tokens regardless ignore the extra scope, so
+adding it is the safe default. A client can also request it through its own
+`scope` override, which leaves this server-wide value, and every other flow
+using it, untouched.
 
 ## Authentication flows
 

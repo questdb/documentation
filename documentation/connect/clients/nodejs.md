@@ -96,7 +96,9 @@ bearer token, which you acquire out of band from your Identity Provider:
 QuestDB publishes the provider's endpoints on its
 [settings endpoint](/docs/security/oidc/#settings-endpoint), and the same
 response tells you [which token to send](/docs/security/oidc/#which-token-to-send).
-See [OpenID Connect](/docs/security/oidc/).
+See [OpenID Connect](/docs/security/oidc/), and
+[implementing the flow yourself](/docs/security/oidc-device-flow/#implementing-the-flow-yourself) for the device grant's
+requests and polling rules.
 
 ## Basic insert
 

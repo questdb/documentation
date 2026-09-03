@@ -182,12 +182,12 @@ scope, and the token QuestDB expects from the public `/settings` endpoint:
 
 Pass the closure as a provider instead of putting the current token in the
 connect string. Every new connection and reconnect then receives the cached or
-silently refreshed token. Silent refresh needs a refresh token, which most
-providers issue only when `offline_access` is among the scopes in
-[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
-own `scope` override. A transport call never starts an interactive flow; it
-returns a `questdb::Error` with `ErrorCode::AuthError`, whose `err.oidc_error()`
-reports `OidcErrorKind::InteractionRequired` when a new sign-in is needed. Call
+silently refreshed token. Silent refresh needs a refresh token, which the
+provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). A transport call
+never starts an interactive flow; it returns a `questdb::Error` with
+`ErrorCode::AuthError`, whose `err.oidc_error()` reports
+`OidcErrorKind::InteractionRequired` when a new sign-in is needed. Call
 `sign_in()` explicitly on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an

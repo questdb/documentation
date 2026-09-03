@@ -350,12 +350,13 @@ object to the pool so sender and reader connections share its rotating token:
 
 The pool retains the auth state and gets a cached or silently refreshed token
 for every connection and reconnect. Silent refresh needs a refresh token, which
-most providers issue only when `offline_access` is among the scopes in
-[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
-own `scope` override. Those transport operations never prompt; they fail with
+the provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Those transport
+operations never prompt; they fail with
 `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` in C, or
-`questdb::oidc::error_kind::interaction_required` in C++, and the application calls
-`sign_in()` / `questdb_oidc_auth_sign_in()` explicitly on the main or UI thread.
+`questdb::oidc::error_kind::interaction_required` in C++, and the application
+calls `sign_in()` / `questdb_oidc_auth_sign_in()` explicitly on the main or UI
+thread.
 
 The Identity Provider must enable the device grant. For discovery without an
 override, QuestDB must publish a device authorization endpoint, either from the
