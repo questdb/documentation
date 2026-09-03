@@ -25,7 +25,7 @@ fn main() -> questdb::Result<()> {
     let mut buffer = sender.new_buffer();
     buffer
         .table("trades")?
-        .symbol("symbol", "ETH-USD")?
+        .symbol("symbol", "ETH-USDT")?
         .symbol("side", "sell")?
         .column_f64("price", 2615.54)?
         .column_f64("amount", 0.00044)?

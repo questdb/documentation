@@ -261,8 +261,12 @@ To carry out permission checks, the database has to know more about the user.
 
 For this, QuestDB has a User Info Cache.
 
-If it finds a valid entry for the token in the cache, steps 8 and 9 are
-skipped:
+Steps 8 and 9 describe the default flow, where QuestDB validates the access
+token by asking the OIDC Provider about it. They are skipped when the cache
+already holds a valid entry for the token, and they do not happen at all when
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+is `true`, in which case QuestDB validates the ID token itself and never calls
+the provider. See [Which token to send](#which-token-to-send).
 
 ```bash title="Query request example"
 https://questdb.example.com:9000/exec?query=select%20current_user()
@@ -816,7 +820,9 @@ This method works wherever a Postgres client library is available, including jup
 
 Token authentication for the PGWire endpoint should be enabled by adding the `acl.oidc.pg.token.as.password.enabled=true` setting to the server configuration.
 
-The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option:
+The token should be sent in the password field, while the username field should contain the string `_sso`, or left empty if that is an option. Send the token
+selected by [Which token to send](#which-token-to-send): the access token by
+default, or the ID token when group memberships are encoded in it.
 
 ```python
 import psycopg as pg

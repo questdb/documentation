@@ -1,6 +1,5 @@
 ---
-title: OpenID Connect (OIDC)
-sidebar_label: OIDC settings
+title: OIDC settings
 description: "QuestDB Enterprise acl.oidc.* settings reference: minimum configuration and startup rules, endpoints, TLS, user and group claims, caching and buffers."
 ---
 
@@ -360,9 +359,9 @@ If the claim is missing from the user information, or it is an empty list,
 authentication fails. See
 [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
 
-A custom name applies to the user info flow. Set this to `groups` when
+The name applies to both flows. Set it to `groups` when
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,
-because the token validator requires that name.
+because the token validator accepts no other name for the group memberships.
 
 ### acl.oidc.groups.encoded.in.token
 
@@ -390,13 +389,22 @@ the token itself and never asks the provider about it:
 | `aud`, against [`acl.oidc.audience`](#acloidcaudience) | `nbf`, the not-before time |
 | that `sub` and the group memberships are present | `iss`, the issuer |
 
-The validator reads those two claims under the names `sub` and `groups`
-literally, and rejects a token which does not carry both, whatever
+Two things have to line up here, because two different components read the
+token. The signature validator deserializes the payload into a fixed structure,
+so the JWT must carry claims named `sub` and `groups` literally, and `groups`
+must be an array of strings. A token without both is rejected whatever the claim
+settings say. QuestDB then reads the principal and the group memberships out of
+that same payload using
 [`acl.oidc.sub.claim`](#acloidcsubclaim) and
-[`acl.oidc.groups.claim`](#acloidcgroupsclaim) are set to. `groups` must be an
-array of strings. Custom claim names apply to the user info flow, so with this
-setting enabled leave `acl.oidc.sub.claim` at its default and set
-`acl.oidc.groups.claim=groups`.
+[`acl.oidc.groups.claim`](#acloidcgroupsclaim), exactly as it does in the user
+info flow.
+
+So set `acl.oidc.groups.claim=groups`, since that is the only name the validator
+accepts for the group memberships. `acl.oidc.sub.claim` may name any claim the
+token carries: a provider which issues both `sub` and a friendlier claim lets
+you keep the readable one as the principal. The Entra ID walkthrough does this,
+setting `acl.oidc.sub.claim=name` while the token still carries `sub` for the
+validator.
 
 :::caution
 

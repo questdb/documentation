@@ -321,13 +321,19 @@ QuestDB supports four authentication methods:
 | **Password**          | Interactive users           | REST API, PostgreSQL Wire      |
 | **JWK Token**         | ILP ingestion               | InfluxDB Line Protocol         |
 | **REST API Token**    | Programmatic REST access    | REST API                       |
-| **OIDC bearer token** | SSO users, external clients | REST API, PostgreSQL Wire, QWP |
+| **OIDC bearer token** | SSO users, external clients | REST API and QWP, both under the `HTTP` permission; PostgreSQL Wire once enabled |
 
 The first three are QuestDB's own credentials, created with the statements
 below. An OIDC bearer token is issued by an external Identity Provider instead,
 and the user's group memberships come from the token or the provider's user
 info endpoint; see [OpenID Connect](/docs/security/oidc/) and
 [which token to send](/docs/security/oidc/#which-token-to-send).
+
+OIDC on the PostgreSQL Wire endpoint is off by default. Enable it with
+[`acl.oidc.pg.token.as.password.enabled`](/docs/configuration/oidc/#acloidcpgtokenaspasswordenabled),
+which accepts the token in the password field, or with
+[`acl.oidc.ropc.flow.enabled`](/docs/configuration/oidc/#acloidcropcflowenabled),
+which has QuestDB exchange the user's SSO credentials for a token itself.
 
 Users can have multiple authentication methods enabled simultaneously:
 

@@ -22,7 +22,7 @@ int main() {
     auto sender = pool.borrow_sender();
     auto buffer = sender.new_buffer();
     buffer.table("trades"_tn)
-          .symbol("symbol"_cn, "ETH-USD"_utf8)
+          .symbol("symbol"_cn, "ETH-USDT"_utf8)
           .symbol("side"_cn, "sell"_utf8)
           .column("price"_cn, 2615.54)
           .column("amount"_cn, 0.00044)

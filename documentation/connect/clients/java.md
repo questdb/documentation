@@ -427,11 +427,17 @@ Otherwise pin the provider by passing
 argument to `fromQuestDB`, or set the client ID, scope and endpoints yourself
 with `OidcDeviceAuth.builder()`.
 
+`DiscoveryOptions` carries `issuer`, `prompt`, `tokenStore`, `tlsConfig` and
+`allowInsecureTransport` only. The client ID, scope, audience and
+token-selection mode live on `OidcDeviceAuth.builder()`, which requires the
+client ID and both endpoints together, so registering this application under its
+own Client Id means pinning the endpoints rather than discovering them.
+
 Tokens stay in memory until a store is attached with
-`DiscoveryOptions.tokenStore(FileTokenStore.atDefaultLocation())`, which writes
-a long-lived refresh token to disk as plaintext. See the [OIDC guide's client
-examples](/docs/security/oidc-device-flow/#official-client-examples) for the sign-in prompt,
-explicit configuration, and the token store's location and permissions.
+`new OidcDeviceAuth.DiscoveryOptions().tokenStore(FileTokenStore.atDefaultLocation())`,
+which writes a long-lived refresh token to disk as plaintext. See the [OIDC device flow examples](/docs/security/oidc-device-flow/#official-client-examples)
+for the sign-in prompt, explicit configuration, and the token store's location
+and permissions.
 
 ### HTTP basic auth
 

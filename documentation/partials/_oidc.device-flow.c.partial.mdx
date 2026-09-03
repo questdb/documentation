@@ -47,8 +47,11 @@ int main(void) {
     if (!buffer) goto done;
     if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto done;
     if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
-                                   QDB_UTF8_LITERAL("ETH-USD"), &error)) goto done;
+                                   QDB_UTF8_LITERAL("ETH-USDT"), &error)) goto done;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("side"),
+                                   QDB_UTF8_LITERAL("sell"), &error)) goto done;
     if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto done;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("amount"), 0.00044, &error)) goto done;
     if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &error)) goto done;
     if (!qwp_sender_flush_buffer_and_wait(sender, buffer, qwpws_ack_level_ok, &error)) goto done;
     status = 0;
