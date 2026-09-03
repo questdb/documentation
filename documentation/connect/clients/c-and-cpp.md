@@ -330,7 +330,7 @@ Handle it there, not at `connect` (see
 ### OIDC device flow (Enterprise)
 
 The C and C++ APIs sign in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc-device-flow/).
+[OIDC device flow](/docs/security/oidc-device-flow/).
 They discover the provider endpoints, client ID, scope, and the token QuestDB
 expects from the server's public `/settings` endpoint. Attach the resulting auth
 object to the pool so sender and reader connections share its rotating token:
@@ -367,9 +367,9 @@ names are prefixed with `questdb_oidc_builder_`.
 
 Tokens stay in memory until `.default_file_token_store()` in C++, or
 `questdb_oidc_builder_default_file_token_store()` in C, writes a long-lived
-refresh token to disk as plaintext. See the [complete client
-examples](/docs/security/oidc-device-flow/#official-client-examples) for error handling, the
-sign-in prompt, and the store's location and permissions.
+refresh token to disk as plaintext. See [token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ### Other authentication limitations
 

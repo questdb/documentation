@@ -168,7 +168,7 @@ choices have feature requirements:
 ### OIDC device flow (Enterprise)
 
 Enable the `oidc` feature to sign in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc-device-flow/):
+[OIDC device flow](/docs/security/oidc-device-flow/):
 
 ```toml title="Cargo.toml"
 [dependencies]
@@ -199,10 +199,11 @@ Otherwise add `.issuer(...)` to the builder, or set `.client_id()`, `.scope()`,
 yourself.
 
 Tokens stay in memory until
-`.token_store(FileTokenStore::at_default_location()?)` is added, which writes a
-long-lived refresh token to disk as plaintext. See the [OIDC client
-examples](/docs/security/oidc-device-flow/#official-client-examples) for the sign-in prompt,
-explicit configuration, and the store's location and permissions.
+`.token_store(FileTokenStore::at_default_location()?)` is added (it returns a
+`std::io::Result`, so map the error into yours), which writes a
+long-lived refresh token to disk as plaintext. See [token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ## The pool
 

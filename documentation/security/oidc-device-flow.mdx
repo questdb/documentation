@@ -1,5 +1,5 @@
 ---
-title: OIDC Device Authorization Flow
+title: OIDC device flow
 description: "OIDC device flow for QuestDB Enterprise: headless SSO sign-in from a CLI, container, or notebook, with Java, Python, Rust, C and C++ examples."
 ---
 
@@ -13,7 +13,7 @@ import CExample from "../partials/_oidc.device-flow.c.partial.mdx";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
-  The Device Authorization Flow signs in an interactive user from a client that
+  The OIDC device flow signs in an interactive user from a client that
   cannot receive a browser redirect.
 </EnterpriseNote>
 
@@ -32,17 +32,26 @@ sequenceDiagram
     participant QDB as QuestDB
     participant IdP as Identity Provider
     participant User
-    Client->>QDB: GET /settings
-    QDB-->>Client: client ID, scope, endpoints, token mode
+    alt Discovery through QuestDB
+        Client->>QDB: GET /settings
+        QDB-->>Client: client ID, scope, endpoints, token mode
+    else issuer pinned on the client
+        Client->>IdP: GET /.well-known/openid-configuration
+        IdP-->>Client: endpoints
+    end
     Client->>IdP: Request device and user codes
     IdP-->>Client: device_code, user_code, verification URI
     Client->>User: Display URL and code
-    User->>IdP: Sign in and approve in a browser
-    loop Until approved or expired
-        Client->>IdP: Poll token endpoint
-        IdP-->>Client: authorization_pending / tokens
+    par User authorizes
+        User->>IdP: Sign in and approve in a browser
+    and Client polls
+        loop Until approved or expired
+            Client->>IdP: Poll token endpoint
+            IdP-->>Client: authorization_pending / tokens
+        end
     end
     Client->>QDB: Authorization: Bearer selected token
+    Note over Client,IdP: Later: silent refresh, or an interaction-required error
 ```
 
 The client must respect the polling interval, `slow_down` responses, and the
@@ -244,7 +253,7 @@ needs:
 | --- | --- |
 | `client_id` | the application has its own registration, which is the recommended setup |
 | `scope` | the provider requires `offline_access` before it issues a refresh token |
-| `audience` | the provider requires one, or QuestDB validates `aud` against a non-default [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
+| `audience` | the provider requires one, or QuestDB checks `aud` against [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
 | `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads the provider's `/.well-known/openid-configuration` instead |
 | `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
 | `groups_in_token` | overriding which of the two tokens the client selects |
@@ -326,7 +335,7 @@ where that at-rest exposure is acceptable:
 | --- | --- | --- |
 | Java | `FileTokenStore.atDefaultLocation()` | `FileTokenStore.at(path)` |
 | Python | `FileTokenStore.at_default_location()` | `FileTokenStore.at(path)` |
-| Rust | `FileTokenStore::at_default_location()?` | `FileTokenStore::at(path)` |
+| Rust | `FileTokenStore::at_default_location()` | `FileTokenStore::at(path)` |
 | C | `questdb_oidc_builder_default_file_token_store()` | `questdb_oidc_builder_file_token_store()` |
 | C++ | `.default_file_token_store()` | `.file_token_store(directory)` |
 
@@ -368,9 +377,14 @@ let auth = OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
 </Tabs>
 
 The default directory is `$HOME/.questdb/oidc-tokens/`, overridden by the
-`questdb.client.oidc.token.store.dir` environment variable. Java reads that same
+`questdb.client.oidc.token.store.dir` environment variable. The name contains
+dots, so most shells will not `export` it directly; set it through the container
+or service manager, or pass an explicit directory instead. Java reads that same
 name as a JVM system property rather than an environment variable, and falls
-back to `${user.home}/.questdb/oidc-tokens/`. On Unix the clients create token
+back to `${user.home}/.questdb/oidc-tokens/`. Resolving the default location can
+fail where there is no home directory, as in a distroless container, so Rust
+returns a `std::io::Result` from `at_default_location()` and an explicit
+directory avoids the question. On Unix the clients create token
 files with mode `0600` and the store directory with `0700`; on other platforms
 the directory's existing ACL governs access, so restrict it before enabling the
 store.

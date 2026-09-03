@@ -4,8 +4,6 @@ description: Integrate QuestDB Enterprise with an external OIDC Identity Provide
 ---
 
 import Screenshot from "@theme/Screenshot";
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
@@ -395,7 +393,7 @@ configuration document when `acl.oidc.configuration.url` is set.
 [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
 is present when a device authorization endpoint has been configured, or when the
 provider advertises one. QuestDB publishes it without using it, for clients
-which implement the [Device Authorization Flow](/docs/security/oidc-device-flow/)
+which implement the [OIDC device flow](/docs/security/oidc-device-flow/)
 themselves.
 
 `acl.oidc.redirect.uri` is `null` unless
@@ -461,7 +459,7 @@ for the full list of what is and is not validated.
 
 :::
 
-## Device Authorization Flow
+## OIDC device flow {#device-authorization-flow}
 
 For command-line applications, containers, and remote notebook kernels, where
 no browser redirect can reach the client, QuestDB Enterprise supports the
@@ -469,7 +467,7 @@ OAuth 2.0 Device Authorization Grant. QuestDB does not run the flow: the client
 talks to the Identity Provider directly and presents the resulting bearer
 token.
 
-See [OIDC Device Authorization Flow](/docs/security/oidc-device-flow/) for the
+See [OIDC device flow](/docs/security/oidc-device-flow/) for the
 protocol walkthrough, what to configure first, and worked examples for the
 Java, Python, Rust, C and C++ clients.
 
@@ -524,7 +522,7 @@ The OAuthenticator documentation also contains
 using different identity providers.
 
 If Jupyter notebooks are used without JupyterHub, use the official Python
-client's [Device Authorization Flow](/docs/security/oidc-device-flow/). It works when
+client's [OIDC device flow](/docs/security/oidc-device-flow/). It works when
 the browser and notebook kernel are on different machines and does not put the
 user's password in the notebook.
 
@@ -590,7 +588,7 @@ Here is an example using the `dotenv` library.
 
 First we need to create a file named `.env` with the settings:
 
-```python
+```ini title=".env"
 username=testuser
 password=testpwd
 ```
@@ -628,8 +626,8 @@ with request.urlopen(req) as f:
 The Resource Owner Password Credentials flow can be enabled in QuestDB within
 `server.conf`:
 
-```
-acl.oidc.ropc.flow.enabled = true
+```ini title="server.conf"
+acl.oidc.ropc.flow.enabled=true
 ```
 
 > Note that the flow also has to be configured in the OAuth2/OIDC provider!
@@ -690,7 +688,7 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 For a CLI or standalone application built with an official Java, Python, Rust,
 C, or C++ client, use the
-[Device Authorization Flow](/docs/security/oidc-device-flow/).
+[OIDC device flow](/docs/security/oidc-device-flow/).
 Tools such as `psql` and Microsoft Access cannot run the flow themselves; for
 those tools, acquire a token separately and use
 [PGWire token authentication](#oidc-for-the-pgwire-endpoint), or enable the
@@ -757,7 +755,12 @@ settings = requests.get("https://questdb.example.com:9000/settings").json()["con
 if not settings.get("acl.oidc.enabled"):
     raise SystemExit("OIDC is not enabled on this QuestDB instance")
 
-response = requests.post(settings["acl.oidc.token.endpoint"],
+# the endpoint keys are absent until QuestDB resolves them
+token_endpoint = settings.get("acl.oidc.token.endpoint")
+if not token_endpoint:
+    raise SystemExit("QuestDB has not resolved the provider's token endpoint")
+
+response = requests.post(token_endpoint,
                          data={"grant_type": "password",
                                "client_id": client_id,
                                "username": user,
