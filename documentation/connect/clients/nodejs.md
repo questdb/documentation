@@ -91,6 +91,13 @@ When using QuestDB Enterprise, authentication can also be done via REST token.
 Please check the [RBAC docs](/docs/security/rbac/#authentication) for more
 info.
 
+This client does not run an OIDC flow. QuestDB Enterprise also accepts an OIDC
+bearer token, which you acquire out of band from your Identity Provider:
+QuestDB publishes the provider's endpoints on its
+[settings endpoint](/docs/security/oidc/#settings-endpoint), and the same
+response tells you [which token to send](/docs/security/oidc/#which-token-to-send).
+See [OpenID Connect](/docs/security/oidc/).
+
 ## Basic insert
 
 Example: inserting executed trades for cryptocurrencies.

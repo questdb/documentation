@@ -36,7 +36,7 @@ sequenceDiagram
     QDB-->>Client: client ID, scope, endpoints, token mode
     Client->>IdP: Request device and user codes
     IdP-->>Client: device_code, user_code, verification URI
-    Client-->>User: Display URL and code
+    Client->>User: Display URL and code
     User->>IdP: Sign in and approve in a browser
     loop Until approved or expired
         Client->>IdP: Poll token endpoint

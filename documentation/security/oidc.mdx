@@ -125,7 +125,7 @@ been authenticated already:
   Identity Provider for authentication.
 
 ```bash title="Authorization code request example"
-https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
+https://oidc.provider:443/as/authorization.oauth2?client_id=questdb&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fquestdb.example.com%3A9000&code_challenge=IwZ-WuypAY3fMtvismbj1MQUe5CzMgrBa87nYcgFoLQ&code_challenge_method=S256
 ```
 
 :::note
@@ -191,7 +191,7 @@ The Authorization Server redirects the user back to the
 [Web Console](/docs/getting-started/web-console/overview/) with the _authorization code_:
 
 ```bash title="Authorization code response example"
-https://questdb.host:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
+https://questdb.example.com:9000/?code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A
 ```
 
 ### 5. Credential request
@@ -213,7 +213,7 @@ which requested the authorization code, and it was not stolen:
 ```bash title="Token request example"
 POST https://oidc.provider:443/as/token.oauth2 HTTP/1.1
 Content-Type: application/x-www-form-urlencoded
-grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.host%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
+grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.example.com%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
 ```
 
 ### 6. Credentials received
@@ -248,20 +248,24 @@ A token is in the header of every request sent to QuestDB. Which of the two goes
 there depends on where QuestDB reads the group memberships from, see
 [Which token to send](#which-token-to-send).
 
-> **Worried about exposing the token?** The access token is rather opaque and
-> does not contain user details. The ID token does: it is a JWT whose payload is
-> base64 encoded, not encrypted, so treat it as you would the user's directory
-> record.
+:::note
+
+Worried about exposing the token? An access token is usually opaque and carries
+no user details, though some providers issue a JWT here too. An ID token always
+does: it is a JWT whose payload is base64 encoded, not encrypted, so treat it as
+you would the user's directory record.
+
+:::
 
 To carry out permission checks, the database has to know more about the user.
 
 For this, QuestDB has a User Info Cache.
 
-If it finds a valid entry with the access token in the cache, steps 8 and 9 are
+If it finds a valid entry for the token in the cache, steps 8 and 9 are
 skipped:
 
 ```bash title="Query request example"
-https://questdb.host:9999/exec?query=select%20current_user()
+https://questdb.example.com:9000/exec?query=select%20current_user()
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
@@ -333,7 +337,7 @@ order to start an authentication flow. Any client can read them from the
 settings endpoint, which requires no authentication:
 
 ```bash title="Settings request example"
-curl https://questdb.host:9000/settings
+curl https://questdb.example.com:9000/settings
 ```
 
 The OIDC-related entries of the response look like this, alongside other server
@@ -343,12 +347,13 @@ settings:
 {
   "config": {
     "acl.enabled": true,
+    "acl.basic.auth.realm.enabled": false,
     "acl.oidc.enabled": true,
     "acl.oidc.pkce.required": true,
     "acl.oidc.state.required": false,
     "acl.oidc.groups.encoded.in.token": false,
     "acl.oidc.client.id": "questdb",
-    "acl.oidc.redirect.uri": "https://questdb.host:9000",
+    "acl.oidc.redirect.uri": "https://questdb.example.com:9000",
     "acl.oidc.scope": "openid",
     "acl.oidc.authorization.endpoint": "https://oidc.provider:443/as/authorization.oauth2",
     "acl.oidc.token.endpoint": "https://oidc.provider:443/as/token.oauth2",
@@ -368,6 +373,7 @@ hard coding the provider's details.
 | Key | Type | Present |
 | --- | --- | --- |
 | `acl.enabled` | boolean | always |
+| `acl.basic.auth.realm.enabled` | boolean | always |
 | `acl.oidc.enabled` | boolean | always |
 | `acl.oidc.pkce.required` | boolean | always |
 | `acl.oidc.state.required` | boolean | always |
@@ -400,8 +406,10 @@ gets back.
 :::note
 
 Read `acl.oidc.enabled` before any of the other keys. The `acl.oidc.*` entries
-are published whether or not OIDC is enabled, and with OIDC disabled the
-endpoint URLs are built from the defaults rather than from a real provider.
+are published whether or not OIDC is enabled. With OIDC disabled and
+`acl.oidc.host` in use, the endpoint URLs are built from the defaults rather
+than from a real provider; with `acl.oidc.configuration.url` set they are not
+resolved at all, and the endpoint keys are absent from the response.
 
 OIDC also requires [`acl.enabled`](/docs/configuration/iam/#aclenabled) to be
 `true`, which the same response carries. When access control is disabled,
@@ -484,7 +492,9 @@ possible flows to request an access token.:
    flow **(Recommended, more secure)**
 
 2. [Implicit](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth)
-   flow
+   flow **(deprecated)**. It cannot use PKCE, so it does not satisfy
+   [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired),
+   which is `true` by default.
 
 The client can read the authorization and token endpoints, the client id and
 the scopes from the [settings endpoint](#settings-endpoint) instead of hard
@@ -674,8 +684,9 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 ### CLI, standalone applications
 
-For a CLI or standalone application built with an official Java, Rust, C, or
-C++ client, use the [Device Authorization Flow](/docs/security/oidc-device-flow/).
+For a CLI or standalone application built with an official Java, Python, Rust,
+C, or C++ client, use the
+[Device Authorization Flow](/docs/security/oidc-device-flow/).
 Tools such as `psql` and Microsoft Access cannot run the flow themselves; for
 those tools, acquire a token separately and use
 [PGWire token authentication](#oidc-for-the-pgwire-endpoint), or enable the
@@ -726,8 +737,8 @@ applies to the connection below, which carries the resulting token.
 import os
 import requests
 import pandas as pd
+import questdb
 from dotenv import load_dotenv
-from questdb.ingress import Sender
 
 load_dotenv()
 user = os.environ.get("username")
@@ -758,11 +769,11 @@ if token_key not in tokens:
     raise SystemExit(f"the provider did not issue an {token_key} for the password grant")
 token = tokens[token_key]
 
-conf = f"https::addr=questdb.example.com:9000;token={token};"
-with Sender.from_conf(conf) as sender:
-    df = pd.read_csv("data.csv")
-    df["ts"] = pd.to_datetime(df["ts"])
-    sender.dataframe(df, table_name="foo", at="ts")
+conf = f"wss::addr=questdb.example.com:9000;token={token};"
+with questdb.connect(conf) as db:
+    df = pd.read_csv("trades.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
 ```
 
 :::note
@@ -782,18 +793,18 @@ server side:
 ```python
 import os
 import pandas as pd
+import questdb
 from dotenv import load_dotenv
-from questdb.ingress import Sender
 
 load_dotenv()
 user = os.environ.get("username")
 pwd = os.environ.get("password")
 
-conf = f"https::addr=questdb.example.com:9000;username={user};password={pwd};"
-with Sender.from_conf(conf) as sender:
-    df = pd.read_csv("data.csv")
-    df["ts"] = pd.to_datetime(df["ts"])
-    sender.dataframe(df, table_name="foo", at="ts")
+conf = f"wss::addr=questdb.example.com:9000;username={user};password={pwd};"
+with questdb.connect(conf) as db:
+    df = pd.read_csv("trades.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
 ```
 
 ## OIDC for the PGWire endpoint
@@ -1255,9 +1266,8 @@ The value is `memberOf`.
 
 #### Enable Resource Owner Password Credentials (ROPC) flow
 
-As described in the
-[OIDC operations document](/docs/security/oidc/#enable-ropc)
-tools - such as `psql` - can be integrated with the OIDC provider using the ROPC flow.
+As described under [Enable ROPC](#enable-ropc), tools such as `psql` can be
+integrated with the OIDC provider using the ROPC flow.
 
 When setting this flow up, enable the Resource Owner Password Credentials flow in the
 client settings.
@@ -1274,7 +1284,7 @@ Then select the `username` attribute of the PCV as `USER_KEY`.
 
 The below should be set in QuestDB's `server.conf`:
 
-```shell
+```ini title="server.conf"
 # enable OIDC
 acl.oidc.enabled=true
 
@@ -1303,8 +1313,8 @@ set.
 
 #### Confirm QuestDB mappings and login
 
-QuestDB requires a mapping, as laid out in the
-[OIDC operations document](/docs/security/oidc/#mapping-user-permissions).
+QuestDB requires a mapping, as laid out under
+[Mapping user permissions](#mapping-user-permissions).
 
 If a given user has the HTTP permission, they will be able to now login via the
 [Web Console](/docs/getting-started/web-console/overview/).
@@ -1438,8 +1448,7 @@ validate the ID token, and take the group information from there.
 QuestDB authorization relies on receiving the group memberships of the user.
 Entra ID groups should be mapped to QuestDB groups, and permissions can be
 granted to the QuestDB groups. Detailed information about group mappings can
-be found in the [OIDC integration](/docs/security/oidc/#user-permissions)
-documentation.
+be found under [User permissions](#user-permissions).
 
 <Screenshot
 alt="EntraID image, token customization"
@@ -1499,7 +1508,7 @@ adding OIDC configuration to QuestDB.
 
 The below should be set in QuestDB's `server.conf`:
 
-```shell
+```ini title="server.conf"
 # enable OIDC
 acl.oidc.enabled=true
 

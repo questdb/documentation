@@ -515,7 +515,8 @@ Context path for the file import service.
 
 ### http.context.settings
 
-- **Default**: `/settings`
+- **Default**: `/settings`, relative to
+  [`http.context.web.console`](#httpcontextwebconsole)
 - **Reloadable**: no
 
 Context path for the service that serves server-side settings to clients, such

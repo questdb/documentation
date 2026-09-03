@@ -721,7 +721,7 @@ module.exports = {
         {
           id: "security/oidc",
           type: "doc",
-          label: "OpenID Connect (OIDC)",
+          label: "OpenID Connect (OIDC) guide",
         },
         {
           id: "security/oidc-device-flow",

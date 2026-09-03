@@ -948,6 +948,7 @@ integrations only when your application uses them:
 | `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
 | `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
 | `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
+| `oidc` | No | Interactive OIDC sign-in with the [device flow](/docs/security/oidc-device-flow/). Pulls in `sync-sender-http`, and needs a TLS root source for `https` discovery. |
 | `tls-native-certs` | No | TLS validation through the operating-system certificate store. |
 | `insecure-skip-verify` | No | `tls_verify=unsafe_off` for controlled testing only. |
 | `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |

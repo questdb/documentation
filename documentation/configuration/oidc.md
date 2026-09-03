@@ -1,5 +1,6 @@
 ---
 title: OpenID Connect (OIDC)
+sidebar_label: OIDC settings
 description: "QuestDB Enterprise acl.oidc.* settings reference: minimum configuration and startup rules, endpoints, TLS, user and group claims, caching and buffers."
 ---
 
@@ -23,13 +24,15 @@ which is the default. With access control disabled no OIDC authentication takes
 place, but the OIDC settings are still validated at startup: with
 `acl.oidc.enabled=true` the server enforces every rule below and downloads the
 provider's configuration document, so an inconsistent OIDC configuration still
-prevents it from starting. Set `acl.oidc.enabled=false` to take the settings out
-of play entirely.
+prevents it from starting. Set `acl.oidc.enabled=false` to stop the rules below being
+enforced. `acl.oidc.configuration.url` is still parsed even then, and its
+scheme must still match [`acl.oidc.tls.enabled`](#acloidctlsenabled), so a
+malformed value there fails startup with OIDC switched off.
 
 A working setup against a Ping Identity provider needs four settings. Every
 other setting has a usable default:
 
-```shell
+```ini title="server.conf"
 acl.oidc.enabled=true
 acl.oidc.host=oidc.provider
 acl.oidc.client.id=questdb
@@ -141,7 +144,8 @@ set, because the port is taken from the discovered endpoint URLs.
 
 The redirect URI tells the OIDC server where to redirect the user after
 successful authentication. If not set, the Web Console defaults it to the
-location where it was loaded from (`window.location.href`).
+location it was loaded from, without the query string or fragment
+(`window.location.origin + window.location.pathname`).
 
 ### acl.oidc.scope
 
