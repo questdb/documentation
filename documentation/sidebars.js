@@ -840,6 +840,11 @@ module.exports = {
                   id: "enterprise-kubernetes-operator/getting-started/azure",
                   label: "Azure AKS",
                 },
+                {
+                  type: "doc",
+                  id: "enterprise-kubernetes-operator/getting-started/migrate",
+                  label: "Migrate existing QuestDB",
+                },
               ],
             },
             "enterprise-kubernetes-operator/configuration",
