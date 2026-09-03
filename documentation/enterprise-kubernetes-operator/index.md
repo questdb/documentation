@@ -37,6 +37,8 @@ static Secret. QuestDB database pods perform all object-store I/O.
   [AKS onboarding guide](/docs/enterprise-kubernetes-operator/getting-started/azure/).
 - **Shared install requirements:** see
   [Installation](/docs/enterprise-kubernetes-operator/installation/).
+- **Migrate an existing QuestDB:** follow the cloud-neutral
+  [migration guide](/docs/enterprise-kubernetes-operator/getting-started/migrate/).
 - **PGWire TLS and network isolation:** plan them before creation with
   [Configuration](/docs/enterprise-kubernetes-operator/configuration/#pgwire-tls).
 - **Operate the operator:** use the
