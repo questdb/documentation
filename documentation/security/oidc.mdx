@@ -490,10 +490,12 @@ send the device code or the user's Identity Provider password to QuestDB.
 
 Before using the flow:
 
-1. Enable the device authorization grant for the public client registered with
-   the Identity Provider. The discovery examples below use the client ID in
-   `acl.oidc.client.id`; configure the client explicitly when an application
-   has its own registration.
+1. Register the application as a public client with the Identity Provider and
+   enable the device authorization grant on it. Each application which
+   integrates via OIDC should have its own Client Id, so that it can be told
+   apart from QuestDB in the provider's audit log and given its own policies.
+   Pass that Client Id to the client explicitly, as described under
+   [Explicit configuration and endpoint pinning](#explicit-configuration-and-endpoint-pinning).
 2. Make the device authorization endpoint available to clients. For the
    zero-configuration examples below, `acl.oidc.configuration.url` must resolve
    a provider document containing `device_authorization_endpoint`, or the
@@ -523,6 +525,11 @@ both endpoints explicitly.
 Each example discovers the OIDC client ID, scope, token-selection mode, and
 provider endpoints from QuestDB's [settings endpoint](#settings-endpoint), then
 signs in before opening the database connection.
+
+Discovering the client ID means reusing QuestDB's own registration, which keeps
+the examples short but gives the application no separate identity at the
+provider. That is fine for evaluation; in production register the application
+and set its Client Id explicitly, as described below.
 
 The discovery URL must use `https`: reaching QuestDB over plaintext would let an
 attacker replace the advertised Identity Provider endpoints and redirect the

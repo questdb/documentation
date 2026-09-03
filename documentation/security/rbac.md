@@ -314,13 +314,20 @@ dropped, all members lose the permissions they inherited from that group.
   width={745}
 />
 
-QuestDB supports three authentication methods:
+QuestDB supports four authentication methods:
 
-| Method             | Use case                 | Endpoints                 |
-| ------------------ | ------------------------ | ------------------------- |
-| **Password**       | Interactive users        | REST API, PostgreSQL Wire |
-| **JWK Token**      | ILP ingestion            | InfluxDB Line Protocol    |
-| **REST API Token** | Programmatic REST access | REST API                  |
+| Method                | Use case                    | Endpoints                      |
+| --------------------- | --------------------------- | ------------------------------ |
+| **Password**          | Interactive users           | REST API, PostgreSQL Wire      |
+| **JWK Token**         | ILP ingestion               | InfluxDB Line Protocol         |
+| **REST API Token**    | Programmatic REST access    | REST API                       |
+| **OIDC bearer token** | SSO users, external clients | REST API, PostgreSQL Wire, QWP |
+
+The first three are QuestDB's own credentials, created with the statements
+below. An OIDC bearer token is issued by an external Identity Provider instead,
+and the user's group memberships come from the token or the provider's user
+info endpoint; see [OpenID Connect](/docs/security/oidc/) and
+[which token to send](/docs/security/oidc/#which-token-to-send).
 
 Users can have multiple authentication methods enabled simultaneously:
 

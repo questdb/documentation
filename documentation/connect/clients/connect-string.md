@@ -220,6 +220,12 @@ WebSocket upgrade request.
   exclusive with `username` / `password`. Token auth avoids the per-request
   overhead of basic auth and is the recommended path for Enterprise
   deployments.
+- Device-flow OIDC credentials are **not** connect-string keys. The Java,
+  Python, Rust, C and C++ clients take an auth object alongside the connect
+  string, which rotates the token on every reconnect; see
+  [OIDC device flow](/docs/security/oidc/#device-authorization-flow). A
+  static `token=` does not rotate, so a reconnect after expiry keeps sending
+  the stale value.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.
   Does not cover TLS handshake or post-upgrade frame reads, which use OS or
   hard-coded defaults. Default: `15000` (15 s).

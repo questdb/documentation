@@ -356,6 +356,10 @@ If the claim is missing from the user information, or it is an empty list,
 authentication fails. See
 [Mapping user permissions](/docs/security/oidc/#mapping-user-permissions).
 
+A custom name applies to the user info flow. Set this to `groups` when
+[`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,
+because the token validator requires that name.
+
 ### acl.oidc.groups.encoded.in.token
 
 - **Default**: `false`
@@ -381,6 +385,14 @@ the token itself and never asks the provider about it:
 | the signature, against the public key named by the token's `kid` | `exp`, the expiry |
 | `aud`, against [`acl.oidc.audience`](#acloidcaudience) | `nbf`, the not-before time |
 | that `sub` and the group memberships are present | `iss`, the issuer |
+
+The validator reads those two claims under the names `sub` and `groups`
+literally, and rejects a token which does not carry both, whatever
+[`acl.oidc.sub.claim`](#acloidcsubclaim) and
+[`acl.oidc.groups.claim`](#acloidcgroupsclaim) are set to. `groups` must be an
+array of strings. Custom claim names apply to the user info flow, so with this
+setting enabled leave `acl.oidc.sub.claim` at its default and set
+`acl.oidc.groups.claim=groups`.
 
 :::caution
 

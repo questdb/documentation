@@ -367,6 +367,12 @@ QuestDB publishes the provider's authorization and token endpoints on its
 discover them instead of hard coding them. The same response tells the client
 [which token to send](/docs/security/oidc/#which-token-to-send): the access
 token, or the ID token when QuestDB reads group memberships from the token.
+This client does not run an OIDC flow, so acquire the token with an OAuth2
+library: `golang.org/x/oauth2` implements the device grant, and QuestDB
+publishes the device authorization endpoint on the same settings response. The
+[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow)
+describes the protocol, including the polling interval, `slow_down`, and the
+device code's expiry.
 When the token expires or is rotated, construct a new handle with the new token.
 An expired or rejected token surfaces as an authentication failure (see
 [Connection-level errors](#connection-level-errors)). It is mutually exclusive

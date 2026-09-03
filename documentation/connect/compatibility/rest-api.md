@@ -794,11 +794,16 @@ A HTTP status code of `400` is returned with the following response body:
 
 ## Authentication
 
-The REST API supports two authentication types:
+The REST API supports three authentication types:
 
 - **HTTP basic authentication**, available in QuestDB Open Source and QuestDB
   Enterprise.
 - **Token-based authentication**, available in QuestDB Enterprise only.
+- **OIDC bearer tokens**, available in QuestDB Enterprise only. These also
+  travel in the `Authorization: Bearer` header but are issued by an external
+  Identity Provider rather than by QuestDB, so they are a different credential
+  from the REST API token below. See [OpenID Connect](/docs/security/oidc/) and
+  [which token to send](/docs/security/oidc/#which-token-to-send).
 
 :::note
 
