@@ -174,9 +174,25 @@ challenge elsewhere, or to declare the process interactive anyway:
 | C | `questdb_oidc_builder_event_handler()` | `questdb_oidc_builder_interactive()` |
 | C++ | `.event_handler(...)` | `.interactive(true)` |
 
-The prompt's text fields are display-safe. Where a client opens the URL or makes
-it clickable, use the separately vetted browser target instead: `browser_target`
-on the C event struct, `event_view::browser_target()` in C++.
+The Java, C and C++ clients strip terminal controls, bidi marks and zero-width
+characters from the prompt's text fields before the callback sees them. The Rust
+and Python clients sanitize inside their built-in renderers only, so a custom
+renderer receives the Identity Provider's response verbatim.
+
+:::caution
+
+A custom Rust or Python renderer must sanitize the user code and verification
+URL itself before writing them to a terminal or a DOM. Rendering them raw
+reopens the spoofing surface the built-in renderers close. Rust exposes
+`display_user_code()` and `display_verification_uri()` on the challenge; Python
+exports `sanitize_display_text` from `questdb.auth`.
+
+:::
+
+The text fields are for display only. Where a client opens the URL or makes it
+clickable, use the separately vetted browser target instead: `browser_target` on
+the C event struct, `event_view::browser_target()` in C++, `browser_target()` on
+the Rust challenge, and the `browser_target` key on the Python prompt event.
 
 ### Explicit configuration and endpoint pinning
 
@@ -237,7 +253,7 @@ the main or UI thread:
 | Python | `OidcInteractionRequired`, importable from `questdb.auth` |
 | Rust | a `questdb::Error` carrying `ErrorCode::AuthError`; read `err.oidc_error()` and match on `OidcErrorKind::InteractionRequired` |
 | C | error kind `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` |
-| C++ | `questdb::error_kind::interaction_required` |
+| C++ | `questdb::oidc::error_kind::interaction_required` |
 | Java | `OidcAuthException`, with no distinct interaction-required type to match on |
 
 In C++ a failure raised through an attached sender arrives as

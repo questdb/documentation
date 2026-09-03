@@ -354,7 +354,7 @@ most providers issue only when `offline_access` is among the scopes in
 [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
 own `scope` override. Those transport operations never prompt; they fail with
 `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` in C, or
-`questdb::error_kind::interaction_required` in C++, and the application calls
+`questdb::oidc::error_kind::interaction_required` in C++, and the application calls
 `sign_in()` / `questdb_oidc_auth_sign_in()` explicitly on the main or UI thread.
 
 The Identity Provider must enable the device grant. For discovery without an
