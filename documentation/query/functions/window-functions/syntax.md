@@ -11,12 +11,14 @@ The `OVER` clause defines the window for a window function. The `WINDOW` clause 
 
 ```sql
 -- Inline window definition
-function_name(arguments) [IGNORE NULLS | RESPECT NULLS] OVER (
-    [PARTITION BY column [, ...]]
-    [ORDER BY column [ASC | DESC] [, ...]]
-    [frame_clause]
-    [exclusion_clause]
-)
+function_name(arguments)
+    [FILTER (WHERE condition) | IGNORE NULLS | RESPECT NULLS]
+    OVER (
+        [PARTITION BY column [, ...]]
+        [ORDER BY column [ASC | DESC] [, ...]]
+        [frame_clause]
+        [exclusion_clause]
+    )
 
 -- Named window definition
 function_name(arguments) OVER window_name
@@ -54,6 +56,7 @@ EXCLUDE CURRENT ROW | EXCLUDE NO OTHERS
 
 | Component | Description |
 |-----------|-------------|
+| `FILTER (WHERE ...)` | Restricts an aggregate to rows matching a condition |
 | `IGNORE NULLS` | Skip null values when evaluating the function |
 | `RESPECT NULLS` | Include null values (default behavior) |
 | `PARTITION BY` | Divides the result set into partitions |
@@ -148,6 +151,46 @@ This returns the most recent non-null `price` value, skipping any intermediate n
 **Common use cases:**
 - **Filling gaps**: Use `first_value() IGNORE NULLS` or `last_value() IGNORE NULLS` to carry forward/backward the last known value
 - **Sparse data**: Use `lag() IGNORE NULLS` to reference the previous actual measurement, ignoring missing readings
+
+## FILTER on window function aggregates
+
+Aggregates used in window position accept a
+[`FILTER (WHERE ...)`](/docs/query/sql/filter/) clause, which restricts the rows
+the aggregate sees within its frame. The clause goes immediately after the
+aggregate's closing parenthesis, before `OVER`.
+
+```questdb-sql title="Running buy volume, keeping every row" demo
+SELECT
+    timestamp,
+    symbol,
+    side,
+    quantity,
+    sum(quantity) FILTER (WHERE side = 'buy')
+        OVER (PARTITION BY symbol ORDER BY timestamp) AS cumulative_buy
+FROM fx_trades
+WHERE timestamp IN '$today'
+LIMIT 100;
+```
+
+A frame containing only non-matching rows aggregates over an empty set, so
+`cumulative_buy` stays null until the first buy trade appears in each partition.
+A `count(*)` in the same position would read `0` rather than null.
+
+**Only aggregates support it.** Every other window function, including
+`row_number`, `rank`, `lag`, `first_value` and `nth_value`, rejects `FILTER`
+with `FILTER is supported only for aggregate functions`. Use a `CASE` expression
+inside the function's argument instead.
+
+`FILTER` may not appear inside the window specification itself. This is
+rejected with `FILTER is not supported in a window specification`:
+
+```questdb-sql title="Incorrect - FILTER inside OVER"
+SELECT sum(quantity) OVER (PARTITION BY abs(price) FILTER (WHERE false))
+FROM fx_trades;
+```
+
+For the excluded aggregates, argument-type restrictions and further examples,
+see the [FILTER](/docs/query/sql/filter/) page.
 
 ## Frame types and behavior
 
@@ -496,6 +539,25 @@ WHERE timestamp IN '[$today]' AND symbol = 'BTC-USDT'
 WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
 LIMIT 100;
 ```
+
+### Different conditions over one named window
+
+A named window fixes the frame, while [`FILTER`](/docs/query/sql/filter/) lets each aggregate see a different subset of it. Here all three columns share the same 100-row frame:
+
+```questdb-sql title="Filtered and unfiltered aggregates over one window" demo
+SELECT
+    timestamp,
+    price,
+    sum(quantity) FILTER (WHERE side = 'buy') OVER w AS buy_volume,
+    sum(quantity) OVER w AS total_volume,
+    count(*) FILTER (WHERE quantity >= 250_000) OVER w AS large_trades
+FROM fx_trades
+WHERE timestamp IN '$today' AND symbol = 'EURUSD'
+WINDOW w AS (ORDER BY timestamp ROWS BETWEEN 99 PRECEDING AND CURRENT ROW)
+LIMIT 100;
+```
+
+Dividing `buy_volume` by `total_volume` gives the rolling share of aggressive buying, which would otherwise need two separate window definitions or a CTE.
 
 ### Multiple named windows
 

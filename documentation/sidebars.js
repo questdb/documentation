@@ -456,6 +456,7 @@ module.exports = {
                 "query/sql/declare",
                 "query/sql/distinct",
                 "query/sql/fill",
+                "query/sql/filter",
                 "query/sql/group-by",
                 "query/sql/horizon-join",
                 "query/sql/join",
