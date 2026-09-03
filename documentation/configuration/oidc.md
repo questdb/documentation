@@ -389,9 +389,10 @@ the token itself and never asks the provider about it:
 
 | Checked | Not checked |
 | --- | --- |
-| the signature, against the public key named by the token's `kid` | `exp`, the expiry |
-| `aud`, against [`acl.oidc.audience`](#acloidcaudience) | `nbf`, the not-before time |
-| that `sub` and the group memberships are present | `iss`, the issuer |
+| the signature, against the public key named by the token's `kid` | `nbf`, the not-before time |
+| `exp`, the expiry | `iss`, the issuer |
+| `aud`, against [`acl.oidc.audience`](#acloidcaudience) | |
+| that `sub` and the group memberships are present | |
 
 Two things have to line up here, because two different components read the
 token. The signature validator deserializes the payload into a fixed structure,
@@ -412,15 +413,13 @@ validator.
 
 :::caution
 
-An expired token is therefore still accepted. Once issued, a token stays valid
-for as long as the key that signed it is in QuestDB's cache, which is governed
-by [`acl.oidc.public.keys.expiry`](#acloidcpublickeysexpiry) and by how long the
-provider publishes the key. Neither
-[`acl.oidc.cache.ttl`](#acloidccachettl) nor a shorter token lifetime in the
-provider shortens it.
-
-Do not enable this setting where you rely on being able to revoke a token, or on
-the provider's token lifetimes being enforced.
+Because QuestDB never asks the provider about the token, revoking a token does
+not end the access it grants: the token keeps working until its `exp` passes,
+and [`acl.oidc.cache.ttl`](#acloidccachettl) does not shorten that. The only
+lever is withdrawing the signing key at the provider, which cuts short every
+token signed with it and takes effect within
+[`acl.oidc.public.keys.expiry`](#acloidcpublickeysexpiry). Keep token lifetimes
+short in the provider if you need revocation to take effect quickly.
 
 :::
 
@@ -456,8 +455,10 @@ request. When
 QuestDB checks the token locally instead, and contacts the provider only when
 the public keys have to be reloaded.
 
-That local check does not test the token's expiry, so shortening this TTL does
-not shorten how long an issued token is accepted. See
+That local check tests the token's expiry, so an issued token is accepted until
+it expires whatever this TTL is. Shortening the TTL does not make QuestDB
+consult the provider, so a token revoked before its expiry is not picked up any
+sooner. See
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) for what is
 and is not validated.
 

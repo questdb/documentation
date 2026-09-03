@@ -447,18 +447,6 @@ straight out of its payload. The
 [Web Console](/docs/getting-started/web-console/overview/) picks the token this
 way, and so should any other client.
 
-:::caution
-
-With `acl.oidc.groups.encoded.in.token` enabled, QuestDB checks the token's
-signature, its `aud` claim, and that `sub` and the group memberships are
-present. It does not check `exp`, `nbf` or `iss`, so an expired token is still
-accepted, and the provider's token lifetimes are not enforced. Do not enable the
-setting where you rely on being able to revoke a token. See
-[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
-for the full list of what is and is not validated.
-
-:::
-
 ## OIDC device flow {#device-authorization-flow}
 
 For command-line applications, containers, and remote notebook kernels, where
@@ -514,17 +502,14 @@ QuestDB. Select the access or ID token as described in
 
 ### Jupyter notebook
 
-JupyterHub can integrate with OAuth2 providers using OAuthenticator, as
-described in its
-[documentation](https://jupyterhub.readthedocs.io/en/stable/explanation/oauth.html).
-The OAuthenticator documentation also contains
-[examples](https://oauthenticator.readthedocs.io/en/latest/tutorials/provider-specific-setup/index.html)
-using different identity providers.
+Use the official Python client's
+[OIDC device flow](/docs/security/oidc-device-flow/). It works when the browser
+and the notebook kernel are on different machines, and does not put the user's
+password in the notebook.
 
-If Jupyter notebooks are used without JupyterHub, use the official Python
-client's [OIDC device flow](/docs/security/oidc-device-flow/). It works when
-the browser and notebook kernel are on different machines and does not put the
-user's password in the notebook.
+Note that JupyterHub's OAuth integration (OAuthenticator) is a separate concern:
+it decides who may log in to JupyterHub, and gives the notebook no token to send
+to QuestDB.
 
 For tooling without device-flow support, a last-resort option is the <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.3" target="_blank" rel="noopener noreferrer">
 Resource Owner Password Credentials (ROPC) </a> flow. Enabling it usually
@@ -1567,10 +1552,10 @@ This setup relies on
 [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken),
 because Entra ID cannot serve the group memberships from its User Info
 endpoint. QuestDB then validates the ID token itself and never asks Entra ID
-about it, which means it does not check the token's expiry: an issued token is
-accepted for as long as the key that signed it stays in QuestDB's cache. Read
-that option before going to production, and note that clients must send the ID
-token here, not the access token.
+about it, so revoking a token in Entra ID does not end the access it grants:
+the token keeps working until it expires. Read that option before going to
+production, and note that clients must send the ID token here, not the access
+token.
 
 :::
 
