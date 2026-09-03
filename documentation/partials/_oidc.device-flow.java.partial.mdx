@@ -1,0 +1,24 @@
+```java
+import io.questdb.client.QuestDB;
+import io.questdb.client.Sender;
+import io.questdb.client.cutlass.auth.OidcDeviceAuth;
+
+try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+        "https://questdb.example.com:9000")) {
+    auth.signIn(); // the only call which may prompt or open a browser
+
+    try (QuestDB db = QuestDB.connect(
+            "wss::addr=questdb.example.com:9000;",
+            auth::getToken)) {
+        try (Sender sender = db.borrowSender()) {
+            sender.table("trades")
+                  .symbol("symbol", "ETH-USD")
+                  .symbol("side", "sell")
+                  .doubleColumn("price", 2615.54)
+                  .doubleColumn("amount", 0.00044)
+                  .atNow();
+        }
+        // db.borrowQuery() uses the same rotating token.
+    }
+}
+```

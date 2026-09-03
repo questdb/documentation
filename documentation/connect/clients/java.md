@@ -12,6 +12,7 @@ import TabItem from "@theme/TabItem"
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 import CodeBlock from "@theme/CodeBlock"
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.java.partial.mdx";
 
 :::note
 
@@ -400,27 +401,13 @@ both the ingress and egress WebSocket upgrades. It is mutually exclusive with
 ### OIDC device flow (Enterprise)
 
 `OidcDeviceAuth` signs in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow).
+[Device Authorization Flow](/docs/security/oidc-device-flow/).
 It discovers the provider endpoints, client ID, scope, and the token QuestDB
 expects from the server's public `/settings` endpoint. The user can approve the
 sign-in from a browser on any device, so this also works from a container or
 remote notebook kernel:
 
-```java
-import io.questdb.client.QuestDB;
-import io.questdb.client.cutlass.auth.OidcDeviceAuth;
-
-try (OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
-        "https://questdb.example.com:9000")) {
-    auth.signIn(); // the only call which may prompt or open a browser
-
-    try (QuestDB db = QuestDB.connect(
-            "wss::addr=questdb.example.com:9000;",
-            auth::getToken)) {
-        // Ingestion and query connections share the rotating token provider.
-    }
-}
-```
+<OidcDeviceFlowExample />
 
 Pass `auth::getToken` as a provider instead of putting the current token in the
 connect string. Every new connection and reconnect then receives the cached or
@@ -443,7 +430,7 @@ with `OidcDeviceAuth.builder()`.
 Tokens stay in memory until a store is attached with
 `DiscoveryOptions.tokenStore(FileTokenStore.atDefaultLocation())`, which writes
 a long-lived refresh token to disk as plaintext. See the [OIDC guide's client
-examples](/docs/security/oidc/#official-client-examples) for the sign-in prompt,
+examples](/docs/security/oidc-device-flow/#official-client-examples) for the sign-in prompt,
 explicit configuration, and the token store's location and permissions.
 
 ### HTTP basic auth

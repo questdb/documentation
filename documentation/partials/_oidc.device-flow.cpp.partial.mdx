@@ -1,0 +1,33 @@
+```cpp
+#include <questdb/ingress/qwp_sender.hpp>  // pool::borrow_sender
+#include <questdb/egress/qwp_reader.hpp>   // pool::borrow_reader
+#include <questdb/oidc.hpp>
+#include <iostream>
+
+using namespace questdb::ingress::literals;
+
+int main() {
+    auto auth = questdb::oidc::builder::from_questdb(
+            "https://questdb.example.com:9000")
+        .event_handler([](const questdb::oidc::event_view& event) {
+            if (event.kind() == questdb::oidc::event_kind::prompt)
+                std::cerr << "Open " << event.verification_uri()
+                          << " and enter " << event.user_code() << '\n';
+        })
+        .build();
+
+    auth.sign_in(); // the only call which may prompt or open a browser
+    questdb::pool pool{"wss::addr=questdb.example.com:9000;", auth};
+
+    auto sender = pool.borrow_sender();
+    auto buffer = sender.new_buffer();
+    buffer.table("trades"_tn)
+          .symbol("symbol"_cn, "ETH-USD"_utf8)
+          .symbol("side"_cn, "sell"_utf8)
+          .column("price"_cn, 2615.54)
+          .column("amount"_cn, 0.00044)
+          .at(questdb::ingress::timestamp_nanos::now());
+    sender.flush_and_wait(buffer);
+    // pool.borrow_reader() uses the same rotating token.
+}
+```

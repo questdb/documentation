@@ -5,6 +5,8 @@ sidebar_label: Rust
 description: "Use the QuestDB Rust connection pool for Buffer, Chunk, Arrow, and Polars ingestion plus streaming SQL queries over QWP."
 ---
 
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.rust.partial.mdx";
+
 The QuestDB Rust client uses a thread-safe `QuestDb` pool for ingestion and SQL
 queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Borrow
 a short-lived writer or reader for each unit of work, then let `Drop` return its
@@ -152,10 +154,21 @@ let token = QuestDb::connect(
 )?;
 ```
 
+With the default crate features, the TLS root set is `webpki_roots`. Other
+choices have feature requirements:
+
+| Setting | Requirement |
+| --- | --- |
+| `tls_ca=os_roots` | Enable `tls-native-certs`. |
+| `tls_ca=webpki_and_os_roots` | Enable both `tls-webpki-certs` and `tls-native-certs`. |
+| `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
+| `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
+| `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
+
 ### OIDC device flow (Enterprise)
 
 Enable the `oidc` feature to sign in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow):
+[Device Authorization Flow](/docs/security/oidc-device-flow/):
 
 ```toml title="Cargo.toml"
 [dependencies]
@@ -165,28 +178,7 @@ questdb-rs = { version = "7", features = ["oidc"] }
 `OidcDeviceAuth::from_questdb` discovers the provider endpoints, client ID,
 scope, and the token QuestDB expects from the public `/settings` endpoint:
 
-```rust
-use std::sync::Arc;
-use questdb::{oidc::OidcDeviceAuth, QuestDb};
-
-fn main() -> questdb::Result<()> {
-    let auth = Arc::new(
-        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
-            .build()?,
-    );
-    auth.sign_in()?; // the only call which may prompt or open a browser
-
-    let db = QuestDb::connect_with_token_provider(
-        "wss::addr=questdb.example.com:9000;",
-        {
-            let auth = Arc::clone(&auth);
-            move || auth.token()
-        },
-    )?;
-    // Sender and reader connections share the rotating token provider.
-    Ok(())
-}
-```
+<OidcDeviceFlowExample />
 
 Pass the closure as a provider instead of putting the current token in the
 connect string. Every new connection and reconnect then receives the cached or
@@ -209,19 +201,8 @@ yourself.
 Tokens stay in memory until
 `.token_store(FileTokenStore::at_default_location()?)` is added, which writes a
 long-lived refresh token to disk as plaintext. See the [OIDC client
-examples](/docs/security/oidc/#official-client-examples) for the sign-in prompt,
+examples](/docs/security/oidc-device-flow/#official-client-examples) for the sign-in prompt,
 explicit configuration, and the store's location and permissions.
-
-With the default crate features, the TLS root set is `webpki_roots`. Other
-choices have feature requirements:
-
-| Setting | Requirement |
-| --- | --- |
-| `tls_ca=os_roots` | Enable `tls-native-certs`. |
-| `tls_ca=webpki_and_os_roots` | Enable both `tls-webpki-certs` and `tls-native-certs`. |
-| `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
-| `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
-| `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
 
 ## The pool
 

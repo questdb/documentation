@@ -5,6 +5,8 @@ sidebar_label: Python
 description: "Use the QuestDB Python client's QuestDB pool for row, DataFrame, and Arrow ingestion plus SQL queries over QWP."
 ---
 
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.python.partial.mdx";
+
 The QuestDB Python client uses one `QuestDB` handle for ingestion and SQL
 queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Lease a short-lived sender for each unit of row-building work, bulk-load DataFrames
 through the handle, and run SQL with `query()`.
@@ -142,51 +144,6 @@ token = questdb.connect(
 )
 ```
 
-### OIDC device flow (Enterprise)
-
-`OidcDeviceAuth` signs in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow).
-It discovers the provider endpoints, client ID, scope, and the token QuestDB
-expects from the server's public `/settings` endpoint. The default prompt works
-in terminals and remote Jupyter kernels:
-
-```python
-import questdb
-from questdb.auth import OidcDeviceAuth
-
-with OidcDeviceAuth.from_questdb(
-        "https://questdb.example.com:9000") as auth:
-    auth.sign_in()  # the only call which may prompt or open a browser
-
-    with questdb.connect(
-            "wss::addr=questdb.example.com:9000;",
-            oidc_auth=auth) as db:
-        # sender(), dataframe(), and query() share the rotating token provider.
-        pass
-```
-
-`oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
-or silently refreshed token for every connection and reconnect. It is mutually
-exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
-which most providers issue only when `offline_access` is among the scopes in
-[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
-own `scope` override. Transport operations never prompt; if they raise
-`OidcInteractionRequired`, importable from `questdb.auth`, call `auth.sign_in()`
-explicitly on the main or UI thread.
-
-The Identity Provider must enable the device grant. For discovery without an
-override, QuestDB must publish a device authorization endpoint, either from the
-provider's configuration document or from
-[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
-Otherwise pass `issuer=...`, or set `client_id=`, `scope=`, `audience=`,
-`token_endpoint=` and `device_authorization_endpoint=` on `from_questdb`.
-
-Tokens stay in memory until a store is passed as
-`token_store=FileTokenStore.at_default_location()`, which writes a long-lived
-refresh token to disk as plaintext. See the [OIDC client
-examples](/docs/security/oidc/#official-client-examples) for the sign-in prompt,
-explicit configuration, and the store's location and permissions.
-
 Authentication happens during the WebSocket upgrade, before any data frames
 are exchanged. Bad credentials raise `QuestDBErrorCode.AuthError` from the
 first operation that needs the connection, not from `connect()`. Queries and
@@ -208,6 +165,38 @@ operating-system certificate store. Override it with configuration keys:
 
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
+
+### OIDC device flow (Enterprise)
+
+`OidcDeviceAuth` signs in an interactive user with the
+[Device Authorization Flow](/docs/security/oidc-device-flow/).
+It discovers the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public `/settings` endpoint. The default prompt works
+in terminals and remote Jupyter kernels:
+
+<OidcDeviceFlowExample />
+
+`oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
+or silently refreshed token for every connection and reconnect. It is mutually
+exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
+which most providers issue only when `offline_access` is among the scopes in
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope) or in the client's
+own `scope` override. Transport operations never prompt; if they raise
+`OidcInteractionRequired`, importable from `questdb.auth`, call `auth.sign_in()`
+explicitly on the main or UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise pass `issuer=...`, or set `client_id=`, `scope=`, `audience=`,
+`token_endpoint=` and `device_authorization_endpoint=` on `from_questdb`.
+
+Tokens stay in memory until a store is passed as
+`token_store=FileTokenStore.at_default_location()`, which writes a long-lived
+refresh token to disk as plaintext. See the [OIDC client
+examples](/docs/security/oidc-device-flow/#official-client-examples) for the sign-in prompt,
+explicit configuration, and the store's location and permissions.
 
 ### Other authentication limitations
 

@@ -1,0 +1,37 @@
+```rust
+use std::sync::Arc;
+use questdb::{
+    ingress::{AckLevel, TimestampNanos},
+    oidc::OidcDeviceAuth,
+    QuestDb,
+};
+
+fn main() -> questdb::Result<()> {
+    let auth = Arc::new(
+        OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
+            .build()?,
+    );
+    auth.sign_in()?; // the only call which may prompt or open a browser
+
+    let db = QuestDb::connect_with_token_provider(
+        "wss::addr=questdb.example.com:9000;",
+        {
+            let auth = Arc::clone(&auth);
+            move || auth.token()
+        },
+    )?;
+
+    let mut sender = db.borrow_sender()?;
+    let mut buffer = sender.new_buffer();
+    buffer
+        .table("trades")?
+        .symbol("symbol", "ETH-USD")?
+        .symbol("side", "sell")?
+        .column_f64("price", 2615.54)?
+        .column_f64("amount", 0.00044)?
+        .at(TimestampNanos::now())?;
+    sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok)?;
+    // db.borrow_reader() uses the same rotating token.
+    Ok(())
+}
+```

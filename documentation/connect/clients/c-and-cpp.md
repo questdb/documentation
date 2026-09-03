@@ -7,6 +7,8 @@ description: "QuestDB C and C++ client: the questdb_db / questdb::pool connectio
 
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
+import OidcDeviceFlowCpp from "../../partials/_oidc.device-flow.cpp.partial.mdx";
+import OidcDeviceFlowC from "../../partials/_oidc.device-flow.c.partial.mdx";
 
 The C and C++ clients ingest and query over
 [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), a columnar binary
@@ -328,7 +330,7 @@ Handle it there, not at `connect` (see
 ### OIDC device flow (Enterprise)
 
 The C and C++ APIs sign in an interactive user with the
-[Device Authorization Flow](/docs/security/oidc/#device-authorization-flow).
+[Device Authorization Flow](/docs/security/oidc-device-flow/).
 They discover the provider endpoints, client ID, scope, and the token QuestDB
 expects from the server's public `/settings` endpoint. Attach the resulting auth
 object to the pool so sender and reader connections share its rotating token:
@@ -336,75 +338,12 @@ object to the pool so sender and reader connections share its rotating token:
 <Tabs defaultValue="cpp" groupId="c-cpp">
 <TabItem value="cpp" label="C++">
 
-```cpp
-#include <questdb/ingress/qwp_sender.hpp>
-#include <questdb/oidc.hpp>
-#include <iostream>
-
-int main() {
-    auto auth = questdb::oidc::builder::from_questdb(
-            "https://questdb.example.com:9000")
-        .event_handler([](const questdb::oidc::event_view& event) {
-            if (event.kind() == questdb::oidc::event_kind::prompt)
-                std::cerr << "Open " << event.verification_uri()
-                          << " and enter " << event.user_code() << '\n';
-        })
-        .build();
-
-    auth.sign_in(); // the only call which may prompt or open a browser
-    questdb::pool pool{"wss::addr=questdb.example.com:9000;", auth};
-}
-```
+<OidcDeviceFlowCpp />
 
 </TabItem>
 <TabItem value="c" label="C">
 
-```c
-#include <questdb/client.h>
-#include <questdb/oidc.h>
-#include <stdio.h>
-#include <string.h>
-
-static void show_prompt(void *data, const questdb_oidc_event *event) {
-    (void)data;
-    if (event->kind == QUESTDB_OIDC_EVENT_PROMPT)
-        fprintf(stderr, "Open %.*s and enter %.*s\n",
-                (int)event->verification_uri_len, event->verification_uri,
-                (int)event->user_code_len, event->user_code);
-}
-
-int main(void) {
-    questdb_error *error = NULL;
-    questdb_oidc_builder *builder = NULL;
-    questdb_oidc_auth *auth = NULL;
-    questdb_db *db = NULL;
-    int status = 1;
-    const char *url = "https://questdb.example.com:9000";
-    builder = questdb_oidc_builder_from_questdb(url, strlen(url), &error);
-    if (!builder || !questdb_oidc_builder_event_handler(
-            builder, show_prompt, NULL, NULL, &error))
-        goto done;
-
-    auth = questdb_oidc_builder_build(builder, &error);
-    if (!auth || !questdb_oidc_auth_sign_in(auth, &error))
-        goto done;
-
-    questdb_db_connect_options options;
-    questdb_db_connect_options_init(&options, sizeof options);
-    options.oidc_auth = auth;
-    const char *conf = "wss::addr=questdb.example.com:9000;";
-    db = questdb_db_connect_ex(conf, strlen(conf), &options, &error);
-    if (db)
-        status = 0;
-
-done:
-    questdb_db_close(db);
-    questdb_oidc_auth_free(auth);
-    questdb_oidc_builder_free(builder);
-    questdb_error_free(error);
-    return status;
-}
-```
+<OidcDeviceFlowC />
 
 </TabItem>
 </Tabs>
@@ -429,7 +368,7 @@ names are prefixed with `questdb_oidc_builder_`.
 Tokens stay in memory until `.default_file_token_store()` in C++, or
 `questdb_oidc_builder_default_file_token_store()` in C, writes a long-lived
 refresh token to disk as plaintext. See the [complete client
-examples](/docs/security/oidc/#official-client-examples) for error handling, the
+examples](/docs/security/oidc-device-flow/#official-client-examples) for error handling, the
 sign-in prompt, and the store's location and permissions.
 
 ### Other authentication limitations

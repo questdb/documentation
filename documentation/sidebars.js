@@ -724,6 +724,11 @@ module.exports = {
           label: "OpenID Connect (OIDC)",
         },
         {
+          id: "security/oidc-device-flow",
+          type: "doc",
+          label: "OIDC device flow",
+        },
+        {
           type: "doc",
           id: "security/tls",
         },

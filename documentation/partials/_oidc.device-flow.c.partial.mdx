@@ -1,0 +1,70 @@
+```c
+#include <questdb/client.h>
+#include <questdb/ingress/qwp_sender.h>   // questdb_db_borrow_sender + line_sender_buffer
+#include <questdb/oidc.h>
+#include <stdio.h>
+#include <string.h>
+
+static void show_prompt(void *data, const questdb_oidc_event *event) {
+    (void)data;
+    if (event->kind == QUESTDB_OIDC_EVENT_PROMPT)
+        fprintf(stderr, "Open %.*s and enter %.*s\n",
+                (int)event->verification_uri_len, event->verification_uri,
+                (int)event->user_code_len, event->user_code);
+}
+
+int main(void) {
+    questdb_error *error = NULL;
+    questdb_oidc_builder *builder = NULL;
+    questdb_oidc_auth *auth = NULL;
+    questdb_db *db = NULL;
+    qwp_sender *sender = NULL;
+    line_sender_buffer *buffer = NULL;
+    int status = 1;
+
+    const char *url = "https://questdb.example.com:9000";
+    builder = questdb_oidc_builder_from_questdb(url, strlen(url), &error);
+    if (!builder || !questdb_oidc_builder_event_handler(
+            builder, show_prompt, NULL, NULL, &error))
+        goto done;
+
+    auth = questdb_oidc_builder_build(builder, &error);
+    if (!auth || !questdb_oidc_auth_sign_in(auth, &error))
+        goto done;
+
+    questdb_db_connect_options options;
+    questdb_db_connect_options_init(&options, sizeof options);
+    options.oidc_auth = auth;
+
+    const char *conf = "wss::addr=questdb.example.com:9000;";
+    db = questdb_db_connect_ex(conf, strlen(conf), &options, &error);
+    if (!db) goto done;
+
+    /* Sender and reader borrows use the rotating token. */
+    sender = questdb_db_borrow_sender(db, &error);
+    if (!sender) goto done;
+    buffer = questdb_db_new_buffer(db, &error);
+    if (!buffer) goto done;
+    if (!line_sender_buffer_table(buffer, QDB_TABLE_NAME_LITERAL("trades"), &error)) goto done;
+    if (!line_sender_buffer_symbol(buffer, QDB_COLUMN_NAME_LITERAL("symbol"),
+                                   QDB_UTF8_LITERAL("ETH-USD"), &error)) goto done;
+    if (!line_sender_buffer_column_f64(buffer, QDB_COLUMN_NAME_LITERAL("price"), 2615.54, &error)) goto done;
+    if (!line_sender_buffer_at_nanos(buffer, line_sender_now_nanos(), &error)) goto done;
+    if (!qwp_sender_flush_buffer_and_wait(sender, buffer, qwpws_ack_level_ok, &error)) goto done;
+    status = 0;
+
+done:
+    if (error) {
+        size_t len = 0;
+        const char *message = questdb_error_msg(error, &len);
+        fprintf(stderr, "OIDC device flow failed: %.*s\n", (int)len, message);
+        questdb_error_free(error);
+    }
+    line_sender_buffer_free(buffer);
+    if (sender) questdb_db_return_sender(db, sender);
+    questdb_db_close(db);
+    questdb_oidc_auth_free(auth);
+    questdb_oidc_builder_free(builder);
+    return status;
+}
+```
