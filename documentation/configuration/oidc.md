@@ -185,9 +185,14 @@ back.
 - **Default**: `false`
 - **Reloadable**: no
 
-When enabled, the PGWire endpoint supports OIDC authentication. The OAuth2
-token should be sent in the password field, while the username field should
-contain the string `_sso`, or left empty if that is an option.
+When enabled, the PGWire endpoint accepts an OAuth2 token obtained by the
+client. The token should be sent in the password field, while the username field
+should contain the string `_sso`, or be left empty if that is an option.
+
+This setting is not required for the ROPC path. To let a client such as `psql`
+send the user's SSO username and password and have QuestDB exchange them for a
+token, enable [`acl.oidc.ropc.flow.enabled`](#acloidcropcflowenabled) instead.
+The two settings do not need to be enabled together.
 
 ### acl.oidc.pkce.required
 
@@ -211,6 +216,12 @@ over HTTP basic authentication or PGWire that match no local user are sent on to
 the OIDC Provider's token endpoint as a password grant, and the user is logged
 in if the provider issues a token. This lets clients which cannot follow a
 browser redirect, such as `psql`, authenticate with their SSO credentials.
+
+For this `psql` login path, enable this setting along with the normal OIDC
+configuration.
+[`acl.oidc.pg.token.as.password.enabled`](#acloidcpgtokenaspasswordenabled) is
+not required; that setting is for clients which obtain an OAuth2 token
+themselves and send the token, rather than their SSO password, to QuestDB.
 
 Local users are matched first, so a QuestDB user whose name also exists in the
 Identity Provider is authenticated against its local password, without involving

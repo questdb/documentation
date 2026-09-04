@@ -154,7 +154,7 @@ Enable the `oidc` crate feature:
 
 ```toml title="Cargo.toml"
 [dependencies]
-questdb-rs = { version = "7", features = ["oidc"] }
+questdb-rs = { version = "7.1", features = ["oidc"] }
 ```
 
 <RustExample />
@@ -246,18 +246,17 @@ Override the default prompt to render the challenge elsewhere:
 | C | `questdb_oidc_builder_event_handler()` |
 | C++ | `.event_handler(...)` |
 
-The Java, C and C++ clients strip terminal controls, bidi marks and zero-width
-characters from the prompt's text fields before the callback sees them. The Rust
-and Python clients sanitize inside their built-in renderers only, so a custom
+The Java, Python, C and C++ clients strip terminal controls, bidi marks and
+zero-width characters from the prompt's text fields before the callback sees
+them. Rust sanitizes inside its built-in renderer only, so a custom Rust
 renderer receives the Identity Provider's response verbatim.
 
 :::caution
 
-A custom Rust or Python renderer must sanitize the user code and verification
-URL itself before writing them to a terminal or a DOM. Rendering them raw
-reopens the spoofing surface the built-in renderers close. Rust exposes
-`display_user_code()` and `display_verification_uri()` on the challenge; Python
-exports `sanitize_display_text` from `questdb.auth`.
+A custom Rust renderer must sanitize the user code and verification URL itself
+before writing them to a terminal or a DOM. Rendering them raw reopens the
+spoofing surface the built-in renderer closes. Rust exposes
+`display_user_code()` and `display_verification_uri()` on the challenge.
 
 :::
 
@@ -268,10 +267,9 @@ the Rust challenge, and the `browser_target` key on the Python prompt event.
 
 ## Explicit configuration and endpoint pinning
 
-Discovery supplies the client ID, scope, audience, token-selection mode, and
-endpoints. Set any of them explicitly when the application has its own
-registration with the provider, or when QuestDB does not publish what the client
-needs:
+Discovery supplies the client ID, scope, token-selection mode, and endpoints.
+Set configuration explicitly when the application has its own registration with
+the provider, or when QuestDB does not publish what the client needs:
 
 | Setting | Set it when |
 | --- | --- |

@@ -60,11 +60,15 @@ ALTER GROUP groupName WITH EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=qu
 ALTER GROUP groupName DROP EXTERNAL ALIAS 'CN=TestGroup1,OU=DC Users,DC=ad,DC=quest,DC=dev';
 ```
 
-QuestDB works the list of external groups out from the User Info response
-message.
+QuestDB can obtain the list of external groups from either the User Info
+response or the ID token. By default, it reads them from the User Info
+response. When
+[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
+is `true`, it reads them from the ID token instead; this mode supports providers
+such as Entra ID, which cannot return groups from the User Info endpoint.
 
-If we take the example used earlier, we will see that the message contains a
-claim called `groups`. Its name is set with
+In the User Info example used earlier, the response contains a claim called
+`groups`. Its name is set with
 [`acl.oidc.groups.claim`](/docs/configuration/oidc/#acloidcgroupsclaim), which
 has no default and must be set whenever OIDC is enabled.
 

@@ -172,7 +172,7 @@ Enable the `oidc` feature to sign in an interactive user with the
 
 ```toml title="Cargo.toml"
 [dependencies]
-questdb-rs = { version = "7", features = ["oidc"] }
+questdb-rs = { version = "7.1", features = ["oidc"] }
 ```
 
 `OidcDeviceAuth::from_questdb` discovers the provider endpoints, client ID,
