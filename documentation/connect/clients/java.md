@@ -12,6 +12,7 @@ import TabItem from "@theme/TabItem"
 import SfDedupWarning from "../../partials/_sf-dedup-warning.partial.mdx"
 
 import CodeBlock from "@theme/CodeBlock"
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.java.partial.mdx";
 
 :::note
 
@@ -396,6 +397,50 @@ try (QuestDB db = QuestDB.connect(
 The token is sent as an `Authorization: Bearer YOUR_BEARER_TOKEN` header on
 both the ingress and egress WebSocket upgrades. It is mutually exclusive with
 `username`/`password`.
+
+### OIDC device flow (Enterprise)
+
+`OidcDeviceAuth` signs in an interactive user with the
+[OIDC device flow](/docs/security/oidc/device-flow/).
+It discovers the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL passed to
+`fromQuestDB`; the client appends `/settings`. The user can approve the sign-in
+from a browser on any device, so this also works from a container or remote
+notebook kernel:
+
+<OidcDeviceFlowExample />
+
+Pass `auth::getToken` as a provider instead of putting the current token in the
+connect string. Every new connection and reconnect then receives the cached or
+silently refreshed token. Silent refresh needs a refresh token, which the
+provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). A transport call
+never starts an interactive flow; it throws `OidcAuthException`, which carries
+no distinct interaction-required type, so call `signIn()` again on the main or
+UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise pin the provider by passing
+`new OidcDeviceAuth.DiscoveryOptions().issuer("https://idp")` as the second
+argument to `fromQuestDB`, or set the client ID, scope and endpoints yourself
+with `OidcDeviceAuth.builder()`.
+
+`DiscoveryOptions` carries `issuer`, `prompt`, `tokenStore`, `tlsConfig` and
+`allowInsecureTransport` only. The client ID, scope, audience and
+token-selection mode live on `OidcDeviceAuth.builder()`, which requires the
+client ID and both endpoints together, so registering this application under its
+own Client Id means pinning the endpoints rather than discovering them.
+
+Tokens stay in memory until a store is attached with
+`new OidcDeviceAuth.DiscoveryOptions().tokenStore(FileTokenStore.atDefaultLocation())`,
+which writes a long-lived refresh token to disk as plaintext. See [token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ### HTTP basic auth
 

@@ -7,6 +7,8 @@ description: "QuestDB C and C++ client: the questdb_db / questdb::pool connectio
 
 import Tabs from "@theme/Tabs"
 import TabItem from "@theme/TabItem"
+import OidcDeviceFlowCpp from "../../partials/_oidc.device-flow.cpp.partial.mdx";
+import OidcDeviceFlowC from "../../partials/_oidc.device-flow.c.partial.mdx";
 
 The C and C++ clients ingest and query over
 [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/), a columnar binary
@@ -325,16 +327,62 @@ Because the pool connects lazily, a bad credential surfaces as
 Handle it there, not at `connect` (see
 [Which errors mean what](#which-errors-mean-what)).
 
-### Unsupported auth paths
+### OIDC device flow (Enterprise)
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
+The C and C++ APIs sign in an interactive user with the
+[OIDC device flow](/docs/security/oidc/device-flow/).
+They discover the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL passed to the
+builder; the client appends `/settings`. Attach the resulting auth object to the
+pool so sender and reader connections share its rotating token:
 
-| Path | Status | Workaround |
-|---|---|---|
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and has no callback to refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the pool when the token nears expiry. |
-| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. See the connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls). |
-| Token rotation mid-session | Not supported. Credentials are presented once during the WebSocket upgrade and are not re-sent. | On token expiry, close the pool and build a fresh one with the new token. |
+<Tabs defaultValue="cpp" groupId="c-cpp">
+<TabItem value="cpp" label="C++">
+
+<OidcDeviceFlowCpp />
+
+</TabItem>
+<TabItem value="c" label="C">
+
+<OidcDeviceFlowC />
+
+</TabItem>
+</Tabs>
+
+The pool retains the auth state and gets a cached or silently refreshed token
+for every connection and reconnect. Silent refresh needs a refresh token, which
+the provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Those transport
+operations never prompt; they fail with
+`QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` in C, or
+`questdb::oidc::error_kind::interaction_required` in C++, and the application
+calls `sign_in()` / `questdb_oidc_auth_sign_in()` explicitly on the main or UI
+thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise set the builder's `issuer`, or set `client_id`, `scope`, `audience`,
+`token_endpoint` and `device_authorization_endpoint` yourself; in C the same
+names are prefixed with `questdb_oidc_builder_`.
+
+Tokens stay in memory until `.default_file_token_store()` in C++, or
+`questdb_oidc_builder_default_file_token_store()` in C, writes a long-lived
+refresh token to disk as plaintext. See [token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
+
+### Other authentication limitations
+
+- Mutual TLS client certificates are not supported because the QuestDB server
+  does not negotiate them. Use bearer-token authentication over `wss`; see the
+  connect-string reference's [TLS section](/docs/connect/clients/connect-string/#tls).
+- A token supplied directly through `token=...` remains fixed. Attach an OIDC
+  auth object for device-flow token refresh, or rebuild the pool when an
+  externally acquired token rotates.
 
 ## Headers
 

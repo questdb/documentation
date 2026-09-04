@@ -1,0 +1,22 @@
+```python
+import questdb
+from questdb import TimestampNanos
+from questdb.auth import OidcDeviceAuth
+
+with OidcDeviceAuth.from_questdb(
+        "https://questdb.example.com:9000") as auth:
+    auth.sign_in()  # the only call which may prompt or open a browser
+
+    with questdb.connect(
+            "wss::addr=questdb.example.com:9000;",
+            oidc_auth=auth) as db:
+        with db.sender() as sender:
+            sender.row(
+                "trades",
+                symbols={"symbol": "ETH-USDT", "side": "sell"},
+                columns={"price": 2615.54, "amount": 0.00044},
+                at=TimestampNanos.now(),
+            )
+            sender.flush(wait=True)
+        # db.dataframe() and db.query() use the same rotating token.
+```

@@ -288,6 +288,10 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
+                  id: "query/sql/acl/alter-group",
+                  type: "doc",
+                },
+                {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
                 },
@@ -714,14 +718,94 @@ module.exports = {
       type: "category",
       items: [
         {
-          id: "security/rbac",
-          type: "doc",
           label: "Role-Based Access Control (RBAC)",
+          type: "category",
+          link: { type: "doc", id: "security/rbac/index" },
+          items: [
+            {
+              id: "security/rbac/index",
+              type: "doc",
+              label: "Overview",
+            },
+            {
+              id: "security/rbac/users-and-groups",
+              type: "doc",
+              label: "Users and groups",
+            },
+            {
+              id: "security/rbac/authentication",
+              type: "doc",
+              label: "Authentication and endpoints",
+            },
+            {
+              id: "security/rbac/granting-permissions",
+              type: "doc",
+              label: "Granting permissions",
+            },
+            {
+              id: "security/rbac/permissions-reference",
+              type: "doc",
+              label: "Permissions reference",
+            },
+            {
+              id: "security/rbac/common-scenarios",
+              type: "doc",
+              label: "Common scenarios",
+            },
+          ],
         },
         {
-          id: "security/oidc",
-          type: "doc",
           label: "OpenID Connect (OIDC)",
+          type: "category",
+          link: { type: "doc", id: "security/oidc/index" },
+          items: [
+            {
+              id: "security/oidc/index",
+              type: "doc",
+              label: "Overview",
+            },
+            {
+              id: "security/oidc/how-sign-in-works",
+              type: "doc",
+              label: "How sign-in works",
+            },
+            {
+              id: "security/oidc/client-discovery",
+              type: "doc",
+              label: "Client discovery and tokens",
+            },
+            {
+              id: "security/oidc/device-flow",
+              type: "doc",
+              label: "Device flow",
+            },
+            {
+              id: "security/oidc/client-integration",
+              type: "doc",
+              label: "Client integration patterns",
+            },
+            {
+              id: "security/oidc/group-mapping",
+              type: "doc",
+              label: "Mapping groups and permissions",
+            },
+            {
+              label: "Provider setup",
+              type: "category",
+              items: [
+                {
+                  id: "security/oidc/pingfederate",
+                  type: "doc",
+                  label: "PingFederate",
+                },
+                {
+                  id: "security/oidc/entra-id",
+                  type: "doc",
+                  label: "Microsoft Entra ID",
+                },
+              ],
+            },
+          ],
         },
         {
           type: "doc",

@@ -1,0 +1,151 @@
+---
+title: OpenID Connect (OIDC)
+sidebar_label: Overview
+slug: /security/oidc
+description: Integrate QuestDB Enterprise with an external OIDC Identity Provider for Web Console SSO, client authentication, PGWire token authentication, and group mapping.
+---
+
+import Screenshot from "@theme/Screenshot";
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  OpenID Connect (OIDC) enables SSO authentication with external Identity Providers.
+</EnterpriseNote>
+
+OpenID Connect (OIDC) integrates with Identity Providers (IdP) external to
+QuestDB.
+
+It is a convenient way to integrate QuestDB into your enterprise environment,
+and it provides SSO (Single Sign-On) for the [Web Console](/docs/getting-started/web-console/overview/).
+
+Microsoft Active Directory and Azure AD, for example, can be turned into an
+Identity Provider.
+
+Specific installation steps depend on the type of the provider.
+
+## Architecture overview
+
+Altogether, the architecture appears as such:
+
+<Screenshot
+  alt="Overall architecture"
+  src="images/docs/guide/oidc/oidc-architecture.webp"
+  title="Architecture diagram"
+  width={750}
+/>
+
+We can break it down into core components.
+
+### Web Console
+
+QuestDB's interactive UI. Users must authenticate before accessing the database
+via the interface.
+
+The [Web Console](/docs/getting-started/web-console/overview/) uses PKCE (Proof Key for Code Exchange) to
+secure the authentication and authorization flow.
+
+In OAuth2/OIDC terms, the [Web Console](/docs/getting-started/web-console/overview/) is referred to as
+the _client_, and it is assigned an identifier: the **Client Id**.
+
+Each application which integrates via OIDC should be given a different **Client
+Id**.
+
+### OIDC Provider
+
+Typically consists of a number of modules.
+
+We are interested in two of them only.
+
+1. The _Identity Provider_ holds user identities and user information, capable
+   of authenticating users, and to issue an ID Token which uniquely identify
+   them.
+
+2. The _Authorization Server_ grants access to resources, such as a database, in
+   the form of access tokens.
+
+The OIDC Provider usually integrates with a number of applications which require
+different access to a number of resources.
+
+These clients communicate with the OIDC Provider via its endpoints.
+
+It exposes a number of APIs, including the Authorization, Token and User Info
+endpoints.
+
+### QuestDB
+
+The database, in OAuth2/OIDC terms the _protected resource_ or _resource
+server_.
+
+Only processes requests which contain the bearer token selected by its OIDC
+configuration: normally the access token, or the ID token when group memberships
+are encoded in it.
+
+
+## Where to go next
+
+| Page | Covers |
+| --- | --- |
+| [How sign-in works](/docs/security/oidc/how-sign-in-works/) | The Authorization Code Flow with PKCE, step by step |
+| [Client discovery and tokens](/docs/security/oidc/client-discovery/) | The settings endpoint, and which of the two tokens to send |
+| [Device flow](/docs/security/oidc/device-flow/) | Headless sign-in for a CLI, container, or notebook kernel |
+| [Client integration patterns](/docs/security/oidc/client-integration/) | Browser clients, Jupyter, CLI tools, unattended jobs, PGWire |
+| [Mapping groups and permissions](/docs/security/oidc/group-mapping/) | Turning Identity Provider groups into QuestDB permissions |
+| [PingFederate](/docs/security/oidc/pingfederate/) | Provider setup walkthrough |
+| [Microsoft Entra ID](/docs/security/oidc/entra-id/) | Provider setup walkthrough |
+
+For the `acl.oidc.*` settings, see the
+[OIDC settings reference](/docs/configuration/oidc/).
+
+## Where each section moved {#moved}
+
+These anchors are kept so that existing links keep working. Prefer the pages
+above when adding new links.
+
+| Section | Now at |
+| --- | --- |
+| <span id="authentication-and-authorization-flow"></span> Authentication and authorization flow | [How sign-in works](/docs/security/oidc/how-sign-in-works/) |
+| <span id="1-secret-generation"></span> Secret generation | [How sign-in works](/docs/security/oidc/how-sign-in-works/#1-secret-generation) |
+| <span id="2-prove-identity"></span> Prove identity | [How sign-in works](/docs/security/oidc/how-sign-in-works/#2-prove-identity) |
+| <span id="3-scope-consent"></span> Scope consent | [How sign-in works](/docs/security/oidc/how-sign-in-works/#3-scope-consent) |
+| <span id="4-redirection"></span> Redirection | [How sign-in works](/docs/security/oidc/how-sign-in-works/#4-redirection) |
+| <span id="5-credential-request"></span> Credential request | [How sign-in works](/docs/security/oidc/how-sign-in-works/#5-credential-request) |
+| <span id="6-credentials-received"></span> Credentials received | [How sign-in works](/docs/security/oidc/how-sign-in-works/#6-credentials-received) |
+| <span id="7-database-access"></span> Database access | [How sign-in works](/docs/security/oidc/how-sign-in-works/#7-database-access) |
+| <span id="8-find-user-information"></span> Find user information | [How sign-in works](/docs/security/oidc/how-sign-in-works/#8-find-user-information) |
+| <span id="9-receive-user-information"></span> Receive user information | [How sign-in works](/docs/security/oidc/how-sign-in-works/#9-receive-user-information) |
+| <span id="10-permission-check"></span> Permission check | [How sign-in works](/docs/security/oidc/how-sign-in-works/#10-permission-check) |
+| <span id="user-permissions"></span> User permissions | [Mapping groups and permissions](/docs/security/oidc/group-mapping/) |
+| <span id="mapping-user-permissions"></span> Mapping user permissions | [Mapping groups and permissions](/docs/security/oidc/group-mapping/#mapping-user-permissions) |
+| <span id="interactive-clients"></span> Interactive clients | [Client integration patterns](/docs/security/oidc/client-integration/) |
+| <span id="browser-based-clients"></span> Browser-based clients | [Client integration patterns](/docs/security/oidc/client-integration/#browser-based-clients) |
+| <span id="jupyter-notebook"></span> Jupyter notebook | [Client integration patterns](/docs/security/oidc/client-integration/#jupyter-notebook) |
+| <span id="externalizing-credentials"></span> Externalizing credentials | [Client integration patterns](/docs/security/oidc/client-integration/#externalizing-credentials) |
+| <span id="enable-ropc"></span> Enable ROPC | [Client integration patterns](/docs/security/oidc/client-integration/#enable-ropc) |
+| <span id="cli-standalone-applications"></span> CLI and standalone applications | [Client integration patterns](/docs/security/oidc/client-integration/#cli-standalone-applications) |
+| <span id="non-interactive-clients"></span> Non-interactive clients | [Client integration patterns](/docs/security/oidc/client-integration/#non-interactive-clients) |
+| <span id="oidc-for-the-pgwire-endpoint"></span> OIDC for the PGWire endpoint | [Client integration patterns](/docs/security/oidc/client-integration/#oidc-for-the-pgwire-endpoint) |
+| <span id="active-directory"></span> Active Directory | [PingFederate](/docs/security/oidc/pingfederate/) or [Microsoft Entra ID](/docs/security/oidc/entra-id/) |
+| <span id="pingfederate"></span> PingFederate | [PingFederate](/docs/security/oidc/pingfederate/) |
+| <span id="set-up-pingfederate-client"></span> Set up PingFederate client | [PingFederate](/docs/security/oidc/pingfederate/#set-up-pingfederate-client) |
+| <span id="access-token-manager-settings"></span> Access Token Manager settings | [PingFederate](/docs/security/oidc/pingfederate/#access-token-manager-settings) |
+| <span id="authorization-server-settings"></span> Authorization Server settings | [PingFederate](/docs/security/oidc/pingfederate/#authorization-server-settings) |
+| <span id="set-up-a-microsoft-entra-id-data-source"></span> Set up a Microsoft Entra ID Data Source | [PingFederate](/docs/security/oidc/pingfederate/#set-up-a-microsoft-entra-id-data-source) |
+| <span id="set-up-a-password-credential-validator"></span> Set up a Password Credential Validator | [PingFederate](/docs/security/oidc/pingfederate/#set-up-a-password-credential-validator) |
+| <span id="set-up-an-identity-provider"></span> Set up an Identity Provider | [PingFederate](/docs/security/oidc/pingfederate/#set-up-an-identity-provider) |
+| <span id="add-groups-to-oidc-policy-management"></span> Add groups to OIDC policy management | [PingFederate](/docs/security/oidc/pingfederate/#add-groups-to-oidc-policy-management) |
+| <span id="enable-resource-owner-password-credentials-ropc-flow"></span> Enable Resource Owner Password Credentials flow | [PingFederate](/docs/security/oidc/pingfederate/#enable-resource-owner-password-credentials-ropc-flow) |
+| <span id="questdb-configuration-for-pingfederate"></span> QuestDB configuration for PingFederate | [PingFederate](/docs/security/oidc/pingfederate/#questdb-configuration) |
+| <span id="confirm-questdb-mappings-and-login"></span> Confirm QuestDB mappings and login | [PingFederate](/docs/security/oidc/pingfederate/#confirm-questdb-mappings-and-login) |
+| <span id="microsoft-entraid"></span><span id="questdb-configuration"></span> Microsoft Entra ID | [Microsoft Entra ID](/docs/security/oidc/entra-id/) |
+| <span id="set-up-the-client-application-in-entra-id"></span> Set up the client application in Entra ID | [Microsoft Entra ID](/docs/security/oidc/entra-id/#set-up-the-client-application-in-entra-id) |
+| <span id="map-groups-and-grant-permissions"></span> Map groups and grant permissions | [Microsoft Entra ID](/docs/security/oidc/entra-id/#map-groups-and-grant-permissions) |
+| <span id="confirm-group-mappings-and-login"></span> Confirm group mappings and login | [Microsoft Entra ID](/docs/security/oidc/entra-id/#confirm-group-mappings-and-login) |
+| <span id="configuration-options"></span> Configuration options | [OIDC settings](/docs/configuration/oidc/) |
+
+## See also
+
+- [OIDC settings reference](/docs/configuration/oidc/) - configure QuestDB and
+  its Identity Provider connection
+- [Role-based access control](/docs/security/rbac/) - grant endpoint and data
+  permissions after authentication
+- [TLS](/docs/security/tls/) - protect credentials and tokens in transit

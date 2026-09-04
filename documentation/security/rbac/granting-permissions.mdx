@@ -1,0 +1,186 @@
+---
+title: Granting and revoking permissions
+sidebar_label: Granting permissions
+description:
+  How QuestDB Enterprise permissions apply at database, table and column level,
+  what GRANT ALL and WITH GRANT OPTION really do, and how a grant changes level
+  when you revoke part of it.
+---
+
+Permissions are granted with [`GRANT`](/docs/query/sql/acl/grant/) and removed
+with [`REVOKE`](/docs/query/sql/acl/revoke/). This page covers the level a grant
+applies at, the semantics that are easy to get wrong, and the behaviour that
+surprises people the first time they hit it.
+
+For the list of permissions themselves, see the
+[permissions reference](/docs/security/rbac/permissions-reference/).
+
+The examples use the `trades(timestamp, symbol, side, price, amount)` table from
+the [Create your first database guide](/docs/getting-started/create-database/).
+
+## Permission levels
+
+Permissions have different granularities determining where they can be applied:
+
+| Granularity | Can be granted at                     |
+| ----------- | ------------------------------------- |
+| Database    | Database only                         |
+| Table       | Database or specific tables           |
+| Column      | Database, tables, or specific columns |
+
+Examples:
+
+```questdb-sql
+-- Database-level: applies to all tables
+GRANT SELECT ON ALL TABLES TO user;
+
+-- Table-level: applies to a specific table
+GRANT SELECT ON trades TO user;
+
+-- Column-level: applies to specific columns
+GRANT SELECT ON trades(timestamp, symbol, price) TO user;
+```
+
+### Column-level access
+
+Restrict users to see only certain columns:
+
+```questdb-sql
+-- User can only see timestamp and price, not symbol, side, or amount
+GRANT SELECT ON trades(timestamp, price) TO analyst;
+```
+
+To grant on every column except a few, use the `*` wildcard with an `EXCLUDE`
+list:
+
+```questdb-sql
+-- User can see all columns except side
+GRANT SELECT ON trades(* EXCLUDE (side)) TO analyst;
+```
+
+The wildcard covers the columns that exist when the statement runs, not columns
+added later. See
+[GRANT](/docs/query/sql/acl/grant/#grant-on-all-columns-of-a-table) for details.
+
+### Row-level access with views
+
+For row-level security, create a [view](/docs/concepts/views/) that filters
+rows, then grant access to the view instead of the underlying table:
+
+```questdb-sql
+-- Create a view that only shows AAPL trades
+CREATE VIEW aapl_trades AS (
+  SELECT * FROM trades WHERE symbol = 'AAPL'
+);
+
+-- Grant access to the view, not the base table
+GRANT SELECT ON aapl_trades TO aapl_analyst;
+-- No GRANT on trades table = user cannot see other symbols
+```
+
+The user `aapl_analyst` can only see AAPL trades. They have no access to the
+underlying `trades` table.
+
+Creating a view needs the `CREATE VIEW` permission; dropping or redefining one
+needs `DROP VIEW` or `ALTER VIEW` on that view.
+
+## Granting ALL {#granting-all}
+
+`ALL` expands to every permission valid at the level you grant it, and at the
+database level that set includes `DATABASE ADMIN`:
+
+```questdb-sql
+-- Makes database_admin a full database administrator
+GRANT ALL TO database_admin;
+
+-- Every permission on one table only
+GRANT ALL ON trades TO trade_manager;
+```
+
+:::warning
+
+`GRANT ALL TO <user>` with no table or column list is an administrator grant,
+not a broad data grant. Scope it to tables, or name the permissions you mean.
+
+:::
+
+## The GRANT option
+
+When granting permissions, you can allow the recipient to grant that permission
+to others:
+
+```questdb-sql
+GRANT SELECT ON trades TO team_lead WITH GRANT OPTION;
+
+-- team_lead can now grant SELECT on trades to others
+```
+
+## Owner permissions {#owner-grants}
+
+When a user creates a table, they automatically receive all permissions on it
+with the GRANT option. This ownership does not persist - if revoked, they cannot
+get it back without someone re-granting it.
+
+## Permission re-adjustment {#permission-level-re-adjustment}
+
+Database-level permissions include access to future tables. If you revoke access
+to one table, QuestDB automatically converts the database-level grant to
+individual table-level grants:
+
+```questdb-sql
+GRANT SELECT ON ALL TABLES TO user;  -- Database level
+REVOKE SELECT ON secret_table FROM user;
+
+-- Result: user now has table-level SELECT on all tables EXCEPT secret_table
+-- Future tables will NOT be accessible
+```
+
+The same applies from table to column level:
+
+```questdb-sql
+GRANT SELECT ON trades TO user;           -- Table level
+REVOKE SELECT ON trades(side) FROM user;  -- Revoke one column
+
+-- Result: user has column-level SELECT on all columns EXCEPT side
+-- Future columns will NOT be accessible
+```
+
+:::note
+
+Dropping a table removes every permission granted on it, from every user and
+group. Recreating a table with the same name does not bring them back, so a
+drop-and-recreate has to re-grant them. The same applies to views, materialized
+views and live views.
+
+:::
+
+## Implicit timestamp permissions {#implicit-permissions}
+
+If a user has SELECT or UPDATE on any column of a table, they automatically get
+the same permission on the designated timestamp column. This ensures time-series
+operations (SAMPLE BY, LATEST ON, etc.) work correctly.
+
+## Granting on non-existent objects {#grant-verification}
+
+You can grant permissions on tables/columns that don't exist yet:
+
+```questdb-sql
+GRANT INSERT ON future_table TO app;
+-- Permission activates when future_table is created
+```
+
+Use `WITH VERIFICATION` to catch typos:
+
+```questdb-sql
+GRANT SELECT ON trdaes TO user WITH VERIFICATION;
+-- Fails immediately because 'trdaes' doesn't exist
+```
+
+## See also
+
+- [Permissions reference](/docs/security/rbac/permissions-reference/) - every
+  permission and the level it can be granted at
+- [Common scenarios](/docs/security/rbac/common-scenarios/) - worked grants for
+  analysts, service accounts, teams and admins
+- [`GRANT`](/docs/query/sql/acl/grant/) and
+  [`REVOKE`](/docs/query/sql/acl/revoke/) statement syntax

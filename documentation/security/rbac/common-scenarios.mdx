@@ -1,0 +1,125 @@
+---
+title: RBAC common scenarios
+sidebar_label: Common scenarios
+description:
+  Worked QuestDB Enterprise permission setups for read-only analysts, ingestion
+  service accounts, teams, column and row restrictions, database administrators,
+  and failover operators.
+---
+
+Each scenario below is a complete permission setup. The examples use the
+`trades(timestamp, symbol, side, price, amount)` table from the
+[Create your first database guide](/docs/getting-started/create-database/).
+Adapt the principal and table names; the shape of the grants is the part worth
+copying.
+
+## Read-only analyst
+
+A user who can query data but cannot modify anything:
+
+```questdb-sql
+CREATE USER analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO analyst;
+GRANT SELECT ON ALL TABLES TO analyst;
+```
+
+## Application service account
+
+A service account for an application that ingests data into specific tables:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT ingest_app WITH PASSWORD 'pwd';
+GRANT ILP TO ingest_app;               -- InfluxDB Line Protocol access
+GRANT INSERT ON trades TO ingest_app;  -- Can only insert into trades
+```
+
+## Team-based access with groups
+
+Multiple users sharing the same permissions:
+
+```questdb-sql
+-- Create a group
+CREATE GROUP trading_team;
+
+-- Grant permissions to the group
+GRANT HTTP, PGWIRE TO trading_team;
+GRANT SELECT ON trades TO trading_team;
+GRANT INSERT ON trades TO trading_team;
+
+-- Add users to the group - they inherit all permissions
+CREATE USER market_analyst WITH PASSWORD 'pwd1';
+CREATE USER risk_analyst WITH PASSWORD 'pwd2';
+ADD USER market_analyst TO trading_team;
+ADD USER risk_analyst TO trading_team;
+```
+
+## Column-level restrictions (hide sensitive data)
+
+Allow access to selected fields while hiding columns your policy treats as
+sensitive:
+
+```questdb-sql
+CREATE USER auditor WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO auditor;
+
+-- Grant access to approved columns only
+GRANT SELECT ON trades(timestamp, symbol, price) TO auditor;
+-- Columns side and amount are not granted = invisible to auditor
+```
+
+## Row-level security with views {#row-level-security-multi-tenant}
+
+Different users see different subsets of data:
+
+```questdb-sql
+-- Create views over different subsets of the trades table
+CREATE VIEW eth_usd_trades AS (SELECT * FROM trades WHERE symbol = 'ETH-USD');
+CREATE VIEW btc_usd_trades AS (SELECT * FROM trades WHERE symbol = 'BTC-USD');
+
+-- Grant users access to their subset only
+CREATE USER eth_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO eth_analyst;
+GRANT SELECT ON eth_usd_trades TO eth_analyst;
+
+CREATE USER btc_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO btc_analyst;
+GRANT SELECT ON btc_usd_trades TO btc_analyst;
+```
+
+## Database administrator
+
+A user with full control (but not the built-in admin):
+
+```questdb-sql
+CREATE USER dba WITH PASSWORD 'pwd';
+GRANT DATABASE ADMIN TO dba;
+```
+
+:::warning
+
+`DATABASE ADMIN` grants all current and future permissions. Use sparingly.
+
+:::
+
+## Failover operator
+
+A service account that can move the primary role between nodes, for an external
+coordinator or a runbook, without any other administrative right:
+
+```questdb-sql
+CREATE SERVICE ACCOUNT failover_bot WITH PASSWORD 'pwd';
+GRANT HTTP TO failover_bot;         -- POST /lifecycle/switch on port 9003
+GRANT SWITCH ROLE TO failover_bot;  -- SWITCH ROLE, SWITCH STATUS, the endpoint
+```
+
+`SYSTEM ADMIN` is neither required nor sufficient for a role switch, and
+`DATABASE ADMIN` includes `SWITCH ROLE`. Monitoring accounts do not need it:
+`node_role()` and `GET /lifecycle` are open to any authenticated principal. See
+[Failover and role switch](/docs/high-availability/failover/).
+
+## See also
+
+- [Granting and revoking permissions](/docs/security/rbac/granting-permissions/) -
+  the semantics behind these grants
+- [Permissions reference](/docs/security/rbac/permissions-reference/) - every
+  permission available

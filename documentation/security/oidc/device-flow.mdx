@@ -1,0 +1,529 @@
+---
+title: OIDC device flow
+description: "OIDC device flow for QuestDB Enterprise: headless SSO sign-in from a CLI, container, or notebook, with Java, Python, Rust, C and C++ examples."
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import JavaExample from "../../partials/_oidc.device-flow.java.partial.mdx";
+import PythonExample from "../../partials/_oidc.device-flow.python.partial.mdx";
+import RustExample from "../../partials/_oidc.device-flow.rust.partial.mdx";
+import CppExample from "../../partials/_oidc.device-flow.cpp.partial.mdx";
+import CExample from "../../partials/_oidc.device-flow.c.partial.mdx";
+import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
+
+<EnterpriseNote>
+  The OIDC device flow signs in an interactive user from a client that
+  cannot receive a browser redirect.
+</EnterpriseNote>
+
+The [OAuth 2.0 Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628)
+signs in a person without redirecting a browser back to the client. It is a good
+fit for command-line applications, containers, and remote notebook kernels: the
+client displays a verification URL and short code, and the user can authorize
+from a browser on any laptop or phone.
+
+QuestDB does not run the device flow. The client communicates directly with the
+Identity Provider, then presents the resulting bearer token to QuestDB:
+
+```mermaid
+sequenceDiagram
+    participant Client as QuestDB client
+    participant QDB as QuestDB
+    participant IdP as Identity Provider
+    participant User
+    alt Discovery through QuestDB
+        Client->>QDB: GET /settings
+        QDB-->>Client: client ID, scope, endpoints, token mode
+    else issuer pinned on the client
+        Client->>IdP: GET {issuer path}/.well-known/openid-configuration
+        IdP-->>Client: endpoints
+    end
+    Client->>IdP: Request device and user codes
+    IdP-->>Client: device_code, user_code, verification URI
+    Client->>User: Display URL and code
+    par User authorizes
+        User->>IdP: Sign in and approve in a browser
+    and Client polls
+        loop Until approved or expired
+            Client->>IdP: Poll token endpoint
+            IdP-->>Client: authorization_pending / tokens
+        end
+    end
+    Client->>QDB: Authorization: Bearer selected token
+    Note over Client,IdP: Later: silent refresh, or an interaction-required error
+```
+
+The client must respect the polling interval, `slow_down` responses, and the
+device code's expiry. The official clients handle those protocol details,
+choose the access or ID token according to
+[`acl.oidc.groups.encoded.in.token`](/docs/security/oidc/client-discovery/#which-token-to-send), cache it in memory,
+and refresh it silently when the provider issues a refresh token. They never
+send the device code or the user's Identity Provider password to QuestDB.
+
+## Configure the provider and QuestDB
+
+Before using the flow:
+
+1. Register the application as a public client with the Identity Provider and
+   enable the device authorization grant on it. Each application which
+   integrates via OIDC should have its own Client Id, so that it can be told
+   apart from QuestDB in the provider's audit log and given its own policies.
+   Pass that Client Id to the client explicitly, as described under
+   [Explicit configuration and endpoint pinning](#explicit-configuration-and-endpoint-pinning).
+2. Make the device authorization endpoint available to clients. For the
+   zero-configuration examples below, `acl.oidc.configuration.url` must resolve
+   a provider document containing `device_authorization_endpoint`, or the
+   host-based configuration must set
+   [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+3. Keep `openid` in [`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope),
+   and add `offline_access` so the provider issues a refresh token. Without one
+   the client must make the user sign in again at every token expiry.
+
+For example, a host-based configuration can add:
+
+```ini title="server.conf"
+acl.oidc.scope=openid offline_access
+acl.oidc.device.authorization.endpoint=/as/device_authz.oauth2
+```
+
+The exact endpoint path and refresh-token scope are provider-specific. With
+configuration-document discovery, do not set the endpoint property: all
+individual endpoint settings are ignored in that mode.
+
+If QuestDB does not publish the device authorization endpoint, pin the provider
+with the client's `issuer` option so the client can fetch
+`{issuer}/.well-known/openid-configuration`, including any path component in the
+issuer, or configure the client ID and both endpoints explicitly.
+
+Clients reach QuestDB over `https` for discovery, so the HTTP endpoint needs TLS
+enabled with [`http.tls.enabled`](/docs/configuration/tls/#httptlsenabled) and a
+certificate. For setting OIDC up against a specific provider, the OIDC guide has
+walkthroughs for
+[Microsoft Entra ID](/docs/security/oidc/entra-id/) and
+[PingFederate](/docs/security/oidc/pingfederate/).
+
+## Official client examples
+
+Each example discovers the OIDC client ID, scope, token-selection mode, and
+provider endpoints from QuestDB's [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), then
+signs in before opening the database connection.
+
+The examples use QuestDB's default Web Console context. The clients append
+`/settings` to the QuestDB URL, so include a non-default context in that URL. For
+example, with `http.context.web.console=/console`, pass
+`https://questdb.example.com:9000/console`. See the settings endpoint's
+[path rules](/docs/security/oidc/client-discovery/#settings-endpoint).
+
+Discovering the client ID means reusing QuestDB's own registration, which keeps
+the examples short but gives the application no separate identity at the
+provider. That is fine for evaluation; in production register the application
+and set its Client Id explicitly, as described below.
+
+The discovery URL must use `https`: reaching QuestDB over plaintext would let an
+attacker replace the advertised Identity Provider endpoints and redirect the
+device code and the refresh token, so the clients reject it rather than warn.
+The Rust, C, C++ and Python clients accept loopback `http` for local
+development; the Java client requires the opt-out below even for `localhost`.
+
+The opt-out covers the QuestDB discovery request only. Every client holds the
+Identity Provider itself to `https` or loopback, and no flag relaxes that:
+
+| Client | Opt out of `https` for discovery |
+| --- | --- |
+| Java | `allowInsecureTransport(true)` |
+| Python | `insecure=True` |
+| Rust | `.allow_insecure_transport(true)` |
+| C | `questdb_oidc_builder_allow_insecure_transport()` |
+| C++ | `.allow_insecure_transport(true)` |
+
+The flag alone is not enough. Over plaintext a client also refuses to take the
+credential endpoints from a `/settings` response that could have been tampered
+with in transit, so pin the provider with `issuer` as well, and pass explicitly
+any client ID, scope, audience, or token-selection mode you rely on. An issuer
+pin covers the endpoints, not those four values.
+
+<Tabs defaultValue="java" groupId="oidc-device-client-example">
+<TabItem value="java" label="Java">
+
+<JavaExample />
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+<PythonExample />
+
+</TabItem>
+<TabItem value="rust" label="Rust">
+
+Enable the `oidc` crate feature:
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7.1", features = ["oidc"] }
+```
+
+<RustExample />
+
+</TabItem>
+<TabItem value="cpp" label="C++">
+
+<CppExample />
+
+</TabItem>
+<TabItem value="c" label="C">
+
+<CExample />
+
+</TabItem>
+</Tabs>
+
+The authentication object owns the token state, and the connection asks it for a
+token on every connect and reconnect. Java and Rust take a token provider
+(`auth::getToken`, a closure over `auth.token()`); Python, C and C++ take the
+authentication object itself. Either way, hand the connection the object rather
+than copying the current token into the connection string, otherwise a reconnect
+after expiry keeps sending the stale value.
+
+Device flow always requires a person to approve the sign-in. For unattended
+services, scheduled jobs, or CI, use a
+[QuestDB service-account token](/docs/security/oidc/client-integration/#non-interactive-clients)
+or a provider flow intended for machine identities instead.
+
+## The sign-in prompt
+
+Signing in renders the verification URL and the user code, then blocks until the
+user approves or the device code expires. Where that text goes, and whether the
+call runs at all without a terminal, differs by client:
+
+| Client | Default prompt | Without a terminal |
+| --- | --- | --- |
+| Java | prints to `System.out` | runs anyway |
+| Python | prints to stderr, or to the frontend inside an IPython kernel | runs anyway, except under a notebook executor which refuses stdin |
+| Rust, C, C++ | prints to stderr | runs anyway |
+
+None of the clients tests for a TTY. A missing terminal is not evidence of a
+missing human: a pipe into `tee`, a process supervisor, or an IDE which captures
+stderr all still put the code in front of someone. The call therefore prompts
+and waits whatever the process is attached to, until the user approves or the
+device code expires. Redirecting or discarding the output hides the code without
+shortening that wait.
+
+The one client which stops early does so on positive evidence rather than on a
+guess. A notebook executor such as papermill, `nbclient` or
+`jupyter nbconvert --execute` runs a real kernel, but issues every request with
+`allow_stdin=False`, which is the frontend stating that nobody is there to
+answer. The Python client reads that flag and fails with
+[`OidcInteractionRequired`](#interaction-required-errors) instead of polling to
+the device code's deadline.
+
+A headless service or a CI job should say so itself rather than rely on the
+absence of a terminal. Turning the prompt off makes sign-in fail immediately
+with an [interaction-required error](#interaction-required-errors):
+
+| Client | Fail instead of prompting |
+| --- | --- |
+| Java | not available |
+| Python | `interactive=False` |
+| Rust | `.interactive(false)` |
+| C | `questdb_oidc_builder_interactive(builder, false, &error)` |
+| C++ | `.interactive(false)` |
+
+All five clients also try to open the verification URL in a local browser by
+default. That is useful on a workstation and pointless on a remote or headless
+host, where the browser opens on the wrong machine or a process starts that
+nobody can see. Python is the exception: it suppresses the launch by itself
+inside a Jupyter kernel. Turn it off explicitly elsewhere:
+
+| Client | Suppress the browser launch |
+| --- | --- |
+| Java | `prompt(DeviceCodePrompt.SYSTEM_OUT)`, or the `questdb.client.oidc.open.browser` system property set to `false` |
+| Python | `open_browser=False` |
+| Rust | `.open_browser(false)` |
+| C | `questdb_oidc_builder_open_browser(builder, false, &error)` |
+| C++ | `.open_browser(false)` |
+
+Override the default prompt to render the challenge elsewhere:
+
+| Client | Custom prompt |
+| --- | --- |
+| Java | `prompt(...)` |
+| Python | `renderer=`, or `qr=True` for a QR code |
+| Rust | `.renderer(...)` |
+| C | `questdb_oidc_builder_event_handler()` |
+| C++ | `.event_handler(...)` |
+
+The Java, Python, C and C++ clients strip terminal controls, bidi marks and
+zero-width characters from the prompt's text fields before the callback sees
+them. Rust sanitizes inside its built-in renderer only, so a custom Rust
+renderer receives the Identity Provider's response verbatim.
+
+:::caution
+
+A custom Rust renderer must sanitize the user code and verification URL itself
+before writing them to a terminal or a DOM. Rendering them raw reopens the
+spoofing surface the built-in renderer closes. Rust exposes
+`display_user_code()` and `display_verification_uri()` on the challenge.
+
+:::
+
+The text fields are for display only. Where a client opens the URL or makes it
+clickable, use the separately vetted browser target instead: `browser_target` on
+the C event struct, `event_view::browser_target()` in C++, `browser_target()` on
+the Rust challenge, and the `browser_target` key on the Python prompt event.
+
+## Explicit configuration and endpoint pinning
+
+Discovery supplies the client ID, scope, token-selection mode, and endpoints.
+Set configuration explicitly when the application has its own registration with
+the provider, or when QuestDB does not publish what the client needs:
+
+| Setting | Set it when |
+| --- | --- |
+| `client_id` | the application has its own registration, which is the recommended setup |
+| `scope` | requesting `offline_access` for this application alone, rather than server-wide |
+| `audience` | the provider requires one, or QuestDB checks `aud` against [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
+| `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads `{issuer}/.well-known/openid-configuration` instead |
+| `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
+| `groups_in_token` | overriding which of the two tokens the client selects |
+
+Python passes these as keyword arguments to `from_questdb`. Rust and C++ are
+builder methods in snake case, and C prefixes the same names with
+`questdb_oidc_builder_`.
+
+Java splits them. `OidcDeviceAuth.DiscoveryOptions` carries only `issuer`,
+`prompt`, `tokenStore`, `tlsConfig` and `allowInsecureTransport`; `client_id`,
+`scope`, `audience` and `groups_in_token` live on `OidcDeviceAuth.builder()`,
+which requires the client ID and both endpoints together. So Java cannot combine
+its own client ID with endpoints discovered from `/settings`: use the builder
+and pin the endpoints too. The other four clients accept a `client_id` override
+on top of discovery.
+
+:::caution
+
+`/settings` needs no authentication, so it designates where your users type
+their credentials and where the refresh token goes. Pinning `issuer` binds the
+advertised endpoints to that issuer's origin, which is why it is worth setting
+against any server you do not fully trust, not only when an endpoint is missing.
+
+:::
+
+Pinning a provider and using an application's own registration:
+
+<Tabs groupId="oidc-device-explicit-configuration">
+<TabItem value="java" label="Java">
+
+```java
+OidcDeviceAuth auth = OidcDeviceAuth.builder()
+        .clientId("my-cli")
+        .audience("questdb-api")
+        .deviceAuthorizationEndpoint("https://login.example.com/oauth2/v2.0/devicecode")
+        .tokenEndpoint("https://login.example.com/oauth2/v2.0/token")
+        .build();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+auth = OidcDeviceAuth.from_questdb(
+    "https://questdb.example.com:9000",
+    issuer="https://login.example.com",
+    client_id="my-cli",
+    audience="questdb-api",
+)
+```
+
+</TabItem>
+<TabItem value="rust" label="Rust">
+
+```rust
+let auth = OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
+    .issuer("https://login.example.com")
+    .client_id("my-cli")
+    .audience("questdb-api")
+    .build()?;
+```
+
+</TabItem>
+</Tabs>
+
+An endpoint QuestDB advertises must sit under the pinned issuer's origin, or the
+client rejects it. An endpoint the client reads from the provider's own
+`{issuer}/.well-known/openid-configuration` is exempt, which is what makes the
+pin work with providers that host their endpoints outside the issuer, such as
+Microsoft Entra ID and Google.
+
+## Token persistence
+
+Tokens stay in memory unless a file token store is enabled. The store writes the
+access, ID and long-lived refresh tokens as unencrypted JSON, so turn it on only
+where that at-rest exposure is acceptable:
+
+| Client | Default location | A directory you choose |
+| --- | --- | --- |
+| Java | `FileTokenStore.atDefaultLocation()` | `FileTokenStore.at(path)` |
+| Python | `FileTokenStore.at_default_location()` | `FileTokenStore.at(path)` |
+| Rust | `FileTokenStore::at_default_location()` | `FileTokenStore::at(path)` |
+| C | `questdb_oidc_builder_default_file_token_store()` | `questdb_oidc_builder_file_token_store()` |
+| C++ | `.default_file_token_store()` | `.file_token_store(directory)` |
+
+Java, Python and Rust attach the store with `tokenStore(...)`, `token_store=`
+and `.token_store(...)` respectively; the C and C++ calls above are builder
+methods and attach it themselves. Attach it before signing in, so the first
+`sign_in()` can reuse a refresh token an earlier run left behind:
+
+<Tabs groupId="oidc-device-token-persistence">
+<TabItem value="java" label="Java">
+
+```java
+OidcDeviceAuth auth = OidcDeviceAuth.fromQuestDB(
+        "https://questdb.example.com:9000",
+        new OidcDeviceAuth.DiscoveryOptions()
+                .tokenStore(FileTokenStore.at(Paths.get("/var/lib/myapp/oidc"))));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+auth = OidcDeviceAuth.from_questdb(
+    "https://questdb.example.com:9000",
+    token_store=FileTokenStore.at("/var/lib/myapp/oidc"),
+)
+```
+
+</TabItem>
+<TabItem value="rust" label="Rust">
+
+```rust
+let auth = OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
+    .token_store(FileTokenStore::at("/var/lib/myapp/oidc"))
+    .build()?;
+```
+
+</TabItem>
+</Tabs>
+
+The default directory is `$HOME/.questdb/oidc-tokens/`, overridden by the
+`questdb.client.oidc.token.store.dir` environment variable. The name contains
+dots, so most shells will not `export` it directly; set it through the container
+or service manager, or pass an explicit directory instead. Java reads that same
+name as a JVM system property rather than an environment variable, and falls
+back to `${user.home}/.questdb/oidc-tokens/`. Resolving the default location can
+fail where there is no home directory, as in a distroless container, so Rust
+returns a `std::io::Result` from `at_default_location()` and an explicit
+directory avoids the question. On Unix the clients create token
+files with mode `0600` and the store directory with `0700`; on other platforms
+the directory's existing ACL governs access, so restrict it before enabling the
+store.
+
+## Interaction-required errors
+
+A transport call never prompts. When the cached token cannot be refreshed
+silently, the call fails instead, and the application has to sign in again on
+the main or UI thread:
+
+| Client | How it surfaces |
+| --- | --- |
+| Python | `OidcInteractionRequired`, importable from `questdb.auth` |
+| Rust | a `questdb::Error` carrying `ErrorCode::AuthError`; read `err.oidc_error()` and match on `OidcErrorKind::InteractionRequired` |
+| C | error kind `QUESTDB_OIDC_ERROR_INTERACTION_REQUIRED` |
+| C++ | `questdb::oidc::error_kind::interaction_required` |
+| Java | `OidcAuthException`, with no distinct interaction-required type to match on |
+
+In C++ a failure raised through an attached sender arrives as
+`questdb::ingress::line_sender_error` carrying `oidc_diagnostic()`, not as
+`questdb::oidc::error`, so catch the common base `const questdb::error&` to
+handle both.
+
+Catching it and signing in again:
+
+<Tabs groupId="oidc-device-refresh">
+<TabItem value="python" label="Python">
+
+```python
+try:
+    sender.flush(wait=True)
+except OidcInteractionRequired:
+    auth.sign_in()  # on the main or UI thread
+    sender.flush(wait=True)
+```
+
+</TabItem>
+<TabItem value="rust" label="Rust">
+
+```rust
+fn needs_sign_in(err: &questdb::Error) -> bool {
+    err.code() == ErrorCode::AuthError
+        && matches!(
+            err.oidc_error().map(|e| e.kind()),
+            Some(OidcErrorKind::InteractionRequired)
+        )
+}
+
+if let Err(err) = sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok) {
+    if needs_sign_in(&err) {
+        auth.sign_in()?; // on the main or UI thread
+        sender.flush_buffer_and_wait(&mut buffer, AckLevel::Ok)?;
+    } else {
+        return Err(err);
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+Java has no distinct type to match on, so an application that must recover
+automatically has to treat any `OidcAuthException` from a transport call as a
+prompt to call `signIn()` again.
+
+## Implementing the flow yourself
+
+The Go, Node.js and .NET clients do not run an OIDC flow, and neither does a
+tool built directly on the REST API. Acquire the token out of band, with an
+OAuth2 library that implements RFC 8628 or by making the two requests yourself,
+then pass it as a static bearer token and replace it before it expires.
+
+Read the client ID, the scope, and the endpoints from the
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), including
+`acl.oidc.device.authorization.endpoint`, which QuestDB publishes without using.
+
+**Request a device code**, by posting `client_id` and `scope` as
+`application/x-www-form-urlencoded` to the device authorization endpoint. The
+response carries `device_code`, `user_code`, `verification_uri`, `expires_in`,
+an optional `verification_uri_complete` with the code already embedded, and an
+optional `interval` which defaults to 5 seconds. Show the URL and the user code,
+sanitized, and treat them as untrusted text.
+
+**Poll the token endpoint** with
+`grant_type=urn:ietf:params:oauth:grant-type:device_code`, the `device_code` and
+the `client_id`, waiting `interval` seconds between attempts. Four error codes
+decide what happens next:
+
+| `error` | What to do |
+| --- | --- |
+| `authorization_pending` | the user has not finished; poll again after `interval` |
+| `slow_down` | polling too fast; add 5 seconds to `interval`, then poll again |
+| `access_denied` | the user refused; stop |
+| `expired_token` | `expires_in` elapsed; start a new device authorization request |
+
+Polling faster than `interval`, or ignoring `slow_down`, gets the client rate
+limited or blocked by the provider.
+
+Send the token your configuration calls for, per
+[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send): the access
+token, or the ID token where group memberships are encoded in it. Keep the
+`refresh_token` if the provider issues one, and redeem it with
+`grant_type=refresh_token` rather than making the user sign in again.
+
+[RFC 8628](https://www.rfc-editor.org/rfc/rfc8628) sections 3.1 to 3.5 give the
+full request and response grammar.
+
+For the per-language API surface, the connection options, and the rest of each
+client's behaviour, see the client pages:
+[Java](/docs/connect/clients/java/#oidc-device-flow-enterprise),
+[Python](/docs/connect/clients/python/#oidc-device-flow-enterprise),
+[Rust](/docs/connect/clients/rust/#oidc-device-flow-enterprise), and
+[C and C++](/docs/connect/clients/c-and-cpp/#oidc-device-flow-enterprise).

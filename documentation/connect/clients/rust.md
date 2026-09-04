@@ -5,6 +5,8 @@ sidebar_label: Rust
 description: "Use the QuestDB Rust connection pool for Buffer, Chunk, Arrow, and Polars ingestion plus streaming SQL queries over QWP."
 ---
 
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.rust.partial.mdx";
+
 The QuestDB Rust client uses a thread-safe `QuestDb` pool for ingestion and SQL
 queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Borrow
 a short-lived writer or reader for each unit of work, then let `Drop` return its
@@ -162,6 +164,58 @@ choices have feature requirements:
 | `tls_roots=/path/to/roots.pem` | Uses the supplied PEM bundle and implies `tls_ca=pem_file`. |
 | `tls_roots_password=...` | Unlocks a JKS or PKCS#12 store named by `tls_roots`. |
 | `tls_verify=unsafe_off` | Enable `insecure-skip-verify`; use only in controlled tests. |
+
+### OIDC device flow (Enterprise)
+
+Enable the `oidc` feature to sign in an interactive user with the
+[OIDC device flow](/docs/security/oidc/device-flow/):
+
+```toml title="Cargo.toml"
+[dependencies]
+questdb-rs = { version = "7.1", features = ["oidc"] }
+```
+
+`OidcDeviceAuth::from_questdb` discovers the provider endpoints, client ID,
+scope, and the token QuestDB expects from the public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL; the client
+appends `/settings`:
+
+<OidcDeviceFlowExample />
+
+Pass the closure as a provider instead of putting the current token in the
+connect string. Every new connection and reconnect then receives the cached or
+silently refreshed token. Silent refresh needs a refresh token, which the
+provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). A transport call
+never starts an interactive flow; it returns a `questdb::Error` with
+`ErrorCode::AuthError`, whose `err.oidc_error()` reports
+`OidcErrorKind::InteractionRequired` when a new sign-in is needed. Call
+`sign_in()` explicitly on the main or UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise add `.issuer(...)` to the builder, or set `.client_id()`, `.scope()`,
+`.audience()`, `.token_endpoint()` and `.device_authorization_endpoint()`
+yourself.
+
+Tokens stay in memory until a token store is attached, which writes a
+long-lived refresh token to disk as plaintext. `at_default_location()` returns a
+`std::io::Result`, and `?` does not convert an `io::Error` into a
+`questdb::Error`, so map it first:
+
+```rust
+let store = FileTokenStore::at_default_location()
+    .map_err(|e| Error::new(ErrorCode::ConfigError, format!("token store: {e}")))?;
+let auth = OidcDeviceAuth::from_questdb(url).token_store(store).build()?;
+```
+
+`FileTokenStore::at(path)` takes a directory directly and needs no mapping. See
+[token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ## The pool
 
@@ -923,6 +977,7 @@ integrations only when your application uses them:
 | `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
 | `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
 | `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
+| `oidc` | No | Interactive OIDC sign-in with the [device flow](/docs/security/oidc/device-flow/). Pulls in `sync-sender-http`, and needs a TLS root source for `https` discovery. |
 | `tls-native-certs` | No | TLS validation through the operating-system certificate store. |
 | `insecure-skip-verify` | No | `tls_verify=unsafe_off` for controlled testing only. |
 | `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |

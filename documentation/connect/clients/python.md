@@ -5,6 +5,8 @@ sidebar_label: Python
 description: "Use the QuestDB Python client's QuestDB pool for row, DataFrame, and Arrow ingestion plus SQL queries over QWP."
 ---
 
+import OidcDeviceFlowExample from "../../partials/_oidc.device-flow.python.partial.mdx";
+
 The QuestDB Python client uses one `QuestDB` handle for ingestion and SQL
 queries over [QWP](/docs/connect/wire-protocols/qwp-ingress-websocket/). Lease a short-lived sender for each unit of row-building work, bulk-load DataFrames
 through the handle, and run SQL with `query()`.
@@ -164,16 +166,47 @@ operating-system certificate store. Override it with configuration keys:
 See the [connect string reference](/docs/connect/clients/connect-string/) for
 the full grammar.
 
-### Unsupported auth paths
+### OIDC device flow (Enterprise)
 
-The client supports only HTTP basic auth and static bearer-token auth. The
-following are **not** supported:
+`OidcDeviceAuth` signs in an interactive user with the
+[OIDC device flow](/docs/security/oidc/device-flow/).
+It discovers the provider endpoints, client ID, scope, and the token QuestDB
+expects from the server's public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL passed to
+`from_questdb`; the client appends `/settings`. The default prompt works in
+terminals and remote Jupyter kernels:
 
-| Path | Status | Workaround |
-| --- | --- | --- |
-| OIDC token acquisition or in-band refresh | Not supported. The client does not negotiate with an identity provider and cannot refresh a token mid-session. | QuestDB itself supports OIDC; see [OpenID Connect](/docs/security/oidc/). Acquire an access token out-of-band from your IdP, pass it via `token=...`, and rebuild the handle when the token nears expiry. |
-| Mutual TLS (client certificates) | Not supported. The QuestDB server does not negotiate client certificates regardless of client. | Use bearer-token auth over `wss`. |
-| Token rotation mid-session | Not supported. The handle keeps the credentials it was built with and presents them on every connection it opens — including reconnects and failover, so an expired token also breaks mid-session reconnection. | On token expiry, close the handle and build a fresh one with the new token. |
+<OidcDeviceFlowExample />
+
+`oidc_auth=auth` keeps shared ownership of the provider and obtains the cached
+or silently refreshed token for every connection and reconnect. It is mutually
+exclusive with a fixed `token=` setting. Silent refresh needs a refresh token,
+which the provider issues only when `offline_access` was requested; see
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope). Transport operations
+never prompt; if they raise `OidcInteractionRequired`, importable from
+`questdb.auth`, call `auth.sign_in()` explicitly on the main or UI thread.
+
+The Identity Provider must enable the device grant. For discovery without an
+override, QuestDB must publish a device authorization endpoint, either from the
+provider's configuration document or from
+[`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint).
+Otherwise pass `issuer=...`, or set `client_id=`, `scope=`, `audience=`,
+`token_endpoint=` and `device_authorization_endpoint=` on `from_questdb`.
+
+Tokens stay in memory until a store is passed as
+`token_store=FileTokenStore.at_default_location()`, which writes a long-lived
+refresh token to disk as plaintext. See [token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
+
+### Other authentication limitations
+
+- Mutual TLS client certificates are not supported because the QuestDB server
+  does not negotiate them. Use bearer-token authentication over `wss`.
+- A token supplied directly through `token=...` remains fixed. Use
+  `oidc_auth=...` for device-flow token refresh, or close the handle and build a
+  new one when an externally acquired token rotates.
 
 ## The pool
 

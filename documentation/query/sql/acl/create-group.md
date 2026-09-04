@@ -25,6 +25,10 @@ see the [RBAC operations](/docs/security/rbac) page.
 CREATE GROUP [IF NOT EXISTS] groupName;
 ```
 
+```questdb-sql title="Create an OIDC-mapped group"
+CREATE GROUP groupName WITH EXTERNAL ALIAS externalAlias;
+```
+
 ## Description
 
 `CREATE GROUP` adds a new user group with no permissions.
@@ -37,12 +41,19 @@ the statement.
 Contrary to users and service accounts, it is not possible to log in as group. A
 group only serves as a container for permissions which are shared between users.
 
+`WITH EXTERNAL ALIAS` maps a group name supplied by an OIDC Identity Provider
+to the new QuestDB group. It cannot be combined with `IF NOT EXISTS`. Use
+[`ALTER GROUP`](/docs/query/sql/acl/alter-group/) to add or remove mappings on
+an existing group.
+
 ## Examples
 
 ```questdb-sql
 CREATE GROUP admins;
 
 CREATE GROUP IF NOT EXISTS admins;
+
+CREATE GROUP analysts WITH EXTERNAL ALIAS 'identity-provider-analysts';
 ```
 
 It can be verified with:

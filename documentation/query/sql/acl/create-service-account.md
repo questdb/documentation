@@ -23,12 +23,20 @@ see the [RBAC operations](/docs/security/rbac) page.
 ## Syntax
 
 ```questdb-sql
-CREATE SERVICE ACCOUNT [IF NOT EXISTS] accountName [OWNED BY ownerName];
+CREATE SERVICE ACCOUNT [IF NOT EXISTS] accountName
+    [WITH { PASSWORD password | NO PASSWORD }]
+    [OWNED BY ownerName];
 ```
 
 ## Description
 
 `CREATE SERVICE ACCOUNT` adds a new service account with no permissions.
+
+`WITH PASSWORD` enables password authentication at creation time. Omit the
+clause, or use `WITH NO PASSWORD`, to create the account without a password.
+Then use
+[`ALTER SERVICE ACCOUNT`](/docs/query/sql/acl/alter-service-account/) to add a
+password or token later.
 
 The chosen name must be unique across all users (including the built-in admin),
 groups and service accounts. If the name has already been reserved, the command
@@ -36,7 +44,7 @@ fails and an error is raised, unless the `IF NOT EXISTS` clause is included in
 the statement.
 
 Note that new service accounts can only access the database if the necessary
-[endpoint permissions](/docs/security/rbac/#endpoint-permissions) have been
+[endpoint permissions](/docs/security/rbac/authentication/#endpoint-permissions) have been
 granted.
 
 The user creating the service account automatically receives the
@@ -53,12 +61,13 @@ an external user, because permissions cannot be granted to them.
 CREATE SERVICE ACCOUNT audit;
 
 CREATE SERVICE ACCOUNT IF NOT EXISTS audit;
+
+CREATE SERVICE ACCOUNT ingest_app WITH PASSWORD 'change_me';
 ```
 
-```
+```questdb-sql
 CREATE GROUP analysts;
 CREATE SERVICE ACCOUNT dashboard OWNED BY analysts;
-
 ```
 
 It can be verified with:
