@@ -15,6 +15,9 @@ surprises people the first time they hit it.
 For the list of permissions themselves, see the
 [permissions reference](/docs/security/rbac/permissions-reference/).
 
+The examples use the `trades(timestamp, symbol, side, price, amount)` table from
+the [Create your first database guide](/docs/getting-started/create-database/).
+
 ## Permission levels
 
 Permissions have different granularities determining where they can be applied:
@@ -31,11 +34,11 @@ Examples:
 -- Database-level: applies to all tables
 GRANT SELECT ON ALL TABLES TO user;
 
--- Table-level: applies to specific tables
-GRANT SELECT ON trades, prices TO user;
+-- Table-level: applies to a specific table
+GRANT SELECT ON trades TO user;
 
 -- Column-level: applies to specific columns
-GRANT SELECT ON trades(ts, symbol, price) TO user;
+GRANT SELECT ON trades(timestamp, symbol, price) TO user;
 ```
 
 ### Column-level access
@@ -43,16 +46,16 @@ GRANT SELECT ON trades(ts, symbol, price) TO user;
 Restrict users to see only certain columns:
 
 ```questdb-sql
--- User can only see timestamp and price, not quantity or trader_id
-GRANT SELECT ON trades(ts, price) TO analyst;
+-- User can only see timestamp and price, not symbol, side, or amount
+GRANT SELECT ON trades(timestamp, price) TO analyst;
 ```
 
 To grant on every column except a few, use the `*` wildcard with an `EXCLUDE`
 list:
 
 ```questdb-sql
--- User can see all columns except trader_id
-GRANT SELECT ON trades(* EXCLUDE (trader_id)) TO analyst;
+-- User can see all columns except side
+GRANT SELECT ON trades(* EXCLUDE (side)) TO analyst;
 ```
 
 The wildcard covers the columns that exist when the statement runs, not columns
@@ -87,11 +90,11 @@ needs `DROP VIEW` or `ALTER VIEW` on that view.
 database level that set includes `DATABASE ADMIN`:
 
 ```questdb-sql
--- Makes alice a full database administrator
-GRANT ALL TO alice;
+-- Makes database_admin a full database administrator
+GRANT ALL TO database_admin;
 
 -- Every permission on one table only
-GRANT ALL ON trades TO alice;
+GRANT ALL ON trades TO trade_manager;
 ```
 
 :::warning
@@ -136,9 +139,9 @@ The same applies from table to column level:
 
 ```questdb-sql
 GRANT SELECT ON trades TO user;           -- Table level
-REVOKE SELECT ON trades(ssn) FROM user;   -- Revoke one column
+REVOKE SELECT ON trades(side) FROM user;  -- Revoke one column
 
--- Result: user has column-level SELECT on all columns EXCEPT ssn
+-- Result: user has column-level SELECT on all columns EXCEPT side
 -- Future columns will NOT be accessible
 ```
 

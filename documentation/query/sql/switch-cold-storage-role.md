@@ -59,7 +59,10 @@ A role set this way does **not** survive a restart. Update `cold.storage.role` i
 
 ### Permissions
 
-Both statements require the `SYSTEM ADMIN` [permission](/docs/security/rbac/permissions-reference/), including with `FORCE`. There is no narrower grant for the cold storage role: granting `SYSTEM ADMIN` also grants every other system function.
+Both statements require the `SYSTEM ADMIN`
+[permission](/docs/security/rbac/permissions-reference/#special-permissions),
+including with `FORCE`. There is no narrower grant for the cold storage role:
+granting `SYSTEM ADMIN` also grants every other system function.
 
 ## Examples
 

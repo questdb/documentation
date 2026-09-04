@@ -90,6 +90,7 @@ This page tracks significant updates to the QuestDB documentation.
 
 ### Updated
 
+- Restructured [OpenID Connect](/docs/security/oidc/) and [role-based access control](/docs/security/rbac/) from two monolithic guides into task-focused sections covering client flows, provider setup, group mapping, authentication, principals, permissions, and common scenarios, while preserving links to the former section anchors
 - [OpenID Connect (OIDC)](/docs/security/oidc/how-sign-in-works/#1-secret-generation) - Noted that some Identity Providers require the `state` parameter in the authorization request, and that `acl.oidc.state.required` should be set to `true` for those providers
 - [Which token to send](/docs/security/oidc/client-discovery/#which-token-to-send) - Documented that `acl.oidc.groups.encoded.in.token` decides whether a client sends the access token or the ID token, and that sending the wrong one fails authentication
 - [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken) - Documented what QuestDB validates when it checks a token itself: the signature, the expiry, the audience and the presence of the claims, but not `nbf` or `iss`. QuestDB never asks the provider about such a token, so a revoked token keeps working until it expires

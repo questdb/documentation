@@ -14,7 +14,9 @@ Management. The database can be integrated with any OAuth2/OIDC Identity
 Provider (IdP).
 
 For detailed information about OIDC, see the
-[OpenID Connect (OIDC) integration guide](/docs/security/oidc).
+[OpenID Connect (OIDC) integration guide](/docs/security/oidc/). For guidance on
+choosing a flow for an application, see
+[OIDC client integration patterns](/docs/security/oidc/client-integration/).
 
 ## Minimum configuration
 
@@ -163,9 +165,15 @@ QuestDB uses the scopes in the requests it makes itself, in the
 run the flow themselves.
 
 For the [OIDC device flow](/docs/security/oidc-device-flow/), add
-`offline_access`. Most providers, Microsoft Entra ID among them, issue a
-refresh token only when that scope was requested, and without one the client
-has to make the user sign in again as soon as the current token expires.
+`offline_access` alongside `openid`:
+
+```ini title="server.conf"
+acl.oidc.scope=openid offline_access
+```
+
+Most providers, Microsoft Entra ID among them, issue a refresh token only when
+that scope was requested, and without one the client has to make the user sign
+in again as soon as the current token expires.
 Providers which issue refresh tokens regardless ignore the extra scope, so
 adding it is the safe default. A client can also request it through its own
 `scope` override, which leaves this server-wide value, and every other flow

@@ -137,7 +137,7 @@ with in transit, so pin the provider with `issuer` as well, and pass explicitly
 any client ID, scope, audience, or token-selection mode you rely on. An issuer
 pin covers the endpoints, not those four values.
 
-<Tabs defaultValue="java" groupId="oidc-device-client">
+<Tabs defaultValue="java" groupId="oidc-device-client-example">
 <TabItem value="java" label="Java">
 
 <JavaExample />
@@ -303,7 +303,7 @@ against any server you do not fully trust, not only when an endpoint is missing.
 
 Pinning a provider and using an application's own registration:
 
-<Tabs groupId="oidc-device-client">
+<Tabs groupId="oidc-device-explicit-configuration">
 <TabItem value="java" label="Java">
 
 ```java
@@ -366,7 +366,7 @@ and `.token_store(...)` respectively; the C and C++ calls above are builder
 methods and attach it themselves. Attach it before signing in, so the first
 `sign_in()` can reuse a refresh token an earlier run left behind:
 
-<Tabs groupId="oidc-device-client">
+<Tabs groupId="oidc-device-token-persistence">
 <TabItem value="java" label="Java">
 
 ```java
@@ -432,7 +432,7 @@ handle both.
 
 Catching it and signing in again:
 
-<Tabs groupId="oidc-device-client">
+<Tabs groupId="oidc-device-refresh">
 <TabItem value="python" label="Python">
 
 ```python

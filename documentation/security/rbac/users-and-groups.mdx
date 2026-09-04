@@ -94,8 +94,8 @@ CREATE GROUP analysts;
 GRANT SELECT ON ALL TABLES TO analysts;
 
 -- All users added to this group can read all tables
-ADD USER alice TO analysts;
-ADD USER bob TO analysts;
+ADD USER market_analyst TO analysts;
+ADD USER risk_analyst TO analysts;
 ```
 
 Users inherit permissions from their groups. Inherited permissions cannot be

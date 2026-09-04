@@ -7,8 +7,11 @@ description:
   and failover operators.
 ---
 
-Each scenario below is a complete, runnable setup. Adapt the names and tables;
-the shape of the grants is the part worth copying.
+Each scenario below is a complete permission setup. The examples use the
+`trades(timestamp, symbol, side, price, amount)` table from the
+[Create your first database guide](/docs/getting-started/create-database/).
+Adapt the principal and table names; the shape of the grants is the part worth
+copying.
 
 ## Read-only analyst
 
@@ -26,8 +29,8 @@ A service account for an application that ingests data into specific tables:
 
 ```questdb-sql
 CREATE SERVICE ACCOUNT ingest_app WITH PASSWORD 'pwd';
-GRANT ILP TO ingest_app;                    -- InfluxDB Line Protocol access
-GRANT INSERT ON sensor_data TO ingest_app;  -- Can only insert into sensor_data
+GRANT ILP TO ingest_app;               -- InfluxDB Line Protocol access
+GRANT INSERT ON trades TO ingest_app;  -- Can only insert into trades
 ```
 
 ## Team-based access with groups
@@ -40,49 +43,47 @@ CREATE GROUP trading_team;
 
 -- Grant permissions to the group
 GRANT HTTP, PGWIRE TO trading_team;
-GRANT SELECT ON trades, positions TO trading_team;
+GRANT SELECT ON trades TO trading_team;
 GRANT INSERT ON trades TO trading_team;
 
 -- Add users to the group - they inherit all permissions
-CREATE USER alice WITH PASSWORD 'pwd1';
-CREATE USER bob WITH PASSWORD 'pwd2';
-ADD USER alice TO trading_team;
-ADD USER bob TO trading_team;
+CREATE USER market_analyst WITH PASSWORD 'pwd1';
+CREATE USER risk_analyst WITH PASSWORD 'pwd2';
+ADD USER market_analyst TO trading_team;
+ADD USER risk_analyst TO trading_team;
 ```
 
 ## Column-level restrictions (hide sensitive data)
 
-Allow access to a table but hide sensitive columns:
+Allow access to selected fields while hiding columns your policy treats as
+sensitive:
 
 ```questdb-sql
 CREATE USER auditor WITH PASSWORD 'pwd';
 GRANT HTTP, PGWIRE TO auditor;
 
--- Grant access to non-sensitive columns only
-GRANT SELECT ON employees(id, name, department, hire_date) TO auditor;
--- Columns salary and ssn are not granted = invisible to auditor
+-- Grant access to approved columns only
+GRANT SELECT ON trades(timestamp, symbol, price) TO auditor;
+-- Columns side and amount are not granted = invisible to auditor
 ```
 
-## Row-level security (multi-tenant)
+## Row-level security with views {#row-level-security-multi-tenant}
 
 Different users see different subsets of data:
 
 ```questdb-sql
--- Base table has data for all regions
-CREATE TABLE sales (ts TIMESTAMP, region SYMBOL, amount DOUBLE) TIMESTAMP(ts);
+-- Create views over different subsets of the trades table
+CREATE VIEW aapl_trades AS (SELECT * FROM trades WHERE symbol = 'AAPL');
+CREATE VIEW msft_trades AS (SELECT * FROM trades WHERE symbol = 'MSFT');
 
--- Create region-specific views
-CREATE VIEW sales_emea AS (SELECT * FROM sales WHERE region = 'EMEA');
-CREATE VIEW sales_apac AS (SELECT * FROM sales WHERE region = 'APAC');
+-- Grant users access to their subset only
+CREATE USER aapl_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO aapl_analyst;
+GRANT SELECT ON aapl_trades TO aapl_analyst;
 
--- Grant users access to their region only
-CREATE USER emea_manager WITH PASSWORD 'pwd';
-GRANT HTTP, PGWIRE TO emea_manager;
-GRANT SELECT ON sales_emea TO emea_manager;
-
-CREATE USER apac_manager WITH PASSWORD 'pwd';
-GRANT HTTP, PGWIRE TO apac_manager;
-GRANT SELECT ON sales_apac TO apac_manager;
+CREATE USER msft_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO msft_analyst;
+GRANT SELECT ON msft_trades TO msft_analyst;
 ```
 
 ## Database administrator

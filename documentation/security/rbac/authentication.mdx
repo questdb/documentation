@@ -35,6 +35,7 @@ The first three are QuestDB's own credentials, created with the statements
 below. An OIDC bearer token is issued by an external Identity Provider instead,
 and the user's group memberships come from the token or the provider's user info
 endpoint; see [OpenID Connect](/docs/security/oidc/) and
+[client integration patterns](/docs/security/oidc/client-integration/), including
 [which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
 
 OIDC on the PostgreSQL Wire endpoint is off by default. Enable it with
@@ -71,11 +72,11 @@ to protect credentials in transit.
 
 Before a user can connect, they need endpoint permissions:
 
-| Permission | Allows access to                       |
-| ---------- | -------------------------------------- |
-| `HTTP`     | REST API, Web Console, ILP over HTTP   |
-| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)   |
-| `ILP`      | InfluxDB Line Protocol TCP (port 9009) |
+| Permission | Allows access to                          |
+| ---------- | ----------------------------------------- |
+| `HTTP`     | REST API, Web Console, QWP, ILP over HTTP |
+| `PGWIRE`   | PostgreSQL Wire Protocol (port 8812)      |
+| `ILP`      | InfluxDB Line Protocol TCP (port 9009)    |
 
 ```questdb-sql
 -- Typical setup for an interactive user
