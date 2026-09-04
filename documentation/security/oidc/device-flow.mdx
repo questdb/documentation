@@ -5,11 +5,11 @@ description: "OIDC device flow for QuestDB Enterprise: headless SSO sign-in from
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
-import JavaExample from "../partials/_oidc.device-flow.java.partial.mdx";
-import PythonExample from "../partials/_oidc.device-flow.python.partial.mdx";
-import RustExample from "../partials/_oidc.device-flow.rust.partial.mdx";
-import CppExample from "../partials/_oidc.device-flow.cpp.partial.mdx";
-import CExample from "../partials/_oidc.device-flow.c.partial.mdx";
+import JavaExample from "../../partials/_oidc.device-flow.java.partial.mdx";
+import PythonExample from "../../partials/_oidc.device-flow.python.partial.mdx";
+import RustExample from "../../partials/_oidc.device-flow.rust.partial.mdx";
+import CppExample from "../../partials/_oidc.device-flow.cpp.partial.mdx";
+import CExample from "../../partials/_oidc.device-flow.c.partial.mdx";
 import { EnterpriseNote } from "@site/src/components/EnterpriseNote"
 
 <EnterpriseNote>
@@ -36,7 +36,7 @@ sequenceDiagram
         Client->>QDB: GET /settings
         QDB-->>Client: client ID, scope, endpoints, token mode
     else issuer pinned on the client
-        Client->>IdP: GET /.well-known/openid-configuration
+        Client->>IdP: GET {issuer path}/.well-known/openid-configuration
         IdP-->>Client: endpoints
     end
     Client->>IdP: Request device and user codes
@@ -92,9 +92,9 @@ configuration-document discovery, do not set the endpoint property: all
 individual endpoint settings are ignored in that mode.
 
 If QuestDB does not publish the device authorization endpoint, pin the provider
-with the client's `issuer` option so the client can fetch the provider's
-`/.well-known/openid-configuration` document, or configure the client ID and
-both endpoints explicitly.
+with the client's `issuer` option so the client can fetch
+`{issuer}/.well-known/openid-configuration`, including any path component in the
+issuer, or configure the client ID and both endpoints explicitly.
 
 Clients reach QuestDB over `https` for discovery, so the HTTP endpoint needs TLS
 enabled with [`http.tls.enabled`](/docs/configuration/tls/#httptlsenabled) and a
@@ -108,6 +108,12 @@ walkthroughs for
 Each example discovers the OIDC client ID, scope, token-selection mode, and
 provider endpoints from QuestDB's [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), then
 signs in before opening the database connection.
+
+The examples use QuestDB's default Web Console context. The clients append
+`/settings` to the QuestDB URL, so include a non-default context in that URL. For
+example, with `http.context.web.console=/console`, pass
+`https://questdb.example.com:9000/console`. See the settings endpoint's
+[path rules](/docs/security/oidc/client-discovery/#settings-endpoint).
 
 Discovering the client ID means reusing QuestDB's own registration, which keeps
 the examples short but gives the application no separate identity at the
@@ -180,8 +186,9 @@ than copying the current token into the connection string, otherwise a reconnect
 after expiry keeps sending the stale value.
 
 Device flow always requires a person to approve the sign-in. For unattended
-services, scheduled jobs, or CI, use a service-account token or a provider flow
-intended for machine identities instead.
+services, scheduled jobs, or CI, use a
+[QuestDB service-account token](/docs/security/oidc/client-integration/#non-interactive-clients)
+or a provider flow intended for machine identities instead.
 
 ## The sign-in prompt
 
@@ -276,7 +283,7 @@ the provider, or when QuestDB does not publish what the client needs:
 | `client_id` | the application has its own registration, which is the recommended setup |
 | `scope` | requesting `offline_access` for this application alone, rather than server-wide |
 | `audience` | the provider requires one, or QuestDB checks `aud` against [`acl.oidc.audience`](/docs/configuration/oidc/#acloidcaudience). QuestDB does not publish that key, so discovery cannot supply it |
-| `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads the provider's `/.well-known/openid-configuration` instead |
+| `issuer` | hardening discovery, or QuestDB publishes no device authorization endpoint so the client reads `{issuer}/.well-known/openid-configuration` instead |
 | `token_endpoint`, `device_authorization_endpoint` | pinning both endpoints directly rather than through an issuer |
 | `groups_in_token` | overriding which of the two tokens the client selects |
 
@@ -343,9 +350,9 @@ let auth = OidcDeviceAuth::from_questdb("https://questdb.example.com:9000")
 
 An endpoint QuestDB advertises must sit under the pinned issuer's origin, or the
 client rejects it. An endpoint the client reads from the provider's own
-`/.well-known/openid-configuration` is exempt, which is what makes the pin work
-with providers that host their endpoints outside the issuer, such as Microsoft
-Entra ID and Google.
+`{issuer}/.well-known/openid-configuration` is exempt, which is what makes the
+pin work with providers that host their endpoints outside the issuer, such as
+Microsoft Entra ID and Google.
 
 ## Token persistence
 

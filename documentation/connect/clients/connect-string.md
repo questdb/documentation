@@ -223,7 +223,7 @@ WebSocket upgrade request.
 - Device-flow OIDC credentials are **not** connect-string keys. The Java,
   Python, Rust, C and C++ clients take an auth object alongside the connect
   string, which rotates the token on every reconnect; see
-  [OIDC device flow](/docs/security/oidc-device-flow/). A
+  [OIDC device flow](/docs/security/oidc/device-flow/). A
   static `token=` does not rotate, so a reconnect after expiry keeps sending
   the stale value.
 - `auth_timeout_ms` — per-host upper bound on the upgrade response read.

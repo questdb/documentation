@@ -21,7 +21,7 @@ three kinds, how they differ, and the statements that manage them.
 
 ## Users and service accounts
 
-QuestDB has two types of principals:
+QuestDB has two account types:
 
 - **Users**: For human individuals. Can belong to multiple groups and inherit
   permissions from them. Cannot be assumed by others.
@@ -157,7 +157,8 @@ ADD USER username TO group1, group2;
 REMOVE USER username FROM group1;
 ```
 
-Passwords and tokens are managed with `ALTER USER`; see
+Passwords and tokens are managed with `ALTER USER` or
+`ALTER SERVICE ACCOUNT`; see
 [managing authentication](/docs/security/rbac/authentication/#managing-authentication).
 
 ### Viewing information

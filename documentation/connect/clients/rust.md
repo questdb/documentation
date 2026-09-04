@@ -168,7 +168,7 @@ choices have feature requirements:
 ### OIDC device flow (Enterprise)
 
 Enable the `oidc` feature to sign in an interactive user with the
-[OIDC device flow](/docs/security/oidc-device-flow/):
+[OIDC device flow](/docs/security/oidc/device-flow/):
 
 ```toml title="Cargo.toml"
 [dependencies]
@@ -176,7 +176,10 @@ questdb-rs = { version = "7.1", features = ["oidc"] }
 ```
 
 `OidcDeviceAuth::from_questdb` discovers the provider endpoints, client ID,
-scope, and the token QuestDB expects from the public `/settings` endpoint:
+scope, and the token QuestDB expects from the public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL; the client
+appends `/settings`:
 
 <OidcDeviceFlowExample />
 
@@ -210,9 +213,9 @@ let auth = OidcDeviceAuth::from_questdb(url).token_store(store).build()?;
 ```
 
 `FileTokenStore::at(path)` takes a directory directly and needs no mapping. See
-[token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
-permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
-[explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
+[token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ## The pool
 
@@ -974,7 +977,7 @@ integrations only when your application uses them:
 | `ndarray` | No | `Buffer::column_arr` from `ndarray` views. |
 | `rust_decimal` / `bigdecimal` | No | Row-buffer decimal values from those crates. Decimal strings need neither feature. |
 | `chrono-timestamp` | No | Timestamp values built from `chrono::DateTime`. |
-| `oidc` | No | Interactive OIDC sign-in with the [device flow](/docs/security/oidc-device-flow/). Pulls in `sync-sender-http`, and needs a TLS root source for `https` discovery. |
+| `oidc` | No | Interactive OIDC sign-in with the [device flow](/docs/security/oidc/device-flow/). Pulls in `sync-sender-http`, and needs a TLS root source for `https` discovery. |
 | `tls-native-certs` | No | TLS validation through the operating-system certificate store. |
 | `insecure-skip-verify` | No | `tls_verify=unsafe_off` for controlled testing only. |
 | `almost-all-features` | No | Client development and testing with most compatible features. It excludes Arrow and Polars. |

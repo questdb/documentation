@@ -237,10 +237,17 @@ This setup relies on
 [`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken),
 because Entra ID cannot serve the group memberships from its User Info
 endpoint. QuestDB then validates the ID token itself and never asks Entra ID
-about it, so revoking a token in Entra ID does not end the access it grants:
-the token keeps working until it expires. Read that option before going to
-production, and note that clients must send the ID token here, not the access
-token.
+for current user information. Revoking a token, disabling a user, or changing
+their Entra ID groups therefore does not immediately change access in QuestDB.
+The client must obtain a new ID token for updated claims.
+
+On releases that validate `exp`, a token can still authenticate for the
+60-second clock-skew allowance plus up to `acl.oidc.cache.ttl` while an earlier
+validation remains cached. Existing PGWire and WebSocket connections are not
+closed when the token expires. QuestDB Enterprise 4.0.1 and earlier do not
+validate `exp` in this mode, so upgrade before relying on token expiry. Read the
+configuration option before going to production, and note that clients must
+send the ID token here, not the access token.
 
 :::
 

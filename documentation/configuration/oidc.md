@@ -164,7 +164,7 @@ QuestDB uses the scopes in the requests it makes itself, in the
 [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) for clients which
 run the flow themselves.
 
-For the [OIDC device flow](/docs/security/oidc-device-flow/), add
+For the [OIDC device flow](/docs/security/oidc/device-flow/), add
 `offline_access` alongside `openid`:
 
 ```ini title="server.conf"
@@ -279,7 +279,7 @@ has no default, and QuestDB never calls it. QuestDB resolves the endpoint and
 publishes it on the
 [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), for clients which
 implement the
-[OIDC device flow](/docs/security/oidc-device-flow/)
+[OIDC device flow](/docs/security/oidc/device-flow/)
 themselves. The official Java, Python, Rust, C, and C++ clients can discover and
 use the published endpoint.
 
@@ -300,9 +300,10 @@ The keys are only used to validate tokens when
 With the default user info flow QuestDB validates tokens by calling the user
 info endpoint instead.
 
-QuestDB downloads the keys from this endpoint at startup either way, so that the
-cache is never empty. A failure to download them is logged, and does not stop
-the server.
+QuestDB attempts to download the keys from this endpoint at startup either way.
+A failure is logged and does not stop the server. Until a download succeeds,
+the cache is empty and ID-token validation fails because QuestDB cannot find the
+signing key.
 
 ### acl.oidc.token.endpoint
 
@@ -429,15 +430,28 @@ and a friendlier claim lets you keep the readable one as the principal. The
 Entra ID walkthrough does this, setting `acl.oidc.sub.claim=name` while the
 token still carries `sub` for the validator.
 
+:::note Version requirement
+
+QuestDB Enterprise 4.0.1 and earlier do not validate `exp` in this mode. They
+also require a claim literally named `groups` before applying the claim name
+configured with `acl.oidc.groups.claim`. Upgrade to a later release before
+relying on expiry validation or a differently named groups claim.
+
+:::
+
 :::caution
 
 Because QuestDB never asks the provider about the token, revoking a token does
-not end the access it grants: the token keeps working until its `exp` passes,
-and [`acl.oidc.cache.ttl`](#acloidccachettl) does not shorten that. The only
-lever is withdrawing the signing key at the provider, which cuts short every
-token signed with it and takes effect within
+not immediately end the access it grants. On a new authentication, QuestDB may
+accept a token for up to 60 seconds after `exp` to allow for clock skew. A token
+validated before or during that allowance may then remain in the authentication
+cache for up to [`acl.oidc.cache.ttl`](#acloidccachettl). An established PGWire
+or WebSocket connection is not closed when its token expires.
+
+Withdrawing a signing key can shorten this window, but only after QuestDB
+successfully reloads the provider's key set. See
 [`acl.oidc.public.keys.expiry`](#acloidcpublickeysexpiry). Keep token lifetimes
-short in the provider if you need revocation to take effect quickly.
+and the authentication cache TTL short if revocation must take effect quickly.
 
 :::
 
@@ -462,9 +476,10 @@ fails. The same applies to the claim named by
 - **Default**: `30000`
 - **Reloadable**: no
 
-User info cache entry TTL in milliseconds, as a plain integer only. QuestDB
-caches user info responses for each valid access token. This setting controls
-how often the access token is validated and user info refreshed.
+OIDC authentication cache entry TTL in milliseconds, as a plain integer only.
+QuestDB caches the principal and group-derived access list produced by a
+successful authentication. This setting controls how often the token is checked
+again and that access list is rebuilt.
 
 Set it to `0` to disable the cache, so that every request is checked again. In
 the default user info flow that means a call to the OIDC Provider on every
@@ -473,12 +488,18 @@ request. When
 QuestDB checks the token locally instead, and contacts the provider only when
 the public keys have to be reloaded.
 
-That local check tests the token's expiry, so an issued token is accepted until
-it expires whatever this TTL is. Shortening the TTL does not make QuestDB
-consult the provider, so a token revoked before its expiry is not picked up any
-sooner. See
+The local expiry check allows 60 seconds for clock skew. A token validated
+before or during that allowance can remain accepted from the cache for up to
+this TTL afterward. Setting the TTL to `0` removes that additional cache window,
+but not the clock-skew allowance. It still does not make QuestDB consult the
+provider, so provider-side token revocation, user disabling, and group changes
+are not discovered from the same ID token. Those changes require the client to
+obtain a new token. See
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) for what is
 and is not validated.
+
+The TTL applies when a request or connection authenticates. It does not
+continuously revalidate an established PGWire or WebSocket connection.
 
 ### acl.oidc.public.keys.expiry
 
@@ -489,12 +510,19 @@ Expiry of the cached JSON Web Key Set (JWKS) in milliseconds. Also accepts a
 duration, such as `2m` or `120s`.
 
 QuestDB caches the public keys used to validate tokens issued by the OIDC
-Provider, and reloads them from the public keys endpoint when the cache expires.
+Provider. After the cache expires, the next token validation attempts to reload
+them from the public keys endpoint.
 
-Key rotation does not depend on this setting: a token signed with a key QuestDB
-has not cached triggers an immediate reload. The expiry governs how long a key
-the provider has already withdrawn stays usable, so lower it if signing keys are
-revoked, at the cost of more requests to the endpoint.
+A token signed with a key QuestDB has not cached triggers an immediate reload,
+independently of this setting. QuestDB replaces the cached set only after it
+downloads and parses a non-empty replacement successfully. If a reload fails,
+the failure is logged and the previous keys remain available while later token
+validations continue to retry. A key withdrawn by the provider can therefore
+remain usable beyond this expiry during a provider or network failure.
+
+Lowering this setting reduces the normal delay before QuestDB notices a
+withdrawn key after a successful reload, at the cost of more requests to the
+endpoint. It does not provide a hard revocation deadline.
 
 Only used when
 [`acl.oidc.groups.encoded.in.token`](#acloidcgroupsencodedintoken) is `true`,

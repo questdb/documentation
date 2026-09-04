@@ -169,10 +169,13 @@ the full grammar.
 ### OIDC device flow (Enterprise)
 
 `OidcDeviceAuth` signs in an interactive user with the
-[OIDC device flow](/docs/security/oidc-device-flow/).
+[OIDC device flow](/docs/security/oidc/device-flow/).
 It discovers the provider endpoints, client ID, scope, and the token QuestDB
-expects from the server's public `/settings` endpoint. The default prompt works
-in terminals and remote Jupyter kernels:
+expects from the server's public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL passed to
+`from_questdb`; the client appends `/settings`. The default prompt works in
+terminals and remote Jupyter kernels:
 
 <OidcDeviceFlowExample />
 
@@ -193,9 +196,9 @@ Otherwise pass `issuer=...`, or set `client_id=`, `scope=`, `audience=`,
 
 Tokens stay in memory until a store is passed as
 `token_store=FileTokenStore.at_default_location()`, which writes a long-lived
-refresh token to disk as plaintext. See [token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
-permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
-[explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
+refresh token to disk as plaintext. See [token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ### Other authentication limitations
 

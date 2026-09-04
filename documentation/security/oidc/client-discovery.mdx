@@ -50,6 +50,13 @@ Each key is the name of the
 its authorization request, and any other client can do the same instead of
 hard coding the provider's details.
 
+The published `acl.oidc.client.id` and `acl.oidc.scope` belong to QuestDB's Web
+Console registration. Reusing them keeps an evaluation client short, but a
+production application should have its own provider registration, client ID,
+redirect URIs, scopes, and policies. It can still discover the provider
+endpoints and `acl.oidc.groups.encoded.in.token` here while overriding the
+client ID and scope.
+
 | Key | Type | Present |
 | --- | --- | --- |
 | `acl.enabled` | boolean | always |
@@ -71,7 +78,7 @@ configuration document when `acl.oidc.configuration.url` is set.
 [`acl.oidc.device.authorization.endpoint`](/docs/configuration/oidc/#acloidcdeviceauthorizationendpoint)
 is present when a device authorization endpoint has been configured, or when the
 provider advertises one. QuestDB publishes it without using it, for clients
-which implement the [OIDC device flow](/docs/security/oidc-device-flow/)
+which implement the [OIDC device flow](/docs/security/oidc/device-flow/)
 themselves.
 
 `acl.oidc.redirect.uri` is `null` unless
@@ -107,6 +114,19 @@ is at its default, as the settings path follows the Web Console context path.
 A client which cannot assume both are at their defaults should make the path
 configurable.
 
+The official device-flow clients append `/settings` to the QuestDB base URL
+passed to `from_questdb`, `fromQuestDB`, or the corresponding C/C++ builder. If
+`http.context.web.console=/console`, pass the context in that base URL:
+
+```text
+https://questdb.example.com:9000/console
+```
+
+The clients then request `https://questdb.example.com:9000/console/settings`.
+With a custom `http.context.settings`, QuestDB still preserves the path beneath
+the Web Console context, so the same base URL works. A client which fetches the
+settings document itself must use one of the exact configured paths.
+
 ## Which token to send
 
 `acl.oidc.groups.encoded.in.token` tells the client which of the tokens returned
@@ -129,7 +149,7 @@ way, and so should any other client.
 
 - [Client integration patterns](/docs/security/oidc/client-integration/) - use
   discovery and bearer tokens from browser, notebook, CLI, and PGWire clients
-- [OIDC device flow](/docs/security/oidc-device-flow/) - discovery in the
+- [OIDC device flow](/docs/security/oidc/device-flow/) - discovery in the
   official Java, Python, Rust, C, and C++ clients
 - [OIDC settings reference](/docs/configuration/oidc/) - configure the values
   published to clients

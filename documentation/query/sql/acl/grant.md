@@ -326,49 +326,27 @@ ALTER TABLE countries ADD COLUMN description string;
 | UPDATE     | countries  | id          | f            | G      |
 | UPDATE     | countries  | description | f            | G      |
 
-### Grant when table or column is dropped and recreated
+### Grants when a table or column is dropped and recreated {#grant-when-table-or-column-is-dropped-and-recreated}
 
-Granted permissions are not automatically revoked when related tables or columns
-are dropped. Instead, they have no effect until table or column is recreated.
+Dropping a table permanently removes every permission granted on it. Recreating
+a table with the same name does not restore those permissions:
 
 ```questdb-sql
 CREATE TABLE countries (id INT, name STRING, iso_code STRING);
 GRANT SELECT ON countries TO john;
 GRANT UPDATE ON countries(iso_code) TO john;
-```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     | countries  |             | f            | G      |
-| UPDATE     | countries  | iso_code    | f            | G      |
-
-Now, if the table is dropped, then permission stops being visible:
-
-```questdb-sql
 DROP TABLE countries;
+CREATE TABLE countries (id INT, name STRING, iso_code STRING);
+
+-- Required after recreation
+GRANT SELECT ON countries TO john;
+GRANT UPDATE ON countries(iso_code) TO john;
 ```
 
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-
-When the table is later recreated, permission are in full effect again :
-
-```questdb-sql
-CREATE TABLE countries (id INT, name STRING, iso_code int, alpha2 STRING);
-```
-
-| permission | table_name | column_name | grant_option | origin |
-| ---------- | ---------- | ----------- | ------------ | ------ |
-| SELECT     | countries  |             | f            | G      |
-| UPDATE     | countries  |             | f            | G      |
-
-:::note
-
-Only the table and/or column name is used when applying permission. The type is
-ignored. In the example above `iso_code` was initially of string type, then
-recreated as int.
-
-:::
+Dropping a column likewise removes permissions granted specifically on that
+column. Adding a column with the same name later does not restore them. The same
+drop-and-regrant rule applies to views, materialized views, and live views.
 
 ### Owner grants
 

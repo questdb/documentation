@@ -73,17 +73,17 @@ Different users see different subsets of data:
 
 ```questdb-sql
 -- Create views over different subsets of the trades table
-CREATE VIEW aapl_trades AS (SELECT * FROM trades WHERE symbol = 'AAPL');
-CREATE VIEW msft_trades AS (SELECT * FROM trades WHERE symbol = 'MSFT');
+CREATE VIEW eth_usd_trades AS (SELECT * FROM trades WHERE symbol = 'ETH-USD');
+CREATE VIEW btc_usd_trades AS (SELECT * FROM trades WHERE symbol = 'BTC-USD');
 
 -- Grant users access to their subset only
-CREATE USER aapl_analyst WITH PASSWORD 'pwd';
-GRANT HTTP, PGWIRE TO aapl_analyst;
-GRANT SELECT ON aapl_trades TO aapl_analyst;
+CREATE USER eth_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO eth_analyst;
+GRANT SELECT ON eth_usd_trades TO eth_analyst;
 
-CREATE USER msft_analyst WITH PASSWORD 'pwd';
-GRANT HTTP, PGWIRE TO msft_analyst;
-GRANT SELECT ON msft_trades TO msft_analyst;
+CREATE USER btc_analyst WITH PASSWORD 'pwd';
+GRANT HTTP, PGWIRE TO btc_analyst;
+GRANT SELECT ON btc_usd_trades TO btc_analyst;
 ```
 
 ## Database administrator

@@ -288,6 +288,10 @@ module.exports = {
               label: "ALTER",
               items: [
                 {
+                  id: "query/sql/acl/alter-group",
+                  type: "doc",
+                },
+                {
                   id: "query/sql/acl/alter-service-account",
                   type: "doc",
                 },
@@ -771,7 +775,7 @@ module.exports = {
               label: "Client discovery and tokens",
             },
             {
-              id: "security/oidc-device-flow",
+              id: "security/oidc/device-flow",
               type: "doc",
               label: "Device flow",
             },

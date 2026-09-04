@@ -99,12 +99,17 @@ This could be a username with:
 After successful authentication, the user provides consent for the requested
 scopes.
 
-The list of scopes are configurable.
+The list of scopes is configurable with
+[`acl.oidc.scope`](/docs/configuration/oidc/#acloidcscope).
 
-By default the Web Console requests only the `openid` scope which is mandatory
+By default the Web Console requests only the `openid` scope, which is mandatory
 for OIDC.
 
 No ID Token is issued without it.
+
+A provider may require `offline_access`, explicit consent, or another policy
+before issuing a refresh token. Requesting a refresh-token scope does not
+guarantee that the provider returns one.
 
 The OIDC provider can be configured to provide the consent automatically,
 without presenting the user with an additional screen in the browser.
@@ -144,34 +149,39 @@ The matching code challenge proves that the token is requested by the client
 which requested the authorization code, and it was not stolen:
 
 ```bash title="Token request example"
-POST https://oidc.provider:443/as/token.oauth2 HTTP/1.1
-Content-Type: application/x-www-form-urlencoded
-grant_type=authorization_code&code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A&client_id=questdb&&redirect_uri=https%3A%2F%2Fquestdb.example.com%3A9000&code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF
+curl --request POST https://oidc.provider:443/as/token.oauth2 \
+  --header "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=authorization_code" \
+  --data-urlencode "code=1L344XEY5XRka1j4ySNa8bVQSLf71as9uGLEuv_A" \
+  --data-urlencode "client_id=questdb" \
+  --data-urlencode "redirect_uri=https://questdb.example.com:9000" \
+  --data-urlencode "code_verifier=uGZh4sQffXLgRna7D-jtEAkuXzp7Lm_okZXBljzP38coAD44kEheIaz7Pdh98KxYtYLZHNiQPCczQYeF"
 ```
 
 ### 6. Credentials received
 
-If the PKCE check is passed, the Web Console receives the ID and access tokens.
+If the PKCE check passes, the Web Console receives the ID and access tokens. The
+provider may also return a refresh token when its scopes, consent, and policy
+allow one.
 
-There is a third token in the response too, the refresh token.
+When present, the Web Console uses the refresh token to obtain replacement
+tokens without asking the user to sign in again. Without one, the user must
+authenticate again after the current tokens can no longer be used.
 
-The refresh token is used by the Web Console to refresh the access token before
-it expires.
+Token lifetimes are configurable in the OIDC Provider.
 
-Without the refresh token mechanism, the user would be forced to re-authenticate
-when the access token expires.
-
-The validity of the tokens are configurable inside the OIDC Provider.
-
-```json title="Token response example"
+```json title="Token response example with an optional refresh token"
 {
   "access_token": "gslpJtzmmi6RwaPSx0dYGD4tEkom",
   "refresh_token": "FUuAAqMp6LSTKmkUd5uZuodhiE4Kr6M7Eyv.eg83ge",
   "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6I...",
   "token_type": "Bearer",
-  "expires_in": 300 // In seconds, thus 5 minutes
+  "expires_in": 300
 }
 ```
+
+`expires_in` is measured in seconds. The `refresh_token` field is absent when
+the provider does not issue one.
 
 ### 7. Database access
 
@@ -201,8 +211,9 @@ already holds a valid entry for the token, and they do not happen at all when
 is `true`, in which case QuestDB validates the ID token itself and never calls
 the provider. See [Which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
 
-```bash title="Query request example"
-https://questdb.example.com:9000/exec?query=select%20current_user()
+```http title="Query request example"
+GET /api/v1/sql/execute?query=select%20current_user() HTTP/1.1
+Host: questdb.example.com:9000
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 
@@ -218,8 +229,9 @@ This call also serves as token validation.
 If the token is not real or has been expired, the User Info endpoint replies
 with an error:
 
-```bash title="User info request example"
-https://oidc.provider:443/idp/userinfo.openid
+```http title="User info request example"
+GET /idp/userinfo.openid HTTP/1.1
+Host: oidc.provider:443
 Authorization: Bearer gslpJtzmmi6RwaPSx0dYGD4tEkom
 ```
 

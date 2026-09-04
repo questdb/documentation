@@ -36,9 +36,13 @@ possible flows to request an access token.:
    [`acl.oidc.pkce.required`](/docs/configuration/oidc/#acloidcpkcerequired),
    which is `true` by default.
 
-The client can read the authorization and token endpoints, the client id and
-the scopes from the [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint) instead of hard
-coding them.
+The client can read the authorization and token endpoints and QuestDB's token
+selection mode from the
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint)
+instead of hard coding them. The client ID and scope published there belong to
+the Web Console registration. Reuse them only for evaluation; register a
+production application separately and use its own client ID, redirect URI,
+scopes, and provider policies.
 
 The Web Console implements the
 [Authorization Code Flow with PKCE](https://oauth.net/2/pkce), which is a
@@ -53,7 +57,7 @@ QuestDB. Select the access or ID token as described in
 ### Jupyter notebook
 
 Use the official Python client's
-[OIDC device flow](/docs/security/oidc-device-flow/). It works when the browser
+[OIDC device flow](/docs/security/oidc/device-flow/). It works when the browser
 and the notebook kernel are on different machines, and does not put the user's
 password in the notebook.
 
@@ -224,7 +228,7 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 For a CLI or standalone application built with an official Java, Python, Rust,
 C, or C++ client, use the
-[OIDC device flow](/docs/security/oidc-device-flow/).
+[OIDC device flow](/docs/security/oidc/device-flow/).
 Tools such as `psql` and Microsoft Access cannot run the flow themselves; for
 those tools, acquire a token separately and use
 [PGWire token authentication](#oidc-for-the-pgwire-endpoint), or enable the
@@ -245,110 +249,54 @@ testldap=>
 
 ## Non-interactive clients
 
-Non-interactive clients are usually jobs or standalone applications, such as a
-client for ingesting data. It is practical to manage their credentials via an
-OAuth2 provider too.
+An unattended job cannot complete device flow because that flow always requires
+a person. Prefer a dedicated QuestDB service account with a REST token. This
+keeps the job separate from human identities and gives it an explicit, minimal
+permission set:
 
-As seen in the Jupyter notebook examples, the clients can request a token
-themselves and then use it to authorise data ingestion. QuestDB publishes the
-provider's token endpoint on the [settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint), so it
-does not have to be hard coded, and the same response tells the client
-[which token to send](/docs/security/oidc/client-discovery/#which-token-to-send).
+```questdb-sql title="Create credentials for an ingestion job"
+CREATE SERVICE ACCOUNT ingest_job;
+GRANT HTTP TO ingest_job;
+GRANT INSERT ON trades TO ingest_job;
+ALTER SERVICE ACCOUNT ingest_job CREATE TOKEN TYPE REST WITH TTL '30d' REFRESH;
+```
 
-The client id and the scopes stay the client's own. `acl.oidc.client.id` and
-`acl.oidc.scope` describe QuestDB's registration with the provider, not the
-job's. As noted in [Architecture overview](/docs/security/oidc/#architecture-overview), each
-application which integrates via OIDC should be given a different Client Id, so
-that the two can be told apart in the provider's audit log and given different
-policies.
+The final statement displays the token once. Save it in a secrets manager and
+pass it to the client over TLS, for example through a protected environment
+variable:
 
-:::caution
-
-Both requests must go over `https`. The settings response names the URL this
-code posts the user's password to, so anyone able to tamper with a plaintext
-response can redirect the password grant to a host of their choosing. The same
-applies to the connection below, which carries the resulting token.
-
-:::
-
-```python
+```python title="Use the service-account token"
 import os
-import requests
-import pandas as pd
 import questdb
-from dotenv import load_dotenv
 
-load_dotenv()
-user = os.environ.get("username")
-pwd = os.environ.get("password")
-
-# this job's own registration in the OIDC Provider, not QuestDB's;
-# the openid scope is what makes the provider issue an ID token
-client_id = os.environ.get("client_id")
-scope = "openid"
-
-settings = requests.get("https://questdb.example.com:9000/settings").json()["config"]
-if not settings.get("acl.oidc.enabled"):
-    raise SystemExit("OIDC is not enabled on this QuestDB instance")
-
-# the endpoint keys are absent until QuestDB resolves them
-token_endpoint = settings.get("acl.oidc.token.endpoint")
-if not token_endpoint:
-    raise SystemExit("QuestDB has not resolved the provider's token endpoint")
-
-response = requests.post(token_endpoint,
-                         data={"grant_type": "password",
-                               "client_id": client_id,
-                               "username": user,
-                               "password": pwd,
-                               "scope": scope},
-                         headers={"Content-Type": "application/x-www-form-urlencoded"})
-response.raise_for_status()
-tokens = response.json()
-
-# QuestDB reads the group memberships from the ID token when this is enabled
-token_key = "id_token" if settings["acl.oidc.groups.encoded.in.token"] else "access_token"
-if token_key not in tokens:
-    raise SystemExit(f"the provider did not issue an {token_key} for the password grant")
-token = tokens[token_key]
-
+token = os.environ["QUESTDB_TOKEN"]
 conf = f"wss::addr=questdb.example.com:9000;token={token};"
+
 with questdb.connect(conf) as db:
-    df = pd.read_csv("trades.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
+    with db.query("SELECT current_user()") as result:
+        print(result.to_pandas())
 ```
 
-:::note
+The `REFRESH` modifier extends the REST token's expiry after successful
+authentication to the primary. Review its replication behavior and revocation
+commands in the
+[ALTER SERVICE ACCOUNT reference](/docs/query/sql/acl/alter-service-account/#add-rest-api-token).
 
-The Resource Owner Password Credentials flow returns an ID token only if the
-provider issues one for the password grant, and only when `openid` is among the
-requested scopes. Check that the provider does before relying on
-[`acl.oidc.groups.encoded.in.token`](/docs/configuration/oidc/#acloidcgroupsencodedintoken)
-with a non-interactive client.
+If organizational policy requires provider-managed machine identities, give
+the job its own confidential application or service principal and use a
+machine-to-machine grant supported by that provider, commonly the OAuth 2.0
+client credentials grant. Do not use QuestDB's published Web Console client ID
+or a human's username and password. The token must expose the subject and group
+information required by QuestDB's configured
+[validation mode](/docs/security/oidc/client-discovery/#which-token-to-send);
+there is no provider-independent client-credentials setup in QuestDB. Many
+providers do not issue ID tokens for client credentials, so verify this
+provider-specific path before choosing encoded-token mode.
 
-:::
-
-Alternatively, a user may rely on QuestDB to authenticate them via the OAuth2
-provider when the Resource Owner Password Credentials flow is enabled on the
-server side:
-
-```python
-import os
-import pandas as pd
-import questdb
-from dotenv import load_dotenv
-
-load_dotenv()
-user = os.environ.get("username")
-pwd = os.environ.get("password")
-
-conf = f"wss::addr=questdb.example.com:9000;username={user};password={pwd};"
-with questdb.connect(conf) as db:
-    df = pd.read_csv("trades.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    db.dataframe(df, table_name="trades", symbols=["symbol"], at="timestamp")
-```
+ROPC authenticates a human by handing their password to the client. It is a
+legacy fallback, not a machine-identity mechanism. Use it only for tooling that
+cannot accept a separately acquired token, as described in
+[Enable ROPC](#enable-ropc).
 
 ## OIDC for the PGWire endpoint
 
@@ -386,7 +334,7 @@ with pg.connect(conn_str, autocommit=True) as connection:
 
 - [Client discovery and tokens](/docs/security/oidc/client-discovery/) - find
   the provider endpoints and select the token QuestDB expects
-- [OIDC device flow](/docs/security/oidc-device-flow/) - interactive sign-in
+- [OIDC device flow](/docs/security/oidc/device-flow/) - interactive sign-in
   for CLI applications, containers, and remote notebooks
 - [Authentication and endpoint access](/docs/security/rbac/authentication/) -
   grant the endpoint permission each client protocol requires

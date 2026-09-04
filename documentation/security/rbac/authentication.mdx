@@ -26,9 +26,9 @@ QuestDB supports four authentication methods:
 
 | Method                | Use case                    | Endpoints                                                                        |
 | --------------------- | --------------------------- | -------------------------------------------------------------------------------- |
-| **Password**          | Interactive users           | REST API, PostgreSQL Wire                                                        |
+| **Password**          | Interactive users           | REST API and QWP, both under the `HTTP` permission; PostgreSQL Wire              |
 | **JWK Token**         | ILP ingestion               | InfluxDB Line Protocol                                                           |
-| **REST API Token**    | Programmatic REST access    | REST API                                                                         |
+| **REST API Token**    | Programmatic HTTP access    | REST API and QWP, both under the `HTTP` permission                               |
 | **OIDC bearer token** | SSO users, external clients | REST API and QWP, both under the `HTTP` permission; PostgreSQL Wire once enabled |
 
 The first three are QuestDB's own credentials, created with the statements
@@ -92,7 +92,9 @@ able to ingest but never query.
 
 ## Managing authentication {#managing-authentication}
 
-```questdb-sql
+For a user:
+
+```questdb-sql title="Manage user authentication"
 -- Change password
 ALTER USER username WITH PASSWORD 'new_pwd';
 
@@ -110,8 +112,24 @@ ALTER USER username DROP TOKEN TYPE REST;  -- Drops all REST tokens
 ALTER USER username DROP TOKEN TYPE REST 'token_value_here';  -- Drop specific token
 ```
 
-Removing all authentication methods (password and tokens) effectively disables
-the user - they can no longer connect to the database.
+Use the parallel `ALTER SERVICE ACCOUNT` forms for an application identity:
+
+```questdb-sql title="Manage service-account authentication"
+ALTER SERVICE ACCOUNT service_account WITH PASSWORD 'new_pwd';
+ALTER SERVICE ACCOUNT service_account WITH NO PASSWORD;
+
+ALTER SERVICE ACCOUNT service_account CREATE TOKEN TYPE JWK;
+ALTER SERVICE ACCOUNT service_account CREATE TOKEN TYPE REST WITH TTL '30d';
+
+ALTER SERVICE ACCOUNT service_account DROP TOKEN TYPE JWK;
+ALTER SERVICE ACCOUNT service_account DROP TOKEN TYPE REST;
+```
+
+See the [ALTER USER](/docs/query/sql/acl/alter-user/) and
+[ALTER SERVICE ACCOUNT](/docs/query/sql/acl/alter-service-account/) references
+for token refresh, expiry, and targeted REST-token removal. Removing every
+authentication method effectively disables that user or service account: it can
+no longer connect to the database.
 
 ## See also
 

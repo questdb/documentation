@@ -401,11 +401,14 @@ both the ingress and egress WebSocket upgrades. It is mutually exclusive with
 ### OIDC device flow (Enterprise)
 
 `OidcDeviceAuth` signs in an interactive user with the
-[OIDC device flow](/docs/security/oidc-device-flow/).
+[OIDC device flow](/docs/security/oidc/device-flow/).
 It discovers the provider endpoints, client ID, scope, and the token QuestDB
-expects from the server's public `/settings` endpoint. The user can approve the
-sign-in from a browser on any device, so this also works from a container or
-remote notebook kernel:
+expects from the server's public
+[settings endpoint](/docs/security/oidc/client-discovery/#settings-endpoint).
+Include any non-default Web Console context in the QuestDB URL passed to
+`fromQuestDB`; the client appends `/settings`. The user can approve the sign-in
+from a browser on any device, so this also works from a container or remote
+notebook kernel:
 
 <OidcDeviceFlowExample />
 
@@ -435,9 +438,9 @@ own Client Id means pinning the endpoints rather than discovering them.
 
 Tokens stay in memory until a store is attached with
 `new OidcDeviceAuth.DiscoveryOptions().tokenStore(FileTokenStore.atDefaultLocation())`,
-which writes a long-lived refresh token to disk as plaintext. See [token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
-permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
-[explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
+which writes a long-lived refresh token to disk as plaintext. See [token persistence](/docs/security/oidc/device-flow/#token-persistence) for the store's location and
+permissions, [the sign-in prompt](/docs/security/oidc/device-flow/#the-sign-in-prompt), and
+[explicit configuration](/docs/security/oidc/device-flow/#explicit-configuration-and-endpoint-pinning).
 
 ### HTTP basic auth
 
