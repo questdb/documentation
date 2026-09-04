@@ -105,7 +105,7 @@ This token can be used to authenticate with QuestDB:
 query = parse.urlencode({
     "query": "select current_user()"
 })
-req = request.Request(f"http://localhost:9000/api/v1/sql/execute?{query}")
+req = request.Request(f"https://questdb.example.com:9000/api/v1/sql/execute?{query}")
 req.add_header("Authorization", f"Bearer {access_token}")
 with request.urlopen(req) as f:
     body = f.read().decode(f.headers.get_content_charset())
@@ -174,8 +174,9 @@ the OAuth2 provider.
 ```python
 from dotenv import load_dotenv
 import os
-from urllib import request
+from urllib import parse, request
 import base64
+import json
 
 load_dotenv()
 user = os.environ.get("username")
@@ -184,7 +185,7 @@ pwd = os.environ.get("password")
 query = parse.urlencode({
     "query": "select current_user()"
 })
-req = request.Request(f"http://localhost:9000/api/v1/sql/execute?{query}")
+req = request.Request(f"https://questdb.example.com:9000/api/v1/sql/execute?{query}")
 b64credentials = base64.standard_b64encode(f"{user}:{pwd}".encode()).decode()
 req.add_header("Authorization", f"Basic {b64credentials}")
 with request.urlopen(req) as f:

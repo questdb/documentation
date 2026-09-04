@@ -198,10 +198,19 @@ Otherwise add `.issuer(...)` to the builder, or set `.client_id()`, `.scope()`,
 `.audience()`, `.token_endpoint()` and `.device_authorization_endpoint()`
 yourself.
 
-Tokens stay in memory until
-`.token_store(FileTokenStore::at_default_location()?)` is added (it returns a
-`std::io::Result`, so map the error into yours), which writes a
-long-lived refresh token to disk as plaintext. See [token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
+Tokens stay in memory until a token store is attached, which writes a
+long-lived refresh token to disk as plaintext. `at_default_location()` returns a
+`std::io::Result`, and `?` does not convert an `io::Error` into a
+`questdb::Error`, so map it first:
+
+```rust
+let store = FileTokenStore::at_default_location()
+    .map_err(|e| Error::new(ErrorCode::ConfigError, format!("token store: {e}")))?;
+let auth = OidcDeviceAuth::from_questdb(url).token_store(store).build()?;
+```
+
+`FileTokenStore::at(path)` takes a directory directly and needs no mapping. See
+[token persistence](/docs/security/oidc-device-flow/#token-persistence) for the store's location and
 permissions, [the sign-in prompt](/docs/security/oidc-device-flow/#the-sign-in-prompt), and
 [explicit configuration](/docs/security/oidc-device-flow/#explicit-configuration-and-endpoint-pinning).
 

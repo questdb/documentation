@@ -266,14 +266,14 @@ to make sure users can access the Web Console, Postgres and ILP
 interfaces as required. [Read more about endpoint permissions](/docs/security/rbac/authentication/#endpoint-permissions).
 
 ```questdb-sql title="Grant endpoint permissions"
-GRANT HTTP, PGWIRE TO groupName;
+GRANT HTTP, PGWIRE TO extUsers;
 ```
 
 Now we can grant the rest of the permissions as required. We can
 grant access to tables, for example.
 
 ```questdb-sql title="Grant database permissions"
-GRANT SELECT ON table1, table2 to groupName;
+GRANT SELECT ON trades, fx_trades TO extUsers;
 ```
 
 ## Confirm group mappings and login

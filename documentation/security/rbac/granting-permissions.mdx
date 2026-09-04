@@ -144,9 +144,10 @@ REVOKE SELECT ON trades(ssn) FROM user;   -- Revoke one column
 
 :::note
 
-When dropping a table, permissions on it are preserved by default (useful if the
-table is recreated). Use `DROP TABLE ... CASCADE PERMISSIONS` to also remove all
-associated permissions.
+Dropping a table removes every permission granted on it, from every user and
+group. Recreating a table with the same name does not bring them back, so a
+drop-and-recreate has to re-grant them. The same applies to views, materialized
+views and live views.
 
 :::
 
