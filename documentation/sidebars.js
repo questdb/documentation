@@ -719,6 +719,11 @@ module.exports = {
           link: { type: "doc", id: "security/rbac/index" },
           items: [
             {
+              id: "security/rbac/index",
+              type: "doc",
+              label: "Overview",
+            },
+            {
               id: "security/rbac/users-and-groups",
               type: "doc",
               label: "Users and groups",
@@ -750,6 +755,11 @@ module.exports = {
           type: "category",
           link: { type: "doc", id: "security/oidc/index" },
           items: [
+            {
+              id: "security/oidc/index",
+              type: "doc",
+              label: "Overview",
+            },
             {
               id: "security/oidc/how-sign-in-works",
               type: "doc",
